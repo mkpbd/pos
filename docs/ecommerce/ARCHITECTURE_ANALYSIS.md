@@ -74,6 +74,8 @@ The POS is multi-tenant; a shopper is not logged in, so the tenant cannot come f
 ### D2 — Customer identity
 Shoppers are **not** staff `users`. New `customer_accounts` table (email, phone, password hash, verification) 1:1 with a `customers` row, unique per organization. Separate session guard `customer` and password broker `customers`. Sanctum's stateful guard list stays `['web']`, so a shopper cookie can never pass a staff route; storefront account routes use `auth:customer`. Guest checkout creates/links a `customers` row by phone (the existing unique key), without credentials. POS and web then share one customer record, one loyalty balance and one statement.
 
+> **As built (E7/E8a):** sign-ups always create a new customer record (ADR-018) and guest orders create no customer at all — they keep a contact snapshot on the order. Linking online and POS customers is a later, staff-driven feature.
+
 ### D3 — Online orders: own document or POS `sales`? *(open)*
 - **Recommended:** new `orders` document in the Orders module. An online order has a lifecycle the immutable POS invoice does not (pending payment → confirmed → packed → shipped → delivered / cancelled / failed), addresses, shipping and gateway payments. Orders posts stock via `StockLedger` and money via `PaymentLedger`, so inventory and cash reporting already see it; Reports (Phase 7) unions `sales` and `orders` for revenue.
 - Alternative: on delivery, convert the order into a Sales invoice (channel `online`). Reuses returns/receivables/loyalty, but `CompleteSale` assumes a cashier, a drawer session and immediate settlement — forcing web orders through it would bend the POS rules.

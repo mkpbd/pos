@@ -5,8 +5,8 @@ namespace App\Modules\Cart;
 use App\Modules\Cart\Infrastructure\Console\PruneCartsCommand;
 use App\Modules\Cart\Presentation\Http\Support\CartIdempotencyScope;
 use App\Modules\Cart\Presentation\Http\Support\CookieGuestCartMerger;
-use App\Modules\Shared\Infrastructure\Http\Middleware\ShopperIdempotencyScope;
 use App\Modules\CustomerAccounts\Application\Contracts\GuestCartMerger;
+use App\Modules\Shared\Infrastructure\Http\Middleware\ShopperIdempotencyScope;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
 /**

@@ -422,3 +422,54 @@ test('a guest cart merges into the shopper account at sign-in and its totals mat
   await signOut()
   expect((await (await page.request.get('/api/v1/store/cart')).json()).data.items).toHaveLength(0)
 })
+
+test('a guest places a cash-on-delivery order; the admin sees it and stock goes down once', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin sidebar flow runs on desktop')
+
+  // Brief check 13: a guest buys two litchi drinks (seeded stock: 4) with cash on delivery.
+  await page.goto('/product/pran-litchi-drink-250ml')
+  const buy = page.getByTestId('product-page').getByRole('form', { name: 'Add to cart' })
+  await buy.getByRole('button', { name: /^Increase/ }).click()
+  await buy.getByRole('button', { name: 'Add to cart' }).click()
+  await expect(page.getByTestId('mini-cart').getByTestId('cart-line')).toHaveCount(1)
+  await page.goto('/checkout')
+
+  const checkout = page.getByRole('form', { name: 'Checkout' })
+  await checkout.getByLabel('Full name').fill('Rahim Uddin')
+  await checkout.getByLabel('E-mail').fill('rahim@example.test')
+  await checkout.getByLabel('Mobile number', { exact: true }).fill('01711000111')
+  await checkout.getByLabel('Recipient name').fill('Rahim Uddin')
+  await checkout.getByLabel('Recipient mobile number').fill('01711000111')
+  await checkout.getByLabel('Division').selectOption({ label: 'Dhaka (ঢাকা)' })
+  await checkout.getByLabel('District').selectOption({ label: 'Dhaka (ঢাকা)' })
+  await checkout.getByLabel('Area / thana').fill('Dhanmondi')
+  await checkout.getByLabel('Street address').fill('House 12, Road 5')
+  await checkout.getByRole('radio', { name: /Home delivery/ }).check()
+  await checkout.getByRole('radio', { name: /Cash on delivery/ }).check()
+  await checkout.getByRole('button', { name: 'Place order' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Thank you, Rahim!' })).toBeVisible()
+  const number = (await page.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
+  // Reloading the confirmation page shows the order again and never places a second one.
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: `Order ${number}` })).toBeVisible()
+
+  // Brief check 14: the order is in the admin's web orders and the stock went down by two.
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.getByRole('link', { name: 'Web orders' }).first().click()
+  const row = page.getByRole('row').filter({ hasText: number })
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('Rahim Uddin')
+  await row.getByRole('link', { name: number }).click()
+  await expect(page.getByRole('heading', { name: number })).toBeVisible()
+  await expect(page.getByText('Pran Litchi Drink 250ml')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Inventory' }).first().click()
+  const litchi = page.getByRole('row').filter({ hasText: 'Pran Litchi Drink 250ml' })
+  await expect(litchi.getByRole('cell').nth(2)).toHaveText(/^2(\s|$)/)
+})

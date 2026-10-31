@@ -2,6 +2,7 @@
 
 namespace App\Modules\Orders\Tests\Feature;
 
+use App\Modules\Audit\Infrastructure\Models\AuditLog;
 use App\Modules\CustomerAccounts\Tests\Concerns\ActsAsShopper;
 use App\Modules\Inventory\Infrastructure\Models\StockLevel;
 use App\Modules\Inventory\Infrastructure\Models\StockMovement;
@@ -122,7 +123,7 @@ class WebOrderWorkflowTest extends TestCase
         $this->assertNull($ledger[0]->cash_register_session_id);
         $this->assertSame('WEB-000001', $ledger[0]->source_number);
         $this->assertSame(['web_order.processing', 'web_order.shipped', 'web_order.cod_payment_recorded', 'web_order.delivered'],
-            \App\Modules\Audit\Infrastructure\Models\AuditLog::query()->withoutGlobalScopes()->where('action', 'like', 'web_order.%')->orderBy('created_at')->orderBy('id')->pluck('action')->all());
+            AuditLog::query()->withoutGlobalScopes()->where('action', 'like', 'web_order.%')->orderBy('created_at')->orderBy('id')->pluck('action')->all());
     }
 
     public function test_bank_transfer_payment_confirmation_is_idempotent(): void

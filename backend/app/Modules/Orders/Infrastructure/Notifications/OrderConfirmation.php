@@ -2,6 +2,7 @@
 
 namespace App\Modules\Orders\Infrastructure\Notifications;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -22,6 +23,7 @@ class OrderConfirmation extends Notification implements ShouldQueue
         public readonly string $storeName,
         public readonly array $order,
         public readonly string $orderUrl,
+        public readonly string $timezone = 'UTC',
     ) {}
 
     /**
@@ -64,7 +66,8 @@ class OrderConfirmation extends Notification implements ShouldQueue
         if ($o['payment_instructions'] !== null) {
             $mail->line('How to pay:')->line($o['payment_instructions']);
             if ($o['expires_at'] !== null) {
-                $mail->line('Please pay before '.$o['expires_at'].'; unpaid orders are cancelled after that.');
+                $deadline = CarbonImmutable::parse($o['expires_at'])->setTimezone($this->timezone)->format('j M Y, g:i A');
+                $mail->line('Please pay before '.$deadline.' ('.$this->timezone.'); unpaid orders are cancelled after that.');
             }
         }
 

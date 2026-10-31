@@ -105,6 +105,15 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `VARIANT_NOT_PURCHASABLE`, `OUT_OF_STOCK` | Cart: the variant is not live (listing not published or outside its window, product or variant inactive/archived, unknown variant); nothing on hand at the fulfilment store. |
 | 422 | `INSUFFICIENT_STOCK` | Also: cart line quantity above what the fulfilment store has (`details.max_quantity`, `in_cart` — what the line already holds). |
 | 422 | `CART_FULL`, `WISHLIST_FULL` | 50 different products in a cart (`details.max_lines`); 200 wishlist entries (`details.max_items`). |
+| 422 | `CART_EMPTY`, `CART_HAS_ISSUES` | Checkout: no cart or no lines (also from `idempotent:shopper` for a guest without a cart cookie); a line is unavailable, out of stock or above the stock (`details.cart` = the repriced cart). |
+| 422 | `CHECKOUT_UNAVAILABLE`, `GUEST_CHECKOUT_DISABLED` | No active fulfilment store (`details.reason` `no_fulfilment_store`); the store requires an account to check out. |
+| 422 | `SHIPPING_UNAVAILABLE` | The chosen delivery method is not offered for the address's district (`details.district_id`, `shipping_method_id`, `available_methods` — ids). |
+| 422 | `PAYMENT_METHOD_UNAVAILABLE` | Method disabled, COD not allowed by the delivery method, or the total above COD's maximum (`details.payment_method`, `reason` `disabled` \| `delivery_method` \| `max_order_total`, `max_order_total` for the last). |
+| 409 | `TOTAL_CHANGED` | The server total differs from the `expected_total` the shopper confirmed (`details.expected_total`, `total`, `preview` — the fresh preview). Nothing was placed. |
+| 422 | `INSUFFICIENT_STOCK` | Also: order placement — stock at the fulfilment store went below the order quantity (names the first failing variant; web orders never use the branch's negative-stock allowance). The whole placement rolls back. |
+| 422 | `INVALID_STATUS_TRANSITION` | Web order step not allowed from the current status (`details.from`, `to`, `allowed`); also confirming payment of a COD order and recording a COD payment for a bank-transfer order or one not shipped/delivered (`details.status`, `payment_method`). |
+| 422 | `ORDER_PAID`, `ORDER_ALREADY_PAID` | Cancelling a paid web order (needs a refund, E10); confirming or recording a payment twice. |
+| 422 | `DISTRICT_IN_OTHER_ZONE` | Delivery zone with a district another zone covers (`details.district_ids`, `districts: [{id, name, zone_id, zone_name}]`). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -114,7 +123,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | Header | Direction | Purpose |
 |--------|-----------|---------|
 | `X-Request-Id` | both | Correlation id. Clients may send one (8–64 chars `[A-Za-z0-9-_.]`); the server always returns it. |
-| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses` and `/register-sessions/{id}/cash-movements`: 8–100 characters, one per logical operation (the SPA uses a UUID); reuse it when retrying. A replayed response carries `Idempotent-Replayed: true`. |
+| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses`, `/register-sessions/{id}/cash-movements`, the six web order steps `/web-orders/{id}/*` and the storefront's `POST /store/checkout`: 8–100 characters (`[A-Za-z0-9_\-:.]`), one per logical operation (the SPA uses a UUID); reuse it when retrying. Missing → `428 IDEMPOTENCY_KEY_REQUIRED`. A replayed response carries `Idempotent-Replayed: true`. Keys are scoped (ADR-014): staff `user:{id}`, signed-in shopper `customer:{account id}`, guest `cart:{cart token hash}`. |
 | `X-Branch-Id` | request | Active branch. Optional; when sent it must be an active branch of the organization that the user is assigned to (or `branches.access_all`). Branch-scoped endpoints (Phase 4+) require it. |
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). Also required on unsafe storefront requests that run the `storefront.session` stack (account, cart, wishlist). |
@@ -126,7 +135,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 - **Sorting:** `?sort=name` / `?sort=-created_at` (prefix `-` for descending); only whitelisted columns.
 - **Filtering:** plain, validated query parameters per endpoint, e.g. `?status=active&role_id=…`; date ranges `?from=2026-10-01&to=2026-10-31` (inclusive).
 - **Search:** `?search=term` (case-insensitive, whitelisted columns).
-- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP; shopper credential endpoints (`customer-auth`) as `auth` (`POS_AUTH_RATE_LIMIT` per e-mail+IP, four times that per IP); shopper writes (`storefront-write`) 60/min per IP and 60/min per signed-in customer.
+- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP; shopper credential endpoints (`customer-auth`) as `auth` (`POS_AUTH_RATE_LIMIT` per e-mail+IP, four times that per IP); shopper writes (`storefront-write`) 60/min per IP and 60/min per signed-in customer; checkout preview and placement (`checkout`) `POS_CHECKOUT_RATE_LIMIT` (default 10)/min per IP and shopper (customer account or guest cart).
 - **Identifiers:** UUIDv7 strings (device token ids are integers).
 - **Versioning:** breaking changes go to `/api/v2`; additive changes stay in v1.
 
@@ -644,6 +653,129 @@ Example — sign-in (`POST /store/account/login`, with `X-XSRF-TOKEN`):
   "meta": { "request_id": "0193…" }
 }
 ```
+
+### E-commerce track — shipping, checkout and orders (E8a)
+
+Checkout and order routes run like the cart: storefront host → organization, `storefront.session` (cookie session, CSRF on POST), `throttle:storefront`, and `customer.active:optional` (a disabled shopper is treated as a guest). They work for guests and signed-in shoppers (*P/C*). Promotions and coupons are E8b; online gateways, `POST /store/orders/{number}/pay` and the gateway return/webhook routes are E8c.
+
+| Method & path | Auth · limiter | Notes |
+|---------------|----------------|-------|
+| GET `/store/shipping-methods?district_id=` | P (no session) | The active methods of the active zone that covers the district, by order then name: `[{id, name, description, fee, free_over, cod_allowed, cod_fee, eta_min_days, eta_max_days}]`; `[]` (not an error) when no zone covers it. |
+| GET `/store/checkout/options` | P/C | `{available, reason: null \| "no_fulfilment_store" \| "cart_empty", guest_checkout, payment_methods: [{code, display_name, instructions_preview: null}], signed_in}`. Lists only **enabled** methods; instructions are shown only after placing the order. |
+| POST `/store/checkout/preview` | P/C · `checkout` | Body: any subset of the placement body (`shipping_address_id`, `address.division_id`, `address.district_id`, `shipping_method_id`, `payment_method`; no `Idempotency-Key`). → `{lines (cart line shape), subtotal, tax_total, shipping_total, cod_fee, total, currency, prices_include_tax, shipping_methods (for the district), shipping_method_id, payment_method, issues}`. Without a district: no methods, delivery `"0.00"`. When the district has exactly one method it is picked. An unknown/unoffered method → `shipping_method_id: null`; an unusable payment method (disabled, COD not allowed or above its maximum) → `payment_method: null` and no COD fee. Errors: `CHECKOUT_UNAVAILABLE`, `CART_EMPTY` (field errors only from placement). |
+| POST `/store/checkout` | P/C · `checkout` · **I** | Places the order (below). 201 `{order: <order view>, access_token}` — the token only for guests (`null` for customers). A guest response also forgets the `cart_token` cookie. |
+| GET `/store/orders/{number}?token=` | P/C | The order view for a guest holding the token, or for the signed-in customer who owns it (no token needed). Unknown number, wrong/missing token or someone else's order → 404. `Cache-Control: no-store`. |
+
+**Placement body.**
+
+```json
+{
+  "contact": { "name": "≤ 120", "email": "≤ 255", "phone": "Bangladeshi mobile" },
+  "shipping_address_id": "uuid — signed-in customers only (a guest sending it gets a field error: prohibited)",
+  "address": { "recipient_name": "≤ 120", "phone": "Bangladeshi mobile", "division_id": 3, "district_id": 18,
+               "area": "≤ 100, optional", "address_line": "≤ 255", "postcode": "4 digits, optional" },
+  "save_address": false,
+  "shipping_method_id": "uuid",
+  "payment_method": "cod | bank_transfer",
+  "notes": "≤ 500, optional",
+  "expected_total": "104.00"
+}
+```
+
+- `address` is required unless a signed-in customer sends `shipping_address_id` (one of their own addresses, else a field error); the district must be in the division (field error on `address.district_id`). Phones are normalized to `01XXXXXXXXX`.
+- `save_address: true` (customers with an inline address) adds it to the address book after the order is placed — skipped silently when `area` is empty (the book requires it) or the book is full; the order never fails because of it.
+- `expected_total` is the total the shopper saw. The server reprices everything (cart lines through `CartPricer`, delivery fee, COD fee); a different total → `409 TOTAL_CHANGED` with `details.preview`, and nothing is placed.
+- Delivery: the method's `fee`, or `"0.00"` once the goods total after tax reaches `free_over`. COD fee: the method's `cod_fee` when paying cash on delivery. Neither is taxed in E8a. `total` = cart total + delivery + COD fee.
+- Check order (first failure wins): field validation (`VALIDATION_FAILED`), `GUEST_CHECKOUT_DISABLED`, `CHECKOUT_UNAVAILABLE`, `CART_EMPTY`, `CART_HAS_ISSUES`, saved-address / district-in-division field errors, `SHIPPING_UNAVAILABLE`, `PAYMENT_METHOD_UNAVAILABLE`, `TOTAL_CHANGED`, `INSUFFICIENT_STOCK`. Before the controller: `428 IDEMPOTENCY_KEY_REQUIRED`, `422 CART_EMPTY` for a guest without a cart cookie (no idempotency scope), `409 IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_REQUEST_IN_PROGRESS`, `429`.
+- **Idempotency.** One key per attempt. A retry with the same key and body returns the stored 201 (`Idempotent-Replayed: true`) — also for a guest whose cart has meanwhile been converted, because the scope is the cart cookie's token hash. Failed attempts release the key.
+- Result: cash on delivery → `status: confirmed`; bank transfer → `status: pending_payment` with `expires_at` = placed + the method's `hold_hours` (default 48). `payment_status: unpaid`. Unverified shopper e-mail addresses may check out.
+- After commit: the confirmation e-mail (queued) and the staff inbox notification. Neither can fail the order.
+
+**Order view** (storefront; staff get it too, extended):
+
+`{number, status, status_label, payment_status, payment_method, payment_method_label (the method's display name), payment_instructions (bank transfer while pending_payment, else null), placed_at, expires_at, contact: {name, email, phone}, shipping_address: {recipient_name, phone, division, district, area, address_line, postcode}, shipping_method_name, eta_min_days, eta_max_days, lines: [{product_name, variant_name, sku, image_url, quantity, unit_price, line_total, product_url}], subtotal, tax_total, shipping_total, cod_fee, total, currency, prices_include_tax, courier_name, tracking_number, history: [{status, label, at}]}`
+
+- `lines[].line_total` = quantity × unit price, as in the cart, so the lines add up to `subtotal` (the stored tax-inclusive line total is kept separately in `order_lines.line_total`). `quantity` drops trailing zeros (`"2"`, `"1.5"`). `product_url` is `/product/{slug}` from the snapshot (`null` if the product had no listing address).
+- Names, prices, address and delivery method are snapshots: later catalog, address or shipping changes do not alter the order.
+
+Staff endpoints (`auth:sanctum` + `tenant`; web order steps also `Idempotency-Key`):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/geography/divisions` · `/geography/districts?division=` | any staff user | Same lists as the storefront's `/store/geo/*`, for the admin's zone editor. |
+| GET `/shipping/zones` | `shipping.manage` or `web_orders.view` | Every zone `{id, name, is_active, sort_order, districts: [{id, name}] (by name), methods: [method]}` by order then name. Method: `{id, zone_id, name, description, fee, free_over, cod_allowed, cod_fee, eta_min_days, eta_max_days, is_active, sort_order}`. |
+| POST `/shipping/zones` · PATCH/DELETE `/shipping/zones/{id}` | `shipping.manage` | `{name (≤ 60), is_active?, sort_order? (0–9999), district_ids? (≤ 64 distinct district ids)}`; PATCH any subset, `district_ids` replaces the zone's districts. A district another zone covers → `DISTRICT_IN_OTHER_ZONE`. DELETE (204) also deletes the zone's methods; orders keep their snapshot (`orders.shipping_method_id` set null). Audited `shipping.zone_*`. |
+| POST `/shipping/zones/{id}/methods` · PATCH/DELETE `/shipping/methods/{id}` | `shipping.manage` | `{name (≤ 60), description? (≤ 160), fee, free_over? (null = never free), cod_allowed?, cod_fee? (null → 0), eta_min_days, eta_max_days (0–30, min ≤ max — field error on eta_max_days), is_active?, sort_order?}`; amounts ≥ 0 with ≤ 2 decimals. Audited `shipping.method_*`. |
+| GET `/payment-gateways` | `payment_gateways.manage` | Both offline methods `[{code, display_name, is_enabled, instructions, settings, sort_order}]`, rows created with defaults on first read (COD on with "Pay in cash when your order is delivered.", bank transfer off). |
+| PUT `/payment-gateways/{code}` | `payment_gateways.manage` | `code` `cod` \| `bank_transfer` (else 404). `{is_enabled?, display_name? (≤ 60), instructions? (≤ 2000, null clears), sort_order?, settings?}` — `bank_transfer`: `{hold_hours: 1–168}`; `cod`: `{max_order_total: amount \| null}` (null = no limit). Settings are merged over the stored ones; unknown keys are dropped. Audited `payment_gateway.updated`. → the method. |
+| PATCH `/storefront/settings` | `storefront.manage` | Also accepts `guest_checkout_enabled` (boolean, default `true`); GET returns it. |
+| GET `/web-orders` | `web_orders.view` | Filters `status`, `payment_status`, `from`/`to` (`Y-m-d`, calendar days in the organization's timezone), `search` (number, contact name, phone, e-mail), `sort` (`placed_at`, `number`, `total`; default `-placed_at`), paging. Rows `{id, number, placed_at, status, status_label, payment_status, payment_method, contact_name, contact_phone, total, currency, item_count}` (`item_count` = sum of line quantities). |
+| GET `/web-orders/{id}` | `web_orders.view` | The order view plus `id`, `payment_status_label`, `paid_total`, `customer` (`{id, name, code}`, `null` for guests — guest orders have no customer record), `customer_account_id`, `ip`, `user_agent`, `notes`, `cancelled_at`, `cancelled_by` (`{id, name}`), `cancel_reason`, `confirmed_at`, `shipped_at`, `delivered_at`, `history` with `from_status`, `note` and `actor` (`{id, name}`, `null` = shopper or system), `payments` (`[{method, method_label, direction, amount, reference, recorded_at, recorded_by}]` from the payments ledger) and `allowed_actions` (subset of `confirm_payment`, `process`, `ship`, `deliver`, `record_cod_payment`, `cancel`; empty without `web_orders.manage`). No cost figures. |
+| POST `/web-orders/{id}/confirm-payment` | `web_orders.manage` · I | `{reference (≤ 80)}`. Bank-transfer order `pending_payment` → `confirmed`, `paid`; records the order total as `bank_transfer` in the payments ledger (source `online_order`, no drawer). COD order → `INVALID_STATUS_TRANSITION`; already paid → `ORDER_ALREADY_PAID`. Works until the expiry job has cancelled the order. |
+| POST `/web-orders/{id}/process` | `web_orders.manage` · I | `confirmed` → `processing`. |
+| POST `/web-orders/{id}/ship` | `web_orders.manage` · I | `{courier_name (≤ 100), tracking_number? (≤ 100)}`; `processing` → `shipped`, stored on the order (couriers and shipments are E10). |
+| POST `/web-orders/{id}/deliver` | `web_orders.manage` · I | `shipped` → `delivered`. |
+| POST `/web-orders/{id}/record-cod-payment` | `web_orders.manage` · I | `{reference? (≤ 80)}`. COD orders that are `shipped` or `delivered`: the courier's remittance arrived — records the total as `cash_on_delivery` (no drawer) and marks the order paid; the status does not change. Other states or methods → `INVALID_STATUS_TRANSITION`; `ORDER_ALREADY_PAID` when repeated. |
+| POST `/web-orders/{id}/cancel` | `web_orders.manage` · I | `{reason (≤ 200)}`. Unpaid orders in `pending_payment`, `confirmed` or `processing`; the stock goes back to the exact batches at the cost it left with (`online_order_cancel`). Paid → `ORDER_PAID` (refunds are E10); cancelled/shipped/delivered → `INVALID_STATUS_TRANSITION`. |
+
+Every step locks the order row, appends `order_status_history`, is audited (`web_order.payment_confirmed`, `.processing`, `.shipped`, `.delivered`, `.cod_payment_recorded`, `.cancelled`) and returns the full staff order. Organization Admin and Online Store Manager hold `web_orders.*` and `shipping.manage`; `payment_gateways.manage` is Organization Admin only (ADR-016).
+
+**Expiry.** `orders:expire-pending` (scheduler, every minute) cancels `pending_payment` orders whose `expires_at` has passed: reason `payment_expired`, no actor, stock restored as above.
+
+**Notifications.** The staff inbox item has type `orders.new_online_order` and data `{title: "New online order WEB-000123", message, order_id, number, total, url: "/web-orders/{id}", link}`; the admin bell opens `url`. The confirmation e-mail links to `{scheme+host of the checkout request}/order/{number}` (with `?token=` for guests) — see the deployment guide's `TRUSTED_PROXIES` for HTTPS behind a proxy.
+
+Pages: the shell answers `/checkout` (title "Checkout | {store}") and `/order/{number}` ("Your order | {store}") with `noindex`.
+
+Example — a guest places a cash-on-delivery order (exclusive tax mode, no VAT on this product; Inside Dhaka, home delivery 60):
+
+```http
+POST /api/v1/store/checkout
+Host: shop.example.com
+Content-Type: application/json
+Idempotency-Key: 6f1c2a9e-3b7d-4e0a-9c55-1d2e3f4a5b6c
+X-XSRF-TOKEN: …
+Cookie: cart_token=…; XSRF-TOKEN=…; …session cookie…
+
+{
+  "contact": { "name": "Rahim Uddin", "email": "rahim@example.test", "phone": "+88 01711-000111" },
+  "address": { "recipient_name": "Rahim Uddin", "phone": "01711000111", "division_id": 3, "district_id": 18,
+               "area": "Dhanmondi", "address_line": "House 12, Road 5", "postcode": null },
+  "shipping_method_id": "0193…",
+  "payment_method": "cod",
+  "notes": null,
+  "expected_total": "104.00"
+}
+```
+```json
+{
+  "success": true,
+  "data": {
+    "order": {
+      "number": "WEB-000001",
+      "status": "confirmed", "status_label": "Confirmed",
+      "payment_status": "unpaid", "payment_method": "cod", "payment_method_label": "Cash on delivery",
+      "payment_instructions": null,
+      "placed_at": "2026-10-31T09:15:02+00:00", "expires_at": null,
+      "contact": { "name": "Rahim Uddin", "email": "rahim@example.test", "phone": "01711000111" },
+      "shipping_address": { "recipient_name": "Rahim Uddin", "phone": "01711000111", "division": "Dhaka", "district": "Dhaka",
+                            "area": "Dhanmondi", "address_line": "House 12, Road 5", "postcode": null },
+      "shipping_method_name": "Home delivery", "eta_min_days": 1, "eta_max_days": 2,
+      "lines": [
+        { "product_name": "Pran Litchi Drink 250ml", "variant_name": null, "sku": "PRAN-LITCHI-250", "image_url": "/storage/…",
+          "quantity": "2", "unit_price": "22.00", "line_total": "44.00", "product_url": "/product/pran-litchi-drink-250ml" }
+      ],
+      "subtotal": "44.00", "tax_total": "0.00", "shipping_total": "60.00", "cod_fee": "0.00", "total": "104.00",
+      "currency": "BDT", "prices_include_tax": false,
+      "courier_name": null, "tracking_number": null,
+      "history": [ { "status": "confirmed", "label": "Confirmed", "at": "2026-10-31T09:15:02+00:00" } ]
+    },
+    "access_token": "q3Vh…43 characters, base64url…"
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+The guest opens `/order/WEB-000001?token=q3Vh…`. With `"expected_total": "100.00"` the answer would be `409` with `error.code` `TOTAL_CHANGED`, `details: {expected_total: "100.00", total: "104.00", preview: {…}}`.
 
 ### Planned (by phase)
 

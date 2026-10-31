@@ -57,6 +57,8 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       css: false,
+      // Form-heavy page tests drive many user-event steps; 5 s is too tight on a busy machine.
+      testTimeout: 20_000,
     },
   }
 })

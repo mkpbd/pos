@@ -4,8 +4,8 @@ namespace App\Modules\Shipping\Infrastructure;
 
 use App\Modules\Shipping\Application\Contracts\ShippingRates;
 use App\Modules\Shipping\Infrastructure\Models\ShippingMethod;
-use App\Modules\Shipping\Infrastructure\Models\ShippingZoneDistrict;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
+use App\Modules\Shipping\Infrastructure\Models\ShippingZoneDistrict;
 
 class EloquentShippingRates implements ShippingRates
 {

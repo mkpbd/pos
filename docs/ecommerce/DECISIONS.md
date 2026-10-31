@@ -22,22 +22,26 @@ Phase **E3**. Status of every record: **Accepted 2026-10-31** (owner proceeded p
 
 **Decision.** `orders` in a new Orders module with lifecycle `pending_payment → confirmed → processing → shipped → delivered`, side exits `cancelled`, `failed`, `returned`. Not converted into POS `sales`. Numbering `WEB-000001` per organization via `SequenceGenerator`. Reports union `sales` and `orders`.
 **Consequences.** Online returns/refunds are a mirror of the Phase 6 pattern inside Orders (`order_returns`, `order_refunds`), not a reuse of `sale_returns`.
+*As built (E8a):* statuses `pending_payment`, `confirmed`, `processing`, `shipped`, `delivered`, `cancelled` and `failed` (reserved for gateways, unused); `returned` waits for E10. Transitions are coded in `OrderStatus` (`pending_payment → confirmed|cancelled`, `confirmed → processing|cancelled`, `processing → shipped|cancelled`, `shipped → delivered`; else `INVALID_STATUS_TRANSITION`). Cash-on-delivery orders start `confirmed`, bank-transfer orders `pending_payment`. `payment_status` is `unpaid|paid` only; paid orders cannot be cancelled until refunds exist (`ORDER_PAID`, E10). Guest orders carry no customer (`customer_id` NULL, contact snapshot) — no POS customer is created or linked by phone. Every change is appended to `order_status_history` (actor NULL = shopper or system).
 
 ## ADR-004 Stock leaves at placement from one fulfilment store
 
 **Decision.** `storefront_settings.fulfilment_store_id`. Order placement posts `MovementType::OnlineOrder` through `StockLedger` inside the order transaction. Cancellation/expiry posts `OnlineOrderCancel` to the exact allocations; returns post `OnlineReturn`. `pending_payment` orders expire after `pending_payment_ttl_minutes` (default 30) via a scheduled job using `FOR UPDATE SKIP LOCKED`.
 **Consequences.** New `MovementType` enum cases only — the `type` column is a plain string with no DB CHECK (verified). Storefront availability = stock of the fulfilment store; `allow_negative_stock` of its branch is **ignored for web orders** (web never oversells).
+*As built (E8a):* `online_order` and `online_order_cancel` (inbound, restores the exact batch allocations of `order_line_stock` at their cost) exist; `online_return` waits for E10. `MovementType::forbidsNegativeStock()` makes the ledger refuse `online_order` below zero whatever the branch allows. The payment hold is not `pending_payment_ttl_minutes` on the storefront settings but the bank-transfer method's `hold_hours` (1–168, default 48); the job is `orders:expire-pending`, every minute, `FOR UPDATE SKIP LOCKED` on PostgreSQL, reason `payment_expired`.
 
 ## ADR-005 One pricing path, server-side
 
 **Decision.** Extract from `Sales\CartPricer` a `VariantPriceLoader` (variants, selling price, tax rate, product flags) usable without a POS store/actor. Web pricing = loader → Promotions (automatic + coupon) → `SaleCalculator` (organization `tax_mode`) → shipping + COD fee lines. Used by cart, checkout preview, placement. Compare-at price is display-only (`variant_listings.compare_at_price`); "sale prices" are Promotions with dates.
 **Consequences.** POS behaviour unchanged (CartPricer keeps its public API and delegates). Golden tests: same cart priced by POS and web without promotions gives identical tax/total.
+*As built (E7–E8a):* no `VariantPriceLoader` was extracted; the web path is the Cart module's own `CartPricer` (live data from `StorefrontCatalog::variantsForCart` → POS `SaleCalculator`), and checkout's `CheckoutQuoter` adds the delivery and COD fees — after tax and untaxed in E8a. Promotions join in E8b. The client confirms the total it showed (`expected_total`); a difference is `409 TOTAL_CHANGED` with a fresh preview.
 
 ## ADR-006 Gateways behind one interface; server verification only
 
 **Decision.** `OnlinePayments\Domain\PaymentGateway` (`initiate`, `verify`, `parseWebhook`, `refund`, `supportsRefund`). Drivers: `cod`, `bank_transfer` (manual confirm by staff), `sslcommerz`, `bkash` (tokenized checkout), `nagad`. Paid = verified server-to-server (IPN/webhook + verify API, amount + currency + order match). Browser return URL only triggers verify and redirects. Every call logged in `payment_transactions` (redacted). Webhooks idempotent via `webhook_receipts`. Credentials per organization, `encrypted` cast, write-only in the API.
 **Ledger.** `PaymentLedger` gains `recordSystem(string $branchId, array $entries, PaymentSource $source, ?string $actorId = null)` for non-drawer entries (`created_by` is already nullable — verified); cash-method entries are refused there (`CASH_SESSION_REQUIRED` semantics kept). New `PaymentSource` cases `online_order`, `online_order_refund`; new `PaymentMethod` cases `online_gateway` (gateway code kept in the reference) and `cash_on_delivery` (recorded when staff confirm courier remittance). Both are PHP enums over string columns — no DB constraint change.
 **Order of delivery.** COD + bank transfer (no credentials) → SSLCommerz sandbox → bKash sandbox → Nagad, each when credentials exist.
+*As built (E8a):* the interface has only `code()`, `initiate()` (returns `GatewayInitiation{awaitsPayment, redirectUrl}`) and `supportsRefund()`; `verify`/`parseWebhook`/`refund`, `payment_transactions`, `webhook_receipts`, `mode` and encrypted credentials arrive with the online drivers (E8c). Checkout talks to the module through `CheckoutPaymentMethods`. `payment_gateways` rows hold COD (`max_order_total`) and bank transfer (`hold_hours`, instructions = bank details) with lazily created defaults (COD on, bank transfer off). Ledger extensions as decided, plus `PaymentLedger::entriesOf()` for the order page; bank transfers are recorded when staff confirm them (reference required), COD when staff record the courier's remittance — both through `recordSystem` with source `online_order`. `PaymentSource` is a class with string constants (`ONLINE_ORDER`, `ONLINE_ORDER_REFUND`), not an enum.
 
 ## ADR-007 Frontend: second Vite entry, admin under `/admin`
 
@@ -76,15 +80,18 @@ Phase **E3**. Status of every record: **Accepted 2026-10-31** (owner proceeded p
 **Context (verified).** `idempotency_keys.user_id` is a NOT NULL FK to `users` and the middleware scopes keys by staff user id. Guests and customers have none.
 **Decision.** Migration: `user_id` nullable, add `scope varchar(80)`; unique `(scope, key)`. Scope = `user:{id}` (staff), `customer:{id}` (logged-in shopper), `cart:{cart token hash}` (guest). Existing rows backfilled `user:{user_id}`. Middleware resolves the scope; behaviour otherwise unchanged.
 **Consequences.** Phase 5–6 idempotency tests must stay green; new tests for guest/customer replay and cross-scope isolation.
+*As built (E8a):* migration in `database/migrations` as decided (`user_id` kept for staff rows). The middleware takes a mode: `idempotent` (staff, `user:{id}`) and `idempotent:shopper`, which resolves the scope through the Shared interface `ShopperIdempotencyScope`, implemented by Cart: `customer:{account id}` (the account, not the customer id), else `cart:{sha-256 of the cart cookie token}`; a guest without a cart cookie gets `422 CART_EMPTY` before the controller. The guest scope outlives the cart's conversion, so a lost 201 is replayed. Staff tests unchanged and green; `CheckoutTest` covers replay and cross-scope isolation.
 
 ## ADR-015 Rate limits for public endpoints
 
 **Decision.** New limiters: `storefront` 300/min per IP (reads), `storefront-write` 30/min per IP+cart (cart, wishlist), `checkout` 10/min per IP+cart, `customer-auth` same shape as `auth` (5/min per e-mail+IP, 20/min per IP), `coupon` 10/min per cart (brute force), `contact`/`newsletter` 5/hour per IP, webhooks unthrottled but signature/verify gated. Listing `per_page` capped at 48.
 *As built (E7):* `storefront-write` is 60/min per IP plus 60/min per signed-in customer (not per cart); `customer-auth` takes its numbers from `POS_AUTH_RATE_LIMIT` like staff sign-in.
+*As built (E8a):* `checkout` (preview and placement) is `POS_CHECKOUT_RATE_LIMIT` (default 10) per minute per IP + shopper (customer account, else guest cart). Behind a proxy all limiters need `TRUSTED_PROXIES` to see the visitor's IP.
 
 ## ADR-016 Roles
 
 **Decision.** New permissions (API_PLAN.md §1) flow into **Organization Admin** through its existing glob. New built-in role **Online Store Manager**: `storefront.*`, `media.*`, `cms.*`, `online_catalog.*`, `attributes.manage`, `promotions.*`, `shipping.*`, `web_orders.*`, `reviews.*`, plus `products.view`, `inventory.view`, `customers.view`. `storefront.custom_css` and `payment_gateways.manage` are **not** in that role (Organization Admin only by default).
+*As built (E8a):* `web_orders.view`, `web_orders.manage` and `shipping.manage` reach the Online Store Manager through `web_orders.*` / `shipping.*`; `web_orders.refund` is not declared yet (E10). `GET /shipping/zones` is also readable with `web_orders.view`.
 
 ## ADR-017 Out of scope for v1
 

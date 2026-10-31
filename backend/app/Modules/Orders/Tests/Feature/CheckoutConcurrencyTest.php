@@ -26,11 +26,13 @@ class CheckoutConcurrencyTest extends TestCase
 
     protected function setUp(): void
     {
-        parent::setUp();
-
-        if (DB::getDriverName() !== 'pgsql') {
+        // Decided before the application boots: DatabaseTruncation would otherwise mark the
+        // in-memory SQLite schema as migrated and break the RefreshDatabase tests run after it.
+        if ((getenv('DB_CONNECTION') ?: ($_ENV['DB_CONNECTION'] ?? null)) !== 'pgsql') {
             $this->markTestSkipped('Row-level locking tests require PostgreSQL.');
         }
+
+        parent::setUp();
 
         config(['database.connections.pgsql_second' => config('database.connections.pgsql')]);
         Notification::fake();

@@ -34,7 +34,7 @@ Columns `id`, `organization_id`, timestamps and author columns are omitted from 
 |-------|--------|-----|
 | `stock_movements.type` | **No schema change** (verified: plain string, constrained only by PHP `MovementType`). Add enum cases `online_order`, `online_order_cancel`, `online_return`. | Online stock posts through the same ledger. |
 | `payments.source_type`, `payments.method` | **No schema change** (verified: strings + PHP enums; `created_by` already nullable). Add `PaymentSource` cases `online_order`, `online_order_refund`; `PaymentMethod` cases `online_gateway`, `cash_on_delivery` (ADR-006). | Gateway-verified money in the ledger. |
-| `idempotency_keys` | `user_id` → nullable; add `scope varchar(80)` backfilled `user:{user_id}`; unique `(scope, key)` replaces `(user_id, key)` (ADR-014). | Guests and customers have no staff user id. |
+| `idempotency_keys` | `user_id` → nullable; add `scope varchar(80)` backfilled `user:{user_id}`; unique `(scope, key)` replaces `(user_id, key)` (ADR-014). *Built in E8a as planned.* | Guests and customers have no staff user id. |
 | `product_variants` | Index: `CREATE INDEX … USING gin (option_values jsonb_path_ops)` | Attribute facet filtering. |
 | `products` | `pg_trgm` GIN index on `lower(name)` (already planned for Phase 9) | Search suggestions. |
 
@@ -43,7 +43,7 @@ No column is renamed or dropped. The only change to an existing constraint is th
 ## 3. New tables per module
 
 ### Storefront
-- `storefront_settings` — organization_id **unique**, is_enabled, fulfilment_store_id → stores, default_locale, currency (copy of base), order_number_prefix, pending_payment_ttl_minutes (default 30), guest_checkout_enabled.
+- `storefront_settings` — organization_id **unique**, is_enabled, fulfilment_store_id → stores, default_locale, currency (copy of base), order_number_prefix, pending_payment_ttl_minutes (default 30), guest_checkout_enabled. *(E8a: `guest_checkout_enabled` added, default true; no `order_number_prefix` — numbers are `WEB-` — and no `pending_payment_ttl_minutes`: the hold is the bank-transfer method's `hold_hours`.)*
 - `storefront_domains` — host **unique (lower(host))**, is_primary. Index `(organization_id)`.
 - `theme_settings` — organization_id unique, `settings jsonb` validated by a versioned PHP schema (logo media, favicon, colors primary/secondary/accent, font key from a bundled whitelist, button radius, container width, header/footer layout keys, sticky header, announcement bar {enabled, text, link, colors, schedule}, page title banner {bg color, image per page type, show breadcrumb}, footer gallery media ids, payment logo media ids, map embed URL, social links, contact info), `custom_css text`, version int (cache key).
 - `menus` — location `main|footer_1|footer_2|footer_3|mobile|top_bar` unique per org, name, is_active.
@@ -85,11 +85,15 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `couriers` — name, tracking_url_template, is_active.
 - `shipments` — order_id, courier_id, tracking_number, status `pending|handed_over|in_transit|delivered|returned|failed`, shipped_at, delivered_at, cod_amount, notes. `shipment_events` append-only (status, note, occurred_at).
 
+*As built (E8a):* `shipping_zones` adds sort_order; `shipping_zone_districts` has its own id and organization_id and a **database** unique `(organization_id, district_id)` besides the app check (`DISTRICT_IN_OTHER_ZONE`). `shipping_methods` is flat-rate only — no `code`, `rate_type` or `per_kg_fee` (`fee` instead of `base_fee`) — and adds a description; CHECKs on amounts and ETA (≤ 30 days, min ≤ max) on PostgreSQL. `couriers`, `shipments` and `shipment_events` wait for E10; until then the order stores `courier_name` and `tracking_number`.
+
 ### Cart
 - `carts` — customer_id NULL, token_hash (guest cookie, unique), currency, coupon_code NULL, expires_at, converted_order_id NULL. Partial unique: one active cart per customer `WHERE converted_order_id IS NULL AND customer_id IS NOT NULL`.
 - `cart_items` — cart_id, variant_id, quantity NUMERIC(18,3) CHECK > 0. Unique `(cart_id, variant_id)`. **No price columns** — always repriced.
 - `wishlists` — customer_id unique (guest wishlist lives in the browser and is merged on login).
 - `wishlist_items` — wishlist_id, product_id, variant_id NULL, created_at. Unique `(wishlist_id, product_id, variant_id)`.
+
+*As built (E8a):* `carts.converted_order_id` (→ orders, set null) added; the partial unique index is now `(customer_id) WHERE customer_id IS NOT NULL AND converted_order_id IS NULL` as planned. A converted cart keeps its row and loses its lines. `coupon_code` waits for E8b; `currency` is still not stored.
 
 *As built (E7):* `carts` has no `currency`, `coupon_code` or `converted_order_id` yet (currency comes from the organization on every read; coupons and conversion arrive with checkout in E8), so the partial unique index is `(customer_id) WHERE customer_id IS NOT NULL`; guest carts carry `expires_at` (30 days after the last change, `cart:prune`), customer carts none. `cart_items` CHECK `quantity > 0` on PostgreSQL. `wishlists` carries `organization_id`; because `wishlist_items.variant_id` is nullable, uniqueness is two partial indexes — `(wishlist_id, product_id) WHERE variant_id IS NULL` and `(wishlist_id, product_id, variant_id) WHERE variant_id IS NOT NULL` — valid on PostgreSQL and SQLite.
 
@@ -107,11 +111,15 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `order_status_history` — order_id, from_status, to_status, note, actor (user or system), created_at. Append-only.
 - `order_returns`, `order_return_lines`, `order_refunds` — same pattern as Phase 6 sale returns; refunds through the gateway (where supported) or manual.
 
+*As built (E8a):* `orders.customer_id` is **NULL for guests** (no customer record; contact snapshot `contact_name/email/phone`), `customer_account_id` is set for signed-in shoppers. Status has no `returned` yet; `payment_status` is `unpaid|paid`; `payment_method` (not `payment_method_code`); no `discount_total`, `coupon_code` (E8b) or `refunded_total` (E10). Added: `shipping_method_name`, `eta_min_days/eta_max_days` (snapshot), `access_token_hash` (guest order page), `courier_name`, `tracking_number`, `confirmed_at`, `shipped_at`, `delivered_at`, index `(status, expires_at)` and an amounts CHECK. `order_lines` adds `position`, `product_slug` and `line_subtotal` (quantity × unit price), no `discount_amount` yet. `order_addresses` stores division/district ids **and** names plus the contact e-mail; one `shipping` row (billing = shipping). Append-only triggers on `order_lines`, `order_line_stock`, `order_status_history`. `order_returns`/`order_refunds` wait for E10.
+
 ### OnlinePayments
 - `payment_gateways` — code `cod|bank_transfer|sslcommerz|bkash|nagad`, display_name, is_enabled, mode `sandbox|live`, credentials **encrypted text**, settings jsonb (bank details text, COD limits), sort_order. Unique `(organization_id, code)`.
 - `payment_intents` — order_id, gateway_code, amount, currency, status `created|pending|succeeded|failed|cancelled|expired|refunded`, provider_reference (session/payment id), idempotency_key, verified_at. Unique `(gateway_code, provider_reference)` where not null.
 - `payment_transactions` — intent_id, kind `initiate|redirect_return|webhook|verify|refund|query`, http_status, request jsonb (redacted), response jsonb (redacted), provider_txn_id, amount, succeeded bool, created_at. Append-only.
 - `webhook_receipts` — gateway_code, provider_event_id unique per gateway, payload hash, processed_at — idempotent webhook processing.
+
+*As built (E8a):* `payment_gateways` holds only `cod` and `bank_transfer` (no `mode`, no credentials; `settings` json: `max_order_total` / `hold_hours`; `instructions` text for bank details), rows created with defaults on first use. `payment_intents`, `payment_transactions` and `webhook_receipts` arrive with the online gateways (E8c).
 
 ### Reviews
 - `reviews` — product_id, customer_id, order_line_id NULL (verified purchase), rating smallint CHECK 1–5, title, body, status `pending|approved|rejected`, moderated_by/at. Unique `(customer_id, product_id)`.
@@ -140,4 +148,4 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 ## 5. Migration order
 
-E4 Storefront + Media → E5 Cms (pages needed by menus) → E6 OnlineCatalog + Catalog attributes → E7 CustomerAccounts/addresses + Cart → E8 Shipping + Promotions + Orders + OnlinePayments + ledger CHECK changes → E10 Reviews, returns → E13 AI. Each migration ships with its tests and runs on PostgreSQL before the phase closes.
+E4 Storefront + Media → E5 Cms (pages needed by menus) → E6 OnlineCatalog + Catalog attributes → E7 CustomerAccounts/addresses + Cart → E8 Shipping + Promotions + Orders + OnlinePayments + ledger CHECK changes (*E8a: idempotency scope, guest checkout flag, Shipping, OnlinePayments, Orders, `carts.converted_order_id`; no ledger CHECK change was needed*) → E10 Reviews, returns → E13 AI. Each migration ships with its tests and runs on PostgreSQL before the phase closes.

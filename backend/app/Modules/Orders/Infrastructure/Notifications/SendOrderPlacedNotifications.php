@@ -5,6 +5,7 @@ namespace App\Modules\Orders\Infrastructure\Notifications;
 use App\Modules\Orders\Application\Events\OrderPlaced;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
+use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Users\Application\Contracts\UserDirectory;
@@ -22,6 +23,7 @@ class SendOrderPlacedNotifications
         private readonly UserDirectory $users,
         private readonly OrderPresenter $presenter,
         private readonly StorefrontConfig $storefront,
+        private readonly OrganizationDirectory $organizations,
     ) {}
 
     public function handle(OrderPlaced $event): void
@@ -36,7 +38,7 @@ class SendOrderPlacedNotifications
             $url = rtrim($event->siteUrl, '/').'/order/'.$order->number.($event->accessToken === null ? '' : '?token='.$event->accessToken);
 
             Notification::route('mail', $order->contact_email)
-                ->notify(new OrderConfirmation($this->storefront->settings()->site_name, $view, $url));
+                ->notify(new OrderConfirmation($this->storefront->settings()->site_name, $view, $url, $this->organizations->summary($event->organizationId)['timezone'] ?? 'UTC'));
 
             $recipients = $this->users->withPermission($event->organizationId, 'web_orders.view');
             if ($recipients->isNotEmpty()) {

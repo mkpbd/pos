@@ -49,16 +49,16 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | GET/POST/PUT/DELETE `/store/account/addresses[/{id}]` | C | E7 | (*E7: changes use PATCH, not PUT; max 10, `ADDRESS_LIMIT_REACHED`*) |
 | GET `/store/cart` | P/C | E7 | Guest cart by httpOnly `cart_token` cookie; always repriced |
 | POST `/store/cart/items` · PATCH/DELETE `/store/cart/items/{id}` | P/C | E7 | `throttle:storefront-write` (*E7: also DELETE `/store/cart`*) |
-| POST/DELETE `/store/cart/coupon` | P/C | E8 | `throttle:coupon` |
-| POST `/store/cart/estimate` | P/C | E8 | District → shipping options and totals |
+| POST/DELETE `/store/cart/coupon` | P/C | E8 | `throttle:coupon` (*E8b*) |
+| POST `/store/cart/estimate` | P/C | E8 | District → shipping options and totals (*not built: `POST /store/checkout/preview` covers it*) |
 | GET/POST/DELETE `/store/wishlist[/items/{id}]` | C | E7 | Guest wishlist local, merged on login (*E7: POST `/store/wishlist/merge`, ≤ 100 entries per call, ≤ 200 per wishlist*) |
-| GET `/store/shipping-methods?district_id=` | P | E8 | |
-| POST `/store/checkout/preview` | P/C | E8 | Server totals for the chosen address/method/payment |
-| POST `/store/checkout` | P/C, I | E8 | Creates order (stock posted); returns order number, guest access token, next payment action |
-| POST `/store/orders/{number}/pay` | P/C, I | E8 | Initiate gateway payment; returns redirect URL |
-| GET `/store/payments/{gateway}/return` | P | E8 | Browser return → server verify → redirect to order page |
-| POST `/store/payments/{gateway}/webhook` | P | E8 | IPN/webhook; signature + verify API; idempotent |
-| GET `/store/orders/{number}?token=` | P | E8 | Guest order view (signed token, expires) |
+| GET `/store/shipping-methods?district_id=` | P | E8 | (*E8a ✅; `[]` when no active zone covers the district*) |
+| POST `/store/checkout/preview` | P/C | E8 | Server totals for the chosen address/method/payment (*E8a ✅, `throttle:checkout`; also GET `/store/checkout/options`*) |
+| POST `/store/checkout` | P/C, I | E8 | Creates order (stock posted); returns order number, guest access token, next payment action (*E8a ✅: 201 `{order, access_token}` — no payment action yet; `expected_total` required, `409 TOTAL_CHANGED`*) |
+| POST `/store/orders/{number}/pay` | P/C, I | E8 | Initiate gateway payment; returns redirect URL (*E8c*) |
+| GET `/store/payments/{gateway}/return` | P | E8 | Browser return → server verify → redirect to order page (*E8c*) |
+| POST `/store/payments/{gateway}/webhook` | P | E8 | IPN/webhook; signature + verify API; idempotent (*E8c*) |
+| GET `/store/orders/{number}?token=` | P | E8 | Guest order view (signed token, expires) (*E8a ✅: random token stored as sha-256, does not expire; the signed-in owner needs no token*) |
 | GET `/store/account/orders` · `/store/account/orders/{number}` | C | E9 | Own orders only |
 | POST `/store/account/orders/{number}/cancel` | C, I | E9 | Only `pending_payment`/`confirmed` |
 | POST `/store/account/orders/{number}/returns` | C, I | E10 | Within the return window |
@@ -82,12 +82,12 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | Product listings | GET/PUT `/online-catalog/products/{productId}` (incl. variant listings), PUT `/related` | online_catalog.manage (GET: online_catalog.view) | E6 |
 | Category/brand listings | GET/PUT `/online-catalog/categories/{id}`, `/online-catalog/brands/{id}` (+ GET lists) | online_catalog.manage (GET: online_catalog.view) | E6 |
 | Attributes | CRUD `/attributes`, `/attributes/{id}/values` (*E6: values are replaced with the attribute — no separate `/values` route; GET also with `products.view`*) | attributes.manage | E6 |
-| Geography areas | CRUD `/shipping/areas` (divisions/districts read-only) | shipping.manage | E8 |
-| Shipping | CRUD `/shipping/zones`, `/shipping/methods`, `/shipping/couriers` | shipping.manage | E8 |
-| Promotions | CRUD `/promotions`, `/promotions/{id}/coupons`, GET `/promotions/{id}/redemptions` | promotions.view / .manage | E8 |
-| Payment gateways | GET `/payment-gateways`, PUT `/payment-gateways/{code}` (credentials write-only) | payment_gateways.manage | E8 |
+| Geography areas | CRUD `/shipping/areas` (divisions/districts read-only) | shipping.manage | E8 (*not built — no upazila dataset; E8a adds read-only GET `/geography/divisions`, `/geography/districts` for any staff user*) |
+| Shipping | CRUD `/shipping/zones`, `/shipping/methods`, `/shipping/couriers` | shipping.manage | E8 (*E8a ✅: GET/POST `/shipping/zones`, PATCH/DELETE `/shipping/zones/{id}`, POST `/shipping/zones/{id}/methods`, PATCH/DELETE `/shipping/methods/{id}`; GET also with web_orders.view; couriers E10*) |
+| Promotions | CRUD `/promotions`, `/promotions/{id}/coupons`, GET `/promotions/{id}/redemptions` | promotions.view / .manage | E8 (*E8b*) |
+| Payment gateways | GET `/payment-gateways`, PUT `/payment-gateways/{code}` (credentials write-only) | payment_gateways.manage | E8 (*E8a ✅ for `cod` and `bank_transfer`; credentials E8c*) |
 | Customer online accounts | `online_account` in GET `/customers/{id}`; PATCH `/customer-accounts/{customerId}` `{status}` (*added in E7*) | customers.view / customers.manage | E7 |
-| Web orders | GET `/web-orders`, `/web-orders/{id}`; POST `/{id}/confirm`, `/process`, `/ship` (shipment), `/deliver`, `/cancel` (I), `/confirm-payment` (bank transfer, I), `/cod-remittance` (I) | web_orders.view / .manage | E8/E10 |
+| Web orders | GET `/web-orders`, `/web-orders/{id}`; POST `/{id}/confirm`, `/process`, `/ship` (shipment), `/deliver`, `/cancel` (I), `/confirm-payment` (bank transfer, I), `/cod-remittance` (I) | web_orders.view / .manage | E8/E10 (*E8a ✅: `/confirm-payment`, `/process`, `/ship` (courier name + tracking text), `/deliver`, `/record-cod-payment` (instead of `/cod-remittance`), `/cancel` — **all** with I; no `/confirm` (COD orders start confirmed)*) |
 | Online returns | GET `/web-orders/returns`, POST `/web-orders/{id}/returns` (I), POST `/web-orders/returns/{id}/approve` (I) / `/reject` | web_orders.refund | E10 |
 | Reviews | GET `/reviews`, POST `/reviews/{id}/approve` / `/reject` | reviews.moderate | E9/E10 |
 | AI generations | POST `/ai/generations` (description, seo, category suggestion), POST `/{id}/approve` / `/reject` | online_catalog.manage + ai.use | E13 |
@@ -97,6 +97,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 `STOREFRONT_NOT_FOUND` (404) · `PRODUCT_NOT_AVAILABLE` (variant unpublished/inactive) · `INSUFFICIENT_STOCK` (existing, reused) · `CART_EMPTY` · `CART_CHANGED` (prices/availability moved since preview; client re-previews) · `COUPON_INVALID` · `COUPON_NOT_APPLICABLE` · `COUPON_LIMIT_REACHED` · `SHIPPING_NOT_AVAILABLE` · `PAYMENT_METHOD_NOT_AVAILABLE` · `ORDER_NOT_PAYABLE` · `PAYMENT_VERIFICATION_FAILED` · `ORDER_TRANSITION_NOT_ALLOWED` · `RETURN_WINDOW_CLOSED` · `REVIEW_ALREADY_EXISTS` · `MEDIA_IN_USE` (via `IN_USE`) · `CUSTOM_CSS_REJECTED`.
 
 *Added in E6:* `COMPARE_AT_NOT_ABOVE_PRICE`, `PRODUCT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND`, `STORE_NOT_FOUND`; reused `PRODUCT_NOT_SELLABLE`, `SCHEDULE_INVALID`, `SECTION_ITEMS_INVALID`, `MEDIA_NOT_FOUND`. A taken slug is a field error (`VALIDATION_FAILED`), not a separate code.
+
+*Added in E8a:* `CART_HAS_ISSUES` (instead of `CART_CHANGED`; `details.cart`), `TOTAL_CHANGED` (409, `details.preview`), `CHECKOUT_UNAVAILABLE`, `GUEST_CHECKOUT_DISABLED`, `SHIPPING_UNAVAILABLE` (instead of `SHIPPING_NOT_AVAILABLE`), `PAYMENT_METHOD_UNAVAILABLE` (instead of `PAYMENT_METHOD_NOT_AVAILABLE`), `INVALID_STATUS_TRANSITION` (instead of `ORDER_TRANSITION_NOT_ALLOWED`), `ORDER_PAID`, `ORDER_ALREADY_PAID`, `DISTRICT_IN_OTHER_ZONE`; reused `CART_EMPTY`, `INSUFFICIENT_STOCK`, `IDEMPOTENCY_KEY_REQUIRED` / `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_REQUEST_IN_PROGRESS`, `CASH_SESSION_REQUIRED` (cash refused by `recordSystem`). `ORDER_NOT_PAYABLE` and `PAYMENT_VERIFICATION_FAILED` wait for E8c.
 
 *Added in E7:* `VARIANT_NOT_PURCHASABLE` (instead of the planned `PRODUCT_NOT_AVAILABLE`), `OUT_OF_STOCK`, `CART_FULL`, `WISHLIST_FULL`, `ADDRESS_LIMIT_REACHED`; reused `INSUFFICIENT_STOCK` (`details.max_quantity`, `in_cart`), `INVALID_CREDENTIALS`, `TOKEN_INVALID`, `SESSION_UNAVAILABLE`. A wrong reset token, a wrong current password and a non-live wishlist product are field errors (`VALIDATION_FAILED`).
 

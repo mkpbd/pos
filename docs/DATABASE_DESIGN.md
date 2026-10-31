@@ -191,6 +191,31 @@ Cart module (no price columns anywhere — every read reprices, ADR-005):
 
 No existing table changed in E7. Deferred to E8 with checkout: `carts.coupon_code` / `converted_order_id` and the idempotency scope change (ADR-014).
 
+### E-commerce E8a — Shipping, checkout and orders (implemented)
+
+Shipping module:
+- `shipping_zones` — name varchar(60), is_active, sort_order, author columns, timestamps. Index `(organization_id, sort_order)`.
+- `shipping_zone_districts` — organization_id, zone_id → shipping_zones (cascade), district_id → geo_districts (`RESTRICT`). **Unique `(organization_id, district_id)`**: one zone per district per organization (the save action reports `DISTRICT_IN_OTHER_ZONE` first; the index catches concurrent saves).
+- `shipping_methods` — zone_id → shipping_zones (cascade), name varchar(60), description varchar(160) NULL, fee NUMERIC(18,2), free_over NUMERIC(18,2) NULL (free when the goods total after tax reaches it), cod_allowed (default true), cod_fee NUMERIC(18,2) (default 0), eta_min_days / eta_max_days smallint, is_active, sort_order, author columns, timestamps. Index `(zone_id, sort_order)`. PostgreSQL CHECKs: amounts ≥ 0; `eta_min_days <= eta_max_days AND eta_max_days <= 30`.
+
+OnlinePayments module:
+- `payment_gateways` — code varchar(30) (`cod` \| `bank_transfer` in E8a), is_enabled, display_name varchar(60), instructions text NULL (shown after placement — bank details), settings json NULL (`bank_transfer`: `{hold_hours}` 1–168; `cod`: `{max_order_total}` amount or null), sort_order, author columns, timestamps. Unique `(organization_id, code)`. Rows are created with defaults on first use (COD on, bank transfer off). `mode` and encrypted credentials arrive with the online gateways (E8c).
+
+Orders module (ADR-003; snapshots and append-only detail like `sales`):
+- `orders` — number varchar(40) (`WEB-000001`, unique `(organization_id, number)`), customer_id → customers NULL (`RESTRICT`; **NULL for guests** — no customer record is created), customer_account_id → customer_accounts NULL (set null), branch_id / store_id (the fulfilment store the stock left from, `RESTRICT`), status varchar(20) (`pending_payment|confirmed|processing|shipped|delivered|cancelled|failed`), payment_status varchar(20) (`unpaid|paid`), payment_method varchar(30) (`cod|bank_transfer`), shipping_method_id → shipping_methods NULL (set null) + shipping_method_name varchar(60) and eta_min_days / eta_max_days (snapshot), currency char(3), tax_mode varchar(10), subtotal, tax_total, shipping_total, cod_fee, total, paid_total (default 0), cost_total (NUMERIC(18,2)), contact_name / contact_email / contact_phone, notes varchar(500) NULL, access_token_hash char(64) NULL (sha-256 of the guest token), courier_name / tracking_number varchar(100) NULL, placed_at, expires_at NULL (bank transfer while pending), confirmed_at, shipped_at, delivered_at, cancelled_at, cancelled_by → users NULL, cancel_reason varchar(200) NULL, ip varchar(45), user_agent varchar(255), timestamps. Indexes `(organization_id, status, placed_at)`, `(organization_id, customer_id, placed_at)`, `(status, expires_at)` (expiry job). PostgreSQL CHECK: all amounts ≥ 0.
+- `order_lines` — order_id (`RESTRICT`), position, product_id, variant_id, snapshots product_name, variant_name, product_slug varchar(160) NULL (for the product link), sku, option_values json NULL, image_url, quantity NUMERIC(18,3) (CHECK > 0 on PostgreSQL), unit_price, compare_at_price NULL, line_subtotal (quantity × unit price, what the storefront shows as the line total), net_amount, tax_rate NUMERIC(9,4), tax_amount, line_total (net + tax), unit_cost NUMERIC(18,4), cost_total, created_at. Indexes `(order_id, position)`, `(organization_id, variant_id)`.
+- `order_line_stock` — order_line_id, batch_id → batches NULL, quantity NUMERIC(18,3), unit_cost NUMERIC(18,4), movement_id NULL: the exact allocations used to restock on cancellation (mirrors `sale_line_stock`).
+- `order_addresses` — order_id, kind (`shipping`; billing = shipping in E8a; unique `(order_id, kind)`), recipient_name, phone, email NULL, division_id + division_name, district_id + district_name, area NULL, address_line, postcode NULL, created_at. Ids and names are copies (no FKs), so the address reads the same forever.
+- `order_status_history` — order_id, from_status NULL, to_status, note varchar(255) NULL, actor_user_id → users NULL (NULL = the shopper at placement or the system at expiry), created_at. Index `(order_id, created_at)`.
+- PostgreSQL triggers (`prevent_order_detail_mutation`) reject `UPDATE`/`DELETE` on `order_lines`, `order_line_stock` and `order_status_history`. `orders` itself is updated by the workflow (status, payment, timestamps) under a row lock.
+
+Changes to existing tables:
+- `idempotency_keys` (ADR-014; migration `database/migrations/2026_10_31_190000_scope_idempotency_keys.php`): new `scope varchar(80)` NOT NULL (`user:{id}` \| `customer:{account id}` \| `cart:{cart token hash}`; existing rows backfilled `user:{user_id}`), `user_id` nullable (set only for staff), unique `(scope, key)` replaces `(user_id, key)`.
+- `carts.converted_order_id` → orders NULL (set null): a converted cart keeps its row and loses its lines. The one-cart-per-customer index becomes `carts_customer_unique (customer_id) WHERE customer_id IS NOT NULL AND converted_order_id IS NULL`.
+- `storefront_settings.guest_checkout_enabled` boolean, default true.
+- No schema change for the new values `stock_movements.type` `online_order` / `online_order_cancel`, `payments.source_type` `online_order` (`online_order_refund` reserved for E10) and `payments.method` `cash_on_delivery` (`online_gateway` reserved for E8c): those columns are plain strings checked by PHP enums.
+- Not built in E8a: `carts.coupon_code`, promotions tables (E8b); `payment_intents`, `payment_transactions`, `webhook_receipts` (E8c); couriers and shipments (E10).
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.
@@ -208,7 +233,8 @@ No existing table changed in E7. Deferred to E8 with checkout: `carts.coupon_cod
 
 ## 4. Concurrency model
 
-- Every stock posting (adjustment, transfer, receipt, return; checkout from Phase 5) locks `stock_levels` rows `FOR UPDATE` in ascending `store|variant|batch` order, creating missing rows first with `INSERT … ON CONFLICT DO NOTHING` so there is always a row to lock.
+- Web order placement (E8a) locks the shopper's cart row first, then posts stock through the same ledger; staff steps and cancellation lock the `orders` row; the expiry job takes due orders with `FOR UPDATE SKIP LOCKED` (PostgreSQL) so it never waits on, or doubles, a staff action.
+- Every stock posting (adjustment, transfer, receipt, return; checkout from Phase 5; web orders from E8a) locks `stock_levels` rows `FOR UPDATE` in ascending `store|variant|batch` order, creating missing rows first with `INSERT … ON CONFLICT DO NOTHING` so there is always a row to lock.
 - Receiving locks the purchase order row and returning locks the receipt lines first, so two concurrent receipts (or returns) cannot both take the last open (or returnable) quantity.
 - `register_sessions` row is locked when posting cash payments.
 - Document numbers allocated from locked `document_sequences` rows.

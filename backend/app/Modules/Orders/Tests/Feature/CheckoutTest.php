@@ -2,8 +2,10 @@
 
 namespace App\Modules\Orders\Tests\Feature;
 
+use App\Modules\Branches\Infrastructure\Models\Branch;
 use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\CustomerAccounts\Tests\Concerns\ActsAsShopper;
+use App\Modules\Inventory\Application\Actions\PostStockAdjustment;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Inventory\Infrastructure\Models\StockLevel;
@@ -20,6 +22,7 @@ use App\Modules\Shared\Infrastructure\Persistence\IdempotencyKey;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\AnonymousNotifiable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -269,7 +272,7 @@ class CheckoutTest extends TestCase
             $preview['shipping_methods'], $preview['shipping_method_id'], $preview['payment_method'],
         ]);
         // A district without a zone: no methods, no error.
-        $none = (int) \Illuminate\Support\Facades\DB::table('geo_districts')->whereNotIn('id', [self::DHAKA, $this->otherDistrict])->value('id');
+        $none = (int) DB::table('geo_districts')->whereNotIn('id', [self::DHAKA, $this->otherDistrict])->value('id');
         $this->previewCheckout(['address' => ['district_id' => $none], 'shipping_method_id' => $this->methods['inside']])->assertOk()
             ->assertJsonPath('data.shipping_methods', [])->assertJsonPath('data.shipping_method_id', null);
         $this->browse('GET', $this->storeUrl("shipping-methods?district_id={$none}"))->assertOk()->assertJsonPath('data', []);
@@ -302,8 +305,8 @@ class CheckoutTest extends TestCase
             ->assertJsonPath('error.details.available_methods', [$this->methods['inside']]);
 
         // A district outside every zone.
-        $none = (int) \Illuminate\Support\Facades\DB::table('geo_districts')->whereNotIn('id', [self::DHAKA, $this->otherDistrict])->first()->id;
-        $division = (int) \Illuminate\Support\Facades\DB::table('geo_districts')->where('id', $none)->value('division_id');
+        $none = (int) DB::table('geo_districts')->whereNotIn('id', [self::DHAKA, $this->otherDistrict])->first()->id;
+        $division = (int) DB::table('geo_districts')->where('id', $none)->value('division_id');
         $this->placeOrder($this->checkoutBody('510.00', ['address' => $this->inlineAddress($none, $division)]))->assertStatus(422)
             ->assertJsonPath('error.code', 'SHIPPING_UNAVAILABLE');
 
@@ -341,7 +344,7 @@ class CheckoutTest extends TestCase
     public function test_cart_issues_block_placement(): void
     {
         $this->addToCart('SHIRT', 3);
-        $this->inTenant($this->tenant['organization'], fn () => app(\App\Modules\Inventory\Application\Actions\PostStockAdjustment::class)($this->tenant['admin']->fresh(), [
+        $this->inTenant($this->tenant['organization'], fn () => app(PostStockAdjustment::class)($this->tenant['admin']->fresh(), [
             'store_id' => $this->tenant['store']->id,
             'reason' => 'damage',
             'lines' => [['variant_id' => $this->v['SHIRT'], 'quantity' => '-4']],
@@ -417,7 +420,7 @@ class CheckoutTest extends TestCase
     public function test_web_orders_never_oversell_even_when_the_branch_allows_negative_stock(): void
     {
         $this->addToCart('SHIRT', 2);
-        $this->inTenant($this->tenant['organization'], fn () => \App\Modules\Branches\Infrastructure\Models\Branch::query()->whereKey($this->tenant['store']->branch_id)->update(['allow_negative_stock' => true]));
+        $this->inTenant($this->tenant['organization'], fn () => Branch::query()->whereKey($this->tenant['store']->branch_id)->update(['allow_negative_stock' => true]));
         $this->app->extend(StockLedger::class, fn (StockLedger $inner) => new class($inner) implements StockLedger
         {
             public function __construct(private readonly StockLedger $inner) {}
