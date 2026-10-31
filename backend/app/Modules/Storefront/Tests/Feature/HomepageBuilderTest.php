@@ -111,7 +111,7 @@ class HomepageBuilderTest extends TestCase
         $types = $this->getJson('/api/v1/storefront/homepage-sections/types')->assertOk()->json('data');
         $this->assertSame([
             'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
-            'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip',
+            'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'hot_deals',
         ], array_column($types, 'type'));
 
         $this->postJson('/api/v1/storefront/homepage-sections', ['type' => 'deal_countdown'])->assertUnprocessable()->assertJsonValidationErrors('type', 'error.details');

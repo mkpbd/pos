@@ -35,11 +35,12 @@ const capCard = {
   id: 'p-kids-cap', slug: 'kids-cap', name: 'Kids Cap', url: '/product/kids-cap', image: { url: '/favicon.svg', alt: 'Kids Cap' }, hover_image: null,
   price: '350.00', price_max: '350.00', compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, is_new: false, is_featured: false,
   brand: { name: 'Sunny', slug: 'sunny' }, category: { name: 'Clothing', slug: 'clothing' }, variant_count: 1, default_variant_id: 'v-cap', short_description: null,
+  promotion: null,
 }
 
 const variant = (id: string, colour: string, size: string, extra: Record<string, unknown> = {}) => ({
   id, sku: `TEE-${colour[0]}${size}`, name: `${colour} / ${size}`, option_values: { Colour: colour, Size: size }, price: '450.00',
-  compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, low_stock: false, image_id: null, ...extra,
+  compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, low_stock: false, image_id: null, promo_price: null, ...extra,
 })
 
 const tee = {
@@ -52,7 +53,7 @@ const tee = {
     { name: 'Size', slug: 'size', display: 'button', values: [{ value: 'M', swatch_hex: null }, { value: 'L', swatch_hex: null }] },
   ],
   variants: [variant('v-red-m', 'Red', 'M'), variant('v-red-l', 'Red', 'L', { in_stock: false })],
-  price: '450.00', price_max: '450.00', on_sale: false, in_stock: true, is_new: false, default_variant_id: 'v-red-m', unit: 'pcs',
+  price: '450.00', price_max: '450.00', on_sale: false, in_stock: true, is_new: false, default_variant_id: 'v-red-m', unit: 'pcs', promotion: null,
   seo: { title: null, description: null, image_url: null },
 }
 
@@ -70,9 +71,11 @@ function cartBody(lines: Line[]) {
       variant_name: l.variant_name, option_values: {}, sku: l.variant_id.toUpperCase(), quantity: String(l.quantity), unit_price: money(l.unit), compare_at_price: null,
       line_total: money(l.unit * Math.min(l.quantity, l.max ?? l.quantity)), purchasable: true, in_stock: true,
       max_quantity: l.max === null ? null : `${l.max}.000`, exceeds_stock: l.max !== null && l.quantity > l.max, allow_decimal: false,
+      discount_amount: '0.00', promotion: null,
     })),
     item_count: String(lines.reduce((sum, l) => sum + l.quantity, 0)),
-    subtotal: money(subtotal), tax_total: money(tax), total: money(subtotal + tax), prices_include_tax: false, currency: 'BDT', issues: [],
+    subtotal: money(subtotal), discount_total: '0.00', tax_total: money(tax), total: money(subtotal + tax), prices_include_tax: false, currency: 'BDT', issues: [],
+    promotions: [], free_shipping: null, coupon: null,
   }
 }
 

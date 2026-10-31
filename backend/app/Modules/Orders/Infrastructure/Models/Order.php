@@ -36,8 +36,11 @@ use LogicException;
  * @property string $currency
  * @property TaxMode $tax_mode
  * @property string $subtotal
+ * @property string $discount_total
  * @property string $tax_total
  * @property string $shipping_total
+ * @property string $shipping_discount
+ * @property ?string $coupon_code
  * @property string $cod_fee
  * @property string $total
  * @property string $paid_total
@@ -63,7 +66,7 @@ use LogicException;
 #[Fillable([
     'id', 'organization_id', 'number', 'customer_id', 'customer_account_id', 'branch_id', 'store_id', 'status',
     'payment_status', 'payment_method', 'shipping_method_id', 'shipping_method_name', 'eta_min_days', 'eta_max_days',
-    'currency', 'tax_mode', 'subtotal', 'tax_total', 'shipping_total', 'cod_fee', 'total', 'paid_total', 'cost_total',
+    'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'paid_total', 'cost_total',
     'contact_name', 'contact_email', 'contact_phone', 'notes', 'access_token_hash', 'courier_name', 'tracking_number',
     'placed_at', 'expires_at', 'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by',
     'cancel_reason', 'ip', 'user_agent',
@@ -88,8 +91,10 @@ class Order extends Model
             'eta_min_days' => 'integer',
             'eta_max_days' => 'integer',
             'subtotal' => 'decimal:2',
+            'discount_total' => 'decimal:2',
             'tax_total' => 'decimal:2',
             'shipping_total' => 'decimal:2',
+            'shipping_discount' => 'decimal:2',
             'cod_fee' => 'decimal:2',
             'total' => 'decimal:2',
             'paid_total' => 'decimal:2',
@@ -129,6 +134,14 @@ class Order extends Model
     public function shippingAddress(): HasOne
     {
         return $this->hasOne(OrderAddress::class)->where('kind', 'shipping');
+    }
+
+    /**
+     * @return HasMany<OrderPromotion, $this>
+     */
+    public function promotions(): HasMany
+    {
+        return $this->hasMany(OrderPromotion::class)->orderBy('created_at')->orderBy('id');
     }
 
     /**

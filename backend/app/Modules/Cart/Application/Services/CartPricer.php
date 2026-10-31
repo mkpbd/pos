@@ -7,16 +7,26 @@ use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Cart\Infrastructure\Models\CartItem;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Promotions\Application\Contracts\PromotionPricing;
+use App\Modules\Promotions\Application\DTOs\PromotionQuote;
+use App\Modules\Sales\Domain\Discount;
 use App\Modules\Sales\Domain\SaleCalculator;
 use App\Modules\Sales\Domain\TaxMode;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Domain\ValueObjects\Money;
 
 /**
  * The one pricing path of the online cart (ADR-005): live catalog data (listing, price,
  * availability, stock at the fulfilment store, tax rate) for every line, then the POS
  * SaleCalculator with the organization's tax mode and currency. Runs on every read and
  * after every write; nothing about prices is stored.
+ *
+ * Promotions (E8b) join the same path: the Promotions module decides each counted line's
+ * product discount and the order discount (automatic promotions + the cart's coupon), which
+ * reach SaleCalculator as the line discounts and the invoice discount, so tax is computed
+ * after discounts. A line's `discount_amount` is its product discount plus its share of the
+ * order discount, so the lines add up to `discount_total`.
  *
  * Lines are never changed on read. A line that is no longer purchasable or is out of stock
  * stays in the cart, flagged, and does not count; a line above the available quantity is
@@ -28,6 +38,7 @@ class CartPricer
         private readonly StorefrontCatalog $catalog,
         private readonly OrganizationDirectory $organizations,
         private readonly TenantContext $tenant,
+        private readonly PromotionPricing $promotions,
     ) {}
 
     /**
@@ -43,16 +54,21 @@ class CartPricer
      * counted line (purchasable and in stock, in cart order) the snapshot data and the
      * SaleCalculator amounts, and the organization's tax mode.
      *
+     * `$email` (the contact e-mail at checkout) lets per-customer promotion limits count a
+     * guest's earlier orders; `$coupon` prices with another code than the cart's (false =
+     * the cart's code, null = none).
+     *
      * @return array{
      *   cart: array<string, mixed>,
      *   lines: list<array{variant_id: string, product_id: string, product_slug: ?string, product_name: string, variant_name: ?string,
      *     option_values: array<string, string>, sku: string, image_url: ?string, quantity: string, unit_price: string,
-     *     compare_at_price: ?string, tax_rate: string, tracked: bool, line_subtotal: string, net_amount: string,
-     *     tax_amount: string, line_total: string}>,
-     *   tax_mode: TaxMode
+     *     compare_at_price: ?string, tax_rate: string, tracked: bool, line_subtotal: string, discount_amount: string,
+     *     net_amount: string, tax_amount: string, line_total: string}>,
+     *   tax_mode: TaxMode,
+     *   promotions: PromotionQuote
      * }
      */
-    public function quote(?Cart $cart): array
+    public function quote(?Cart $cart, ?string $email = null, string|false|null $coupon = false): array
     {
         $items = $cart === null ? [] : $cart->items()->orderBy('created_at')->orderBy('id')->get()->all();
         $organization = $this->organizations->summary($this->tenant->requireOrganization()) ?? [];
@@ -63,6 +79,7 @@ class CartPricer
 
         $lines = [];
         $calc = [];
+        $promoLines = [];
         $issues = [];
         $itemCount = '0';
         foreach ($items as $i => $item) {
@@ -91,6 +108,14 @@ class CartPricer
                     'tax_rate' => $variant['tax_rate'],
                     'discount' => null,
                 ];
+                $promoLines[] = [
+                    'key' => $i,
+                    'product_id' => $variant['product_id'],
+                    'brand_id' => $variant['brand_id'] ?? null,
+                    'category_id' => $variant['category_id'] ?? null,
+                    'quantity' => $calc[$i]['quantity'],
+                    'unit_price' => $variant['price'],
+                ];
             }
 
             $lines[$i] = [
@@ -110,6 +135,8 @@ class CartPricer
                 'unit_price' => $variant['price'] ?? '0.00',
                 'compare_at_price' => $variant['compare_at_price'] ?? null,
                 'line_total' => '0.00',
+                'discount_amount' => '0.00',
+                'promotion' => null,
                 'purchasable' => $purchasable,
                 'in_stock' => $inStock,
                 'max_quantity' => $max,
@@ -118,14 +145,25 @@ class CartPricer
             ];
         }
 
-        $totals = SaleCalculator::calculate(array_values($calc), null, $taxMode, $currency);
+        $couponCode = $coupon === false ? $cart?->coupon_code : $coupon;
+        $promotions = $this->promotions->price($promoLines, $couponCode, $cart?->customer_id, $email, $currency);
+        foreach (array_keys($calc) as $i) {
+            $discount = Discount::amount($promotions->lineDiscount($i));
+            $calc[$i]['discount'] = $discount->isZero() ? null : $discount;
+        }
+        $invoiceDiscount = Discount::amount($promotions->orderDiscount);
+
+        $totals = SaleCalculator::calculate(array_values($calc), $invoiceDiscount->isZero() ? null : $invoiceDiscount, $taxMode, $currency);
         $counted = [];
         foreach (array_keys($calc) as $position => $i) {
+            $amounts = $totals['lines'][$position];
+            $lineDiscount = Money::of($amounts['discount_amount'], $currency)->plus(Money::of($amounts['invoice_discount_share'], $currency))->amount();
             // Quantity × unit price, so the lines add up to the subtotal.
-            $lines[$i]['line_total'] = $totals['lines'][$position]['line_subtotal'];
+            $lines[$i]['line_total'] = $amounts['line_subtotal'];
+            $lines[$i]['discount_amount'] = $lineDiscount;
+            $lines[$i]['promotion'] = $promotions->linePromotion($i);
 
             $variant = $variants[$items[$i]->variant_id];
-            $amounts = $totals['lines'][$position];
             $counted[] = [
                 'variant_id' => $variant['variant_id'],
                 'product_id' => $variant['product_id'],
@@ -141,6 +179,7 @@ class CartPricer
                 'tax_rate' => Decimal::round($variant['tax_rate'], 4),
                 'tracked' => $variant['max_quantity'] !== null,
                 'line_subtotal' => $amounts['line_subtotal'],
+                'discount_amount' => $lineDiscount,
                 'net_amount' => $amounts['net_amount'],
                 'tax_amount' => $amounts['tax_amount'],
                 'line_total' => $amounts['line_total'],
@@ -152,13 +191,17 @@ class CartPricer
             'items' => array_values($lines),
             'item_count' => CartRules::display($itemCount),
             'subtotal' => $totals['subtotal'],
+            'discount_total' => $totals['discount_total'],
             'tax_total' => $totals['tax_total'],
             'total' => $totals['total'],
+            'promotions' => $promotions->promotions,
+            'free_shipping' => $promotions->freeShipping === null ? null : ['id' => $promotions->freeShipping['id'], 'name' => $promotions->freeShipping['name']],
+            'coupon' => $promotions->coupon,
             'prices_include_tax' => $taxMode === TaxMode::Inclusive,
             'currency' => $currency,
             'issues' => array_keys($issues),
         ];
 
-        return ['cart' => $view, 'lines' => $counted, 'tax_mode' => $taxMode];
+        return ['cart' => $view, 'lines' => $counted, 'tax_mode' => $taxMode, 'promotions' => $promotions];
     }
 }

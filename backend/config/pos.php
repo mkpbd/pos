@@ -32,4 +32,7 @@ return [
     // Storefront checkout previews and placements per minute per IP + cart (ADR-015). Full-stack e2e runs raise it.
     'checkout_rate_limit' => (int) env('POS_CHECKOUT_RATE_LIMIT', 10),
 
+    // Coupon codes tried per minute per cart / customer (E8b, ADR-015).
+    'coupon_rate_limit' => (int) env('POS_COUPON_RATE_LIMIT', 10),
+
 ];

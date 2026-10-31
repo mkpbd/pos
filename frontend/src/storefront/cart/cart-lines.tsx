@@ -87,14 +87,12 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
           {!compact && <span className="text-xs">each</span>}
         </p>
 
+        {/* The line's product discount plus its share of an order discount; the product promotion is named. */}
         {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
           <p className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-sf-sale" data-testid="line-discount">
             <TagIcon aria-hidden className="size-3.5 shrink-0" />
-            <span>{line.promotion?.name ?? 'Discount'}:</span>
-            <span>
-              <span className="sr-only">saves </span>
-              {formatDiscount(line.discount_amount, currency)}
-            </span>
+            <span>Discount{line.promotion ? ` (${line.promotion.name})` : ''}:</span>
+            <span>{formatDiscount(line.discount_amount, currency)}</span>
           </p>
         )}
 

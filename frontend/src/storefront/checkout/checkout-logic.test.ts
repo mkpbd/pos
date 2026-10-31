@@ -201,5 +201,7 @@ describe('delivery display', () => {
     expect(methodFee(method, '1999.99')).toBe('60.00')
     expect(methodFee(method, '2000.00')).toBe('0.00')
     expect(methodFee({ ...method, free_over: null }, '5000.00')).toBe('60.00')
+    // A free-shipping promotion (E8b) waives every method's fee.
+    expect(methodFee({ ...method, free_over: null }, '10.00', true)).toBe('0.00')
   })
 })

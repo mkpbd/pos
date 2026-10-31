@@ -28,6 +28,14 @@ interface StorefrontCatalog
     public function sourceProductCards(string $source, ?string $categoryId, int $limit): array;
 
     /**
+     * Hot deals (E8b): cards of live products whose shown promotion is a live countdown
+     * promotion ($promotionId only, or any), featured order, at most $limit.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function hotDealCards(?string $promotionId, int $limit): array;
+
+    /**
      * Visible categories for a strip: the given ones in order, or the top level for null.
      *
      * @param  list<string>|null  $categoryIds
@@ -89,12 +97,13 @@ interface StorefrontCatalog
      * What the cart needs to price and show its lines, keyed by variant id (variants of other
      * organizations or unknown ids are left out; archived products/variants are included as
      * not purchasable). `purchasable` = live listing, active product, active variant.
+     * `brand_id` / `category_id` feed the promotion rules (E8b).
      * `max_quantity` is the sellable on-hand quantity at the fulfilment store for stock-tracked
      * products (no fulfilment store = nothing on hand), null when stock is not tracked.
      *
      * @param  list<string>  $variantIds
      * @return array<string, array{
-     *   variant_id: string, product_id: string, product_slug: ?string, product_name: string,
+     *   variant_id: string, product_id: string, brand_id: ?string, category_id: ?string, product_slug: ?string, product_name: string,
      *   variant_name: ?string, option_values: array<string, string>, sku: string,
      *   image: ?array{url: string, alt: string}, price: string, compare_at_price: ?string,
      *   purchasable: bool, in_stock: bool, max_quantity: ?string, allow_decimal: bool, tax_rate: string

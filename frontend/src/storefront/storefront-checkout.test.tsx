@@ -489,3 +489,52 @@ describe('order page', () => {
     expect(within(screen.getByTestId('order-page')).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/account/login?next=%2Forder%2FWEB-000009')
   })
 })
+
+describe('checkout with promotions (E8b)', () => {
+  it('shows the discounts, a coupon that is not applied, and free delivery on every method', async () => {
+    const cart = () =>
+      cartFixture([cartLine('l-1', { discount_amount: '90.00', promotion: { id: 'pr-1', name: 'Juice week' } })], {
+        discount_total: '90.00',
+        total: '810.00',
+        promotions: [{ id: 'pr-1', name: 'Juice week', kind: 'product', amount: '90.00' }],
+        free_shipping: { id: 'pr-3', name: 'Free delivery over ৳500' },
+        coupon: { code: 'WELCOME50', applied: false, reason: null, message: 'A better offer is already applied.', promotion_name: 'Welcome 50' },
+      })
+    serve({
+      cart,
+      routes: {
+        'POST /store/checkout/preview': (init) => {
+          const base = previewFor(bodyOf(init))
+          return ok({
+            ...base,
+            lines: cart().items,
+            discount_total: '90.00',
+            shipping_discount: base.shipping_total,
+            shipping_total: '0.00',
+            total: '810.00',
+            promotions: [
+              { name: 'Juice week', kind: 'product', amount: '90.00' },
+              ...(base.shipping_method_id ? [{ name: 'Free delivery over ৳500', kind: 'shipping', amount: base.shipping_total }] : []),
+            ],
+          })
+        },
+      },
+    })
+    renderRoutes(storefrontRoutes, '/checkout')
+    const user = userEvent.setup()
+
+    const summary = await screen.findByTestId('order-summary')
+    expect(await within(summary).findByTestId('summary-discount')).toHaveTextContent('−৳90.00')
+    expect(within(summary).getByTestId('summary-line-discount')).toHaveTextContent('Discount (Juice week): −৳90.00')
+    const note = within(summary).getByTestId('summary-coupon-note')
+    expect(note).toHaveTextContent('Coupon WELCOME50 is not applied: A better offer is already applied.')
+    expect(within(note).getByRole('link', { name: 'Change it in your cart' })).toHaveAttribute('href', '/cart')
+    expect(within(summary).queryByTestId('summary-coupon')).not.toBeInTheDocument()
+
+    await fillGuestForm(user)
+    const options = await screen.findAllByTestId('shipping-option')
+    expect(options.map((o) => within(o).getByText(/^(Free|৳)/).textContent)).toEqual(['Free', 'Free'])
+    await waitFor(() => expect(within(summary).getByTestId('summary-shipping')).toHaveTextContent('Was ৳60.00Free'))
+    expect(within(summary).getByRole('list', { name: 'Delivery offers' })).toHaveTextContent('Free delivery over ৳500−৳60.00')
+  })
+})

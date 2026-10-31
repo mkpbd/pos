@@ -50,7 +50,7 @@ async function serveStore(page: Page, data: unknown, sections: unknown[] = []) {
   // A guest with an empty cart (E7 header).
   await page.route('**/api/v1/store/account/me', (route) => route.fulfill({ json: envelope(null) }))
   await page.route('**/api/v1/store/cart', (route) =>
-    route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: true, currency: 'BDT', issues: [] }) }),
+    route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', discount_total: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: true, currency: 'BDT', issues: [], promotions: [], free_shipping: null, coupon: null }) }),
   )
 }
 
@@ -170,4 +170,40 @@ test('homepage sections render in order and link to content pages', async ({ pag
   await expect(page.getByRole('heading', { level: 1, name: 'About us' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'Since 2020' })).toBeVisible()
   await expect(page).toHaveTitle('About us | Berry Kids')
+})
+
+test('a hot deals section counts down and hides itself when the sale ends', async ({ page }) => {
+  await serveStore(page, bootstrap())
+  const card = (slug: string, name: string, endsAt: string) => ({
+    id: `p-${slug}`, slug, name, url: `/product/${slug}`, image: { url: '/favicon.svg', alt: name }, hover_image: null, price: '120.00', price_max: '120.00',
+    compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, is_new: false, is_featured: false, brand: null, category: null,
+    variant_count: 1, default_variant_id: `v-${slug}`, short_description: null,
+    promotion: { id: 'pr-1', name: 'Juice week', type: 'percent', value: '10.00', ends_at: endsAt, show_countdown: true, price: '108.00' },
+  })
+  // The sale ends 6 s after the page first asks (a cold dev server can take a while to load);
+  // afterwards the homepage has no deals any more.
+  let endsAt: number | null = null
+  let readsAfterEnd = 0
+  await page.route('**/api/v1/store/homepage*', (route) => {
+    endsAt ??= Date.now() + 6_000
+    const live = Date.now() < endsAt
+    if (!live) readsAfterEnd += 1
+    const iso = new Date(endsAt).toISOString()
+    const sections = live
+      ? [{ id: 'hd-1', type: 'hot_deals', title: 'Flash sale', subtitle: null, config: { promotion_id: null, limit: 8 }, ends_at: iso, products: [card('mango-juice', 'Mango Juice', iso), card('lychee-juice', 'Lychee Juice', iso)] }]
+      : []
+    return route.fulfill({ json: envelope({ sections, preview: false }) })
+  })
+  await page.goto('/')
+
+  const deals = page.getByTestId('hot-deals')
+  await expect(deals.getByRole('heading', { level: 2, name: 'Flash sale' })).toBeVisible()
+  await expect(deals.getByTestId('product-card')).toHaveCount(2)
+  await expect(deals.getByTestId('product-card').first().getByTestId('promotion-badge')).toHaveText('Offer: −10 %')
+  await expect(deals.getByTestId('product-card').first().getByTestId('price')).toHaveText(/^Sale price: ৳?108\.00$/)
+  await expect(deals.getByTestId('countdown-time').first()).toHaveAttribute('data-remaining', /^00:00:0\d$/)
+
+  await expect(deals).toBeHidden({ timeout: 15_000 })
+  // The section asked for a fresh homepage when it ended.
+  await expect.poll(() => readsAfterEnd).toBeGreaterThanOrEqual(1)
 })

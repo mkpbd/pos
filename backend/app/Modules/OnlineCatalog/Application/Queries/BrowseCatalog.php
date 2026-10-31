@@ -200,6 +200,48 @@ class BrowseCatalog
         );
     }
 
+    /**
+     * Hot deals (E8b): live products targeted by live countdown promotions (or just
+     * $promotionId), whose card shows such a promotion — in featured order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function hotDealCards(?string $promotionId, int $limit): array
+    {
+        $deals = $this->catalog->countdownPromotions($promotionId);
+        if ($deals === []) {
+            return [];
+        }
+        $productIds = array_fill_keys(array_merge(...array_column($deals, 'product_ids')), true);
+        $categoryIds = array_fill_keys(array_merge(...array_column($deals, 'category_ids')), true);
+        $brandIds = array_fill_keys(array_merge(...array_column($deals, 'brand_ids')), true);
+        $countdownIds = array_fill_keys(array_column($deals, 'id'), true);
+
+        $byId = [];
+        $items = [];
+        foreach ($this->catalog->products() as $record) {
+            if (isset($productIds[$record['id']])
+                || ($record['category_id'] !== null && isset($categoryIds[$record['category_id']]))
+                || ($record['brand_id'] !== null && isset($brandIds[$record['brand_id']]))) {
+                $byId[$record['id']] = $record;
+                $items[] = $this->catalog->item($record);
+            }
+        }
+
+        $cards = [];
+        foreach (CatalogSort::Featured->sort($items) as $item) {
+            $card = $this->catalog->card($byId[$item->id]);
+            if (($card['promotion']['show_countdown'] ?? false) && isset($countdownIds[$card['promotion']['id']])) {
+                $cards[] = $card;
+                if (count($cards) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return $cards;
+    }
+
     private function visibleCategoryBySlug(string $slug): ?string
     {
         $tree = $this->catalog->categoryTree();

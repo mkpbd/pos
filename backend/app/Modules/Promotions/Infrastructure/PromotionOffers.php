@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Loads promotions of the organization in context as engine offers: targets resolved
  * (categories with every sub-category, from the Catalog tree), usage counted from the
- * redemptions. Caches the live automatic promotions and the category tree for its lifetime.
+ * redemptions. Caches the live automatic promotions and the category tree for the current
+ * request only (controllers, and so this, may outlive a request: Octane, test runs).
  */
 class PromotionOffers
 {
@@ -32,6 +33,11 @@ class PromotionOffers
 
     /** @var array<string, list<string>> promotion id => resolved target ids */
     private array $targets = [];
+
+    /** @var ?\WeakReference<object> the request the caches belong to */
+    private ?\WeakReference $cachedFor = null;
+
+    private ?string $organizationKey = null;
 
     public function __construct(
         private readonly TenantContext $tenant,
@@ -50,6 +56,7 @@ class PromotionOffers
      */
     public function liveAutomatic(): array
     {
+        $this->forgetStale();
         if ($this->automatic === null) {
             $now = $this->now();
             $this->automatic = Promotion::query()
@@ -123,6 +130,7 @@ class PromotionOffers
 
     public function offer(Promotion $promotion, bool $isCoupon = false): Offer
     {
+        $this->forgetStale();
         if (! array_key_exists($promotion->id, $this->targets)) {
             $this->loadTargets([$promotion]);
         }
@@ -178,6 +186,22 @@ class PromotionOffers
                 fn (Builder $q) => $q->where('email', mb_strtolower(trim((string) $email))))
             ->groupBy('promotion_id')->select('promotion_id', DB::raw('count(*) as uses'))
             ->pluck('uses', 'promotion_id')->map(fn ($n) => (int) $n)->all();
+    }
+
+    /**
+     * Drops the caches when a new request (or another organization) is being served.
+     */
+    public function forgetStale(): void
+    {
+        $owner = app()->bound('request') ? app('request') : null;
+        $key = $this->tenant->hasOrganization() ? $this->tenant->organizationId() : null;
+        if ($this->cachedFor?->get() !== $owner || $this->organizationKey !== $key) {
+            $this->automatic = null;
+            $this->children = null;
+            $this->targets = [];
+            $this->cachedFor = $owner === null ? null : \WeakReference::create($owner);
+            $this->organizationKey = $key;
+        }
     }
 
     private function limitReached(Promotion $p, int $total, int $own, bool $knowsShopper): bool

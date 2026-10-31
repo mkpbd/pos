@@ -21,6 +21,9 @@ class EloquentCatalogPromotions implements CatalogPromotions
 
     private ?string $currency = null;
 
+    /** @var ?\WeakReference<object> the request the display cache belongs to */
+    private ?\WeakReference $displayFor = null;
+
     public function __construct(
         private readonly PromotionOffers $offers,
         private readonly TenantContext $tenant,
@@ -92,6 +95,12 @@ class EloquentCatalogPromotions implements CatalogPromotions
      */
     private function displayOffers(): array
     {
+        $owner = app()->bound('request') ? app('request') : null;
+        if ($this->displayFor?->get() !== $owner) {
+            $this->display = null;
+            $this->currency = null;
+            $this->displayFor = $owner === null ? null : \WeakReference::create($owner);
+        }
         if ($this->display === null) {
             $this->display = [];
             foreach ($this->offers->usableAutomatic(null, null) as $promotion) {

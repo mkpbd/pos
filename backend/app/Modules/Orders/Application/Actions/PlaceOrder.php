@@ -5,6 +5,7 @@ namespace App\Modules\Orders\Application\Actions;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Cart\Application\Actions\ShoppingCart;
 use App\Modules\Cart\Domain\CartOwner;
+use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Customers\Application\Actions\CustomerAddressBook;
 use App\Modules\Geography\Application\Contracts\GeoDirectory;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
@@ -21,8 +22,10 @@ use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderAddress;
 use App\Modules\Orders\Infrastructure\Models\OrderLine;
 use App\Modules\Orders\Infrastructure\Models\OrderLineStock;
+use App\Modules\Orders\Infrastructure\Models\OrderPromotion;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
+use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
@@ -47,6 +50,14 @@ use Throwable;
  *
  * COD orders start `confirmed`; bank transfer orders start `pending_payment` and expire after
  * the method's hold hours. Guests get a one-time access token (stored hashed).
+ *
+ * Promotions (E8b): after the first repricing, the promotions with usage limits and the
+ * coupon the order would use are locked (FOR UPDATE, sorted) and the cart is priced again,
+ * so limits are counted under the lock; a limit reached meanwhile drops that promotion and
+ * the total no longer matches → 409 TOTAL_CHANGED with a fresh preview. The order stores
+ * its discounts and promotion snapshot, and one redemption per promotion is appended
+ * (the coupon's use counted). An idempotent replay returns the stored answer, so nothing
+ * is redeemed twice.
  */
 class PlaceOrder
 {
@@ -62,6 +73,7 @@ class PlaceOrder
         private readonly ProductDirectory $products,
         private readonly StockLedger $stock,
         private readonly SequenceGenerator $sequences,
+        private readonly PromotionRedemptions $redemptions,
     ) {}
 
     /**
@@ -87,7 +99,7 @@ class PlaceOrder
                 throw new BusinessRuleViolation('CART_EMPTY', 'Your cart is empty.');
             }
 
-            $quote = $this->quoter->quote($cart, $data, $customer['customer_id'] ?? null);
+            $quote = $this->quoteUnderPromotionLocks($cart, $data, $customer['customer_id'] ?? null);
             $preview = $quote['preview'];
             if ($preview['issues'] !== [] || $quote['lines'] === []) {
                 throw new BusinessRuleViolation('CART_HAS_ISSUES', 'Some products in your cart are no longer available in the quantity you chose. Please review your cart.', [
@@ -160,8 +172,11 @@ class PlaceOrder
                 'currency' => $currency,
                 'tax_mode' => $quote['tax_mode'],
                 'subtotal' => $preview['subtotal'],
+                'discount_total' => $preview['discount_total'],
                 'tax_total' => $preview['tax_total'],
                 'shipping_total' => $preview['shipping_total'],
+                'shipping_discount' => $quote['shipping_discount'],
+                'coupon_code' => $quote['coupon_code'],
                 'cod_fee' => $codFee->amount(),
                 'total' => $total->amount(),
                 'paid_total' => '0.00',
@@ -195,6 +210,7 @@ class PlaceOrder
                     'unit_price' => $line['unit_price'],
                     'compare_at_price' => $line['compare_at_price'],
                     'line_subtotal' => $line['line_subtotal'],
+                    'discount_amount' => $line['discount_amount'],
                     'net_amount' => $line['net_amount'],
                     'tax_rate' => $line['tax_rate'],
                     'tax_amount' => $line['tax_amount'],
@@ -213,6 +229,21 @@ class PlaceOrder
                         'movement_id' => $allocation['movement_id'],
                     ]);
                 }
+            }
+
+            foreach ($quote['redemptions'] as $redemption) {
+                OrderPromotion::query()->create([
+                    'organization_id' => $organizationId,
+                    'order_id' => $orderId,
+                    'promotion_id' => $redemption['promotion_id'],
+                    'name' => $redemption['name'],
+                    'kind' => $redemption['kind'],
+                    'amount' => $redemption['amount'],
+                    'created_at' => $now,
+                ]);
+            }
+            if ($quote['redemptions'] !== []) {
+                $this->redemptions->record($orderId, $number, $customer['customer_id'] ?? null, $customer['account_id'] ?? null, $data['contact']['email'], $quote['redemptions']);
             }
 
             OrderAddress::query()->create($address + [
@@ -249,6 +280,37 @@ class PlaceOrder
         }
 
         return ['order' => $order, 'access_token' => $token];
+    }
+
+    /**
+     * Prices the locked cart, locks the limited promotions and the coupon it would use, and
+     * prices again under those locks (at most three rounds, in case the second pricing picks
+     * another limited promotion).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed> the CheckoutQuoter quote
+     */
+    private function quoteUnderPromotionLocks(Cart $cart, array $data, ?string $customerId): array
+    {
+        $quote = $this->quoter->quote($cart, $data, $customerId);
+        $lockedPromotions = [];
+        $lockedCoupons = [];
+        for ($round = 0; $round < 3; $round++) {
+            $promotionIds = array_values(array_diff(array_unique(array_column($quote['redemptions'], 'promotion_id')), $lockedPromotions));
+            $couponIds = array_values(array_diff(array_unique(array_filter(array_column($quote['redemptions'], 'coupon_id'))), $lockedCoupons));
+            if ($promotionIds === [] && $couponIds === []) {
+                break;
+            }
+            $locked = $this->redemptions->lock($promotionIds, $couponIds[0] ?? null);
+            array_push($lockedPromotions, ...$promotionIds);
+            array_push($lockedCoupons, ...$couponIds);
+            if (! $locked) {
+                break;
+            }
+            $quote = $this->quoter->quote($cart, $data, $customerId);
+        }
+
+        return $quote;
     }
 
     /**

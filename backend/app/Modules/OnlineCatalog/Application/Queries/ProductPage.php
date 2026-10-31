@@ -75,6 +75,8 @@ class ProductPage
                 'compare_at_price' => $v['compare_at_price'],
                 'on_sale' => $v['compare_at_price'] !== null,
                 'discount_percent' => Pricing::discountPercent($v['price'], $v['compare_at_price']),
+                // Unit price after the automatic promotion (E8b), null when none applies.
+                'promo_price' => $this->catalog->promotion($record, $v['price'])['price'] ?? null,
                 'in_stock' => $v['in_stock'],
                 'low_stock' => $v['low_stock'],
                 'image_id' => $v['image_id'],
@@ -82,6 +84,7 @@ class ProductPage
             'price' => $pricing['price'],
             'price_max' => $pricing['price_max'],
             'on_sale' => $pricing['on_sale'],
+            'promotion' => $variants === [] ? null : $this->catalog->promotion($record, $pricing['price']),
             'in_stock' => $this->catalog->inStock($record),
             'is_new' => $this->catalog->isNew($listing),
             'default_variant_id' => $default,

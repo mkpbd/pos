@@ -101,7 +101,8 @@ class CartTest extends TestCase
     {
         $empty = $this->browse('GET', $this->url())->assertOk()->json('data');
         $this->assertSame([
-            'id' => null, 'items' => [], 'item_count' => '0', 'subtotal' => '0.00', 'tax_total' => '0.00', 'total' => '0.00',
+            'id' => null, 'items' => [], 'item_count' => '0', 'subtotal' => '0.00', 'discount_total' => '0.00', 'tax_total' => '0.00', 'total' => '0.00',
+            'promotions' => [], 'free_shipping' => null, 'coupon' => null,
             'prices_include_tax' => false, 'currency' => 'BDT', 'issues' => [],
         ], $empty);
 
@@ -113,7 +114,7 @@ class CartTest extends TestCase
         $this->assertGreaterThan(now()->addDays(29)->getTimestamp(), $cookie->getExpiresTime());
         $cart = $added->json('data');
         $this->assertNotNull($cart['id']);
-        $this->assertSame(['id', 'variant_id', 'product', 'variant_name', 'option_values', 'sku', 'quantity', 'unit_price', 'compare_at_price', 'line_total', 'purchasable', 'in_stock', 'max_quantity', 'exceeds_stock', 'allow_decimal'], array_keys($cart['items'][0]));
+        $this->assertSame(['id', 'variant_id', 'product', 'variant_name', 'option_values', 'sku', 'quantity', 'unit_price', 'compare_at_price', 'line_total', 'discount_amount', 'promotion', 'purchasable', 'in_stock', 'max_quantity', 'exceeds_stock', 'allow_decimal'], array_keys($cart['items'][0]));
         $this->assertSame([
             'variant_name' => 'M', 'option_values' => ['Size' => 'M'], 'sku' => 'SHIRT-M', 'quantity' => '2', 'unit_price' => '450.00',
             'compare_at_price' => null, 'line_total' => '900.00', 'purchasable' => true, 'in_stock' => true, 'max_quantity' => '5.000',

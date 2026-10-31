@@ -32,6 +32,8 @@ export function couponReasonMessage(reason: CouponReason | null | undefined, opt
         : 'Your cart does not reach the minimum amount for this coupon.'
     case 'not_applicable':
       return 'This coupon does not apply to the items in your cart.'
+    case 'better_offer':
+      return BETTER_OFFER_MESSAGE
     default:
       return null
   }
@@ -54,7 +56,7 @@ export function couponErrorMessage(error: unknown, currency?: string | null): st
 
 /**
  * Why the cart's coupon is not used in the totals: the server's message, else one for its
- * reason; no reason means an automatic offer gives more ("A better offer is already applied.").
+ * reason; `better_offer` (or no reason) means an automatic offer gives more.
  */
 export function couponNote(coupon: CartCoupon): string | null {
   if (coupon.applied) return null

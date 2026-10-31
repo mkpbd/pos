@@ -22,7 +22,7 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
                 ->orderBy('id')->lockForUpdate()->pluck('id')->isNotEmpty();
         }
         if ($couponId !== null) {
-            $locked = Coupon::query()->whereKey($couponId)->lockForUpdate()->exists() || $locked;
+            $locked = Coupon::query()->whereKey($couponId)->lockForUpdate()->pluck('id')->isNotEmpty() || $locked;
         }
 
         return $locked;

@@ -38,13 +38,22 @@ const line = {
   id: 'l-1', variant_id: 'v-red-m', product: { slug: 'kids-tee', name: 'Kids Tee', url: '/product/kids-tee', image: { url: '/favicon.svg', alt: 'Kids Tee' } },
   variant_name: 'Red / M', option_values: { Colour: 'Red', Size: 'M' }, sku: 'TEE-RM', quantity: '2', unit_price: '450.00', compare_at_price: null,
   line_total: '900.00', purchasable: true, in_stock: true, max_quantity: null, exceeds_stock: false, allow_decimal: false,
+  discount_amount: '0.00', promotion: null,
 }
 
-function cartBody(empty: boolean, unit = 450) {
+/** The demo coupon (E8b): ৳50 off orders of ৳500 or more. */
+const COUPON = 'WELCOME50'
+const COUPON_OFF = 50
+
+function cartBody(empty: boolean, unit = 450, coupon: string | null = null) {
   const total = unit * 2
+  const off = !empty && coupon ? COUPON_OFF : 0
   return {
     id: empty ? null : 'cart-1', items: empty ? [] : [{ ...line, unit_price: money(unit), line_total: money(total) }], item_count: empty ? '0' : '2',
-    subtotal: money(empty ? 0 : total), tax_total: '0.00', total: money(empty ? 0 : total), prices_include_tax: true, currency: 'BDT', issues: [],
+    subtotal: money(empty ? 0 : total), discount_total: money(off), tax_total: '0.00', total: money(empty ? 0 : total - off), prices_include_tax: true, currency: 'BDT', issues: [],
+    promotions: off ? [{ id: 'pr-welcome', name: 'Welcome 50', kind: 'order', amount: money(off) }] : [],
+    free_shipping: null,
+    coupon: !empty && coupon ? { code: coupon, applied: true, reason: null, message: null, promotion_name: 'Welcome 50' } : null,
   }
 }
 
@@ -73,6 +82,8 @@ type State = {
   placed: boolean
   /** The unit price the server charges now (raise it to make the total change). */
   unit: number
+  /** The coupon on the cart (E8b). */
+  coupon: string | null
   places: { body: Body; key: string | undefined }[]
   orders: Map<string, Record<string, unknown>>
   orderReads: (string | null)[]
@@ -80,7 +91,7 @@ type State = {
 }
 
 async function serveStore(page: Page, options: { me?: typeof customer | null } = {}) {
-  const state: State = { me: options.me ?? null, placed: false, unit: 450, places: [], orders: new Map(), orderReads: [], lastPreview: null }
+  const state: State = { me: options.me ?? null, placed: false, unit: 450, coupon: null, places: [], orders: new Map(), orderReads: [], lastPreview: null }
 
   const preview = (body: Body) => {
     const district = body.shipping_address_id ? '47' : body.address?.district_id !== undefined ? String(body.address.district_id) : null
@@ -89,9 +100,12 @@ async function serveStore(page: Page, options: { me?: typeof customer | null } =
     const subtotal = state.unit * 2
     const fee = method ? Number(method.fee) : 0
     const cod = method && body.payment_method === 'cod' ? Number(method.cod_fee) : 0
+    const off = state.coupon ? COUPON_OFF : 0
     return {
-      lines: cartBody(false, state.unit).items, subtotal: money(subtotal), tax_total: '0.00', shipping_total: money(fee), cod_fee: money(cod),
-      total: money(subtotal + fee + cod), currency: 'BDT', prices_include_tax: true, shipping_methods: offered, shipping_method_id: method?.id ?? null,
+      lines: cartBody(false, state.unit).items, subtotal: money(subtotal), discount_total: money(off), shipping_discount: '0.00',
+      promotions: off ? [{ name: 'Welcome 50', kind: 'order', amount: money(off) }] : [], coupon_code: state.coupon,
+      tax_total: '0.00', shipping_total: money(fee), cod_fee: money(cod),
+      total: money(subtotal - off + fee + cod), currency: 'BDT', prices_include_tax: true, shipping_methods: offered, shipping_method_id: method?.id ?? null,
       payment_method: body.payment_method ?? null, issues: [],
     }
   }
@@ -109,8 +123,9 @@ async function serveStore(page: Page, options: { me?: typeof customer | null } =
       payment_instructions: bank ? 'Demo Bank, account 0000000000 — demo only' : null, placed_at: '2026-10-31T10:00:00+06:00',
       expires_at: bank ? '2026-11-02T10:00:00+06:00' : null, contact, shipping_address: address, shipping_method_name: method.name,
       eta_min_days: method.eta_min_days, eta_max_days: method.eta_max_days,
-      lines: [{ product_name: 'Kids Tee', variant_name: 'Red / M', sku: 'TEE-RM', image_url: '/favicon.svg', quantity: '2.000', unit_price: money(state.unit), line_total: totals.subtotal, product_url: '/product/kids-tee' }],
-      subtotal: totals.subtotal, tax_total: '0.00', shipping_total: totals.shipping_total, cod_fee: totals.cod_fee, total: totals.total, currency: 'BDT',
+      lines: [{ product_name: 'Kids Tee', variant_name: 'Red / M', sku: 'TEE-RM', image_url: '/favicon.svg', quantity: '2.000', unit_price: money(state.unit), line_total: totals.subtotal, product_url: '/product/kids-tee', discount_amount: totals.discount_total }],
+      subtotal: totals.subtotal, discount_total: totals.discount_total, shipping_discount: totals.shipping_discount, promotions: totals.promotions, coupon_code: totals.coupon_code,
+      tax_total: '0.00', shipping_total: totals.shipping_total, cod_fee: totals.cod_fee, total: totals.total, currency: 'BDT',
       prices_include_tax: true, courier_name: null, tracking_number: null,
       history: [{ status: bank ? 'pending_payment' : 'confirmed', label: bank ? 'Awaiting payment' : 'Confirmed', at: '2026-10-31T10:00:00+06:00' }],
     }
@@ -140,7 +155,16 @@ async function serveStore(page: Page, options: { me?: typeof customer | null } =
         case 'GET /store/account/me':
           return route.fulfill({ json: envelope(state.me) })
         case 'GET /store/cart':
-          return route.fulfill({ json: envelope(cartBody(state.placed, state.unit)) })
+          return route.fulfill({ json: envelope(cartBody(state.placed, state.unit, state.coupon)) })
+        case 'POST /store/cart/coupon': {
+          const code = String((body as { code?: string }).code ?? '')
+          if (code !== COUPON) return route.fulfill(failure(422, 'COUPON_INVALID', 'This coupon code is not valid.', { reason: 'not_found' }))
+          state.coupon = code
+          return route.fulfill({ json: envelope(cartBody(state.placed, state.unit, state.coupon)) })
+        }
+        case 'DELETE /store/cart/coupon':
+          state.coupon = null
+          return route.fulfill({ json: envelope(cartBody(state.placed, state.unit, state.coupon)) })
         case 'GET /store/wishlist':
           return route.fulfill({ json: envelope({ items: [] }) })
         case 'GET /store/account/addresses':
@@ -168,6 +192,7 @@ async function serveStore(page: Page, options: { me?: typeof customer | null } =
           const placed = order(body, totals)
           state.orders.set(placed.number, placed)
           state.placed = true
+          state.coupon = null
           return route.fulfill({ status: 201, json: envelope({ order: placed, access_token: state.me ? null : 'guest-token-123' }) })
         }
       }
@@ -288,4 +313,41 @@ test('a changed total is shown and confirmed again', async ({ page, isMobile }) 
   await expect(page.getByTestId('summary-total')).toHaveText('৳1,060.00')
   expect(state.places.map((p) => p.body.expected_total)).toEqual(['960.00', '1060.00'])
   expect(state.places[1]!.key).not.toBe(state.places[0]!.key)
+})
+
+test('a coupon applied in the cart lowers the checkout total and shows on the order', async ({ page, isMobile }) => {
+  const state = await serveStore(page, { me: customer })
+  await page.goto('/cart')
+  const cart = page.getByTestId('cart-page')
+  const field = cart.getByRole('textbox', { name: 'Coupon code' })
+
+  await field.fill('nope')
+  await cart.getByRole('button', { name: 'Apply' }).click()
+  await expect(cart.getByRole('alert')).toHaveText('This coupon code is not valid.')
+  await expect(field).toBeFocused()
+
+  await field.fill('welcome50')
+  await field.press('Enter')
+  const coupon = cart.getByRole('group', { name: 'Coupon WELCOME50' })
+  await expect(coupon).toBeFocused()
+  await expect(coupon.getByTestId('coupon-applied')).toHaveText('Coupon applied')
+  await expect(cart.getByTestId('cart-discount')).toHaveText('−৳50.00')
+  await expect(cart.getByTestId('cart-promotion')).toHaveText('Welcome 50−৳50.00')
+  await expect(cart.getByTestId('cart-total')).toHaveText('৳850.00')
+
+  await page.goto('/checkout')
+  await expect(page.getByRole('radio', { name: /Home delivery/ })).toBeChecked()
+  await page.getByRole('radio', { name: /Cash on delivery/ }).check()
+  await settled(page, state, 'cod')
+  await expect(await summaryTotal(page, isMobile)).toHaveText('৳910.00')
+  const summary = page.getByTestId('order-summary')
+  await expect(summary.getByTestId('summary-discount')).toHaveText('−৳50.00')
+  await expect(summary.getByTestId('summary-coupon')).toHaveText('WELCOME50')
+
+  await page.getByRole('button', { name: 'Place order' }).click()
+  await expect(page).toHaveURL(/\/order\/WEB-000001$/)
+  await expect(page.getByTestId('summary-discount')).toHaveText('−৳50.00')
+  await expect(page.getByTestId('summary-coupon')).toHaveText('WELCOME50')
+  await expect(page.getByTestId('summary-total')).toHaveText('৳910.00')
+  expect(state.places[0]!.body.expected_total).toBe('910.00')
 })

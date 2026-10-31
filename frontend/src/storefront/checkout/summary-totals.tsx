@@ -155,7 +155,7 @@ export function SummaryLines({ lines, currency }: { lines: CartLine[]; currency:
               </p>
               {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
                 <p className="text-xs font-semibold text-sf-sale" data-testid="summary-line-discount">
-                  {line.promotion?.name ?? 'Discount'}: {formatDiscount(line.discount_amount, currency)}
+                  Discount{line.promotion ? ` (${line.promotion.name})` : ''}: {formatDiscount(line.discount_amount, currency)}
                 </p>
               )}
               {excluded ? (

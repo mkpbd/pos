@@ -13,6 +13,8 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'c
         Route::patch('cart/items/{itemId}', [CartController::class, 'update'])->whereUuid('itemId');
         Route::delete('cart/items/{itemId}', [CartController::class, 'destroy'])->whereUuid('itemId');
         Route::delete('cart', [CartController::class, 'clear']);
+        Route::post('cart/coupon', [CartController::class, 'applyCoupon'])->middleware('throttle:coupon')->name('store.cart.coupon');
+        Route::delete('cart/coupon', [CartController::class, 'removeCoupon']);
     });
 
     Route::middleware(['auth:customer', 'customer.active'])->prefix('wishlist')->group(function () {

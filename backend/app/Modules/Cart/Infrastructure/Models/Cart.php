@@ -16,9 +16,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?string $token_hash
  * @property ?CarbonImmutable $expires_at
  * @property ?string $converted_order_id the web order this cart became (never used again)
+ * @property ?string $coupon_code the applied coupon (E8b), upper-case
  * @property ?CarbonImmutable $updated_at
  */
-#[Fillable(['organization_id', 'customer_id', 'token_hash', 'expires_at', 'converted_order_id'])]
+#[Fillable(['organization_id', 'customer_id', 'token_hash', 'expires_at', 'converted_order_id', 'coupon_code'])]
 class Cart extends Model
 {
     use BelongsToOrganization, HasUuids;

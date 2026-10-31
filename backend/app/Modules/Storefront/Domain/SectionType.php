@@ -5,8 +5,8 @@ namespace App\Modules\Storefront\Domain;
 /**
  * Homepage section types and their configuration documents. Only types whose content and
  * link targets exist are offered: product, category and brand sections come from the online
- * catalog (E6; category tabs are product tabs with category sources), deal countdowns arrive
- * with promotions (E8), blog teasers with the blog (E11).
+ * catalog (E6; category tabs are product tabs with category sources), hot deals with a
+ * countdown come with promotions (E8b), blog teasers with the blog (E11).
  *
  * Like ThemeSchema, defaults() defines each config's shape and normalize() fills gaps and
  * drops unknown keys; value validation lives with the HTTP request.
@@ -24,6 +24,7 @@ enum SectionType: string
     case ProductTabs = 'product_tabs';
     case CategoryStrip = 'category_strip';
     case BrandStrip = 'brand_strip';
+    case HotDeals = 'hot_deals';
 
     public const BANNER_GRID_LAYOUTS = ['2-col', '3-col', '3-col-split', '4-col'];
 
@@ -48,6 +49,7 @@ enum SectionType: string
         'product_tabs' => [4, 12],
         'category_strip' => [4, 16],
         'brand_strip' => [4, 24],
+        'hot_deals' => [4, 12],
     ];
 
     public const TABS = ['min' => 2, 'max' => 5];
@@ -66,6 +68,7 @@ enum SectionType: string
             self::ProductTabs => 'Product tabs',
             self::CategoryStrip => 'Category strip',
             self::BrandStrip => 'Brand strip',
+            self::HotDeals => 'Hot deals',
         };
     }
 
@@ -83,6 +86,7 @@ enum SectionType: string
             self::ProductTabs => 'Two to five tabs of products, e.g. New arrivals / Best sellers / On sale, or one tab per category.',
             self::CategoryStrip => 'Category tiles with image and product count: hand-picked or the top level.',
             self::BrandStrip => 'A row of brand logos: hand-picked or every brand.',
+            self::HotDeals => 'A countdown to the end of a flash sale with its products: one promotion or every running flash sale. Hidden when none is running.',
         };
     }
 
@@ -170,6 +174,8 @@ enum SectionType: string
             self::ProductTabs => ['tabs' => [], 'limit' => 8],
             self::CategoryStrip => ['source' => 'top_level', 'limit' => 8],
             self::BrandStrip => ['source' => 'all', 'limit' => 12],
+            // promotion_id null = every live countdown promotion ("flash sale").
+            self::HotDeals => ['promotion_id' => null, 'limit' => 8, 'view_all_url' => null],
         };
     }
 

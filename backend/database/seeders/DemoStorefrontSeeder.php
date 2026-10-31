@@ -143,6 +143,9 @@ class DemoStorefrontSeeder extends Seeder
             }
 
             $sections->save(new HomepageSection, ['type' => 'hero_slider', 'banner_ids' => [$hero1->id, $hero2->id]]);
+            // E8b: every running flash sale (DemoPromotionsSeeder adds "Juice week"); hidden while none runs.
+            $sections->save(new HomepageSection, ['type' => 'hot_deals', 'title' => 'Hot deals', 'subtitle' => 'Ends soon — grab them while the clock runs',
+                'config' => ['promotion_id' => null, 'limit' => 8, 'view_all_url' => '/shop']]);
             $sections->save(new HomepageSection, ['type' => 'features_strip', 'config' => ['items' => [
                 ['icon' => 'truck', 'title' => 'Same-day delivery', 'text' => 'Inside Dhaka, order before 4 pm'],
                 ['icon' => 'credit-card', 'title' => 'Pay your way', 'text' => 'Cash on delivery, cards, mobile banking'],

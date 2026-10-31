@@ -94,9 +94,9 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
   return (
     <div className={cn('flex flex-col gap-2 text-sm', !compact && 'border-b pb-4')} data-testid="coupon-box">
       {coupon ? (
-        <div ref={couponRef} tabIndex={-1} role="group" aria-labelledby={`${id}-coupon`} className="flex flex-col gap-1.5 rounded-lg border border-dashed border-sf-border px-3 py-2.5 outline-none focus-visible:outline-2 focus-visible:outline-sf-accent" data-testid="cart-coupon">
+        <div ref={couponRef} tabIndex={-1} role="group" aria-label={`Coupon ${coupon.code}`} className="flex flex-col gap-1.5 rounded-lg border border-dashed border-sf-border px-3 py-2.5 outline-none focus-visible:outline-2 focus-visible:outline-sf-accent" data-testid="cart-coupon">
           <div className="flex items-center justify-between gap-3">
-            <p id={`${id}-coupon`} className="inline-flex min-w-0 items-center gap-2">
+            <p className="inline-flex min-w-0 items-center gap-2">
               <TicketPercentIcon aria-hidden className="size-4 shrink-0 text-sf-accent" />
               <span className="min-w-0">
                 <span className="sr-only">Coupon </span>

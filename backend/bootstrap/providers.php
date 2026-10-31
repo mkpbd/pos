@@ -21,6 +21,7 @@ use App\Modules\Organizations\OrganizationsServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
 use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
+use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Shipping\ShippingServiceProvider;
@@ -57,6 +58,7 @@ return [
     OnlineCatalogServiceProvider::class,
     GeographyServiceProvider::class,
     CustomerAccountsServiceProvider::class,
+    PromotionsServiceProvider::class,
     CartServiceProvider::class,
     ShippingServiceProvider::class,
     OnlinePaymentsServiceProvider::class,

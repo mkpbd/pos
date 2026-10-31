@@ -473,3 +473,84 @@ test('a guest places a cash-on-delivery order; the admin sees it and stock goes 
   const litchi = page.getByRole('row').filter({ hasText: 'Pran Litchi Drink 250ml' })
   await expect(litchi.getByRole('cell').nth(2)).toHaveText(/^2(\s|$)/)
 })
+
+test('a flash sale and the WELCOME50 coupon lower the price from card to placed order and the admin order', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin sidebar flow runs on desktop')
+
+  // The seeded "Juice week" flash sale (10% off Pran) shows on the homepage hot deals with its countdown.
+  await page.goto('/')
+  const deals = page.getByTestId('hot-deals')
+  await expect(deals.getByRole('heading', { name: /Hot deals/ })).toBeVisible()
+  const card = deals.getByTestId('product-card').filter({ hasText: 'Pran Mango Juice 250ml' })
+  await expect(card.getByTestId('price')).toContainText('22.50')
+  await expect(card.getByTestId('compare-price')).toContainText('25.00')
+  await expect(card.getByTestId('promotion-badge')).toContainText('10')
+
+  // The product page shows the promotional price too.
+  await page.goto('/product/pran-mango-juice-250ml')
+  await expect(page.getByTestId('product-page').getByTestId('price').first()).toContainText('22.50')
+  const buy = page.getByTestId('product-page').getByRole('form', { name: 'Add to cart' })
+  await buy.getByRole('button', { name: 'Add to cart' }).click()
+  await expect(page.getByTestId('mini-cart').getByTestId('cart-line')).toHaveCount(1)
+  await page.keyboard.press('Escape')
+
+  // 20 juices = 500.00 before discounts: the flash sale takes 50.00, then WELCOME50 (min. 500) another 50.00.
+  await page.goto('/cart')
+  const cartPage = page.getByTestId('cart-page')
+  const quantity = cartPage.getByRole('textbox', { name: 'Quantity of Pran Mango Juice 250ml' })
+  await quantity.fill('20')
+  await quantity.press('Enter')
+  await expect.poll(async () => (await (await page.request.get('/api/v1/store/cart')).json()).data.subtotal).toBe('500.00')
+
+  const coupon = cartPage.getByRole('form', { name: 'Coupon' })
+  await coupon.getByLabel('Coupon code').fill('welcome50')
+  await coupon.getByRole('button', { name: 'Apply' }).click()
+  await expect(cartPage.getByTestId('coupon-applied')).toBeVisible()
+
+  const server = (await (await page.request.get('/api/v1/store/cart')).json()).data
+  expect(server.discount_total).toBe('100.00')
+  expect(server.coupon).toMatchObject({ code: 'WELCOME50', applied: true })
+  expect((await cartPage.getByTestId('cart-total').innerText()).replace(/[^\d.]/g, '')).toBe(server.total)
+
+  // Checkout as a guest with cash on delivery; the summary carries the discounts and the coupon.
+  await page.goto('/checkout')
+  const checkout = page.getByRole('form', { name: 'Checkout' })
+  await checkout.getByLabel('Full name').fill('Karim Ahmed')
+  await checkout.getByLabel('E-mail').fill('karim@example.test')
+  await checkout.getByLabel('Mobile number', { exact: true }).fill('01711000222')
+  await checkout.getByLabel('Recipient name').fill('Karim Ahmed')
+  await checkout.getByLabel('Recipient mobile number').fill('01711000222')
+  await checkout.getByLabel('Division').selectOption({ label: 'Dhaka (ঢাকা)' })
+  await checkout.getByLabel('District').selectOption({ label: 'Dhaka (ঢাকা)' })
+  await checkout.getByLabel('Area / thana').fill('Gulshan')
+  await checkout.getByLabel('Street address').fill('House 3, Road 9')
+  await checkout.getByRole('radio', { name: /Home delivery/ }).check()
+  await checkout.getByRole('radio', { name: /Cash on delivery/ }).check()
+  await expect(page.getByTestId('summary-discount').first()).toContainText('100.00')
+  await expect(page.getByTestId('summary-coupon').first()).toContainText('WELCOME50')
+  await checkout.getByRole('button', { name: 'Place order' }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Thank you, Karim!' })).toBeVisible()
+  const number = (await page.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
+  await expect(page.getByTestId('summary-discount').first()).toContainText('100.00')
+
+  // The admin's web order shows both promotions and the coupon code.
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.getByRole('link', { name: 'Web orders' }).first().click()
+  await page.getByRole('row').filter({ hasText: number }).getByRole('link', { name: number }).click()
+  await expect(page.getByRole('heading', { name: number })).toBeVisible()
+  await expect(page.getByText('Juice week')).toBeVisible()
+  await expect(page.getByText('Welcome 50')).toBeVisible()
+  await expect(page.getByTestId('order-coupon')).toContainText('WELCOME50')
+
+  // The redemption is listed on the promotion.
+  await page.getByRole('link', { name: 'Promotions' }).first().click()
+  await page.getByRole('link', { name: 'Welcome 50' }).click()
+  await page.getByRole('tab', { name: /Redemptions/ }).click()
+  await expect(page.getByRole('row').filter({ hasText: number })).toContainText('50.00')
+})

@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Application\Actions;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Support\Changes;
@@ -33,6 +34,7 @@ class ManageHomepageSections
         private readonly HtmlSanitizer $sanitizer,
         private readonly StorefrontCatalog $catalog,
         private readonly AuditTrail $audit,
+        private readonly CatalogPromotions $promotions,
     ) {}
 
     /**
@@ -180,6 +182,11 @@ class ManageHomepageSections
         $missing = array_values(array_diff($categoryIds, $this->catalog->existing('category', $categoryIds)));
         if ($missing !== []) {
             throw new BusinessRuleViolation('CATEGORY_NOT_FOUND', 'Some selected categories no longer exist.', ['category_ids' => $missing]);
+        }
+
+        // Hot deals: one countdown promotion, or null for every running flash sale.
+        if ($type === SectionType::HotDeals && is_string($config['promotion_id']) && ! $this->promotions->isCountdownPromotion($config['promotion_id'])) {
+            throw new BusinessRuleViolation('PROMOTION_NOT_FOUND', 'Choose an automatic promotion with a countdown (a flash sale).', ['promotion_id' => $config['promotion_id']]);
         }
 
         return $config;

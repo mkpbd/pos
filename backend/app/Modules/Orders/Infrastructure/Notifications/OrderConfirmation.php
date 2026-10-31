@@ -48,9 +48,20 @@ class OrderConfirmation extends Notification implements ShouldQueue
             $mail->line("{$line['quantity']} × {$name} — {$money($line['line_total'])}");
         }
 
-        $mail->line('Subtotal: '.$money($o['subtotal']))
-            ->line(($o['prices_include_tax'] ? 'VAT included: ' : 'VAT: ').$money($o['tax_total']))
+        $mail->line('Subtotal: '.$money($o['subtotal']));
+        foreach ($o['promotions'] ?? [] as $promotion) {
+            if ($promotion['kind'] !== 'shipping') {
+                $mail->line("Discount ({$promotion['name']}): −".$money($promotion['amount']));
+            }
+        }
+        if (($o['coupon_code'] ?? null) !== null) {
+            $mail->line("Coupon: {$o['coupon_code']}");
+        }
+        $mail->line(($o['prices_include_tax'] ? 'VAT included: ' : 'VAT: ').$money($o['tax_total']))
             ->line("Delivery ({$o['shipping_method_name']}): ".$money($o['shipping_total']));
+        if (($o['shipping_discount'] ?? '0.00') !== '0.00') {
+            $mail->line('Free delivery: '.$money($o['shipping_discount']).' saved');
+        }
         if ($o['cod_fee'] !== '0.00') {
             $mail->line('Cash on delivery fee: '.$money($o['cod_fee']));
         }

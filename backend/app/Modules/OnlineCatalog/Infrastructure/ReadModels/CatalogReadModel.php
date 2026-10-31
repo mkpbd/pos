@@ -12,6 +12,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\BrandListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\CategoryListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Carbon\CarbonImmutable;
@@ -66,6 +67,7 @@ class CatalogReadModel
         private readonly CatalogDirectory $catalog,
         private readonly StockLevels $stock,
         private readonly OrganizationDirectory $organizations,
+        private readonly CatalogPromotions $promotions,
     ) {}
 
     public function organizationId(): string
@@ -218,7 +220,31 @@ class CatalogReadModel
             // Lets a card add a single-variant product to the cart; null when options must be chosen.
             'default_variant_id' => count($variants) === 1 ? $variants[0]['id'] : null,
             'short_description' => $listing->short_description,
+            // Live automatic promotion of the variant giving `price` (E8b): {id, name, type, value, ends_at, show_countdown, price}.
+            'promotion' => $variants === [] ? null : $this->promotion($record, $pricing['price']),
         ];
+    }
+
+    /**
+     * The automatic promotion shown for one unit at $unitPrice (promotional `price`), or null.
+     * Listing filters and sorting keep the base price (E8b).
+     *
+     * @param  ProductRecord  $record
+     * @return ?array{id: string, name: string, type: string, value: string, ends_at: ?string, show_countdown: bool, price: string}
+     */
+    public function promotion(array $record, string $unitPrice): ?array
+    {
+        return $this->promotions->bestFor($record['id'], $record['brand_id'], $record['category_id'], $unitPrice);
+    }
+
+    /**
+     * Live countdown promotions with their targets (hot deals).
+     *
+     * @return list<array{id: string, ends_at: string, product_ids: list<string>, category_ids: list<string>, brand_ids: list<string>}>
+     */
+    public function countdownPromotions(?string $promotionId): array
+    {
+        return $this->promotions->countdownPromotions($promotionId);
     }
 
     /**

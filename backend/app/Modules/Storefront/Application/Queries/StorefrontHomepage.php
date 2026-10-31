@@ -99,7 +99,7 @@ class StorefrontHomepage
      * other section types. Records that are not (or no longer) live or visible drop out.
      *
      * @param  array<string, mixed>  $config  normalized
-     * @return array<string, list<mixed>>|null
+     * @return array<string, mixed>|null
      */
     private function catalogContent(HomepageSection $section, SectionType $type, array $config): ?array
     {
@@ -116,16 +116,33 @@ class StorefrontHomepage
             ], $config['tabs']), fn (array $tab) => $tab['products'] !== []))],
             SectionType::CategoryStrip => ['categories' => $this->catalog->categoryStrip($config['source'] === 'manual' ? $picked() : null, $config['limit'])],
             SectionType::BrandStrip => ['brands' => $this->catalog->brandStrip($config['source'] === 'manual' ? $picked() : null, $config['limit'])],
+            SectionType::HotDeals => $this->hotDeals($config),
             default => null,
         };
     }
 
     /**
-     * @param  array<string, list<mixed>>  $content
+     * Products of the live countdown promotions (cards carry their promotion) and the
+     * earliest end among them, which the section counts down to.
+     *
+     * @param  array<string, mixed>  $config  normalized
+     * @return array{products: list<array<string, mixed>>, ends_at: ?string}
+     */
+    private function hotDeals(array $config): array
+    {
+        $products = $this->catalog->hotDealCards(is_string($config['promotion_id']) ? $config['promotion_id'] : null, (int) $config['limit']);
+        $ends = array_values(array_filter(array_map(fn (array $card) => $card['promotion']['ends_at'] ?? null, $products)));
+        usort($ends, fn (string $a, string $b) => strtotime($a) <=> strtotime($b));
+
+        return ['products' => $products, 'ends_at' => $ends[0] ?? null];
+    }
+
+    /**
+     * @param  array<string, mixed>  $content
      */
     private function isEmpty(array $content): bool
     {
-        return reset($content) === [];
+        return array_key_exists('products', $content) ? $content['products'] === [] : reset($content) === [];
     }
 
     /**

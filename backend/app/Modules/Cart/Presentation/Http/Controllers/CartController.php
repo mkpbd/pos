@@ -28,6 +28,13 @@ class CartController
      * Repriced from the live catalog on every read. Lines that are unavailable or out of stock
      * stay listed (flagged) but do not count; a line above the stock counts with `max_quantity`
      * (`exceeds_stock`). `issues` lists `unavailable`, `out_of_stock`, `exceeds_stock`.
+     *
+     * Promotions (E8b): lines carry `discount_amount` (product discount + share of the order
+     * discount) and `promotion` (`{id, name}` of the product promotion or null); `line_total`
+     * stays quantity × unit price. Totals: `subtotal` (before discounts), `discount_total`,
+     * `tax_total` (after discounts), `total`; `promotions` `[{id, name, kind: product|order,
+     * amount}]`, `free_shipping` (`{id, name}` or null) and `coupon` (`{code, applied, reason,
+     * message, promotion_name}` or null).
      */
     public function show(Request $request): JsonResponse
     {
@@ -67,6 +74,31 @@ class CartController
     public function destroy(Request $request, string $itemId): JsonResponse
     {
         return ApiResponse::success($this->pricer->price($this->carts->remove(CartCookie::owner($request), $itemId)));
+    }
+
+    /**
+     * Apply a coupon
+     *
+     * `{code}` (any case). Replaces the cart's coupon and returns the repriced cart; a valid
+     * coupon beaten by an automatic promotion stays with `coupon.applied` false and reason
+     * `better_offer`. 422 `COUPON_INVALID` with `details.reason`: `not_found` (also switched
+     * off), `not_started`, `expired`, `usage_limit_reached`, `customer_limit_reached` (signed-in
+     * customers), `min_subtotal` (+ `details.min_subtotal`), `not_applicable`. Rate limit
+     * `coupon` (10/min per cart or customer).
+     */
+    public function applyCoupon(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:60']]);
+
+        return ApiResponse::success($this->pricer->price($this->carts->applyCoupon(CartCookie::owner($request), $data['code'])));
+    }
+
+    /**
+     * Remove the coupon
+     */
+    public function removeCoupon(Request $request): JsonResponse
+    {
+        return ApiResponse::success($this->pricer->price($this->carts->removeCoupon(CartCookie::owner($request))));
     }
 
     /**

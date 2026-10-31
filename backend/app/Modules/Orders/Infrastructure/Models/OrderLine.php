@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $unit_price
  * @property ?string $compare_at_price
  * @property string $line_subtotal
+ * @property string $discount_amount product discount + share of the order discount (E8b)
  * @property string $net_amount
  * @property string $tax_rate
  * @property string $tax_amount
@@ -40,7 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Table(timestamps: false)]
 #[Fillable([
     'organization_id', 'order_id', 'position', 'product_id', 'variant_id', 'product_name', 'variant_name', 'product_slug',
-    'sku', 'option_values', 'image_url', 'quantity', 'unit_price', 'compare_at_price', 'line_subtotal', 'net_amount',
+    'sku', 'option_values', 'image_url', 'quantity', 'unit_price', 'compare_at_price', 'line_subtotal', 'discount_amount', 'net_amount',
     'tax_rate', 'tax_amount', 'line_total', 'unit_cost', 'cost_total', 'created_at',
 ])]
 class OrderLine extends Model
@@ -56,6 +57,7 @@ class OrderLine extends Model
             'unit_price' => 'decimal:2',
             'compare_at_price' => 'decimal:2',
             'line_subtotal' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'net_amount' => 'decimal:2',
             'tax_rate' => 'decimal:4',
             'tax_amount' => 'decimal:2',

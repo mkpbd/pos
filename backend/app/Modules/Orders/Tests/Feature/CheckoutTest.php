@@ -92,7 +92,7 @@ class CheckoutTest extends TestCase
         $this->assertSame(['Home delivery', 1, 2], [$order['shipping_method_name'], $order['eta_min_days'], $order['eta_max_days']]);
         $this->assertSame([
             'product_name' => 'Shirt', 'variant_name' => null, 'sku' => 'SHIRT', 'image_url' => null, 'quantity' => '2',
-            'unit_price' => '450.00', 'line_total' => '900.00', 'product_url' => '/product/shirt',
+            'unit_price' => '450.00', 'line_total' => '900.00', 'discount_amount' => '0.00', 'product_url' => '/product/shirt',
         ], $order['lines'][0]);
         $this->assertSame([['status' => 'confirmed', 'label' => 'Confirmed']], array_map(fn ($h) => array_diff_key($h, ['at' => 1]), $order['history']));
 

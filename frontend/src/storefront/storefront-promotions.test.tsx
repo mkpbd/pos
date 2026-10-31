@@ -124,13 +124,13 @@ describe('cart discounts and coupons', () => {
     renderRoutes(storefrontRoutes, '/cart')
 
     const page = await screen.findByTestId('cart-page')
-    await waitFor(() => expect(within(page).getByTestId('line-discount')).toHaveTextContent('Juice week: saves −৳90.00'))
+    await waitFor(() => expect(within(page).getByTestId('line-discount')).toHaveTextContent(/^Discount \(Juice week\):\s*−৳90\.00$/))
     expect(within(page).getByTestId('cart-subtotal')).toHaveTextContent('৳900.00')
     expect(within(page).getByTestId('cart-discount')).toHaveTextContent('−৳140.00')
     expect(within(page).getAllByTestId('cart-promotion').map((p) => p.textContent)).toEqual(['Juice week−৳90.00', 'Welcome 50−৳50.00'])
     expect(within(page).getByTestId('cart-total')).toHaveTextContent('৳760.00')
     expect(within(page).getByTestId('free-shipping-note')).toHaveTextContent('Free delivery with Free delivery over ৳3,000 — applied at checkout.')
-    const coupon = within(page).getByRole('group', { name: 'Coupon WELCOME50 Welcome 50' })
+    const coupon = within(page).getByRole('group', { name: 'Coupon WELCOME50' })
     expect(within(coupon).getByTestId('coupon-applied')).toHaveTextContent('Coupon applied')
   })
 

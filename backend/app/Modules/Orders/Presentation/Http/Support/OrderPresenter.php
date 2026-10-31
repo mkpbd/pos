@@ -9,6 +9,7 @@ use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderLine;
+use App\Modules\Orders\Infrastructure\Models\OrderPromotion;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
 use App\Modules\Payments\Domain\PaymentSource;
@@ -35,7 +36,7 @@ class OrderPresenter
      */
     public function storefront(Order $order): array
     {
-        $order->loadMissing(['lines', 'shippingAddress', 'history']);
+        $order->loadMissing(['lines', 'shippingAddress', 'history', 'promotions']);
         $address = $order->shippingAddress;
 
         return [
@@ -70,11 +71,21 @@ class OrderPresenter
                 'unit_price' => (string) $l->unit_price,
                 // Quantity × unit price (as in the cart), so the lines add up to the subtotal.
                 'line_total' => (string) $l->line_subtotal,
+                // Product discount + share of the order discount (E8b).
+                'discount_amount' => (string) $l->discount_amount,
                 'product_url' => $l->product_slug === null ? null : '/product/'.$l->product_slug,
             ])->values()->all(),
             'subtotal' => (string) $order->subtotal,
+            'discount_total' => (string) $order->discount_total,
             'tax_total' => (string) $order->tax_total,
             'shipping_total' => (string) $order->shipping_total,
+            'shipping_discount' => (string) $order->shipping_discount,
+            'promotions' => $order->promotions->map(fn (OrderPromotion $p) => [
+                'name' => $p->name,
+                'kind' => $p->kind,
+                'amount' => (string) $p->amount,
+            ])->values()->all(),
+            'coupon_code' => $order->coupon_code,
             'cod_fee' => (string) $order->cod_fee,
             'total' => (string) $order->total,
             'currency' => $order->currency,

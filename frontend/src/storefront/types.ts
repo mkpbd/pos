@@ -392,7 +392,7 @@ export type CartLine = {
   max_quantity: string | null
   exceeds_stock: boolean
   allow_decimal: boolean
-  /** The discount on this line (E8b); `line_total` stays quantity × unit price. */
+  /** The discount on this line (E8b): its product discount plus its share of an order discount; `line_total` stays quantity × unit price. */
   discount_amount: string
   /** The product promotion applied to this line. */
   promotion: { id: string; name: string } | null
@@ -401,7 +401,7 @@ export type CartLine = {
 export type CartIssue = 'exceeds_stock' | 'unavailable' | (string & {})
 
 /** Why a coupon was refused (422 COUPON_INVALID details.reason) or is not used any more (cart.coupon.reason). */
-export type CouponReason = 'not_found' | 'not_started' | 'expired' | 'usage_limit_reached' | 'customer_limit_reached' | 'min_subtotal' | 'not_applicable' | (string & {})
+export type CouponReason = 'not_found' | 'not_started' | 'expired' | 'usage_limit_reached' | 'customer_limit_reached' | 'min_subtotal' | 'not_applicable' | 'better_offer' | (string & {})
 
 /** The coupon on the cart (one per cart). `applied: false` — not used in the totals (a better offer applies, or it became invalid). */
 export type CartCoupon = {

@@ -32,6 +32,11 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         return $this->browse->sourceCards($source, $categoryId, $limit);
     }
 
+    public function hotDealCards(?string $promotionId, int $limit): array
+    {
+        return $this->browse->hotDealCards($promotionId, $limit);
+    }
+
     public function categoryStrip(?array $categoryIds, int $limit): array
     {
         return $this->navigation->categoryStrip($categoryIds, $limit);
@@ -175,6 +180,8 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
             $result[$id] = [
                 'variant_id' => $id,
                 'product_id' => $v['product_id'],
+                'brand_id' => $record['brand_id'] ?? null,
+                'category_id' => $record['category_id'] ?? ($v['category_id'] ?? null),
                 'product_slug' => $record === null ? null : $record['listing']->slug,
                 'product_name' => $v['product_name'],
                 'variant_name' => is_string($name) && $name !== '' ? $name : ($optionValues !== [] ? implode(' / ', $optionValues) : null),

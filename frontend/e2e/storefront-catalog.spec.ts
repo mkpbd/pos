@@ -27,14 +27,18 @@ const bootstrap = {
 const card = (slug: string, name: string, brand: { name: string; slug: string }, extra: Record<string, unknown> = {}) => ({
   id: `p-${slug}`, slug, name, url: `/product/${slug}`, image: { url: '/favicon.svg', alt: name }, hover_image: null,
   price: '450.00', price_max: '450.00', compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true,
-  is_new: false, is_featured: false, brand, category: { name: 'Clothing', slug: 'clothing' }, variant_count: 1, default_variant_id: `v-${slug}`, short_description: null, ...extra,
+  is_new: false, is_featured: false, brand, category: { name: 'Clothing', slug: 'clothing' }, variant_count: 1, default_variant_id: `v-${slug}`, short_description: null, promotion: null, ...extra,
 })
 
 const freshCo = { name: 'Fresh Co', slug: 'fresh-co' }
 const sunny = { name: 'Sunny', slug: 'sunny' }
 const cards = [
   card('kids-tee', 'Kids Tee', freshCo, { price_max: '480.00', variant_count: 3, default_variant_id: null, on_sale: true, is_new: true }),
-  card('kids-shorts', 'Kids Shorts', sunny, { price: '350.00', price_max: '350.00' }),
+  // A flash sale (E8b): 10 % off, ending in two days.
+  card('kids-shorts', 'Kids Shorts', sunny, {
+    price: '350.00', price_max: '350.00',
+    promotion: { id: 'pr-1', name: 'Summer flash sale', type: 'percent', value: '10.00', ends_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), show_countdown: true, price: '315.00' },
+  }),
   card('kids-cap', 'Kids Cap', sunny, { in_stock: false }),
 ]
 
@@ -54,7 +58,7 @@ function facets(brands: string[]) {
 
 const variant = (id: string, colour: string, size: string, extra: Record<string, unknown> = {}) => ({
   id, sku: `TEE-${colour[0]}${size}`, name: `${colour} / ${size}`, option_values: { Colour: colour, Size: size }, price: '450.00',
-  compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, low_stock: false, image_id: null, ...extra,
+  compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, low_stock: false, image_id: null, promo_price: null, ...extra,
 })
 
 const tee = {
@@ -72,7 +76,7 @@ const tee = {
     variant('v-red-l', 'Red', 'L', { in_stock: false, image_id: 'img-red' }),
     variant('v-blue-l', 'Blue', 'L', { price: '480.00', low_stock: true, image_id: 'img-blue' }),
   ],
-  price: '450.00', price_max: '480.00', on_sale: true, in_stock: true, is_new: true, default_variant_id: 'v-red-m', unit: 'pcs',
+  price: '450.00', price_max: '480.00', on_sale: true, in_stock: true, is_new: true, default_variant_id: 'v-red-m', unit: 'pcs', promotion: null,
   seo: { title: null, description: null, image_url: null },
 }
 
@@ -83,7 +87,7 @@ async function serveCatalog(page: Page) {
   // A guest with an empty cart (E7 header).
   await page.route('**/api/v1/store/account/me', (route) => route.fulfill({ json: envelope(null) }))
   await page.route('**/api/v1/store/cart', (route) =>
-    route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: false, currency: 'BDT', issues: [] }) }),
+    route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', discount_total: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: false, currency: 'BDT', issues: [], promotions: [], free_shipping: null, coupon: null }) }),
   )
   await page.route((url) => url.pathname === '/api/v1/store/products', (route) => {
     const params = new URL(route.request().url()).searchParams
@@ -123,6 +127,12 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   await expect(capCard.getByRole('list', { name: 'Product labels' }).getByText('Out of stock')).toBeVisible()
   await expect(capCard.getByRole('button', { name: 'Kids Cap is out of stock' })).toBeDisabled()
   await expect(teeCard.getByRole('link', { name: 'Choose options: Kids Tee' })).toHaveAttribute('href', '/product/kids-tee')
+  // The flash sale: badge, promotional price over the struck base price, and its countdown.
+  const shortsCard = page.getByTestId('product-card').filter({ hasText: 'Kids Shorts' })
+  await expect(shortsCard.getByTestId('promotion-badge')).toHaveText('Offer: −10 %')
+  await expect(shortsCard.getByTestId('price')).toHaveText('Sale price: ৳315.00')
+  await expect(shortsCard.getByTestId('compare-price')).toHaveText('Original price: ৳350.00')
+  await expect(shortsCard.getByTestId('countdown-time')).toHaveText(/^(1d 23|2d 00):\d\d:\d\d$/)
 
   // Filter by brand: in the sidebar on desktop, in the drawer on phones.
   if (isMobile) {

@@ -2,11 +2,14 @@
 
 namespace App\Modules\Cart\Application\Actions;
 
+use App\Modules\Cart\Application\Services\CartPricer;
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Domain\CartRules;
 use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Cart\Infrastructure\Models\CartItem;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Promotions\Domain\CouponCode;
+use App\Modules\Promotions\Domain\CouponReason;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,10 +25,17 @@ use Illuminate\Validation\ValidationException;
  * (VARIANT_NOT_PURCHASABLE), in stock (OUT_OF_STOCK) and the line may not exceed what the
  * fulfilment store has (INSUFFICIENT_STOCK, details.max_quantity). Whole units only unless
  * the unit allows decimals; at most 999 per line and 50 lines (CART_FULL).
+ *
+ * One coupon per cart (E8b): applying checks the code against the cart as it is now and
+ * refuses it with 422 COUPON_INVALID (details.reason) unless it is valid; a valid coupon that
+ * an automatic promotion beats is kept (`better_offer`).
  */
 class ShoppingCart
 {
-    public function __construct(private readonly StorefrontCatalog $catalog) {}
+    public function __construct(
+        private readonly StorefrontCatalog $catalog,
+        private readonly CartPricer $pricer,
+    ) {}
 
     public function find(CartOwner $owner): ?Cart
     {
@@ -99,6 +109,51 @@ class ShoppingCart
     }
 
     /**
+     * Puts a coupon on the cart (replacing any other) when it is valid for the cart now.
+     *
+     * @throws BusinessRuleViolation COUPON_INVALID with details.reason (and details.min_subtotal)
+     */
+    public function applyCoupon(CartOwner $owner, string $code): Cart
+    {
+        $code = CouponCode::normalize($code);
+
+        return DB::transaction(function () use ($owner, $code) {
+            $cart = $this->query($owner)?->lockForUpdate()->first();
+            $quote = $this->pricer->quote($cart, null, $code)['promotions'];
+            $reason = CouponReason::tryFrom((string) ($quote->coupon['reason'] ?? ''));
+            if ($cart === null || ! $cart->items()->exists()) {
+                $reason = $reason === CouponReason::NotFound ? $reason : CouponReason::NotApplicable;
+            }
+            if ($reason !== null && $reason->rejects()) {
+                $details = ['reason' => $reason->value, 'code' => $code];
+                if ($reason === CouponReason::MinSubtotal) {
+                    $details['min_subtotal'] = $quote->couponMinSubtotal;
+                }
+
+                throw new BusinessRuleViolation('COUPON_INVALID', $quote->coupon['message'] ?? $reason->message(), $details);
+            }
+
+            /** @var Cart $cart */
+            $cart->forceFill(['coupon_code' => $code])->save();
+            $this->touch($cart);
+
+            return $cart;
+        });
+    }
+
+    public function removeCoupon(CartOwner $owner): ?Cart
+    {
+        return DB::transaction(function () use ($owner) {
+            $cart = $this->query($owner)?->lockForUpdate()->first();
+            if ($cart !== null && $cart->coupon_code !== null) {
+                $cart->forceFill(['coupon_code' => null])->save();
+            }
+
+            return $cart;
+        });
+    }
+
+    /**
      * The owner's active cart locked for checkout (call inside the placement transaction), or
      * null when there is none.
      */
@@ -159,6 +214,10 @@ class ShoppingCart
                 $capped += $wasCapped ? 1 : 0;
             }
 
+            // The guest's coupon follows unless the customer's cart already has one.
+            if ($cart->coupon_code === null && $guest->coupon_code !== null) {
+                $cart->forceFill(['coupon_code' => $guest->coupon_code])->save();
+            }
             $guest->delete();
             $this->touch($cart);
 
