@@ -15,12 +15,15 @@ use App\Modules\Loyalty\LoyaltyServiceProvider;
 use App\Modules\Media\MediaServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\OnlineCatalog\OnlineCatalogServiceProvider;
+use App\Modules\OnlinePayments\OnlinePaymentsServiceProvider;
+use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Organizations\OrganizationsServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
 use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
+use App\Modules\Shipping\ShippingServiceProvider;
 use App\Modules\Storefront\StorefrontServiceProvider;
 use App\Modules\Suppliers\SuppliersServiceProvider;
 use App\Modules\System\SystemServiceProvider;
@@ -55,6 +58,9 @@ return [
     GeographyServiceProvider::class,
     CustomerAccountsServiceProvider::class,
     CartServiceProvider::class,
+    ShippingServiceProvider::class,
+    OnlinePaymentsServiceProvider::class,
+    OrdersServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

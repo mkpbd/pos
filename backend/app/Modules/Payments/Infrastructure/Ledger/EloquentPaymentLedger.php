@@ -75,6 +75,65 @@ class EloquentPaymentLedger implements PaymentLedger
         }
     }
 
+    public function recordSystem(string $branchId, array $entries, PaymentSource $source, ?string $actorId = null): void
+    {
+        if ($entries === []) {
+            return;
+        }
+        foreach ($entries as $entry) {
+            if ($entry->method->isCash()) {
+                throw new BusinessRuleViolation('CASH_SESSION_REQUIRED', 'Cash goes through a register drawer; record it from an open register session.', [
+                    'branch_id' => $branchId,
+                ]);
+            }
+        }
+
+        $organizationId = $this->tenant->requireOrganization();
+        $currency = $this->organizations->summary($organizationId)['base_currency'] ?? config('pos.default_currency');
+        $now = now();
+
+        foreach ($entries as $entry) {
+            Payment::query()->create([
+                'organization_id' => $organizationId,
+                'branch_id' => $branchId,
+                'cash_register_session_id' => null,
+                'direction' => $entry->direction,
+                'method' => $entry->method,
+                'currency' => $currency,
+                'amount' => Decimal::round($entry->amount, 2),
+                'source_type' => $source->type,
+                'source_id' => $source->id,
+                'source_number' => $source->number,
+                'customer_id' => $entry->customerId,
+                'reference' => $entry->reference,
+                'description' => $entry->description,
+                'created_by' => $actorId,
+                'created_at' => $now,
+            ]);
+        }
+    }
+
+    public function entriesOf(string $sourceType, string $sourceId): array
+    {
+        return Payment::query()
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->orderBy('created_at')->orderBy('id')
+            ->get()
+            ->map(fn (Payment $p) => [
+                'id' => $p->id,
+                'direction' => $p->direction->value,
+                'method' => $p->method->value,
+                'method_label' => $p->method->label(),
+                'amount' => Decimal::round((string) $p->amount, 2),
+                'reference' => $p->reference,
+                'created_at' => $p->created_at?->toIso8601String(),
+                'created_by' => $p->created_by,
+            ])
+            ->values()
+            ->all();
+    }
+
     /**
      * The actor's open session (locked) when it is in this branch.
      *

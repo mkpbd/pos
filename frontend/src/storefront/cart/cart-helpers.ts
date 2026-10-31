@@ -11,3 +11,8 @@ export function useCartCurrency(cart: Pick<Cart, 'currency'> | undefined): strin
 export function isExcluded(line: CartLine): boolean {
   return !line.purchasable || !line.in_stock
 }
+
+/** True when a line or the cart is flagged (not available, out of stock, above the stock): checkout waits for a fix. */
+export function cartNeedsAttention(cart: Pick<Cart, 'items' | 'issues'>): boolean {
+  return cart.issues.length > 0 || cart.items.some((line) => isExcluded(line) || line.exceeds_stock)
+}

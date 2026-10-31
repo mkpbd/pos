@@ -15,8 +15,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $site_name
  * @property ?string $meta_description
  * @property ?string $fulfilment_store_id stock location deciding online availability
+ * @property bool $guest_checkout_enabled shoppers may check out without an account
  */
-#[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id'])]
+#[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, HasUuids, TracksAuthor;
@@ -25,10 +26,11 @@ class StorefrontSettings extends Model
 
     protected $attributes = [
         'is_enabled' => false,
+        'guest_checkout_enabled' => true,
     ];
 
     protected function casts(): array
     {
-        return ['is_enabled' => 'boolean'];
+        return ['is_enabled' => 'boolean', 'guest_checkout_enabled' => 'boolean'];
     }
 }

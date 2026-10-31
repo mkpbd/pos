@@ -90,7 +90,7 @@ describe('mini-cart', () => {
     expect(within(drawer).getByTestId('cart-subtotal')).toHaveTextContent('৳1,350.00')
     expect(within(drawer).getByText('Prices include VAT.')).toBeInTheDocument()
     expect(within(drawer).getByRole('link', { name: 'View cart' })).toHaveAttribute('href', '/cart')
-    expect(within(drawer).queryByRole('button', { name: /checkout/i })).not.toBeInTheDocument()
+    expect(within(drawer).getByRole('link', { name: 'Checkout' })).toHaveAttribute('href', '/checkout')
 
     await user.click(within(drawer).getByRole('button', { name: 'Increase: Quantity of Kids Tee (Red / M)' }))
     await waitFor(() => expect(within(drawer).getByTestId('cart-subtotal')).toHaveTextContent('৳1,800.00'))
@@ -211,7 +211,7 @@ describe('add to cart', () => {
 })
 
 describe('cart page', () => {
-  it('lists the lines with flags and a fix, the server totals with VAT, and no checkout', async () => {
+  it('lists the lines with flags and a fix, the server totals with VAT, and holds checkout until fixed', async () => {
     const patches: unknown[] = []
     const cart = cartFixture(
       [
@@ -249,7 +249,9 @@ describe('cart page', () => {
     expect(screen.getByText('VAT')).toBeInTheDocument()
     expect(screen.getByTestId('cart-total')).toHaveTextContent('৳1,035.00')
     expect(screen.queryByTestId('vat-note')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /checkout/i })).not.toBeInTheDocument()
+    const checkout = screen.getByRole('button', { name: 'Checkout' })
+    expect(checkout).toBeDisabled()
+    expect(checkout).toHaveAccessibleDescription('Please fix the items marked in your cart before checking out.')
     expect(screen.queryByRole('link', { name: /checkout/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Continue shopping' })).toHaveAttribute('href', '/shop')
 

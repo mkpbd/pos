@@ -42,7 +42,7 @@ final class ApiExceptionRenderer
                 'NOT_FOUND', 'The requested resource was not found.', 404,
             ),
             $e instanceof BusinessRuleViolation => ApiResponse::error(
-                $e->errorCode, $e->getMessage(), 422, $e->details,
+                $e->errorCode, $e->getMessage(), $e->status, $e->details,
             ),
             // A unique index caught a race that validation could not see (two requests at once).
             $e instanceof UniqueConstraintViolationException => ApiResponse::error(

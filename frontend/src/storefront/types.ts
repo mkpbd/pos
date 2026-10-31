@@ -377,3 +377,113 @@ export type WishlistItem = { id: string; product: ProductCard; variant_id: strin
 
 /** GET /store/wishlist (signed-in customers only). */
 export type Wishlist = { items: WishlistItem[] }
+
+/* ---------------------------------------------------------------------------------------
+ * Checkout and orders (E8a) — /api/v1/store/checkout*, /store/shipping-methods, /store/orders/{number}
+ * ------------------------------------------------------------------------------------- */
+
+export type PaymentMethodCode = 'cod' | 'bank_transfer'
+
+/** GET /store/checkout/options */
+export type CheckoutOptions = {
+  available: boolean
+  reason: null | 'no_fulfilment_store' | 'cart_empty' | (string & {})
+  guest_checkout: boolean
+  payment_methods: { code: PaymentMethodCode; display_name: string; instructions_preview?: string | null }[]
+  signed_in: boolean
+}
+
+/** A delivery method of the zone that serves a district. */
+export type ShippingMethod = {
+  id: string
+  name: string
+  description: string | null
+  fee: string
+  /** Delivery is free when the cart total reaches this amount. */
+  free_over: string | null
+  cod_allowed: boolean
+  cod_fee: string
+  eta_min_days: number
+  eta_max_days: number
+}
+
+/** POST /store/checkout/preview — the cart repriced with delivery and COD fees. */
+export type CheckoutPreview = {
+  lines: CartLine[]
+  subtotal: string
+  tax_total: string
+  shipping_total: string
+  cod_fee: string
+  total: string
+  currency: string | null
+  prices_include_tax: boolean
+  shipping_methods: ShippingMethod[]
+  shipping_method_id: string | null
+  payment_method: PaymentMethodCode | null
+  issues: CartIssue[]
+}
+
+export type CheckoutAddressInput = {
+  recipient_name: string
+  phone: string
+  division_id: GeoId
+  district_id: GeoId
+  area?: string
+  address_line: string
+  postcode?: string
+}
+
+/** POST /store/checkout (with an Idempotency-Key header). */
+export type PlaceOrderInput = {
+  contact: { name: string; email: string; phone: string }
+  shipping_address_id?: string
+  address?: CheckoutAddressInput
+  save_address?: boolean
+  shipping_method_id: string
+  payment_method: PaymentMethodCode
+  notes?: string
+  expected_total: string
+}
+
+/** The pricing part of the place body; the preview tolerates partial input. */
+export type CheckoutPreviewInput = {
+  shipping_address_id?: string
+  address?: Partial<CheckoutAddressInput>
+  shipping_method_id?: string
+  payment_method?: PaymentMethodCode
+}
+
+export type OrderStatus = 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed' | (string & {})
+
+/** GET /store/orders/{number}?token= — and the `order` of the placement response. */
+export type OrderView = {
+  number: string
+  status: OrderStatus
+  status_label: string
+  payment_status: 'unpaid' | 'paid' | (string & {})
+  payment_method: PaymentMethodCode
+  payment_method_label: string
+  /** Bank transfer details while the order waits for the money; null otherwise. */
+  payment_instructions: string | null
+  placed_at: string
+  expires_at: string | null
+  contact: { name: string; email: string; phone: string }
+  shipping_address: { recipient_name: string; phone: string; division: string; district: string; area: string | null; address_line: string; postcode: string | null }
+  shipping_method_name: string | null
+  eta_min_days: number | null
+  eta_max_days: number | null
+  lines: { product_name: string; variant_name: string | null; sku: string; image_url: string | null; quantity: string; unit_price: string; line_total: string; product_url: string | null }[]
+  subtotal: string
+  tax_total: string
+  shipping_total: string
+  cod_fee: string
+  total: string
+  currency: string | null
+  prices_include_tax: boolean
+  courier_name: string | null
+  tracking_number: string | null
+  history: { status: OrderStatus; label: string; at: string }[]
+}
+
+/** 201 of POST /store/checkout; the access token is only for guests (null for customers). */
+export type PlacedOrder = { order: OrderView; access_token: string | null }

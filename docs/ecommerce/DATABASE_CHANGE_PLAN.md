@@ -74,8 +74,12 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `customer_password_reset_tokens` — organization_id, email, token hash, created_at.
 - `customer_addresses` (Customers) — customer_id, label, recipient_name, phone, division_id, district_id, area_id, address_line, postcode, is_default_shipping, is_default_billing, soft delete.
 
+*As built (E7):* `customer_accounts` has no `phone_verified_at` (no phone OTP yet) and adds `email_verification_token_hash` / `email_verification_sent_at` (24-hour link); the e-mail index is a plain `(organization_id, lower(email))` unique index (e-mail is required). `customer_password_reset_tokens` is keyed `(organization_id, email)` — one live token per address — and replaces a Laravel password broker. `customer_addresses` stores a free-text `area` (≤ 100) instead of `area_id`, and references `geo_divisions` / `geo_districts` directly.
+
 ### Shipping
 - `geo_divisions` (8), `geo_districts` (64), `geo_areas` (upazila/thana, admin-extendable) — **global reference tables** (no organization_id), name_en, name_bn, code. Seeded from an openly licensed dataset (source to be confirmed in E8).
+
+*As built (E7):* `geo_divisions` and `geo_districts` shipped early, in their own `Geography` module (addresses needed them before Shipping exists), with fixed ids and BBS codes from a bundled PHP data file loaded by the migration. `geo_areas` is **deferred** until a licensed upazila/thana dataset is confirmed.
 - `shipping_zones` — name, is_active; `shipping_zone_districts` (zone_id, district_id) PK pair; unique district per org enforced in app (one zone per district).
 - `shipping_methods` — zone_id, name, code, rate_type `flat|weight|order_total`, base_fee, per_kg_fee, free_over NUMERIC NULL, cod_allowed, cod_fee, eta_min_days, eta_max_days, is_active, sort_order.
 - `couriers` — name, tracking_url_template, is_active.
@@ -86,6 +90,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `cart_items` — cart_id, variant_id, quantity NUMERIC(18,3) CHECK > 0. Unique `(cart_id, variant_id)`. **No price columns** — always repriced.
 - `wishlists` — customer_id unique (guest wishlist lives in the browser and is merged on login).
 - `wishlist_items` — wishlist_id, product_id, variant_id NULL, created_at. Unique `(wishlist_id, product_id, variant_id)`.
+
+*As built (E7):* `carts` has no `currency`, `coupon_code` or `converted_order_id` yet (currency comes from the organization on every read; coupons and conversion arrive with checkout in E8), so the partial unique index is `(customer_id) WHERE customer_id IS NOT NULL`; guest carts carry `expires_at` (30 days after the last change, `cart:prune`), customer carts none. `cart_items` CHECK `quantity > 0` on PostgreSQL. `wishlists` carries `organization_id`; because `wishlist_items.variant_id` is nullable, uniqueness is two partial indexes — `(wishlist_id, product_id) WHERE variant_id IS NULL` and `(wishlist_id, product_id, variant_id) WHERE variant_id IS NOT NULL` — valid on PostgreSQL and SQLite.
 
 ### Promotions
 - `promotions` — name, type `percent|fixed|free_shipping`, value, scope `order|products|categories|brands`, min_subtotal, max_discount, customer_group_id NULL, channel `web|pos|all` (POS use later), is_automatic, starts_at, ends_at, priority, is_stackable, show_countdown, is_active, usage_limit, usage_limit_per_customer.

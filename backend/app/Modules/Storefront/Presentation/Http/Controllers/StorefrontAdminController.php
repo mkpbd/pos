@@ -41,6 +41,7 @@ class StorefrontAdminController
             'site_name' => ['sometimes', 'required', 'string', 'max:120'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:300'],
             'fulfilment_store_id' => ['sometimes', 'nullable', 'uuid'],
+            'guest_checkout_enabled' => ['sometimes', 'boolean'],
         ]);
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)));

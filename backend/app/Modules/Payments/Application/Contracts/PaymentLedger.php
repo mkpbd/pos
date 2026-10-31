@@ -33,4 +33,22 @@ interface PaymentLedger
      * @throws BusinessRuleViolation CASH_SESSION_REQUIRED, INSUFFICIENT_CASH
      */
     public function record(TenantUser $actor, string $branchId, array $entries, PaymentSource $source): void;
+
+    /**
+     * Appends entries that do not pass through a register drawer (ADR-006): money confirmed
+     * by staff or a gateway for a document such as a web order. `$actorId` is the staff user
+     * who confirmed it (null = system). Cash needs a drawer, so cash entries are refused.
+     *
+     * @param  list<LedgerEntry>  $entries
+     *
+     * @throws BusinessRuleViolation CASH_SESSION_REQUIRED
+     */
+    public function recordSystem(string $branchId, array $entries, PaymentSource $source, ?string $actorId = null): void;
+
+    /**
+     * The ledger entries of one document, oldest first.
+     *
+     * @return list<array{id: string, direction: string, method: string, method_label: string, amount: string, reference: ?string, created_at: ?string, created_by: ?string}>
+     */
+    public function entriesOf(string $sourceType, string $sourceId): array;
 }

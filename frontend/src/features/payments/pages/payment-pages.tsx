@@ -27,6 +27,7 @@ function sourceLink(entry: PaymentEntry): string | null {
   if (!entry.source_id) return null
   if (entry.source_type === 'sale' || entry.source_type === 'sale_cancellation') return `/sales/${entry.source_id}`
   if (entry.source_type === 'sale_return') return `/returns/${entry.source_id}`
+  if (entry.source_type === 'online_order') return `/web-orders/${entry.source_id}`
   return null
 }
 

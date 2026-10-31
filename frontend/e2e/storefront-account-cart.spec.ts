@@ -244,13 +244,13 @@ test('a guest cart and wishlist follow the shopper into a new account', async ({
   expect(state.csrf.every((token) => token === 'e2e-token')).toBe(true)
   expect(await page.evaluate(() => localStorage.getItem('sf:wishlist'))).toBeNull()
 
-  // The cart page shows the merged lines and the server's totals with VAT; no checkout yet.
+  // The cart page shows the merged lines and the server's totals with VAT, and leads to checkout.
   await page.goto('/cart')
   await expect(page.getByTestId('cart-line')).toHaveCount(2)
   await expect(page.getByTestId('cart-subtotal')).toHaveText('৳800.00')
   await expect(page.getByTestId('cart-tax')).toHaveText('৳120.00')
   await expect(page.getByTestId('cart-total')).toHaveText('৳920.00')
-  await expect(page.getByRole('button', { name: /checkout/i })).toHaveCount(0)
+  await expect(page.getByTestId('cart-page').getByRole('link', { name: 'Checkout' })).toHaveAttribute('href', '/checkout')
 
   // Add an address: division, then a district of that division.
   await page.goto('/account/addresses')

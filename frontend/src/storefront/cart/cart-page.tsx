@@ -4,6 +4,7 @@ import { primaryButtonClass, secondaryButtonClass, Spinner } from '../account/fo
 import { useDocumentTitle } from '../use-document-title'
 import { useCartQuery } from './api'
 import { CartLines, CartTotals } from './cart-lines'
+import { CheckoutButton } from './checkout-button'
 import { displayQuantity } from './quantity'
 
 /**
@@ -55,6 +56,7 @@ export function CartPage() {
                 Cart totals
               </h2>
               <CartTotals cart={data} />
+              <CheckoutButton cart={data} />
               <Link to="/shop" className={secondaryButtonClass}>
                 Continue shopping
               </Link>

@@ -7,6 +7,8 @@ export type StorefrontSettings = {
   meta_description: string | null
   /** Store whose stock decides web availability; null = tracked products show as out of stock. */
   fulfilment_store_id: string | null
+  /** Shoppers may check out without an account (default on). */
+  guest_checkout_enabled?: boolean
   updated_at: string | null
 }
 
@@ -231,7 +233,7 @@ export function useSaveStorefrontSettingsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id'>>) =>
+    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id' | 'guest_checkout_enabled'>>) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),
   })

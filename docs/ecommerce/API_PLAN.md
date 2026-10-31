@@ -43,15 +43,15 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | GET `/store/products/{slug}/related` | P | E6 | Related + frequently bought together |
 | GET `/store/products/{slug}/reviews` | P | E9 | Approved only, paginated |
 | GET `/store/search/suggest?q=` | P | E6 | ≤ 8 products + categories, `pg_trgm` (*E6: ≤ 6 products + ≤ 4 categories, substring match; trigram index only speeds it up, no similarity ranking*) |
-| GET `/store/geo/divisions` · `/districts?division=` · `/areas?district=` | P | E7 | Global reference data, long cache |
-| POST `/store/account/register` · `login` · `logout` · `forgot-password` · `reset-password` · `verify-email` | P/C | E7 | `throttle:customer-auth` |
+| GET `/store/geo/divisions` · `/districts?division=` · `/areas?district=` | P | E7 | Global reference data, long cache (*E7: divisions and districts only, `max-age=86400`; `/areas` waits for an upazila/thana dataset — addresses carry a free-text `area`*) |
+| POST `/store/account/register` · `login` · `logout` · `forgot-password` · `reset-password` · `verify-email` | P/C | E7 | `throttle:customer-auth` (*E7: plus GET `/store/account/me` (null for guests) and POST `/store/account/verification-notification`; `logout` unthrottled beyond `storefront`, `verify-email` on `storefront-write`; register/login/reset return `{customer, merge}`; reset uses an own token table, not a broker*) |
 | GET/PUT `/store/account/profile` · PUT `/store/account/password` | C | E7 | |
-| GET/POST/PUT/DELETE `/store/account/addresses[/{id}]` | C | E7 | |
+| GET/POST/PUT/DELETE `/store/account/addresses[/{id}]` | C | E7 | (*E7: changes use PATCH, not PUT; max 10, `ADDRESS_LIMIT_REACHED`*) |
 | GET `/store/cart` | P/C | E7 | Guest cart by httpOnly `cart_token` cookie; always repriced |
-| POST `/store/cart/items` · PATCH/DELETE `/store/cart/items/{id}` | P/C | E7 | `throttle:storefront-write` |
+| POST `/store/cart/items` · PATCH/DELETE `/store/cart/items/{id}` | P/C | E7 | `throttle:storefront-write` (*E7: also DELETE `/store/cart`*) |
 | POST/DELETE `/store/cart/coupon` | P/C | E8 | `throttle:coupon` |
 | POST `/store/cart/estimate` | P/C | E8 | District → shipping options and totals |
-| GET/POST/DELETE `/store/wishlist[/items/{id}]` | C | E7 | Guest wishlist local, merged on login |
+| GET/POST/DELETE `/store/wishlist[/items/{id}]` | C | E7 | Guest wishlist local, merged on login (*E7: POST `/store/wishlist/merge`, ≤ 100 entries per call, ≤ 200 per wishlist*) |
 | GET `/store/shipping-methods?district_id=` | P | E8 | |
 | POST `/store/checkout/preview` | P/C | E8 | Server totals for the chosen address/method/payment |
 | POST `/store/checkout` | P/C, I | E8 | Creates order (stock posted); returns order number, guest access token, next payment action |
@@ -86,6 +86,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | Shipping | CRUD `/shipping/zones`, `/shipping/methods`, `/shipping/couriers` | shipping.manage | E8 |
 | Promotions | CRUD `/promotions`, `/promotions/{id}/coupons`, GET `/promotions/{id}/redemptions` | promotions.view / .manage | E8 |
 | Payment gateways | GET `/payment-gateways`, PUT `/payment-gateways/{code}` (credentials write-only) | payment_gateways.manage | E8 |
+| Customer online accounts | `online_account` in GET `/customers/{id}`; PATCH `/customer-accounts/{customerId}` `{status}` (*added in E7*) | customers.view / customers.manage | E7 |
 | Web orders | GET `/web-orders`, `/web-orders/{id}`; POST `/{id}/confirm`, `/process`, `/ship` (shipment), `/deliver`, `/cancel` (I), `/confirm-payment` (bank transfer, I), `/cod-remittance` (I) | web_orders.view / .manage | E8/E10 |
 | Online returns | GET `/web-orders/returns`, POST `/web-orders/{id}/returns` (I), POST `/web-orders/returns/{id}/approve` (I) / `/reject` | web_orders.refund | E10 |
 | Reviews | GET `/reviews`, POST `/reviews/{id}/approve` / `/reject` | reviews.moderate | E9/E10 |
@@ -96,6 +97,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 `STOREFRONT_NOT_FOUND` (404) · `PRODUCT_NOT_AVAILABLE` (variant unpublished/inactive) · `INSUFFICIENT_STOCK` (existing, reused) · `CART_EMPTY` · `CART_CHANGED` (prices/availability moved since preview; client re-previews) · `COUPON_INVALID` · `COUPON_NOT_APPLICABLE` · `COUPON_LIMIT_REACHED` · `SHIPPING_NOT_AVAILABLE` · `PAYMENT_METHOD_NOT_AVAILABLE` · `ORDER_NOT_PAYABLE` · `PAYMENT_VERIFICATION_FAILED` · `ORDER_TRANSITION_NOT_ALLOWED` · `RETURN_WINDOW_CLOSED` · `REVIEW_ALREADY_EXISTS` · `MEDIA_IN_USE` (via `IN_USE`) · `CUSTOM_CSS_REJECTED`.
 
 *Added in E6:* `COMPARE_AT_NOT_ABOVE_PRICE`, `PRODUCT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND`, `STORE_NOT_FOUND`; reused `PRODUCT_NOT_SELLABLE`, `SCHEDULE_INVALID`, `SECTION_ITEMS_INVALID`, `MEDIA_NOT_FOUND`. A taken slug is a field error (`VALIDATION_FAILED`), not a separate code.
+
+*Added in E7:* `VARIANT_NOT_PURCHASABLE` (instead of the planned `PRODUCT_NOT_AVAILABLE`), `OUT_OF_STOCK`, `CART_FULL`, `WISHLIST_FULL`, `ADDRESS_LIMIT_REACHED`; reused `INSUFFICIENT_STOCK` (`details.max_quantity`, `in_cart`), `INVALID_CREDENTIALS`, `TOKEN_INVALID`, `SESSION_UNAVAILABLE`. A wrong reset token, a wrong current password and a non-live wishlist product are field errors (`VALIDATION_FAILED`).
 
 ## 5. OpenAPI (Scramble) tags
 

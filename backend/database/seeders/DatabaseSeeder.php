@@ -69,5 +69,6 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoStockSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
         $this->callWith(DemoSalesSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
         $this->callWith(DemoStorefrontSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
+        $this->callWith(DemoCheckoutSeeder::class, ['organizationId' => $result['organization']->id]);
     }
 }

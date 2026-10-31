@@ -39,6 +39,18 @@ class CustomerAddressBook
     }
 
     /**
+     * One of the customer's addresses, or null (another customer's address is not found).
+     *
+     * @return AddressView|null
+     */
+    public function find(string $customerId, string $addressId): ?array
+    {
+        $address = $this->query($customerId)->whereKey($addressId)->first();
+
+        return $address === null ? null : $this->present(new Collection([$address]))[0];
+    }
+
+    /**
      * @param  array{label?: ?string, recipient_name: string, phone: string, division_id: int, district_id: int, area: string, address_line: string, postcode?: ?string, is_default_shipping?: bool, is_default_billing?: bool}  $data
      * @return AddressView
      */

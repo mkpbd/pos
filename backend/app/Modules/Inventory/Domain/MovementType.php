@@ -14,6 +14,8 @@ enum MovementType: string
     case Sale = 'sale';
     case SaleCancellation = 'sale_cancellation';
     case SaleReturn = 'sale_return';
+    case OnlineOrder = 'online_order';
+    case OnlineOrderCancel = 'online_order_cancel';
 
     /**
      * Inbound movements bring their own unit cost and update the weighted average;
@@ -21,6 +23,14 @@ enum MovementType: string
      */
     public function isInbound(): bool
     {
-        return in_array($this, [self::Opening, self::AdjustmentIn, self::TransferIn, self::PurchaseReceipt, self::SaleCancellation, self::SaleReturn], true);
+        return in_array($this, [self::Opening, self::AdjustmentIn, self::TransferIn, self::PurchaseReceipt, self::SaleCancellation, self::SaleReturn, self::OnlineOrderCancel], true);
+    }
+
+    /**
+     * Web orders never oversell (ADR-004): the branch's allow_negative_stock does not apply.
+     */
+    public function forbidsNegativeStock(): bool
+    {
+        return $this === self::OnlineOrder;
     }
 }

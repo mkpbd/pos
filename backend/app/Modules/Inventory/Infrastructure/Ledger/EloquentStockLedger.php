@@ -11,11 +11,11 @@ use App\Modules\Inventory\Infrastructure\Models\Batch;
 use App\Modules\Inventory\Infrastructure\Models\StockLevel;
 use App\Modules\Inventory\Infrastructure\Models\StockMovement;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
+use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
@@ -118,7 +118,7 @@ class EloquentStockLedger implements StockLedger
                     4,
                 );
         } else {
-            if (Decimal::isNegative($newQuantity) && ! $store['allow_negative_stock']) {
+            if (Decimal::isNegative($newQuantity) && (! $store['allow_negative_stock'] || $change->type->forbidsNegativeStock())) {
                 throw $this->insufficient($store, $variant, $change, $level->quantity);
             }
             $cost = $change->unitCost !== null ? Decimal::round($change->unitCost, 4) : $level->average_cost;
@@ -144,7 +144,7 @@ class EloquentStockLedger implements StockLedger
             'reference_type' => $reference->type,
             'reference_id' => $reference->id,
             'reference_number' => $reference->number,
-            'created_by' => Auth::id(),
+            'created_by' => StaffActor::id(),
             'created_at' => $now,
         ]);
 
@@ -198,7 +198,7 @@ class EloquentStockLedger implements StockLedger
         }
 
         if (Decimal::compare($remaining, '0') > 0) {
-            if (! $store['allow_negative_stock']) {
+            if (! $store['allow_negative_stock'] || $change->type->forbidsNegativeStock()) {
                 $available = $usable->reduce(fn (string $sum, array $c) => Decimal::add($sum, $c['level']->quantity, 3), '0.000');
                 throw $this->insufficient($store, $variant, $change, $available);
             }

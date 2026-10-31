@@ -20,6 +20,13 @@ interface UserDirectory
     public function withPermissionInBranch(string $organizationId, string $permission, string $branchId): Collection;
 
     /**
+     * Active users of the organization holding the permission (any branch).
+     *
+     * @return Collection<int, Authenticatable&RoutesNotifications>
+     */
+    public function withPermission(string $organizationId, string $permission): Collection;
+
+    /**
      * Display names keyed by user id (users of other organizations are left out).
      *
      * @param  list<string>  $userIds

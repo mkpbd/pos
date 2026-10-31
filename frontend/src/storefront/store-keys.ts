@@ -8,3 +8,11 @@ export const customerKeys = {
   divisions: ['store', 'geo', 'divisions'] as const,
   districts: (division: string) => ['store', 'geo', 'districts', division] as const,
 }
+
+/** Checkout and order queries (E8a). */
+export const checkoutKeys = {
+  options: ['store', 'checkout', 'options'] as const,
+  preview: (input: unknown) => ['store', 'checkout', 'preview', input] as const,
+  previewAll: ['store', 'checkout', 'preview'] as const,
+  order: (number: string) => ['store', 'orders', number] as const,
+}

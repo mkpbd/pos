@@ -16,6 +16,7 @@ Phase **E3**. Status of every record: **Accepted 2026-10-31** (owner proceeded p
 **Decision.** `customer_accounts` (1:1 `customers`), session guard `customer` (provider `customer_accounts`), password broker `customers`. `config/sanctum.php` keeps `guard => ['web']`, so a customer session can never satisfy `auth:sanctum`. Storefront account routes use `auth:customer`.
 **Session rule.** Customer logout calls `Auth::guard('customer')->logout()` + `session()->regenerateToken()`, **never** `session()->invalidate()` (that would also log out a staff user in the same browser). Login regenerates the session id (fixation).
 **Consequences.** Tests: customer cookie → 401 on staff routes; staff cookie → 401 on `/store/account/*`; customer logout keeps staff logged in.
+*As built (E7):* no password broker — password resets use the module's own `customer_password_reset_tokens` (organization + e-mail, sha-256, 60 minutes). Storefront hosts get their session and CSRF from the `storefront.session` middleware, not from `SANCTUM_STATEFUL_DOMAINS`. Because `auth:customer` makes `customer` the default guard, author and audit columns use `StaffActor::id()` (staff only). All three tests above exist (`CustomerSessionTest`).
 
 ## ADR-003 Online orders are their own document
 
@@ -79,6 +80,7 @@ Phase **E3**. Status of every record: **Accepted 2026-10-31** (owner proceeded p
 ## ADR-015 Rate limits for public endpoints
 
 **Decision.** New limiters: `storefront` 300/min per IP (reads), `storefront-write` 30/min per IP+cart (cart, wishlist), `checkout` 10/min per IP+cart, `customer-auth` same shape as `auth` (5/min per e-mail+IP, 20/min per IP), `coupon` 10/min per cart (brute force), `contact`/`newsletter` 5/hour per IP, webhooks unthrottled but signature/verify gated. Listing `per_page` capped at 48.
+*As built (E7):* `storefront-write` is 60/min per IP plus 60/min per signed-in customer (not per cart); `customer-auth` takes its numbers from `POS_AUTH_RATE_LIMIT` like staff sign-in.
 
 ## ADR-016 Roles
 
@@ -87,3 +89,8 @@ Phase **E3**. Status of every record: **Accepted 2026-10-31** (owner proceeded p
 ## ADR-017 Out of scope for v1
 
 Product compare, multi-currency, split fulfilment across stores, marketplace, subscriptions, bundles, blog comments, Instagram API feed (footer gallery is admin-curated media), drag-and-drop page builder, offline/PWA checkout.
+
+## ADR-018 Registration never links POS customers
+
+*Accepted 2026-10-31 (E7).*
+Registration never links POS customers. Every sign-up creates a new `customers` row (CUS sequence) with its 1:1 `customer_accounts` row. It never attaches to an existing customer with the same e-mail or phone, because proving ownership of a known number would allow account takeover. The phone goes on the new customer only when no other live customer uses it, so the till's unique lookup and non-enumeration both hold. Staff linking or merging of online and POS customers is out of scope (later phase).

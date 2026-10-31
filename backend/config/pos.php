@@ -29,4 +29,7 @@ return [
     // Sign-in / reset attempts per minute per account+IP (four times that per IP). Full-stack e2e runs raise it.
     'auth_rate_limit' => (int) env('POS_AUTH_RATE_LIMIT', 5),
 
+    // Storefront checkout previews and placements per minute per IP + cart (ADR-015). Full-stack e2e runs raise it.
+    'checkout_rate_limit' => (int) env('POS_CHECKOUT_RATE_LIMIT', 10),
+
 ];

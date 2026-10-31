@@ -41,6 +41,7 @@ export const PAYMENT_SOURCES: Record<string, string> = {
   income_void: 'Voided income',
   cash_in: 'Cash in',
   cash_out: 'Cash out',
+  online_order: 'Online orders',
 }
 
 export type PaymentsLedgerParams = {

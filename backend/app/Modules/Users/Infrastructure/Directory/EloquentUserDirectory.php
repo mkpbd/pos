@@ -22,6 +22,16 @@ class EloquentUserDirectory implements UserDirectory
             ->values();
     }
 
+    public function withPermission(string $organizationId, string $permission): Collection
+    {
+        return User::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $organizationId)
+            ->where('status', UserStatus::Active->value)
+            ->whereHas('roles.permissions', fn (Builder $q) => $q->where('name', $permission))
+            ->get()
+            ->values();
+    }
+
     public function names(string $organizationId, array $userIds): array
     {
         if ($userIds === []) {

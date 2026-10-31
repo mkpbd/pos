@@ -85,6 +85,10 @@ const pages = {
   customerPayments: page(() => import('@/features/payments/pages/payment-pages'), 'CustomerPaymentsPage'),
   expenses: page(() => import('@/features/expenses/pages/expenses-page'), 'ExpensesPage'),
   loyalty: page(() => import('@/features/loyalty/pages/loyalty-page'), 'LoyaltyPage'),
+  webOrders: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrdersPage'),
+  webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
+  storefrontShipping: page(() => import('@/features/shipping/pages/shipping-page'), 'ShippingPage'),
+  storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
 }
 
 const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage']
@@ -123,6 +127,8 @@ export const routes: RouteObject[] = [
                 element: <RequirePermission permission="sales.view" />,
                 children: [guarded('returns.create', 'sales/:saleId/return', pages.newReturn)],
               },
+              guarded('web_orders.view', 'web-orders', pages.webOrders),
+              guarded('web_orders.view', 'web-orders/:orderId', pages.webOrder),
               guarded('returns.view', 'returns', pages.returns),
               guarded('returns.view', 'returns/:returnId', pages.saleReturn),
               guarded(REGISTER_PERMISSIONS, 'cash-registers', pages.cashRegisters),
@@ -166,6 +172,8 @@ export const routes: RouteObject[] = [
               guarded('storefront.view', 'storefront/menus', pages.storefrontMenus),
               guarded('storefront.view', 'storefront/homepage', pages.storefrontHomepage),
               guarded('storefront.view', 'storefront/banners', pages.storefrontBanners),
+              guarded('shipping.manage', 'storefront/shipping', pages.storefrontShipping),
+              guarded('payment_gateways.manage', 'storefront/payments', pages.storefrontPayments),
               guarded('online_catalog.view', 'storefront/categories', pages.webCategories),
               guarded('online_catalog.view', 'storefront/brands', pages.webBrands),
               { path: 'content', element: <Navigate to="/content/pages" replace /> },

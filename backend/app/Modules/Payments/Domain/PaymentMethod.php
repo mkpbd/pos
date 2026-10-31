@@ -13,6 +13,10 @@ enum PaymentMethod: string
     case MobileBanking = 'mobile_banking';
     case BankTransfer = 'bank_transfer';
     case Cheque = 'cheque';
+    /** Cash a courier collected on delivery of a web order (recorded when staff confirm the remittance). */
+    case CashOnDelivery = 'cash_on_delivery';
+    /** Paid through an online payment gateway (the gateway code is kept in the reference). */
+    case OnlineGateway = 'online_gateway';
 
     public function label(): string
     {
@@ -22,6 +26,8 @@ enum PaymentMethod: string
             self::MobileBanking => 'Mobile banking',
             self::BankTransfer => 'Bank transfer',
             self::Cheque => 'Cheque',
+            self::CashOnDelivery => 'Cash on delivery',
+            self::OnlineGateway => 'Online payment',
         };
     }
 

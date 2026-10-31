@@ -22,10 +22,10 @@ class StorefrontShellController
     /** Storefront routes that exist in this phase (exact paths); content pages are looked up. */
     private const KNOWN_PATHS = ['/', '/shop', '/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
 
-    /** Shopper pages (E7): account, cart and wishlist. Personal, never indexed. */
+    /** Shopper pages (E7, E8a): account, cart, wishlist and checkout. Personal, never indexed. */
     private const ACCOUNT_PATHS = [
         '/account', '/account/login', '/account/register', '/account/forgot-password', '/account/reset-password',
-        '/account/verify-email', '/account/profile', '/account/addresses', '/cart', '/wishlist',
+        '/account/verify-email', '/account/profile', '/account/addresses', '/cart', '/wishlist', '/checkout',
     ];
 
     /** Utility pages that search engines should not index. */
@@ -60,8 +60,15 @@ class StorefrontShellController
             $meta['title'] = match ($path) {
                 '/cart' => 'Cart',
                 '/wishlist' => 'Wishlist',
+                '/checkout' => 'Checkout',
                 default => 'My account',
             }.' | '.$data['store']['name'];
+        }
+        // Order confirmation / status pages (E8a): personal, never indexed; the SPA asks the API.
+        $orderPage = preg_match('#^/order/[A-Za-z0-9-]{1,40}$#', $path) === 1;
+        if ($orderPage) {
+            $status = 200;
+            $meta['title'] = 'Your order | '.$data['store']['name'];
         }
         if (preg_match('#^/(category|brand|product)/([A-Za-z0-9-]{1,120})$#', $path, $m) === 1 && ($found = $catalog->pageMeta($m[1], $m[2])) !== null) {
             $status = 200;
@@ -72,7 +79,7 @@ class StorefrontShellController
                 'type' => $m[1] === 'product' ? 'product' : 'website',
             ];
         }
-        $noindex = $data['preview'] || $status === 404 || in_array($path, self::NOINDEX_PATHS, true);
+        $noindex = $data['preview'] || $status === 404 || $orderPage || in_array($path, self::NOINDEX_PATHS, true);
 
         $html = $this->inject((string) file_get_contents($shell), $data, $meta, $request->url(), $noindex);
 

@@ -178,10 +178,11 @@ export function useChangePasswordMutation() {
 
 export const MAX_ADDRESSES = 10
 
-export function useAddressesQuery() {
+export function useAddressesQuery(enabled = true) {
   return useQuery({
     queryKey: customerKeys.addresses,
     queryFn: ({ signal }) => storeApi.get<CustomerAddress[]>('/store/account/addresses', { signal }).then((r) => r.data),
+    enabled,
   })
 }
 

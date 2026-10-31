@@ -1,4 +1,4 @@
-import type { Cart, CartLine, Customer, CustomerAddress, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
+import type { Cart, CartLine, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, OrderView, ShippingMethod, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
 
 let nextId = 0
 
@@ -240,6 +240,87 @@ export function addressFixture(id: string, overrides: Partial<CustomerAddress> =
     postcode: '1205',
     is_default_shipping: true,
     is_default_billing: true,
+    ...overrides,
+  }
+}
+
+/* E8a: checkout and orders --------------------------------------------------------------- */
+
+export function checkoutOptionsFixture(overrides: Partial<CheckoutOptions> = {}): CheckoutOptions {
+  return {
+    available: true,
+    reason: null,
+    guest_checkout: true,
+    payment_methods: [
+      { code: 'cod', display_name: 'Cash on delivery', instructions_preview: null },
+      { code: 'bank_transfer', display_name: 'Bank transfer', instructions_preview: null },
+    ],
+    signed_in: false,
+    ...overrides,
+  }
+}
+
+export function shippingMethodFixture(id: string, overrides: Partial<ShippingMethod> = {}): ShippingMethod {
+  return {
+    id,
+    name: 'Home delivery',
+    description: 'Delivered to your door',
+    fee: '60.00',
+    free_over: '2000.00',
+    cod_allowed: true,
+    cod_fee: '0.00',
+    eta_min_days: 1,
+    eta_max_days: 2,
+    ...overrides,
+  }
+}
+
+/** A checkout preview as POST /store/checkout/preview returns it (totals are whatever the test says). */
+export function previewFixture(overrides: Partial<CheckoutPreview> = {}): CheckoutPreview {
+  return {
+    lines: [cartLine('l-1')],
+    subtotal: '900.00',
+    tax_total: '0.00',
+    shipping_total: '0.00',
+    cod_fee: '0.00',
+    total: '900.00',
+    currency: 'BDT',
+    prices_include_tax: true,
+    shipping_methods: [],
+    shipping_method_id: null,
+    payment_method: null,
+    issues: [],
+    ...overrides,
+  }
+}
+
+export function orderFixture(overrides: Partial<OrderView> = {}): OrderView {
+  return {
+    number: 'WEB-000001',
+    status: 'confirmed',
+    status_label: 'Confirmed',
+    payment_status: 'unpaid',
+    payment_method: 'cod',
+    payment_method_label: 'Cash on delivery',
+    payment_instructions: null,
+    placed_at: '2026-10-31T10:00:00+06:00',
+    expires_at: null,
+    contact: { name: 'Rina Akter', email: 'rina@example.com', phone: '01712345678' },
+    shipping_address: { recipient_name: 'Rina Akter', phone: '01712345678', division: 'Dhaka', district: 'Dhaka', area: 'Dhanmondi', address_line: 'House 12, Road 5', postcode: '1205' },
+    shipping_method_name: 'Home delivery',
+    eta_min_days: 1,
+    eta_max_days: 2,
+    lines: [{ product_name: 'Kids Tee', variant_name: 'Red / M', sku: 'TEE-RM', image_url: null, quantity: '2.000', unit_price: '450.00', line_total: '900.00', product_url: '/product/kids-tee' }],
+    subtotal: '900.00',
+    tax_total: '0.00',
+    shipping_total: '60.00',
+    cod_fee: '0.00',
+    total: '960.00',
+    currency: 'BDT',
+    prices_include_tax: true,
+    courier_name: null,
+    tracking_number: null,
+    history: [{ status: 'confirmed', label: 'Confirmed', at: '2026-10-31T10:00:00+06:00' }],
     ...overrides,
   }
 }

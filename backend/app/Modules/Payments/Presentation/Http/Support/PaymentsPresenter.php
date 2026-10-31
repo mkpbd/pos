@@ -37,6 +37,8 @@ class PaymentsPresenter
         'income_void' => 'Voided income',
         'cash_in' => 'Cash in',
         'cash_out' => 'Cash out',
+        'online_order' => 'Online orders',
+        'online_order_refund' => 'Online order refunds',
     ];
 
     public function __construct(

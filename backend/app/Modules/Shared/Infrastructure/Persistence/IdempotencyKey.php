@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  * Stored outcome of an idempotent request; see EnsureIdempotency.
  *
  * @property string $id
- * @property string $user_id
+ * @property string $scope user:{id} | customer:{account id} | cart:{cart token hash}
+ * @property ?string $user_id
  * @property string $key
  * @property string $fingerprint
  * @property string $status

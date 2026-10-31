@@ -35,6 +35,25 @@ class CartPricer
      */
     public function price(?Cart $cart): array
     {
+        return $this->quote($cart)['cart'];
+    }
+
+    /**
+     * The cart as the storefront shows it plus what checkout needs to write an order: per
+     * counted line (purchasable and in stock, in cart order) the snapshot data and the
+     * SaleCalculator amounts, and the organization's tax mode.
+     *
+     * @return array{
+     *   cart: array<string, mixed>,
+     *   lines: list<array{variant_id: string, product_id: string, product_slug: ?string, product_name: string, variant_name: ?string,
+     *     option_values: array<string, string>, sku: string, image_url: ?string, quantity: string, unit_price: string,
+     *     compare_at_price: ?string, tax_rate: string, tracked: bool, line_subtotal: string, net_amount: string,
+     *     tax_amount: string, line_total: string}>,
+     *   tax_mode: TaxMode
+     * }
+     */
+    public function quote(?Cart $cart): array
+    {
         $items = $cart === null ? [] : $cart->items()->orderBy('created_at')->orderBy('id')->get()->all();
         $organization = $this->organizations->summary($this->tenant->requireOrganization()) ?? [];
         $currency = (string) ($organization['base_currency'] ?? config('pos.default_currency'));
@@ -100,12 +119,35 @@ class CartPricer
         }
 
         $totals = SaleCalculator::calculate(array_values($calc), null, $taxMode, $currency);
+        $counted = [];
         foreach (array_keys($calc) as $position => $i) {
             // Quantity × unit price, so the lines add up to the subtotal.
             $lines[$i]['line_total'] = $totals['lines'][$position]['line_subtotal'];
+
+            $variant = $variants[$items[$i]->variant_id];
+            $amounts = $totals['lines'][$position];
+            $counted[] = [
+                'variant_id' => $variant['variant_id'],
+                'product_id' => $variant['product_id'],
+                'product_slug' => $variant['product_slug'],
+                'product_name' => $variant['product_name'],
+                'variant_name' => $variant['variant_name'],
+                'option_values' => $variant['option_values'],
+                'sku' => $variant['sku'],
+                'image_url' => $variant['image']['url'] ?? null,
+                'quantity' => Decimal::round($calc[$i]['quantity'], 3),
+                'unit_price' => $variant['price'],
+                'compare_at_price' => $variant['compare_at_price'],
+                'tax_rate' => Decimal::round($variant['tax_rate'], 4),
+                'tracked' => $variant['max_quantity'] !== null,
+                'line_subtotal' => $amounts['line_subtotal'],
+                'net_amount' => $amounts['net_amount'],
+                'tax_amount' => $amounts['tax_amount'],
+                'line_total' => $amounts['line_total'],
+            ];
         }
 
-        return [
+        $view = [
             'id' => $lines === [] ? null : $cart?->id,
             'items' => array_values($lines),
             'item_count' => CartRules::display($itemCount),
@@ -116,5 +158,7 @@ class CartPricer
             'currency' => $currency,
             'issues' => array_keys($issues),
         ];
+
+        return ['cart' => $view, 'lines' => $counted, 'tax_mode' => $taxMode];
     }
 }

@@ -97,6 +97,14 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `PRODUCT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND` | Related products, hand-picked section items, section category sources or menu targets that are not (any more) in the organization; archived products count as missing (`details.product_ids` / `category_ids` / `brand_ids`). |
 | 422 | `SECTION_ITEMS_INVALID` | Also: a catalog section with source `manual` and fewer than 1 or more than its maximum hand-picked records (24 products, 16 categories, 24 brands). |
 | 422 | `STORE_NOT_FOUND` | Storefront fulfilment store that is not an active store of the organization. |
+| 401 | `UNAUTHENTICATED` | Also: storefront account, address and wishlist routes without a signed-in shopper, or for a shopper whose account was disabled or whose customer record was archived/deactivated since signing in (the shopper is signed out). |
+| 419 | `CSRF_TOKEN_MISMATCH` | Also: storefront writes without a valid `X-XSRF-TOKEN`; the storefront refreshes the cookie with `GET /store/account/me` and retries once. |
+| 422 | `INVALID_CREDENTIALS`, `SESSION_UNAVAILABLE` | Also: shopper sign-in — unknown e-mail, wrong password and disabled accounts give the same answer; signing in without a session. |
+| 422 | `TOKEN_INVALID` | Also: e-mail confirmation link unknown or older than 24 hours. |
+| 422 | `ADDRESS_LIMIT_REACHED` | A shopper already has 10 saved addresses (`details.max`). |
+| 422 | `VARIANT_NOT_PURCHASABLE`, `OUT_OF_STOCK` | Cart: the variant is not live (listing not published or outside its window, product or variant inactive/archived, unknown variant); nothing on hand at the fulfilment store. |
+| 422 | `INSUFFICIENT_STOCK` | Also: cart line quantity above what the fulfilment store has (`details.max_quantity`, `in_cart` — what the line already holds). |
+| 422 | `CART_FULL`, `WISHLIST_FULL` | 50 different products in a cart (`details.max_lines`); 200 wishlist entries (`details.max_items`). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -109,7 +117,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses` and `/register-sessions/{id}/cash-movements`: 8–100 characters, one per logical operation (the SPA uses a UUID); reuse it when retrying. A replayed response carries `Idempotent-Replayed: true`. |
 | `X-Branch-Id` | request | Active branch. Optional; when sent it must be an active branch of the organization that the user is assigned to (or `branches.access_all`). Branch-scoped endpoints (Phase 4+) require it. |
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
-| `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). |
+| `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). Also required on unsafe storefront requests that run the `storefront.session` stack (account, cart, wishlist). |
 | `Retry-After`, `X-RateLimit-*` | response | Rate-limit information. |
 
 ## Conventions
@@ -118,7 +126,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 - **Sorting:** `?sort=name` / `?sort=-created_at` (prefix `-` for descending); only whitelisted columns.
 - **Filtering:** plain, validated query parameters per endpoint, e.g. `?status=active&role_id=…`; date ranges `?from=2026-10-01&to=2026-10-31` (inclusive).
 - **Search:** `?search=term` (case-insensitive, whitelisted columns).
-- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP.
+- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP; shopper credential endpoints (`customer-auth`) as `auth` (`POS_AUTH_RATE_LIMIT` per e-mail+IP, four times that per IP); shopper writes (`storefront-write`) 60/min per IP and 60/min per signed-in customer.
 - **Identifiers:** UUIDv7 strings (device token ids are integers).
 - **Versioning:** breaking changes go to `/api/v2`; additive changes stay in v1.
 
@@ -531,6 +539,109 @@ Host: shop.example.com
     "on_sale": { "count": 1 }
   },
   "context": { "category": { "slug": "beverages", "name": "Beverages" }, "brand": { "slug": "pran", "name": "Pran" }, "q": null }
+}
+```
+
+### E-commerce track — customer accounts, cart and wishlist (E7)
+
+Shopper endpoints live under `/api/v1/store/*` like the rest of the storefront API (organization from the host, `throttle:storefront`). Accounts use their own session guard **`customer`** (ADR-002); a shopper session never satisfies `auth:sanctum`, and a staff session is never a shopper. Accounts resolve only inside the host's organization, so a session cookie of one store is anonymous on another store's host.
+
+**Session and CSRF.** Storefront hosts are not in `SANCTUM_STATEFUL_DOMAINS`, so the `storefront.session` middleware gives the bootstrap, account, cart and wishlist routes the cookie stack Sanctum uses for first-party SPAs (encrypted cookies, session, `ValidateCsrfToken`; skipped when Sanctum already made the request stateful). `GET /store/bootstrap` and `GET /store/account/me` set the session and `XSRF-TOKEN` cookies; every POST/PUT/PATCH/DELETE must echo the cookie in `X-XSRF-TOKEN` (missing or stale → `419 CSRF_TOKEN_MISMATCH`). The storefront client then fetches `GET /store/account/me` once and retries the request once. Catalog, CMS and geography routes stay sessionless.
+
+**Signed-in routes** (marked *C*) need `auth:customer`; they answer `401 UNAUTHENTICATED` without a shopper, and also when staff disabled the account or the customer record was archived or deactivated since sign-in (the shopper is signed out on that request). Routes marked *P/C* work for guests and shoppers.
+
+| Method & path | Auth · limiter | Notes |
+|---------------|----------------|-------|
+| GET `/store/account/me` | P | `data: null` for guests (always 200; also `null` for a disabled account), else `{id, name, email, phone, email_verified}` — `id` is the account id. Issues the session/XSRF cookies. |
+| POST `/store/account/register` | P · `customer-auth` | `{name (≤ 120), email (≤ 254, unique per store regardless of case → field error), phone? (Bangladeshi mobile), password, password_confirmation}` (password rules as staff: `Password::defaults()`). **Always creates a new customer** (`CUS-` code) with its account (ADR-018); the phone goes on the customer only when no other customer of the organization uses it. Signs in, merges the guest cart, queues a confirmation e-mail. 201 `{customer, merge}`. |
+| POST `/store/account/login` | P · `customer-auth` | `{email, password, remember?}` → `{customer, merge}`. Unknown e-mail, wrong password and disabled accounts (or archived/inactive customers) → `422 INVALID_CREDENTIALS` with one message. Regenerates the session id; merges the guest cart. |
+| POST `/store/account/logout` | P | 204. Forgets the shopper only and issues a new CSRF token; the session (and a staff sign-in in the same browser) stays. |
+| POST `/store/account/forgot-password` | P · `customer-auth` | `{email}` → 200 with the same message whether or not an account uses it. Sends a link `/account/reset-password?token=&email=` on the shopper's host (valid 60 minutes; one live token per e-mail; at most one e-mail a minute per address; nothing is sent for disabled accounts). |
+| POST `/store/account/reset-password` | P · `customer-auth` | `{email, token, password, password_confirmation}` → `{customer, merge}`: sets the password, consumes the token, marks the e-mail verified, rotates the remember-me token, signs in and merges the guest cart. Any wrong/expired/unknown pair → 422 field error on `token`. Other open sessions are not ended. |
+| POST `/store/account/verify-email` | P · `storefront-write` | `{token}` from the e-mailed link `/account/verify-email?token=` (valid 24 hours, the latest link only) → 200; otherwise `422 TOKEN_INVALID`. No sign-in needed. |
+| POST `/store/account/verification-notification` | C · `customer-auth` | Sends a new link (the previous one stops working); a verified account gets a message and no e-mail. Unverified accounts can sign in and use cart, wishlist and profile. |
+| GET · PUT `/store/account/profile` | C · PUT `storefront-write` | Shape as `me`. PUT `{name, phone?}` (phone normalized; copied to the customer record only while no other customer uses it). The e-mail address cannot be changed. |
+| PUT `/store/account/password` | C · `customer-auth` | `{current_password, password, password_confirmation}`; wrong current password → field error on `current_password`. Regenerates the session id. |
+| GET `/store/account/addresses` | C | Default shipping address first, then newest first. |
+| POST · PATCH `/{id}` · DELETE `/{id}` `/store/account/addresses` | C · `storefront-write` | POST `{label? (≤ 40), recipient_name (≤ 120), phone, division_id, district_id, area (≤ 100), address_line (≤ 255), postcode? (4 digits), is_default_shipping?, is_default_billing?}` → 201 address; PATCH any subset; DELETE → 204. The district must be in the division (field error on `district_id`); at most 10 (`ADDRESS_LIMIT_REACHED`). The first address becomes the default shipping and billing address; `is_default_shipping: true` moves the default (it cannot be switched off); deleting a default promotes the most recent remaining address. Another customer's id → 404. |
+| GET `/store/geo/divisions` · `/store/geo/districts?division=` | P (no session) | `[{id, name, name_bn}]` (8) · `[{id, division_id, name, name_bn}]` (the division's districts, or all 64), by English name. `Cache-Control: public, max-age=86400`. |
+| GET `/store/cart` | P/C | The signed-in shopper's cart, else the guest cart of the httpOnly `cart_token` cookie. **Repriced on every read** (shape below). |
+| POST `/store/cart/items` | P/C · `storefront-write` | `{variant_id, quantity}` → cart. Adding a variant already in the cart adds to its line. A guest's first add creates the cart and sets `cart_token` (30 days, SameSite=Lax, Secure on HTTPS). Quantity > 0, ≤ 999, at most 3 decimals and whole unless the unit allows decimals (field errors). Errors `VARIANT_NOT_PURCHASABLE`, `OUT_OF_STOCK`, `INSUFFICIENT_STOCK` (`details.max_quantity`, `in_cart`; the check applies to the line's new total), `CART_FULL` (50 lines). |
+| PATCH · DELETE `/store/cart/items/{id}` | P/C · `storefront-write` | PATCH `{quantity}` (same checks; `in_cart` is `"0"`) → cart; DELETE → cart. Lines of another cart → 404. |
+| DELETE `/store/cart` | P/C · `storefront-write` | Deletes the cart → the empty cart. |
+| GET `/store/wishlist` | C | `{items: [{id, product: card, variant_id}]}`, newest first; entries whose product is not live are kept but left out. |
+| POST `/store/wishlist/items` · DELETE `/store/wishlist/items/{id}` | C · `storefront-write` | `{product_id, variant_id?}` (a live product; the variant must be one of its own, else a field error) → list. Adding an existing entry changes nothing; at most 200 (`WISHLIST_FULL`). |
+| POST `/store/wishlist/merge` | C · `storefront-write` | `{items: [{product_id, variant_id?}]}` (≤ 100) — the browser list of a guest who just signed in. Products that are not live, foreign variants and duplicates are skipped; merging stops at 200 entries. → list. |
+
+Staff endpoints (`auth:sanctum` + `tenant`):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/customers/{id}` (also the POST, PATCH and restore responses) | `customers.view` | Adds `online_account: null \| {email, email_verified_at, last_login_at, status: active\|disabled, created_at}` (Customers asks its `CustomerOnlineAccounts` contract; list rows do not carry it). |
+| PATCH `/customer-accounts/{customerId}` | `customers.manage` | `{status: active\|disabled}` → the `online_account` shape; 404 when the customer has no store account. A disabled shopper is refused at sign-in and signed out on the next request. Audited (`customer_account.status_changed`). |
+
+**Cart pricing.** Nothing about prices is stored. `CartPricer` asks the OnlineCatalog contract (`StorefrontCatalog::variantsForCart`) for every line's live data — listing state, current selling price, compare-at price, availability and on-hand quantity at the fulfilment store, unit, tax rate — and totals the countable lines with the POS `SaleCalculator` in the organization's tax mode and currency, so the cart shows exactly what the server computes (ADR-005). Per line:
+
+- `purchasable` — the listing is live, the product active and not archived, the variant active. `false` → `issues` gets `unavailable`.
+- `in_stock` — the product does not track stock, or the fulfilment store has some (no fulfilment store = nothing on hand). `false` on a purchasable line → `out_of_stock`.
+- `max_quantity` — on-hand quantity (`"5.000"`) for stock-tracked products, `null` when stock is not tracked. A quantity above it sets `exceeds_stock` (and `issues` `exceeds_stock`); the line counts with `max_quantity`.
+- Lines that are not purchasable or out of stock stay in the cart, keep their quantity and show `line_total: "0.00"`; they are left out of `subtotal`, `tax_total` and `total`. Quantities are never changed on read — the shopper fixes them.
+- `line_total` = countable quantity × unit price (before tax), so the lines add up to `subtotal`. In exclusive mode `total` = `subtotal` + `tax_total`; in inclusive mode (`prices_include_tax: true`) the tax is contained in the prices and `total` = `subtotal`.
+- `item_count` — sum of the quantities of purchasable lines as entered (trailing zeros dropped: `"3"`, `"1.5"`); `quantity` is shown the same way. `product.url` is `null` (and `product.name` "Product no longer available") when the product has no listing any more.
+- An empty or missing cart → `id: null`, `items: []`, zero totals.
+
+**Merge on sign-in.** Login, registration and password reset move the guest cart of the request's cookie into the shopper's cart inside one transaction: quantities of the same variant are summed and capped at the on-hand quantity (when tracked and above zero) and at 999; guest lines that would exceed the 50-line limit are dropped. Every capped or dropped line counts in `merge.capped_lines`; `merged_lines` counts the lines added or increased. The guest cart is deleted and the cookie forgotten. Without a guest cart `merge` is `{merged_lines: 0, capped_lines: 0}`. Customer carts never expire; guest carts are deleted 30 days after their last change (`cart:prune`, daily).
+
+**Catalog additions.** Product cards add `default_variant_id` (the only active variant of a single-variant product, else `null` — used by the card's *Add to cart*); `GET /store/products/{slug}` adds `allow_decimal` (the product's unit allows quantities with up to 3 decimals).
+
+Pages: the shell answers `/account`, `/account/login`, `/account/register`, `/account/forgot-password`, `/account/reset-password`, `/account/verify-email`, `/account/profile`, `/account/addresses`, `/cart` and `/wishlist` with `noindex` and the title "My account", "Cart" or "Wishlist" `| {store}`.
+
+Example — cart (exclusive tax mode, no VAT on these products, one line above the stock):
+
+```http
+GET /api/v1/store/cart
+Host: shop.example.com
+Cookie: cart_token=…; XSRF-TOKEN=…; …session cookie…
+```
+```json
+{
+  "success": true,
+  "data": {
+    "id": "0193…",
+    "items": [
+      { "id": "0193…", "variant_id": "0193…",
+        "product": { "id": "0193…", "slug": "pran-mango-juice-250ml", "name": "Pran Mango Juice 250ml", "url": "/product/pran-mango-juice-250ml", "image": { "url": "/storage/products/…/….jpg", "alt": "Pran Mango Juice 250ml" } },
+        "variant_name": null, "option_values": {}, "sku": "…",
+        "quantity": "3", "unit_price": "25.00", "compare_at_price": "30.00", "line_total": "75.00",
+        "purchasable": true, "in_stock": true, "max_quantity": null, "exceeds_stock": false, "allow_decimal": false },
+      { "id": "0193…", "variant_id": "0193…",
+        "product": { "id": "0193…", "slug": "pran-litchi-drink-250ml", "name": "Pran Litchi Drink 250ml", "url": "/product/pran-litchi-drink-250ml", "image": null },
+        "variant_name": null, "option_values": {}, "sku": "…",
+        "quantity": "6", "unit_price": "22.00", "compare_at_price": null, "line_total": "88.00",
+        "purchasable": true, "in_stock": true, "max_quantity": "4.000", "exceeds_stock": true, "allow_decimal": false }
+    ],
+    "item_count": "9",
+    "subtotal": "163.00",
+    "tax_total": "0.00",
+    "total": "163.00",
+    "prices_include_tax": false,
+    "currency": "BDT",
+    "issues": ["exceeds_stock"]
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+Example — sign-in (`POST /store/account/login`, with `X-XSRF-TOKEN`):
+
+```json
+{
+  "success": true,
+  "data": {
+    "customer": { "id": "0193…", "name": "Demo Shopper", "email": "shopper@demo.test", "phone": "01711000000", "email_verified": true },
+    "merge": { "merged_lines": 2, "capped_lines": 0 }
+  },
+  "meta": { "request_id": "0193…" }
 }
 ```
 

@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
+import { notificationTarget } from '@/features/notifications/target'
 
 type AppNotification = {
   id: string
   type: string
-  data: { title?: string; message?: string; link?: string }
+  /** `link` (older alerts) or `url` (e.g. "/web-orders/{id}"): an in-app path to open. */
+  data: { title?: string; message?: string; link?: string; url?: string }
   read_at: string | null
   created_at: string
 }
@@ -69,7 +71,8 @@ export function NotificationBell() {
                   className={cn('flex w-full flex-col gap-0.5 border-b px-3 py-2 text-left text-sm hover:bg-accent', !n.read_at && 'bg-primary/5')}
                   onClick={() => {
                     if (!n.read_at) markRead.mutate(n.id)
-                    if (n.data.link) navigate(n.data.link)
+                    const target = notificationTarget(n.data)
+                    if (target) navigate(target)
                   }}
                 >
                   <span className={cn(!n.read_at && 'font-medium')}>{n.data.title ?? 'Notification'}</span>

@@ -169,6 +169,28 @@ Storefront module:
 - `storefront_settings` (changed, additive): `fulfilment_store_id` → stores NULL (`RESTRICT`) — the stock location for online availability.
 - `homepage_section_items.item_type` now also `product|category|brand` (hand-picked records of catalog sections; no foreign key — records that disappear drop out when the section is read). `menu_items.type` also `category|brand`.
 
+### E-commerce E7 — Customer accounts, cart and wishlist (implemented)
+
+Geography module (**global** reference data — no `organization_id`, shared by every organization):
+- `geo_divisions` — id smallint (fixed 1–8, primary key), code varchar(8) unique (BBS geocode), name_en varchar(60), name_bn varchar(60).
+- `geo_districts` — id smallint (fixed 1–64, primary key), division_id → geo_divisions (`RESTRICT`, indexed), code varchar(8) unique (division code + district geocode), name_en, name_bn.
+- Both are filled by the migration from `Geography/Infrastructure/Data/bangladesh.php` (8 divisions, 64 districts; 2018 government English spellings, official Bangla names). Fixed ids keep addresses meaningful when the data is reloaded. No upazila/thana table yet.
+
+CustomerAccounts module:
+- `customer_accounts` — customer_id → customers (**unique**, cascade), email varchar(254) (unique per organization regardless of case: expression index `(organization_id, lower(email))` on PostgreSQL and SQLite), phone varchar(11) NULL (`01XXXXXXXXX`), password (hashed), status (`active|disabled`, default `active`, CHECK on PostgreSQL), email_verified_at, email_verification_token_hash varchar(64) NULL unique (sha-256), email_verification_sent_at (the link is valid 24 hours from it), last_login_at, remember_token, timestamps. No soft delete: the row follows its customer.
+- `customer_password_reset_tokens` — organization_id → organizations (cascade), email, token_hash (sha-256), created_at; primary key `(organization_id, email)` — one live token per e-mail and store, valid 60 minutes. No surrogate id.
+
+Customers module:
+- `customer_addresses` — customer_id → customers (cascade), label varchar(40) NULL, recipient_name varchar(120), phone varchar(11) (`01XXXXXXXXX`), division_id → geo_divisions and district_id → geo_districts (`RESTRICT`; "district in division" is checked on save), area varchar(100) (thana/area as typed), address_line varchar(255), postcode varchar(4) NULL, is_default_shipping, is_default_billing, timestamps, soft delete. Index `(organization_id, customer_id)`. The limit of 10 and the single default are enforced in `CustomerAddressBook` under a lock on the customer row (no partial unique index on the flags).
+
+Cart module (no price columns anywhere — every read reprices, ADR-005):
+- `carts` — organization_id, customer_id → customers NULL (cascade; **one cart per customer**: partial unique index `carts_customer_unique (customer_id) WHERE customer_id IS NOT NULL`), token_hash varchar(64) NULL unique (sha-256 of the guest cookie token), expires_at (guest carts: 30 days after the last change; customer carts: NULL), timestamps. Index `(organization_id, expires_at)` for `cart:prune`.
+- `cart_items` — cart_id → carts (cascade), variant_id → product_variants (cascade), quantity NUMERIC(18,3) (CHECK > 0 on PostgreSQL), timestamps; unique `(cart_id, variant_id)`. No organization_id (reached through the cart).
+- `wishlists` — organization_id, customer_id → customers (**unique**, cascade), timestamps.
+- `wishlist_items` — wishlist_id → wishlists (cascade), product_id → products (cascade), variant_id → product_variants NULL (cascade), created_at. One entry per product and variant through two partial unique indexes (a plain unique index would let NULL variants repeat): `(wishlist_id, product_id) WHERE variant_id IS NULL` and `(wishlist_id, product_id, variant_id) WHERE variant_id IS NOT NULL`.
+
+No existing table changed in E7. Deferred to E8 with checkout: `carts.coupon_code` / `converted_order_id` and the idempotency scope change (ADR-014).
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.

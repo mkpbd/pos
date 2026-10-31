@@ -99,6 +99,25 @@ class ShoppingCart
     }
 
     /**
+     * The owner's active cart locked for checkout (call inside the placement transaction), or
+     * null when there is none.
+     */
+    public function lockForCheckout(CartOwner $owner): ?Cart
+    {
+        return $this->query($owner)?->lockForUpdate()->first();
+    }
+
+    /**
+     * Marks a locked cart as turned into the order: its lines are deleted and the row keeps
+     * the link, so the shopper starts with an empty cart.
+     */
+    public function markConverted(Cart $cart, string $orderId): void
+    {
+        $cart->items()->delete();
+        $cart->forceFill(['converted_order_id' => $orderId])->save();
+    }
+
+    /**
      * Moves a guest cart's lines into the customer's cart: quantities are summed and capped
      * at what the fulfilment store has (and 999); lines beyond the 50-line limit are left out
      * and count as capped. The guest cart is deleted.
@@ -180,7 +199,7 @@ class ShoppingCart
     private function query(CartOwner $owner): ?Builder
     {
         if (! $owner->isGuest()) {
-            return Cart::query()->where('customer_id', $owner->customerId);
+            return Cart::query()->where('customer_id', $owner->customerId)->whereNull('converted_order_id');
         }
         if ($owner->guestToken === null) {
             return null;
@@ -188,6 +207,7 @@ class ShoppingCart
 
         return Cart::query()
             ->whereNull('customer_id')
+            ->whereNull('converted_order_id')
             ->where('token_hash', CartOwner::hashToken($owner->guestToken))
             ->where('expires_at', '>', now());
     }

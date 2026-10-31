@@ -6,7 +6,7 @@ use DomainException;
 
 /**
  * Thrown when a domain invariant is violated (insufficient stock, credit limit exceeded, ...).
- * Rendered as HTTP 422 with the machine-readable $errorCode.
+ * Rendered as HTTP 422 (or $status, e.g. 409 for a stale client view) with the machine-readable $errorCode.
  */
 class BusinessRuleViolation extends DomainException
 {
@@ -17,6 +17,7 @@ class BusinessRuleViolation extends DomainException
         public readonly string $errorCode,
         string $message,
         public readonly array $details = [],
+        public readonly int $status = 422,
     ) {
         parent::__construct($message);
     }

@@ -32,6 +32,7 @@ export type BatchRow = { store: StoreRef | null; variant: VariantRef | null; bat
 export type MovementType =
   | 'opening' | 'adjustment_in' | 'adjustment_out' | 'transfer_out' | 'transfer_in'
   | 'purchase_receipt' | 'purchase_return' | 'sale' | 'sale_return'
+  | 'online_order' | 'online_order_cancel'
 
 export type Movement = {
   id: string
@@ -163,6 +164,8 @@ export const MOVEMENT_LABELS: Record<MovementType, string> = {
   purchase_return: 'Purchase return',
   sale: 'Sale',
   sale_return: 'Sale return',
+  online_order: 'Online order',
+  online_order_cancel: 'Online order cancelled',
 }
 
 export const REASON_LABELS: Record<AdjustmentReason, string> = {

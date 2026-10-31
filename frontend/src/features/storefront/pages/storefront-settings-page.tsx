@@ -115,6 +115,33 @@ function DetailsCard({ settings, canManage }: { settings: StorefrontSettings; ca
   )
 }
 
+function CheckoutCard({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
+  const save = useSaveStorefrontSettingsMutation()
+  const allowed = settings.guest_checkout_enabled ?? true
+
+  const toggle = (on: boolean) =>
+    save.mutate(
+      { guest_checkout_enabled: on },
+      {
+        onSuccess: (s) => toast.success((s.guest_checkout_enabled ?? on) ? 'Guests can check out without an account.' : 'Customers must sign in to check out.'),
+        onError: (e) => toast.error(e.message),
+      },
+    )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Checkout</CardTitle>
+        <CardDescription>Guests give their name, e-mail and phone at checkout instead of creating an account.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex items-center gap-2">
+        <Switch id="guest-checkout" checked={allowed} disabled={!canManage || save.isPending} onCheckedChange={toggle} />
+        <Label htmlFor="guest-checkout">Allow guest checkout</Label>
+      </CardContent>
+    </Card>
+  )
+}
+
 const NO_STORE = '__none__'
 const FULFILMENT_HELP = 'Stock-tracked products show as out of stock until a fulfilment store is chosen.'
 
@@ -285,6 +312,7 @@ export function StorefrontSettingsPage() {
             <StatusCard settings={settings.data} primary={domains.data.find((d) => d.is_primary)} canManage={canManage} />
             <DetailsCard settings={settings.data} canManage={canManage} />
             <AvailabilityCard settings={settings.data} canManage={canManage} />
+            <CheckoutCard settings={settings.data} canManage={canManage} />
           </div>
           <DomainsCard domains={domains.data} canManage={canManage} />
         </div>

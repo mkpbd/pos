@@ -17,3 +17,6 @@ Schedule::command('storefront:refresh-product-stats')->hourly()->withoutOverlapp
 
 // Guest carts expire 30 days after their last change.
 Schedule::command('cart:prune')->daily();
+
+// Unpaid bank-transfer web orders are cancelled (and restocked) when their payment hold runs out.
+Schedule::command('orders:expire-pending')->everyMinute()->withoutOverlapping();

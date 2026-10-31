@@ -19,6 +19,10 @@ use Throwable;
  * and payload (header Idempotent-Replayed: true). Failed attempts release the key so the
  * operation can be retried after fixing the cause. Reusing a key for a different payload
  * is rejected, and so is a retry that arrives while the first attempt is still running.
+ *
+ * Keys are scoped (ADR-014): staff routes use `user:{id}`; storefront routes
+ * (`idempotent:shopper`) use `customer:{account id}` or, for guests, `cart:{cart token hash}`
+ * — a guest without a cart gets CART_EMPTY (there is nothing to check out).
  */
 class EnsureIdempotency
 {
@@ -27,19 +31,29 @@ class EnsureIdempotency
     /** A claim older than this is treated as abandoned (e.g. the worker died mid-request). */
     private const ABANDONED_AFTER_SECONDS = 120;
 
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $mode = 'staff'): Response
     {
         $key = $request->header(self::HEADER);
         if (! is_string($key) || preg_match('/^[A-Za-z0-9_\-:.]{8,100}$/', $key) !== 1) {
             return ApiResponse::error('IDEMPOTENCY_KEY_REQUIRED', 'Send a unique Idempotency-Key header (8–100 letters, digits or - _ : .) with this request.', 428);
         }
 
-        $userId = (string) $request->user()?->getAuthIdentifier();
+        $userId = null;
+        if ($mode === 'shopper') {
+            $scope = app()->bound(ShopperIdempotencyScope::class) ? app(ShopperIdempotencyScope::class)->resolve($request) : null;
+            if ($scope === null) {
+                return ApiResponse::error('CART_EMPTY', 'Your cart is empty.', 422);
+            }
+        } else {
+            $userId = (string) $request->user()?->getAuthIdentifier();
+            $scope = 'user:'.$userId;
+        }
         $fingerprint = $this->fingerprint($request);
 
         $claimed = IdempotencyKey::query()->insertOrIgnore([
             'id' => (string) Str::uuid7(),
-            'user_id' => $userId,
+            'scope' => $scope,
+            'user_id' => $userId === '' ? null : $userId,
             'key' => $key,
             'fingerprint' => $fingerprint,
             'status' => 'processing',
@@ -48,7 +62,7 @@ class EnsureIdempotency
         ]) === 1;
 
         if (! $claimed) {
-            $existing = IdempotencyKey::query()->where('user_id', $userId)->where('key', $key)->first();
+            $existing = IdempotencyKey::query()->where('scope', $scope)->where('key', $key)->first();
 
             if ($existing !== null && $existing->fingerprint !== $fingerprint) {
                 return ApiResponse::error('IDEMPOTENCY_KEY_REUSED', 'This Idempotency-Key was already used for a different request.', 409);
@@ -73,28 +87,28 @@ class EnsureIdempotency
         try {
             $response = $next($request);
         } catch (Throwable $e) {
-            $this->release($userId, $key);
+            $this->release($scope, $key);
 
             throw $e;
         }
 
         if ($response->isSuccessful()) {
-            IdempotencyKey::query()->where('user_id', $userId)->where('key', $key)->update([
+            IdempotencyKey::query()->where('scope', $scope)->where('key', $key)->update([
                 'status' => 'completed',
                 'response_status' => $response->getStatusCode(),
                 'response_body' => $response->getContent(),
                 'updated_at' => now(),
             ]);
         } else {
-            $this->release($userId, $key);
+            $this->release($scope, $key);
         }
 
         return $response;
     }
 
-    private function release(string $userId, string $key): void
+    private function release(string $scope, string $key): void
     {
-        IdempotencyKey::query()->where('user_id', $userId)->where('key', $key)->where('status', 'processing')->delete();
+        IdempotencyKey::query()->where('scope', $scope)->where('key', $key)->where('status', 'processing')->delete();
     }
 
     private function fingerprint(Request $request): string
