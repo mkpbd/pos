@@ -35,4 +35,25 @@ interface CatalogDirectory
      * @return list<string>
      */
     public function categoryWithDescendants(string $organizationId, string $categoryId): array;
+
+    /**
+     * Every category of the organization (inactive ones included), ordered by sort order and name.
+     *
+     * @return list<array{id: string, parent_id: ?string, name: string, sort_order: int, is_active: bool}>
+     */
+    public function categories(string $organizationId): array;
+
+    /**
+     * Every brand of the organization (inactive ones included), ordered by name.
+     *
+     * @return list<array{id: string, name: string, is_active: bool}>
+     */
+    public function brands(string $organizationId): array;
+
+    /**
+     * The attribute dictionary in display order, values in their order.
+     *
+     * @return list<array{id: string, name: string, slug: string, display: string, is_filterable: bool, sort_order: int, values: list<array{value: string, swatch_hex: ?string}>}>
+     */
+    public function attributes(string $organizationId): array;
 }

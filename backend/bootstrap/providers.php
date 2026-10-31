@@ -11,6 +11,7 @@ use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Loyalty\LoyaltyServiceProvider;
 use App\Modules\Media\MediaServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
+use App\Modules\OnlineCatalog\OnlineCatalogServiceProvider;
 use App\Modules\Organizations\OrganizationsServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
 use App\Modules\Pos\PosServiceProvider;
@@ -47,6 +48,7 @@ return [
     PosServiceProvider::class,
     MediaServiceProvider::class,
     CmsServiceProvider::class,
+    OnlineCatalogServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

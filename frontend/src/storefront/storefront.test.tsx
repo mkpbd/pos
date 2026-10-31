@@ -37,7 +37,7 @@ describe('storefront layout', () => {
     const script = document.createElement('script')
     script.id = 'storefront-bootstrap'
     script.type = 'application/json'
-    script.textContent = JSON.stringify(bootstrapFixture({ store: { name: 'Inline Store', description: null } }))
+    script.textContent = JSON.stringify(bootstrapFixture({ store: { name: 'Inline Store', description: null, prices_include_tax: true } }))
     document.body.appendChild(script)
 
     renderRoutes(storefrontRoutes)

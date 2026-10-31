@@ -20,6 +20,7 @@ import {
   type TaxRate,
   type Unit,
 } from '@/features/catalog/api'
+import { AttributesSection } from '@/features/catalog/components/attributes-section'
 import { CatalogRecordDialog, type FieldConfig } from '@/features/catalog/components/catalog-record-dialog'
 import { decimalPattern, formatMoney, trimDecimal } from '@/lib/money'
 
@@ -141,13 +142,14 @@ export function CatalogPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Catalog" description="Categories, brands, units of measure and tax rates used by products." />
+      <PageHeader title="Catalog" description="Categories, brands, units of measure, tax rates and attributes used by products." />
       <Tabs defaultValue="categories">
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="brands">Brands</TabsTrigger>
           <TabsTrigger value="units">Units</TabsTrigger>
           <TabsTrigger value="taxes">Tax rates</TabsTrigger>
+          {can('attributes.manage') && <TabsTrigger value="attributes">Attributes</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="categories" className="pt-4">
@@ -243,6 +245,12 @@ export function CatalogPage() {
             toValues={(t) => ({ name: t?.name ?? '', rate: t?.rate ?? '', is_active: t?.is_active ?? true })}
           />
         </TabsContent>
+
+        {can('attributes.manage') && (
+          <TabsContent value="attributes" className="pt-4">
+            <AttributesSection />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

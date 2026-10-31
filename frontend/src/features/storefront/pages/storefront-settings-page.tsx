@@ -12,10 +12,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
+import { useBranchesQuery } from '@/features/branches/api'
 import {
   useAddDomainMutation,
   useMakeDomainPrimaryMutation,
@@ -108,6 +110,55 @@ function DetailsCard({ settings, canManage }: { settings: StorefrontSettings; ca
             </Button>
           )}
         </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+const NO_STORE = '__none__'
+const FULFILMENT_HELP = 'Stock-tracked products show as out of stock until a fulfilment store is chosen.'
+
+function AvailabilityCard({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
+  const save = useSaveStorefrontSettingsMutation()
+  const branches = useBranchesQuery({ page: 1, per_page: 100, is_active: true })
+  const [error, setError] = useState<string | undefined>()
+  const groups = (branches.data?.items ?? []).map((b) => ({ branch: b, stores: b.stores.filter((s) => s.is_active || s.id === settings.fulfilment_store_id) })).filter((g) => g.stores.length > 0)
+
+  const change = (value: string) => {
+    setError(undefined)
+    save.mutate(
+      { fulfilment_store_id: value === NO_STORE ? null : value },
+      {
+        onSuccess: () => toast.success('Fulfilment store saved.'),
+        onError: (e) => {
+          const map = fieldErrorMap(e)
+          setError(map.fulfilment_store_id ?? map.form)
+        },
+      },
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Stock & availability</CardTitle>
+        <CardDescription>The online store shows a product as in stock while this store has it. Exact quantities are never shown.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <FormField label="Fulfilment store" error={error} hint={FULFILMENT_HELP}>
+          <Select value={settings.fulfilment_store_id ?? NO_STORE} onValueChange={change} disabled={!canManage || save.isPending}>
+            <SelectTrigger className="w-full sm:w-80" aria-label="Fulfilment store"><SelectValue placeholder={branches.isPending ? 'Loading stores…' : undefined} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_STORE}>No fulfilment store</SelectItem>
+              {groups.map(({ branch, stores }) => (
+                <SelectGroup key={branch.id}>
+                  <SelectLabel>{branch.name}</SelectLabel>
+                  {stores.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.code})</SelectItem>)}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
       </CardContent>
     </Card>
   )
@@ -233,6 +284,7 @@ export function StorefrontSettingsPage() {
           <div className="flex flex-col gap-6">
             <StatusCard settings={settings.data} primary={domains.data.find((d) => d.is_primary)} canManage={canManage} />
             <DetailsCard settings={settings.data} canManage={canManage} />
+            <AvailabilityCard settings={settings.data} canManage={canManage} />
           </div>
           <DomainsCard domains={domains.data} canManage={canManage} />
         </div>

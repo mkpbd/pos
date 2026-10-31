@@ -14,7 +14,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { flattenCategoryTree, useCatalogList } from '@/features/catalog/api'
+import { useCan } from '@/features/auth/use-auth'
+import { flattenCategoryTree, useAttributesQuery, useCatalogList } from '@/features/catalog/api'
+import { OnlineListingSection } from '@/features/online-catalog/components/online-listing-section'
 import {
   useArchiveProductMutation,
   useProductQuery,
@@ -128,7 +130,14 @@ function ProductForm({ product }: { product?: Product }) {
   const { errors, isDirty } = form.formState
   const options = useFieldArray({ control: form.control, name: 'options' })
   const variants = useFieldArray({ control: form.control, name: 'variants' })
-  const [type, hasVariants, trackStock] = useWatch({ control: form.control, name: ['type', 'has_variants', 'track_stock'] })
+  const [type, hasVariants, trackStock, optionNames] = useWatch({ control: form.control, name: ['type', 'has_variants', 'track_stock', 'options'] })
+  // Attribute dictionary: suggests option names and shows the known values of a matching option.
+  const attributes = useAttributesQuery(hasVariants)
+  const attributeNames = (attributes.data ?? []).map((a) => a.name)
+  const attributeHint = (name: string | undefined) => {
+    const match = (attributes.data ?? []).find((a) => a.name.toLowerCase() === name?.trim().toLowerCase())
+    return match && match.values.length > 0 ? `Comma separated. Known ${match.name} values: ${match.values.map((v) => v.value).join(', ')}` : undefined
+  }
 
   // Active records, plus whatever the product already references (even if since deactivated).
   const activeOr = <T extends { id: string; is_active: boolean }>(rows: T[] | undefined, current: string | null | undefined) =>
@@ -275,9 +284,9 @@ function ProductForm({ product }: { product?: Product }) {
               {options.fields.map((option, i) => (
                 <div key={option.id} className="grid gap-2 sm:grid-cols-[12rem_1fr_auto] sm:items-start">
                   <FormField label={`Option ${i + 1}`} error={errors.options?.[i]?.name?.message}>
-                    <Input placeholder="e.g. Size" {...form.register(`options.${i}.name`)} />
+                    <Input placeholder="e.g. Size" list={attributeNames.length ? 'attribute-names' : undefined} {...form.register(`options.${i}.name`)} />
                   </FormField>
-                  <FormField label="Values" error={errors.options?.[i]?.values?.message} hint="Comma separated, e.g. S, M, L">
+                  <FormField label="Values" error={errors.options?.[i]?.values?.message} hint={attributeHint(optionNames?.[i]?.name) ?? 'Comma separated, e.g. S, M, L'}>
                     <Input {...form.register(`options.${i}.values`)} />
                   </FormField>
                   <Button type="button" variant="ghost" size="icon" className="sm:mt-6" aria-label={`Remove option ${i + 1}`} onClick={() => options.remove(i)}>
@@ -285,6 +294,11 @@ function ProductForm({ product }: { product?: Product }) {
                   </Button>
                 </div>
               ))}
+              {attributeNames.length > 0 && (
+                <datalist id="attribute-names">
+                  {attributeNames.map((n) => <option key={n} value={n} />)}
+                </datalist>
+              )}
               {errors.options?.message && <p className="text-sm text-destructive">{errors.options.message}</p>}
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" disabled={options.fields.length >= 3} onClick={() => options.append({ name: '', values: '' })}>
@@ -347,6 +361,7 @@ function ProductForm({ product }: { product?: Product }) {
 
 export function ProductEditorPage() {
   const { productId } = useParams()
+  const can = useCan()
   const { data, error, isPending, refetch } = useProductQuery(productId)
 
   if (!productId) return <ProductForm key="new" />
@@ -354,5 +369,14 @@ export function ProductEditorPage() {
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />
 
   // Remount per product so the form's defaults always belong to the product shown.
-  return <ProductForm key={data.id} product={data} />
+  return (
+    <div className="flex flex-col gap-6">
+      <ProductForm key={data.id} product={data} />
+      {can('online_catalog.view') && (
+        <div className="mx-auto w-full max-w-5xl">
+          <OnlineListingSection productId={data.id} />
+        </div>
+      )}
+    </div>
+  )
 }

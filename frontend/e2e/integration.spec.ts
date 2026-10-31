@@ -231,11 +231,14 @@ test('theme colour and menu changes made in the admin reach the storefront', asy
   await page.getByRole('button', { name: 'Save theme' }).click()
   await expect(page.getByText('Theme saved.')).toBeVisible()
 
-  // The seeded main menu has Home, About us, FAQ and Contact; add a fifth top-level link.
+  // Add a top-level link after the seeded main menu items (numbered across all levels).
   await page.goto('/admin/storefront/menus')
+  const labels = page.getByRole('textbox', { name: /^Item \d+ label$/ })
+  await expect(labels.first()).toBeVisible()
+  const next = (await labels.count()) + 1
   await page.getByRole('button', { name: 'Add item' }).click()
-  await page.getByLabel('Item 5 label').fill('Gift ideas')
-  await page.getByLabel('Item 5 link', { exact: true }).fill('/gifts')
+  await page.getByLabel(`Item ${next} label`).fill('Gift ideas')
+  await page.getByLabel(`Item ${next} link`, { exact: true }).fill('/gifts')
   await page.getByRole('button', { name: 'Save items' }).click()
   await expect(page.getByText('Menu items saved.')).toBeVisible()
 
@@ -302,4 +305,64 @@ test('a banner edited and a section added in the admin show on the storefront in
   await expect(rows.first()).toContainText('Hidden')
   await page.goto('/')
   await expect(page.getByText('We now deliver on Fridays.')).toHaveCount(0)
+})
+
+test('a product created and repriced in the admin shows its current price everywhere on the storefront', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin product editor flow runs on desktop')
+  const name = `E2E Kettle ${Date.now()}`
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // Brief check 7: create the product and publish it, featured, on the online store.
+  await page.goto('/admin/products/new')
+  await page.getByLabel('Name').fill(name)
+  await page.getByRole('combobox').filter({ hasText: 'Choose a unit' }).click()
+  await page.getByRole('option', { name: 'Piece (pcs)' }).click()
+  await page.getByLabel('Cost price').fill('300')
+  await page.getByLabel('Selling price').fill('450')
+  await page.getByRole('button', { name: 'Create product' }).click()
+  await expect(page.getByRole('heading', { name })).toBeVisible()
+
+  const listing = page.getByRole('form', { name: 'Online listing' })
+  await listing.getByRole('switch', { name: 'Published' }).click()
+  await listing.getByRole('switch', { name: 'Featured' }).click()
+  await listing.getByRole('button', { name: 'Save online listing' }).click()
+  await expect(page.getByText('Online listing saved.')).toBeVisible()
+
+  // Brief check 8: it is in the shop listing and has a product page.
+  const card = () => page.getByTestId('product-card').filter({ hasText: name })
+  await page.goto(`/search?q=${encodeURIComponent(name)}`)
+  await expect(card().getByTestId('price')).toContainText('450.00')
+  await card().getByRole('link', { name }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+  await expect(page.getByTestId('product-page').getByTestId('price').first()).toContainText('450.00')
+  const productUrl = page.url()
+
+  // Brief check 9: change the price in the admin product editor.
+  await page.goto('/admin/products')
+  await page.getByLabel('Search products').fill(name)
+  await page.getByRole('link', { name }).click()
+  await page.getByLabel('Selling price').fill('499.99')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByText(/saved/i).first()).toBeVisible()
+
+  // Brief check 10: the new price on the product page, the listing, the search suggestions and the homepage.
+  await page.goto(productUrl)
+  await expect(page.getByTestId('product-page').getByTestId('price').first()).toContainText('499.99')
+
+  await page.goto('/shop?sort=latest')
+  await expect(card().getByTestId('price')).toContainText('499.99')
+
+  await page.getByRole('combobox', { name: 'Search products' }).first().fill(name.slice(0, 12))
+  await expect(page.getByTestId('search-suggestions').getByRole('option', { name: new RegExp(name) })).toContainText('499.99')
+
+  await page.goto('/')
+  const featured = page.locator('[data-section-type="product_carousel"]')
+  const homeCard = featured.getByTestId('product-card').filter({ hasText: name })
+  await expect(homeCard.getByTestId('price')).toContainText('499.99')
+  await expect(homeCard).not.toContainText('450.00')
 })

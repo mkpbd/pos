@@ -91,6 +91,12 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `BUTTON_LINK_REQUIRED`, `SCHEDULE_INVALID` | A banner button without label or link; a schedule whose end is not after its start. |
 | 422 | `CONTENT_EMPTY`, `PAGE_NOT_FOUND`, `ORDER_MISMATCH`, `LIMIT_REACHED` | Rich text empty after sanitizing; a menu item linking to a missing page; a reorder that does not list every item exactly once; too many sections/banners/FAQ entries. |
 | 422 | `TOKEN_INVALID` | Newsletter confirm/unsubscribe token unknown or expired. |
+| 422 | `COMPARE_AT_NOT_ABOVE_PRICE` | A variant's compare-at price is not above its selling price (`details.variant_id`, `selling_price`). |
+| 422 | `PRODUCT_NOT_SELLABLE` | Also: publishing the web listing of an inactive product. |
+| 422 | `SCHEDULE_INVALID` | Also: a product listing whose publishing window ends before it starts (when one end comes from the stored listing; both sent → field error on `unpublished_at`). |
+| 422 | `PRODUCT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND` | Related products, hand-picked section items, section category sources or menu targets that are not (any more) in the organization; archived products count as missing (`details.product_ids` / `category_ids` / `brand_ids`). |
+| 422 | `SECTION_ITEMS_INVALID` | Also: a catalog section with source `manual` and fewer than 1 or more than its maximum hand-picked records (24 products, 16 categories, 24 brands). |
+| 422 | `STORE_NOT_FOUND` | Storefront fulfilment store that is not an active store of the organization. |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -425,6 +431,106 @@ Example — homepage:
     "preview": false
   },
   "meta": { "request_id": "0193…" }
+}
+```
+
+### E-commerce track — online catalog and product page (E6)
+
+Staff endpoints (`auth:sanctum` + `tenant`):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/attributes` | `products.view` or `attributes.manage` | Whole dictionary, unpaginated, by `sort_order` then name: `[{id, name, slug, display, is_filterable, sort_order, values: [{id, value, swatch_hex, sort_order}]}]`. |
+| POST · PATCH `/{id}` · DELETE `/{id}` `/attributes` | `attributes.manage` | `{name (≤ 60, unique per organization, case-insensitive), slug? (a-z0-9-, ≤ 80; blank → from the name), display button\|swatch\|text, is_filterable, sort_order?, values: [{id?, value (≤ 60, unique per attribute), swatch_hex? #rrggbb}] (≤ 100)}`. `values` replaces the list in the order sent: entries with `id` keep that value, others are added, missing ones are deleted (`values` must be present on create, may be empty; optional on update). Products are not affected by deletion (options stay on the product). |
+| GET `/online-catalog/products/{productId}` | `online_catalog.view` | `{product: {id, name, category_id, brand_id, is_active, options, images: [{id, url}], variants: [{id, sku, name, option_values, selling_price, is_active}]}, listing: {exists, slug, is_published, published_at, unpublished_at, is_featured, is_new_until, short_description, description_html, specifications, seo_title, seo_description, sort_weight, state, updated_at}, variants: [{variant_id, compare_at_price, image_id}], related: {related: [{id, name, image_url, sku}], frequently_bought: […]}, url}`. Never listed → `exists: false`, a free suggested slug and defaults. `state`: `draft`, `scheduled`, `live`, `expired`. Archived products → 404. |
+| PUT `/online-catalog/products/{productId}` | `online_catalog.manage` | Upsert: `{slug?, is_published, is_featured, published_at?, unpublished_at? (after published_at), is_new_until? (Y-m-d), short_description? (≤ 500), description_html? (sanitized; empty → null), specifications? ([{label ≤ 60, value ≤ 200}] ≤ 30), seo_title? (≤ 70), seo_description? (≤ 160), sort_weight? (±100000), variants?: [{variant_id, compare_at_price?, image_id?}]}`. Omitted optional fields keep their value; `variants` rows update only the variants named (ids must belong to the product, images must be the product's). Blank slug keeps the current one or takes a free suggestion; a slug used by another product → 422 field error. Errors `COMPARE_AT_NOT_ABOVE_PRICE`, `PRODUCT_NOT_SELLABLE`, `SCHEDULE_INVALID`. Audited (`online_catalog.product_listing.saved`). Returns the GET shape. |
+| PUT `/online-catalog/products/{productId}/related` | `online_catalog.manage` | `{related: [productId…], frequently_bought: [productId…]}` — both present (may be empty), ≤ 12 each, distinct, ordered; not the product itself (field error); other organizations' or archived products → `PRODUCT_NOT_FOUND`. Returns the GET shape. |
+| GET `/online-catalog/categories` | `online_catalog.view` | Every catalog category in tree order: `[{id, name, parent_id, depth, is_active, listing: null \| {slug, is_visible, image_media_id, banner_media_id, image, banner, description_html, seo_title, seo_description, updated_at}}]`. |
+| GET · PUT `/online-catalog/categories/{categoryId}` | view · manage | GET `{category: {id, name, parent_id, is_active}, listing: {exists, …}, url}`. PUT `{slug?, is_visible, image_media_id?, banner_media_id?, description_html? (sanitized), seo_title?, seo_description?}`; images must be in the media library (`MEDIA_NOT_FOUND`). |
+| GET `/online-catalog/brands` · GET · PUT `/online-catalog/brands/{brandId}` | view · manage | List `[{id, name, is_active, listing: null \| {slug, is_visible, logo_media_id, logo, description, seo_title, seo_description, updated_at}}]` by name. PUT `{slug?, is_visible, logo_media_id?, description? (≤ 1000), seo_title?, seo_description?}`. |
+| GET · PATCH `/storefront/settings` | view · manage | Adds `fulfilment_store_id` (nullable): must be an active store of the organization (`STORE_NOT_FOUND`). Without one, stock-tracked products show as out of stock. |
+| GET `/storefront/link-targets` | `storefront.view` | Adds `categories: [{id, name, url, parent_id, depth}]` (tree order) and `brands: [{id, name, url}]`; `url` is the storefront address (`/category/{slug}`, `/brand/{slug}`) or `null` while the record has no visible listing. Menu items `{type: "category"\|"brand", label, target_id}` in `PUT /storefront/menus/{id}/items`; unknown targets → `CATEGORY_NOT_FOUND` / `BRAND_NOT_FOUND`. |
+| `/storefront/homepage-sections` | as E5 | New types `product_carousel`, `product_grid`, `product_tabs`, `category_strip`, `brand_strip` (configs below). Hand-picked records are sent as `item_ids` (ordered; only for carousel, grid and the strips; used while `config.source` is `manual`, cleared otherwise). Responses add `item_ids` and `items: [{id, name, image_url}]`; `/types` adds `manual_items: {type, min, max}`. |
+
+Section configs (validated per type; `limit` bounds per type):
+
+| Type | Config | Hand-picked (`item_ids`) |
+|------|--------|--------------------------|
+| `product_carousel` | `{source: manual\|featured\|new_arrivals\|best_sellers\|on_sale\|category (default featured), category_id (required for category), limit 4–24 (8), view_all_url (site path or http(s), optional)}` | products, 1–24 |
+| `product_grid` | as the carousel + `columns: 3\|4\|5` (4) | products, 1–24 |
+| `product_tabs` | `{tabs: [{label ≤ 40, source (not manual), category_id?}] 2–5 (required on create), limit 4–12 (8)}` | — |
+| `category_strip` | `{source: manual\|top_level (top_level), limit 4–16 (8)}` | categories, 1–16 |
+| `brand_strip` | `{source: manual\|all (all), limit 4–24 (12)}` | brands, 1–24 |
+
+Sources: `featured` = featured listings; `new_arrivals` = newest first (schedule start, else when listed); `best_sellers` = units sold in 30 days > 0, most first; `on_sale` = at least one variant with a compare-at price above its price; `category` = the category and its subcategories. Stock never hides a product (cards show it). Category ids in configs must exist (`CATEGORY_NOT_FOUND`); hand-picked records must exist (`PRODUCT_NOT_FOUND` …) and are counted (`SECTION_ITEMS_INVALID`).
+
+Public endpoints (`/api/v1/store/*`, organization from the host, `throttle:storefront`). A product is **live** when its listing is published, inside its window, the product is active and not archived, and it has at least one active variant. A category or brand is **visible** when its listing has `is_visible` and the record is active; everything else is 404 `NOT_FOUND`.
+
+| Method & path | Notes |
+|---------------|-------|
+| GET `/store/categories` | Visible categories as a tree `[{id, slug, name, image, product_count, children}]`; a visible category under a hidden one hangs from its nearest visible ancestor (or the root). `product_count` = live products in the category and below. |
+| GET `/store/categories/{slug}` | `{id, slug, name, description_html, image, banner, seo: {title, description}, breadcrumbs: [{name, url}], children: [{slug, name, image, product_count}]}`. |
+| GET `/store/brands` · `/store/brands/{slug}` | Visible brands by name `[{slug, name, logo, product_count}]`; one brand `{slug, name, description, logo, seo}`. |
+| GET `/store/products` | Query below. Returns the envelope plus `facets` and `context` (example below). |
+| GET `/store/products/{slug}` | `{id, slug, name, url, short_description, description_html, specifications, brand: {name, slug\|null}\|null, category: {name, slug\|null}\|null, breadcrumbs, images: [{id, url, alt}], options: [{name, slug\|null, display, values: [{value, swatch_hex}]}], variants: [{id, sku, name, option_values, price, compare_at_price, on_sale, discount_percent, in_stock, low_stock, image_id}], price, price_max, on_sale, in_stock, is_new, default_variant_id, unit, seo: {title, description, image_url}}`. Inactive variants are omitted; option values follow the attribute dictionary when the option is linked (else the product's order) and list only values active variants use; `default_variant_id` = first in-stock variant, else the first. `?preview=1` from signed-in staff of this store with `storefront.view` also opens draft, scheduled and expired listings and adds `preview_state` (`Cache-Control: no-store, private`). |
+| GET `/store/products/{slug}/related` | `{related: [card…], frequently_bought: [card…]}` — live hand-picked products in order; without a live related pick, up to 8 other live products of the same category, newest first. Frequently bought has no fallback. |
+| GET `/store/search/suggest?q=` | `q` < 2 characters → empty lists. `{products: [{slug, name, url, image, price}] (≤ 6; names starting with the term first), categories: [{slug, name, url}] (≤ 4 visible categories whose name contains the term)}`. |
+| GET `/store/bootstrap` | `store` adds `currency` (organization base currency, e.g. `BDT`) and `prices_include_tax` (`true` in inclusive tax mode; otherwise the storefront shows prices "Excl. VAT" and tax is added at checkout, E8). Menu items of type `category`/`brand` resolve to `/category/{slug}` / `/brand/{slug}` and are left out while the target is not visible. |
+| GET `/store/homepage` | Catalog sections add `products: [card…]` (carousel, grid), `tabs: [{label, products: [card…]}]` (tabs without products are dropped), `categories: [{slug, name, url, image, product_count}]` (category strip) or `brands: [{slug, name, url, logo}]` (brand strip). A catalog section without products/categories/brands is left out (preview: `state: "empty"`). |
+
+`GET /store/products` query:
+
+| Parameter | Meaning |
+|-----------|---------|
+| `q` | ≤ 100 characters; case-insensitive substring of the product name, an active variant's SKU or the brand name. |
+| `category` | Category slug; scopes the listing to the category and its subcategories. Unknown or hidden → 404 `NOT_FOUND`. |
+| `brand[]` (or `brand=a,b`) | Brand slugs, OR-ed; unknown slugs are ignored. |
+| `price_min`, `price_max` | Decimals (`100`, `99.50`) compared with the card price (cheapest active variant). |
+| `attr[<attribute-slug>][]` (or `attr[size]=m,l`) | Option values, OR-ed within an attribute, case-insensitive; only filterable attributes count. |
+| `in_stock=1`, `on_sale=1` | Available products; products with a variant on sale. |
+| `sort` | `featured` (default: featured first, then sort weight, then newest), `popularity` (units sold in 30 days, then in total), `latest`, `price_asc`, `price_desc`, `name`; ties by name and id. |
+| `page`, `per_page` | `per_page` 12, 24 (default), 36 or 48. |
+| `slugs=a,b,c` | ≤ 12 product slugs: exactly those live products, in that order, ignoring every other parameter; `facets` and `context` are `null` (recently viewed lists). |
+
+Facets are **disjunctive**: each facet's counts apply every active filter except its own, so selecting a brand never zeroes the other brands; within a facet selected values are OR-ed, across facets AND-ed. `brands` and attribute `values` list values with matches plus selected ones (count 0 kept); attribute values follow the dictionary order (unknown values after, alphabetically). `categories` lists the visible children of the current category (or the top level) that have matches, counting subcategories, over the fully filtered set (the category is the page's scope, not a toggle). `price` is the range over everything except the price filter (`null` values when nothing matches). Invalid input → 422 `VALIDATION_FAILED`.
+
+Product card (listings, related, homepage): `{id, slug, name, url, image: {url, alt}|null, hover_image, price, price_max, compare_at_price, on_sale, discount_percent, in_stock, is_new, is_featured, brand: {name, slug|null}|null, category: {name, slug|null}|null, variant_count, short_description}`. `price`/`price_max` span the active variants' selling prices as stored (decimal strings); `compare_at_price` belongs to the variant giving `price` and counts only while above it (a later price increase silently ends the sale); `discount_percent` = ⌊(compare − price) / compare × 100⌋; `on_sale` when any variant is on sale. Availability comes from the fulfilment store (no store → stock-tracked products are out of stock); quantities are never exposed — `low_stock` means 1–5 left.
+
+Pages: the shell also answers `/shop`, `/search` (`noindex`) and, when they exist on the storefront, `/category/{slug}`, `/brand/{slug}`, `/product/{slug}` with title `"{SEO title or name} | {store}"`, description, absolute `og:image` (first product image, category banner or image, brand logo) and `og:type` `product` for products; otherwise 404.
+
+Example — listing:
+
+```http
+GET /api/v1/store/products?category=beverages&brand[]=pran&sort=price_asc&per_page=12
+Host: shop.example.com
+```
+```json
+{
+  "success": true,
+  "data": [
+    { "id": "0193…", "slug": "pran-litchi-drink-250ml", "name": "Pran Litchi Drink 250ml", "url": "/product/pran-litchi-drink-250ml",
+      "image": { "url": "/storage/products/…/….jpg", "alt": "Pran Litchi Drink 250ml" }, "hover_image": null,
+      "price": "22.00", "price_max": "22.00", "compare_at_price": null, "on_sale": false, "discount_percent": null,
+      "in_stock": true, "is_new": true, "is_featured": false,
+      "brand": { "name": "Pran", "slug": "pran" }, "category": { "name": "Beverages", "slug": "beverages" },
+      "variant_count": 1, "short_description": "Sweet litchi drink, best served cold." },
+    { "id": "0193…", "slug": "pran-mango-juice-250ml", "name": "Pran Mango Juice 250ml", "url": "/product/pran-mango-juice-250ml",
+      "image": { "url": "/storage/products/…/….jpg", "alt": "Pran Mango Juice 250ml" }, "hover_image": { "url": "/storage/products/…/….jpg", "alt": "Pran Mango Juice 250ml" },
+      "price": "25.00", "price_max": "25.00", "compare_at_price": "30.00", "on_sale": true, "discount_percent": 16,
+      "in_stock": true, "is_new": false, "is_featured": true,
+      "brand": { "name": "Pran", "slug": "pran" }, "category": { "name": "Beverages", "slug": "beverages" },
+      "variant_count": 1, "short_description": "Real mango pulp, no added colour." }
+  ],
+  "meta": { "current_page": 1, "per_page": 12, "total": 2, "last_page": 1, "request_id": "0193…" },
+  "facets": {
+    "categories": [],
+    "brands": [{ "slug": "pran", "name": "Pran", "count": 2, "selected": true }],
+    "attributes": [],
+    "price": { "min": "22.00", "max": "25.00" },
+    "in_stock": { "count": 2 },
+    "on_sale": { "count": 1 }
+  },
+  "context": { "category": { "slug": "beverages", "name": "Beverages" }, "brand": { "slug": "pran", "name": "Pran" }, "q": null }
 }
 ```
 

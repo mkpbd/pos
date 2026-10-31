@@ -13,6 +13,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | `storefront.custom_css` | Edit custom CSS (Org Admin only by default) |
 | `media.manage` | Upload, edit alt text, delete unused media |
 | `cms.manage` | Pages, FAQ, blog, contact messages, newsletter export |
+| `online_catalog.view` | Read web listings in the admin (added in E6) |
 | `online_catalog.manage` | Product/category/brand web listings, publish schedule, featured, related |
 | `attributes.manage` | Attribute dictionary and values |
 | `promotions.view` / `promotions.manage` | Promotions, coupons, usage |
@@ -37,11 +38,11 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | POST `/store/newsletter` · GET `/store/newsletter/unsubscribe/{token}` | P | E5 | Double opt-in by e-mail |
 | GET `/store/categories` · `/store/categories/{slug}` | P | E6 | Tree (published listings only) |
 | GET `/store/brands` · `/store/brands/{slug}` | P | E6 | |
-| GET `/store/products` | P | E6 | `q, category, brand, price_min, price_max, attr[<slug>][]=, in_stock, on_sale, sort=(popularity\|rating\|latest\|price_asc\|price_desc), page, per_page≤48`; returns items + `facets` (counts) |
-| GET `/store/products/{slug}` | P | E6 | Variants, prices, availability, gallery, specs, SEO, rating summary |
+| GET `/store/products` | P | E6 | `q, category, brand, price_min, price_max, attr[<slug>][]=, in_stock, on_sale, sort=(popularity\|rating\|latest\|price_asc\|price_desc), page, per_page≤48`; returns items + `facets` (counts). *As built (E6):* sorts `featured` (default), `popularity`, `latest`, `price_asc`, `price_desc`, `name` — no `rating` until E10; `per_page` 12/24/36/48; extra `slugs=` mode for recently viewed; response adds `context` |
+| GET `/store/products/{slug}` | P | E6 | Variants, prices, availability, gallery, specs, SEO, rating summary (*E6: no rating summary until E10; staff `?preview=1`*) |
 | GET `/store/products/{slug}/related` | P | E6 | Related + frequently bought together |
 | GET `/store/products/{slug}/reviews` | P | E9 | Approved only, paginated |
-| GET `/store/search/suggest?q=` | P | E6 | ≤ 8 products + categories, `pg_trgm` |
+| GET `/store/search/suggest?q=` | P | E6 | ≤ 8 products + categories, `pg_trgm` (*E6: ≤ 6 products + ≤ 4 categories, substring match; trigram index only speeds it up, no similarity ranking*) |
 | GET `/store/geo/divisions` · `/districts?division=` · `/areas?district=` | P | E7 | Global reference data, long cache |
 | POST `/store/account/register` · `login` · `logout` · `forgot-password` · `reset-password` · `verify-email` | P/C | E7 | `throttle:customer-auth` |
 | GET/PUT `/store/account/profile` · PUT `/store/account/password` | C | E7 | |
@@ -78,9 +79,9 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | CMS pages, FAQ | CRUD `/cms/pages`, `/cms/faq` | cms.manage | E5 |
 | Contact messages | GET `/cms/contact-messages`, PATCH `/{id}` (handled) | cms.manage | E5 |
 | Newsletter | GET `/cms/newsletter-subscribers` (+ CSV export) | cms.manage | E5 |
-| Product listings | GET/PUT `/online-catalog/products/{productId}` (incl. variant listings), PUT `/related` | online_catalog.manage | E6 |
-| Category/brand listings | GET/PUT `/online-catalog/categories/{id}`, `/online-catalog/brands/{id}` | online_catalog.manage | E6 |
-| Attributes | CRUD `/attributes`, `/attributes/{id}/values` | attributes.manage | E6 |
+| Product listings | GET/PUT `/online-catalog/products/{productId}` (incl. variant listings), PUT `/related` | online_catalog.manage (GET: online_catalog.view) | E6 |
+| Category/brand listings | GET/PUT `/online-catalog/categories/{id}`, `/online-catalog/brands/{id}` (+ GET lists) | online_catalog.manage (GET: online_catalog.view) | E6 |
+| Attributes | CRUD `/attributes`, `/attributes/{id}/values` (*E6: values are replaced with the attribute — no separate `/values` route; GET also with `products.view`*) | attributes.manage | E6 |
 | Geography areas | CRUD `/shipping/areas` (divisions/districts read-only) | shipping.manage | E8 |
 | Shipping | CRUD `/shipping/zones`, `/shipping/methods`, `/shipping/couriers` | shipping.manage | E8 |
 | Promotions | CRUD `/promotions`, `/promotions/{id}/coupons`, GET `/promotions/{id}/redemptions` | promotions.view / .manage | E8 |
@@ -93,6 +94,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 ## 4. New error codes
 
 `STOREFRONT_NOT_FOUND` (404) · `PRODUCT_NOT_AVAILABLE` (variant unpublished/inactive) · `INSUFFICIENT_STOCK` (existing, reused) · `CART_EMPTY` · `CART_CHANGED` (prices/availability moved since preview; client re-previews) · `COUPON_INVALID` · `COUPON_NOT_APPLICABLE` · `COUPON_LIMIT_REACHED` · `SHIPPING_NOT_AVAILABLE` · `PAYMENT_METHOD_NOT_AVAILABLE` · `ORDER_NOT_PAYABLE` · `PAYMENT_VERIFICATION_FAILED` · `ORDER_TRANSITION_NOT_ALLOWED` · `RETURN_WINDOW_CLOSED` · `REVIEW_ALREADY_EXISTS` · `MEDIA_IN_USE` (via `IN_USE`) · `CUSTOM_CSS_REJECTED`.
+
+*Added in E6:* `COMPARE_AT_NOT_ABOVE_PRICE`, `PRODUCT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND`, `STORE_NOT_FOUND`; reused `PRODUCT_NOT_SELLABLE`, `SCHEDULE_INVALID`, `SECTION_ITEMS_INVALID`, `MEDIA_NOT_FOUND`. A taken slug is a field error (`VALIDATION_FAILED`), not a separate code.
 
 ## 5. OpenAPI (Scramble) tags
 

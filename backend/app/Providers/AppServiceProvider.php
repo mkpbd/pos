@@ -47,8 +47,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Credential endpoints: per account+IP and per IP, to slow down guessing and enumeration.
         RateLimiter::for('auth', fn (Request $request) => [
-            Limit::perMinute(5)->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
-            Limit::perMinute(20)->by($request->ip()),
+            Limit::perMinute((int) config('pos.auth_rate_limit'))->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute(4 * (int) config('pos.auth_rate_limit'))->by($request->ip()),
         ]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Catalog\Presentation\Http\Controllers\AttributeController;
 use App\Modules\Catalog\Presentation\Http\Controllers\BrandController;
 use App\Modules\Catalog\Presentation\Http\Controllers\CategoryController;
 use App\Modules\Catalog\Presentation\Http\Controllers\TaxRateController;
@@ -21,4 +22,10 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         Route::patch("{$path}/{{$parameter}}", [$controller, 'update'])->middleware("can:{$managePermission}");
         Route::delete("{$path}/{{$parameter}}", [$controller, 'destroy'])->middleware("can:{$managePermission}");
     }
+
+    // Attribute dictionary: readable by product viewers and attribute managers.
+    Route::get('attributes', [AttributeController::class, 'index'])->middleware('can:attributes.read');
+    Route::post('attributes', [AttributeController::class, 'store'])->middleware('can:attributes.manage');
+    Route::patch('attributes/{attribute}', [AttributeController::class, 'update'])->whereUuid('attribute')->middleware('can:attributes.manage');
+    Route::delete('attributes/{attribute}', [AttributeController::class, 'destroy'])->whereUuid('attribute')->middleware('can:attributes.manage');
 });

@@ -23,6 +23,7 @@ final class StorefrontPresenter
             'is_enabled' => $s->is_enabled,
             'site_name' => $s->site_name,
             'meta_description' => $s->meta_description,
+            'fulfilment_store_id' => $s->fulfilment_store_id,
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

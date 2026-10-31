@@ -150,6 +150,25 @@ Cms module:
 
 All timestamps with an offset are converted to the application timezone before they are stored (`Shared\Application\Support\Instants`).
 
+### E-commerce E6 — Online catalog (implemented)
+
+OnlineCatalog module (1:1 web tables beside the POS catalog; slugs are lower-case `a-z0-9-`, ≤ 120, **unique per organization regardless of case** through expression indexes `(organization_id, lower(slug))` on PostgreSQL and SQLite):
+- `product_listings` — product_id → products (**unique**, `RESTRICT`), slug, is_published (default false), published_at / unpublished_at (optional window; CHECK end > start on PostgreSQL), is_featured, is_new_until date, short_description varchar(500), description_html (sanitized), specifications jsonb (`[{label, value}]`, default `[]`), seo_title varchar(70), seo_description varchar(160), sort_weight int, created_by/updated_by. Index `(organization_id, is_published)`. A product without a row is not online.
+- `variant_listings` — variant_id → product_variants (**unique**, cascade), compare_at_price NUMERIC(18,2) NULL (CHECK > 0 on PostgreSQL; "above the selling price" is checked on save), image_id → product_images (`SET NULL` on delete). Rows exist only for variants with web data.
+- `category_listings` — category_id → categories (**unique**, cascade), slug, is_visible (default true), image_media_id / banner_media_id → media (`RESTRICT`), description_html, seo_title, seo_description, author columns.
+- `brand_listings` — brand_id → brands (**unique**, cascade), slug, is_visible (default true), logo_media_id → media (`RESTRICT`), description varchar(1000), seo_title, seo_description, author columns.
+- `related_products` — organization_id, product_id → products (cascade), related_product_id → products (cascade), kind (`related|frequently_bought`, CHECK on PostgreSQL), sort_order smallint; primary key `(product_id, related_product_id, kind)`; CHECK not self on PostgreSQL; index `(organization_id, product_id, kind)`. No surrogate id.
+- `product_stats` — product_id → products (**primary key**, cascade), organization_id, units_sold_30d / units_sold_total NUMERIC(18,3), refreshed_at; index `(organization_id, units_sold_30d)`. A projection, not a ledger: each refresh replaces the organization's rows (net units of completed sales minus completed returns, never below zero). No rating columns yet (E10).
+- `products` (index only, PostgreSQL): extension `pg_trgm` and `products_name_trgm_index` — GIN `(lower(name) gin_trgm_ops)` for substring search.
+
+Catalog module:
+- `attributes` — name varchar(60) and slug varchar(80), each unique per organization case-insensitively; display (`text|swatch|button`, default `button`, CHECK on PostgreSQL), is_filterable (default true), sort_order, author columns.
+- `attribute_values` — attribute_id → attributes (cascade), value varchar(60) (unique per attribute, case-insensitive), swatch_hex char(7) NULL (`#rrggbb`, CHECK on PostgreSQL), sort_order; index `(attribute_id, sort_order)`. Products keep `products.options` / `product_variants.option_values` as the source of truth; no foreign key from products, so deleting an attribute never touches a product.
+
+Storefront module:
+- `storefront_settings` (changed, additive): `fulfilment_store_id` → stores NULL (`RESTRICT`) — the stock location for online availability.
+- `homepage_section_items.item_type` now also `product|category|brand` (hand-picked records of catalog sections; no foreign key — records that disappear drop out when the section is read). `menu_items.type` also `category|brand`.
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.
@@ -160,7 +179,7 @@ All timestamps with an offset are converted to the application timezone before t
 ## 3. Indexing strategy
 
 - Every tenant table: composite index starting with `(organization_id, …)`; branch tables `(organization_id, branch_id, …)`.
-- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. A trigram GIN index on product name (`pg_trgm`) is planned for Phase 9 performance work.
+- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6).
 - Case-insensitive uniqueness uses expression indexes, e.g. `brands (organization_id, lower(name))`, and partial indexes such as `customers (organization_id, phone) WHERE deleted_at IS NULL AND phone IS NOT NULL` — valid on PostgreSQL and SQLite alike.
 - Ledgers: `stock_movements (store_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down to the source document.
 - Reports: `sales (organization_id, branch_id, created_at)` and BRIN on large append-only `created_at` columns once volumes justify it.

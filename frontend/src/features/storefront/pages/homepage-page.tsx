@@ -64,6 +64,7 @@ function SectionRow({ section, index, count, canManage, onMove, onEdit, onDelete
   const duplicate = useDuplicateSectionMutation()
   const name = section.title ?? section.type_label
   const state = STATE[section.state]
+  const itemCount = section.item_ids?.length ?? 0
 
   return (
     <li className="flex flex-wrap items-center gap-3 py-3">
@@ -73,6 +74,7 @@ function SectionRow({ section, index, count, canManage, onMove, onEdit, onDelete
         <p className="text-sm text-muted-foreground">
           {section.type_label}
           {section.banner_ids.length > 0 && ` · ${section.banner_ids.length} banner${section.banner_ids.length === 1 ? '' : 's'}`}
+          {itemCount > 0 && ` · ${itemCount} hand-picked`}
         </p>
       </div>
       <Badge variant={state.variant}>{state.label}</Badge>
@@ -144,7 +146,7 @@ export function HomepagePage() {
           ) : sections.error ? (
             <ErrorState error={sections.error} onRetry={() => sections.refetch()} />
           ) : sections.data.length === 0 ? (
-            <EmptyState title="The homepage has no sections yet" description="Add a hero slider, banners, text, features, testimonials or a newsletter sign-up." />
+            <EmptyState title="The homepage has no sections yet" description="Add a hero slider, banners, products, categories, brands, text, features, testimonials or a newsletter sign-up." />
           ) : (
             <ol className="flex flex-col divide-y" aria-label="Homepage sections">
               {sections.data.map((s, i) => (

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
@@ -47,6 +48,11 @@ final class ContentPresenter
      */
     public static function section(HomepageSection $s): array
     {
+        $manual = $s->type->manualItemLimits();
+        $itemIds = $manual === null ? [] : $s->items
+            ->where('item_type', $manual['type'])->sortBy('sort_order')->pluck('item_id')->values()->all();
+        $summaries = $itemIds === [] ? [] : app(StorefrontCatalog::class)->itemSummaries($manual['type'], $itemIds);
+
         return [
             'id' => $s->id,
             'type' => $s->type->value,
@@ -56,6 +62,9 @@ final class ContentPresenter
             'config' => $s->type->normalize($s->config),
             'banner_ids' => $s->type->bannerPlacement() === null ? [] : $s->items
                 ->where('item_type', HomepageSectionItem::TYPE_BANNER)->sortBy('sort_order')->pluck('item_id')->values()->all(),
+            // Hand-picked products, categories or brands, in order, with names for the editor.
+            'item_ids' => $itemIds,
+            'items' => array_values(array_filter(array_map(fn (string $id) => $summaries[$id] ?? null, $itemIds))),
             'is_enabled' => $s->is_enabled,
             'starts_at' => $s->starts_at?->toIso8601String(),
             'ends_at' => $s->ends_at?->toIso8601String(),
@@ -78,6 +87,7 @@ final class ContentPresenter
             'description' => $t->description(),
             'banner_placement' => $t->bannerPlacement()?->value,
             'items' => $t->itemLimits(),
+            'manual_items' => $t->manualItemLimits(),
             'defaults' => $t->defaults(),
         ], SectionType::cases());
     }

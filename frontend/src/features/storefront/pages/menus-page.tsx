@@ -131,7 +131,7 @@ function MenuEditor({ menu, canManage, onDeleted }: { menu: MenuDetail; canManag
           {menu.name} <Badge variant="outline">{menu.location_label}</Badge>
           {!menu.is_active && <Badge variant="warning">Hidden</Badge>}
         </CardTitle>
-        <CardDescription>Link to a content page, or type a site path (/sale) or full web address. Links to pages follow renames and appear once the page is published. Up to {MAX_MENU_ITEMS} items, three levels deep.</CardDescription>
+        <CardDescription>Link to a content page, category or brand, or type a site path (/sale) or full web address. Linked items follow renames and appear once their page is on the store. Up to {MAX_MENU_ITEMS} items, three levels deep.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {canManage && (
@@ -162,7 +162,7 @@ function MenuEditor({ menu, canManage, onDeleted }: { menu: MenuDetail; canManag
           </div>
         )}
 
-        <MenuTreeEditor nodes={nodes} onChange={change} allowsMega={allowsMega} errors={errors} readOnly={!canManage} pages={linkTargets.data?.pages ?? []} />
+        <MenuTreeEditor nodes={nodes} onChange={change} allowsMega={allowsMega} errors={errors} readOnly={!canManage} pages={linkTargets.data?.pages ?? []} categories={linkTargets.data?.categories} brands={linkTargets.data?.brands} />
 
         {canManage && (
           <div className="flex items-center justify-end gap-3 border-t pt-4">

@@ -4,6 +4,9 @@ namespace App\Modules\Storefront\Application\Queries;
 
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Domain\MenuItemType;
 use App\Modules\Storefront\Domain\MenuLocation;
 use App\Modules\Storefront\Domain\ThemeSchema;
@@ -23,6 +26,9 @@ class StorefrontBootstrap
         private readonly StorefrontConfig $config,
         private readonly MediaLibrary $media,
         private readonly PageDirectory $pages,
+        private readonly StorefrontCatalog $catalog,
+        private readonly OrganizationDirectory $organizations,
+        private readonly TenantContext $tenant,
     ) {}
 
     /**
@@ -45,11 +51,26 @@ class StorefrontBootstrap
 
         $pageIds = $menus->flatMap(fn (Menu $menu) => $menu->items->where('type', MenuItemType::Page)->pluck('target_id'))->filter()->unique()->values()->all();
         $pages = $this->pages->visible($pageIds);
+        $targetIds = fn (MenuItemType $type) => $menus->flatMap(fn (Menu $menu) => $menu->items->where('type', $type)->pluck('target_id'))->filter()->unique()->values()->all();
+        $links = [];
+        foreach ($pages as $id => $page) {
+            $links[MenuItemType::Page->value][$id] = '/pages/'.$page['slug'];
+        }
+        foreach ($this->catalog->visibleCategories($targetIds(MenuItemType::Category)) as $id => $category) {
+            $links[MenuItemType::Category->value][$id] = '/category/'.$category['slug'];
+        }
+        foreach ($this->catalog->visibleBrands($targetIds(MenuItemType::Brand)) as $id => $brand) {
+            $links[MenuItemType::Brand->value][$id] = '/brand/'.$brand['slug'];
+        }
+        $organization = $this->organizations->summary($this->tenant->requireOrganization());
 
         return [
             'store' => [
                 'name' => $settings->site_name,
                 'description' => $settings->meta_description,
+                'currency' => $organization['base_currency'] ?? null,
+                // Exclusive tax mode: the storefront shows prices "excl. VAT"; tax is added at checkout.
+                'prices_include_tax' => ($organization['tax_mode'] ?? 'exclusive') === 'inclusive',
             ],
             'theme' => [
                 'colors' => $t['colors'],
@@ -71,7 +92,7 @@ class StorefrontBootstrap
             'menus' => $menus
                 ->mapWithKeys(fn (Menu $menu) => [$menu->location->value => [
                     'name' => $menu->name,
-                    'items' => $this->tree($menu->items, null, $ref, $pages),
+                    'items' => $this->tree($menu->items, null, $ref, $links),
                 ]])
                 ->sortKeysUsing(fn (string $a, string $b) => array_search(MenuLocation::from($a), MenuLocation::cases(), true) <=> array_search(MenuLocation::from($b), MenuLocation::cases(), true))
                 ->all(),
@@ -103,28 +124,29 @@ class StorefrontBootstrap
     }
 
     /**
-     * Visible items only; a hidden parent hides its whole branch. Items linking to a page
-     * that is not published (any more) are left out like hidden ones.
+     * Visible items only; a hidden parent hides its whole branch. Items linking to a page,
+     * category or brand that is not visible on the storefront (any more) are left out like
+     * hidden ones.
      *
      * @param  Collection<int, MenuItem>  $items
-     * @param  array<string, array{id: string, slug: string, title: string}>  $pages
+     * @param  array<string, array<string, string>>  $links  item type => target id => storefront path
      * @return list<array<string, mixed>>
      */
-    private function tree(Collection $items, ?string $parentId, callable $ref, array $pages): array
+    private function tree(Collection $items, ?string $parentId, callable $ref, array $links): array
     {
         return $items
             ->where('parent_id', $parentId)
             ->sortBy('sort_order')
-            ->filter(fn (MenuItem $item) => $item->type !== MenuItemType::Page || isset($pages[$item->target_id]))
+            ->filter(fn (MenuItem $item) => $item->type === MenuItemType::Custom || isset($links[$item->type->value][$item->target_id]))
             ->map(fn (MenuItem $item) => [
                 'id' => $item->id,
                 'label' => $item->label,
-                'url' => $item->type === MenuItemType::Page ? '/pages/'.$pages[$item->target_id]['slug'] : $item->url,
+                'url' => $item->type === MenuItemType::Custom ? $item->url : $links[$item->type->value][$item->target_id],
                 'open_in_new_tab' => $item->open_in_new_tab,
                 'is_mega' => $item->is_mega,
                 'mega_columns' => $item->mega_columns,
                 'image' => $ref($item->image_media_id),
-                'children' => $this->tree($items, $item->id, $ref, $pages),
+                'children' => $this->tree($items, $item->id, $ref, $links),
             ])
             ->values()
             ->all();

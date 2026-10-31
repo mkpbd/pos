@@ -24,6 +24,8 @@ export function ProductsPage() {
   const me = useAuth()
   const can = useCan()
   const canEdit = can('products.manage') && can('products.view_cost')
+  // Online store staff without product editing still reach the web listing.
+  const canListOnline = can('online_catalog.view')
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState(ALL)
@@ -113,6 +115,8 @@ export function ProductsPage() {
                       <TableCell>
                         {canEdit && !product.archived_at ? (
                           <Link to={`/products/${product.id}`} className="font-medium underline-offset-4 hover:underline">{product.name}</Link>
+                        ) : canListOnline && !product.archived_at ? (
+                          <Link to={`/products/${product.id}/online-store`} className="font-medium underline-offset-4 hover:underline">{product.name}</Link>
                         ) : (
                           <span className="font-medium">{product.name}</span>
                         )}

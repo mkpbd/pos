@@ -3,12 +3,47 @@ import { BannerGrid } from './banner-grid'
 import { FeaturesStrip, RichTextSection, Testimonials } from './content-sections'
 import { HeroSlider } from './hero-slider'
 import { NewsletterStrip } from './newsletter-strip'
+import { BrandStrip, CategoryStrip, ProductCarouselSection, ProductGridSection, ProductTabsSection } from './product-sections'
 
-const PREVIEW_LABELS: Record<Exclude<SectionPreviewState, 'live'>, string> = {
+const PREVIEW_LABELS: Record<Exclude<SectionPreviewState, 'live' | 'empty'>, string> = {
   disabled: 'Hidden — visitors do not see this section',
   scheduled: 'Scheduled — not shown yet',
   expired: 'Ended — no longer shown',
-  empty: 'No live banners — visitors do not see this section',
+}
+
+/** Why an empty section is not shown, by what it would list. */
+function emptyLabel(section: StoreSection): string {
+  switch (section.type) {
+    case 'hero_slider':
+    case 'banner_grid':
+      return 'No live banners — visitors do not see this section'
+    case 'category_strip':
+      return 'No visible categories — visitors do not see this section'
+    case 'brand_strip':
+      return 'No visible brands — visitors do not see this section'
+    default:
+      return 'No products to show — visitors do not see this section'
+  }
+}
+
+/** A section without anything to list (only sent in previews). */
+function isEmpty(section: StoreSection): boolean {
+  switch (section.type) {
+    case 'hero_slider':
+    case 'banner_grid':
+      return section.banners.length === 0
+    case 'product_carousel':
+    case 'product_grid':
+      return section.products.length === 0
+    case 'product_tabs':
+      return section.tabs.every((tab) => tab.products.length === 0)
+    case 'category_strip':
+      return section.categories.length === 0
+    case 'brand_strip':
+      return section.brands.length === 0
+    default:
+      return false
+  }
 }
 
 function Section({ section }: { section: StoreSection }) {
@@ -25,6 +60,16 @@ function Section({ section }: { section: StoreSection }) {
       return <Testimonials section={section} />
     case 'newsletter':
       return <NewsletterStrip section={section} />
+    case 'product_carousel':
+      return <ProductCarouselSection section={section} />
+    case 'product_grid':
+      return <ProductGridSection section={section} />
+    case 'product_tabs':
+      return <ProductTabsSection section={section} />
+    case 'category_strip':
+      return <CategoryStrip section={section} />
+    case 'brand_strip':
+      return <BrandStrip section={section} />
     default:
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
@@ -36,15 +81,17 @@ export function SectionList({ sections }: { sections: StoreSection[] }) {
   return (
     <>
       {sections.map((section) => {
-        const hasBanners = 'banners' in section
+        const empty = isEmpty(section)
         const state = section.state && section.state !== 'live' ? section.state : null
+        // Outside previews the API never sends empty sections; never draw one regardless.
+        if (empty && !state) return null
 
         return (
           <div key={section.id} data-section-type={section.type} data-testid="homepage-section" className={state ? 'relative opacity-60 outline-2 outline-offset-[-2px] outline-dashed outline-sf-sale' : undefined}>
             {state && (
-              <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{PREVIEW_LABELS[state]}</p>
+              <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{state === 'empty' ? emptyLabel(section) : PREVIEW_LABELS[state]}</p>
             )}
-            {hasBanners && section.banners.length === 0 ? <div className="h-24" aria-hidden /> : <Section section={section} />}
+            {empty ? <div className="h-24" aria-hidden /> : <Section section={section} />}
           </div>
         )
       })}

@@ -14,8 +14,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $is_enabled
  * @property string $site_name
  * @property ?string $meta_description
+ * @property ?string $fulfilment_store_id stock location deciding online availability
  */
-#[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description'])]
+#[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, HasUuids, TracksAuthor;

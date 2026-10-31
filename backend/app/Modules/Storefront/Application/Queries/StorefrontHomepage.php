@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Application\Queries;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
@@ -18,7 +19,10 @@ use App\Modules\Storefront\Infrastructure\Models\HomepageSectionItem;
  */
 class StorefrontHomepage
 {
-    public function __construct(private readonly MediaLibrary $media) {}
+    public function __construct(
+        private readonly MediaLibrary $media,
+        private readonly StorefrontCatalog $catalog,
+    ) {}
 
     /**
      * @return array{sections: list<array<string, mixed>>}
@@ -62,6 +66,14 @@ class StorefrontHomepage
                 }
             }
 
+            $catalogContent = $this->catalogContent($section, $type, $config);
+            if ($catalogContent !== null && $this->isEmpty($catalogContent)) {
+                if (! $preview) {
+                    continue;
+                }
+                $state = $state === 'live' ? 'empty' : $state;
+            }
+
             $data = [
                 'id' => $section->id,
                 'type' => $type->value,
@@ -72,6 +84,7 @@ class StorefrontHomepage
             if ($type->bannerPlacement() !== null) {
                 $data['banners'] = $sectionBanners;
             }
+            $data += $catalogContent ?? [];
             if ($preview) {
                 $data['state'] = $state;
             }
@@ -79,6 +92,40 @@ class StorefrontHomepage
         }
 
         return ['sections' => $result];
+    }
+
+    /**
+     * Products, categories or brands of a catalog section, from the online catalog; null for
+     * other section types. Records that are not (or no longer) live or visible drop out.
+     *
+     * @param  array<string, mixed>  $config  normalized
+     * @return array<string, list<mixed>>|null
+     */
+    private function catalogContent(HomepageSection $section, SectionType $type, array $config): ?array
+    {
+        $manual = $type->manualItemLimits();
+        $picked = fn () => $section->items->where('item_type', $manual['type'])->sortBy('sort_order')->pluck('item_id')->values()->all();
+
+        return match ($type) {
+            SectionType::ProductCarousel, SectionType::ProductGrid => ['products' => $config['source'] === 'manual'
+                ? array_slice($this->catalog->productCards($picked()), 0, $config['limit'])
+                : $this->catalog->sourceProductCards($config['source'], $config['category_id'], $config['limit'])],
+            SectionType::ProductTabs => ['tabs' => array_values(array_filter(array_map(fn (array $tab) => [
+                'label' => $tab['label'],
+                'products' => $this->catalog->sourceProductCards($tab['source'], $tab['category_id'], $config['limit']),
+            ], $config['tabs']), fn (array $tab) => $tab['products'] !== []))],
+            SectionType::CategoryStrip => ['categories' => $this->catalog->categoryStrip($config['source'] === 'manual' ? $picked() : null, $config['limit'])],
+            SectionType::BrandStrip => ['brands' => $this->catalog->brandStrip($config['source'] === 'manual' ? $picked() : null, $config['limit'])],
+            default => null,
+        };
+    }
+
+    /**
+     * @param  array<string, list<mixed>>  $content
+     */
+    private function isEmpty(array $content): bool
+    {
+        return reset($content) === [];
     }
 
     /**

@@ -82,7 +82,8 @@ npm run test:e2e
 - Playwright starts the Vite dev server automatically.
 - `smoke.spec.ts` intercepts `/api/v1/*` with `page.route` (no backend needed).
 - `storefront.spec.ts` (public storefront) and `storefront-admin.spec.ts` (Online store and Media library screens) are mocked like the smoke tests. The dev server serves the storefront at `/` and the admin at `/admin`.
-- `integration.spec.ts` runs against a **real backend** (Sanctum cookies, CSRF, tenancy, RBAC; since E4 also the admin → storefront path: a theme colour and a menu item changed in the admin appear on the storefront; since E5 a banner edited and a section added and moved to the top appear on the storefront in that order — brief checks 1, 2, 5, 6) and is opt-in:
+- `online-catalog-admin.spec.ts` (product web listing with sale price and related product, category visibility, hand-picked product carousel, menu item linking a category) and `storefront-catalog.spec.ts` (browse the shop, filter by brand, open a product and switch its variant; search suggestions and quick view; unknown product → not-found page) are mocked too; they run on both projects (the mocked suite: 36 pass, 2 skipped by design — the desktop/mobile navigation tests of `storefront.spec.ts`).
+- `integration.spec.ts` runs against a **real backend** (Sanctum cookies, CSRF, tenancy, RBAC; since E4 also the admin → storefront path: a theme colour and a menu item changed in the admin appear on the storefront; since E5 a banner edited and a section added and moved to the top appear on the storefront in that order — brief checks 1, 2, 5, 6; since E6 `a product created and repriced in the admin shows its current price everywhere on the storefront` — a product created and published in the admin is found by search and has a product page, and after a price change in the product editor the new price shows on the product page, the shop listing, the search suggestions and the homepage carousel — brief checks 7–10; the menu test counts the existing menu items instead of assuming four) and is opt-in:
 
 ```powershell
 cd backend;  php artisan migrate:fresh --seed; php artisan serve --port=8010   # re-seed before every run: the specs post documents
@@ -90,10 +91,10 @@ cd frontend; $env:E2E_BACKEND=1; $env:VITE_BACKEND_ORIGIN='http://127.0.0.1:8010
 ```
 
 Notes for the full-stack run:
-- The backend needs `STOREFRONT_DEFAULT_HOST=shop.localhost` (the seeded store) and, because the suite signs in many times a minute, `POS_API_RATE_LIMIT=1000`.
+- The backend needs `STOREFRONT_DEFAULT_HOST=shop.localhost` (the seeded store) and, because the suite signs in many times a minute, `POS_API_RATE_LIMIT=1000` and `POS_AUTH_RATE_LIMIT=100`. `POS_AUTH_RATE_LIMIT` (default 5) is the number of sign-in / password-reset attempts per minute per account and IP (four times that per IP); the suite signs the owner in more than five times a minute, so the default makes later specs fail with 429.
 - `php artisan serve` passes only a few environment variables to its PHP process; to override `DB_*` and the settings above from the shell, run `php -S 127.0.0.1:8010 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php` from `backend/public` instead.
 - If another dev server already holds port 5173, Playwright would reuse it (and its backend). Set `E2E_PORT=5180` and add `localhost:5180` to `SANCTUM_STATEFUL_DOMAINS` of the test backend. The same applies to any port: a leftover dev server or `php -S` from an earlier run is silently reused (Windows lets several processes listen on one port), so if results do not match a fresh seed, check for old `node`/`php` processes and pick unused ports.
-- Run one project per fresh seed (`--project=desktop-chromium`): both projects post documents into the same database. The admin's mobile layout hides the sidebar links the first specs click, so the full-stack suite currently passes on desktop only.
+- Run one project per fresh seed (`--project=desktop-chromium`): both projects post documents into the same database. The admin's mobile layout hides the sidebar links the first specs click, so the full-stack suite currently passes on desktop only (9/9 on `desktop-chromium` against a fresh seed in E6; the E6 product test skips itself on mobile).
 
 ## Definition of done per phase
 

@@ -3,11 +3,11 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { MediaField } from '@/features/media/components/media-picker'
-import type { LinkTargetPage } from '@/features/storefront/api'
-import { addNode, errorKey, MAX_MENU_DEPTH, moveNode, removeNode, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
+import type { LinkTargetPage, LinkTargetTerm } from '@/features/storefront/api'
+import { addNode, decodeTarget, encodeTarget, errorKey, MAX_MENU_DEPTH, moveNode, removeNode, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -20,14 +20,18 @@ type Props = {
   readOnly: boolean
   /** Content pages an item can link to. */
   pages: LinkTargetPage[]
+  /** Categories and brands an item can link to. */
+  categories?: LinkTargetTerm[]
+  brands?: LinkTargetTerm[]
 }
 
 const CUSTOM = 'custom'
+const offStore = (t: LinkTargetTerm) => (t.url ? '' : ' (not on the store)')
 
 const itemName = (path: NodePath) => `Item ${path.map((i) => i + 1).join('.')}`
 
 function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNode; path: NodePath; siblings: number }) {
-  const { nodes, onChange, allowsMega, errors, readOnly, pages } = props
+  const { nodes, onChange, allowsMega, errors, readOnly, pages, categories = [], brands = [] } = props
   const linkError = errors[`${errorKey(path)}.url`] ?? errors[`${errorKey(path)}.target_id`]
   const name = itemName(path)
   const key = errorKey(path)
@@ -46,20 +50,40 @@ function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNo
           <div className="flex flex-col gap-1">
             <div className="flex gap-2">
               <Select
-                value={node.type === 'page' ? (node.target_id ?? '') : CUSTOM}
-                onValueChange={(v) => patch(v === CUSTOM ? { type: 'custom' } : { type: 'page', target_id: v })}
+                value={node.type === 'custom' ? CUSTOM : node.target_id ? encodeTarget(node.type, node.target_id) : ''}
+                onValueChange={(v) => {
+                  const target = decodeTarget(v)
+                  patch(target ? { type: target.type, target_id: target.id } : { type: 'custom' })
+                }}
                 disabled={readOnly}
               >
-                <SelectTrigger aria-label={`${name} link type`} className={cn(node.type === 'page' ? 'w-full' : 'w-36 shrink-0')}>
-                  <SelectValue placeholder="Choose a page" />
+                <SelectTrigger aria-label={`${name} link type`} className={cn(node.type !== 'custom' ? 'w-full' : 'w-36 shrink-0')}>
+                  <SelectValue placeholder={`Choose a ${node.type}`} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={CUSTOM}>Custom link</SelectItem>
-                  {pages.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      Page: {p.title}{p.status === 'draft' ? ' (draft)' : ''}
-                    </SelectItem>
-                  ))}
+                  {pages.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Pages</SelectLabel>
+                      {pages.map((p) => (
+                        <SelectItem key={p.id} value={encodeTarget('page', p.id)}>
+                          Page: {p.title}{p.status === 'draft' ? ' (draft)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  {categories.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Categories</SelectLabel>
+                      {categories.map((c) => <SelectItem key={c.id} value={encodeTarget('category', c.id)}>Category: {c.name}{offStore(c)}</SelectItem>)}
+                    </SelectGroup>
+                  )}
+                  {brands.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Brands</SelectLabel>
+                      {brands.map((b) => <SelectItem key={b.id} value={encodeTarget('brand', b.id)}>Brand: {b.name}{offStore(b)}</SelectItem>)}
+                    </SelectGroup>
+                  )}
                 </SelectContent>
               </Select>
               {node.type === 'custom' && (

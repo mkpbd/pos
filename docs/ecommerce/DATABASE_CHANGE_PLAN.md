@@ -60,10 +60,14 @@ No column is renamed or dropped. The only change to an existing constraint is th
 - `product_stats` — product_id PK, units_sold_30d, units_sold_total, rating_avg NUMERIC(3,2), rating_count, refreshed_at. Projection rebuilt by a scheduled job (best sellers, rating sort). Not a ledger.
 - `related_products` — product_id, related_product_id, kind `related|frequently_bought`, sort_order. PK `(product_id, related_product_id, kind)`.
 
+*As built in E6* (see DATABASE_DESIGN.md): `product_listings` has no `shipping_note`, `og_media_id` or `translations` yet (SEO image = first product image; translations E12) and is indexed `(organization_id, is_published)`; `variant_listings.image_id` is a single nullable FK to `product_images` instead of an ordered id list; `category_listings` uses `is_visible` instead of `show_in_menu` (menus link categories explicitly) and has no `translations`; `product_stats` has no rating columns yet (E10) and adds `organization_id`; `related_products` also carries `organization_id`.
+
 ### Catalog (extension)
 - `attributes` — name (unique per org, lower), slug, display `text|swatch|button`, is_filterable, sort_order.
 - `attribute_values` — attribute_id, value (unique per attribute, lower), swatch_hex char(7) NULL, swatch_media_id, sort_order.
 Product options remain `products.options` jsonb; the editor offers dictionary values; facets read `product_variants.option_values` via GIN.
+
+*As built in E6:* `attribute_values` has no `swatch_media_id` (colour swatches only). Facets are computed in PHP from the live candidate set, so the GIN index on `product_variants.option_values` (§2) was not added; E12 decides with `EXPLAIN`. The `pg_trgm` index on `lower(products.name)` shipped (PostgreSQL only). `storefront_settings` got only `fulfilment_store_id` in E6.
 
 ### CustomerAccounts / Customers
 - `customer_accounts` — customer_id **unique**, email (unique per org, lower, partial on not null), phone (normalized), password, email_verified_at, phone_verified_at, status `active|disabled`, last_login_at, remember_token. Unique `(organization_id, lower(email))`.

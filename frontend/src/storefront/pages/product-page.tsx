@@ -1,0 +1,194 @@
+import { useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
+import { Button } from '@/components/ui/button'
+import { useStorefront } from '../api'
+import { isNotFound, useProductQuery, useProductsBySlugsQuery, useRelatedProductsQuery } from '../catalog/api'
+import { Breadcrumbs } from '../catalog/breadcrumbs'
+import { ProductBadges, ProductCard } from '../catalog/product-card'
+import { ProductGallery } from '../catalog/product-gallery'
+import { PRODUCT_RAIL_ITEM, Rail } from '../catalog/product-rail'
+import { ProductSummary } from '../catalog/product-summary'
+import { Tabs, type TabItem } from '../catalog/product-tabs'
+import { readRecentlyViewed, recordRecentlyViewed } from '../catalog/recently-viewed'
+import { imageIndexOf, useVariantSelection } from '../catalog/use-variant-selection'
+import { initialVariant } from '../catalog/variant-selection'
+import { RichText } from '../components/rich-text'
+import type { ProductCard as Card, ProductDetail } from '../types'
+import { NotFoundPage } from './not-found-page'
+
+const PREVIEW_STATES: Record<string, string> = {
+  draft: 'Preview — this product is not published.',
+  scheduled: 'Preview — this product is scheduled and not visible yet.',
+  expired: 'Preview — this product is no longer published.',
+}
+
+export function ProductPage() {
+  const { slug = '' } = useParams()
+  return <ProductPageContent key={slug} slug={slug} />
+}
+
+function ProductPageContent({ slug }: { slug: string }) {
+  const { store } = useStorefront()
+  const [params] = useSearchParams()
+  const product = useProductQuery(slug, params.get('preview') === '1')
+  const data = product.data
+
+  useEffect(() => {
+    if (data) document.title = `${data.seo.title || data.name} | ${store.name}`
+  }, [data, store.name])
+
+  useEffect(() => {
+    if (data && !data.preview_state) recordRecentlyViewed(data.slug)
+  }, [data])
+
+  if (isNotFound(product.error)) return <NotFoundPage />
+  if (product.error) {
+    return (
+      <section className="mx-auto max-w-sf px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold">This product could not be loaded</h1>
+        <Button className="mt-4 rounded-sf-button" onClick={() => void product.refetch()}>Try again</Button>
+      </section>
+    )
+  }
+  if (!data) {
+    return (
+      <div role="status" className="grid min-h-[50vh] place-items-center">
+        <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
+        <span className="sr-only">Loading the product</span>
+      </div>
+    )
+  }
+
+  return <ProductView product={data} />
+}
+
+function ProductView({ product }: { product: ProductDetail }) {
+  const [params, setParams] = useSearchParams()
+  const variantParam = params.get('variant')
+  // The variant from the URL shows its own image first.
+  const [imageIndex, setImageIndex] = useState(() => Math.max(0, imageIndexOf(product, initialVariant(product, variantParam)?.image_id)))
+
+  const { selection, variant, choose } = useVariantSelection(product, variantParam, (next) => {
+    setParams(
+      (current) => {
+        const updated = new URLSearchParams(current)
+        if (next) updated.set('variant', next.id)
+        else updated.delete('variant')
+        return updated
+      },
+      { replace: true },
+    )
+    const i = imageIndexOf(product, next?.image_id)
+    if (i >= 0) setImageIndex(i)
+  })
+
+
+  const tabs: TabItem[] = []
+  if (product.description_html) tabs.push({ id: 'description', label: 'Description', content: <RichText html={product.description_html} className="max-w-3xl" /> })
+  if (product.specifications.length > 0) {
+    tabs.push({
+      id: 'specifications',
+      label: 'Specifications',
+      content: (
+        <table className="w-full max-w-2xl text-sm">
+          <tbody>
+            {product.specifications.map((spec, i) => (
+              <tr key={`${spec.label}-${i}`} className="border-b last:border-b-0">
+                <th scope="row" className="w-1/3 py-2.5 pr-4 text-left align-top font-semibold text-sf-heading">{spec.label}</th>
+                <td className="py-2.5">{spec.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ),
+    })
+  }
+
+  const notice = product.preview_state ? PREVIEW_STATES[product.preview_state] : undefined
+
+  return (
+    <article data-testid="product-page">
+      {notice && (
+        <p role="status" className="bg-neutral-900 px-4 py-1.5 text-center text-xs font-semibold text-white">
+          {notice}
+        </p>
+      )}
+      <div className="bg-sf-surface">
+        <div className="mx-auto max-w-sf px-4 py-5">
+          <Breadcrumbs items={product.breadcrumbs} />
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-sf px-4 py-8">
+        <div className="grid gap-8 rounded-sf-card bg-sf-surface p-4 md:grid-cols-2 md:p-8 lg:gap-12">
+          <div className="relative">
+            <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} />
+            <ProductBadges
+              onSale={variant ? variant.on_sale : product.on_sale}
+              discountPercent={null}
+              isNew={product.is_new}
+              inStock={variant ? variant.in_stock : product.in_stock}
+              className="absolute top-3 left-3"
+            />
+          </div>
+          <div className="flex flex-col gap-5">
+            <h1 className="text-3xl leading-tight font-extrabold lg:text-4xl">{product.name}</h1>
+            <ProductSummary product={product} variant={variant} selection={selection} onChoose={choose} />
+            {product.category?.slug && (
+              <p className="border-t pt-4 text-sm">
+                Category:{' '}
+                <Link to={`/category/${product.category.slug}`} className="font-semibold text-sf-accent hover:underline">
+                  {product.category.name}
+                </Link>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {tabs.length > 0 && (
+          <section aria-label="Product information" className="mt-8 rounded-sf-card bg-sf-surface p-4 md:p-8">
+            <Tabs tabs={tabs} label="Product information" />
+          </section>
+        )}
+
+        <RelatedSections slug={product.slug} />
+        <RecentlyViewed currentSlug={product.slug} />
+      </div>
+    </article>
+  )
+}
+
+function ProductRow({ title, products }: { title: string; products: Card[] }) {
+  if (products.length === 0) return null
+
+  return (
+    <section className="mt-12" aria-label={title}>
+      <h2 className="mb-6 text-2xl font-extrabold lg:text-3xl">{title}</h2>
+      <Rail label={title} count={products.length} itemClassName={PRODUCT_RAIL_ITEM}>
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </Rail>
+    </section>
+  )
+}
+
+function RelatedSections({ slug }: { slug: string }) {
+  const related = useRelatedProductsQuery(slug)
+  if (!related.data) return null
+
+  return (
+    <>
+      <ProductRow title="Frequently bought together" products={related.data.frequently_bought} />
+      <ProductRow title="Related products" products={related.data.related} />
+    </>
+  )
+}
+
+/** Up to eight products this visitor looked at before, fetched fresh (current prices). */
+function RecentlyViewed({ currentSlug }: { currentSlug: string }) {
+  const [slugs] = useState(() => readRecentlyViewed().filter((s) => s !== currentSlug).slice(0, 8))
+  const products = useProductsBySlugsQuery(slugs)
+
+  return <ProductRow title="Recently viewed" products={products.data ?? []} />
+}

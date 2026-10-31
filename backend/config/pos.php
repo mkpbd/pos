@@ -26,4 +26,7 @@ return [
     // Requests per minute per user (or IP when signed out) on the API. Full-stack e2e runs raise it.
     'api_rate_limit' => (int) env('POS_API_RATE_LIMIT', 120),
 
+    // Sign-in / reset attempts per minute per account+IP (four times that per IP). Full-stack e2e runs raise it.
+    'auth_rate_limit' => (int) env('POS_AUTH_RATE_LIMIT', 5),
+
 ];

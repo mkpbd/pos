@@ -4,8 +4,9 @@ namespace App\Modules\Storefront\Domain;
 
 /**
  * Homepage section types and their configuration documents. Only types whose content and
- * link targets exist are offered: product, category and brand sections arrive with the
- * online catalog (E6), deal countdowns with promotions (E8), blog teasers with the blog (E11).
+ * link targets exist are offered: product, category and brand sections come from the online
+ * catalog (E6; category tabs are product tabs with category sources), deal countdowns arrive
+ * with promotions (E8), blog teasers with the blog (E11).
  *
  * Like ThemeSchema, defaults() defines each config's shape and normalize() fills gaps and
  * drops unknown keys; value validation lives with the HTTP request.
@@ -18,6 +19,11 @@ enum SectionType: string
     case FeaturesStrip = 'features_strip';
     case Testimonials = 'testimonials';
     case Newsletter = 'newsletter';
+    case ProductCarousel = 'product_carousel';
+    case ProductGrid = 'product_grid';
+    case ProductTabs = 'product_tabs';
+    case CategoryStrip = 'category_strip';
+    case BrandStrip = 'brand_strip';
 
     public const BANNER_GRID_LAYOUTS = ['2-col', '3-col', '3-col-split', '4-col'];
 
@@ -25,6 +31,26 @@ enum SectionType: string
     public const FEATURE_ICONS = ['truck', 'shield-check', 'credit-card', 'headset', 'gift', 'rotate-ccw', 'badge-percent', 'clock', 'leaf', 'heart', 'star', 'store'];
 
     public const MAX_CONFIG_ITEMS = ['features_strip' => 6, 'testimonials' => 12];
+
+    /** Where product sections take their products from; `manual` uses the section's items. */
+    public const PRODUCT_SOURCES = ['manual', 'featured', 'new_arrivals', 'best_sellers', 'on_sale', 'category'];
+
+    public const GRID_COLUMNS = [3, 4, 5];
+
+    public const CATEGORY_STRIP_SOURCES = ['manual', 'top_level'];
+
+    public const BRAND_STRIP_SOURCES = ['manual', 'all'];
+
+    /** Bounds of `limit` per type. */
+    public const LIMITS = [
+        'product_carousel' => [4, 24],
+        'product_grid' => [4, 24],
+        'product_tabs' => [4, 12],
+        'category_strip' => [4, 16],
+        'brand_strip' => [4, 24],
+    ];
+
+    public const TABS = ['min' => 2, 'max' => 5];
 
     public function label(): string
     {
@@ -35,6 +61,11 @@ enum SectionType: string
             self::FeaturesStrip => 'Features strip',
             self::Testimonials => 'Testimonials',
             self::Newsletter => 'Newsletter sign-up',
+            self::ProductCarousel => 'Product carousel',
+            self::ProductGrid => 'Product grid',
+            self::ProductTabs => 'Product tabs',
+            self::CategoryStrip => 'Category strip',
+            self::BrandStrip => 'Brand strip',
         };
     }
 
@@ -47,6 +78,11 @@ enum SectionType: string
             self::FeaturesStrip => 'Icons with a short title and text, e.g. delivery, payment, returns.',
             self::Testimonials => 'Customer quotes with name, role and photo.',
             self::Newsletter => 'An e-mail sign-up form with double opt-in.',
+            self::ProductCarousel => 'A sliding row of products: hand-picked, featured, new, best sellers, on sale or from a category.',
+            self::ProductGrid => 'Products in a grid of three to five columns, from the same sources as the carousel.',
+            self::ProductTabs => 'Two to five tabs of products, e.g. New arrivals / Best sellers / On sale, or one tab per category.',
+            self::CategoryStrip => 'Category tiles with image and product count: hand-picked or the top level.',
+            self::BrandStrip => 'A row of brand logos: hand-picked or every brand.',
         };
     }
 
@@ -63,7 +99,50 @@ enum SectionType: string
     }
 
     /**
-     * @return array{min: int, max: int}|null attached items allowed, null when the type has none
+     * Records a section of this type can hand-pick (`item_ids`, used when its source is
+     * `manual`), or null.
+     *
+     * @return array{type: string, min: int, max: int}|null
+     */
+    public function manualItemLimits(): ?array
+    {
+        return match ($this) {
+            self::ProductCarousel, self::ProductGrid => ['type' => 'product', 'min' => 1, 'max' => 24],
+            self::CategoryStrip => ['type' => 'category', 'min' => 1, 'max' => 16],
+            self::BrandStrip => ['type' => 'brand', 'min' => 1, 'max' => 24],
+            default => null,
+        };
+    }
+
+    /**
+     * Whether a (normalized) config takes its records from the section's hand-picked items.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function usesManualItems(array $config): bool
+    {
+        return $this->manualItemLimits() !== null && ($config['source'] ?? null) === 'manual';
+    }
+
+    /**
+     * Category ids a (normalized) config refers to (category sources).
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<string>
+     */
+    public function categoryIds(array $config): array
+    {
+        $ids = match ($this) {
+            self::ProductCarousel, self::ProductGrid => [$config['category_id'] ?? null],
+            self::ProductTabs => array_column($config['tabs'] ?? [], 'category_id'),
+            default => [],
+        };
+
+        return array_values(array_unique(array_filter($ids, 'is_string')));
+    }
+
+    /**
+     * @return array{min: int, max: int}|null attached banners allowed, null when the type shows none
      */
     public function itemLimits(): ?array
     {
@@ -86,6 +165,11 @@ enum SectionType: string
             self::FeaturesStrip => ['items' => [], 'background' => null],
             self::Testimonials => ['items' => [], 'background' => null],
             self::Newsletter => ['text' => null, 'button_label' => 'Subscribe', 'image_media_id' => null, 'background' => '#c2410c', 'foreground' => '#ffffff'],
+            self::ProductCarousel => ['source' => 'featured', 'category_id' => null, 'limit' => 8, 'view_all_url' => null],
+            self::ProductGrid => ['source' => 'featured', 'category_id' => null, 'limit' => 8, 'columns' => 4, 'view_all_url' => null],
+            self::ProductTabs => ['tabs' => [], 'limit' => 8],
+            self::CategoryStrip => ['source' => 'top_level', 'limit' => 8],
+            self::BrandStrip => ['source' => 'all', 'limit' => 12],
         };
     }
 
@@ -115,6 +199,22 @@ enum SectionType: string
                 'rating' => isset($i['rating']) ? (int) $i['rating'] : null,
                 'avatar_media_id' => $i['avatar_media_id'] ?? null,
             ], array_values(array_filter((array) $result['items'], 'is_array')));
+        }
+
+        if ($this === self::ProductCarousel || $this === self::ProductGrid) {
+            $result['category_id'] = $result['source'] === 'category' ? $result['category_id'] : null;
+        }
+        if ($this === self::ProductTabs) {
+            $result['tabs'] = array_map(fn (array $t) => [
+                'label' => $t['label'] ?? '',
+                'source' => $t['source'] ?? 'featured',
+                'category_id' => ($t['source'] ?? null) === 'category' ? ($t['category_id'] ?? null) : null,
+            ], array_values(array_filter((array) $result['tabs'], 'is_array')));
+        }
+        foreach (['limit', 'columns'] as $key) {
+            if (isset($result[$key]) && is_numeric($result[$key])) {
+                $result[$key] = (int) $result[$key];
+            }
         }
 
         return $result;

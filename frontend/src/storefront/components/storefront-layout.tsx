@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect } from 'react'
 import { Outlet } from 'react-router'
 import { ApiError } from '@/lib/api/client'
 import { BootstrapContext, useBootstrapQuery } from '../api'
+import { QuickViewProvider } from '../catalog/quick-view'
 import { applyCssVars, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
 import { AnnouncementBar, PreviewRibbon } from './announcement-bar'
@@ -28,7 +29,9 @@ export function StorefrontLayout() {
           {query.data.theme.announcement && <AnnouncementBar announcement={query.data.theme.announcement} />}
           <SiteHeader />
           <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-            <Outlet />
+            <QuickViewProvider>
+              <Outlet />
+            </QuickViewProvider>
           </main>
           <SiteFooter />
         </div>

@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Presentation\Http\Requests;
 
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
+use App\Modules\Storefront\Presentation\Http\Rules\SafeLink;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -39,7 +40,15 @@ class SaveHomepageSectionRequest extends FormRequest
             $rules['banner_ids'] = ['prohibited'];
         }
 
-        $needsConfig = in_array($type, [SectionType::RichText, SectionType::FeaturesStrip, SectionType::Testimonials, SectionType::BannerGrid], true);
+        // Hand-picked products, categories or brands (used when the config's source is `manual`).
+        if (($manual = $type->manualItemLimits()) !== null) {
+            $rules['item_ids'] = ['sometimes', 'array', 'max:'.$manual['max']];
+            $rules['item_ids.*'] = ['uuid', 'distinct'];
+        } else {
+            $rules['item_ids'] = ['prohibited'];
+        }
+
+        $needsConfig = in_array($type, [SectionType::RichText, SectionType::FeaturesStrip, SectionType::Testimonials, SectionType::BannerGrid, SectionType::ProductTabs], true);
         $rules['config'] = [$creating && $needsConfig ? 'required' : 'sometimes', 'array'];
 
         return $rules + $this->configRules($type);
@@ -94,6 +103,29 @@ class SaveHomepageSectionRequest extends FormRequest
                 'config.image_media_id' => ['sometimes', 'nullable', 'uuid'],
                 'config.background' => ['sometimes', ...$hex],
                 'config.foreground' => ['sometimes', ...$hex],
+            ],
+            SectionType::ProductCarousel, SectionType::ProductGrid => [
+                'config.source' => ['sometimes', Rule::in(SectionType::PRODUCT_SOURCES)],
+                'config.category_id' => ['required_if:config.source,category', 'nullable', 'uuid'],
+                'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS[$type->value])],
+                'config.view_all_url' => ['sometimes', 'nullable', new SafeLink],
+                ...($type === SectionType::ProductGrid ? ['config.columns' => ['sometimes', 'integer', Rule::in(SectionType::GRID_COLUMNS)]] : []),
+            ],
+            SectionType::ProductTabs => [
+                'config.tabs' => ['required_with:config', 'array', 'min:'.SectionType::TABS['min'], 'max:'.SectionType::TABS['max']],
+                'config.tabs.*' => ['array'],
+                'config.tabs.*.label' => ['required', 'string', 'max:40'],
+                'config.tabs.*.source' => ['required', Rule::in(array_values(array_diff(SectionType::PRODUCT_SOURCES, ['manual'])))],
+                'config.tabs.*.category_id' => ['required_if:config.tabs.*.source,category', 'nullable', 'uuid'],
+                'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS['product_tabs'])],
+            ],
+            SectionType::CategoryStrip => [
+                'config.source' => ['sometimes', Rule::in(SectionType::CATEGORY_STRIP_SOURCES)],
+                'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS['category_strip'])],
+            ],
+            SectionType::BrandStrip => [
+                'config.source' => ['sometimes', Rule::in(SectionType::BRAND_STRIP_SOURCES)],
+                'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS['brand_strip'])],
             ],
         };
     }

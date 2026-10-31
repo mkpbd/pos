@@ -109,9 +109,12 @@ class HomepageBuilderTest extends TestCase
         $tiles = [$this->banner('home_promo', 'T1'), $this->banner('home_promo', 'T2'), $this->banner('home_promo', 'T3')];
 
         $types = $this->getJson('/api/v1/storefront/homepage-sections/types')->assertOk()->json('data');
-        $this->assertSame(['hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter'], array_column($types, 'type'));
+        $this->assertSame([
+            'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
+            'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip',
+        ], array_column($types, 'type'));
 
-        $this->postJson('/api/v1/storefront/homepage-sections', ['type' => 'product_grid'])->assertUnprocessable()->assertJsonValidationErrors('type', 'error.details');
+        $this->postJson('/api/v1/storefront/homepage-sections', ['type' => 'deal_countdown'])->assertUnprocessable()->assertJsonValidationErrors('type', 'error.details');
         $this->postJson('/api/v1/storefront/homepage-sections', ['type' => 'hero_slider', 'banner_ids' => [$tiles[0]]])
             ->assertUnprocessable()->assertJsonPath('error.code', 'BANNER_NOT_FOUND');
         $this->postJson('/api/v1/storefront/homepage-sections', ['type' => 'hero_slider', 'banner_ids' => []])

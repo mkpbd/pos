@@ -91,3 +91,59 @@ export function flattenCategoryTree(categories: Category[]): (Category & { depth
 
   return result
 }
+
+export const ATTRIBUTE_DISPLAYS = ['button', 'swatch', 'text'] as const
+export type AttributeDisplay = (typeof ATTRIBUTE_DISPLAYS)[number]
+
+export type AttributeValue = { id: string; value: string; swatch_hex: string | null; sort_order: number }
+
+/** A product option dictionary entry (e.g. Size, Colour) used for web filters and swatches. */
+export type Attribute = {
+  id: string
+  name: string
+  slug: string
+  display: AttributeDisplay
+  is_filterable: boolean
+  sort_order: number
+  values: AttributeValue[]
+}
+
+export type AttributeInput = {
+  name: string
+  slug?: string
+  display: AttributeDisplay
+  is_filterable: boolean
+  sort_order?: number
+  /** Replaces the values in this order; ids keep existing ones. */
+  values: { id?: string; value: string; swatch_hex?: string | null }[]
+}
+
+export const attributeKeys = { all: ['catalog', 'attributes'] as const }
+
+export function useAttributesQuery(enabled = true) {
+  return useQuery({
+    queryKey: attributeKeys.all,
+    queryFn: ({ signal }) => api.get<Attribute[]>('/attributes', { signal }).then((r) => r.data),
+    staleTime: 5 * 60_000,
+    enabled,
+  })
+}
+
+export function useSaveAttributeMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: AttributeInput }) =>
+      (id ? api.patch<Attribute>(`/attributes/${id}`, input) : api.post<Attribute>('/attributes', input)).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: attributeKeys.all }),
+  })
+}
+
+export function useDeleteAttributeMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/attributes/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: attributeKeys.all }),
+  })
+}

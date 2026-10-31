@@ -11,7 +11,7 @@ export const MAX_MENU_ITEMS = 200
 export type EditorNode = Omit<MenuItemNode, 'id' | 'type' | 'url' | 'target_id' | 'children'> & {
   key: string
   type: MenuItemType
-  /** Custom links; kept while the item points at a page so switching back loses nothing. */
+  /** Custom links; kept while the item points at a page, category or brand so switching back loses nothing. */
   url: string
   target_id: string | null
   children: EditorNode[]
@@ -47,7 +47,7 @@ export function toApi(nodes: EditorNode[]): MenuItemNode[] {
     type: n.type,
     label: n.label.trim(),
     url: n.type === 'custom' ? n.url.trim() : null,
-    target_id: n.type === 'page' ? n.target_id : null,
+    target_id: n.type === 'custom' ? null : n.target_id,
     open_in_new_tab: n.open_in_new_tab,
     is_visible: n.is_visible,
     is_mega: n.is_mega,
@@ -133,12 +133,26 @@ export function validateTree(nodes: EditorNode[], allowsMega: boolean): Record<s
       const key = errorKey(path)
       if (!n.label.trim()) errors[`${key}.label`] = 'Enter a label.'
       else if (n.label.trim().length > 80) errors[`${key}.label`] = 'At most 80 characters.'
-      if (n.type === 'page') {
-        if (!n.target_id) errors[`${key}.target_id`] = 'Choose a page.'
+      if (n.type !== 'custom') {
+        if (!n.target_id) errors[`${key}.target_id`] = `Choose a ${n.type}.`
       } else if (!isSafeLink(n.url)) errors[`${key}.url`] = 'Use a site path such as /sale or an http(s) URL.'
       if (n.is_mega && (path.length > 1 || !allowsMega)) errors[`${key}.is_mega`] = 'Only top-level items of the main navigation can open a mega menu.'
       walk(n.children, path)
     })
   walk(nodes, [])
   return errors
+}
+
+const TARGET_TYPES = ['page', 'category', 'brand'] as const
+export type TargetType = (typeof TARGET_TYPES)[number]
+
+/** Link-type select values encode the target kind with its id: "category:<uuid>". */
+export function encodeTarget(type: TargetType, id: string): string {
+  return `${type}:${id}`
+}
+
+export function decodeTarget(value: string): { type: TargetType; id: string } | null {
+  const [type = '', ...rest] = value.split(':')
+  const id = rest.join(':')
+  return (TARGET_TYPES as readonly string[]).includes(type) && id ? { type: type as TargetType, id } : null
 }

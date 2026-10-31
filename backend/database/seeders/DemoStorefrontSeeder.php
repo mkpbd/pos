@@ -2,12 +2,28 @@
 
 namespace Database\Seeders;
 
+use App\Modules\Branches\Infrastructure\Models\Store;
+use App\Modules\Catalog\Application\Actions\SaveAttribute;
+use App\Modules\Catalog\Infrastructure\Models\Brand;
+use App\Modules\Catalog\Infrastructure\Models\Category;
+use App\Modules\Catalog\Infrastructure\Models\Unit;
 use App\Modules\Cms\Application\Actions\ManageFaq;
 use App\Modules\Cms\Application\Actions\SavePage;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
+use App\Modules\Inventory\Application\Actions\PostStockAdjustment;
 use App\Modules\Media\Application\Actions\UploadMedia;
+use App\Modules\OnlineCatalog\Application\Actions\SaveBrandListing;
+use App\Modules\OnlineCatalog\Application\Actions\SaveCategoryListing;
+use App\Modules\OnlineCatalog\Application\Actions\SaveProductListing;
+use App\Modules\OnlineCatalog\Application\Actions\SaveRelatedProducts;
+use App\Modules\OnlineCatalog\Infrastructure\Jobs\RefreshProductStats;
+use App\Modules\Products\Application\Actions\ManageProductImages;
+use App\Modules\Products\Application\Actions\SaveProduct;
+use App\Modules\Products\Application\DTOs\ProductData;
+use App\Modules\Products\Infrastructure\Models\Product;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Slug;
 use App\Modules\Storefront\Application\Actions\ManageBanners;
 use App\Modules\Storefront\Application\Actions\ManageHomepageSections;
 use App\Modules\Storefront\Application\Actions\ReplaceMenuItems;
@@ -18,6 +34,7 @@ use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
+use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
 
@@ -26,12 +43,18 @@ use Illuminate\Http\UploadedFile;
  * default shop.localhost), created through the real use cases: content pages, FAQ,
  * banners (plain generated artwork, no third-party images) and a homepage. Menus only
  * link to pages that exist in this phase.
+ *
+ * Online catalog (E6): the main store fulfils online orders; every demo product for sale is
+ * listed (two featured, two with a compare-at price), categories and brands are visible,
+ * a "Size" attribute links the polo shirt's option, products get generated artwork, and the
+ * homepage and main menu link into the shop.
  */
 class DemoStorefrontSeeder extends Seeder
 {
     public function run(
         string $organizationId,
         TenantContext $tenant,
+        ?string $adminId,
         SaveStorefrontDomain $saveDomain,
         SaveStorefrontSettings $saveSettings,
         SaveMenu $saveMenu,
@@ -44,13 +67,15 @@ class DemoStorefrontSeeder extends Seeder
     ): void {
         $host = (string) (config('storefront.default_host') ?: 'shop.localhost');
 
-        $tenant->runAs($organizationId, function () use ($host, $saveDomain, $saveSettings, $saveMenu, $replaceItems, $pages, $faq, $upload, $banners, $sections) {
+        $tenant->runAs($organizationId, function () use ($host, $adminId, $saveDomain, $saveSettings, $saveMenu, $replaceItems, $pages, $faq, $upload, $banners, $sections) {
             $saveDomain(new StorefrontDomain, ['host' => $host]);
             $saveSettings([
                 'is_enabled' => true,
                 'site_name' => 'Demo Mart',
                 'meta_description' => 'Groceries and household goods from Demo Mart, Dhaka.',
+                'fulfilment_store_id' => Store::query()->where('code', 'MAIN')->value('id'),
             ]);
+            $catalog = $this->onlineCatalog($adminId, $upload);
 
             $about = $pages->save(new CmsPage, [
                 'slug' => 'about-us',
@@ -120,6 +145,14 @@ class DemoStorefrontSeeder extends Seeder
                 ['icon' => 'rotate-ccw', 'title' => '7-day returns', 'text' => 'Unopened products, with receipt'],
                 ['icon' => 'headset', 'title' => 'Real people', 'text' => 'Call us 9 am to 9 pm'],
             ]]]);
+            $sections->save(new HomepageSection, ['type' => 'product_carousel', 'title' => 'Featured products', 'subtitle' => 'Hand-picked by our team',
+                'config' => ['source' => 'featured', 'limit' => 8, 'view_all_url' => '/shop']]);
+            $sections->save(new HomepageSection, ['type' => 'category_strip', 'title' => 'Shop by category', 'config' => ['source' => 'top_level', 'limit' => 8]]);
+            $sections->save(new HomepageSection, ['type' => 'product_tabs', 'title' => 'Our products', 'config' => ['limit' => 8, 'tabs' => [
+                ['label' => 'New arrivals', 'source' => 'new_arrivals'],
+                ['label' => 'Best sellers', 'source' => 'best_sellers'],
+                ['label' => 'On sale', 'source' => 'on_sale'],
+            ]]]);
             $sections->save(new HomepageSection, ['type' => 'banner_grid', 'title' => 'Shop by aisle', 'config' => ['layout' => '3-col'], 'banner_ids' => $tiles]);
             $sections->save(new HomepageSection, ['type' => 'rich_text', 'title' => 'Welcome to Demo Mart', 'config' => [
                 'alignment' => 'center',
@@ -134,6 +167,12 @@ class DemoStorefrontSeeder extends Seeder
             $main = $saveMenu->save(new Menu, ['name' => 'Main navigation', 'location' => 'main']);
             $replaceItems($main, [
                 ['label' => 'Home', 'url' => '/'],
+                ['label' => 'Shop', 'url' => '/shop'],
+                ['type' => 'category', 'label' => 'Grocery', 'target_id' => $catalog['grocery'], 'is_mega' => true, 'mega_columns' => 2, 'children' => [
+                    ['type' => 'category', 'label' => 'Beverages', 'target_id' => $catalog['beverages']],
+                    ['type' => 'category', 'label' => 'Rice & Grains', 'target_id' => $catalog['rice']],
+                ]],
+                ['type' => 'category', 'label' => 'Apparel', 'target_id' => $catalog['apparel']],
                 ['type' => 'page', 'label' => 'About us', 'target_id' => $about->id],
                 ['type' => 'page', 'label' => 'FAQ', 'target_id' => $faqPage->id],
                 ['type' => 'page', 'label' => 'Contact', 'target_id' => $contact->id],
@@ -151,6 +190,118 @@ class DemoStorefrontSeeder extends Seeder
                 ['type' => 'page', 'label' => 'Privacy policy', 'target_id' => $privacy->id],
             ]);
         });
+    }
+
+    /**
+     * Web listings, artwork and stock for the demo catalogue (DemoCatalogSeeder's products plus
+     * two more), through the real use cases.
+     *
+     * @return array{grocery: string, beverages: string, rice: string, apparel: string}
+     */
+    private function onlineCatalog(?string $adminId, UploadMedia $upload): array
+    {
+        $category = fn (string $name) => Category::query()->where('name', $name)->firstOrFail();
+        $brand = fn (string $name) => Brand::query()->where('name', $name)->firstOrFail();
+        [$grocery, $beverages, $rice, $apparel] = [$category('Grocery'), $category('Beverages'), $category('Rice & Grains'), $category('Apparel')];
+        [$pran, $mills] = [$brand('Pran'), $brand('Local Mills')];
+
+        app(SaveAttribute::class)(null, ['name' => 'Size', 'display' => 'button', 'is_filterable' => true, 'values' => [
+            ['value' => 'S'], ['value' => 'M'], ['value' => 'L'], ['value' => 'XL'],
+        ]]);
+
+        // Two more products so the shop has something to filter and compare.
+        $saveProduct = app(SaveProduct::class);
+        $pcs = Unit::query()->where('code', 'pcs')->firstOrFail();
+        $kg = Unit::query()->where('code', 'kg')->firstOrFail();
+        $litchi = $saveProduct(null, ProductData::fromArray([
+            'name' => 'Pran Litchi Drink 250ml', 'type' => 'standard', 'category_id' => $beverages->id, 'brand_id' => $pran->id,
+            'unit_id' => $pcs->id, 'is_active' => true, 'track_stock' => true,
+            'variants' => [['sku' => 'PRAN-LITCHI-250', 'purchase_price' => '17.00', 'selling_price' => '22.00']],
+        ]));
+        $chinigura = $saveProduct(null, ProductData::fromArray([
+            'name' => 'Chinigura Aromatic Rice', 'type' => 'standard', 'category_id' => $rice->id, 'brand_id' => $mills->id,
+            'unit_id' => $kg->id, 'is_active' => true, 'track_stock' => true,
+            'variants' => [['sku' => 'LM-CHINIGURA', 'purchase_price' => '120.00', 'selling_price' => '145.00']],
+        ]));
+        $admin = $adminId !== null ? User::query()->find($adminId) : null;
+        if ($admin !== null) {
+            app(PostStockAdjustment::class)($admin, [
+                'store_id' => Store::query()->where('code', 'MAIN')->value('id'),
+                'reason' => 'opening',
+                'note' => 'Opening stock for the online shop',
+                'lines' => [
+                    ['variant_id' => $litchi->variants()->value('id'), 'quantity' => '4', 'unit_cost' => '17.00'],
+                    ['variant_id' => $chinigura->variants()->value('id'), 'quantity' => '40', 'unit_cost' => '120.00'],
+                ],
+            ]);
+        }
+
+        $tile = fn (string $name, array $from, array $to) => $upload($this->artwork($name, $from, $to, 800, 600), null)['media']->id;
+        $saveCategory = app(SaveCategoryListing::class);
+        $saveCategory($grocery->id, ['is_visible' => true, 'image_media_id' => $tile('cat-grocery.jpg', [47, 133, 90], [16, 74, 50]),
+            'description_html' => '<p>Everyday groceries at shelf prices.</p>', 'seo_description' => 'Groceries delivered the same day in Dhaka.']);
+        $saveCategory($beverages->id, ['is_visible' => true, 'image_media_id' => $tile('cat-beverages.jpg', [245, 158, 11], [180, 83, 9]),
+            'banner_media_id' => $upload($this->artwork('banner-beverages.jpg', [245, 158, 11], [124, 45, 18], 1600, 400), null)['media']->id,
+            'description_html' => '<p>Juices and soft drinks, chilled in our store.</p>']);
+        $saveCategory($rice->id, ['is_visible' => true, 'image_media_id' => $tile('cat-rice.jpg', [202, 138, 4], [113, 63, 18])]);
+        $saveCategory($apparel->id, ['is_visible' => true, 'image_media_id' => $tile('cat-apparel.jpg', [111, 85, 194], [52, 36, 110])]);
+        $saveBrand = app(SaveBrandListing::class);
+        $saveBrand($pran->id, ['is_visible' => true, 'logo_media_id' => $tile('brand-pran.jpg', [220, 38, 38], [153, 27, 27]), 'description' => 'Juices, drinks and snacks from Bangladesh.']);
+        $saveBrand($mills->id, ['is_visible' => true, 'logo_media_id' => $tile('brand-mills.jpg', [120, 113, 108], [68, 64, 60]), 'description' => 'Rice and grains milled locally.']);
+
+        $images = app(ManageProductImages::class);
+        $saveListing = app(SaveProductListing::class);
+        $listings = [
+            'Pran Mango Juice 250ml' => [[[245, 158, 11], [194, 65, 12]], [[250, 204, 21], [234, 88, 12]], [
+                'is_featured' => true, 'short_description' => 'Real mango pulp, no added colour.',
+                'specifications' => [['label' => 'Volume', 'value' => '250 ml'], ['label' => 'Pack', 'value' => 'Tetra pack']],
+                'compare_at' => ['30.00'],
+            ]],
+            'Pran Litchi Drink 250ml' => [[[244, 114, 182], [190, 24, 93]], null, ['short_description' => 'Sweet litchi drink, best served cold.', 'new' => true]],
+            'Miniket Rice' => [[[231, 229, 228], [168, 162, 158]], null, [
+                'short_description' => 'Fine miniket rice, sold loose by the kilogram.',
+                'specifications' => [['label' => 'Origin', 'value' => 'Kushtia'], ['label' => 'Sold by', 'value' => 'kg']],
+            ]],
+            'Chinigura Aromatic Rice' => [[[254, 243, 199], [217, 119, 6]], null, ['short_description' => 'Small-grain aromatic rice for polao.', 'new' => true]],
+            'Cotton Polo Shirt' => [[[59, 130, 246], [30, 64, 175]], [[96, 165, 250], [29, 78, 216]], [
+                'is_featured' => true, 'short_description' => 'Breathable pique cotton in three sizes.',
+                'description_html' => '<p>A classic polo in soft, breathable cotton pique. Machine washable.</p>',
+                'specifications' => [['label' => 'Material', 'value' => '100% cotton'], ['label' => 'Fit', 'value' => 'Regular']],
+                'compare_at' => ['520.00', '520.00', '560.00'],
+            ]],
+        ];
+        $day = 0;
+        foreach ($listings as $name => [$colors, $hover, $data]) {
+            $product = Product::query()->where('name', $name)->firstOrFail();
+            $slug = Slug::fromName($name);
+            $images->add($product, $this->artwork("{$slug}.jpg", $colors[0], $colors[1], 800, 800));
+            if ($hover !== null) {
+                $images->add($product, $this->artwork("{$slug}-2.jpg", $hover[0], $hover[1], 800, 800));
+            }
+            $variants = $product->variants()->get();
+            $saveListing($product->id, [
+                'is_published' => true,
+                'published_at' => now()->subDays(10 - $day++),
+                'is_featured' => $data['is_featured'] ?? false,
+                'is_new_until' => ($data['new'] ?? false) ? now()->addDays(30)->toDateString() : null,
+                'short_description' => $data['short_description'],
+                'description_html' => $data['description_html'] ?? null,
+                'specifications' => $data['specifications'] ?? [],
+                'variants' => array_map(fn ($variant, $compareAt) => ['variant_id' => $variant->id, 'compare_at_price' => $compareAt],
+                    $variants->all(), array_pad($data['compare_at'] ?? [], $variants->count(), null)),
+            ]);
+        }
+
+        $mango = Product::query()->where('name', 'Pran Mango Juice 250ml')->firstOrFail();
+        app(SaveRelatedProducts::class)($mango->id, [
+            'related' => [$litchi->id],
+            'frequently_bought' => [Product::query()->where('name', 'Miniket Rice')->value('id')],
+        ]);
+
+        // Best sellers and the popularity sort come from the demo POS sales.
+        app()->call([new RefreshProductStats(app(TenantContext::class)->requireOrganization()), 'handle']);
+
+        return ['grocery' => $grocery->id, 'beverages' => $beverages->id, 'rice' => $rice->id, 'apparel' => $apparel->id];
     }
 
     /**

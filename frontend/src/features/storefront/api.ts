@@ -5,6 +5,8 @@ export type StorefrontSettings = {
   is_enabled: boolean
   site_name: string
   meta_description: string | null
+  /** Store whose stock decides web availability; null = tracked products show as out of stock. */
+  fulfilment_store_id: string | null
   updated_at: string | null
 }
 
@@ -66,15 +68,15 @@ export const MENU_LOCATION_LABELS: Record<MenuLocation, string> = {
 
 export type MenuSummary = { id: string; name: string; location: MenuLocation; location_label: string; is_active: boolean; updated_at: string | null }
 
-export type MenuItemType = 'custom' | 'page'
+export type MenuItemType = 'custom' | 'page' | 'category' | 'brand'
 
 export type MenuItemNode = {
   id?: string
   type?: MenuItemType
   label: string
-  /** Custom links only; page items resolve their address on the storefront. */
+  /** Custom links only; page, category and brand items resolve their address on the storefront. */
   url: string | null
-  /** The linked content page (type "page"). */
+  /** The linked content page, category or brand (types "page", "category", "brand"). */
   target_id?: string | null
   open_in_new_tab: boolean
   is_visible: boolean
@@ -87,7 +89,9 @@ export type MenuItemNode = {
 export type MenuDetail = MenuSummary & { items: MenuItemNode[] }
 
 export type LinkTargetPage = { id: string; slug: string; title: string; status: 'draft' | 'published' }
-export type LinkTargets = { pages: LinkTargetPage[] }
+/** A category or brand a menu item can link to; `url` is null while it has no visible web listing. */
+export type LinkTargetTerm = { id: string; name: string; url: string | null }
+export type LinkTargets = { pages: LinkTargetPage[]; categories?: LinkTargetTerm[]; brands?: LinkTargetTerm[] }
 
 export const BANNER_PLACEMENTS = ['hero_slider', 'home_promo'] as const
 export type BannerPlacement = (typeof BANNER_PLACEMENTS)[number]
@@ -124,7 +128,10 @@ export type Banner = {
 
 export type BannerInput = Omit<Banner, 'id' | 'is_live' | 'state' | 'sort_order' | 'updated_at'>
 
-export const SECTION_TYPES = ['hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter'] as const
+export const SECTION_TYPES = [
+  'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
+  'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip',
+] as const
 export type SectionType = (typeof SECTION_TYPES)[number]
 export type SectionState = 'live' | 'disabled' | 'scheduled' | 'expired'
 
@@ -136,6 +143,11 @@ export type FeatureIcon = (typeof FEATURE_ICONS)[number]
 export type FeatureItem = { icon: FeatureIcon; title: string; text: string | null }
 export type TestimonialItem = { quote: string; name: string; role: string | null; rating: number | null; avatar_media_id: string | null }
 
+export const PRODUCT_SOURCES = ['manual', 'featured', 'new_arrivals', 'best_sellers', 'on_sale', 'category'] as const
+export type ProductSource = (typeof PRODUCT_SOURCES)[number]
+export type TabSource = Exclude<ProductSource, 'manual'>
+export type ProductTab = { label: string; source: TabSource; category_id: string | null }
+
 /** Section configs exactly as the API stores them (backend Domain/SectionType). */
 export type SectionConfigs = {
   hero_slider: { autoplay_seconds: number; height: 'medium' | 'large' }
@@ -144,6 +156,11 @@ export type SectionConfigs = {
   features_strip: { items: FeatureItem[]; background: string | null }
   testimonials: { items: TestimonialItem[]; background: string | null }
   newsletter: { text: string | null; button_label: string; image_media_id: string | null; background: string; foreground: string }
+  product_carousel: { source: ProductSource; category_id: string | null; limit: number; view_all_url: string | null }
+  product_grid: { source: ProductSource; category_id: string | null; limit: number; columns: 3 | 4 | 5; view_all_url: string | null }
+  product_tabs: { tabs: ProductTab[]; limit: number }
+  category_strip: { source: 'manual' | 'top_level'; limit: number }
+  brand_strip: { source: 'manual' | 'all'; limit: number }
 }
 export type AnySectionConfig = SectionConfigs[SectionType]
 
@@ -155,6 +172,10 @@ export type HomepageSection = {
   subtitle: string | null
   config: AnySectionConfig
   banner_ids: string[]
+  /** Hand-picked products, categories or brands of a manual product/category/brand section, in order. */
+  item_ids?: string[]
+  /** The same records with their names, when the API includes them. */
+  items?: SectionItemRef[]
   is_enabled: boolean
   starts_at: string | null
   ends_at: string | null
@@ -162,6 +183,8 @@ export type HomepageSection = {
   sort_order: number
   updated_at: string | null
 }
+
+export type SectionItemRef = { id: string; name: string; image_url?: string | null }
 
 export type SectionTypeInfo = {
   type: SectionType
@@ -178,6 +201,7 @@ export type SectionInput = {
   subtitle: string | null
   config: AnySectionConfig
   banner_ids?: string[]
+  item_ids?: string[]
   is_enabled: boolean
   starts_at: string | null
   ends_at: string | null
@@ -207,7 +231,7 @@ export function useSaveStorefrontSettingsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description'>>) =>
+    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id'>>) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),
   })

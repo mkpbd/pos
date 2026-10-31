@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Application\Actions;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Support\Changes;
@@ -16,8 +17,9 @@ use App\Modules\Storefront\Infrastructure\Models\HomepageSectionItem;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The homepage builder: save a section with its config and attached banners, duplicate,
- * delete and reorder. A section's type never changes after creation. New sections go last.
+ * The homepage builder: save a section with its config and attached banners or hand-picked
+ * products/categories/brands, duplicate, delete and reorder. A section's type never changes
+ * after creation. New sections go last.
  */
 class ManageHomepageSections
 {
@@ -29,11 +31,12 @@ class ManageHomepageSections
     public function __construct(
         private readonly MediaLibrary $media,
         private readonly HtmlSanitizer $sanitizer,
+        private readonly StorefrontCatalog $catalog,
         private readonly AuditTrail $audit,
     ) {}
 
     /**
-     * @param  array<string, mixed>  $attributes  validated; `config` and `banner_ids` optional on update
+     * @param  array<string, mixed>  $attributes  validated; `config`, `banner_ids` and `item_ids` optional on update
      */
     public function save(HomepageSection $section, array $attributes): HomepageSection
     {
@@ -43,17 +46,32 @@ class ManageHomepageSections
 
         $attributes = Instants::normalize($attributes, ['starts_at', 'ends_at']);
         $bannerIds = array_key_exists('banner_ids', $attributes) ? array_values($attributes['banner_ids'] ?? []) : null;
-        unset($attributes['banner_ids']);
+        $itemIds = array_key_exists('item_ids', $attributes) ? array_values($attributes['item_ids'] ?? []) : null;
+        unset($attributes['banner_ids'], $attributes['item_ids']);
 
-        if (array_key_exists('config', $attributes) || $creating) {
+        $configSent = array_key_exists('config', $attributes);
+        if ($configSent || $creating) {
             $attributes['config'] = $this->prepareConfig($type, (array) ($attributes['config'] ?? []));
         }
-        $config = $attributes['config'] ?? $section->config;
-        if ($type->itemLimits() !== null && ($creating || $bannerIds !== null || array_key_exists('config', $attributes))) {
-            $this->checkBanners($type, $config, $bannerIds ?? $this->bannerIds($section));
+        $config = $attributes['config'] ?? $type->normalize($section->config);
+        if ($type->itemLimits() !== null && ($creating || $bannerIds !== null || $configSent)) {
+            $this->checkBanners($type, $config, $bannerIds ?? $this->itemIds($section, HomepageSectionItem::TYPE_BANNER));
         }
 
-        return DB::transaction(function () use ($section, $attributes, $type, $bannerIds, $creating) {
+        // Hand-picked records only exist while the source is `manual`.
+        $manual = $type->manualItemLimits();
+        if ($manual !== null && ($creating || $itemIds !== null || $configSent)) {
+            if ($type->usesManualItems($config)) {
+                $itemIds ??= $this->itemIds($section, $manual['type']);
+                $this->checkManualItems($manual, $itemIds);
+            } else {
+                $itemIds = [];
+            }
+        } else {
+            $itemIds = null;
+        }
+
+        return DB::transaction(function () use ($section, $attributes, $type, $bannerIds, $itemIds, $manual, $creating) {
             $before = $creating ? [] : $this->snapshot($section);
 
             if ($creating) {
@@ -68,7 +86,10 @@ class ManageHomepageSections
             $section->save();
 
             if ($bannerIds !== null && $type->itemLimits() !== null) {
-                $this->replaceItems($section, $bannerIds);
+                $this->replaceItems($section, HomepageSectionItem::TYPE_BANNER, $bannerIds);
+            }
+            if ($itemIds !== null && $manual !== null) {
+                $this->replaceItems($section, $manual['type'], $itemIds);
             }
 
             [$old, $new] = Changes::between($before, $this->snapshot($section));
@@ -96,7 +117,9 @@ class ManageHomepageSections
             $copy->is_enabled = false;
             $copy->sort_order = $section->sort_order + 1;
             $copy->save();
-            $this->replaceItems($copy, $this->bannerIds($section));
+            foreach ($section->items()->get()->groupBy('item_type') as $itemType => $items) {
+                $this->replaceItems($copy, (string) $itemType, $items->pluck('item_id')->all());
+            }
 
             $this->audit->record('homepage_section.duplicated', $copy, [], ['from' => $section->id]);
 
@@ -131,7 +154,7 @@ class ManageHomepageSections
     }
 
     /**
-     * Normalizes the config, sanitizes rich text and checks referenced media.
+     * Normalizes the config, sanitizes rich text and checks referenced media and categories.
      *
      * @param  array<string, mixed>  $config
      * @return array<string, mixed>
@@ -151,6 +174,12 @@ class ManageHomepageSections
         $missing = array_values(array_diff($mediaIds, $this->media->existing($mediaIds)));
         if ($missing !== []) {
             throw new BusinessRuleViolation('MEDIA_NOT_FOUND', 'Some selected images no longer exist in the media library.', ['media_ids' => $missing]);
+        }
+
+        $categoryIds = $type->categoryIds($config);
+        $missing = array_values(array_diff($categoryIds, $this->catalog->existing('category', $categoryIds)));
+        if ($missing !== []) {
+            throw new BusinessRuleViolation('CATEGORY_NOT_FOUND', 'Some selected categories no longer exist.', ['category_ids' => $missing]);
         }
 
         return $config;
@@ -181,15 +210,33 @@ class ManageHomepageSections
     }
 
     /**
-     * @param  list<string>  $bannerIds
+     * @param  array{type: string, min: int, max: int}  $limits
+     * @param  list<string>  $ids
      */
-    private function replaceItems(HomepageSection $section, array $bannerIds): void
+    private function checkManualItems(array $limits, array $ids): void
     {
-        $section->items()->delete();
-        foreach ($bannerIds as $position => $id) {
+        ['type' => $itemType, 'min' => $min, 'max' => $max] = $limits;
+        $noun = ['product' => 'products', 'category' => 'categories', 'brand' => 'brands'][$itemType];
+        if (count($ids) < $min || count($ids) > $max) {
+            throw new BusinessRuleViolation('SECTION_ITEMS_INVALID', "Choose between {$min} and {$max} {$noun} for this section.");
+        }
+
+        $missing = array_values(array_diff($ids, $this->catalog->existing($itemType, $ids)));
+        if ($missing !== []) {
+            throw new BusinessRuleViolation(strtoupper($itemType).'_NOT_FOUND', "Some selected {$noun} no longer exist.", [$itemType.'_ids' => $missing]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $ids
+     */
+    private function replaceItems(HomepageSection $section, string $itemType, array $ids): void
+    {
+        $section->items()->where('item_type', $itemType)->delete();
+        foreach (array_values($ids) as $position => $id) {
             HomepageSectionItem::query()->create([
                 'section_id' => $section->id,
-                'item_type' => HomepageSectionItem::TYPE_BANNER,
+                'item_type' => $itemType,
                 'item_id' => $id,
                 'sort_order' => $position,
             ]);
@@ -199,9 +246,9 @@ class ManageHomepageSections
     /**
      * @return list<string>
      */
-    private function bannerIds(HomepageSection $section): array
+    private function itemIds(HomepageSection $section, string $itemType): array
     {
-        return $section->items()->where('item_type', HomepageSectionItem::TYPE_BANNER)->pluck('item_id')->all();
+        return $section->exists ? $section->items()->where('item_type', $itemType)->pluck('item_id')->all() : [];
     }
 
     /**
@@ -209,12 +256,15 @@ class ManageHomepageSections
      */
     private function snapshot(HomepageSection $section): array
     {
+        $manual = $section->type->manualItemLimits();
+
         return [
             'type' => $section->type->value,
             'title' => $section->title,
             'subtitle' => $section->subtitle,
             'config_hash' => hash('xxh128', (string) json_encode($section->config)),
-            'banner_ids' => $section->exists ? $this->bannerIds($section) : [],
+            'banner_ids' => $this->itemIds($section, HomepageSectionItem::TYPE_BANNER),
+            'item_ids' => $manual === null ? [] : $this->itemIds($section, $manual['type']),
             'is_enabled' => $section->is_enabled,
             'starts_at' => $section->starts_at?->toIso8601String(),
             'ends_at' => $section->ends_at?->toIso8601String(),

@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 
 // Stored idempotent responses are only needed while clients may still retry.
 Schedule::command('model:prune', ['--model' => [IdempotencyKey::class]])->daily();
+
+// Storefront popularity ("best sellers", popularity sort) from completed sales.
+Schedule::command('storefront:refresh-product-stats')->hourly()->withoutOverlapping();

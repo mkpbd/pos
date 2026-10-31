@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated } from '@/lib/api/client'
+import { onlineCatalogKeys } from '@/features/online-catalog/api'
 
 export type ProductType = 'standard' | 'service'
 
@@ -111,7 +112,11 @@ export function useProductQuery(id: string | undefined) {
 function useProductCache() {
   const queryClient = useQueryClient()
   return (product?: Product) => {
-    if (product) queryClient.setQueryData(productKeys.detail(product.id), product)
+    if (product) {
+      queryClient.setQueryData(productKeys.detail(product.id), product)
+      // The web listing shows the product's variants, prices and images.
+      void queryClient.invalidateQueries({ queryKey: onlineCatalogKeys.product(product.id) })
+    }
     void queryClient.invalidateQueries({ queryKey: ['products', 'list'] })
   }
 }
@@ -167,4 +172,24 @@ export function useRemoveProductImageMutation(productId: string) {
     mutationFn: (imageId: string) => api.delete<Product>(`/products/${productId}/images/${imageId}`).then((r) => r.data),
     onSuccess: (product) => update(product),
   })
+}
+
+/**
+ * Names and first images of products by id (one cached GET /products/{id} each), for showing
+ * references such as hand-picked homepage products. Missing products resolve to nothing.
+ */
+export function useProductNames(ids: string[]): Map<string, { name: string; image_url: string | null }> {
+  const results = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: productKeys.detail(id),
+      queryFn: ({ signal }: { signal: AbortSignal }) => api.get<Product>(`/products/${id}`, { signal }).then((r) => r.data),
+      staleTime: 5 * 60_000,
+      retry: false,
+    })),
+  })
+  const map = new Map<string, { name: string; image_url: string | null }>()
+  results.forEach((r) => {
+    if (r.data) map.set(r.data.id, { name: r.data.name, image_url: r.data.images[0]?.url ?? null })
+  })
+  return map
 }

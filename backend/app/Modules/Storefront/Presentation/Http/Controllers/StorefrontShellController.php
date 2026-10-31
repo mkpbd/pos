@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Cms\Application\Contracts\PageDirectory;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use Illuminate\Http\Request;
@@ -19,12 +20,12 @@ use Illuminate\Http\Response;
 class StorefrontShellController
 {
     /** Storefront routes that exist in this phase (exact paths); content pages are looked up. */
-    private const KNOWN_PATHS = ['/', '/newsletter/confirm', '/newsletter/unsubscribe'];
+    private const KNOWN_PATHS = ['/', '/shop', '/search', '/newsletter/confirm', '/newsletter/unsubscribe'];
 
     /** Utility pages that search engines should not index. */
-    private const NOINDEX_PATHS = ['/newsletter/confirm', '/newsletter/unsubscribe'];
+    private const NOINDEX_PATHS = ['/search', '/newsletter/confirm', '/newsletter/unsubscribe'];
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog): Response
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
@@ -43,6 +44,21 @@ class StorefrontShellController
                 'description' => $page['seo_description'] ?? $data['store']['description'],
             ];
         }
+        if ($path === '/shop') {
+            $meta['title'] = 'Shop | '.$data['store']['name'];
+        }
+        if ($path === '/search') {
+            $meta['title'] = 'Search | '.$data['store']['name'];
+        }
+        if (preg_match('#^/(category|brand|product)/([A-Za-z0-9-]{1,120})$#', $path, $m) === 1 && ($found = $catalog->pageMeta($m[1], $m[2])) !== null) {
+            $status = 200;
+            $meta = [
+                'title' => $found['title'].' | '.$data['store']['name'],
+                'description' => $found['description'] ?? $data['store']['description'],
+                'image' => $found['image_url'] === null ? null : $request->getSchemeAndHttpHost().$found['image_url'],
+                'type' => $m[1] === 'product' ? 'product' : 'website',
+            ];
+        }
         $noindex = $data['preview'] || $status === 404 || in_array($path, self::NOINDEX_PATHS, true);
 
         $html = $this->inject((string) file_get_contents($shell), $data, $meta, $request->url(), $noindex);
@@ -55,7 +71,7 @@ class StorefrontShellController
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array{title: string, description: ?string}  $meta
+     * @param  array{title: string, description: ?string, image?: ?string, type?: string}  $meta
      */
     private function inject(string $html, array $data, array $meta, string $url, bool $noindex): string
     {
@@ -68,13 +84,16 @@ class StorefrontShellController
             '<meta name="description" content="'.$e($description).'">',
             '<meta name="theme-color" content="'.$e($data['theme']['colors']['accent']).'">',
             '<link rel="canonical" href="'.$e($url).'">',
-            '<meta property="og:type" content="website">',
+            '<meta property="og:type" content="'.$e($meta['type'] ?? 'website').'">',
             '<meta property="og:site_name" content="'.$e($name).'">',
             '<meta property="og:title" content="'.$e($title).'">',
             '<meta property="og:url" content="'.$e($url).'">',
         ];
         if ($description) {
             $head[] = '<meta property="og:description" content="'.$e($description).'">';
+        }
+        if (! empty($meta['image'])) {
+            $head[] = '<meta property="og:image" content="'.$e($meta['image']).'">';
         }
         if ($data['theme']['favicon']) {
             $head[] = '<link rel="icon" href="'.$e($data['theme']['favicon']['url']).'">';

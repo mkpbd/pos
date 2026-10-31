@@ -3,6 +3,8 @@
 namespace App\Modules\Catalog\Infrastructure\Directory;
 
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
+use App\Modules\Catalog\Infrastructure\Models\Attribute;
+use App\Modules\Catalog\Infrastructure\Models\AttributeValue;
 use App\Modules\Catalog\Infrastructure\Models\Brand;
 use App\Modules\Catalog\Infrastructure\Models\Category;
 use App\Modules\Catalog\Infrastructure\Models\TaxRate;
@@ -75,5 +77,39 @@ class EloquentCatalogDirectory implements CatalogDirectory
         }
 
         return $ids;
+    }
+
+    public function categories(string $organizationId): array
+    {
+        return Category::query()->withoutGlobalScope('organization')->where('organization_id', $organizationId)
+            ->orderBy('sort_order')->orderBy('name')->orderBy('id')
+            ->get(['id', 'parent_id', 'name', 'sort_order', 'is_active'])
+            ->map(fn (Category $c) => [
+                'id' => $c->id, 'parent_id' => $c->parent_id, 'name' => $c->name,
+                'sort_order' => $c->sort_order, 'is_active' => $c->is_active,
+            ])->all();
+    }
+
+    public function brands(string $organizationId): array
+    {
+        return Brand::query()->withoutGlobalScope('organization')->where('organization_id', $organizationId)
+            ->orderBy('name')->orderBy('id')
+            ->get(['id', 'name', 'is_active'])
+            ->map(fn (Brand $b) => ['id' => $b->id, 'name' => $b->name, 'is_active' => $b->is_active])->all();
+    }
+
+    public function attributes(string $organizationId): array
+    {
+        $values = AttributeValue::query()->withoutGlobalScope('organization')->where('organization_id', $organizationId)
+            ->orderBy('sort_order')->get(['attribute_id', 'value', 'swatch_hex'])->groupBy('attribute_id');
+
+        return Attribute::query()->withoutGlobalScope('organization')->where('organization_id', $organizationId)
+            ->orderBy('sort_order')->orderBy('name')->get()
+            ->map(fn (Attribute $a) => [
+                'id' => $a->id, 'name' => $a->name, 'slug' => $a->slug, 'display' => $a->display,
+                'is_filterable' => $a->is_filterable, 'sort_order' => $a->sort_order,
+                'values' => ($values[$a->id] ?? collect())
+                    ->map(fn (AttributeValue $v) => ['value' => $v->value, 'swatch_hex' => $v->swatch_hex])->values()->all(),
+            ])->all();
     }
 }

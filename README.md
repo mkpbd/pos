@@ -24,6 +24,8 @@ cd backend;  composer install; copy .env.example .env; php artisan key:generate;
 cd frontend; npm install; npm run dev     # admin http://localhost:5173/admin, storefront http://localhost:5173/
 ```
 
+Storefront pages: `/` (homepage), `/shop`, `/search?q=`, `/category/{slug}`, `/brand/{slug}`, `/product/{slug}`, `/pages/{slug}` — e.g. http://localhost:5173/shop and http://localhost:5173/product/pran-mango-juice-250ml on the seeded Demo Mart.
+
 ## Documentation
 
 | Document | Contents |
@@ -62,7 +64,7 @@ BerryKid-inspired storefront on the same backend; plan, decisions and API in [do
 | E1–E3 | Project analysis, reference investigation, architecture and database plan | ✅ |
 | E4 | Storefront shell: host-based storefronts, theme, menus, media library, storefront layout, admin under `/admin` | ✅ (PostgreSQL run pending) |
 | E5 | Content and homepage builder: banners, homepage sections, content pages, FAQ, contact form, newsletter | ✅ (PostgreSQL run pending) |
-| E6 | Online catalog and product pages | ☐ |
+| E6 | Online catalog and product pages: web listings, attributes, shop/category/brand/search pages with faceted filters, product page with variants, related products, catalog homepage sections | ✅ (PostgreSQL run pending) |
 | E7 | Customer accounts, cart, wishlist | ☐ |
 | E8 | Checkout, orders, payments, shipping, promotions | ☐ |
 | E9–E14 | Account area, admin operations, CMS depth, SEO/localization, AI, hardening | ☐ |

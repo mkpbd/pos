@@ -1,0 +1,38 @@
+import { cn } from '@/lib/utils'
+import { usePriceFormat } from '../money'
+
+/**
+ * A price (or price range when variants differ) with the compare-at price struck through
+ * when on sale. Amounts are the server's decimal strings.
+ */
+export function Price({
+  price,
+  priceMax,
+  compareAt,
+  size = 'md',
+  className,
+}: {
+  price: string
+  priceMax?: string
+  compareAt?: string | null
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}) {
+  const format = usePriceFormat()
+  const current = priceMax ? format.range(price, priceMax) : format.price(price)
+
+  return (
+    <p className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
+      <span className={cn('font-bold text-sf-heading', size === 'lg' ? 'text-3xl' : size === 'md' ? 'text-lg' : 'text-base')} data-testid="price">
+        {compareAt && <span className="sr-only">Sale price: </span>}
+        {current}
+      </span>
+      {compareAt && (
+        <s className={cn('text-sf-text', size === 'lg' ? 'text-lg' : 'text-sm')}>
+          <span className="sr-only">Original price: </span>
+          {format.price(compareAt)}
+        </s>
+      )}
+    </p>
+  )
+}

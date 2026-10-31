@@ -26,6 +26,18 @@ export type Customer = {
   notes: string | null
   is_active: boolean
   archived_at: string | null
+  /** Online store sign-in (E7). Only on GET /customers/{id}; absent from list rows. */
+  online_account?: OnlineAccount | null
+}
+
+export type OnlineAccountStatus = 'active' | 'disabled'
+
+export type OnlineAccount = {
+  email: string
+  email_verified_at: string | null
+  last_login_at: string | null
+  status: OnlineAccountStatus
+  created_at: string
 }
 
 export type CustomerInput = {
@@ -43,7 +55,11 @@ export type CustomerInput = {
   is_active?: boolean
 }
 
-const customerKeys = { all: ['customers'] as const, groups: ['customer-groups'] as const }
+const customerKeys = {
+  all: ['customers'] as const,
+  groups: ['customer-groups'] as const,
+  detail: (id: string | undefined) => ['customers', 'detail', id] as const,
+}
 
 export function useCustomersQuery(params: { page: number; search?: string; customer_group_id?: string; archived?: boolean }) {
   return useQuery({
@@ -51,6 +67,28 @@ export function useCustomersQuery(params: { page: number; search?: string; custo
     queryFn: ({ signal }) =>
       api.get<Customer[]>('/customers', { signal, query: { ...params, archived: params.archived ? 1 : undefined } }).then(toPaginated),
     placeholderData: (previous) => previous,
+  })
+}
+
+export function useCustomerQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: customerKeys.detail(id),
+    queryFn: ({ signal }) => api.get<Customer>(`/customers/${id}`, { signal }).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+/** Disable or re-enable the customer's online store sign-in (customers.manage). */
+export function useSetOnlineAccountStatusMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ customerId, status }: { customerId: string; status: OnlineAccountStatus }) =>
+      api.patch<OnlineAccount>(`/customer-accounts/${customerId}`, { status }).then((r) => r.data),
+    onSuccess: (account, { customerId }) => {
+      queryClient.setQueryData<Customer>(customerKeys.detail(customerId), (c) => (c ? { ...c, online_account: account } : c))
+      void queryClient.invalidateQueries({ queryKey: customerKeys.all })
+    },
   })
 }
 

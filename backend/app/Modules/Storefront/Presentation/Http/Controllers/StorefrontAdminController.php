@@ -31,6 +31,8 @@ class StorefrontAdminController
      * Update storefront settings
      *
      * Opening the storefront (`is_enabled: true`) needs at least one domain (`STOREFRONT_DOMAIN_REQUIRED`).
+     * `fulfilment_store_id` must be an active store of the organization (`STORE_NOT_FOUND`); its stock
+     * decides online availability (null: stock-tracked products show as out of stock).
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save): JsonResponse
     {
@@ -38,6 +40,7 @@ class StorefrontAdminController
             'is_enabled' => ['sometimes', 'boolean'],
             'site_name' => ['sometimes', 'required', 'string', 'max:120'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:300'],
+            'fulfilment_store_id' => ['sometimes', 'nullable', 'uuid'],
         ]);
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)));

@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '@/lib/api/client'
+import { storeApi } from './http'
 import type { ContactInput, StorefrontBootstrap, StorefrontHomepage, StorePage } from './types'
 
 export const BOOTSTRAP_ELEMENT_ID = 'storefront-bootstrap'
@@ -68,13 +69,13 @@ export function useStorePageQuery(slug: string) {
 type Message = { message: string }
 
 export function useContactMutation() {
-  return useMutation({ mutationFn: (input: ContactInput) => api.post<Message>('/store/contact', input).then((r) => r.data) })
+  return useMutation({ mutationFn: (input: ContactInput) => storeApi.post<Message>('/store/contact', input).then((r) => r.data) })
 }
 
 export function useNewsletterMutation() {
-  return useMutation({ mutationFn: (email: string) => api.post<Message>('/store/newsletter', { email }).then((r) => r.data) })
+  return useMutation({ mutationFn: (email: string) => storeApi.post<Message>('/store/newsletter', { email }).then((r) => r.data) })
 }
 
 export function useNewsletterTokenMutation(action: 'confirm' | 'unsubscribe') {
-  return useMutation({ mutationFn: (token: string) => api.post<Message>(`/store/newsletter/${action}`, { token }).then((r) => r.data) })
+  return useMutation({ mutationFn: (token: string) => storeApi.post<Message>(`/store/newsletter/${action}`, { token }).then((r) => r.data) })
 }

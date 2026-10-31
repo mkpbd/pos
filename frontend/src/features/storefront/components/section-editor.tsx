@@ -29,7 +29,10 @@ import {
   type SectionTypeInfo,
   type TestimonialItem,
 } from '@/features/storefront/api'
+import { CatalogSectionFields } from '@/features/storefront/components/catalog-section-fields'
 import { ColorField } from '@/features/storefront/components/color-field'
+import { isCatalogSection, normalizeCatalogConfig, SECTION_ITEM_KIND, usesManualItems, validateCatalogSection } from '@/features/storefront/catalog-sections'
+import type { PickedItem } from '@/features/online-catalog/move'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap } from '@/lib/forms'
@@ -202,7 +205,7 @@ function TestimonialsEditor({ items, onChange, errors }: { items: TestimonialIte
   )
 }
 
-/** The type-specific part of the form. */
+/** The type-specific part of the form (catalog sections are handled by CatalogSectionFields). */
 function ConfigFields({ info, config, onChange, errors }: { info: SectionTypeInfo; config: AnySectionConfig; onChange: (config: AnySectionConfig) => void; errors: Errors }) {
   switch (info.type) {
     case 'hero_slider': {
@@ -312,12 +315,12 @@ function ConfigFields({ info, config, onChange, errors }: { info: SectionTypeInf
   }
 }
 
-type Draft = { title: string; subtitle: string; config: AnySectionConfig; bannerIds: string[]; isEnabled: boolean; startsAt: string; endsAt: string }
+type Draft = { title: string; subtitle: string; config: AnySectionConfig; bannerIds: string[]; items: PickedItem[]; isEnabled: boolean; startsAt: string; endsAt: string }
 
 /** Client checks before saving, keyed like the API's validation errors. */
 function validate(info: SectionTypeInfo, d: Draft): Errors {
-  const errors: Errors = {}
-  if (info.items) {
+  const errors: Errors = isCatalogSection(info.type) ? validateCatalogSection(info.type, d.config, d.items.length) : {}
+  if (info.banner_placement && info.items) {
     let { min, max } = info.items
     if (info.type === 'banner_grid') {
       const layout = (d.config as SectionConfigs['banner_grid']).layout
@@ -348,6 +351,8 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
     subtitle: section?.subtitle ?? '',
     config: section?.config ?? structuredClone(info.defaults),
     bannerIds: section?.banner_ids ?? [],
+    // Names come with the section when the API sends them; otherwise they are looked up by id.
+    items: section?.items?.map((i) => ({ id: i.id, name: i.name, image_url: i.image_url ?? null })) ?? (section?.item_ids ?? []).map((id) => ({ id, name: '' })),
     isEnabled: section?.is_enabled ?? true,
     startsAt: toLocalInput(section?.starts_at ?? null),
     endsAt: toLocalInput(section?.ends_at ?? null),
@@ -364,11 +369,12 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
     const input: Partial<SectionInput> = {
       title: draft.title.trim() || null,
       subtitle: draft.subtitle.trim() || null,
-      config: draft.config,
+      config: isCatalogSection(info.type) ? normalizeCatalogConfig(info.type, draft.config) : draft.config,
       is_enabled: draft.isEnabled,
       starts_at: fromLocalInput(draft.startsAt),
       ends_at: fromLocalInput(draft.endsAt),
-      ...(info.items ? { banner_ids: draft.bannerIds } : {}),
+      ...(info.banner_placement && info.items ? { banner_ids: draft.bannerIds } : {}),
+      ...(SECTION_ITEM_KIND[info.type] ? { item_ids: usesManualItems(info.type, draft.config) ? draft.items.map((i) => i.id) : [] } : {}),
       ...(section ? {} : { type: info.type }),
     }
     save.mutate(
@@ -411,7 +417,12 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
         />
       )}
 
-      <ConfigFields info={info} config={draft.config} onChange={(config) => set({ config })} errors={errors} />
+      {isCatalogSection(info.type) ? (
+        <CatalogSectionFields type={info.type} config={draft.config} onChange={(config) => set({ config })} items={draft.items} onItemsChange={(items) => set({ items })} errors={errors} />
+      ) : (
+        <ConfigFields info={info} config={draft.config} onChange={(config) => set({ config })} errors={errors} />
+      )}
+      {errors.item_ids && !usesManualItems(info.type, draft.config) && <p className="text-sm text-destructive">{errors.item_ids}</p>}
 
       <div className="grid gap-4 rounded-md bg-muted/50 p-3 sm:grid-cols-3">
         <div className="flex items-center gap-2">

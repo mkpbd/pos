@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Application\Actions;
 
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\MenuItemType;
@@ -22,6 +23,7 @@ class ReplaceMenuItems
     public function __construct(
         private readonly MediaLibrary $media,
         private readonly PageDirectory $pages,
+        private readonly StorefrontCatalog $catalog,
         private readonly AuditTrail $audit,
     ) {}
 
@@ -54,6 +56,17 @@ class ReplaceMenuItems
         $missingPages = array_values(array_diff($pageIds, array_column($this->pages->all(), 'id')));
         if ($missingPages !== []) {
             throw new BusinessRuleViolation('PAGE_NOT_FOUND', 'Some linked pages no longer exist.', ['page_ids' => $missingPages]);
+        }
+
+        foreach ([MenuItemType::Category, MenuItemType::Brand] as $type) {
+            $ids = array_values(array_unique(array_filter(array_map(
+                fn (array $pair) => ($pair[0]['type'] ?? null) === $type->value ? ($pair[0]['target_id'] ?? null) : null,
+                $flat,
+            ))));
+            $missing = array_values(array_diff($ids, $this->catalog->existing($type->value, $ids)));
+            if ($missing !== []) {
+                throw new BusinessRuleViolation(strtoupper($type->value).'_NOT_FOUND', "Some linked {$type->value} records no longer exist.", [$type->value.'_ids' => $missing]);
+            }
         }
 
         return DB::transaction(function () use ($menu, $items, $flat) {

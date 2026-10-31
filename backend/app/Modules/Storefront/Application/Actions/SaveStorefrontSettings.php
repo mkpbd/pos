@@ -2,8 +2,10 @@
 
 namespace App\Modules\Storefront\Application\Actions;
 
+use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\Changes;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
@@ -12,18 +14,28 @@ use Illuminate\Support\Facades\DB;
 
 class SaveStorefrontSettings
 {
-    private const AUDITED = ['is_enabled', 'site_name', 'meta_description'];
+    private const AUDITED = ['is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
+        private readonly BranchDirectory $branches,
+        private readonly TenantContext $tenant,
         private readonly AuditTrail $audit,
     ) {}
 
     /**
-     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string}  $attributes
+     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {
+        $storeId = $attributes['fulfilment_store_id'] ?? null;
+        if ($storeId !== null) {
+            $store = $this->branches->store($storeId, $this->tenant->requireOrganization());
+            if ($store === null || ! $store['is_active']) {
+                throw new BusinessRuleViolation('STORE_NOT_FOUND', 'Choose an active store of your organization as the fulfilment store.');
+            }
+        }
+
         return DB::transaction(function () use ($attributes) {
             $settings = $this->config->settings();
             $before = $settings->exists ? $settings->only(self::AUDITED) : [];
