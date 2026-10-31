@@ -11,13 +11,15 @@ import { visibleNavItems } from '@/app/navigation'
 import { useAuth } from '@/features/auth/use-auth'
 import { cn } from '@/lib/utils'
 
-function Brand({ subtitle }: { subtitle?: string }) {
+function Brand({ subtitle, className }: { subtitle?: string; className?: string }) {
   return (
-    <div className="flex items-center gap-2 px-2">
-      <StoreIcon className="size-5 shrink-0 text-primary" aria-hidden />
+    <div className={cn('flex min-w-0 items-center gap-2.5', className)}>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/15">
+        <StoreIcon className="size-5" aria-hidden />
+      </span>
       <div className="flex min-w-0 flex-col leading-tight">
-        <span className="font-heading text-base font-semibold">Enterprise POS</span>
-        {subtitle && <span className="truncate text-xs text-muted-foreground">{subtitle}</span>}
+        <span className="font-heading text-base font-bold tracking-wide">Enterprise POS</span>
+        {subtitle && <span className="truncate text-xs opacity-80">{subtitle}</span>}
       </div>
     </div>
   )
@@ -27,7 +29,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const me = useAuth()
 
   return (
-    <nav aria-label="Main" className="flex flex-col gap-1">
+    <nav aria-label="Main" className="flex flex-col gap-0.5 py-3 pr-3">
       {visibleNavItems(me).map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
@@ -35,13 +37,24 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-              isActive ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground',
+              'group/nav flex items-center gap-1 rounded-md text-xs font-semibold tracking-wide uppercase transition-colors',
+              isActive ? 'font-bold text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:text-sidebar-accent-foreground',
             )
           }
         >
-          <Icon className="size-4" aria-hidden />
-          {label}
+          {({ isActive }) => (
+            <>
+              <span
+                className={cn(
+                  'mx-2.5 flex size-10 shrink-0 items-center justify-center rounded-[5px] transition-colors',
+                  isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'group-hover/nav:bg-sidebar-accent',
+                )}
+              >
+                <Icon className="size-5" aria-hidden />
+              </span>
+              <span className="truncate">{label}</span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -53,23 +66,22 @@ export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="flex min-h-svh bg-background text-foreground">
-      <aside className="hidden w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 md:flex">
-        <Brand subtitle={me.organization?.name} />
-        <SidebarNav />
-      </aside>
+    <div className="min-h-svh bg-canvas text-foreground">
+      <header className="sticky top-0 z-20 flex h-topbar items-center bg-topbar text-topbar-foreground shadow-card">
+        <div className="hidden h-full w-sidebar shrink-0 items-center px-5 text-white md:flex dark:text-heading">
+          <Brand subtitle={me.organization?.name} />
+        </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
+        <div className="flex min-w-0 flex-1 items-center gap-2 px-3 md:px-6 [&_[data-slot=button]:hover]:bg-topbar-accent [&_[data-slot=button]:hover]:text-white [&_[data-slot=button][aria-expanded=true]]:bg-topbar-accent [&_[data-slot=button][aria-expanded=true]]:text-white">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation">
                 <MenuIcon />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-4">
-              <SheetHeader className="p-0">
-                <SheetTitle asChild>
+            <SheetContent side="left" className="w-64 gap-0 bg-sidebar p-0 [&>[data-slot=sheet-close]]:top-5 [&>[data-slot=sheet-close]]:text-white [&>[data-slot=sheet-close]:hover]:bg-topbar-accent [&>[data-slot=sheet-close]:hover]:text-white dark:[&>[data-slot=sheet-close]]:text-topbar-foreground">
+              <SheetHeader className="bg-topbar p-4">
+                <SheetTitle asChild className="text-white dark:text-heading">
                   <div>
                     <Brand subtitle={me.organization?.name} />
                   </div>
@@ -78,21 +90,23 @@ export function AppLayout() {
               <SidebarNav onNavigate={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div className="hidden sm:block md:hidden">
-            <Brand />
-          </div>
+          <Brand className="hidden text-white sm:flex md:hidden dark:text-heading" />
           <div className="ml-auto flex min-w-0 items-center gap-1">
             <BranchSwitcher />
             <NotificationBell />
             <ThemeToggle />
             <UserMenu />
           </div>
-        </header>
+        </div>
+      </header>
 
-        <main className="flex-1 p-4 md:p-6">
-          <Outlet />
-        </main>
-      </div>
+      <aside className="fixed top-topbar bottom-0 left-0 z-10 hidden w-sidebar overflow-y-auto bg-sidebar shadow-card md:block">
+        <SidebarNav />
+      </aside>
+
+      <main className="min-w-0 p-4 md:ml-sidebar md:p-6">
+        <Outlet />
+      </main>
     </div>
   )
 }

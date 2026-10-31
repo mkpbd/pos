@@ -4,6 +4,40 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Phase 6 — Payments, returns, refunds, cash registers, expenses, loyalty
+
+#### Added
+- **Payments module:** organization-wide payments ledger (`payments`, append-only) fed by every module through the `PaymentLedger` contract; cash registers per branch; register sessions (`SES-{BRANCH}-000001`) with opening float, cash in/out, closing count, expected cash and variance; X/Z session reports (cash reconciliation, totals per method and per kind of transaction); payment history with totals.
+- **Sales returns and refunds:** returns against the original invoice (`RET-{BRANCH}-000001`) with an approval workflow (pending → completed/rejected; approvers' own returns complete at once), return reasons with a default restocking rule, per-line restock or write-off, restock to the exact batches sold from at their cost, serial numbers released, values from the invoice line (discounts and tax included, exact remainder on the last return), settlement against what the customer still owes before refunding, refunds by method (card/mobile/points capped at what was paid that way), preview endpoint.
+- **Receivables:** customer payments (`RCP-000001`, capped at the balance) and customer statements with running balance; balances now subtract return credits and payments.
+- **Expenses module:** expense and income categories, expenses and other income (`EXP-` / `INC-`), voiding with a reversing payment.
+- **Loyalty module:** program settings (points per spend, point value, minimum redemption), point accounts and an append-only points ledger; points earned at checkout, redeemed as the `loyalty_points` payment method, reversed on cancellation and returns, manual adjustments. Plugs into Sales through the Sales-owned `LoyaltyProgram` contract.
+- Permissions: `payments.view`, `payments.collect`, `cash_registers.view|operate|manage`, `returns.view|create|approve|manage`, `expenses.view|manage`, `loyalty.view|manage` (Cashier: operate registers, request returns, collect payments).
+- Demo data: two registers, the cashier's open shift, return reasons, expense categories, an enabled loyalty program, a customer payment and an expense.
+- Frontend:
+  - **Cash registers** (`/cash-registers`): registers per branch with their open session, add/edit (managers), open a session with a counted float; session list with variance badges; X/Z report page (cash reconciliation, by method, by transaction type, entries) with cash in/out and close-with-count (live variance preview).
+  - **POS terminal:** register-session bar (number, expected cash, cash in/out, close); without a session the till asks to open one before taking payment; loyalty points as a payment method for the selected customer (whole points, minimum redemption, “Use points” fills the affordable amount).
+  - **Returns** (`/returns`): “Return items” on the invoice → per-line quantities or serials, restock switch defaulting from the reason, server preview of value and settlement (credit against the balance, refund due), refund split over the methods the invoice allows (card/mobile/points capped, rest in cash); approvers complete at once, others send for approval; return document with approve (refunds) / reject; return reasons tab. The invoice lists its returns and hides “Cancel sale” once it has any.
+  - **Payments** (`/payments`): payments ledger with period, direction, method and type filters, totals, links to sales, returns and sessions; customer payments list.
+  - **Customers:** account sheet per customer — running statement with “Receive payment”, loyalty points with history and manual adjustment; points column.
+  - **Expenses** (`/expenses`): expenses and other income with period/category filters, totals by category, new entry (cash through the caller's session), void; categories tab.
+  - **Loyalty** (`/loyalty`): program rules with a worked example.
+  - Every money-moving mutation (checkout, cancellation, return, collection, expense) refreshes the ledger, register sessions, customer accounts and points.
+- Tests: 240 backend tests (2 PostgreSQL-only skipped on SQLite) — new `CashRegisterTest`, `SaleReturnTest`, `CustomerPaymentTest`, `ExpenseTest`, `LoyaltyTest`, `ReturnShareTest`, `PointsRuleTest`; 87 Vitest tests (new: refunds and points arithmetic, partial return with immediate card refund, return sent for approval, approval with credit and cash refund, till asks for a register session, X→Z report close with variance, expense blocked without a session then paid by bank); 6 Playwright smoke tests; 6 full-stack Playwright tests (new: a cashier requests a return, the owner tops up the drawer and approves it with a cash refund out of the shift).
+
+#### Changed
+- **Every POS checkout needs the cashier's open register session** in the store's branch (`CASH_SESSION_REQUIRED`); cash refunds, cancellations, collections and expenses go through the user's drawer and cannot take it below zero (`INSUFFICIENT_CASH`).
+- Cancelling a sale writes ledger reversals, reverses loyalty points, and is refused once the sale has returns (`SALE_HAS_RETURNS`).
+- The sale document lists its returns and per-line returned quantities.
+- `Idempotency-Key` is now also required on returns, return approvals, customer payments, expenses and cash movements.
+
+### UI theme refresh
+
+#### Changed
+- New visual theme for the SPA, light and dark: purple top bar with brand and branch switcher over a fixed white icon sidebar (uppercase entries, highlighted active icon), grey page canvas, flat cards with hairline shadow and uppercase titles, tinted table headers, soft status badges (Active/Completed/Received in green, partially received and low stock in amber, in transit in cyan), Plus Jakarta Sans font (replaces Geist).
+- Sales summary cards show the value in the primary colour with a round icon.
+- Sign-in pages use the same top bar and canvas.
+
 ### Phase 5 — POS terminal and sales processing
 
 #### Added

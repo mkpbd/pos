@@ -26,8 +26,12 @@ export function BranchSwitcher() {
         void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== authKeys.me[0] })
       }}
     >
-      <SelectTrigger size="sm" aria-label="Active branch" className="max-w-40 min-w-0 sm:max-w-48">
-        <StoreIcon className="size-4 text-muted-foreground" aria-hidden />
+      <SelectTrigger
+        size="sm"
+        aria-label="Active branch"
+        className="max-w-40 min-w-0 border-white/25 bg-topbar-accent text-white hover:bg-white/20 sm:max-w-48 dark:border-input dark:text-topbar-foreground [&_svg]:text-current! [&_svg]:opacity-80 [&_.text-muted-foreground]:text-current [&_.text-muted-foreground]:opacity-75"
+      >
+        <StoreIcon className="size-4" aria-hidden />
         <SelectValue placeholder="Select branch" />
       </SelectTrigger>
       <SelectContent align="end">

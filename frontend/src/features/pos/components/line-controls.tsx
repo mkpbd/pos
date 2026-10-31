@@ -108,7 +108,7 @@ export function SerialsDialog({ label, quantity, serials, onChange }: { label: s
         onClick={() => { setList(serials); setOpen(true) }}
       >
         <ScanBarcodeIcon />
-        <Badge variant={needed !== null && serials.length === needed ? 'secondary' : 'destructive'}>{serials.length}/{needed ?? '?'}</Badge>
+        <Badge variant={needed !== null && serials.length === needed ? 'success' : 'destructive'}>{serials.length}/{needed ?? '?'}</Badge>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">

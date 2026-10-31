@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInvalidateMoney } from '@/features/payments/api'
 import { api, type Paginated, toPaginated } from '@/lib/api/client'
 
 export type SaleStatus = 'completed' | 'cancelled'
@@ -48,12 +49,31 @@ export type SaleLine = {
   unit_cost: string | null
   batches: { batch_number: string | null; expires_on: string | null; quantity: string }[]
   serials: string[]
+  /** Serials already back from completed returns. */
+  returned_serials: string[]
+  /** Quantity returned by completed returns. */
+  returned_quantity: string
+  /** Quantity reserved by returns awaiting approval. */
+  pending_return_quantity: string
+}
+
+export type SaleReturnStatus = 'pending' | 'completed' | 'rejected'
+
+/** A return against this invoice, as listed on the sale document. */
+export type SaleReturnSummary = {
+  id: string
+  number: string
+  status: SaleReturnStatus
+  total: string
+  credited_total: string
+  refunded_total: string
+  requested_at: string
 }
 
 export type SalePayment = {
   id: string
   kind: 'payment' | 'reversal'
-  method: 'cash' | 'card' | 'mobile_banking'
+  method: 'cash' | 'card' | 'mobile_banking' | 'loyalty_points'
   method_label: string
   amount: string
   tendered: string | null
@@ -68,6 +88,7 @@ export type Sale = SaleHeader & {
   cost_total: string | null
   lines: SaleLine[]
   payments: SalePayment[]
+  returns: SaleReturnSummary[]
   receipt: {
     organization_name: string | null
     header: string | null
@@ -134,6 +155,7 @@ export function useSalesSummaryQuery(params: { date: string; branch_id?: string 
 
 export function useCancelSaleMutation() {
   const queryClient = useQueryClient()
+  const invalidateMoney = useInvalidateMoney()
 
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => api.post<Sale>(`/sales/${id}/cancel`, { reason }).then((r) => r.data),
@@ -141,6 +163,7 @@ export function useCancelSaleMutation() {
       queryClient.setQueryData(salesKeys.detail(sale.id), sale)
       void queryClient.invalidateQueries({ queryKey: salesKeys.all })
       void queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      invalidateMoney()
     },
   })
 }

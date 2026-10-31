@@ -46,11 +46,11 @@ PostgreSQL-only tests (`StockLockingTest`: two real connections, committed data 
 | 4 | Barcode scanning | 5 | ✅ `PosTerminalTest::test_scanning_a_barcode_finds_the_variant`, POS page scan test, full-stack spec (scan → pay → receipt) |
 | 5 | Discount calculation | 5 | ✅ `SaleCalculatorTest` (item/invoice, percent/amount, exact allocation), `DiscountAndTaxTest` (permission, product limit, customer group, preview = checkout) |
 | 6 | Tax calculation | 5 | ✅ `SaleCalculatorTest` (exclusive and inclusive, per-line rounding), `DiscountAndTaxTest::test_tax_inclusive_prices_contain_the_tax` |
-| 7 | Multiple payment processing | 5–6 | ◐ at checkout: `PaymentSettlementTest` (split, change from cash only, partial, credit), `CheckoutTest::test_split_partial_and_credit_payments`; due collection and register in Phase 6 |
+| 7 | Multiple payment processing | 5–6 | ✅ `PaymentSettlementTest` (split, change from cash only, partial, credit), `CheckoutTest::test_split_partial_and_credit_payments`, `CustomerPaymentTest` (collections capped at the balance, ledger and drawer, statement), `LoyaltyTest` (points as a payment method) |
 | 8 | Successful checkout | 5 | ✅ `CheckoutTest` (invoice, immutability, client prices ignored, idempotent replay, rollback, numbering), POS page tests, full-stack spec |
 | 9 | Inventory deduction | 5 | ✅ `CheckoutTest` (deduction, rollback on `INSUFFICIENT_STOCK`, negative-stock branches, FEFO batches, services), `SalesManagementTest` (cancellation restocks exact batches), ledger tests from Phase 4; PostgreSQL-only `StockLockingTest` |
-| 10 | Sales return and refund | 6 | ☐ |
-| 11 | Cash register closing | 6 | ☐ |
+| 10 | Sales return and refund | 6 | ✅ `SaleReturnTest` (request → approval with refunds, quantities reserved, refund caps per method, restock to original batches at cost, credit before refund, written-off lines, serial release, exact remainder, rejection, branch/organization isolation), `ReturnShareTest` |
+| 11 | Cash register closing | 6 | ✅ `CashRegisterTest` (open, cash in/out, `INSUFFICIENT_CASH`, close with variance, one session per register and cashier, visibility, isolation), `CustomerPaymentTest::test_every_checkout_needs_an_open_session_and_feeds_the_ledger` |
 | 12 | Branch-level data isolation | 2+ | ✅ organization/branch/user/role level (`TenantIsolationTest`); extended per module in later phases |
 
 ## Frontend (Vitest 5 + Testing Library)

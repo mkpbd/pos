@@ -258,7 +258,7 @@ class CheckoutTest extends TestCase
         $this->actingAsUser($northCashier);
         $this->getJson("/api/v1/sales/{$saleId}")->assertNotFound();
         $this->assertSame([], $this->getJson('/api/v1/sales')->assertOk()->json('data'));
-        $this->checkout($this->cart($store, [[$juice, '1']], [['cash', '15']]))->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['store_id']]]);
+        $this->checkout($this->cart($store, [[$juice, '1']], [['cash', '15']]), openSession: false)->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['store_id']]]);
 
         ['admin' => $stranger] = $this->provisionTenant('Other Shop');
         $this->actingAsUser($stranger);

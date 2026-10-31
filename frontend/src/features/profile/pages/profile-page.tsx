@@ -144,7 +144,7 @@ function LoginActivityCard() {
                     <TableRow key={a.id}>
                       <TableCell className="whitespace-nowrap text-sm">{new Date(a.created_at).toLocaleString()}</TableCell>
                       <TableCell>
-                        {a.succeeded ? <Badge variant="secondary">Success</Badge> : <Badge variant="destructive">{a.failure_reason?.replaceAll('_', ' ') ?? 'Failed'}</Badge>}
+                        {a.succeeded ? <Badge variant="success">Success</Badge> : <Badge variant="destructive">{a.failure_reason?.replaceAll('_', ' ') ?? 'Failed'}</Badge>}
                       </TableCell>
                       <TableCell className="text-sm">{a.channel === 'session' ? 'Web' : 'Device'}</TableCell>
                       <TableCell className="hidden font-mono text-xs md:table-cell">{a.ip_address ?? '—'}</TableCell>

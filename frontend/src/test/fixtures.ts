@@ -101,12 +101,28 @@ export const posCashier = (): CurrentUser =>
   makeCurrentUser({
     user: { id: 'u-4', name: 'Pos Cashier', email: 'pos@corner.test', phone: null, is_platform_admin: false, last_login_at: null },
     roles: [{ id: 'r-3', name: 'Cashier', system_key: 'cashier' }],
-    permissions: ['branches.view', 'customers.create', 'customers.view', 'pos.sell', 'products.view', 'sales.view'],
+    permissions: ['branches.view', 'cash_registers.operate', 'customers.create', 'customers.view', 'payments.collect', 'pos.sell', 'products.view', 'returns.create', 'returns.view', 'sales.view'],
     branches: [{ id: 'b-1', code: 'MAIN', name: 'Main Branch', is_active: true }],
   })
 
 export const salesManager = (): CurrentUser =>
   makeCurrentUser({
     roles: [{ id: 'r-2', name: 'Branch Manager', system_key: 'branch_manager' }],
-    permissions: ['branches.view', 'customers.view', 'pos.sell', 'products.view', 'products.view_cost', 'sales.cancel', 'sales.credit', 'sales.discount', 'sales.view'],
+    permissions: [
+      'branches.view', 'cash_registers.operate', 'cash_registers.view', 'customers.view', 'payments.collect', 'payments.view', 'pos.sell', 'products.view', 'products.view_cost',
+      'returns.approve', 'returns.create', 'returns.view', 'sales.cancel', 'sales.credit', 'sales.discount', 'sales.view',
+    ],
   })
+
+/** The caller's open register session in Main Branch (X report). */
+export const openSessionReport = (overrides: Record<string, unknown> = {}) => ({
+  id: 'ses-1', number: 'SES-MAIN-000001', status: 'open', currency: 'BDT',
+  branch: { id: 'b-1', code: 'MAIN', name: 'Main Branch' }, register: { id: 'reg-1', code: 'REG-01', name: 'Counter 1' },
+  opening_float: '500.00', opened_by: { id: 'u-4', name: 'Pos Cashier' }, opened_at: '2026-10-31T03:00:00Z',
+  expected_cash: null, counted_cash: null, variance: null, closing_notes: null, closed_by: null, closed_at: null,
+  cash: { opening_float: '500.00', cash_in: '0.00', cash_out: '0.00', expected: '500.00', counted: null, variance: null },
+  by_method: [], by_source: [], entries: [],
+  ...overrides,
+})
+
+export const loyaltyOff = () => ({ is_enabled: false, spend_amount: '100.00', points_per_spend: 1, point_value: '1.00', min_redeem_points: 0 })

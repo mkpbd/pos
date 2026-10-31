@@ -153,7 +153,7 @@ export function PlatformOrganizationsPage() {
                     <TableCell>{org.base_currency}</TableCell>
                     <TableCell className="hidden md:table-cell">{org.timezone}</TableCell>
                     <TableCell>
-                      <Badge variant={org.status === 'active' ? 'secondary' : 'destructive'}>{org.status === 'active' ? 'Active' : 'Suspended'}</Badge>
+                      <Badge variant={org.status === 'active' ? 'success' : 'destructive'}>{org.status === 'active' ? 'Active' : 'Suspended'}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => setToggling(org)}>

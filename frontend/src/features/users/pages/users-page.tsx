@@ -130,7 +130,7 @@ export function UsersPage() {
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{formatDateTime(user.last_login_at)}</TableCell>
                     <TableCell>
-                      <Badge variant={user.status === 'active' ? 'secondary' : 'outline'}>{user.status === 'active' ? 'Active' : 'Inactive'}</Badge>
+                      <Badge variant={user.status === 'active' ? 'success' : 'outline'}>{user.status === 'active' ? 'Active' : 'Inactive'}</Badge>
                     </TableCell>
                     <TableCell>
                       {canManage && roles.data && (

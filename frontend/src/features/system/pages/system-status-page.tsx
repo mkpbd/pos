@@ -25,7 +25,7 @@ export function SystemStatusPage() {
           <CardTitle className="flex items-center gap-2">
             Backend
             {data && (
-              <Badge variant={data.status === 'ok' ? 'secondary' : 'destructive'}>
+              <Badge variant={data.status === 'ok' ? 'success' : 'destructive'}>
                 {data.status === 'ok' ? 'Operational' : 'Degraded'}
               </Badge>
             )}

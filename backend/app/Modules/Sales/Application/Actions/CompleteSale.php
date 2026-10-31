@@ -7,6 +7,12 @@ use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
+use App\Modules\Payments\Application\Contracts\PaymentLedger;
+use App\Modules\Payments\Domain\LedgerEntry;
+use App\Modules\Payments\Domain\PaymentDirection;
+use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
+use App\Modules\Payments\Domain\PaymentSource;
+use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Application\Services\CartPricer;
 use App\Modules\Sales\Application\Services\CustomerCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
@@ -35,6 +41,8 @@ use Illuminate\Validation\ValidationException;
  * transaction — numbers the invoice, deducts stock through the ledger (FEFO batches,
  * INSUFFICIENT_STOCK unless the branch allows negative stock), and writes the immutable
  * invoice with its cost snapshot, batch allocations, serial numbers and payments.
+ * The cashier needs an open register session: the money goes into the payments ledger
+ * (cash into that drawer). Loyalty points are redeemed and earned in the same transaction.
  * Any failure rolls everything back. Idempotency is enforced by the calling endpoint.
  */
 class CompleteSale
@@ -44,8 +52,10 @@ class CompleteSale
         private readonly StoreAccess $storeAccess,
         private readonly CartPricer $pricer,
         private readonly CustomerCredit $credit,
-        private readonly StockLedger $ledger,
+        private readonly StockLedger $stockLedger,
         private readonly SequenceGenerator $sequences,
+        private readonly PaymentLedger $payments,
+        private readonly LoyaltyProgram $loyalty,
     ) {}
 
     /**
@@ -75,8 +85,17 @@ class CompleteSale
         if ($hasDue && ! Gate::forUser($actor)->allows('sales.credit')) {
             throw new BusinessRuleViolation('CREDIT_SALE_NOT_ALLOWED', 'You are not allowed to sell on credit; collect the full amount.', ['due' => $settlement['due']]);
         }
+        $redeemed = array_reduce(
+            array_filter($settlement['payments'], fn (array $p) => $p['method'] === PaymentMethod::LoyaltyPoints),
+            fn (string $sum, array $p) => Decimal::add($sum, $p['amount'], 2),
+            '0.00',
+        );
+        if (! Decimal::isZero($redeemed) && $customer === null) {
+            throw new BusinessRuleViolation('CUSTOMER_REQUIRED', 'Choose the customer whose loyalty points are redeemed.');
+        }
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $priced, $variants, $customer, $serials, $settlement, $hasDue, $data) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $priced, $variants, $customer, $serials, $settlement, $hasDue, $redeemed, $data) {
+            $this->payments->requireSession($actor, $store['branch_id']);
             if ($hasDue) {
                 $this->assertCredit($customer, $settlement['due']);
             }
@@ -91,7 +110,7 @@ class CompleteSale
                     $changes[$i] = new StockChange($store['id'], $line['variant_id'], null, MovementType::Sale, $line['quantity'], allocateBatches: true);
                 }
             }
-            $posted = $this->ledger->post(array_values($changes), new StockReference('sale', $saleId, $number));
+            $posted = $this->stockLedger->post(array_values($changes), new StockReference('sale', $saleId, $number));
             $stock = array_combine(array_keys($changes), $posted);
 
             $costs = [];
@@ -185,6 +204,18 @@ class CompleteSale
                     'created_by' => $actor->getAuthIdentifier(),
                     'created_at' => $now,
                 ]);
+            }
+
+            $this->payments->record($actor, $store['branch_id'], array_values(array_map(
+                fn (array $p) => new LedgerEntry(PaymentDirection::In, LedgerMethod::from($p['method']->value), $p['amount'], $customer['id'] ?? null, $p['reference']),
+                array_filter($settlement['payments'], fn (array $p) => $p['method'] !== PaymentMethod::LoyaltyPoints),
+            )), new PaymentSource('sale', $sale->id, $number));
+
+            if ($customer !== null) {
+                if (! Decimal::isZero($redeemed)) {
+                    $this->loyalty->redeem($customer['id'], $redeemed, $sale->id, $number);
+                }
+                $this->loyalty->award($customer['id'], Decimal::sub($priced['total'], $redeemed, 2), $sale->id, $number);
             }
 
             return $sale;

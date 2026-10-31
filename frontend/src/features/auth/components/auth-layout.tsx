@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 export function AuthLayout({ title, description, children, footer }: { title: string; description?: string; children: ReactNode; footer?: ReactNode }) {
   return (
-    <div className="flex min-h-svh flex-col bg-muted/40">
-      <header className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-2 font-heading font-semibold">
-          <StoreIcon className="size-5 text-primary" aria-hidden />
+    <div className="flex min-h-svh flex-col bg-canvas">
+      <header className="flex items-center justify-between bg-topbar p-4 text-topbar-foreground [&_[data-slot=button]:hover]:bg-topbar-accent [&_[data-slot=button]:hover]:text-white [&_[data-slot=button][aria-expanded=true]]:bg-topbar-accent">
+        <div className="flex items-center gap-2 font-heading font-bold tracking-wide text-white dark:text-heading">
+          <StoreIcon className="size-5" aria-hidden />
           Enterprise POS
         </div>
         <ThemeToggle />
@@ -16,7 +16,7 @@ export function AuthLayout({ title, description, children, footer }: { title: st
       <main className="flex flex-1 items-start justify-center px-4 pt-8 pb-16 sm:pt-16">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="tracking-normal normal-case">
               <h1 className="font-heading text-xl">{title}</h1>
             </CardTitle>
             {description && <CardDescription>{description}</CardDescription>}

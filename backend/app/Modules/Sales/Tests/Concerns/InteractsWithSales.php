@@ -2,13 +2,16 @@
 
 namespace App\Modules\Sales\Tests\Concerns;
 
+use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Catalog\Infrastructure\Models\TaxRate;
 use App\Modules\Customers\Infrastructure\Models\Customer;
 use App\Modules\Customers\Infrastructure\Models\CustomerGroup;
 use App\Modules\Inventory\Tests\Concerns\InteractsWithStock;
 use App\Modules\Organizations\Infrastructure\Models\Organization;
+use App\Modules\Payments\Tests\Concerns\InteractsWithRegisters;
 use App\Modules\Products\Infrastructure\Models\ProductVariant;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 
@@ -17,7 +20,7 @@ use Illuminate\Testing\TestResponse;
  */
 trait InteractsWithSales
 {
-    use InteractsWithStock;
+    use InteractsWithRegisters, InteractsWithStock;
 
     /**
      * @param  array{tax?: string, cost?: string, batches?: bool, serials?: bool, max_discount?: string, service?: bool, barcodes?: list<string>}  $options
@@ -72,10 +75,21 @@ trait InteractsWithSales
     }
 
     /**
+     * Checks out as the authenticated user, first opening a register session for them in the
+     * store's branch (every checkout needs one) unless $openSession is false.
+     *
      * @param  array<string, mixed>  $payload
      */
-    protected function checkout(array $payload, ?string $key = null): TestResponse
+    protected function checkout(array $payload, ?string $key = null, bool $openSession = true): TestResponse
     {
+        $user = auth()->user();
+        if ($openSession && $user instanceof User && is_string($payload['store_id'] ?? null)) {
+            $store = app(BranchDirectory::class)->store($payload['store_id'], (string) $user->organization_id);
+            if ($store !== null) {
+                $this->openSession($user, $store['branch_id']);
+            }
+        }
+
         return $this->postJson('/api/v1/pos/checkout', $payload, ['Idempotency-Key' => $key ?? (string) Str::uuid()]);
     }
 

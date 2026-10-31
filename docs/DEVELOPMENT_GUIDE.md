@@ -74,6 +74,8 @@ npm run dev                   # http://localhost:5173 (proxies /api and /sanctum
 
 Set `VITE_BACKEND_ORIGIN` in `frontend/.env.local` if the backend is not on `http://127.0.0.1:8000`.
 
+Selling needs an open register session (Phase 6). After seeding, the demo cashier's and the owner's shifts are open; anyone else opens one from the POS terminal or **Cash registers** with a counted float. Cash paid out of a session (refunds, expenses, cash out) cannot exceed the cash in its drawer, so the owner's seeded shift (float 0.00) needs a **Cash in** before a cash refund.
+
 ## Daily commands
 
 | Task | Backend (`backend/`) | Frontend (`frontend/`) |
@@ -104,6 +106,7 @@ Set `VITE_BACKEND_ORIGIN` in `frontend/.env.local` if the backend is not on `htt
 - Every async view handles loading, error (with retry) and empty states (`components/common/state-views`).
 - No navigation entries or buttons for features that are not implemented.
 - shadcn components: add with `npx shadcn@4.21.5 add <name>`; prefer composition over editing generated files.
+- Colours come from theme tokens only (`bg-primary`, `text-heading`, `bg-canvas`, badge variants `success`/`warning`/`info`/`soft`); no hex values in components. A newly generated shadcn component may need its radius/ring classes aligned with `card.tsx`, `badge.tsx` and `table.tsx`.
 
 ## Git workflow
 

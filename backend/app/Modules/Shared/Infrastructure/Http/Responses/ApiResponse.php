@@ -43,8 +43,9 @@ final class ApiResponse
 
     /**
      * @param  class-string<JsonResource>|callable(mixed): JsonResource  $resource  resource class, or a factory per item
+     * @param  array<string, mixed>  $meta  extra meta next to the pagination (e.g. totals of the filtered rows)
      */
-    public static function paginated(LengthAwarePaginator $paginator, string|callable $resource): JsonResponse
+    public static function paginated(LengthAwarePaginator $paginator, string|callable $resource, array $meta = []): JsonResponse
     {
         $items = is_string($resource)
             ? $resource::collection($paginator->items())->resolve(request())
@@ -57,7 +58,7 @@ final class ApiResponse
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
                 'last_page' => $paginator->lastPage(),
-            ]],
+            ]] + $meta,
         );
     }
 

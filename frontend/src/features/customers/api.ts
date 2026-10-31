@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, toPaginated } from '@/lib/api/client'
+import { useInvalidateMoney } from '@/features/payments/api'
+import { salesKeys } from '@/features/sales/api'
+import { api, toPaginated, type Paginated } from '@/lib/api/client'
+import type { MoneyMethod } from '@/lib/payment-methods'
 
 export type CustomerGroup = {
   id: string
@@ -97,5 +100,98 @@ export function useDeleteCustomerGroupMutation() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/customer-groups/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.groups }),
+  })
+}
+
+// ── Accounts receivable (Phase 6) ────────────────────────────────────────────
+
+export type CustomerPayment = {
+  id: string
+  number: string
+  customer: { id: string; code: string; name: string; phone?: string | null } | null
+  branch_id: string
+  currency: string
+  amount: string
+  method: MoneyMethod
+  method_label: string
+  reference: string | null
+  notes: string | null
+  created_by: { id: string; name: string | null } | null
+  created_at: string
+}
+
+export type CustomerPaymentInput = {
+  customer_id: string
+  branch_id: string
+  amount: string
+  method: MoneyMethod
+  reference: string | null
+  notes: string | null
+}
+
+/** Signed amount: positive raises what the customer owes, negative lowers it. */
+export type CustomerStatementEntryType = 'sale' | 'sale_payment' | 'sale_cancellation' | 'sale_return' | 'refund' | 'payment'
+
+export type CustomerStatementEntry = {
+  date: string
+  type: CustomerStatementEntryType
+  id: string
+  number: string
+  description: string
+  amount: string
+  balance: string
+}
+
+export type CustomerStatement = {
+  customer: { id: string; code: string; name: string; phone: string | null; credit_limit: string }
+  opening_balance: string
+  entries: CustomerStatementEntry[]
+  closing_balance: string
+}
+
+export const STATEMENT_ENTRY_LABELS: Record<CustomerStatementEntryType, string> = {
+  sale: 'Invoice',
+  sale_payment: 'Paid at the till',
+  sale_cancellation: 'Invoice cancelled',
+  sale_return: 'Return',
+  refund: 'Refund',
+  payment: 'Payment received',
+}
+
+export const accountKeys = {
+  all: ['customer-accounts'] as const,
+  payments: (params: Record<string, unknown>) => ['customer-accounts', 'payments', params] as const,
+  statement: (customerId: string | undefined, params: Record<string, unknown>) => ['customer-accounts', 'statement', customerId, params] as const,
+}
+
+export function useCustomerPaymentsQuery(params: { page: number; customer_id?: string; branch_id?: string; search?: string }) {
+  return useQuery<Paginated<CustomerPayment>>({
+    queryKey: accountKeys.payments(params),
+    queryFn: ({ signal }) => api.get<CustomerPayment[]>('/customer-payments', { signal, query: { ...params, sort: '-created_at' } }).then(toPaginated),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useCustomerStatementQuery(customerId: string | undefined, params: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: accountKeys.statement(customerId, params),
+    queryFn: ({ signal }) => api.get<CustomerStatement>(`/customers/${customerId}/statement`, { signal, query: params }).then((r) => r.data),
+    enabled: !!customerId,
+  })
+}
+
+/** Idempotent: pass the same key when retrying the same payment. */
+export function useReceiveCustomerPaymentMutation() {
+  const queryClient = useQueryClient()
+  const invalidateMoney = useInvalidateMoney()
+
+  return useMutation({
+    mutationFn: ({ input, idempotencyKey }: { input: CustomerPaymentInput; idempotencyKey: string }) =>
+      api.post<CustomerPayment>('/customer-payments', input, { idempotencyKey }).then((r) => r.data),
+    onSuccess: () => {
+      invalidateMoney()
+      // Balances shown on the Customers page and at the till (GET /sales/customer-balances).
+      void queryClient.invalidateQueries({ queryKey: [...salesKeys.all, 'customer-balances'] })
+    },
   })
 }

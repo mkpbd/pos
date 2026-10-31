@@ -14,7 +14,9 @@ const sale = {
   notes: null, invoice_discount: { type: 'percent', value: '5.00', source: 'customer_group' }, cost_total: '120.00',
   lines: [{ id: 'sl-1', variant_id: 'v-1', product_name: 'Cough Syrup', variant_name: null, sku: 'SYR', unit_code: 'pcs', quantity: '2.000', unit_price: '100.00', discount: null,
     line_subtotal: '200.00', discount_amount: '0.00', invoice_discount_share: '10.00', net_amount: '190.00', tax_rate: '15.0000', tax_amount: '28.50', line_total: '218.50',
-    unit_cost: '60.0000', batches: [{ batch_number: 'B-12', expires_on: '2027-03-31', quantity: '2.000' }], serials: [] }],
+    unit_cost: '60.0000', batches: [{ batch_number: 'B-12', expires_on: '2027-03-31', quantity: '2.000' }], serials: [],
+    returned_serials: [], returned_quantity: '0.000', pending_return_quantity: '0.000' }],
+  returns: [],
   payments: [{ id: 'p-1', kind: 'payment', method: 'card', method_label: 'Card', amount: '200.00', tendered: null, reference: 'VISA 4242', created_at: '2026-10-31T06:00:00Z', created_by: 'Pos Cashier' }],
   receipt: { organization_name: 'Corner Shop', header: 'VAT reg. 0001', footer: null, branch: { id: 'b-1', code: 'MAIN', name: 'Main Branch', address: null, phone: '0170000000', email: null }, timezone: 'Asia/Dhaka' },
 }

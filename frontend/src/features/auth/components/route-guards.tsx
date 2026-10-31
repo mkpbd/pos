@@ -69,11 +69,16 @@ function AccessDenied({ reason }: { reason: string }) {
   )
 }
 
-/** Route-level permission gate. The API enforces the same permission. */
-export function RequirePermission({ permission }: { permission: string }) {
+/** Route-level permission gate (any of several when given a list). The API enforces the same permission. */
+export function RequirePermission({ permission }: { permission: string | string[] }) {
   const can = useCan()
+  const permissions = Array.isArray(permission) ? permission : [permission]
 
-  return can(permission) ? <Outlet /> : <AccessDenied reason={`Your role does not include the “${permission}” permission.`} />
+  return permissions.some(can) ? (
+    <Outlet />
+  ) : (
+    <AccessDenied reason={`Your role does not include the “${permissions.join('” or “')}” permission.`} />
+  )
 }
 
 export function RequirePlatformAdmin() {

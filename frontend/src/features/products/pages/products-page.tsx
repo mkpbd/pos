@@ -139,7 +139,7 @@ export function ProductsPage() {
                             <Badge variant="outline">Archived</Badge>
                           )
                         ) : (
-                          <Badge variant={product.is_active ? 'secondary' : 'outline'}>{product.is_active ? 'Active' : 'Inactive'}</Badge>
+                          <Badge variant={product.is_active ? 'success' : 'outline'}>{product.is_active ? 'Active' : 'Inactive'}</Badge>
                         )}
                       </TableCell>
                     </TableRow>

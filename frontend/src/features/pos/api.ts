@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Paginated, toPaginated } from '@/lib/api/client'
 import type { Sale } from '@/features/sales/api'
+import { useInvalidateMoney } from '@/features/payments/api'
 import { salesKeys } from '@/features/sales/api'
 
 export type DiscountInput = { type: 'percent' | 'amount'; value: string }
@@ -85,12 +86,14 @@ export type PricedCart = {
   total: string
 }
 
-export type PaymentMethod = 'cash' | 'card' | 'mobile_banking'
+export type PaymentMethod = 'cash' | 'card' | 'mobile_banking' | 'loyalty_points'
 
 export const PAYMENT_METHODS: Record<PaymentMethod, string> = {
   cash: 'Cash',
   card: 'Card',
   mobile_banking: 'Mobile banking',
+  /** Only for a customer with enough points while the loyalty program is on. */
+  loyalty_points: 'Loyalty points',
 }
 
 export type CheckoutInput = CartInput & {
@@ -144,6 +147,7 @@ export function usePriceQuery(cart: CartInput | null) {
 
 export function useCheckoutMutation() {
   const queryClient = useQueryClient()
+  const invalidateMoney = useInvalidateMoney()
 
   return useMutation({
     mutationFn: ({ input, idempotencyKey }: { input: CheckoutInput; idempotencyKey: string }) =>
@@ -152,6 +156,8 @@ export function useCheckoutMutation() {
       void queryClient.invalidateQueries({ queryKey: posKeys.all })
       void queryClient.invalidateQueries({ queryKey: salesKeys.all })
       void queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      // The drawer's expected cash and the customer's points moved too.
+      invalidateMoney()
     },
   })
 }

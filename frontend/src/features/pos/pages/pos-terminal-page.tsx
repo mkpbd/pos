@@ -6,16 +6,19 @@ import { StoreSelect } from '@/components/common/store-select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useCan } from '@/features/auth/use-auth'
+import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useBranchesQuery } from '@/features/branches/api'
-import { lookupCode, useCheckoutMutation, useHoldMutation, usePriceQuery, type HeldSale, type PosItem, type PricedCart } from '@/features/pos/api'
+import { useLoyaltyBalancesQuery, useLoyaltySettingsQuery } from '@/features/loyalty/api'
+import { lookupCode, useCheckoutMutation, useHoldMutation, usePriceQuery, type HeldSale, type PaymentMethod, type PosItem, type PricedCart } from '@/features/pos/api'
 import { cartOps, toCartInput, usePosCart, type LineInfo } from '@/features/pos/cart-store'
 import { CartLines, CartTotals } from '@/features/pos/components/cart-panel'
 import { CustomerPicker } from '@/features/pos/components/customer-picker'
 import { HeldSalesSheet } from '@/features/pos/components/held-sales-sheet'
-import { PaymentDialog } from '@/features/pos/components/payment-dialog'
+import { PaymentDialog, type LoyaltyTender } from '@/features/pos/components/payment-dialog'
 import { CategoryBar, ProductGrid } from '@/features/pos/components/product-grid'
 import { RecentSalesSheet } from '@/features/pos/components/recent-sales-sheet'
+import { RegisterSessionBar } from '@/features/pos/components/register-session-bar'
+import { useCurrentSessionQuery } from '@/features/registers/api'
 import type { Sale } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
 import { api, ApiError } from '@/lib/api/client'
@@ -31,6 +34,7 @@ import { useSessionStore } from '@/stores/session-store'
 export function PosTerminalPage() {
   const branchId = useSessionStore((s) => s.activeBranchId) ?? ''
   const can = useCan()
+  const me = useAuth()
   const { cart, apply } = usePosCart(branchId)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string | null>(null)
@@ -42,6 +46,7 @@ export function PosTerminalPage() {
   const [paying, setPaying] = useState(false)
   const [clearing, setClearing] = useState(false)
   const [completed, setCompleted] = useState<Sale | null>(null)
+  const [openingRegister, setOpeningRegister] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
@@ -59,6 +64,20 @@ export function PosTerminalPage() {
   const checkout = useCheckoutMutation()
   const hold = useHoldMutation()
   const canDiscount = can('sales.discount')
+
+  // Checkout needs the cashier's open register session in this branch.
+  const canOperate = can('cash_registers.operate')
+  const session = useCurrentSessionQuery(canOperate)
+  const sessionReady = !!session.data && session.data.branch?.id === branchId
+
+  // Loyalty points as a payment method for the selected customer.
+  const loyaltySettings = useLoyaltySettingsQuery()
+  const loyaltyOn = loyaltySettings.data?.is_enabled === true
+  const customerId = priced?.customer?.id
+  const points = useLoyaltyBalancesQuery(customerId ? [customerId] : [], loyaltyOn && paying)
+  const loyalty: LoyaltyTender | null = loyaltyOn && customerId && points.data?.[customerId] !== undefined && loyaltySettings.data
+    ? { points: points.data[customerId] ?? 0, pointValue: loyaltySettings.data.point_value, minRedeemPoints: loyaltySettings.data.min_redeem_points }
+    : null
 
   const addItem = (item: PosItem) => {
     if (!item.sellable) {
@@ -131,10 +150,15 @@ export function PosTerminalPage() {
       toast.error(price.isError ? 'Fix the cart problem shown first.' : 'Still pricing the cart — try again in a moment.')
       return
     }
+    if (!sessionReady) {
+      toast.error('Open a register session before taking payment.')
+      if (canOperate && !session.data) setOpeningRegister(true)
+      return
+    }
     setPaying(true)
   }
 
-  const complete = (payments: { method: 'cash' | 'card' | 'mobile_banking'; amount: string; reference: string | null }[]) => {
+  const complete = (payments: { method: PaymentMethod; amount: string; reference: string | null }[]) => {
     if (!cartInput) return
     const input = { ...cartInput, payments, held_sale_id: cart.heldSaleId }
     const fingerprint = JSON.stringify(input)
@@ -149,6 +173,10 @@ export function PosTerminalPage() {
         apply((c) => cartOps.empty(c.storeId))
       },
       onError: (error) => {
+        if (error instanceof ApiError && error.code === 'CASH_SESSION_REQUIRED') {
+          setPaying(false)
+          void session.refetch()
+        }
         const retryable = !(error instanceof ApiError) || error.status === 0 || error.status >= 500 || error.code === 'IDEMPOTENCY_REQUEST_IN_PROGRESS'
         if (!retryable) apply((c) => ({ ...c, pendingCheckout: null }))
         toast.error(retryable ? `${error.message} Press “Complete sale” again to retry safely.` : error.message)
@@ -172,9 +200,23 @@ export function PosTerminalPage() {
   const itemCount = cart.lines.length
 
   return (
-    <div className="flex flex-col gap-3 lg:h-[calc(100svh-6.5rem)] lg:flex-row">
+    <div className="flex flex-col gap-3 lg:h-[calc(100svh-var(--topbar-height)-3rem)] lg:flex-row">
       <h1 className="sr-only">POS terminal</h1>
       <section className="flex min-h-0 flex-1 flex-col gap-3" aria-label="Products">
+        {canOperate ? (
+          <RegisterSessionBar
+            session={session.data}
+            loading={session.isPending}
+            branchId={branchId}
+            branchName={me.branches.find((b) => b.id === branchId)?.name}
+            openRequested={openingRegister}
+            onOpenRequestedChange={setOpeningRegister}
+          />
+        ) : (
+          <p role="status" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+            Selling needs an open register session, and your role cannot open one (cash_registers.operate).
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <div className="w-48">
             <StoreSelect value={cart.storeId} onChange={(storeId) => apply((c) => ({ ...c, storeId }))} branchIds={branchId ? [branchId] : null} aria-label="Selling from store" />
@@ -256,6 +298,7 @@ export function PosTerminalPage() {
           onOpenChange={(o) => { if (!checkout.isPending) setPaying(o) }}
           priced={priced}
           canCredit={can('sales.credit')}
+          loyalty={loyalty}
           pending={checkout.isPending}
           onSubmit={complete}
         />

@@ -5,9 +5,12 @@ use App\Modules\Authentication\AuthenticationServiceProvider;
 use App\Modules\Branches\BranchesServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Customers\CustomersServiceProvider;
+use App\Modules\Expenses\ExpensesServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
+use App\Modules\Loyalty\LoyaltyServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Organizations\OrganizationsServiceProvider;
+use App\Modules\Payments\PaymentsServiceProvider;
 use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
@@ -34,6 +37,9 @@ return [
     InventoryServiceProvider::class,
     PurchasingServiceProvider::class,
     NotificationsServiceProvider::class,
+    PaymentsServiceProvider::class,
+    ExpensesServiceProvider::class,
     SalesServiceProvider::class,
+    LoyaltyServiceProvider::class,
     PosServiceProvider::class,
 ];

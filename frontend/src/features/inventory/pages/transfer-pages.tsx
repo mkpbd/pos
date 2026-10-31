@@ -26,9 +26,9 @@ import { INVENTORY_TABS } from '@/features/inventory/sections'
 import { linesSchema, toApiLine } from '@/features/inventory/lines'
 import { handleFormError } from '@/lib/forms'
 
-const STATUS: Record<TransferStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
-  in_transit: { label: 'In transit', variant: 'outline' },
-  received: { label: 'Received', variant: 'secondary' },
+const STATUS: Record<TransferStatus, { label: string; variant: 'info' | 'success' | 'destructive' }> = {
+  in_transit: { label: 'In transit', variant: 'info' },
+  received: { label: 'Received', variant: 'success' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 }
 

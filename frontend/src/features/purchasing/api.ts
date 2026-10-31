@@ -169,11 +169,11 @@ export function useRecordPaymentMutation() {
   })
 }
 
-export const PO_STATUS: Record<PurchaseOrderStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
+export const PO_STATUS: Record<PurchaseOrderStatus, { label: string; variant: 'outline' | 'soft' | 'warning' | 'success' | 'destructive' }> = {
   draft: { label: 'Draft', variant: 'outline' },
-  ordered: { label: 'Ordered', variant: 'default' },
-  partially_received: { label: 'Partially received', variant: 'secondary' },
-  received: { label: 'Received', variant: 'secondary' },
+  ordered: { label: 'Ordered', variant: 'soft' },
+  partially_received: { label: 'Partially received', variant: 'warning' },
+  received: { label: 'Received', variant: 'success' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 }
 

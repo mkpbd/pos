@@ -183,7 +183,7 @@ export function SuppliersPage() {
                     <TableCell className="hidden text-right font-mono text-sm lg:table-cell">
                       {canViewAccounts ? (balances.data?.[s.id] !== undefined ? formatMoney(balances.data[s.id], currency) : '…') : formatMoney(s.opening_balance, currency)}
                     </TableCell>
-                    <TableCell>{s.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={s.is_active ? 'secondary' : 'outline'}>{s.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
+                    <TableCell>{s.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={s.is_active ? 'success' : 'outline'}>{s.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
                     {showActions && (
                       <TableCell className="text-right">
                         {canViewAccounts && (

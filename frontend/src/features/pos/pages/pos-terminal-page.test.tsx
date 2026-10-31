@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
 import { useCartStore } from '@/features/pos/cart-store'
-import { branchesWithStores, posCashier } from '@/test/fixtures'
+import { branchesWithStores, loyaltyOff, openSessionReport, posCashier } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 
 const paged = (items: unknown[]) => ok(items, { pagination: { current_page: 1, per_page: 48, total: items.length, last_page: 1 } })
@@ -35,17 +35,21 @@ const sale = {
   paid_total: '50.00', change_total: '50.00', due_total: '0.00', cancelled_at: null, cancelled_by: null, cancellation_reason: null,
   notes: null, invoice_discount: null, cost_total: null,
   lines: [{ id: 'sl-1', variant_id: 'v-1', product_name: 'Mango Juice', variant_name: null, sku: 'JUICE-1L', unit_code: 'pcs', quantity: '2.000', unit_price: '25.00', discount: null,
-    line_subtotal: '50.00', discount_amount: '0.00', invoice_discount_share: '0.00', net_amount: '50.00', tax_rate: '0.0000', tax_amount: '0.00', line_total: '50.00', unit_cost: null, batches: [], serials: [] }],
+    line_subtotal: '50.00', discount_amount: '0.00', invoice_discount_share: '0.00', net_amount: '50.00', tax_rate: '0.0000', tax_amount: '0.00', line_total: '50.00', unit_cost: null, batches: [], serials: [],
+    returned_serials: [], returned_quantity: '0.000', pending_return_quantity: '0.000' }],
+  returns: [],
   payments: [{ id: 'pay-1', kind: 'payment', method: 'cash', method_label: 'Cash', amount: '50.00', tendered: '100.00', reference: null, created_at: '2026-10-31T06:00:00Z', created_by: 'Pos Cashier' }],
   receipt: { organization_name: 'Corner Shop', header: null, footer: 'Come again!', branch: { id: 'b-1', code: 'MAIN', name: 'Main Branch', address: 'Road 1', phone: null, email: null }, timezone: 'Asia/Dhaka' },
 }
 
-function terminalApi(checkout: Parameters<typeof mockApi>[0][string]) {
+function terminalApi(checkout: Parameters<typeof mockApi>[0][string], extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /auth/me': ok(posCashier()),
     'GET /branches': paged(branchesWithStores()),
     'GET /categories': ok([]),
     'GET /customers': paged([]),
+    'GET /register-sessions/current': ok(openSessionReport()),
+    'GET /loyalty/settings': ok(loyaltyOff()),
     'GET /pos/catalog': paged([juice]),
     'GET /pos/lookup': (_init, url) => (url.searchParams.get('code') === '4006381333931' ? ok(juice) : fail(404, 'NOT_FOUND', 'Not found.')),
     'POST /pos/price': (init) => {
@@ -54,6 +58,7 @@ function terminalApi(checkout: Parameters<typeof mockApi>[0][string]) {
       return ok(priced(quantity, quantity === '2' ? '50.00' : '25.00'))
     },
     'POST /pos/checkout': checkout,
+    ...extra,
   })
 }
 
@@ -61,6 +66,40 @@ describe('PosTerminalPage', () => {
   beforeEach(() => {
     localStorage.clear()
     useCartStore.setState({ carts: {} })
+  })
+
+  it('asks for an open register session before taking payment', async () => {
+    const user = userEvent.setup()
+    let session: Record<string, unknown> | null = null
+    let opened: unknown
+    terminalApi(fail(500, 'SHOULD_NOT_CHECKOUT'), {
+      'GET /register-sessions/current': () => ok(session),
+      'GET /cash-registers': ok([{ id: 'reg-1', code: 'REG-01', name: 'Counter 1', is_active: true, branch: { id: 'b-1', code: 'MAIN', name: 'Main Branch' }, open_session: null }]),
+      'POST /cash-registers/reg-1/sessions': (init) => {
+        opened = JSON.parse(String(init.body))
+        session = openSessionReport({ opening_float: '1000.00', cash: { opening_float: '1000.00', cash_in: '0.00', cash_out: '0.00', expected: '1000.00', counted: null, variance: null } })
+        return { status: 201, body: { success: true, data: session, meta: {} } }
+      },
+    })
+    renderRoutes(routes, '/pos')
+
+    expect(await screen.findByText(/No open register session/)).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Mango Juice/ }))
+    const cart = screen.getByRole('complementary', { name: 'Current sale' })
+    await waitFor(() => expect(within(cart).getByTestId('cart-total')).toHaveTextContent('BDT 25.00'))
+
+    await user.click(within(cart).getByRole('button', { name: /^Pay/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Open register session' })
+    expect(screen.queryByRole('dialog', { name: 'Payment' })).not.toBeInTheDocument()
+    // The only free register is chosen for the cashier.
+    expect(within(dialog).getByRole('combobox', { name: 'Register' })).toHaveTextContent('Counter 1 (REG-01)')
+    await user.type(within(dialog).getByLabelText('Opening float (cash counted)'), '1000')
+    await user.click(within(dialog).getByRole('button', { name: 'Open session' }))
+
+    await waitFor(() => expect(opened).toEqual({ opening_float: '1000' }))
+    expect(await screen.findByTestId('session-expected-cash')).toHaveTextContent('BDT 1,000.00')
+    await user.click(within(cart).getByRole('button', { name: /^Pay/ }))
+    expect(await screen.findByRole('dialog', { name: 'Payment' })).toBeInTheDocument()
   })
 
   it('sells a scanned product for cash with change and shows the receipt', async () => {

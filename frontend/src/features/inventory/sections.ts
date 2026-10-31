@@ -14,3 +14,13 @@ export const PURCHASING_TABS: SectionTab[] = [
   { to: '/purchasing/returns', label: 'Returns' },
   { to: '/purchasing/payments', label: 'Supplier payments' },
 ]
+
+export const REGISTER_TABS: SectionTab[] = [
+  { to: '/cash-registers', label: 'Registers' },
+  { to: '/cash-registers/sessions', label: 'Sessions' },
+]
+
+export const PAYMENTS_TABS: SectionTab[] = [
+  { to: '/payments', label: 'Payments ledger' },
+  { to: '/payments/customers', label: 'Customer payments' },
+]

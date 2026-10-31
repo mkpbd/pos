@@ -86,7 +86,7 @@ export function BranchesPage() {
                     <TableCell className="hidden text-muted-foreground md:table-cell">{branch.phone ?? '—'}</TableCell>
                     <TableCell>{branch.stores.length}</TableCell>
                     <TableCell>
-                      <Badge variant={branch.is_active ? 'secondary' : 'outline'}>{branch.is_active ? 'Active' : 'Inactive'}</Badge>
+                      <Badge variant={branch.is_active ? 'success' : 'outline'}>{branch.is_active ? 'Active' : 'Inactive'}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon-sm" aria-label={`Stores of ${branch.name}`} onClick={() => setStoresBranchId(branch.id)}>

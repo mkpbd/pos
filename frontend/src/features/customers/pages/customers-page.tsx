@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArchiveIcon, ArchiveRestoreIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { ArchiveIcon, ArchiveRestoreIcon, FileTextIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { PageHeader } from '@/components/common/page-header'
@@ -24,7 +24,9 @@ import {
   type Customer,
   type CustomerGroup,
 } from '@/features/customers/api'
+import { CustomerAccountSheet } from '@/features/customers/components/customer-account-sheet'
 import { CustomerDialog } from '@/features/customers/components/customer-dialog'
+import { useLoyaltyBalancesQuery, useLoyaltySettingsQuery } from '@/features/loyalty/api'
 import { useCustomerBalancesQuery } from '@/features/sales/api'
 import { decimalPattern, formatMoney } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -123,12 +125,15 @@ export function CustomersPage() {
   const [archived, setArchived] = useState(false)
   const [editing, setEditing] = useState<Customer | null | undefined>(undefined)
   const [archiving, setArchiving] = useState<Customer | null>(null)
+  const [account, setAccount] = useState<Customer | null>(null)
   const debouncedSearch = useDebouncedValue(search)
   const groups = useCustomerGroupsQuery()
   const archive = useArchiveCustomerMutation()
   const { data, error, isPending, refetch } = useCustomersQuery({ page, search: debouncedSearch || undefined, customer_group_id: groupId === ALL ? undefined : groupId, archived })
   const canSeeBalances = can('sales.view')
   const balances = useCustomerBalancesQuery(data?.items.map((c) => c.id) ?? [], canSeeBalances)
+  const loyaltyOn = useLoyaltySettingsQuery().data?.is_enabled === true
+  const points = useLoyaltyBalancesQuery(data?.items.map((c) => c.id) ?? [], loyaltyOn)
 
   return (
     <div className="flex flex-col gap-6">
@@ -179,8 +184,9 @@ export function CustomersPage() {
                       <TableHead className="hidden md:table-cell">Group</TableHead>
                       <TableHead className="hidden lg:table-cell text-right">Credit limit</TableHead>
                       {canSeeBalances && <TableHead className="text-right">Balance owed</TableHead>}
+                      {loyaltyOn && <TableHead className="hidden text-right sm:table-cell">Points</TableHead>}
                       <TableHead>Status</TableHead>
-                      {canManage && <TableHead className="w-24"><span className="sr-only">Actions</span></TableHead>}
+                      <TableHead className="w-28"><span className="sr-only">Actions</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -193,10 +199,11 @@ export function CustomersPage() {
                         {canSeeBalances && (
                           <TableCell className="text-right font-mono text-sm">{balances.data?.[c.id] !== undefined ? formatMoney(balances.data[c.id], currency) : '…'}</TableCell>
                         )}
-                        <TableCell>{c.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={c.is_active ? 'secondary' : 'outline'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
-                        {canManage && (
-                          <TableCell className="text-right">
-                            {c.archived_at ? (
+                        {loyaltyOn && <TableCell className="hidden text-right font-mono text-sm sm:table-cell">{points.data?.[c.id] ?? '…'}</TableCell>}
+                        <TableCell>{c.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={c.is_active ? 'success' : 'outline'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Button variant="ghost" size="icon-sm" aria-label={`Account of ${c.name}`} onClick={() => setAccount(c)}><FileTextIcon /></Button>
+                          {canManage && (c.archived_at ? (
                               <Button variant="ghost" size="icon-sm" aria-label={`Restore ${c.name}`} onClick={() => archive.mutate({ id: c.id, restore: true }, { onSuccess: () => toast.success(`${c.name} restored.`), onError: (e) => toast.error(e.message) })}>
                                 <ArchiveRestoreIcon />
                               </Button>
@@ -205,9 +212,8 @@ export function CustomersPage() {
                                 <Button variant="ghost" size="icon-sm" aria-label={`Edit ${c.name}`} onClick={() => setEditing(c)}><PencilIcon /></Button>
                                 <Button variant="ghost" size="icon-sm" aria-label={`Archive ${c.name}`} onClick={() => setArchiving(c)}><ArchiveIcon /></Button>
                               </>
-                            )}
-                          </TableCell>
-                        )}
+                            ))}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -233,6 +239,7 @@ export function CustomersPage() {
           currency={currency}
         />
       )}
+      <CustomerAccountSheet customer={account} onOpenChange={(o) => !o && setAccount(null)} />
       <ConfirmDialog
         open={archiving !== null}
         onOpenChange={(o) => !o && setArchiving(null)}

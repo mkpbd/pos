@@ -89,17 +89,35 @@ Shared:
 - `idempotency_keys` — user_id, key, sha256 fingerprint (method, path, branch header, canonical body), status `processing|completed`, response status and body; unique `(user_id, key)`; pruned after 24 h by the scheduler (`model:prune`).
 
 Deviations from the original sketch, by design:
-- No `pos_terminals` / `register_sessions` yet: they belong to the cash register (Phase 6). Sales already record branch, store and cashier.
-- Customer balances are computed (opening balance + dues of completed sales); due collections arrive with Phase 6 payments.
-- Payments of a sale live in `sale_payments` (Sales module). Phase 6 adds the organization-wide payments ledger and cash register on top.
+- No `pos_terminals`: the cash register (Phase 6) plays that role. Sales already record branch, store and cashier.
+- Customer balances are computed (opening balance + dues of completed sales; from Phase 6 minus return credits and customer payments).
+- Payments of a sale live in `sale_payments` (Sales module); Phase 6 adds the organization-wide payments ledger and cash registers on top.
 
-### Phase 6 — Money flows
-- `payment_methods`, `payments` (**ledger**: direction in/out, method, amount, reference to sale/purchase/expense, register_session_id)
-- `cash_movements` (cash in/out, reconciliation)
-- `sale_returns`, `sale_return_items` (FK to original sale/sale_item, quantity ≤ remaining returnable), `return_reasons`, approval fields
-- `refunds`
-- `expenses`, `expense_categories`, `incomes`
-- `loyalty_accounts`, `loyalty_transactions` (ledger)
+### Phase 6 — Money flows (implemented)
+Payments module:
+- `cash_registers` — branch, code (unique per organization, case-insensitive), name, active.
+- `cash_register_sessions` — number `SES-{BRANCH}-000001`, register, branch, status `open|closed`, currency, opening_float, opened_by/at; on close expected_cash, counted_cash, variance, closing_notes, closed_by/at. Partial unique indexes: one open session per register and per user. Immutable once closed (model guard).
+- `payments` — **the payments ledger**: branch, register session (nullable), direction `in|out`, method (`cash`, `card`, `mobile_banking`, `bank_transfer`, `cheque`), currency, amount (> 0), source_type (`sale`, `sale_cancellation`, `sale_return`, `customer_payment`, `expense`, `income`, `expense_void`, `income_void`, `cash_in`, `cash_out`) + source_id/number, customer, reference, description, created_by, created_at. Append-only (trigger `prevent_payments_mutation()`). Cash movements of a drawer are ledger rows with `source_type` `cash_in`/`cash_out` — no separate table.
+
+Sales module additions:
+- `return_reasons` — name (unique per organization), `restock_by_default`, active.
+- `sale_returns` — number `RET-{BRANCH}-000001`, sale, branch, store, customer, status `pending|completed|rejected`, reason, notes, subtotal/tax_total/total, credited_total (applied to what the customer owed), refunded_total, requested_by/at, decided_by/at, rejection_reason. Only the decision of a pending return can change it.
+- `sale_return_lines` — sale line, variant, quantity, restock flag, net/tax/line totals, unit_cost/cost_total, serials (JSON). Append-only.
+- `sale_return_line_stock` — which sale-line allocation (and batch) restocked goods went back to, quantity, unit cost. Append-only.
+- `sale_return_refunds` — method (incl. `loyalty_points`), amount, reference. Append-only. (The planned separate `refunds` table became this.)
+- `customer_payments` — number `RCP-000001`, customer, branch, amount, method, reference, notes. Append-only.
+- `sale_payments.method` now also allows `loyalty_points`.
+
+Expenses module:
+- `expense_categories` — type `expense|income`, name (unique per organization and type), active.
+- `expenses` — type, number `EXP-000001` / `INC-000001`, branch, category, amount, method, reference, party, occurred_on, notes, void fields. Expenses and other income share one table (the planned `incomes` table became `type = income`).
+
+Loyalty module:
+- `loyalty_settings` — one row per organization: is_enabled, spend_amount, points_per_spend, point_value, min_redeem_points.
+- `loyalty_accounts` — balance (may go negative), lifetime_earned, lifetime_redeemed per customer; locked `FOR UPDATE` for every change.
+- `loyalty_transactions` — **points ledger**: type (`earn`, `redeem`, `earn_reversal`, `redeem_reversal`, `refund`, `adjustment`), signed points, balance_after, money value, sale, source document. Append-only (trigger `prevent_loyalty_mutation()`).
+
+Deviations from the original sketch, by design: no `payment_methods` table (methods are a fixed list; organization-defined methods are added when a concrete need appears); no `cash_movements` table (they are ledger rows).
 
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …

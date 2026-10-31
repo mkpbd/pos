@@ -26,7 +26,7 @@ function page(load: () => Promise<PageModule>, exportName: string): Pick<RouteOb
   }
 }
 
-function guarded(permission: string, path: string, lazyPage: Pick<RouteObject, 'lazy'>): RouteObject {
+function guarded(permission: string | string[], path: string, lazyPage: Pick<RouteObject, 'lazy'>): RouteObject {
   return { element: <RequirePermission permission={permission} />, children: [{ path, ...lazyPage }] }
 }
 
@@ -61,7 +61,19 @@ const pages = {
   posTerminal: page(() => import('@/features/pos/pages/pos-terminal-page'), 'PosTerminalPage'),
   sales: page(() => import('@/features/sales/pages/sales-pages'), 'SalesPage'),
   sale: page(() => import('@/features/sales/pages/sales-pages'), 'SalePage'),
+  newReturn: page(() => import('@/features/returns/pages/return-pages'), 'NewReturnPage'),
+  returns: page(() => import('@/features/returns/pages/return-pages'), 'ReturnsPage'),
+  saleReturn: page(() => import('@/features/returns/pages/return-pages'), 'ReturnPage'),
+  cashRegisters: page(() => import('@/features/registers/pages/register-pages'), 'CashRegistersPage'),
+  registerSessions: page(() => import('@/features/registers/pages/register-pages'), 'RegisterSessionsPage'),
+  registerSession: page(() => import('@/features/registers/pages/register-pages'), 'RegisterSessionPage'),
+  paymentsLedger: page(() => import('@/features/payments/pages/payment-pages'), 'PaymentsPage'),
+  customerPayments: page(() => import('@/features/payments/pages/payment-pages'), 'CustomerPaymentsPage'),
+  expenses: page(() => import('@/features/expenses/pages/expenses-page'), 'ExpensesPage'),
+  loyalty: page(() => import('@/features/loyalty/pages/loyalty-page'), 'LoyaltyPage'),
 }
+
+const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage']
 
 export const routes: RouteObject[] = [
   {
@@ -92,6 +104,20 @@ export const routes: RouteObject[] = [
               guarded('pos.sell', 'pos', pages.posTerminal),
               guarded('sales.view', 'sales', pages.sales),
               guarded('sales.view', 'sales/:saleId', pages.sale),
+              {
+                // Returning needs the invoice (sales.view) and the right to create returns.
+                element: <RequirePermission permission="sales.view" />,
+                children: [guarded('returns.create', 'sales/:saleId/return', pages.newReturn)],
+              },
+              guarded('returns.view', 'returns', pages.returns),
+              guarded('returns.view', 'returns/:returnId', pages.saleReturn),
+              guarded(REGISTER_PERMISSIONS, 'cash-registers', pages.cashRegisters),
+              guarded(['cash_registers.view', 'cash_registers.operate'], 'cash-registers/sessions', pages.registerSessions),
+              guarded(['cash_registers.view', 'cash_registers.operate'], 'cash-registers/sessions/:sessionId', pages.registerSession),
+              guarded('payments.view', 'payments', pages.paymentsLedger),
+              guarded('payments.view', 'payments/customers', pages.customerPayments),
+              guarded('expenses.view', 'expenses', pages.expenses),
+              guarded(['loyalty.view', 'loyalty.manage'], 'loyalty', pages.loyalty),
               guarded('products.view', 'products', pages.products),
               // Editing needs cost prices, so it requires both permissions.
               {

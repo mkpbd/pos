@@ -79,7 +79,7 @@ function CatalogSection<T extends { id: string; name: string; is_active: boolean
               {rows.map((row) => (
                 <TableRow key={row.id}>
                   {columns.map((c) => <TableCell key={c.header} className={c.className}>{c.cell(row)}</TableCell>)}
-                  <TableCell><Badge variant={row.is_active ? 'secondary' : 'outline'}>{row.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
+                  <TableCell><Badge variant={row.is_active ? 'success' : 'outline'}>{row.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
                   {canManage && (
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon-sm" aria-label={`Edit ${row.name}`} onClick={() => openEditor(row)}><PencilIcon /></Button>

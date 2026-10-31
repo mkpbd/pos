@@ -140,6 +140,56 @@ test('cashier scans, takes cash and the sale reaches stock and history', async (
   await expect(page.getByRole('row').filter({ hasText: 'BDT 57.50' })).toBeVisible()
 })
 
+test('cashier requests a return; the owner approves it and refunds cash from the shift', async ({ browser }) => {
+  const signIn = async (email: string) => {
+    const page = await (await browser.newContext()).newPage()
+    await page.goto('/login')
+    await page.getByLabel('E-mail').fill(email)
+    await page.getByLabel('Password').fill('password')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+    return page
+  }
+
+  // The cashier may request returns but not approve them.
+  const cashier = await signIn('cashier@demo.test')
+  await cashier.getByRole('link', { name: 'Sales' }).first().click()
+  await cashier.getByRole('row').filter({ hasText: 'BDT 57.50' }).getByRole('link').click()
+  await cashier.getByRole('link', { name: 'Return items' }).click()
+  await cashier.getByLabel('Quantity to return of line 1').fill('1')
+  await cashier.getByRole('button', { name: 'Calculate refund' }).click()
+  // Half of 57.50: the line's share of what the invoice charged, VAT included.
+  await expect(cashier.getByTestId('return-total')).toHaveText('BDT 28.75')
+  await cashier.getByRole('button', { name: 'Send for approval' }).click()
+  await expect(cashier.getByText('Awaiting approval')).toBeVisible()
+  const number = (await cashier.getByRole('heading', { name: /^RET-MAIN-\d{6}$/ }).textContent()) ?? ''
+
+  // The owner's seeded shift has no cash in the drawer: top it up first, or the payout is refused.
+  const owner = await signIn('owner@demo.test')
+  await owner.getByRole('link', { name: 'Cash registers' }).first().click()
+  await owner.getByRole('link', { name: 'Open report' }).click()
+  await owner.getByRole('button', { name: 'Cash in' }).click()
+  const cashIn = owner.getByRole('dialog', { name: 'Cash in' })
+  await cashIn.getByLabel('Amount').fill('100')
+  await cashIn.getByLabel('Reason').fill('Float top-up')
+  await cashIn.getByRole('button', { name: 'Record cash in' }).click()
+  await expect(owner.getByTestId('expected-cash')).toHaveText('BDT 100.00')
+
+  // Approving pays the refund in cash out of that shift.
+  await owner.getByRole('link', { name: 'Returns' }).first().click()
+  await owner.getByRole('link', { name: number }).click()
+  await owner.getByRole('button', { name: 'Approve' }).click()
+  const dialog = owner.getByRole('dialog', { name: `Approve ${number}` })
+  await expect(dialog.getByTestId('refund-due')).toHaveText('BDT 28.75')
+  await dialog.getByRole('button', { name: 'Approve return' }).click()
+  await expect(owner.getByText('Completed')).toBeVisible()
+
+  await owner.getByRole('link', { name: 'Cash registers' }).first().click()
+  await owner.getByRole('link', { name: 'Open report' }).click()
+  await expect(owner.getByRole('row').filter({ hasText: number })).toContainText('−28.75')
+  await expect(owner.getByTestId('expected-cash')).toHaveText('BDT 71.25')
+})
+
 test('cashier only sees what the role allows, and the API agrees', async ({ page }) => {
   await page.goto('/login')
   await page.getByLabel('E-mail').fill('cashier@demo.test')

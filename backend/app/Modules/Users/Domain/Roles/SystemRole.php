@@ -49,11 +49,11 @@ enum SystemRole: string
                 'organization.view', 'branches.view', 'users.view', 'roles.view',
                 'products.*', 'categories.*', 'brands.*', 'units.*', 'customers.*', 'suppliers.*',
                 'inventory.*', 'purchases.*', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
-                'payments.*', 'cash_registers.*', 'expenses.*', 'reports.*', 'ai.*',
+                'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*', 'ai.*',
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
-                'pos.*', 'sales.view', 'cash_registers.operate',
+                'pos.*', 'sales.view', 'cash_registers.operate', 'returns.view', 'returns.create', 'payments.collect',
             ],
             self::InventoryManager => [
                 'branches.view', 'products.*', 'categories.*', 'brands.*', 'units.*',
@@ -62,7 +62,7 @@ enum SystemRole: string
             self::Accountant => [
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
                 'sales.view', 'purchases.view', 'purchases.pay', 'customers.view', 'suppliers.view',
-                'payments.*', 'expenses.*', 'cash_registers.view', 'reports.*', 'audit.view',
+                'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'audit.view',
             ],
         };
     }

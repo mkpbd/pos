@@ -72,6 +72,14 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `CUSTOMER_REQUIRED`, `CREDIT_SALE_NOT_ALLOWED`, `CREDIT_LIMIT_EXCEEDED` | An amount left due needs a customer, `sales.credit` and room in the credit limit (`details.outstanding`, `credit_limit`, `available`, `due`). |
 | 422 | `NON_CASH_OVERPAYMENT` | Card/mobile payments exceed the total (only cash gives change). |
 | 422 | `PRODUCT_NOT_SELLABLE`, `HELD_SALE_GONE`, `SALE_ALREADY_CANCELLED` | Scanned product archived/inactive; held cart already checked out or discarded; repeated cancellation. |
+| 422 | `CASH_SESSION_REQUIRED` | Checkout, or any cash in/out (refund, collection, expense, cancellation), without an open register session of the caller in that branch (`details.branch_id`, `open_session_id` when it is open elsewhere). |
+| 422 | `INSUFFICIENT_CASH` | A cash payout would take the drawer below zero (`details.available`, `required`). |
+| 422 | `SESSION_ALREADY_OPEN`, `REGISTER_IN_USE`, `REGISTER_INACTIVE`, `SESSION_CLOSED` | One session per cashier and per register; inactive register; session already closed. |
+| 422 | `SALE_HAS_RETURNS`, `SALE_CANCELLED` | A sale with returns cannot be cancelled; a cancelled sale cannot be returned. |
+| 422 | `REFUND_MISMATCH`, `RETURN_ALREADY_DECIDED` | Refunds must add up to `details.refund_due` (`credit` is applied to the customer's balance); return already completed/rejected. |
+| 422 | `PAYMENT_EXCEEDS_BALANCE` | A customer payment larger than what they owe (`details.outstanding`). |
+| 422 | `ALREADY_VOIDED` | Expense/income entry already void. |
+| 422 | `LOYALTY_NOT_AVAILABLE`, `LOYALTY_AMOUNT_INVALID`, `INSUFFICIENT_POINTS` | Program off; amount not a whole number of points or below the minimum; not enough points (`details.available`, `required`). |
 | 422 | `PRIVILEGE_ESCALATION` | Granting/assigning permissions the actor lacks, or editing a more powerful user. `details.permissions` lists what is missing. |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
@@ -82,7 +90,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | Header | Direction | Purpose |
 |--------|-----------|---------|
 | `X-Request-Id` | both | Correlation id. Clients may send one (8–64 chars `[A-Za-z0-9-_.]`); the server always returns it. |
-| `Idempotency-Key` | request | Required on `POST /pos/checkout` (and payment endpoints from Phase 6): 8–100 characters, one per logical operation (the SPA uses a UUID); reuse it when retrying. A replayed response carries `Idempotent-Replayed: true`. |
+| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses` and `/register-sessions/{id}/cash-movements`: 8–100 characters, one per logical operation (the SPA uses a UUID); reuse it when retrying. A replayed response carries `Idempotent-Replayed: true`. |
 | `X-Branch-Id` | request | Active branch. Optional; when sent it must be an active branch of the organization that the user is assigned to (or `branches.access_all`). Branch-scoped endpoints (Phase 4+) require it. |
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). |
@@ -174,9 +182,38 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET / DELETE | `/pos/held/{id}` | tenant | `pos.sell` | Resume (returns `cart`) / discard. |
 | GET | `/sales` | tenant | `sales.view` (or `pos.sell`: own sales) | History: `branch_id`, `store_id`, `customer_id`, `cashier_id`, `status`, `from`/`to` (days in the organization's timezone), `search` (invoice number); sort `sold_at`, `number`, `total`. |
 | GET | `/sales/{id}` | tenant | as above | Invoice with lines (batches, serials), payments and `receipt` data (organization, header/footer, branch contacts). `cost_total`/`unit_cost` only with `products.view_cost`. |
-| POST | `/sales/{id}/cancel` | tenant | `sales.cancel` | `{reason}` → restock, payment reversals, serials released; `SALE_ALREADY_CANCELLED`. |
+| POST | `/sales/{id}/cancel` | tenant | `sales.cancel` | `{reason}` → restock, payment reversals (cash out of the caller's open session), loyalty points reversed, serials released; `SALE_ALREADY_CANCELLED`, `SALE_HAS_RETURNS`. |
 | GET | `/sales/summary` | tenant | `sales.view` | Daily summary (`date`, `branch_id`): counts, gross/net sales, tax, discounts, due, cancelled, payments by method; `cost`/`gross_profit` only with `products.view_cost`. |
-| GET | `/sales/customer-balances?customer_ids[]=` | tenant | `sales.view` | `{customer_id: amount owed}` = opening balance + dues of completed sales. |
+| GET | `/sales/customer-balances?customer_ids[]=` | tenant | `sales.view` | `{customer_id: amount owed}` = opening balance + dues of completed sales − returns credited − payments received. |
+| GET | `/cash-registers` | tenant | any `cash_registers.*` | Registers of accessible branches (`branch_id`), each with `open_session` (`id`, `number`, `opened_at`, `opened_by`). |
+| POST / PUT | `/cash-registers[/{id}]` | tenant | `cash_registers.manage` | `{branch_id, code, name, is_active}` (code unique per organization). |
+| POST | `/cash-registers/{id}/sessions` | tenant | `cash_registers.operate` | Open a session: `{opening_float}` → `201` session report. `SESSION_ALREADY_OPEN`, `REGISTER_IN_USE`, `REGISTER_INACTIVE`. Number `SES-{BRANCH}-000001`. |
+| GET | `/register-sessions` | tenant | `cash_registers.view` (all in branches) or `.operate` (own) | `branch_id`, `cash_register_id`, `opened_by`, `status`; sort `opened_at`, `number`. |
+| GET | `/register-sessions/current` | tenant | `cash_registers.operate` | Caller's open session report or `null`. |
+| GET | `/register-sessions/{id}` | tenant | as list | Report: header (`opening_float`, `expected_cash`, `counted_cash`, `variance`, opened/closed by/at), `cash{opening_float, cash_in, cash_out, expected, counted, variance}`, `by_method[]{method, label, in, out, net}`, `by_source[]{source_type, label, in, out, entries}`, latest 200 `entries`. |
+| POST | `/register-sessions/{id}/cash-movements` | tenant | `cash_registers.operate` (own session) + `Idempotency-Key` | `{direction: in\|out, amount, reason}`; `INSUFFICIENT_CASH`. Returns the report. |
+| POST | `/register-sessions/{id}/close` | tenant | own with `.operate`, any with `.manage` | `{counted_cash, notes?}` → closed report with `expected_cash`, `variance`; `SESSION_CLOSED`. |
+| GET | `/payments` | tenant | `payments.view` | Payments ledger: `branch_id`, `method`, `direction`, `source_type`, `customer_id`, `cash_register_session_id`, `from`/`to`, `search` (document number/reference). `meta.totals{in, out, net}`. Rows: `direction`, `method`(+`_label`), `amount`, `source_type`(+`_label`), `source_id`, `source_number`, `session{id, number}`, `created_by`. |
+| GET | `/returns` | tenant | `returns.view` | `status` (`pending`, `completed`, `rejected`), `branch_id`, `sale_id`, `customer_id`, `from`/`to`, `search`; sort `requested_at`, `number`, `total`. |
+| POST | `/returns/preview` | tenant | `returns.create` | Same body as `POST /returns`; values the lines and returns `settlement{credit, refund_due, refundable[]{method, label, max}}` (max `null` = cash, unlimited) and `completes_immediately`. |
+| POST | `/returns` | tenant | `returns.create` + `Idempotency-Key` | `{sale_id, return_reason_id?, notes?, lines: [{sale_line_id, quantity, restock?, serials?}], refunds?: [{method, amount, reference?}]}`. Pending (reserves quantities) unless the caller has `returns.approve`, then completed at once (refunds must add up to `refund_due`). Number `RET-{BRANCH}-000001`. |
+| GET | `/returns/{id}` | tenant | `returns.view` | Document: lines (`restock`, amounts, `serials`, restocked `batches`), `refunds[]`, and for pending returns the current `settlement`. |
+| POST | `/returns/{id}/approve` | tenant | `returns.approve` + `Idempotency-Key` | `{refunds: [...]}` → completed: stock back to the original batches (restock lines), serials released, credit applied, refunds booked (cash from the approver's session), loyalty reversed. `REFUND_MISMATCH`, `RETURN_ALREADY_DECIDED`. |
+| POST | `/returns/{id}/reject` | tenant | `returns.approve` | `{reason}`. |
+| GET / POST / PUT / DELETE | `/return-reasons[/{id}]` | tenant | read: any `returns.*`; write: `returns.manage` | `{name, restock_by_default, is_active}`; delete only unused (`IN_USE`). |
+| GET | `/customer-payments` | tenant | `payments.view` | `customer_id`, `branch_id`, `search`. |
+| POST | `/customer-payments` | tenant | `payments.collect` + `Idempotency-Key` | `{customer_id, branch_id, amount, method (cash, card, mobile_banking, bank_transfer, cheque), reference?, notes?}`; at most the outstanding balance (`PAYMENT_EXCEEDS_BALANCE`). Number `RCP-000001`. |
+| GET | `/customers/{id}/statement` | tenant | `sales.view` or `payments.view` | Entries `sale` (+total), `sale_payment` (−paid at the till), `sale_cancellation` (−due), `sale_return` (−total), `refund` (+refunded), `payment` (−amount) with running `balance`; `from`/`to`. |
+| GET | `/expense-categories` | tenant | `expenses.view` | `type` (`expense`, `income`). |
+| POST / PUT / DELETE | `/expense-categories[/{id}]` | tenant | `expenses.manage` | `{type, name, is_active}` (name unique per type). |
+| GET | `/expenses` | tenant | `expenses.view` | `type` (default `expense`), `branch_id`, `expense_category_id`, `method`, `from`/`to` (`occurred_on`), `voided`, `search`; `meta.totals.amount`, `meta.by_category[]`. |
+| POST | `/expenses` | tenant | `expenses.manage` + `Idempotency-Key` | `{type, branch_id, expense_category_id, amount, method, occurred_on, reference?, party?, notes?}` → `EXP-000001` / `INC-000001`; cash through the caller's session. |
+| GET | `/expenses/{id}` | tenant | `expenses.view` | One entry. |
+| POST | `/expenses/{id}/void` | tenant | `expenses.manage` | `{reason}`; books the opposite payment; `ALREADY_VOIDED`. |
+| GET / PUT | `/loyalty/settings` | tenant | read: `loyalty.*`, `customers.view` or `pos.sell`; write: `loyalty.manage` | `{is_enabled, spend_amount, points_per_spend, point_value, min_redeem_points}`. |
+| GET | `/loyalty/balances?customer_ids[]=` | tenant | as settings read | `{customer_id: points}`. |
+| GET | `/loyalty/customers/{id}` | tenant | as settings read | `balance`, `lifetime_earned`, `lifetime_redeemed`, latest 100 `transactions` (`earn`, `redeem`, `earn_reversal`, `redeem_reversal`, `refund`, `adjustment`). |
+| POST | `/loyalty/customers/{id}/adjust` | tenant | `loyalty.manage` | `{points (signed), notes}`. |
 | GET | `/notifications` | auth | — | Own in-app notifications (paginated), `unread=1`. Currently `inventory.low_stock`. |
 | GET | `/notifications/unread-count` | auth | — | `{count}` for the bell. |
 | POST | `/notifications/{id}/read`, `/notifications/read-all` | auth | — | Mark as read. |
@@ -214,6 +251,22 @@ Idempotency-Key: 6f1c2a9e-4c1b-4f55-9a0e-1f3f0b7d2c11
 }
 ```
 Response `201` `data`: `number` `INV-MAIN-000042`, `subtotal`, `item_discount_total`, `invoice_discount_total`, `tax_total`, `total`, `paid_total`, `change_total`, `due_total`, `lines[]` (with `batches`, `serials`), `payments[]` (cash shows `tendered`), `receipt{}`. Prices in the request are ignored; leaving out `invoice_discount` applies the customer's group discount, `null` removes it.
+
+Checkout notes (Phase 6): the cashier needs an open register session in the store's branch (`CASH_SESSION_REQUIRED`); every money payment goes into the payments ledger. `payments[].method` may be `loyalty_points` for a customer with enough points (amount = whole points × `point_value`); points are earned on the total minus the points redeemed.
+
+Example — a return completed by an approver (2 of 3 units, card and cash refund):
+```http
+POST /api/v1/returns
+Idempotency-Key: 2b0c6c1e-6f0d-4c36-9a7a-62d8e1a0f3b4
+```
+```json
+{
+  "sale_id": "0193…", "return_reason_id": "0193…", "notes": "Wrong flavour",
+  "lines": [ { "sale_line_id": "0193…", "quantity": "2", "restock": true } ],
+  "refunds": [ { "method": "card", "amount": "150.00", "reference": "VISA 4242" }, { "method": "cash", "amount": "48.00" } ]
+}
+```
+Response `201` `data`: `number` `RET-MAIN-000001`, `status` `completed`, `total` (the lines' share of what the invoice charged, discounts and tax included; the last return of a line takes the exact remainder), `credited_total`, `refunded_total`, `lines[].batches`, `refunds[]`. Without `returns.approve` the same request creates a `pending` return and `refunds` is ignored; the approver sends them to `/returns/{id}/approve`.
 
 Example — receive goods against a purchase order (stock in + supplier invoice in one transaction):
 ```json
@@ -279,7 +332,6 @@ GET /api/v1/health
 
 | Phase | Resource paths |
 |-------|----------------|
-| 6 | `/payments`, `/cash-registers`, `/returns`, `/refunds`, `/expenses` |
 | 7 | `/reports/*`, `/dashboard` |
 | 8 | `/ai/insights`, `/ai/ask` |
 

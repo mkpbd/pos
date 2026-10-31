@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeftIcon, BanIcon, PrinterIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, BanknoteIcon, PercentIcon, PrinterIcon, ReceiptTextIcon, TrendingUpIcon, Undo2Icon, WalletIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useCan } from '@/features/auth/use-auth'
 import { lineLabel, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleStatus } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
+import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -28,22 +29,27 @@ function SummaryCards({ date }: { date: string }) {
 
   const c = data.currency
   const cards = [
-    { label: 'Sales', value: String(data.sales_count), sub: `avg ${formatMoney(data.average_sale, c)}` },
-    { label: 'Revenue (incl. tax)', value: formatMoney(data.total, c), sub: `net ${formatMoney(data.net_sales)} · tax ${formatMoney(data.tax)}` },
-    ...(data.gross_profit !== null ? [{ label: 'Gross profit', value: formatMoney(data.gross_profit, c), sub: `cost ${formatMoney(data.cost)}` }] : []),
-    { label: 'Discounts', value: formatMoney(data.discounts, c), sub: `${data.cancelled_count} cancelled (${formatMoney(data.cancelled_total)})` },
-    { label: 'Due on account', value: formatMoney(data.due, c), sub: `paid ${formatMoney(data.paid)}` },
+    { label: 'Sales', icon: ReceiptTextIcon, value: String(data.sales_count), sub: `avg ${formatMoney(data.average_sale, c)}` },
+    { label: 'Revenue (incl. tax)', icon: BanknoteIcon, value: formatMoney(data.total, c), sub: `net ${formatMoney(data.net_sales)} · tax ${formatMoney(data.tax)}` },
+    ...(data.gross_profit !== null ? [{ label: 'Gross profit', icon: TrendingUpIcon, value: formatMoney(data.gross_profit, c), sub: `cost ${formatMoney(data.cost)}` }] : []),
+    { label: 'Discounts', icon: PercentIcon, value: formatMoney(data.discounts, c), sub: `${data.cancelled_count} cancelled (${formatMoney(data.cancelled_total)})` },
+    { label: 'Due on account', icon: WalletIcon, value: formatMoney(data.due, c), sub: `paid ${formatMoney(data.paid)}` },
   ]
 
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((card) => (
-          <Card key={card.label} className="gap-1 py-4">
-            <CardHeader className="px-4"><CardTitle className="text-sm font-normal text-muted-foreground">{card.label}</CardTitle></CardHeader>
-            <CardContent className="px-4">
-              <div className="font-mono text-xl font-semibold">{card.value}</div>
-              <div className="text-xs text-muted-foreground">{card.sub}</div>
+          <Card key={card.label} size="sm">
+            <CardContent className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <CardTitle className="mb-2">{card.label}</CardTitle>
+                <div className="font-mono text-xl font-bold text-primary">{card.value}</div>
+                <div className="text-xs text-muted-foreground">{card.sub}</div>
+              </div>
+              <span className="hidden size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground sm:flex">
+                <card.icon className="size-5" aria-hidden />
+              </span>
             </CardContent>
           </Card>
         ))}
@@ -153,11 +159,14 @@ export function SalePage() {
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="icon" aria-label="Back to sales"><Link to="/sales"><ArrowLeftIcon /></Link></Button>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{sale.number}</h1>
-          {sale.status === 'cancelled' ? <Badge variant="destructive">Cancelled</Badge> : <Badge variant="secondary">Completed</Badge>}
+          {sale.status === 'cancelled' ? <Badge variant="destructive">Cancelled</Badge> : <Badge variant="success">Completed</Badge>}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setPrinting(true)}><PrinterIcon data-icon="inline-start" /> Receipt</Button>
-          {can('sales.cancel') && sale.status === 'completed' && (
+          {can('returns.create') && sale.status === 'completed' && sale.lines.some((l) => !isZeroDecimal(returnableQuantity(l)) && !returnableQuantity(l).startsWith('-')) && (
+            <Button asChild variant="outline"><Link to={`/sales/${sale.id}/return`}><Undo2Icon data-icon="inline-start" /> Return items</Link></Button>
+          )}
+          {can('sales.cancel') && sale.status === 'completed' && sale.returns.length === 0 && (
             <Button variant="destructive" onClick={() => { setReason(''); setCancelling(true) }}><BanIcon data-icon="inline-start" /> Cancel sale</Button>
           )}
         </div>
@@ -244,6 +253,24 @@ export function SalePage() {
           </CardContent>
         </Card>
       </div>
+
+      {sale.returns.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Returns</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            {sale.returns.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  {can('returns.view') ? <Link to={`/returns/${r.id}`} className="font-mono underline-offset-4 hover:underline">{r.number}</Link> : <span className="font-mono">{r.number}</span>}
+                  <Badge variant={RETURN_STATUS[r.status].variant}>{RETURN_STATUS[r.status].label}</Badge>
+                  <span className="text-muted-foreground">{new Date(r.requested_at).toLocaleString()}</span>
+                </span>
+                <span className="font-mono">{formatMoney(r.total, c)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <ReceiptDialog sale={sale} open={printing} onOpenChange={setPrinting} title={`Receipt ${sale.number}`} />
       <Dialog open={cancelling} onOpenChange={setCancelling}>

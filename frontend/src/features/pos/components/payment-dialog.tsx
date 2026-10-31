@@ -4,12 +4,36 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { pointsFor, pointsValue } from '@/features/loyalty/api'
 import { PAYMENT_METHODS, type PaymentMethod, type PricedCart } from '@/features/pos/api'
 import { compareDecimal, formatMoney, MONEY_PATTERN, subtractDecimal, sumDecimals } from '@/lib/money'
 
 type Tender = { method: PaymentMethod; amount: string; reference: string }
 
+/** The selected customer's redeemable points, when the loyalty program is on. */
+export type LoyaltyTender = { points: number; pointValue: string; minRedeemPoints: number }
+
 const METHODS = Object.keys(PAYMENT_METHODS) as PaymentMethod[]
+
+/** Whole points whose value fits in `amount` (floor). */
+function maxWholePoints(amount: string, pointValue: string): number {
+  const cents = (v: string) => {
+    const [i = '0', f = ''] = v.split('.')
+    return BigInt(i + (f + '00').slice(0, 2))
+  }
+  const value = cents(pointValue)
+  return value === 0n ? 0 : Number(cents(amount) / value)
+}
+
+/** Why a loyalty tender is not acceptable, or null. */
+function loyaltyProblem(amount: string, loyalty: LoyaltyTender | null | undefined, currency: string): string | null {
+  if (!loyalty) return 'This customer cannot pay with points.'
+  const points = pointsFor(amount, loyalty.pointValue)
+  if (points === null) return `Points pay in steps of ${formatMoney(loyalty.pointValue, currency)} (one point).`
+  if (points < loyalty.minRedeemPoints) return `Redeem at least ${loyalty.minRedeemPoints} points.`
+  if (points > loyalty.points) return `${loyalty.points} points available (${formatMoney(pointsValue(loyalty.points, loyalty.pointValue), currency)}).`
+  return null
+}
 
 /** Smallest multiple of `step` (whole currency units) that is ≥ amount, e.g. 1,987.20 → 2,000. */
 function roundUp(amount: string, step: number): string {
@@ -30,6 +54,7 @@ export function PaymentDialog({
   onOpenChange,
   priced,
   canCredit,
+  loyalty,
   pending,
   onSubmit,
 }: {
@@ -37,6 +62,7 @@ export function PaymentDialog({
   onOpenChange: (open: boolean) => void
   priced: PricedCart
   canCredit: boolean
+  loyalty?: LoyaltyTender | null
   pending: boolean
   onSubmit: (payments: { method: PaymentMethod; amount: string; reference: string | null }[]) => void
 }) {
@@ -51,10 +77,18 @@ export function PaymentDialog({
   const change = remaining.startsWith('-') ? remaining.slice(1) : '0.00'
   const nonCash = sumDecimals(valid.filter((t) => t.method !== 'cash').map((t) => t.amount))
   const hasDue = compareDecimal(due, '0') > 0
+  const canUsePoints = !!loyalty && loyalty.points >= Math.max(loyalty.minRedeemPoints, 1)
+  const methods = METHODS.filter((m) => m !== 'loyalty_points' || canUsePoints || tenders.some((t) => t.method === m))
+  const pointsTender = valid.find((t) => t.method === 'loyalty_points')
 
-  const error =
+  const tenderError =
     tenders.some((t) => t.amount.trim() !== '' && !positive(t.amount)) ? 'Enter amounts greater than zero with up to 2 decimals.'
-    : compareDecimal(nonCash, total) > 0 ? 'Card and mobile payments cannot exceed the total; only cash gives change.'
+    : tenders.filter((t) => t.method === 'loyalty_points').length > 1 ? 'Use one loyalty points payment.'
+    : pointsTender ? loyaltyProblem(pointsTender.amount.trim(), loyalty, priced.currency)
+    : null
+  const error =
+    tenderError ? tenderError
+    : compareDecimal(nonCash, total) > 0 ? 'Card, mobile and points payments cannot exceed the total; only cash gives change.'
     : hasDue && !priced.customer ? 'Collect the full amount, or choose a customer to leave the rest due.'
     : hasDue && !canCredit ? 'You are not allowed to sell on credit; collect the full amount.'
     : hasDue && compareDecimal(due, priced.customer?.credit.available ?? '0') > 0 ? `Only ${formatMoney(priced.customer?.credit.available ?? '0', priced.currency)} of credit is available for ${priced.customer?.name}.`
@@ -66,7 +100,7 @@ export function PaymentDialog({
     e.preventDefault()
     setTouched(true)
     if (error || pending) return
-    onSubmit(valid.map((t) => ({ method: t.method, amount: t.amount.trim(), reference: t.method === 'cash' ? null : t.reference.trim() || null })))
+    onSubmit(valid.map((t) => ({ method: t.method, amount: t.amount.trim(), reference: t.method === 'card' || t.method === 'mobile_banking' ? t.reference.trim() || null : null })))
   }
 
   return (
@@ -84,7 +118,7 @@ export function PaymentDialog({
             <div key={i} className="grid grid-cols-[9rem_1fr_auto] items-start gap-2">
               <Select value={t.method} onValueChange={(v) => set(i, { method: v as PaymentMethod })}>
                 <SelectTrigger className="w-full" aria-label={`Method of payment ${i + 1}`}><SelectValue /></SelectTrigger>
-                <SelectContent>{METHODS.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHODS[m]}</SelectItem>)}</SelectContent>
+                <SelectContent>{methods.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHODS[m]}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex flex-col gap-1">
                 <Input
@@ -96,8 +130,13 @@ export function PaymentDialog({
                   onChange={(e) => set(i, { amount: e.target.value })}
                   onFocus={(e) => e.target.select()}
                 />
-                {t.method !== 'cash' && (
+                {(t.method === 'card' || t.method === 'mobile_banking') && (
                   <Input aria-label={`Reference of payment ${i + 1}`} placeholder="Card / transaction reference" value={t.reference} onChange={(e) => set(i, { reference: e.target.value })} />
+                )}
+                {t.method === 'loyalty_points' && loyalty && (
+                  <p className="text-xs text-muted-foreground">
+                    {pointsFor(t.amount.trim(), loyalty.pointValue) ?? '?'} of {loyalty.points} points · 1 point = {formatMoney(loyalty.pointValue, priced.currency)}
+                  </p>
                 )}
               </div>
               <Button type="button" variant="ghost" size="icon" aria-label={`Remove payment ${i + 1}`} disabled={tenders.length === 1} onClick={() => setTenders((ts) => ts.filter((_, j) => j !== i))}>
@@ -109,6 +148,23 @@ export function PaymentDialog({
             <Button type="button" variant="outline" size="sm" onClick={() => setTenders((ts) => [...ts, { method: 'card', amount: hasDue ? due : '', reference: '' }])}>
               <PlusIcon data-icon="inline-start" /> Split payment
             </Button>
+            {canUsePoints && loyalty && !tenders.some((t) => t.method === 'loyalty_points') && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // As many whole points as the balance and the total allow; the rest stays in the first tender.
+                  const affordable = Math.min(loyalty.points, maxWholePoints(total, loyalty.pointValue))
+                  if (affordable < Math.max(loyalty.minRedeemPoints, 1)) return
+                  const amount = pointsValue(affordable, loyalty.pointValue)
+                  const pointsRow: Tender = { method: 'loyalty_points', amount, reference: '' }
+                  setTenders((ts) => [pointsRow, ...ts.map((t, j) => (j === 0 ? { ...t, amount: subtractDecimal(total, amount, 2) } : t))].filter((t) => t === pointsRow || !/^0+(\.0+)?$/.test(t.amount)))
+                }}
+              >
+                Use points ({loyalty.points})
+              </Button>
+            )}
             {tenders.length === 1 && tenders[0]?.method === 'cash' && [100, 500, 1000].map((step) => {
               const amount = roundUp(total, step)
               return (

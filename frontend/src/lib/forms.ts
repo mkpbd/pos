@@ -40,3 +40,15 @@ export function handleFormError<T extends FieldValues>(
   toast.error(message)
   return message
 }
+
+/**
+ * For plain (non react-hook-form) forms: VALIDATION_FAILED details as `{field: first message}`
+ * with dotted keys kept ("refunds.0.amount"); any other failure under `form`.
+ */
+export function fieldErrorMap(error: unknown): Record<string, string> {
+  if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
+    const entries = Object.entries(error.fieldErrors).map(([key, messages]) => [key, messages[0] ?? error.message] as const)
+    if (entries.length > 0) return Object.fromEntries(entries)
+  }
+  return { form: error instanceof Error ? error.message : 'Something went wrong.' }
+}

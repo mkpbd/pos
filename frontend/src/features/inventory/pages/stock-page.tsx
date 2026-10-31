@@ -96,7 +96,7 @@ export function StockPage() {
                     <TableCell className="text-sm">{row.store?.name}<div className="text-xs text-muted-foreground">{row.store?.branch_name}</div></TableCell>
                     <TableCell className="text-right font-mono">
                       {trimDecimal(row.quantity)} {row.variant?.unit_code}
-                      {row.is_low && <Badge variant="destructive" className="ml-2">Low</Badge>}
+                      {row.is_low && <Badge variant="warning" className="ml-2">Low</Badge>}
                     </TableCell>
                     <TableCell className="hidden text-right font-mono text-muted-foreground md:table-cell">{compareDecimal(row.reorder_level, '0') > 0 ? trimDecimal(row.reorder_level) : '—'}</TableCell>
                     <TableCell className="hidden text-right font-mono lg:table-cell">{row.value === null ? '—' : formatMoney(row.value, currency)}</TableCell>

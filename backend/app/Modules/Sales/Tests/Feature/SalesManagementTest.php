@@ -90,7 +90,7 @@ class SalesManagementTest extends TestCase
         $this->assertSame('20.00', $summary['due']);
         $this->assertSame(1, $summary['cancelled_count']);
         $this->assertSame(
-            ['cash' => '110.00', 'card' => '200.00', 'mobile_banking' => '0.00'],
+            ['cash' => '110.00', 'card' => '200.00', 'mobile_banking' => '0.00', 'loyalty_points' => '0.00'],
             array_column($summary['payments'], 'amount', 'method'),
         );
     }

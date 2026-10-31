@@ -6,12 +6,16 @@ use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Sales\Application\Services\SalesContext;
+use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Sales\Infrastructure\Models\SaleLine;
 use App\Modules\Sales\Infrastructure\Models\SaleLineSerial;
 use App\Modules\Sales\Infrastructure\Models\SaleLineStock;
 use App\Modules\Sales\Infrastructure\Models\SalePayment;
+use App\Modules\Sales\Infrastructure\Models\SaleReturn;
+use App\Modules\Sales\Infrastructure\Models\SaleReturnLine;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Users\Application\Contracts\UserDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -81,7 +85,8 @@ class SalePresenter
     }
 
     /**
-     * The full invoice: lines with batches and serials, payments, and what a receipt prints.
+     * The full invoice: lines with batches, serials and returned quantities, payments, returns,
+     * and what a receipt prints.
      *
      * @return array<string, mixed>
      */
@@ -94,6 +99,17 @@ class SalePresenter
         $users = $this->users->names($org, array_values(array_filter([$sale->created_by, $sale->cancelled_by, ...$payments->pluck('created_by')->all()])));
         $organization = $this->context->organization();
         $branch = $this->branches->profile($sale->branch_id, $org);
+        $returns = SaleReturn::query()->where('sale_id', $sale->id)->orderBy('requested_at')->get();
+        $returned = SaleReturnLine::query()
+            ->whereIn('sale_return_id', $returns->whereIn('status', [ReturnStatus::Pending, ReturnStatus::Completed])->pluck('id'))
+            ->get()
+            ->groupBy('sale_line_id')
+            ->map(fn ($rows) => [
+                'returned' => $rows->filter(fn (SaleReturnLine $l) => $returns->firstWhere('id', $l->sale_return_id)?->status === ReturnStatus::Completed)
+                    ->reduce(fn (string $sum, SaleReturnLine $l) => Decimal::add($sum, $l->quantity, 3), '0.000'),
+                'pending' => $rows->filter(fn (SaleReturnLine $l) => $returns->firstWhere('id', $l->sale_return_id)?->status === ReturnStatus::Pending)
+                    ->reduce(fn (string $sum, SaleReturnLine $l) => Decimal::add($sum, $l->quantity, 3), '0.000'),
+            ]);
 
         return ($this->headers(collect([$sale])))($sale) + [
             'notes' => $sale->notes,
@@ -127,6 +143,18 @@ class SalePresenter
                     'quantity' => $s->quantity,
                 ])->values()->all(),
                 'serials' => $l->serials->map(fn (SaleLineSerial $s) => $s->serial)->all(),
+                'returned_serials' => $l->serials->filter(fn (SaleLineSerial $s) => $s->released_at !== null && $sale->cancelled_at === null)->map(fn (SaleLineSerial $s) => $s->serial)->values()->all(),
+                'returned_quantity' => $returned[$l->id]['returned'] ?? '0.000',
+                'pending_return_quantity' => $returned[$l->id]['pending'] ?? '0.000',
+            ])->all(),
+            'returns' => $returns->map(fn (SaleReturn $r) => [
+                'id' => $r->id,
+                'number' => $r->number,
+                'status' => $r->status->value,
+                'total' => $r->total,
+                'credited_total' => $r->credited_total,
+                'refunded_total' => $r->refunded_total,
+                'requested_at' => $r->requested_at->toIso8601String(),
             ])->all(),
             'payments' => $payments->map(fn (SalePayment $p) => [
                 'id' => $p->id,
