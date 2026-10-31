@@ -8,7 +8,7 @@ test.skip(!process.env.E2E_BACKEND, 'Set E2E_BACKEND=1 and VITE_BACKEND_ORIGIN t
 test.describe.configure({ mode: 'serial' })
 
 test('organization admin signs in with a real Sanctum session and manages users', async ({ page }) => {
-  await page.goto('/login')
+  await page.goto('/admin/login')
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
@@ -42,7 +42,7 @@ test('organization admin creates a product and finds it by barcode', async ({ pa
   const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 1 : 3), 0)
   const ean = barcode + String((10 - (sum % 10)) % 10)
 
-  await page.goto('/login')
+  await page.goto('/admin/login')
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
@@ -71,7 +71,7 @@ test('organization admin creates a product and finds it by barcode', async ({ pa
 })
 
 test('receiving a purchase order moves stock and the supplier balance', async ({ page }) => {
-  await page.goto('/login')
+  await page.goto('/admin/login')
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
@@ -103,7 +103,7 @@ test('receiving a purchase order moves stock and the supplier balance', async ({
 })
 
 test('cashier scans, takes cash and the sale reaches stock and history', async ({ page }) => {
-  await page.goto('/login')
+  await page.goto('/admin/login')
   await page.getByLabel('E-mail').fill('cashier@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
@@ -143,7 +143,7 @@ test('cashier scans, takes cash and the sale reaches stock and history', async (
 test('cashier requests a return; the owner approves it and refunds cash from the shift', async ({ browser }) => {
   const signIn = async (email: string) => {
     const page = await (await browser.newContext()).newPage()
-    await page.goto('/login')
+    await page.goto('/admin/login')
     await page.getByLabel('E-mail').fill(email)
     await page.getByLabel('Password').fill('password')
     await page.getByRole('button', { name: 'Sign in' }).click()
@@ -191,7 +191,7 @@ test('cashier requests a return; the owner approves it and refunds cash from the
 })
 
 test('cashier only sees what the role allows, and the API agrees', async ({ page }) => {
-  await page.goto('/login')
+  await page.goto('/admin/login')
   await page.getByLabel('E-mail').fill('cashier@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
@@ -210,9 +210,44 @@ test('cashier only sees what the role allows, and the API agrees', async ({ page
   expect(variant).toHaveProperty('selling_price')
   expect(variant).not.toHaveProperty('purchase_price')
 
-  await page.goto('/users')
+  await page.goto('/admin/users')
   await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
 
   const status = await page.evaluate(async () => (await fetch('/api/v1/users', { headers: { Accept: 'application/json' }, credentials: 'include' })).status)
   expect(status).toBe(403)
+})
+
+test('theme colour and menu changes made in the admin reach the storefront', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The desktop navigation bar carries the accent colour')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.goto('/admin/storefront/theme')
+  await page.getByLabel('Accent', { exact: true }).fill('#1d4ed8')
+  await page.getByRole('button', { name: 'Save theme' }).click()
+  await expect(page.getByText('Theme saved.')).toBeVisible()
+
+  // The seeded main menu has "Home"; add a second top-level link.
+  await page.goto('/admin/storefront/menus')
+  await page.getByRole('button', { name: 'Add item' }).click()
+  await page.getByLabel('Item 2 label').fill('Gift ideas')
+  await page.getByLabel('Item 2 link').fill('/gifts')
+  await page.getByRole('button', { name: 'Save items' }).click()
+  await expect(page.getByText('Menu items saved.')).toBeVisible()
+
+  // The storefront (same dev server, host mapped to the seeded store) shows both changes.
+  await page.goto('/')
+  const nav = page.getByRole('navigation', { name: 'Main' })
+  await expect(nav).toHaveCSS('background-color', 'rgb(29, 78, 216)')
+  await expect(nav.getByRole('link', { name: 'Gift ideas' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Demo Mart' })).toBeVisible()
+
+  // The new link points at a page this phase does not have: the storefront says so.
+  await nav.getByRole('link', { name: 'Gift ideas' }).click()
+  await expect(page).toHaveURL(/\/gifts$/)
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Demo Mart')
 })

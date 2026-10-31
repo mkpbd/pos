@@ -12,6 +12,7 @@ use ReflectionClass;
  *
  * Convention over configuration: a module that ships
  *   Presentation/Routes/api.php            -> mounted under /api/v1 with the "api" middleware group
+ *   Presentation/Routes/web.php            -> mounted with the "web" middleware group (HTML pages)
  *   Infrastructure/Database/Migrations/    -> registered with the migrator
  * gets both wired automatically. Permissions returned by permissions() are added to the
  * PermissionRegistry. Modules bind their own contracts in register().
@@ -28,6 +29,10 @@ abstract class ModuleServiceProvider extends ServiceProvider
 
         if (is_file($routes = $path.'/Presentation/Routes/api.php') && ! $this->app->routesAreCached()) {
             Route::prefix('api/v1')->middleware('api')->group($routes);
+        }
+
+        if (is_file($routes = $path.'/Presentation/Routes/web.php') && ! $this->app->routesAreCached()) {
+            Route::middleware('web')->group($routes);
         }
 
         if ($permissions = $this->permissions()) {

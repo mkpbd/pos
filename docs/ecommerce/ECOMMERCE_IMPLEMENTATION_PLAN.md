@@ -4,9 +4,9 @@ Phases are numbered **E1–E14** so they never collide with the POS roadmap (Pha
 
 ## 0. Preconditions (before E4 code)
 
-1. POS Phase 6 finished and committed (currently in progress in another session).
-2. PostgreSQL run of the full backend suite (local `DB_PASSWORD` still pending).
-3. E1 decisions approved (open items in §3).
+1. ✅ POS Phase 6 committed (`653e5e1`, 2026-10-31).
+2. ☐ PostgreSQL run of the full backend suite — still blocked: `fe_sendauth: no password supplied` (local `DB_PASSWORD` blank).
+3. ✅ E1 decisions accepted as recommended → DECISIONS.md.
 4. Branch `ecommerce/e4-storefront-shell` off the committed Phase 6 branch.
 
 ## 1. Re-ordering versus the brief
@@ -19,8 +19,8 @@ The brief puts "admin management" (its Phase 10) and "CMS, banners, navigation, 
 |---|-------|----------|---------------|
 | E1 | Existing project analysis | These five documents | Owner approves decisions in §3 |
 | E2 ✅ | Reference investigation | UI_REFERENCE_ANALYSIS.md filled with evidence (Playwright on the public demo; screenshots kept outside the repo): global look, header/footer, 15 homepage section types, card, shop, product page, other pages, interaction status, component map, AA-checked tokens | Owner approves visual direction |
-| E3 | Architecture & DB sign-off | ADRs for D1–D12, final module list, permission catalog, endpoint list in API_DOCUMENTATION (draft), OpenAPI tags | Owner sign-off |
-| E4 | Storefront shell | Vite second entry, admin under `/admin`, Laravel shell route with server meta; `Storefront` module (settings, domains, theme settings, menus/menu items, announcement bar), `Media` module (upload, renditions); `ResolveStorefront`; public `GET /store/bootstrap` (theme + menus + settings in one call, ETag); admin screens: Store settings, Theme, Menus, Media library; storefront header (announcement, logo, desktop + mega + mobile menu, sticky), footer, 404, theme CSS variables from API | Changing theme colour/logo/menu in admin is visible on the storefront without a deploy (Playwright) |
+| E3 ✅ | Architecture & DB sign-off | DECISIONS.md (ADR-001…017), API_PLAN.md (permissions, endpoints, error codes, OpenAPI tags); DB plan corrected against the code | Owner sign-off |
+| E4 ✅ | Storefront shell | Vite second entry, admin under `/admin`, Laravel shell route with server meta; `Storefront` module (settings, domains, theme settings, menus/menu items, announcement bar), `Media` module (upload, renditions); `ResolveStorefront`; public `GET /store/bootstrap` (theme + menus + settings in one call, ETag); admin screens: Store settings, Theme, Menus, Media library; storefront header (announcement, logo, desktop + mega + mobile menu, sticky), footer, 404, theme CSS variables from API | Changing theme colour/logo/menu in admin is visible on the storefront without a deploy (Playwright) |
 | E5 | Content & homepage | `Cms` module (pages, FAQ, contact form, newsletter), banners/sliders, homepage sections + items with per-type config schemas, schedule windows; admin homepage builder (list, add, edit, duplicate, enable, reorder, preview) and banner manager; storefront homepage renderer (hero slider, banner grid, category grid, product carousels/tabs, hot deals countdown, brand strip, blog teaser, newsletter, rich text), CMS page route | Brief checks 1, 2, 5, 6 pass; empty sections never render |
 | E6 | Catalog & product page | `OnlineCatalog` (listings, slugs, SEO, publish schedule, featured, specs, compare-at, variant images, related/FBT), attribute dictionary, facets (category, brand, price range, attributes, availability), sorting, search + suggestions (`pg_trgm`), `product_stats` job; admin "Online" tab in product editor, category/brand web fields, attributes screen; storefront shop/category/brand/search pages (grid/list, filters, sort, pagination, breadcrumbs, quick view), product page (gallery + zoom, variant selector updating price/SKU/stock/images, tabs, related, recently viewed (local)) | Brief checks 7–10 pass; filters return real counts |
 | E7 | Customers, cart, wishlist | `CustomerAccounts` (register, login, logout, verify e-mail, reset password, profile), addresses with BD geography, `Cart` (guest token + customer cart, merge on login, reprice on every read), wishlists (guest local → merge); storefront mini-cart, cart page, wishlist page, account shell | Cart totals equal server totals; guest → login merge tested |
@@ -41,7 +41,7 @@ The brief puts "admin management" (its Phase 10) and "CMS, banners, navigation, 
 | Q3 | Online order document (D3) | Own `orders` document; not converted into POS invoices. |
 | Q4 | Admin URL (D7) | Admin moves under `/admin`; storefront at `/`. |
 | Q5 | SEO approach (D8) | Laravel-rendered shell with server meta; no Node SSR for now. |
-| Q6 | New dependencies | Frontend: `embla-carousel-react` (sliders), TipTap (E11). Backend: `ezyang/htmlpurifier` (E11), `intervention/image` (renditions, E4). No payment SDKs — providers' REST APIs via Laravel HTTP client. |
+| Q6 | New dependencies | Frontend: `embla-carousel-react` (sliders), TipTap (E5). Backend: `ezyang/htmlpurifier` (E5); renditions with PHP GD (no package, E4). No payment SDKs — providers' REST APIs via Laravel HTTP client. |
 | Q7 | Category depth | Keep `MAX_DEPTH = 4` (mega menus need bounded depth) instead of "unlimited". |
 | Q8 | Payment gateway credentials | Needed per provider before its integration: SSLCommerz sandbox store id/password, bKash tokenized sandbox app key/secret/username/password, Nagad merchant id + keys. COD and bank transfer need none. |
 | Q9 | Demo imagery and fonts | Theme demo photos are not licensed for reuse. Seed data needs images you own or a permissive source (e.g. Unsplash licence) — or seed without images. Fonts: open-licence fonts self-hosted via Fontsource. |

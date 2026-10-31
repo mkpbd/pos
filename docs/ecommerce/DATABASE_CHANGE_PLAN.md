@@ -32,13 +32,13 @@ Columns `id`, `organization_id`, timestamps and author columns are omitted from 
 
 | Table | Change | Why |
 |-------|--------|-----|
-| `stock_movements` | Extend `type` CHECK with `online_order`, `online_order_cancel`, `online_return` | Online stock posts through the same ledger. |
-| `payments` | Extend `source_type` CHECK with `online_order`, `online_order_refund`; allow `created_by` NULL for system entries (verify current nullability first) | Gateway-verified money in the ledger. |
-| `payments.method` | Add `online_gateway` (or per gateway: `sslcommerz`, `bkash`, `nagad`) — *decide in E8* | Distinguish settlement channels in cash reports. |
+| `stock_movements.type` | **No schema change** (verified: plain string, constrained only by PHP `MovementType`). Add enum cases `online_order`, `online_order_cancel`, `online_return`. | Online stock posts through the same ledger. |
+| `payments.source_type`, `payments.method` | **No schema change** (verified: strings + PHP enums; `created_by` already nullable). Add `PaymentSource` cases `online_order`, `online_order_refund`; `PaymentMethod` cases `online_gateway`, `cash_on_delivery` (ADR-006). | Gateway-verified money in the ledger. |
+| `idempotency_keys` | `user_id` → nullable; add `scope varchar(80)` backfilled `user:{user_id}`; unique `(scope, key)` replaces `(user_id, key)` (ADR-014). | Guests and customers have no staff user id. |
 | `product_variants` | Index: `CREATE INDEX … USING gin (option_values jsonb_path_ops)` | Attribute facet filtering. |
 | `products` | `pg_trgm` GIN index on `lower(name)` (already planned for Phase 9) | Search suggestions. |
 
-No column is renamed or dropped. Existing POS code is unaffected.
+No column is renamed or dropped. The only change to an existing constraint is the idempotency unique key; Phase 5–6 idempotency tests guard it.
 
 ## 3. New tables per module
 

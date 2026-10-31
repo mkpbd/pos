@@ -15,9 +15,9 @@ class AuthenticationServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
-        // Reset links point to the SPA, which posts the token back to /api/v1/auth/reset-password.
+        // Reset links point to the admin SPA (served under /admin), which posts the token back to /api/v1/auth/reset-password.
         ResetPassword::createUrlUsing(fn ($user, string $token) => rtrim((string) config('pos.frontend_url'), '/')
-            .'/reset-password?'.http_build_query(['token' => $token, 'email' => $user->getEmailForPasswordReset()]));
+            .'/admin/reset-password?'.http_build_query(['token' => $token, 'email' => $user->getEmailForPasswordReset()]));
 
         Password::defaults(fn () => $this->app->isProduction()
             ? Password::min(10)->letters()->mixedCase()->numbers()->uncompromised()

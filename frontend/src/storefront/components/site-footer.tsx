@@ -1,0 +1,110 @@
+import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
+import { useStorefront } from '../api'
+import type { MenuLocation, SocialNetwork } from '../types'
+import { MediaImage } from './media-image'
+import { MenuLink } from './menu-link'
+
+/** For the default copyright line; a page load is short enough not to straddle New Year in practice. */
+const CURRENT_YEAR = new Date().getFullYear()
+
+const FOOTER_MENUS: MenuLocation[] = ['footer_1', 'footer_2', 'footer_3']
+
+const SOCIAL_LABELS: Record<SocialNetwork, string> = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  x: 'X',
+  linkedin: 'LinkedIn',
+}
+
+export function SiteFooter() {
+  const { store, theme, menus } = useStorefront()
+  const { about, contact, social, payment_logos, copyright } = theme.footer
+  const columns = FOOTER_MENUS.flatMap((location) => {
+    const menu = menus[location]
+    return menu && menu.items.length > 0 ? [{ location, menu }] : []
+  })
+  const socialLinks = (Object.keys(SOCIAL_LABELS) as SocialNetwork[]).flatMap((network) => (social[network] ? [{ network, url: social[network] }] : []))
+  const hasContact = Boolean(contact.email || contact.phone || contact.address)
+
+  return (
+    <footer className="mt-auto border-t bg-sf-surface" data-testid="site-footer">
+      <div className="mx-auto grid max-w-sf gap-10 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-4">
+          <p className="font-heading text-2xl font-extrabold text-sf-accent">{store.name}</p>
+          {about && <p className="text-sm leading-relaxed whitespace-pre-line">{about}</p>}
+          {payment_logos.length > 0 && (
+            <ul className="flex flex-wrap items-center gap-2" aria-label="Payment methods">
+              {payment_logos.map((logo) => (
+                <li key={logo.id}>
+                  <MediaImage media={logo} sizes="64px" className="h-6 w-auto object-contain" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {columns.map(({ location, menu }) => (
+          <nav key={location} aria-label={menu.name}>
+            <h2 className="mb-4 text-sm font-bold tracking-wide uppercase">{menu.name}</h2>
+            <ul className="space-y-2 text-sm">
+              {menu.items.map((item) => (
+                <li key={item.id}>
+                  <MenuLink url={item.url} newTab={item.open_in_new_tab} className="transition-colors hover:text-sf-accent">
+                    {item.label}
+                  </MenuLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+
+        {hasContact && (
+          <div>
+            <h2 className="mb-4 text-sm font-bold tracking-wide uppercase">Contact us</h2>
+            <address className="space-y-3 text-sm not-italic">
+              {contact.email && (
+                <p className="flex items-start gap-2">
+                  <MailIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-sf-accent" />
+                  <a href={`mailto:${contact.email}`} className="break-all transition-colors hover:text-sf-accent">{contact.email}</a>
+                </p>
+              )}
+              {contact.phone && (
+                <p className="flex items-start gap-2">
+                  <PhoneIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-sf-accent" />
+                  <a href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`} className="transition-colors hover:text-sf-accent">{contact.phone}</a>
+                </p>
+              )}
+              {contact.address && (
+                <p className="flex items-start gap-2">
+                  <MapPinIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-sf-accent" />
+                  <span className="whitespace-pre-line">{contact.address}</span>
+                </p>
+              )}
+            </address>
+          </div>
+        )}
+      </div>
+
+      {socialLinks.length > 0 && (
+        <div className="border-t">
+          <ul className="mx-auto flex max-w-sf flex-wrap justify-center gap-x-8 gap-y-2 px-4 py-5 text-sm font-medium" aria-label="Social media">
+            {socialLinks.map(({ network, url }) => (
+              <li key={network}>
+                <a href={url} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-sf-accent">
+                  {SOCIAL_LABELS[network]}
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="bg-sf-accent px-4 py-4 text-center text-sm text-sf-accent-foreground">
+        {copyright ?? `© ${CURRENT_YEAR} ${store.name}`}
+      </div>
+    </footer>
+  )
+}

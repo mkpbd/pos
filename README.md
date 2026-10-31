@@ -21,7 +21,7 @@ See [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) for prerequisites and
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h 127.0.0.1 -f backend\database\scripts\create_local_databases.sql
 
 cd backend;  composer install; copy .env.example .env; php artisan key:generate; php artisan migrate; php artisan serve
-cd frontend; npm install; npm run dev     # http://localhost:5173
+cd frontend; npm install; npm run dev     # admin http://localhost:5173/admin, storefront http://localhost:5173/
 ```
 
 ## Documentation
@@ -52,3 +52,17 @@ cd frontend; npm install; npm run dev     # http://localhost:5173
 | 8 | AI features | ☐ |
 | 9 | Test hardening, security review, performance | ☐ |
 | 10 | Production deployment and documentation | ☐ |
+
+### Online store (e-commerce track)
+
+BerryKid-inspired storefront on the same backend; plan, decisions and API in [docs/ecommerce/](docs/ecommerce/ECOMMERCE_IMPLEMENTATION_PLAN.md).
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| E1–E3 | Project analysis, reference investigation, architecture and database plan | ✅ |
+| E4 | Storefront shell: host-based storefronts, theme, menus, media library, storefront layout, admin under `/admin` | ✅ (PostgreSQL run pending) |
+| E5 | Content and homepage builder | ☐ |
+| E6 | Online catalog and product pages | ☐ |
+| E7 | Customer accounts, cart, wishlist | ☐ |
+| E8 | Checkout, orders, payments, shipping, promotions | ☐ |
+| E9–E14 | Account area, admin operations, CMS depth, SEO/localization, AI, hardening | ☐ |

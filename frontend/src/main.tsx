@@ -13,7 +13,10 @@ setContextHeaderProvider(() => {
   return branchId ? { 'X-Branch-Id': branchId } : ({} as Record<string, string>)
 })
 
-const router = createBrowserRouter(routes)
+// The back office lives under /admin; the storefront (storefront.html) owns every other path.
+const ADMIN_BASENAME = '/admin'
+
+const router = createBrowserRouter(routes, { basename: ADMIN_BASENAME })
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element #root not found')

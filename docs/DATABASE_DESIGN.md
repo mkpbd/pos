@@ -119,6 +119,21 @@ Loyalty module:
 
 Deviations from the original sketch, by design: no `payment_methods` table (methods are a fixed list; organization-defined methods are added when a concrete need appears); no `cash_movements` table (they are ledger rows).
 
+### E-commerce E4 — Storefront and media (implemented)
+Full e-commerce schema plan: `docs/ecommerce/DATABASE_CHANGE_PLAN.md`.
+
+Media module:
+- `media` — disk, path, original_name, mime_type, size, width, height, alt, renditions jsonb (`{"320": path, …}`), checksum (sha-256; unique per organization, so identical uploads are stored once), created_by/updated_by.
+
+Storefront module:
+- `storefront_settings` — one row per organization (unique): is_enabled, site_name, meta_description.
+- `storefront_domains` — host (lower-case, **globally** unique: a host serves one organization), is_primary.
+- `theme_settings` — one row per organization: settings jsonb (normalized by `ThemeSchema`), custom_css.
+- `menus` — name, location (`main|mobile|footer_1|footer_2|footer_3`, unique per organization), is_active.
+- `menu_items` — menu (cascade), parent (self-reference, cascade), type (`custom` in E4), label, url, open_in_new_tab, is_visible, is_mega, mega_columns, image_media_id → media (`RESTRICT`), sort_order. Replaced as a whole tree on save.
+
+No existing table changed in E4 (the idempotency scope change of ADR-014 lands with checkout in E8).
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.

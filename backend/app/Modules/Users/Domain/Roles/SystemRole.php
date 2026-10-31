@@ -15,6 +15,7 @@ enum SystemRole: string
     case Cashier = 'cashier';
     case InventoryManager = 'inventory_manager';
     case Accountant = 'accountant';
+    case OnlineStoreManager = 'online_store_manager';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum SystemRole: string
             self::Cashier => 'Cashier',
             self::InventoryManager => 'Inventory Manager',
             self::Accountant => 'Accountant',
+            self::OnlineStoreManager => 'Online Store Manager',
         };
     }
 
@@ -35,6 +37,7 @@ enum SystemRole: string
             self::Cashier => 'Operates the POS terminal and serves customers.',
             self::InventoryManager => 'Manages products, stock and purchasing.',
             self::Accountant => 'Manages payments and expenses, reads financial reports.',
+            self::OnlineStoreManager => 'Runs the online store: storefront, content, online catalog, web orders.',
         };
     }
 
@@ -63,6 +66,12 @@ enum SystemRole: string
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
                 'sales.view', 'purchases.view', 'purchases.pay', 'customers.view', 'suppliers.view',
                 'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'audit.view',
+            ],
+            // Custom CSS and payment gateway credentials stay with the Organization Admin (ADR-016).
+            self::OnlineStoreManager => [
+                'storefront.view', 'storefront.manage', 'media.*', 'cms.*', 'online_catalog.*', 'attributes.manage',
+                'promotions.*', 'shipping.*', 'web_orders.*', 'reviews.*',
+                'branches.view', 'products.view', 'inventory.view', 'customers.view',
             ],
         };
     }

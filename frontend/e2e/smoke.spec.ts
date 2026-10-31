@@ -42,7 +42,7 @@ async function mockBackend(page: Page, { signedIn }: { signedIn: boolean }) {
 
 test('sign-in flow lands on the first permitted page with the branch selected', async ({ page }) => {
   await mockBackend(page, { signedIn: false })
-  await page.goto('/')
+  await page.goto('/admin')
 
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
   await page.getByLabel('E-mail').fill('rahim@corner.test')
@@ -61,7 +61,7 @@ test('sign-in flow lands on the first permitted page with the branch selected', 
 
 test('system status page reports backend health', async ({ page }) => {
   await mockBackend(page, { signedIn: true })
-  await page.goto('/system-status')
+  await page.goto('/admin/system-status')
 
   await expect(page.getByRole('heading', { name: 'System status' })).toBeVisible()
   await expect(page.getByText('Operational')).toBeVisible()
@@ -69,7 +69,7 @@ test('system status page reports backend health', async ({ page }) => {
 
 test('theme can be switched to dark', async ({ page }) => {
   await mockBackend(page, { signedIn: true })
-  await page.goto('/system-status')
+  await page.goto('/admin/system-status')
 
   await page.getByRole('button', { name: 'Change theme' }).click()
   await page.getByRole('menuitemradio', { name: 'Dark' }).click()

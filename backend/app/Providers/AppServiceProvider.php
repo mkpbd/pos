@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
         // Fail loudly in development on lazy loading, unknown attributes and silently discarded fills.
         Model::shouldBeStrict(! $this->app->isProduction());
 
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute((int) config('pos.api_rate_limit'))
             ->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
 
         // Credential endpoints: per account+IP and per IP, to slow down guessing and enumeration.

@@ -1,0 +1,93 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/baloo-2";
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/500.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
+
+/*
+ * Storefront tokens. Values come from the store's theme (themeToCssVars sets the --sf-*
+ * variables on :root); the defaults below match the default theme so loading and error
+ * screens look right before the theme arrives. Separate from the admin tokens in src/index.css.
+ */
+@theme inline {
+    --font-heading: var(--sf-font-heading);
+    --font-sans: var(--sf-font-body);
+    --color-sf-primary: var(--sf-primary);
+    --color-sf-primary-foreground: var(--sf-primary-foreground);
+    --color-sf-accent: var(--sf-accent);
+    --color-sf-accent-foreground: var(--sf-accent-foreground);
+    --color-sf-highlight: var(--sf-highlight);
+    --color-sf-sale: var(--sf-sale);
+    --color-sf-heading: var(--sf-heading);
+    --color-sf-text: var(--sf-text);
+    --color-sf-canvas: var(--sf-canvas);
+    --color-sf-surface: var(--sf-surface);
+    --color-sf-border: var(--sf-border);
+    --radius-sf-button: var(--sf-radius-button);
+    --radius-sf-card: var(--sf-radius-card);
+    --container-sf: var(--sf-container);
+    /* Tokens the shared shadcn primitives (Sheet, Button) read. */
+    --color-background: var(--sf-surface);
+    --color-foreground: var(--sf-text);
+    --color-popover: var(--sf-surface);
+    --color-popover-foreground: var(--sf-text);
+    --color-card: var(--sf-surface);
+    --color-card-foreground: var(--sf-text);
+    --color-primary: var(--sf-accent);
+    --color-primary-foreground: var(--sf-accent-foreground);
+    --color-secondary: var(--sf-canvas);
+    --color-secondary-foreground: var(--sf-heading);
+    --color-muted: var(--sf-canvas);
+    --color-muted-foreground: var(--sf-text);
+    --color-accent: var(--sf-canvas);
+    --color-accent-foreground: var(--sf-heading);
+    --color-border: var(--sf-border);
+    --color-input: var(--sf-border);
+    --color-ring: var(--sf-accent);
+    --color-destructive: var(--sf-sale);
+    --radius-sm: 0.25rem;
+    --radius-md: 0.375rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+}
+
+:root {
+    --sf-primary: #f59e0b;
+    --sf-primary-foreground: #3b2500;
+    --sf-accent: #6f55c2;
+    --sf-accent-foreground: #ffffff;
+    --sf-highlight: #2fb79a;
+    --sf-sale: #c2410c;
+    --sf-heading: #3d3d3d;
+    --sf-text: #5f6368;
+    --sf-canvas: #f3f7fa;
+    --sf-surface: #ffffff;
+    --sf-border: #e1e1e1;
+    --sf-font-heading: 'Baloo 2 Variable', 'Poppins', system-ui, sans-serif;
+    --sf-font-body: 'Poppins', system-ui, sans-serif;
+    --sf-radius-button: 9999px;
+    --sf-radius-card: 12px;
+    --sf-container: 1170px;
+    color-scheme: light;
+}
+
+@layer base {
+  * {
+    @apply border-sf-border outline-sf-accent/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-sf-canvas text-sf-text antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading text-sf-heading;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}

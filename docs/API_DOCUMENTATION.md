@@ -81,6 +81,12 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `ALREADY_VOIDED` | Expense/income entry already void. |
 | 422 | `LOYALTY_NOT_AVAILABLE`, `LOYALTY_AMOUNT_INVALID`, `INSUFFICIENT_POINTS` | Program off; amount not a whole number of points or below the minimum; not enough points (`details.available`, `required`). |
 | 422 | `PRIVILEGE_ESCALATION` | Granting/assigning permissions the actor lacks, or editing a more powerful user. `details.permissions` lists what is missing. |
+| 404 | `STOREFRONT_NOT_FOUND` | Public storefront API: the host name serves no open store (unknown host, closed store, suspended organization). |
+| 422 | `STOREFRONT_DOMAIN_REQUIRED` | Opening the storefront without a domain, or removing the last domain of an open store. |
+| 422 | `MEDIA_NOT_FOUND` | A theme or menu points at media ids that are not in the organization's library (`details.media_ids`). |
+| 422 | `MEGA_MENU_NOT_ALLOWED`, `MENU_TOO_LARGE` | Mega menu outside top-level items of the main menu; more than 200 menu items. |
+| 422 | `CUSTOM_CSS_REJECTED` | Custom CSS breaks the policy (`<`, `@import`, `expression(`, escapes, `url()` outside `/storage/`, > 20 KB). |
+| 422 | `INVALID_IMAGE`, `IN_USE` | Upload is not a readable image; media still used by the theme or a menu. |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -102,7 +108,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 - **Sorting:** `?sort=name` / `?sort=-created_at` (prefix `-` for descending); only whitelisted columns.
 - **Filtering:** plain, validated query parameters per endpoint, e.g. `?status=active&role_id=…`; date ranges `?from=2026-10-01&to=2026-10-31` (inclusive).
 - **Search:** `?search=term` (case-insensitive, whitelisted columns).
-- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP.
+- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP.
 - **Identifiers:** UUIDv7 strings (device token ids are integers).
 - **Versioning:** breaking changes go to `/api/v2`; additive changes stay in v1.
 
@@ -323,6 +329,54 @@ GET /api/v1/health
     "app": "Enterprise POS",
     "environment": "local",
     "time": "2026-10-31T03:00:00+06:00"
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+### E-commerce track — storefront and media (E4)
+
+Public storefront endpoints live under `/api/v1/store/*`: no authentication, the organization comes from the request's **host name** (`storefront_domains`; ADR-001). A closed storefront answers `404 STOREFRONT_NOT_FOUND`, except to signed-in staff of the organization holding `storefront.view` (`preview: true`). The planned surface is in `docs/ecommerce/API_PLAN.md`.
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/store/bootstrap` | public | Store name/description, theme tokens with media resolved to `{id, url, srcset, width, height, alt}`, live announcement (scheduled window applied), active menus as trees of visible items, `preview`. `ETag` / `If-None-Match` → 304. |
+| GET `/storefront/settings` · PATCH | `storefront.view` · `storefront.manage` | `is_enabled`, `site_name`, `meta_description`. Defaults (closed, organization name) until first saved. |
+| GET `/storefront/domains` · POST · PATCH `/{id}` · DELETE `/{id}` | view · manage | Host names only (lower-cased, globally unique); the first is primary; PATCH `{is_primary: true}`. |
+| GET `/storefront/theme` · PUT | view · manage | Whole theme document (`colors`, `typography`, `shape`, `layout`, `logo_media_id`, `favicon_media_id`, `announcement`, `footer`); missing keys take defaults, unknown keys are dropped. `custom_css` only returned with `storefront.custom_css`. |
+| PUT `/storefront/theme/custom-css` | `storefront.custom_css` | `{custom_css}`; policy-checked. |
+| GET `/storefront/menus` · GET `/{id}` · POST · PATCH `/{id}` · DELETE `/{id}` | view · manage | One menu per location `main`, `mobile`, `footer_1`..`footer_3`. |
+| PUT `/storefront/menus/{id}/items` | `storefront.manage` | Whole ordered tree `{items: [{label, url, open_in_new_tab, is_visible, is_mega, mega_columns, image_media_id, children}]}`; ≤ 3 levels, ≤ 200 items; links `/path` or http(s). |
+| GET `/media` · POST · PATCH `/{id}` · DELETE `/{id}` | `media.manage` | Upload multipart `file` (JPEG/PNG/WebP/GIF ≤ 5 MB, ≤ 6000 px) + `alt`; identical bytes return the existing item (200). WebP renditions 320/640/1280 px by a queued job. |
+
+Pages: every path outside `/api`, `/sanctum`, `/storage`, `/admin`, `/docs`, `/up` is the storefront HTML shell (built `storefront.html` with server-written title, description, canonical, Open Graph and favicon, and the inlined bootstrap payload); unknown storefront paths answer 404 with `X-Robots-Tag: noindex`.
+
+Example — bootstrap:
+
+```http
+GET /api/v1/store/bootstrap
+Host: shop.example.com
+```
+```json
+{
+  "success": true,
+  "data": {
+    "store": { "name": "Demo Mart", "description": "Groceries and household goods from Demo Mart, Dhaka." },
+    "theme": {
+      "colors": { "primary": "#f59e0b", "accent": "#6f55c2", "…": "…" },
+      "typography": { "heading_font": "baloo", "body_font": "poppins" },
+      "shape": { "button_style": "pill", "card_radius": 12 },
+      "layout": { "container_width": 1170, "sticky_header": true },
+      "logo": { "id": "0193…", "url": "/storage/media/0193…/0193….png", "srcset": "… 320w, … 400w", "width": 400, "height": 120, "alt": "Demo Mart" },
+      "favicon": null,
+      "announcement": null,
+      "footer": { "about": null, "copyright": null, "contact": { "email": null, "phone": null, "address": null }, "social": {}, "payment_logos": [] },
+      "custom_css": null
+    },
+    "menus": {
+      "main": { "name": "Main navigation", "items": [{ "id": "0193…", "label": "Home", "url": "/", "open_in_new_tab": false, "is_mega": false, "mega_columns": null, "image": null, "children": [] }] }
+    },
+    "preview": false
   },
   "meta": { "request_id": "0193…" }
 }

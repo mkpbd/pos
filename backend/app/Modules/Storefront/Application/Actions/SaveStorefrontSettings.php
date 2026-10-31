@@ -1,0 +1,45 @@
+<?php
+
+namespace App\Modules\Storefront\Application\Actions;
+
+use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Support\Changes;
+use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Storefront\Application\Queries\StorefrontConfig;
+use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
+use App\Modules\Storefront\Infrastructure\Models\StorefrontSettings;
+use Illuminate\Support\Facades\DB;
+
+class SaveStorefrontSettings
+{
+    private const AUDITED = ['is_enabled', 'site_name', 'meta_description'];
+
+    public function __construct(
+        private readonly StorefrontConfig $config,
+        private readonly AuditTrail $audit,
+    ) {}
+
+    /**
+     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string}  $attributes
+     */
+    public function __invoke(array $attributes): StorefrontSettings
+    {
+        return DB::transaction(function () use ($attributes) {
+            $settings = $this->config->settings();
+            $before = $settings->exists ? $settings->only(self::AUDITED) : [];
+
+            $settings->fill($attributes);
+            if ($settings->is_enabled && ! StorefrontDomain::query()->exists()) {
+                throw new BusinessRuleViolation('STOREFRONT_DOMAIN_REQUIRED', 'Add a domain before opening the storefront.');
+            }
+            $settings->save();
+
+            [$old, $new] = Changes::between($before, $settings->only(self::AUDITED));
+            if ($new !== []) {
+                $this->audit->record('storefront.settings_updated', $settings, $old, $new);
+            }
+
+            return $settings;
+        });
+    }
+}

@@ -81,12 +81,19 @@ npm run test:e2e
 - Specs in `frontend/e2e`; projects `desktop-chromium` and `mobile-chromium` (responsive checks).
 - Playwright starts the Vite dev server automatically.
 - `smoke.spec.ts` intercepts `/api/v1/*` with `page.route` (no backend needed).
-- `integration.spec.ts` runs against a **real backend** (Sanctum cookies, CSRF, tenancy, RBAC) and is opt-in:
+- `storefront.spec.ts` (public storefront) and `storefront-admin.spec.ts` (Online store and Media library screens) are mocked like the smoke tests. The dev server serves the storefront at `/` and the admin at `/admin`.
+- `integration.spec.ts` runs against a **real backend** (Sanctum cookies, CSRF, tenancy, RBAC; since E4 also the admin → storefront path: a theme colour and a menu item changed in the admin appear on the storefront) and is opt-in:
 
 ```powershell
 cd backend;  php artisan migrate:fresh --seed; php artisan serve --port=8010   # re-seed before every run: the specs post documents
 cd frontend; $env:E2E_BACKEND=1; $env:VITE_BACKEND_ORIGIN='http://127.0.0.1:8010'; npm run test:e2e -- e2e/integration.spec.ts
 ```
+
+Notes for the full-stack run:
+- The backend needs `STOREFRONT_DEFAULT_HOST=shop.localhost` (the seeded store) and, because the suite signs in many times a minute, `POS_API_RATE_LIMIT=1000`.
+- `php artisan serve` passes only a few environment variables to its PHP process; to override `DB_*` and the settings above from the shell, run `php -S 127.0.0.1:8010 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php` from `backend/public` instead.
+- If another dev server already holds port 5173, Playwright would reuse it (and its backend). Set `E2E_PORT=5180` and add `localhost:5180` to `SANCTUM_STATEFUL_DOMAINS` of the test backend.
+- Run one project per fresh seed (`--project=desktop-chromium`): both projects post documents into the same database. The admin's mobile layout hides the sidebar links the first specs click, so the full-stack suite currently passes on desktop only.
 
 ## Definition of done per phase
 

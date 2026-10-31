@@ -8,6 +8,7 @@ use App\Modules\Customers\CustomersServiceProvider;
 use App\Modules\Expenses\ExpensesServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Loyalty\LoyaltyServiceProvider;
+use App\Modules\Media\MediaServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Organizations\OrganizationsServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
@@ -15,6 +16,7 @@ use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
+use App\Modules\Storefront\StorefrontServiceProvider;
 use App\Modules\Suppliers\SuppliersServiceProvider;
 use App\Modules\System\SystemServiceProvider;
 use App\Modules\Users\UsersServiceProvider;
@@ -42,4 +44,7 @@ return [
     SalesServiceProvider::class,
     LoyaltyServiceProvider::class,
     PosServiceProvider::class,
+    MediaServiceProvider::class,
+    // Registers the storefront catch-all page route, so it stays last.
+    StorefrontServiceProvider::class,
 ];

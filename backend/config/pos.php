@@ -23,4 +23,7 @@ return [
     */
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
+    // Requests per minute per user (or IP when signed out) on the API. Full-stack e2e runs raise it.
+    'api_rate_limit' => (int) env('POS_API_RATE_LIMIT', 120),
+
 ];

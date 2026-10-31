@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Storefront</title>
+  </head>
+  <body>
+    <!-- In production Laravel serves this page with the store's metadata and the bootstrap payload
+         (#storefront-bootstrap) written in; in development the app fetches /api/v1/store/bootstrap. -->
+    <div id="root"></div>
+    <script type="module" src="/src/storefront/main.tsx"></script>
+  </body>
+</html>

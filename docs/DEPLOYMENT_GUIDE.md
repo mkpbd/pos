@@ -7,8 +7,12 @@
 ```
             ┌──────────── HTTPS (TLS terminates here) ────────────┐
 Browser ──▶ │ Nginx                                                │
-            │  /           → frontend/dist (static, SPA fallback)  │
-            │  /api, /sanctum, /docs → PHP-FPM (backend/public)    │
+            │  /assets/*   → frontend/dist/assets (static)         │
+            │  /admin/*    → frontend/dist/index.html (admin SPA)  │
+            │  /api, /sanctum, /docs, /storage, all other paths    │
+            │              → PHP-FPM (backend/public); storefront  │
+            │                pages = Laravel shell around          │
+            │                frontend/dist/storefront.html         │
             └──────────────────────────────────────────────────────┘
                      │                  │                  │
                PHP-FPM 8.4       queue workers (N)     scheduler (1)
@@ -40,12 +44,16 @@ LOG_LEVEL=warning
 
 Secrets (`APP_KEY`, `DB_PASSWORD`, `REDIS_PASSWORD`, AI provider keys) come from the host's secret store or environment, never from the repository.
 
+Storefront hosts: every host listed under **Online store → Domains** must point at this server (and be covered by the TLS certificate); the backend resolves the organization from the `Host` header. Settings: `STOREFRONT_SHELL_PATH` (default `../frontend/dist/storefront.html`), `MEDIA_DISK` (`public`, or an S3-compatible disk whose URL is the CDN). Leave `STOREFRONT_DEFAULT_HOST` empty in production.
+
 ## Release steps
 
 ```bash
 # backend
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
+php artisan storage:link        # once: media and product images under /storage
+php artisan pos:permissions:sync  # new module permissions -> built-in roles
 php artisan optimize            # config, routes, events, views cache
 php artisan queue:restart
 

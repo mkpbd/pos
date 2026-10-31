@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// E2E_PORT runs the suite on its own dev server when 5173 is taken by another one.
+const port = Number(process.env.E2E_PORT ?? 5173)
+const baseURL = `http://localhost:${port}`
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -7,7 +11,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -15,8 +19,8 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: 'npm run dev -- --strictPort',
-    url: 'http://localhost:5173',
+    command: `npm run dev -- --strictPort --port ${port}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
   },
 })

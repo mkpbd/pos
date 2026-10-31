@@ -136,6 +136,15 @@ Each module's provider returns its permissions from `permissions()` (e.g. `'user
 - **Expenses and other income** (Expenses module): categorized, numbered `EXP-`/`INC-`, immutable; voiding books the opposite payment.
 - **Loyalty** plugs into Sales by dependency inversion: Sales declares the `LoyaltyProgram` contract (bound to a no-op by default); the Loyalty module implements it, so Loyalty depends on Sales and not the other way round. Points are earned on the sale total minus points redeemed (`points_per_spend` for every full `spend_amount`, rounded down), redeemed as the `loyalty_points` payment method in whole points, and reversed with cancellations (all) and returns (the returned share of what was earned, cumulatively; points refunded at the rate they were redeemed at). Balances may go negative when earned points were already spent.
 
+## 3e. Online storefront (e-commerce track, E4)
+
+The e-commerce track (plan and decisions in `docs/ecommerce/`) adds a public storefront to the same application.
+
+- **Tenant from the host name.** `storefront_domains` maps host → organization. The `storefront` middleware (`ResolveStorefront` in the Storefront module) puts that organization into `TenantContext`, so the existing organization scope protects every public query; unknown hosts, closed stores and suspended organizations are 404. Staff of the organization holding `storefront.view` can preview a closed store in the browser they are signed in with. Local hosts map to `STOREFRONT_DEFAULT_HOST` (ADR-001).
+- **Configuration modules.** `Storefront` owns settings, domains, the theme document (schema-normalized JSON: defaults for missing keys, unknown keys dropped) with policy-checked custom CSS, and menus (one per location, whole-tree replacement, links restricted to site paths or http(s) URLs). `Media` owns the image library: random names on the configured disk, sha-256 de-duplication, WebP renditions by a queued GD job, `srcset` in every reference, and in-use protection — foreign keys where they exist, plus tagged `MediaReferences` checkers for ids kept in JSON (the theme).
+- **One public read model.** `GET /store/bootstrap` returns everything the storefront needs before drawing a page; the HTML shell (`StorefrontShellController`, a module `web.php` route) serves the built `storefront.html` with title, description, canonical, Open Graph and favicon written on the server and the same payload inlined, so crawlers get metadata in the first byte and the SPA needs no extra round trip (ADR-008). Paths without a storefront page answer 404 + `noindex`.
+- **Two SPAs, one build.** The back office moved under `/admin` (React Router `basename`); the storefront is a second Vite entry (`storefront.html` → `src/storefront/`) that never loads admin code (ADR-007).
+
 ## 4. Authentication and authorization
 
 - **Web SPA:** Laravel Sanctum **cookie-based SPA authentication** (session + CSRF via `XSRF-TOKEN`). No bearer tokens in browser storage, so XSS cannot exfiltrate long-lived credentials. The Vite dev server proxies `/api` and `/sanctum` so the SPA is same-origin.

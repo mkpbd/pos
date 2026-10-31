@@ -90,7 +90,8 @@ Public storefront API and tenant resolution without login · customer accounts (
 | Second auth guard on the same cookie domain | A customer session must never satisfy staff `auth:sanctum` routes | Keep `sanctum.guard = ['web']`; storefront account routes use `auth:customer` only; isolation tests both ways. |
 | Public endpoints bypass the login-derived tenant | Cross-tenant leakage if org resolution is wrong | One `ResolveStorefront` middleware sets `TenantContext` from the request host; the global scope then applies; isolation tests per endpoint. |
 | `PaymentLedger` contract change | Phase 6 callers (Sales, Expenses) | Additive method/parameter only; existing signature unchanged. |
-| New stock movement types | `CHECK` constraint on `stock_movements.type` | Migration replaces the constraint; ledger trigger untouched. |
+| New stock movement types | Reports/filters that switch over `MovementType` | Enum cases only (column is a plain string, verified in E3); ledger trigger untouched. |
+| Idempotency for non-staff callers | `idempotency_keys.user_id` is a NOT NULL FK to `users` | Scope column + new unique key (ADR-014); existing idempotency tests must stay green. |
 | Product changes for the web | POS reads products | Web data lives in new 1:1 tables owned by `OnlineCatalog`; `products` gets no web columns. |
 | Concurrent work | Phase 6 uncommitted in the same tree | Start e-commerce code only after Phase 6 is committed, on its own branch. |
 

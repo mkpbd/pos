@@ -25,6 +25,7 @@ app/Modules/Inventory/
 │   └── ...
 ├── Presentation/
 │   ├── Routes/api.php                    # auto-mounted under /api/v1 with the "api" middleware group
+│   ├── Routes/web.php                    # optional HTML pages, mounted with the "web" group (storefront shell)
 │   ├── Http/Controllers/                 # thin: authorize → call action → return ApiResponse
 │   ├── Http/Requests/                    # Form Requests (shape validation only)
 │   ├── Http/Resources/                   # API Resources (output shape)
@@ -76,6 +77,8 @@ Create only the folders a module actually needs.
 | Payments | The payments ledger (`PaymentLedger`: every amount in/out, by any module), cash registers, register sessions with float, cash in/out, closing count and variance, session reports, payment history | Organizations, Branches, Users | 6 ✅ |
 | Expenses | Expense and income categories, expense/other-income entries, voiding | Payments (`PaymentLedger`), Branches, Users | 6 ✅ |
 | Loyalty | Program settings, point accounts and the points ledger; implements Sales' `LoyaltyProgram` (earn, redeem as a payment method, reversals) | Sales (contract), Customers (`CustomerDirectory`) | 6 ✅ |
+| Media | Image library: uploads, alt text, WebP renditions, in-use protection; `MediaLibrary` (existence + public refs), `MediaReferences` (tagged checkers for JSON references) | Shared | E4 ✅ |
+| Storefront | Storefront settings, domains (host → organization), theme document + custom CSS, menus; `storefront` middleware, public `GET /store/bootstrap`, HTML shell | Media (`MediaLibrary`, implements `MediaReferences`), Organizations (`OrganizationDirectory`) | E4 ✅ |
 | Reports | Read-only views, report definitions, exports | All (read-only views) | 7 |
 | Notifications | In-app notification inbox API (database channel); notifications themselves are sent by the module that owns the event (low stock: Inventory). Expiry alerts and daily summaries follow | Shared | 4 ✅ (inbox) / 7 |
 | AI | Provider abstraction, insights, NL reporting over Reports definitions | Reports | 8 |

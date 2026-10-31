@@ -4,6 +4,25 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### E-commerce E4 — Storefront shell (online store track)
+
+Plan, decisions and API surface of the e-commerce track: `docs/ecommerce/` (analysis E1, reference investigation E2, ADR-001…017 and API plan E3).
+
+#### Added
+- **Storefront module:** storefront settings (open/closed, site name, meta description), domains (host → organization, one primary), theme document (colours, fonts, button style, card radius, content width, sticky header, logo, favicon, scheduled announcement bar, footer about/contact/social/payment logos) normalized by `ThemeSchema`, policy-checked custom CSS, menus per location (`main`, `mobile`, `footer_1`..`footer_3`) with nested items up to three levels and mega menus on the main navigation.
+- **Public storefront API:** `GET /api/v1/store/bootstrap` resolved from the request host (`storefront` middleware; unknown host, closed store or suspended organization → `404 STOREFRONT_NOT_FOUND`; staff with `storefront.view` preview a closed store), with `ETag` support and its own rate limiter (300/min per IP).
+- **Storefront HTML shell:** every non-API, non-admin path is served by Laravel from the built `storefront.html` with server-written title, description, canonical, Open Graph, favicon and the inlined bootstrap payload; unknown storefront paths answer 404 with `noindex`. Modules can now ship `Presentation/Routes/web.php`.
+- **Media module:** image library (JPEG/PNG/WebP/GIF ≤ 5 MB), de-duplication by checksum, WebP renditions 320/640/1280 px by a queued GD job, `srcset` everywhere, alt text, lookup by ids, in-use protection (foreign keys and tagged `MediaReferences` checkers).
+- **Storefront app** (`frontend/storefront.html` → `src/storefront/`): announcement bar, header with logo, accent-coloured main navigation with dropdowns and mega menus (hover and keyboard), sticky header, mobile drawer, footer with menus/contact/social/payment logos, preview ribbon, home page with the store's name and description, not-found page; theme applied as CSS variables; Baloo 2 and Poppins self-hosted.
+- **Admin screens:** *Online store* (`/admin/storefront`: settings and domains, theme with WCAG contrast checks, menus with a tree editor) and *Media library* (`/admin/media`, upload by drag and drop, alt text, delete), with read-only views for `storefront.view` without `storefront.manage`.
+- Permissions `storefront.view`, `storefront.manage`, `storefront.custom_css`, `media.manage`; new built-in role **Online Store Manager** (custom CSS stays with the Organization Admin).
+- Demo data: Demo Mart's storefront open on `STOREFRONT_DEFAULT_HOST` (default `shop.localhost`) with a main and a footer menu.
+- Tests: 275 backend tests (2 PostgreSQL-only skipped on SQLite) — new `MediaLibraryTest`, `StorefrontAdminTest`, `StorefrontPublicTest`, `StorefrontRulesTest`; 119 Vitest tests (32 new: theme mapping, navigation, footer, menu tree operations, contrast, schedule conversion, settings/theme/menu pages); Playwright `storefront.spec.ts` and `storefront-admin.spec.ts` (mocked) and a full-stack test where a theme colour and a menu changed in the admin appear on the storefront.
+
+#### Changed
+- **The back office moved to `/admin`** (React Router `basename`; password-reset links now point to `/admin/reset-password`). The storefront owns `/`. The Vite dev server serves both (`/admin/*` → `index.html`, other pages → `storefront.html`); production routing is in `DEPLOYMENT_GUIDE.md`.
+- `VITE_BACKEND_ORIGIN` from the shell now overrides `frontend/.env.local`; Playwright honours `E2E_PORT` (own dev server when 5173 is busy); the API rate limit is configurable (`POS_API_RATE_LIMIT`, default 120/min).
+
 ### Phase 6 — Payments, returns, refunds, cash registers, expenses, loyalty
 
 #### Added

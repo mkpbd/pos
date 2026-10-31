@@ -28,7 +28,7 @@ class PasswordTest extends TestCase
         Notification::assertSentTo($admin, ResetPassword::class, function (ResetPassword $notification) use ($admin) {
             $url = $notification->toMail($admin)->actionUrl;
 
-            return str_starts_with($url, config('pos.frontend_url').'/reset-password?token=');
+            return str_starts_with($url, config('pos.frontend_url').'/admin/reset-password?token=');
         });
     }
 
