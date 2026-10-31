@@ -61,7 +61,7 @@ enum SystemRole: string
             ],
             self::Accountant => [
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
-                'sales.view', 'purchases.view', 'customers.view', 'suppliers.view',
+                'sales.view', 'purchases.view', 'purchases.pay', 'customers.view', 'suppliers.view',
                 'payments.*', 'expenses.*', 'cash_registers.view', 'reports.*', 'audit.view',
             ],
         };

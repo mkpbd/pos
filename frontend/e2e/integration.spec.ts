@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
  * Full-stack checks against a real backend seeded with `php artisan migrate:fresh --seed`
  * (accounts from database/seeders/DatabaseSeeder.php). Opt-in: E2E_BACKEND=1 npm run test:e2e
  */
-test.skip(!process.env.E2E_BACKEND, 'Set E2E_BACKEND=1 with a seeded backend on :8000')
+test.skip(!process.env.E2E_BACKEND, 'Set E2E_BACKEND=1 and VITE_BACKEND_ORIGIN to a freshly seeded backend')
 test.describe.configure({ mode: 'serial' })
 
 test('organization admin signs in with a real Sanctum session and manages users', async ({ page }) => {
@@ -68,6 +68,38 @@ test('organization admin creates a product and finds it by barcode', async ({ pa
   await expect(page.getByRole('row')).toHaveCount(2)
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: `E2E Tea ${ean}` }) })
   await expect(row.getByRole('cell', { name: 'BDT 55.50' })).toBeVisible()
+})
+
+test('receiving a purchase order moves stock and the supplier balance', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  // Opening stock from the demo seed.
+  await page.getByRole('link', { name: 'Inventory' }).first().click()
+  const juice = page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })
+  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^60(\s|$)/)
+
+  // Receive the seeded order for 96 in full.
+  await page.getByRole('link', { name: 'Purchasing' }).first().click()
+  await page.getByRole('link', { name: 'PO-000001' }).click()
+  await page.getByRole('button', { name: 'Receive goods' }).click()
+  await expect(page.getByRole('heading', { name: 'Receive PO-000001' })).toBeVisible()
+  await expect(page.getByLabel('Quantity of line 1')).toHaveValue('96')
+  await page.getByLabel('Supplier invoice no.').fill(`PRAN-${Date.now()}`)
+  await page.getByRole('button', { name: 'Post receipt' }).click()
+
+  // 96 x 18.00 + 15% VAT, computed by the server.
+  await expect(page.getByRole('heading', { name: /^GRN-\d{6}$/ })).toBeVisible()
+  await expect(page.getByText('BDT 1,987.20')).toBeVisible()
+
+  await page.getByRole('link', { name: 'Inventory' }).first().click()
+  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^156(\s|$)/)
+
+  await page.getByRole('link', { name: 'Suppliers' }).first().click()
+  const pran = page.getByRole('row').filter({ hasText: 'Pran Distribution Ltd' })
+  await expect(pran).toContainText('BDT 1,987.20')
 })
 
 test('cashier only sees what the role allows, and the API agrees', async ({ page }) => {

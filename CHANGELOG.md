@@ -4,6 +4,26 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Phase 4 — Purchasing and inventory
+
+#### Added
+- **Inventory module:** `StockLedger` as the single write path for stock — row-locked `stock_levels` projection (deterministic lock order, insert-if-missing then `FOR UPDATE`, availability checked after the lock), append-only `stock_movements` ledger with `balance_after` (PostgreSQL trigger + model guard), weighted average cost at 4 decimals, per-branch negative-stock setting (`INSUFFICIENT_STOCK` otherwise), batches with expiry (`BATCH_EXPIRY_MISMATCH`), untracked products and services skipped.
+- Stock adjustments (`ADJ-`; opening, count, damage, expiry, theft, correction, other — with sign rules per reason), two-step stock transfers between any active stores (`TRF-`; dispatch at source average cost, receive or cancel), stock list with low-stock filter, batch/expiry list, movement history, valuation (cost-gated).
+- **Purchasing module:** purchase orders (`PO-`; draft → ordered → partially received → received, cancel), goods receipts that are the supplier invoice (`GRN-`; stock in + payable in one transaction, against an order or standalone, open-quantity cap, duplicate supplier-invoice guard, due date from payment terms), purchase returns limited to the returnable quantity at original cost and batch (`PRN-`), supplier payments (`SPAY-`), supplier balances and running statements computed from documents. All totals computed server-side with `Money`/`Decimal`.
+- **Notifications module:** in-app inbox (`/notifications`, unread count, mark read / all read). First notification: low stock — `StockFellBelowReorderLevel` is dispatched after commit and a queued listener notifies users with `inventory.view` for the branch.
+- Shared: `Decimal` helper (BCMath, fixed scales) and `Money::ofProduct()`; directory contracts `ProductDirectory`, `UserDirectory`, `BatchDirectory`; `BranchDirectory::store()/storeSummaries()`; `TenantUnique::withMessage()`.
+- Demo stock seeder (opening stock, an open purchase order, a posted receipt).
+- Frontend: Inventory area (Stock with low-stock filter, Batches & expiry, Movements, Adjustments, Transfers with receive/cancel), Purchasing area (orders with draft/place/cancel, receive goods against an order with open quantities pre-filled, receipts with returns, purchase returns, supplier payments), supplier balances and statement sheet on the Suppliers page, notification bell, reusable product-lines editor (product search/scan picker, batch picker, signed quantities), exact decimal comparison/subtraction (`compareDecimal`, `subtractDecimal`) so quantities never touch floats.
+- Tests: 179 backend tests (2 PostgreSQL-only lock tests skipped until PostgreSQL is configured); 63 Vitest tests; 6 Playwright smoke tests; 4 full-stack Playwright tests (new: receiving a purchase order moves stock 60 → 156 and the supplier balance).
+
+#### Changed
+- Accountant role gains `purchases.pay` (supplier payments).
+- Suppliers page shows the balance owed (with `purchases.view`) instead of the opening balance.
+- Mobile header: brand hidden below `sm` and branch switcher narrower so the notification bell, theme and account buttons stay reachable.
+
+#### Deferred
+- Serial-number capture (products can already be flagged `track_serials`): with the POS in Phase 5, where serials are scanned at sale time.
+
 ### Phase 3 — Products, catalog, suppliers and customers
 
 #### Added

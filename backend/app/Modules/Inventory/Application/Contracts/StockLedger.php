@@ -4,6 +4,7 @@ namespace App\Modules\Inventory\Application\Contracts;
 
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
+use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 
 /**
  * The only way stock quantities change. Other modules (Purchasing, POS, Returns) call it
@@ -20,7 +21,7 @@ interface StockLedger
      * @param  list<StockChange>  $changes
      * @return list<array{movement_id: string, unit_cost: string, balance_after: string}|null>
      *
-     * @throws \App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation INSUFFICIENT_STOCK, STORE_INACTIVE
+     * @throws BusinessRuleViolation INSUFFICIENT_STOCK, STORE_INACTIVE
      */
     public function post(array $changes, StockReference $reference): array;
 }

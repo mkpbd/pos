@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { BranchSwitcher } from '@/app/layouts/branch-switcher'
 import { UserMenu } from '@/app/layouts/user-menu'
+import { NotificationBell } from '@/features/notifications/notification-bell'
 import { visibleNavItems } from '@/app/navigation'
 import { useAuth } from '@/features/auth/use-auth'
 import { cn } from '@/lib/utils'
@@ -77,11 +78,12 @@ export function AppLayout() {
               <SidebarNav onNavigate={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div className="md:hidden">
+          <div className="hidden sm:block md:hidden">
             <Brand />
           </div>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex min-w-0 items-center gap-1">
             <BranchSwitcher />
+            <NotificationBell />
             <ThemeToggle />
             <UserMenu />
           </div>

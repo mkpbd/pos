@@ -64,3 +64,35 @@ export const counterCashier = (): CurrentUser =>
     permissions: ['branches.view', 'customers.create', 'customers.view', 'products.view'],
     branches: [{ id: 'b-1', code: 'MAIN', name: 'Main Branch', is_active: true }],
   })
+
+export const STOCK_MANAGER_PERMISSIONS = [
+  'branches.view',
+  'inventory.adjust',
+  'inventory.transfer',
+  'inventory.view',
+  'products.view',
+  'products.view_cost',
+  'purchases.manage',
+  'purchases.pay',
+  'purchases.receive',
+  'purchases.return',
+  'purchases.view',
+  'suppliers.view',
+]
+
+export const stockManager = (): CurrentUser =>
+  makeCurrentUser({
+    roles: [{ id: 'r-5', name: 'Store Manager', system_key: 'store_manager' }],
+    permissions: STOCK_MANAGER_PERMISSIONS,
+  })
+
+/** One branch with two stores, as returned by GET /branches. */
+export const branchesWithStores = () => [
+  {
+    id: 'b-1', code: 'MAIN', name: 'Main Branch', email: null, phone: null, address: null, timezone: null, is_active: true, allow_negative_stock: false, created_at: '2026-10-01T00:00:00Z',
+    stores: [
+      { id: 's-1', code: 'FLOOR', name: 'Shop floor', is_active: true },
+      { id: 's-2', code: 'WH', name: 'Warehouse', is_active: true },
+    ],
+  },
+]

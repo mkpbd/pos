@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareDecimal, formatMoney, formatRange, MONEY_PATTERN } from '@/lib/money'
+import { compareDecimal, formatMoney, formatRange, MONEY_PATTERN, subtractDecimal, trimDecimal } from '@/lib/money'
 
 describe('money', () => {
   it('formats decimal strings exactly, without float rounding', () => {
@@ -33,5 +33,21 @@ describe('money', () => {
     expect(formatRange(['450.00', '480.00', '450.00'])).toBe('450.00 – 480.00')
     expect(formatRange(['25.00'], 'BDT')).toBe('BDT 25.00')
     expect(formatRange([])).toBe('—')
+  })
+
+  it('trims insignificant zeros without touching integers', () => {
+    expect(trimDecimal('100')).toBe('100')
+    expect(trimDecimal('100.000')).toBe('100')
+    expect(trimDecimal('0.500')).toBe('0.5')
+    expect(trimDecimal('0.000')).toBe('0')
+    expect(trimDecimal('-2.250')).toBe('-2.25')
+    expect(trimDecimal('12.000000')).toBe('12')
+  })
+
+  it('subtracts decimals exactly', () => {
+    expect(subtractDecimal('0.3', '0.1')).toBe('0.200')
+    expect(subtractDecimal('10.000', '4.000')).toBe('6.000')
+    expect(subtractDecimal('1', '2.5')).toBe('-1.500')
+    expect(subtractDecimal('100.25', '0.05', 2)).toBe('100.20')
   })
 })

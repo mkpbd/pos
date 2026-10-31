@@ -10,7 +10,7 @@ import { LoginPage } from '@/features/auth/pages/login-page'
 import { RegisterPage } from '@/features/auth/pages/register-page'
 import { ResetPasswordPage } from '@/features/auth/pages/reset-password-page'
 
-type PageModule = Record<string, ComponentType>
+type PageModule = Record<string, unknown>
 
 /**
  * Feature pages are code-split: each is fetched the first time its route is visited.
@@ -19,7 +19,7 @@ type PageModule = Record<string, ComponentType>
 function page(load: () => Promise<PageModule>, exportName: string): Pick<RouteObject, 'lazy'> {
   return {
     lazy: async () => {
-      const Component = (await load())[exportName]
+      const Component = (await load())[exportName] as ComponentType | undefined
       if (!Component) throw new Error(`Page export ${exportName} not found`)
       return { Component }
     },
@@ -44,6 +44,20 @@ const pages = {
   platformOrganizations: page(() => import('@/features/platform/pages/platform-organizations-page'), 'PlatformOrganizationsPage'),
   profile: page(() => import('@/features/profile/pages/profile-page'), 'ProfilePage'),
   systemStatus: page(() => import('@/features/system/pages/system-status-page'), 'SystemStatusPage'),
+  stock: page(() => import('@/features/inventory/pages/stock-page'), 'StockPage'),
+  batches: page(() => import('@/features/inventory/pages/stock-page'), 'BatchesPage'),
+  movements: page(() => import('@/features/inventory/pages/stock-page'), 'MovementsPage'),
+  adjustments: page(() => import('@/features/inventory/pages/adjustment-pages'), 'AdjustmentsPage'),
+  newAdjustment: page(() => import('@/features/inventory/pages/adjustment-pages'), 'NewAdjustmentPage'),
+  transfers: page(() => import('@/features/inventory/pages/transfer-pages'), 'TransfersPage'),
+  newTransfer: page(() => import('@/features/inventory/pages/transfer-pages'), 'NewTransferPage'),
+  purchaseOrders: page(() => import('@/features/purchasing/pages/order-pages'), 'PurchaseOrdersPage'),
+  purchaseOrder: page(() => import('@/features/purchasing/pages/order-pages'), 'PurchaseOrderPage'),
+  receipts: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReceiptsPage'),
+  newReceipt: page(() => import('@/features/purchasing/pages/receipt-pages'), 'NewReceiptPage'),
+  receipt: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReceiptPage'),
+  purchaseReturns: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReturnsPage'),
+  payments: page(() => import('@/features/purchasing/pages/payment-pages'), 'PaymentsPage'),
 }
 
 export const routes: RouteObject[] = [
@@ -84,6 +98,21 @@ export const routes: RouteObject[] = [
               guarded('products.view', 'catalog', pages.catalog),
               guarded('customers.view', 'customers', pages.customers),
               guarded('suppliers.view', 'suppliers', pages.suppliers),
+              guarded('inventory.view', 'inventory', pages.stock),
+              guarded('inventory.view', 'inventory/batches', pages.batches),
+              guarded('inventory.view', 'inventory/movements', pages.movements),
+              guarded('inventory.view', 'inventory/adjustments', pages.adjustments),
+              guarded('inventory.adjust', 'inventory/adjustments/new', pages.newAdjustment),
+              guarded('inventory.view', 'inventory/transfers', pages.transfers),
+              guarded('inventory.transfer', 'inventory/transfers/new', pages.newTransfer),
+              guarded('purchases.view', 'purchasing/orders', pages.purchaseOrders),
+              guarded('purchases.manage', 'purchasing/orders/new', pages.purchaseOrder),
+              guarded('purchases.view', 'purchasing/orders/:orderId', pages.purchaseOrder),
+              guarded('purchases.view', 'purchasing/receipts', pages.receipts),
+              guarded('purchases.receive', 'purchasing/receipts/new', pages.newReceipt),
+              guarded('purchases.view', 'purchasing/receipts/:receiptId', pages.receipt),
+              guarded('purchases.view', 'purchasing/returns', pages.purchaseReturns),
+              guarded('purchases.view', 'purchasing/payments', pages.payments),
               guarded('branches.view', 'branches', pages.branches),
               guarded('users.view', 'users', pages.users),
               guarded('roles.view', 'roles', pages.roles),

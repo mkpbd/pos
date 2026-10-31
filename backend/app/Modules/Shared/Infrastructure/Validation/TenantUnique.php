@@ -27,9 +27,18 @@ class TenantUnique implements ValidationRule
         private readonly bool $softDeletes = false,
     ) {}
 
+    private string $message = 'The :attribute has already been taken.';
+
     public function where(string $column, mixed $value): static
     {
         $this->wheres[] = [$column, $value];
+
+        return $this;
+    }
+
+    public function withMessage(string $message): static
+    {
+        $this->message = $message;
 
         return $this;
     }
@@ -53,7 +62,7 @@ class TenantUnique implements ValidationRule
             ->exists();
 
         if ($exists) {
-            $fail('The :attribute has already been taken.');
+            $fail($this->message);
         }
     }
 }

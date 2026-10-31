@@ -49,13 +49,29 @@ Deviations from the original sketch, by design:
 - No `attributes`/`attribute_values` tables: variant attributes are the product's `options` plus each variant's `option_values` (validated so every variant has exactly one value per option and combinations are unique).
 - Product images are not secret, so they live on the public disk under random file names; the API returns same-origin `/storage/...` URLs.
 
-### Phase 4 — Inventory & purchasing
-- `stock_levels` (location_id, variant_id, batch_id nullable, quantity, reserved, version) — **projection**, row-locked during checkout, `CHECK (quantity >= 0)` enforced unless branch allows negative stock
-- `stock_movements` (**ledger**, append-only: location, variant, batch, type `opening|purchase|sale|return|adjustment|transfer_in|transfer_out`, quantity signed, unit_cost, reference_type, reference_id, created_by)
-- `batches` (variant_id, batch_no, expiry_date, cost), `serial_numbers`
-- `stock_adjustments` (+ lines), `stock_transfers` (+ lines, status workflow)
-- `purchase_orders`, `purchase_invoices`, `goods_receipts`, `purchase_returns` (+ lines each)
-- `supplier_payments`
+### Phase 4 — Inventory & purchasing (implemented)
+Inventory module:
+- `batches` (variant_id, batch_number, manufactured_on, expires_on) — unique `(organization_id, variant_id, lower(batch_number))`; index `(organization_id, expires_on)` for expiry reports.
+- `stock_levels` (branch_id, store_id, variant_id, batch_id nullable, quantity `NUMERIC(18,3)`, average_cost `NUMERIC(18,4)`) — **projection**, one row per store × variant × batch, enforced by two partial unique indexes (`(store_id, variant_id) WHERE batch_id IS NULL` and `(store_id, variant_id, batch_id) WHERE batch_id IS NOT NULL`, because `NULL` never collides in a plain unique index). Locked `FOR UPDATE` by the ledger; negative quantities only occur in branches with `allow_negative_stock`.
+- `stock_movements` (**ledger**: branch, store, variant, batch, type, signed quantity, unit_cost, balance_after, reference_type / reference_id / reference_number, created_by, created_at). Types: `opening`, `adjustment_in`, `adjustment_out`, `transfer_out`, `transfer_in`, `purchase_receipt`, `purchase_return`; `sale` and `sale_return` are reserved for Phases 5–6. Append-only: PostgreSQL trigger `stock_movements_append_only` (function `prevent_ledger_mutation()`) rejects `UPDATE`/`DELETE`, and the model throws on update/delete. Indexes `(store_id, variant_id, created_at)`, `(organization_id, variant_id, created_at)`, `(organization_id, created_at)`, `(reference_type, reference_id)`.
+- `stock_adjustments` (branch, store, number `ADJ-000001`, reason `opening|count|damage|expiry|theft|correction|other`, note) + `stock_adjustment_lines` (variant, batch, signed quantity, unit_cost).
+- `stock_transfers` (number `TRF-000001`, from/to branch + store, status `in_transit|received|cancelled`, dispatched_by/at, completed_by/at) + `stock_transfer_lines` (variant, batch, quantity, unit_cost = source average cost at dispatch).
+
+Purchasing module (money `NUMERIC(18,2)`, quantities `NUMERIC(18,3)`, unit costs `NUMERIC(18,4)`, tax rates `NUMERIC(9,4)`):
+- `purchase_orders` (number `PO-000001`, supplier, branch, store, status `draft|ordered|partially_received|received|cancelled`, order_date, expected_date, subtotal, tax_total, total) + `purchase_order_lines` (quantity, unit_cost, tax_rate, line_subtotal, line_tax, line_total, received_quantity).
+- `goods_receipts` — the supplier invoice (number `GRN-000001`, supplier, store, purchase_order_id nullable, supplier_invoice_number, invoice_date, due_date, totals) + `goods_receipt_lines` (purchase_order_line_id nullable, batch, amounts, returned_quantity). Unique `(organization_id, supplier_id, lower(supplier_invoice_number))` stops double entry of an invoice.
+- `purchase_returns` (number `PRN-000001`, goods_receipt_id, reason, totals) + `purchase_return_lines` (goods_receipt_line_id, batch, amounts at the receipt's cost).
+- `supplier_payments` (number `SPAY-000001`, supplier, amount, method `cash|bank_transfer|mobile_banking|cheque|card|other`, reference, paid_on).
+- Supplier balance = `suppliers.opening_balance` + Σ receipts − Σ returns − Σ payments, computed on read (no stored balance column to drift).
+
+Notifications module:
+- `notifications` (Laravel's table with UUID `id`, `notifiable` morph, `type`, `data` JSON, `read_at`).
+
+Deviations from the original sketch, by design:
+- No separate `purchase_invoices` table: a goods receipt *is* the supplier invoice (stock and payable are posted in one transaction), which removes a class of "received but not invoiced" mismatches for retail use. Invoice-before-goods workflows can be added later as a status on the receipt.
+- `stock_levels` has no `reserved` or `version` column: stock is decremented under a row lock at the moment of sale, so reservations and optimistic versions are unnecessary.
+- No `CHECK (quantity >= 0)`: negative stock is a per-branch setting, enforced in the ledger after the row lock.
+- `serial_numbers` are deferred: products can be flagged `track_serials`, but serial capture lands with the POS (Phase 5), where serials are scanned at sale time.
 
 ### Phase 5 — POS & sales
 - `pos_terminals`, `register_sessions` (opening cash, closing cash, expected vs counted)
@@ -84,12 +100,13 @@ Deviations from the original sketch, by design:
 - Every tenant table: composite index starting with `(organization_id, …)`; branch tables `(organization_id, branch_id, …)`.
 - Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. A trigram GIN index on product name (`pg_trgm`) is planned for Phase 9 performance work.
 - Case-insensitive uniqueness uses expression indexes, e.g. `brands (organization_id, lower(name))`, and partial indexes such as `customers (organization_id, phone) WHERE deleted_at IS NULL AND phone IS NOT NULL` — valid on PostgreSQL and SQLite alike.
-- Ledgers: `(location_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down.
+- Ledgers: `stock_movements (store_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down to the source document.
 - Reports: `sales (organization_id, branch_id, created_at)` and BRIN on large append-only `created_at` columns once volumes justify it.
 
 ## 4. Concurrency model
 
-- Checkout locks `stock_levels` rows `FOR UPDATE` in ascending `(location_id, variant_id, batch_id)` order.
+- Every stock posting (adjustment, transfer, receipt, return; checkout from Phase 5) locks `stock_levels` rows `FOR UPDATE` in ascending `store|variant|batch` order, creating missing rows first with `INSERT … ON CONFLICT DO NOTHING` so there is always a row to lock.
+- Receiving locks the purchase order row and returning locks the receipt lines first, so two concurrent receipts (or returns) cannot both take the last open (or returnable) quantity.
 - `register_sessions` row is locked when posting cash payments.
 - Document numbers allocated from locked `document_sequences` rows.
 - Transactions are short: pricing is computed before the transaction and re-validated inside it.

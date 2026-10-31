@@ -45,13 +45,15 @@ The development seeder (refuses to run in production) creates:
 
 The seeder also creates a demo catalogue for *Demo Mart* (units, VAT rates, categories, brands, four products incl. a variant product and a service, two suppliers, a customer group and two customers) through the same application actions as the API.
 
+Demo stock (`DemoStockSeeder`): an opening-stock adjustment in store `MAIN` (juice 60, rice 250.5 kg, polo shirts by size), purchase order `PO-000001` for 96 juice from Pran (placed, not yet received) and goods receipt `GRN-000001` for 100 kg rice from Local Mills (invoice `LM-1042`), so Inventory, Purchasing and supplier balances have data on first start.
+
 Product images are stored on the `public` disk; run `php artisan storage:link` once so `/storage/...` URLs are served (the Vite dev server proxies `/storage` to the backend).
 
 After adding permissions to a module, run `php artisan pos:permissions:sync` to update the catalog and every organization's built-in roles.
 
 Without Redis running, keep `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`. With Redis, switch them to `redis`.
 
-Queue worker and scheduler during development:
+Queue worker and scheduler during development (low-stock notifications are queued, so they only appear in the bell while a worker runs):
 
 ```powershell
 php artisan queue:work

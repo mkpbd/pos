@@ -21,11 +21,13 @@ class StockLineRules
      * @param  list<array{variant_id: string, quantity: string, batch_id?: ?string, batch_number?: ?string}>  $lines
      * @param  'in'|'out'  $direction  inbound lines name a batch number (created if new); outbound lines pick an existing batch_id
      * @param  bool  $requireTracked  reject services/untracked products (true for pure stock documents)
+     * @param  bool  $checkBatches  false for documents that do not move stock yet (purchase orders)
+     * @param  bool  $requireSellable  reject archived or inactive products (new purchases)
      * @return array<string, array<string, mixed>> variant info keyed by variant id
      *
      * @throws ValidationException
      */
-    public function validate(string $organizationId, array $lines, string $direction, bool $requireTracked = true, string $prefix = 'lines'): array
+    public function validate(string $organizationId, array $lines, string $direction, bool $requireTracked = true, string $prefix = 'lines', bool $checkBatches = true, bool $requireSellable = false): array
     {
         $variants = $this->products->variants($organizationId, array_column($lines, 'variant_id'));
         $errors = [];
@@ -39,11 +41,18 @@ class StockLineRules
 
                 continue;
             }
+            if ($requireSellable && ! $variant['sellable']) {
+                $errors["{$path}.variant_id"] = "{$variant['product_name']} is archived or inactive.";
+            }
             if ($requireTracked && ! $variant['track_stock']) {
                 $errors["{$path}.variant_id"] = "{$variant['product_name']} does not track stock.";
             }
             if (! $variant['allow_decimal'] && ! Decimal::isWhole($line['quantity'])) {
                 $errors["{$path}.quantity"] = "{$variant['product_name']} is sold in whole units ({$variant['unit_code']}).";
+            }
+
+            if (! $checkBatches) {
+                continue;
             }
 
             $batchId = $line['batch_id'] ?? null;

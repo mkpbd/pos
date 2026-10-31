@@ -65,5 +65,6 @@ class DatabaseSeeder extends Seeder
         });
 
         $this->callWith(DemoCatalogSeeder::class, ['organizationId' => $result['organization']->id]);
+        $this->callWith(DemoStockSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
     }
 }

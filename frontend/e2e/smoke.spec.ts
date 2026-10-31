@@ -34,6 +34,7 @@ async function mockBackend(page: Page, { signedIn }: { signedIn: boolean }) {
     return route.fulfill({ json: envelope(me) })
   })
   await page.route('**/api/v1/branches?*', (route) => route.fulfill({ json: page1([branch]) }))
+  await page.route('**/api/v1/notifications/unread-count', (route) => route.fulfill({ json: envelope({ count: 0 }) }))
   await page.route('**/api/v1/health', (route) =>
     route.fulfill({ json: envelope({ status: 'ok', checks: { database: 'ok', cache: 'ok' }, app: 'Enterprise POS', environment: 'e2e', time: '' }) }),
   )

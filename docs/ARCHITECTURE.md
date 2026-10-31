@@ -75,7 +75,12 @@ Each module has a `<Module>ServiceProvider` listed in `backend/bootstrap/provide
 
 | Orchestrating a use case that spans modules | Call the other module's `Application/Actions` (its public API) inside one transaction | `ProvisionOrganization` → `Branches\CreateBranch` + `Users\ProvisionSystemRoles` + `Users\CreateUser` |
 
-Foreign keys across module tables are allowed (referential integrity matters more than purity), but a module never writes another module's tables and never imports another module's Eloquent models. Read access goes through directory contracts (`BranchDirectory`, `OrganizationDirectory`). Two documented exceptions: the Authentication module operates on the Users module's `User` model (it is Laravel's auth model), and model factories may reference foreign models to build test data.
+Foreign keys across module tables are allowed (referential integrity matters more than purity), but a module never writes another module's tables and never imports another module's Eloquent models. Read access goes through directory contracts (`BranchDirectory`, `OrganizationDirectory`, `ProductDirectory`, `SupplierDirectory`, `UserDirectory`, `BatchDirectory`). Documented exceptions:
+
+- the Authentication module operates on the Users module's `User` model (it is Laravel's auth model);
+- `ProvisionOrganization` receives the `User` returned by the Users module's `CreateUser` action, and `pos:permissions:sync` (Users) iterates `Organization` rows — both are provisioning/maintenance paths, not request paths;
+- **read models may join foreign tables read-only** when a directory round-trip would make a list unfilterable — e.g. `GET /inventory/stock` joins `product_variants` to filter by search text and reorder level. The join is confined to the presenting controller and never writes;
+- model factories and tests may reference foreign models to build data.
 
 ### Permissions are declared by modules
 
@@ -99,6 +104,18 @@ Each module's provider returns its permissions from `permissions()` (e.g. `'user
 - **Human-readable numbers** come from `SequenceGenerator` (row-locked `document_sequences`), the same mechanism invoices will use.
 - **Races** that slip past validation hit unique indexes and are reported as `409 CONFLICT`.
 
+## 3b. Inventory and purchasing (Phase 4)
+
+- **One write path for stock.** Every stock change — adjustment, transfer, goods receipt, purchase return, and later sales and refunds — goes through the `StockLedger` contract (`Inventory\Application\Contracts`). Callers pass `StockChange`s (store, variant, optional batch, signed quantity, unit cost) and a `StockReference` (document type/id/number); the ledger returns the resulting movements.
+- **Two tables, two roles.** `stock_levels` is the current balance per store × variant × batch (a projection, locked and updated in place); `stock_movements` is the append-only ledger with `balance_after` on every row, so history can be audited and levels rebuilt. A PostgreSQL trigger rejects `UPDATE`/`DELETE` on the ledger; the Eloquent model refuses them too.
+- **Locking protocol.** The ledger refuses to run outside a transaction. It sorts changes by `store|variant|batch` (so two documents touching the same rows always lock in the same order and cannot deadlock), inserts a missing level row with `INSERT … ON CONFLICT DO NOTHING`, then takes `SELECT … FOR UPDATE` and checks availability **after** the lock. Outbound quantities beyond stock raise `INSUFFICIENT_STOCK` unless the store's branch has `allow_negative_stock`.
+- **Valuation is weighted average cost** per level row, kept at 4 decimals: inbound `(q·avg + in·cost) / (q + in)` (or the inbound cost when stock was ≤ 0); outbound leaves at the current average, which is also the cost recorded on transfers and the basis for future COGS.
+- **Untracked items are skipped**, not rejected: services and products with `track_stock = false` produce no movement.
+- **Batches and expiry.** Batch-tracked products need a batch number (with optional expiry) on the way in and an existing batch on the way out; the same batch number with a different expiry is `BATCH_EXPIRY_MISMATCH`.
+- **Transfers are two-step** (dispatch → in transit → receive or cancel). Dispatch leaves the source at its average cost and stores that cost on the lines, so the destination receives exactly what left.
+- **Purchasing documents.** A purchase order commits nothing to stock. A goods receipt is the supplier invoice: one transaction posts stock in, the payable, and the received quantities back onto the order (`partially_received`/`received`). Returns are limited per receipt line to the quantity not yet returned and leave at the receipt's unit cost and batch. Supplier balances and statements are computed from documents (opening balance + receipts − returns − payments), not stored, so they can never drift.
+- **Low stock** is detected inside the ledger when a level crosses its reorder level downward. `StockFellBelowReorderLevel` is dispatched **after commit** (a rolled-back sale never alerts) and handled by a queued listener that notifies users holding `inventory.view` for that branch through Laravel database notifications (`/notifications`).
+
 ## 4. Authentication and authorization
 
 - **Web SPA:** Laravel Sanctum **cookie-based SPA authentication** (session + CSRF via `XSRF-TOKEN`). No bearer tokens in browser storage, so XSS cannot exfiltrate long-lived credentials. The Vite dev server proxies `/api` and `/sanctum` so the SPA is same-origin.
@@ -114,14 +131,14 @@ Each module's provider returns its permissions from `permissions()` (e.g. `'user
 | Rule | Implementation |
 |------|----------------|
 | Sale + stock deduction are atomic | Checkout runs in one `DB::transaction`; any failure rolls back sale, payments and stock movements together. |
-| No overselling (unless configured) | Stock rows locked with `SELECT … FOR UPDATE` in ascending product/batch id order (prevents deadlocks); quantity checked after lock; `CHECK (quantity >= 0)` unless branch allows negative stock. |
+| No overselling (unless configured) | Stock level rows locked with `SELECT … FOR UPDATE` in deterministic store/variant/batch order (prevents deadlocks); quantity checked after the lock; `INSUFFICIENT_STOCK` unless the branch allows negative stock (implemented in Phase 4, see §3b). |
 | Server-side totals | Client sends only product ids, quantities, requested discounts and payments. Prices, taxes, discounts and totals are recomputed from the database with `Money`. |
 | Price/discount validation | Discounts checked against product/role limits and active promotions on the server. |
 | Idempotency | `Idempotency-Key` header required on checkout and payment endpoints; key + user + request hash stored with the response; replays return the stored response, mismatched payloads get 409. |
 | Immutable history | Posted sales, stock ledger and payment ledger rows are append-only (enforced in code and by database triggers that reject `UPDATE`/`DELETE`). |
 | Returns reference original sale | `sale_returns.sale_id` FK + per-line quantity ceilings. |
 | Decimal types only | `NUMERIC(18,2)` money, `NUMERIC(18,3)` quantities, `NUMERIC(9,4)` rates. No `float`/`double`/`real` anywhere. |
-| Concurrency-safe inventory | Row locks + ledger + optimistic version on stock levels; covered by concurrency tests that run parallel checkouts. |
+| Concurrency-safe inventory | Row locks + append-only ledger with `balance_after`; PostgreSQL-only tests hold a lock from a second connection and prove the ledger waits and never oversells (`Inventory/Tests/Feature/StockLockingTest`). Parallel-checkout tests follow in Phase 5. |
 | Tax-inclusive / exclusive pricing | Per-organization/branch setting consumed by one pricing service; both modes covered by calculation tests. |
 
 ## 6. API
@@ -131,7 +148,8 @@ Versioned REST under `/api/v1`, one envelope for every response, OpenAPI generat
 ## 7. Asynchronous work
 
 - **Queues** (Redis in staging/production, database driver locally): notifications, report exports, low-stock checks, AI summaries.
-- **Events/listeners:** cross-module reactions; listeners that touch external systems are queued.
+- **Events/listeners:** cross-module reactions; listeners that touch external systems are queued. Events raised inside financial transactions implement `ShouldDispatchAfterCommit` (first one: `StockFellBelowReorderLevel` → queued `NotifyLowStock`).
+- **In-app notifications** use Laravel's database channel (`notifications` table, UUID ids, JSON payload with a `type` and an in-app `link`); the SPA bell polls the unread count every 60 s.
 - **Scheduler:** daily summaries, expiry alerts, idempotency-key cleanup, cash-register reminders.
 - Request id is propagated to jobs through Laravel `Context`.
 

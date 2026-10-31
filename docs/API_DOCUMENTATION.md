@@ -62,6 +62,10 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `INVALID_CREDENTIALS`, `SESSION_UNAVAILABLE`, `INVALID_RESET_TOKEN` | Authentication failures (identical message for unknown e-mail and wrong password). |
 | 422 | `CANNOT_MODIFY_OWN_ACCESS`, `LAST_ORGANIZATION_ADMIN`, `LAST_ACTIVE_BRANCH`, `SYSTEM_ROLE_READ_ONLY`, `ROLE_IN_USE` | Lock-out and integrity guards. |
 | 422 | `IN_USE` | Record still referenced (deactivate it instead). |
+| 422 | `INSUFFICIENT_STOCK` | Outgoing quantity exceeds stock and the branch does not allow negative stock. `details`: `variant_id`, `sku`, `store_id`, `batch_id`, `available`, `requested`. |
+| 422 | `STORE_INACTIVE`, `UNKNOWN_PRODUCT`, `BATCH_EXPIRY_MISMATCH` | Stock posting guards: inactive store/branch, variant not in this organization, existing batch number with a different expiry date. |
+| 422 | `TRANSFER_NOT_IN_TRANSIT` | Transfer was already received or cancelled. |
+| 422 | `PURCHASE_ORDER_LOCKED`, `INVALID_STATUS_CHANGE`, `PURCHASE_ORDER_NOT_OPEN` | Only drafts can be edited; illegal status transition; receiving against a draft/cancelled/fully received order. |
 | 409 | `CONFLICT` | A concurrent request saved a conflicting record (unique index); reload and retry. |
 | 422 | `PRIVILEGE_ESCALATION` | Granting/assigning permissions the actor lacks, or editing a more powerful user. `details.permissions` lists what is missing. |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
@@ -138,6 +142,28 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET / POST | `/customers` | tenant | `customers.view` / `customers.create` | Blank `code` → `CUS-000001`; phone normalised and unique; `customer_group_id`, `credit_limit`, `opening_balance`, `is_active` require `customers.manage`. |
 | GET / PATCH / DELETE | `/customers/{id}`, `/customers/{id}/restore` | tenant | `customers.view` / `customers.manage` | Restore fails with `PHONE_IN_USE` if the phone was reused. |
 | GET / POST / PATCH / DELETE | `/customer-groups[/{id}]` | tenant | `customers.view` / `customers.manage` | `discount_percent` 0–100; delete → `IN_USE` while customers belong to it. |
+| GET | `/inventory/stock` | tenant | `inventory.view` | Stock levels of accessible branches. Filters `branch_id`, `store_id`, `variant_id`, `search`, `low_stock=1` (on hand ≤ reorder level). `value` is `null` without `products.view_cost`. |
+| GET | `/inventory/batches` | tenant | `inventory.view` | Batch balances with expiry; `store_id`, `branch_id`, `variant_id`, `expiring_within_days`. |
+| GET | `/inventory/movements` | tenant | `inventory.view` | Append-only stock ledger; `store_id`, `branch_id`, `variant_id`, `type`, `from`, `to`. Each row carries `balance_after` and the source document (`reference_type`, `reference_number`). |
+| GET | `/inventory/valuation` | tenant | `inventory.view` + `products.view_cost` | Quantity and value (weighted average cost) per store; `branch_id`. |
+| GET / POST | `/inventory/adjustments` | tenant | `inventory.view` / `inventory.adjust` | `reason`: `opening` (positive only), `count`, `correction`, `other` (signed), `damage`, `expiry`, `theft` (negative only). Incoming lines take `unit_cost` (default: purchase price) and `batch_number`/`expires_on`; outgoing batch lines take `batch_id`. Numbered `ADJ-000001`. |
+| GET | `/inventory/adjustments/{id}` | tenant | `inventory.view` | With lines. |
+| GET / POST | `/inventory/transfers` | tenant | `inventory.view` / `inventory.transfer` | Dispatch removes stock from `from_store_id` at its average cost (status `in_transit`); `status`, `direction` (`incoming`/`outgoing`). Numbered `TRF-000001`. |
+| GET | `/inventory/transfers/{id}` | tenant | `inventory.view` | `can_receive` / `can_cancel` reflect branch access and status. |
+| POST | `/inventory/transfers/{id}/receive`, `/cancel` | tenant | `inventory.transfer` | Receive adds stock to the destination (destination branch access); cancel returns it to the source (source branch access). |
+| GET / POST | `/purchasing/orders` | tenant | `purchases.view` / `purchases.manage` | `status`, `supplier_id`, `search`. Created as `draft`; totals computed by the server. Numbered `PO-000001`. |
+| GET / PUT | `/purchasing/orders/{id}` | tenant | `purchases.view` / `purchases.manage` | Only drafts can be replaced (`PURCHASE_ORDER_LOCKED`). Lines show `received_quantity`. |
+| POST | `/purchasing/orders/{id}/place`, `/cancel` | tenant | `purchases.manage` | `draft → ordered`; cancel only before anything was received. |
+| GET / POST | `/purchasing/receipts` | tenant | `purchases.view` / `purchases.receive` | Goods receipt = supplier invoice: stock in + amount owed. `supplier_id`, `purchase_order_id`, `from`/`to`, `search` (number, supplier invoice no.). Duplicate supplier invoice numbers per supplier are rejected. `due_date` defaults to invoice date + payment terms. Numbered `GRN-000001`. |
+| GET | `/purchasing/receipts/{id}` | tenant | `purchases.view` | Lines show `returned_quantity`. |
+| POST | `/purchasing/receipts/{id}/returns` | tenant | `purchases.return` | `{reason, notes, lines: [{goods_receipt_line_id, quantity}]}`; at most the quantity not yet returned, at the original unit cost and batch. Numbered `PRN-000001`. |
+| GET | `/purchasing/returns[/{id}]` | tenant | `purchases.view` | `supplier_id`, `goods_receipt_id`. |
+| GET / POST | `/purchasing/payments` | tenant | `purchases.view` / `purchases.pay` | Supplier payments (`method`: `cash`, `bank_transfer`, `mobile_banking`, `cheque`, `card`, `other`); `supplier_id`, `from`, `to`. Numbered `SPAY-000001`. |
+| GET | `/purchasing/supplier-balances?supplier_ids[]=` | tenant | `purchases.view` | `{supplier_id: "amount owed"}` = opening balance + receipts − returns − payments. |
+| GET | `/purchasing/suppliers/{id}/statement` | tenant | `purchases.view` | Running statement; optional `from`/`to` (earlier activity is folded into `opening_balance`). |
+| GET | `/notifications` | auth | — | Own in-app notifications (paginated), `unread=1`. Currently `inventory.low_stock`. |
+| GET | `/notifications/unread-count` | auth | — | `{count}` for the bell. |
+| POST | `/notifications/{id}/read`, `/notifications/read-all` | auth | — | Mark as read. |
 
 All paths are relative to `/api/v1`.
 
@@ -155,6 +181,27 @@ POST /api/v1/products
 }
 ```
 Prices are decimal strings (2 places; reorder level 3). Blank SKUs become `SKU-000001`, … Numeric 8/12/13/14-digit barcodes must have a valid GS1 check digit. Field errors use dotted paths (`variants.1.barcodes.0`).
+
+Example — receive goods against a purchase order (stock in + supplier invoice in one transaction):
+```json
+POST /api/v1/purchasing/receipts
+{
+  "supplier_id": "0193…", "store_id": "0193…", "purchase_order_id": "0193…",
+  "supplier_invoice_number": "PRAN-5521", "invoice_date": "2026-10-31", "due_date": null,
+  "lines": [
+    { "variant_id": "0193…", "purchase_order_line_id": "0193…", "quantity": "96", "unit_cost": "18.00", "tax_rate": "15" },
+    { "variant_id": "0193…", "quantity": "24", "unit_cost": "110.00", "batch_number": "MJ-2611", "expires_on": "2027-05-31" }
+  ]
+}
+```
+Response `data`: `number` `GRN-000002`, `subtotal`/`tax_total`/`total` computed server-side (decimal strings), `due_date` filled from payment terms, `lines[].line_total`. Receiving more than is still open on the order → `422 VALIDATION_FAILED` with `lines.0.quantity: "Only 40.000 still open on the order."`.
+
+Example — insufficient stock:
+```json
+{ "success": false, "error": { "code": "INSUFFICIENT_STOCK", "message": "Not enough stock of Pran Mango Juice 250ml (JUICE-250) in Main Store.",
+  "details": { "variant_id": "0193…", "sku": "JUICE-250", "store_id": "0193…", "batch_id": null, "available": "4.000", "requested": "6.000" } },
+  "meta": { "request_id": "0193…" } }
+```
 
 Example — login (SPA):
 ```http
@@ -199,7 +246,6 @@ GET /api/v1/health
 
 | Phase | Resource paths |
 |-------|----------------|
-| 4 | `/inventory/stock`, `/inventory/movements`, `/inventory/adjustments`, `/inventory/transfers`, `/purchases/orders`, `/purchases/invoices`, `/purchases/receipts`, `/purchases/returns` |
 | 5 | `/pos/products/lookup`, `/pos/cart/price`, `/pos/hold`, `/pos/checkout`, `/pos/sales` |
 | 6 | `/payments`, `/cash-registers`, `/returns`, `/refunds`, `/expenses` |
 | 7 | `/reports/*`, `/dashboard` |

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, BuildingIcon, Building2Icon, ContactIcon, PackageIcon, ScrollTextIcon, ShieldCheckIcon, StoreIcon, TagsIcon, TruckIcon, UsersIcon } from 'lucide-react'
+import { ActivityIcon, BoxesIcon, BuildingIcon, Building2Icon, ContactIcon, PackageIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingCartIcon, StoreIcon, TagsIcon, TruckIcon, UsersIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -19,6 +19,8 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/products', label: 'Products', icon: PackageIcon, permission: 'products.view' },
   { to: '/catalog', label: 'Catalog', icon: TagsIcon, permission: 'products.view' },
+  { to: '/inventory', label: 'Inventory', icon: BoxesIcon, permission: 'inventory.view' },
+  { to: '/purchasing/orders', label: 'Purchasing', icon: ShoppingCartIcon, permission: 'purchases.view' },
   { to: '/customers', label: 'Customers', icon: ContactIcon, permission: 'customers.view' },
   { to: '/suppliers', label: 'Suppliers', icon: TruckIcon, permission: 'suppliers.view' },
   { to: '/branches', label: 'Branches', icon: StoreIcon, permission: 'branches.view' },

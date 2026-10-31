@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArchiveIcon, ArchiveRestoreIcon, Loader2Icon, PencilIcon, PlusIcon, SearchIcon } from 'lucide-react'
+import { ArchiveIcon, ArchiveRestoreIcon, FileTextIcon, Loader2Icon, PencilIcon, PlusIcon, SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -18,6 +18,8 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth, useCan } from '@/features/auth/use-auth'
+import { useSupplierBalancesQuery } from '@/features/purchasing/api'
+import { SupplierStatementSheet } from '@/features/purchasing/pages/payment-pages'
 import { useArchiveSupplierMutation, useSaveSupplierMutation, useSuppliersQuery, type Supplier } from '@/features/suppliers/api'
 import { handleFormError } from '@/lib/forms'
 import { formatMoney } from '@/lib/money'
@@ -118,20 +120,25 @@ export function SuppliersPage() {
   const me = useAuth()
   const can = useCan()
   const canManage = can('suppliers.manage')
+  const canViewAccounts = can('purchases.view')
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [archived, setArchived] = useState(false)
   const [editing, setEditing] = useState<Supplier | null | undefined>(undefined)
   const [archiving, setArchiving] = useState<Supplier | null>(null)
+  const [statementFor, setStatementFor] = useState<string | null>(null)
   const debouncedSearch = useDebouncedValue(search)
   const archive = useArchiveSupplierMutation()
   const { data, error, isPending, refetch } = useSuppliersQuery({ page, search: debouncedSearch || undefined, archived })
+  const balances = useSupplierBalancesQuery(data?.items.map((s) => s.id) ?? [], canViewAccounts)
+  const currency = me.organization?.base_currency
+  const showActions = canManage || canViewAccounts
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Suppliers"
-        description="Who you buy from. Balances and purchase history arrive with purchasing."
+        description="Who you buy from and what you owe them."
         actions={canManage && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New supplier</Button>}
       />
       <div className="flex flex-wrap items-center gap-3">
@@ -161,9 +168,9 @@ export function SuppliersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead className="hidden md:table-cell">Contact</TableHead>
                   <TableHead className="hidden sm:table-cell">Terms</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Opening balance</TableHead>
+                  <TableHead className="hidden text-right lg:table-cell">{canViewAccounts ? 'Balance owed' : 'Opening balance'}</TableHead>
                   <TableHead>Status</TableHead>
-                  {canManage && <TableHead className="w-24"><span className="sr-only">Actions</span></TableHead>}
+                  {showActions && <TableHead className="w-32"><span className="sr-only">Actions</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,11 +180,16 @@ export function SuppliersPage() {
                     <TableCell className="font-medium">{s.name}</TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{[s.contact_person, s.phone].filter(Boolean).join(' · ') || '—'}</TableCell>
                     <TableCell className="hidden sm:table-cell">{s.payment_terms_days ? `${s.payment_terms_days} days` : 'Cash'}</TableCell>
-                    <TableCell className="hidden text-right font-mono text-sm lg:table-cell">{formatMoney(s.opening_balance, me.organization?.base_currency)}</TableCell>
+                    <TableCell className="hidden text-right font-mono text-sm lg:table-cell">
+                      {canViewAccounts ? (balances.data?.[s.id] !== undefined ? formatMoney(balances.data[s.id], currency) : '…') : formatMoney(s.opening_balance, currency)}
+                    </TableCell>
                     <TableCell>{s.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={s.is_active ? 'secondary' : 'outline'}>{s.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
-                    {canManage && (
+                    {showActions && (
                       <TableCell className="text-right">
-                        {s.archived_at ? (
+                        {canViewAccounts && (
+                          <Button variant="ghost" size="icon-sm" aria-label={`Statement for ${s.name}`} onClick={() => setStatementFor(s.id)}><FileTextIcon /></Button>
+                        )}
+                        {!canManage ? null : s.archived_at ? (
                           <Button variant="ghost" size="icon-sm" aria-label={`Restore ${s.name}`} onClick={() => archive.mutate({ id: s.id, restore: true }, { onSuccess: () => toast.success(`${s.name} restored.`), onError: (e) => toast.error(e.message) })}>
                             <ArchiveRestoreIcon />
                           </Button>
@@ -208,6 +220,7 @@ export function SuppliersPage() {
         pending={archive.isPending}
         onConfirm={() => archiving && archive.mutate({ id: archiving.id }, { onSuccess: () => toast.success(`${archiving.name} archived.`), onError: (e) => toast.error(e.message), onSettled: () => setArchiving(null) })}
       />
+      {canViewAccounts && <SupplierStatementSheet supplierId={statementFor} onOpenChange={(o) => !o && setStatementFor(null)} />}
     </div>
   )
 }

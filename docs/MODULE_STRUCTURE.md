@@ -66,19 +66,19 @@ Create only the folders a module actually needs.
 | Settings | App-wide typed settings beyond organization/branch columns (added when first needed) | Organizations, Branches | later |
 | Catalog | Categories (tree, max 4 levels), brands, units of measure (one-level conversion), tax rates; `CatalogDirectory` | Shared | 3 ✅ |
 | Products | Products, variants (SKU, prices, option values), barcodes (GS1 check), images, archive/restore, code lookup | Catalog (`CatalogDirectory`) | 3 ✅ |
-| Suppliers | Supplier master data, payment terms, opening balance (ledger balances in Phase 4) | Shared | 3 ✅ |
+| Suppliers | Supplier master data, payment terms, opening balance; `SupplierDirectory` (balances are computed by Purchasing) | Shared | 3 ✅ |
 | Customers | Customers, customer groups (default discount), credit limits, opening balance (statements/loyalty in Phases 5–6) | Shared | 3 ✅ |
-| Inventory | Stock levels, stock ledger, batches/expiry, serials, adjustments, transfers, valuation | Products, Branches | 4 |
-| Purchasing | Purchase orders, invoices, goods receipt, purchase returns, supplier payments | Suppliers, Products, Inventory | 4 |
+| Inventory | Stock levels, append-only stock ledger (`StockLedger` — the only stock write path), batches/expiry (`BatchDirectory`), adjustments, two-step transfers, weighted-average valuation, low-stock event | Products (`ProductDirectory`), Branches (`BranchDirectory`), Users (`UserDirectory`, notification recipients) | 4 ✅ (serials with POS in 5) |
+| Purchasing | Purchase orders, goods receipts (= supplier invoices), purchase returns, supplier payments, supplier balances and statements | Suppliers (`SupplierDirectory`), Products (`ProductDirectory`), Branches, Inventory (`StockLedger`, `StockLineRules`, `StoreAccess`, `ResolveBatch`, `BatchDirectory`) | 4 ✅ |
 | Discounts | Discount rules and limits | Products, Customers | 5 |
 | POS | Terminal sessions, holds/drafts, cart pricing, checkout orchestration | Sales, Inventory, Payments, Discounts | 5 |
 | Sales | Sale invoices (immutable), cancellation, history | Products, Customers | 5 |
 | Payments | Payment methods, payment ledger, split/partial/due payments, cash register | Sales, Purchasing | 6 |
-| Returns, Refunds | Sales/purchase returns, approval workflow, refunds, restocking rules | Sales, Inventory, Payments | 6 |
+| Returns, Refunds | Sales returns, approval workflow, refunds, restocking rules (purchase returns live in Purchasing) | Sales, Inventory, Payments | 6 |
 | Expenses | Expense categories and entries, income | Payments | 6 |
 | Loyalty | Points accrual/redemption | Customers, Sales events | 6 |
 | Reports | Read-only views, report definitions, exports | All (read-only views) | 7 |
-| Notifications | Low stock, expiry, daily summary channels | Events from all modules | 7 |
+| Notifications | In-app notification inbox API (database channel); notifications themselves are sent by the module that owns the event (low stock: Inventory). Expiry alerts and daily summaries follow | Shared | 4 ✅ (inbox) / 7 |
 | AI | Provider abstraction, insights, NL reporting over Reports definitions | Reports | 8 |
 
 ## Frontend feature template

@@ -37,7 +37,9 @@ export function formatMoney(amount: string | null | undefined, currency?: string
 /** Drops insignificant trailing zeros: "12.000000" → "12", "1.500" → "1.5". */
 export function trimDecimal(value: string | null | undefined): string {
   if (!value) return ''
-  return value.includes('.') ? value.replace(/\.?0+$/, '') : value
+  if (!value.includes('.')) return value
+  const trimmed = value.replace(/0+$/, '').replace(/\.$/, '')
+  return trimmed === '' || trimmed === '-' ? '0' : trimmed
 }
 
 /**
@@ -68,3 +70,23 @@ export function compareDecimal(a: string, b: string): number {
 
   return fa === fb ? 0 : fa < fb ? -1 : 1
 }
+
+function toScaled(value: string, scale: number): bigint {
+  const negative = value.trim().startsWith('-')
+  const [integer = '0', fraction = ''] = value.trim().replace(/^-/, '').split('.')
+  const digits = BigInt((integer || '0') + (fraction + '0'.repeat(scale)).slice(0, scale))
+  return negative ? -digits : digits
+}
+
+function fromScaled(value: bigint, scale: number): string {
+  const negative = value < 0n
+  const digits = (negative ? -value : value).toString().padStart(scale + 1, '0')
+  const body = scale > 0 ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits
+  return negative ? `-${body}` : body
+}
+
+/** Exact a − b for decimal strings (e.g. open quantity = ordered − received). */
+export function subtractDecimal(a: string, b: string, scale = 3): string {
+  return fromScaled(toScaled(a, scale) - toScaled(b, scale), scale)
+}
+

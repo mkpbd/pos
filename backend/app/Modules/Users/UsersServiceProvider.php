@@ -4,7 +4,9 @@ namespace App\Modules\Users;
 
 use App\Modules\Shared\Application\Authorization\PermissionRegistry;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Users\Application\Contracts\UserDirectory;
 use App\Modules\Users\Infrastructure\Console\SyncPermissionsCommand;
+use App\Modules\Users\Infrastructure\Directory\EloquentUserDirectory;
 use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Support\Facades\Gate;
 
@@ -13,6 +15,11 @@ use Illuminate\Support\Facades\Gate;
  */
 class UsersServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(UserDirectory::class, EloquentUserDirectory::class);
+    }
+
     public function boot(): void
     {
         parent::boot();
