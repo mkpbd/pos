@@ -27,13 +27,13 @@ const bootstrap = {
 const card = (slug: string, name: string, brand: { name: string; slug: string }, extra: Record<string, unknown> = {}) => ({
   id: `p-${slug}`, slug, name, url: `/product/${slug}`, image: { url: '/favicon.svg', alt: name }, hover_image: null,
   price: '450.00', price_max: '450.00', compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true,
-  is_new: false, is_featured: false, brand, category: { name: 'Clothing', slug: 'clothing' }, variant_count: 1, short_description: null, ...extra,
+  is_new: false, is_featured: false, brand, category: { name: 'Clothing', slug: 'clothing' }, variant_count: 1, default_variant_id: `v-${slug}`, short_description: null, ...extra,
 })
 
 const freshCo = { name: 'Fresh Co', slug: 'fresh-co' }
 const sunny = { name: 'Sunny', slug: 'sunny' }
 const cards = [
-  card('kids-tee', 'Kids Tee', freshCo, { price_max: '480.00', variant_count: 3, on_sale: true, is_new: true }),
+  card('kids-tee', 'Kids Tee', freshCo, { price_max: '480.00', variant_count: 3, default_variant_id: null, on_sale: true, is_new: true }),
   card('kids-shorts', 'Kids Shorts', sunny, { price: '350.00', price_max: '350.00' }),
   card('kids-cap', 'Kids Cap', sunny, { in_stock: false }),
 ]
@@ -80,6 +80,11 @@ async function serveCatalog(page: Page) {
   const listingRequests: URLSearchParams[] = []
   await page.route('**/api/v1/store/bootstrap', (route) => route.fulfill({ json: envelope(bootstrap) }))
   await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections: [], preview: false }) }))
+  // A guest with an empty cart (E7 header).
+  await page.route('**/api/v1/store/account/me', (route) => route.fulfill({ json: envelope(null) }))
+  await page.route('**/api/v1/store/cart', (route) =>
+    route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: false, currency: 'BDT', issues: [] }) }),
+  )
   await page.route((url) => url.pathname === '/api/v1/store/products', (route) => {
     const params = new URL(route.request().url()).searchParams
     listingRequests.push(params)
@@ -114,7 +119,10 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   await expect(page).toHaveTitle('Shop | Berry Kids')
   const teeCard = page.getByTestId('product-card').filter({ hasText: 'Kids Tee' })
   await expect(teeCard.getByTestId('price')).toHaveText('৳450.00 – ৳480.00')
-  await expect(page.getByTestId('product-card').filter({ hasText: 'Kids Cap' }).getByText('Out of stock')).toBeVisible()
+  const capCard = page.getByTestId('product-card').filter({ hasText: 'Kids Cap' })
+  await expect(capCard.getByRole('list', { name: 'Product labels' }).getByText('Out of stock')).toBeVisible()
+  await expect(capCard.getByRole('button', { name: 'Kids Cap is out of stock' })).toBeDisabled()
+  await expect(teeCard.getByRole('link', { name: 'Choose options: Kids Tee' })).toHaveAttribute('href', '/product/kids-tee')
 
   // Filter by brand: in the sidebar on desktop, in the drawer on phones.
   if (isMobile) {
@@ -137,7 +145,7 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   await expect(page).toHaveURL(/\/shop$/)
   await expect(page.getByTestId('result-count')).toHaveText('Showing all 3 products')
 
-  await teeCard.getByRole('link', { name: 'Kids Tee' }).click()
+  await teeCard.getByRole('link', { name: 'Kids Tee', exact: true }).click()
   await expect(page).toHaveURL(/\/product\/kids-tee$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Kids Tee' })).toBeVisible()
   await expect(page).toHaveTitle('Kids Tee | Berry Kids')

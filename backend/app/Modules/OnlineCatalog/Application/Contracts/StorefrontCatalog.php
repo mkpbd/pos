@@ -86,6 +86,23 @@ interface StorefrontCatalog
     public function itemSummaries(string $type, array $ids): array;
 
     /**
+     * What the cart needs to price and show its lines, keyed by variant id (variants of other
+     * organizations or unknown ids are left out; archived products/variants are included as
+     * not purchasable). `purchasable` = live listing, active product, active variant.
+     * `max_quantity` is the sellable on-hand quantity at the fulfilment store for stock-tracked
+     * products (no fulfilment store = nothing on hand), null when stock is not tracked.
+     *
+     * @param  list<string>  $variantIds
+     * @return array<string, array{
+     *   variant_id: string, product_id: string, product_slug: ?string, product_name: string,
+     *   variant_name: ?string, option_values: array<string, string>, sku: string,
+     *   image: ?array{url: string, alt: string}, price: string, compare_at_price: ?string,
+     *   purchasable: bool, in_stock: bool, max_quantity: ?string, allow_decimal: bool, tax_rate: string
+     * }>
+     */
+    public function variantsForCart(array $variantIds): array;
+
+    /**
      * Search metadata for the HTML shell, or null when the page does not exist.
      *
      * @param  'category'|'brand'|'product'  $type

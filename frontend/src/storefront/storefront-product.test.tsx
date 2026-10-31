@@ -155,7 +155,8 @@ describe('quick view', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Kids Tee' })
     expect(within(dialog).getByTestId('product-gallery')).toBeInTheDocument()
     expect(within(dialog).getByTestId('sku')).toHaveTextContent('TEE-RM')
-    expect(within(dialog).queryByRole('button', { name: /cart|wishlist/i })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Add to cart' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: 'Add to wishlist' })).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(within(dialog).getByRole('radio', { name: 'Blue' }))
     expect(within(dialog).getAllByTestId('price')[0]).toHaveTextContent('৳480.00')

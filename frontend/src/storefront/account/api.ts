@@ -84,6 +84,7 @@ export function useRegisterMutation() {
   })
 }
 
+/** Sign-out; an account page that is open then sends the visitor to the home page (RequireCustomer). */
 export function useLogoutMutation() {
   const queryClient = useQueryClient()
   return useMutation({

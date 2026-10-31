@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\Users\Infrastructure\Models\User;
 
 return [
@@ -42,6 +43,12 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Online store shoppers (ADR-002): never staff, never accepted by auth:sanctum.
+        'customer' => [
+            'driver' => 'session',
+            'provider' => 'customer_accounts',
+        ],
     ],
 
     /*
@@ -65,6 +72,12 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        // Tenant-scoped: accounts resolve only inside the storefront's organization.
+        'customer_accounts' => [
+            'driver' => 'storefront_customers',
+            'model' => CustomerAccount::class,
         ],
 
         // 'users' => [

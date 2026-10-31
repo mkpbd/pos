@@ -45,8 +45,9 @@ class ProductPage
         }
         $default ??= $variants[0]['id'] ?? null;
 
-        $unit = $record['unit_id'] === null ? null
-            : ($this->directory->describe($this->catalog->organizationId(), ['units' => [$record['unit_id']]])['units'][$record['unit_id']]['code'] ?? null);
+        $unitInfo = $record['unit_id'] === null ? null
+            : ($this->directory->describe($this->catalog->organizationId(), ['units' => [$record['unit_id']]])['units'][$record['unit_id']] ?? null);
+        $unit = $unitInfo['code'] ?? null;
 
         $data = [
             'id' => $record['id'],
@@ -85,6 +86,8 @@ class ProductPage
             'is_new' => $this->catalog->isNew($listing),
             'default_variant_id' => $default,
             'unit' => $unit,
+            // Quantities may have up to 3 decimals (kg, litre) instead of whole units.
+            'allow_decimal' => (bool) ($unitInfo['allow_decimal'] ?? false),
             'seo' => [
                 'title' => $listing->seo_title ?? $record['name'],
                 'description' => $listing->seo_description ?? $listing->short_description,

@@ -1,4 +1,4 @@
-import type { ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
+import type { Cart, CartLine, Customer, CustomerAddress, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
 
 let nextId = 0
 
@@ -180,6 +180,66 @@ export function productDetail(overrides: Partial<ProductDetail> = {}): ProductDe
     default_variant_id: 'v-red-m',
     unit: 'pcs',
     seo: { title: null, description: null, image_url: null },
+    ...overrides,
+  }
+}
+
+/* E7: customer accounts, cart, wishlist ------------------------------------------------- */
+
+export function customerFixture(overrides: Partial<Customer> = {}): Customer {
+  return { id: 'c-1', name: 'Rina Akter', email: 'rina@example.com', phone: '01712345678', email_verified: true, ...overrides }
+}
+
+export function cartLine(id: string, overrides: Partial<CartLine> = {}): CartLine {
+  return {
+    id,
+    variant_id: `v-${id}`,
+    product: { slug: 'kids-tee', name: 'Kids Tee', url: '/product/kids-tee', image: null },
+    variant_name: 'Red / M',
+    option_values: { Colour: 'Red', Size: 'M' },
+    sku: 'TEE-RM',
+    quantity: '2',
+    unit_price: '450.00',
+    compare_at_price: null,
+    line_total: '900.00',
+    purchasable: true,
+    in_stock: true,
+    max_quantity: null,
+    exceeds_stock: false,
+    allow_decimal: false,
+    ...overrides,
+  }
+}
+
+/** A cart as GET /store/cart returns it; totals are whatever the test says (the server computes them). */
+export function cartFixture(items: CartLine[] = [], overrides: Partial<Cart> = {}): Cart {
+  return {
+    id: items.length > 0 ? 'cart-1' : null,
+    items,
+    item_count: items.length > 0 ? '2' : '0',
+    subtotal: items.length > 0 ? '900.00' : '0.00',
+    tax_total: '0.00',
+    total: items.length > 0 ? '900.00' : '0.00',
+    prices_include_tax: true,
+    currency: 'BDT',
+    issues: [],
+    ...overrides,
+  }
+}
+
+export function addressFixture(id: string, overrides: Partial<CustomerAddress> = {}): CustomerAddress {
+  return {
+    id,
+    label: 'Home',
+    recipient_name: 'Rina Akter',
+    phone: '01712345678',
+    division: { id: 3, name: 'Dhaka' },
+    district: { id: 47, name: 'Dhaka' },
+    area: 'Dhanmondi',
+    address_line: 'House 12, Road 5',
+    postcode: '1205',
+    is_default_shipping: true,
+    is_default_billing: true,
     ...overrides,
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useStorefront } from '../api'
+import { AddToCartForm } from '../cart/add-to-cart'
 import { isNotFound, useProductQuery, useProductsBySlugsQuery, useRelatedProductsQuery } from '../catalog/api'
 import { Breadcrumbs } from '../catalog/breadcrumbs'
 import { ProductBadges, ProductCard } from '../catalog/product-card'
@@ -14,6 +15,7 @@ import { imageIndexOf, useVariantSelection } from '../catalog/use-variant-select
 import { initialVariant } from '../catalog/variant-selection'
 import { RichText } from '../components/rich-text'
 import type { ProductCard as Card, ProductDetail } from '../types'
+import { WishlistButton } from '../wishlist/wishlist-button'
 import { NotFoundPage } from './not-found-page'
 
 const PREVIEW_STATES: Record<string, string> = {
@@ -134,6 +136,10 @@ function ProductView({ product }: { product: ProductDetail }) {
           <div className="flex flex-col gap-5">
             <h1 className="text-3xl leading-tight font-extrabold lg:text-4xl">{product.name}</h1>
             <ProductSummary product={product} variant={variant} selection={selection} onChoose={choose} />
+            <div className="flex flex-col gap-3 border-t pt-5">
+              <AddToCartForm key={variant?.id ?? 'none'} product={product} variant={variant} />
+              <WishlistButton product={product} name={product.name} appearance="text" />
+            </div>
             {product.category?.slug && (
               <p className="border-t pt-4 text-sm">
                 Category:{' '}

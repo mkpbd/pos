@@ -48,17 +48,17 @@ class CustomerController
 
     public function store(SaveCustomerRequest $request, SaveCustomer $save): JsonResponse
     {
-        return ApiResponse::created(new CustomerResource($save(null, $request->validated())->load('group')));
+        return ApiResponse::created((new CustomerResource($save(null, $request->validated())->load('group')))->withOnlineAccount());
     }
 
     public function show(Customer $customer): JsonResponse
     {
-        return ApiResponse::success(new CustomerResource($customer->load('group')));
+        return ApiResponse::success((new CustomerResource($customer->load('group')))->withOnlineAccount());
     }
 
     public function update(SaveCustomerRequest $request, Customer $customer, SaveCustomer $save): JsonResponse
     {
-        return ApiResponse::success(new CustomerResource($save($customer, $request->validated())->load('group')));
+        return ApiResponse::success((new CustomerResource($save($customer, $request->validated())->load('group')))->withOnlineAccount());
     }
 
     public function destroy(Customer $customer, ArchiveCustomer $archive): JsonResponse
@@ -70,6 +70,6 @@ class CustomerController
 
     public function restore(string $customerId, ArchiveCustomer $archive): JsonResponse
     {
-        return ApiResponse::success(new CustomerResource($archive->restore(Customer::onlyTrashed()->findOrFail($customerId))->load('group')));
+        return ApiResponse::success((new CustomerResource($archive->restore(Customer::onlyTrashed()->findOrFail($customerId))->load('group')))->withOnlineAccount());
     }
 }

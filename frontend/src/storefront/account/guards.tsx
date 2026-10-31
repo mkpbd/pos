@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Navigate, Outlet, useLocation, useSearchParams } from 'react-router'
 import { ApiError } from '@/lib/api/client'
 import { useMeQuery } from './api'
@@ -8,6 +9,9 @@ import { loginPathFor, safeNextPath } from './safe-next'
 export function RequireCustomer() {
   const me = useMeQuery()
   const location = useLocation()
+  // Signing out (or a session ending) on an account page leads home, not to the sign-in page.
+  const [seenCustomer, setSeenCustomer] = useState(false)
+  if (me.data && !seenCustomer) setSeenCustomer(true)
 
   if (me.isPending) return <Spinner label="Loading your account" />
   if (me.error && !(me.error instanceof ApiError && me.error.status < 500)) {
@@ -21,7 +25,7 @@ export function RequireCustomer() {
       </section>
     )
   }
-  if (!me.data) return <Navigate to={loginPathFor(`${location.pathname}${location.search}`)} replace />
+  if (!me.data) return <Navigate to={seenCustomer ? '/' : loginPathFor(`${location.pathname}${location.search}`)} replace />
   return <Outlet />
 }
 

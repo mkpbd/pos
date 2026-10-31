@@ -35,7 +35,8 @@ describe('shop listing', () => {
     expect(within(orange!).getByText('Sale −14 %')).toBeInTheDocument()
     expect(within(orange!).getByText('৳140.00', { exact: false }).tagName).toBe('S')
     expect(within(orange!).getAllByRole('img', { hidden: true })).toHaveLength(2)
-    expect(within(apple!).getByText('Out of stock')).toBeInTheDocument()
+    expect(within(within(apple!).getByRole('list', { name: 'Product labels' })).getByText('Out of stock')).toBeInTheDocument()
+    expect(within(apple!).getByRole('button', { name: /is out of stock/ })).toBeDisabled()
     expect(within(apple!).getByText('Sunny')).toBeInTheDocument()
 
     // Pagination links carry the page in the URL.

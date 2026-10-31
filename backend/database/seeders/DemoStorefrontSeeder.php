@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Modules\Branches\Infrastructure\Models\Store;
+use App\Modules\Cart\Application\Actions\Wishlists;
 use App\Modules\Catalog\Application\Actions\SaveAttribute;
 use App\Modules\Catalog\Infrastructure\Models\Brand;
 use App\Modules\Catalog\Infrastructure\Models\Category;
@@ -11,6 +12,8 @@ use App\Modules\Cms\Application\Actions\ManageFaq;
 use App\Modules\Cms\Application\Actions\SavePage;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
+use App\Modules\CustomerAccounts\Application\Actions\CreateCustomerAccount;
+use App\Modules\Customers\Application\Actions\CustomerAddressBook;
 use App\Modules\Inventory\Application\Actions\PostStockAdjustment;
 use App\Modules\Media\Application\Actions\UploadMedia;
 use App\Modules\OnlineCatalog\Application\Actions\SaveBrandListing;
@@ -37,6 +40,7 @@ use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
 use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 /**
  * An open demo storefront on the local development host (STOREFRONT_DEFAULT_HOST,
@@ -189,7 +193,39 @@ class DemoStorefrontSeeder extends Seeder
                 ['type' => 'page', 'label' => 'Contact us', 'target_id' => $contact->id],
                 ['type' => 'page', 'label' => 'Privacy policy', 'target_id' => $privacy->id],
             ]);
+
+            $this->shopper();
         });
+    }
+
+    /**
+     * Customer accounts (E7): shopper@demo.test / password, verified, with a home address in
+     * Dhaka and the mango juice on the wishlist. No cart is seeded.
+     */
+    private function shopper(): void
+    {
+        $account = app(CreateCustomerAccount::class)([
+            'name' => 'Demo Shopper',
+            'email' => 'shopper@demo.test',
+            'phone' => '01711000000',
+            'password' => 'password',
+        ]);
+        $account->forceFill(['email_verified_at' => now()])->save();
+
+        $dhakaDivision = (int) DB::table('geo_divisions')->where('name_en', 'Dhaka')->value('id');
+        $dhakaDistrict = (int) DB::table('geo_districts')->where('division_id', $dhakaDivision)->where('name_en', 'Dhaka')->value('id');
+        app(CustomerAddressBook::class)->create($account->customer_id, [
+            'label' => 'Home',
+            'recipient_name' => 'Demo Shopper',
+            'phone' => '01711000000',
+            'division_id' => $dhakaDivision,
+            'district_id' => $dhakaDistrict,
+            'area' => 'Dhanmondi',
+            'address_line' => 'House 12, Road 5',
+            'postcode' => '1205',
+        ]);
+
+        app(Wishlists::class)->add($account->customer_id, Product::query()->where('name', 'Pran Mango Juice 250ml')->value('id'), null);
     }
 
     /**

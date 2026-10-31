@@ -2,6 +2,7 @@
 
 namespace App\Modules\Customers\Presentation\Http\Resources;
 
+use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
 use App\Modules\Customers\Infrastructure\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -11,6 +12,18 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class CustomerResource extends JsonResource
 {
+    private bool $withOnlineAccount = false;
+
+    /**
+     * Include `online_account` (null without one): single-customer responses only.
+     */
+    public function withOnlineAccount(): static
+    {
+        $this->withOnlineAccount = true;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         return [
@@ -33,6 +46,7 @@ class CustomerResource extends JsonResource
             'archived_at' => $this->deleted_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            ...($this->withOnlineAccount ? ['online_account' => app(CustomerOnlineAccounts::class)->forCustomer($this->id)] : []),
         ];
     }
 }

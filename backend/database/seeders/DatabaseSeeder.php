@@ -20,6 +20,7 @@ use RuntimeException;
  *   platform admin:  admin@pos.test    / password
  *   org admin:       owner@demo.test   / password
  *   cashier:         cashier@demo.test / password
+ *   shopper:         shopper@demo.test / password  (online store account on the demo storefront)
  */
 class DatabaseSeeder extends Seeder
 {

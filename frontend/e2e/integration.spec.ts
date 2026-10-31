@@ -366,3 +366,59 @@ test('a product created and repriced in the admin shows its current price everyw
   await expect(homeCard.getByTestId('price')).toContainText('499.99')
   await expect(homeCard).not.toContainText('450.00')
 })
+
+test('a guest cart merges into the shopper account at sign-in and its totals match the server', async ({ page }) => {
+  const signIn = async (next: string) => {
+    await page.goto(`/account/login?next=${next}`)
+    const form = page.getByRole('form', { name: 'Sign in' })
+    await form.getByLabel('E-mail').fill('shopper@demo.test')
+    await form.getByLabel('Password').fill('password')
+    await form.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page).toHaveURL(new RegExp(`${next}$`))
+  }
+  const signOut = async () => {
+    await page.getByRole('button', { name: 'My account' }).click()
+    await page.getByRole('menuitem', { name: 'Sign out' }).click()
+    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
+  }
+  const buy = page.getByTestId('product-page').getByRole('form', { name: 'Add to cart' })
+
+  // The shopper's account cart: one juice.
+  await signIn('/product/pran-mango-juice-250ml')
+  await buy.getByRole('button', { name: 'Add to cart' }).click()
+  await expect(page.getByTestId('mini-cart').getByTestId('cart-line')).toHaveCount(1)
+  await page.keyboard.press('Escape')
+  await signOut()
+
+  // Guest: two juices from the product page, one litchi drink from its card.
+  await page.goto('/product/pran-mango-juice-250ml')
+  await buy.getByRole('button', { name: /^Increase/ }).click()
+  await buy.getByRole('button', { name: 'Add to cart' }).click()
+  await expect(page.getByTestId('mini-cart').getByTestId('cart-line')).toHaveCount(1)
+  await page.keyboard.press('Escape')
+
+  await page.goto('/search?q=litchi')
+  await page.getByRole('button', { name: 'Add Pran Litchi Drink 250ml to the cart' }).click()
+  await expect(page.getByTestId('mini-cart').getByTestId('cart-line')).toHaveCount(2)
+  await page.keyboard.press('Escape')
+
+  const guest = (await (await page.request.get('/api/v1/store/cart')).json()).data
+  expect(guest.item_count).toBe('3')
+
+  // Sign-in merges: 1 + 2 juices, 1 litchi drink.
+  await signIn('/cart')
+  const lines = page.getByTestId('cart-page').getByTestId('cart-line')
+  await expect(lines).toHaveCount(2)
+  await expect(lines.filter({ hasText: 'Pran Mango Juice 250ml' }).getByRole('textbox', { name: 'Quantity of Pran Mango Juice 250ml' })).toHaveValue('3')
+  await expect(lines.filter({ hasText: 'Pran Litchi Drink 250ml' }).getByRole('textbox', { name: 'Quantity of Pran Litchi Drink 250ml' })).toHaveValue('1')
+
+  // What the page shows is what the server computed for this account's cart.
+  const server = (await (await page.request.get('/api/v1/store/cart')).json()).data
+  expect(server.item_count).toBe('4')
+  const shown = await page.getByTestId('cart-page').getByTestId('cart-total').innerText()
+  expect(shown.replace(/[^\d.]/g, '')).toBe(server.total)
+
+  // Signing out leaves the cart with the account, not the browser.
+  await signOut()
+  expect((await (await page.request.get('/api/v1/store/cart')).json()).data.items).toHaveLength(0)
+})

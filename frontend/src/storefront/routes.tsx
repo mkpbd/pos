@@ -1,4 +1,9 @@
 import type { RouteObject } from 'react-router'
+import { AccountPage, ProfilePage, VerifyEmailPage } from './account/account-pages'
+import { AddressesPage } from './account/addresses-page'
+import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './account/auth-pages'
+import { GuestOnly, RequireCustomer } from './account/guards'
+import { CartPage } from './cart/cart-page'
 import { StorefrontLayout } from './components/storefront-layout'
 import { ContentPage } from './pages/content-page'
 import { HomePage } from './pages/home-page'
@@ -6,10 +11,13 @@ import { BrandPage, CategoryPage, SearchPage, ShopPage } from './pages/listing-p
 import { NewsletterConfirmPage, NewsletterUnsubscribePage } from './pages/newsletter-pages'
 import { NotFoundPage } from './pages/not-found-page'
 import { ProductPage } from './pages/product-page'
+import { WishlistPage } from './wishlist/wishlist-page'
 
 /**
  * Storefront pages. Paths must match the server's list of known paths
  * (StorefrontShellController::KNOWN_PATHS; content pages, categories, brands and products are looked up) so unknown URLs are 404s for crawlers too.
+ * Account pages need a signed-in customer (else /account/login?next=…); sign-in, registration
+ * and password pages send signed-in customers on to /account (or a safe `next`).
  */
 export const storefrontRoutes: RouteObject[] = [
   {
@@ -24,6 +32,26 @@ export const storefrontRoutes: RouteObject[] = [
       { path: 'pages/:slug', element: <ContentPage /> },
       { path: 'newsletter/confirm', element: <NewsletterConfirmPage /> },
       { path: 'newsletter/unsubscribe', element: <NewsletterUnsubscribePage /> },
+      { path: 'cart', element: <CartPage /> },
+      { path: 'wishlist', element: <WishlistPage /> },
+      { path: 'account/verify-email', element: <VerifyEmailPage /> },
+      {
+        element: <GuestOnly />,
+        children: [
+          { path: 'account/login', element: <LoginPage /> },
+          { path: 'account/register', element: <RegisterPage /> },
+          { path: 'account/forgot-password', element: <ForgotPasswordPage /> },
+          { path: 'account/reset-password', element: <ResetPasswordPage /> },
+        ],
+      },
+      {
+        element: <RequireCustomer />,
+        children: [
+          { path: 'account', element: <AccountPage /> },
+          { path: 'account/profile', element: <ProfilePage /> },
+          { path: 'account/addresses', element: <AddressesPage /> },
+        ],
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

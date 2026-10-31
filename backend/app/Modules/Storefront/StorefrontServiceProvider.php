@@ -10,6 +10,7 @@ use App\Modules\Storefront\Infrastructure\SectionMediaReferences;
 use App\Modules\Storefront\Infrastructure\ThemeMediaReferences;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -33,6 +34,11 @@ class StorefrontServiceProvider extends ModuleServiceProvider
 
         // Public reads: generous per visitor IP (ADR-015).
         RateLimiter::for('storefront', fn (Request $request) => Limit::perMinute(300)->by($request->ip()));
+        // Shopper writes (cart, wishlist, addresses, profile): per IP, and per signed-in customer.
+        RateLimiter::for('storefront-write', fn (Request $request) => array_values(array_filter([
+            Limit::perMinute(60)->by('ip:'.$request->ip()),
+            ($customerId = Auth::guard('customer')->id()) === null ? null : Limit::perMinute(60)->by('customer:'.$customerId),
+        ])));
     }
 
     protected function permissions(): array

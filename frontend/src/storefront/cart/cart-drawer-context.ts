@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 
-export type CartDrawerApi = { open: () => void; close: () => void }
+/** `returnFocusTo`: where focus goes when the drawer closes (default: the element focused when it opened). */
+export type CartDrawerApi = { open: (returnFocusTo?: HTMLElement | null) => void; close: () => void }
 
 export const CartDrawerContext = createContext<CartDrawerApi | null>(null)
 

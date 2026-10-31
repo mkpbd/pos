@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query'
 import { api, ApiError, type ApiSuccess } from '@/lib/api/client'
 import type {
   ListingContext,
@@ -76,6 +76,31 @@ export function useProductsBySlugsQuery(slugs: string[]) {
     queryKey: catalogKeys.productsBySlugs(limited),
     queryFn: ({ signal }) => fetchListing(new URLSearchParams({ slugs: limited.join(',') }).toString(), signal).then((l) => l.products),
     enabled: limited.length > 0,
+  })
+}
+
+/** The server takes at most 12 slugs per request. */
+const SLUGS_PER_REQUEST = 12
+
+/**
+ * Live products for any number of slugs (a guest's wishlist), fetched 12 at a time, in the
+ * given order; slugs that are not live any more drop out. `data` is undefined until all arrived.
+ */
+export function useAllProductsBySlugsQuery(slugs: string[]) {
+  const chunks: string[][] = []
+  for (let i = 0; i < slugs.length; i += SLUGS_PER_REQUEST) chunks.push(slugs.slice(i, i + SLUGS_PER_REQUEST))
+  return useQueries({
+    queries: chunks.map((chunk) => ({
+      queryKey: catalogKeys.productsBySlugs(chunk),
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchListing(new URLSearchParams({ slugs: chunk.join(',') }).toString(), signal).then((l) => l.products),
+      retry: retryUnlessNotFound,
+      placeholderData: keepPreviousData,
+    })),
+    combine: (results) => ({
+      data: results.every((r) => r.data !== undefined) ? results.flatMap((r) => r.data ?? []) : undefined,
+      error: results.find((r) => r.error)?.error ?? null,
+      refetch: () => Promise.all(results.map((r) => r.refetch())),
+    }),
   })
 }
 

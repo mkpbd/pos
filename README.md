@@ -24,7 +24,9 @@ cd backend;  composer install; copy .env.example .env; php artisan key:generate;
 cd frontend; npm install; npm run dev     # admin http://localhost:5173/admin, storefront http://localhost:5173/
 ```
 
-Storefront pages: `/` (homepage), `/shop`, `/search?q=`, `/category/{slug}`, `/brand/{slug}`, `/product/{slug}`, `/pages/{slug}` — e.g. http://localhost:5173/shop and http://localhost:5173/product/pran-mango-juice-250ml on the seeded Demo Mart.
+Storefront pages: `/` (homepage), `/shop`, `/search?q=`, `/category/{slug}`, `/brand/{slug}`, `/product/{slug}`, `/pages/{slug}`, `/cart`, `/wishlist`, `/account` (sign-in, registration, profile, addresses) — e.g. http://localhost:5173/shop and http://localhost:5173/product/pran-mango-juice-250ml on the seeded Demo Mart.
+
+Seeded logins (`php artisan migrate:fresh --seed`, all with password `password`): back office `admin@pos.test` (platform admin), `owner@demo.test` (organization admin), `cashier@demo.test`; storefront shopper `shopper@demo.test` (verified, one saved address, one wishlist item) at http://localhost:5173/account/login.
 
 ## Documentation
 
@@ -65,6 +67,6 @@ BerryKid-inspired storefront on the same backend; plan, decisions and API in [do
 | E4 | Storefront shell: host-based storefronts, theme, menus, media library, storefront layout, admin under `/admin` | ✅ (PostgreSQL run pending) |
 | E5 | Content and homepage builder: banners, homepage sections, content pages, FAQ, contact form, newsletter | ✅ (PostgreSQL run pending) |
 | E6 | Online catalog and product pages: web listings, attributes, shop/category/brand/search pages with faceted filters, product page with variants, related products, catalog homepage sections | ✅ (PostgreSQL run pending) |
-| E7 | Customer accounts, cart, wishlist | ☐ |
-| E8 | Checkout, orders, payments, shipping, promotions | ☐ |
+| E7 | Customer accounts, cart, wishlist: sign-up/sign-in on a separate shopper guard, e-mail verification, password reset, profile, address book with Bangladesh divisions/districts, guest and customer carts repriced on every read with merge at sign-in, mini-cart and cart page, wishlist | ✅ (PostgreSQL run pending) |
+| E8 | Checkout, orders, payments, shipping, promotions — split into E8a (shipping, checkout, orders with cash on delivery / bank transfer), E8b (promotions, coupons), E8c (online gateways, once sandbox credentials are available) | ☐ |
 | E9–E14 | Account area, admin operations, CMS depth, SEO/localization, AI, hardening | ☐ |

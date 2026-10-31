@@ -63,8 +63,8 @@ export const addressSchema = z.object({
     .trim()
     .min(1, 'Please enter a mobile number.')
     .refine((v) => BD_MOBILE.test(normalizeBdPhone(v)), 'Please enter a Bangladeshi mobile number, e.g. 01712345678.'),
-  division_id: z.string().min(1, 'Please choose a division.'),
-  district_id: z.string().min(1, 'Please choose a district.'),
+  division_id: z.string({ error: 'Please choose a division.' }).min(1, 'Please choose a division.'),
+  district_id: z.string({ error: 'Please choose a district.' }).min(1, 'Please choose a district.'),
   area: z.string().trim().min(2, 'Please enter the area or thana.').max(100, 'Use at most 100 characters.'),
   address_line: z.string().trim().min(3, 'Please enter the street address.').max(255, 'Use at most 255 characters.'),
   postcode: z

@@ -3,10 +3,13 @@
 use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Authentication\AuthenticationServiceProvider;
 use App\Modules\Branches\BranchesServiceProvider;
+use App\Modules\Cart\CartServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Cms\CmsServiceProvider;
+use App\Modules\CustomerAccounts\CustomerAccountsServiceProvider;
 use App\Modules\Customers\CustomersServiceProvider;
 use App\Modules\Expenses\ExpensesServiceProvider;
+use App\Modules\Geography\GeographyServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Loyalty\LoyaltyServiceProvider;
 use App\Modules\Media\MediaServiceProvider;
@@ -49,6 +52,9 @@ return [
     MediaServiceProvider::class,
     CmsServiceProvider::class,
     OnlineCatalogServiceProvider::class,
+    GeographyServiceProvider::class,
+    CustomerAccountsServiceProvider::class,
+    CartServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

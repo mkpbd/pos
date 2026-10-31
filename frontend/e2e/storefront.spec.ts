@@ -47,6 +47,11 @@ function bootstrap(overrides: Record<string, unknown> = {}) {
 async function serveStore(page: Page, data: unknown, sections: unknown[] = []) {
   await page.route('**/api/v1/store/bootstrap', (route) => route.fulfill({ json: envelope(data) }))
   await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections, preview: false }) }))
+  // A guest with an empty cart (E7 header).
+  await page.route('**/api/v1/store/account/me', (route) => route.fulfill({ json: envelope(null) }))
+  await page.route('**/api/v1/store/cart', (route) =>
+    route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: true, currency: 'BDT', issues: [] }) }),
+  )
 }
 
 const image = { id: 'img-1', url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 600, alt: null }

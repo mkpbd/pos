@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { EyeIcon } from 'lucide-react'
 import { compareDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
+import { CardCartAction } from '../cart/add-to-cart'
 import type { ProductCard as Card } from '../types'
+import { WishlistButton } from '../wishlist/wishlist-button'
 import { Price } from './price'
 import { ProductImage } from './product-image'
 import { useQuickView } from './quick-view-context'
@@ -26,10 +29,11 @@ export function ProductBadges({ onSale, discountPercent, isNew, inStock, classNa
 
 /**
  * A product in a grid, carousel or list: image (second image on hover), badges, brand,
- * name, price (range when the variants differ) and a quick view button. Hover-only parts
+ * name, price (range when the variants differ), wishlist heart, quick view button and the
+ * buy action (add to cart for single-variant products, else a link to choose options). Hover-only parts
  * also show on keyboard focus, and the quick view button is always visible on touch screens.
  */
-export function ProductCard({ product, layout = 'grid', eager = false }: { product: Card; layout?: 'grid' | 'list'; eager?: boolean }) {
+export function ProductCard({ product, layout = 'grid', eager = false, actions }: { product: Card; layout?: 'grid' | 'list'; eager?: boolean; actions?: ReactNode }) {
   const quickView = useQuickView()
   const priceMax = compareDecimal(product.price, product.price_max) !== 0 ? product.price_max : undefined
   const compareAt = product.on_sale && !priceMax ? product.compare_at_price : null
@@ -54,16 +58,19 @@ export function ProductCard({ product, layout = 'grid', eager = false }: { produ
           )}
         </Link>
         <ProductBadges onSale={product.on_sale} discountPercent={product.discount_percent} isNew={product.is_new} inStock={product.in_stock} className="absolute top-3 left-3" />
-        {quickView && (
-          <button
-            type="button"
-            onClick={() => quickView.open(product.slug)}
-            aria-label={`Quick view: ${product.name}`}
-            className="absolute top-3 right-3 grid size-10 place-items-center rounded-full bg-sf-surface text-sf-heading shadow-md transition hover:bg-sf-accent hover:text-sf-accent-foreground focus-visible:bg-sf-accent focus-visible:text-sf-accent-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
-          >
-            <EyeIcon aria-hidden className="size-5" />
-          </button>
-        )}
+        <div className="absolute top-3 right-3 flex flex-col gap-2">
+          <WishlistButton product={product} name={product.name} />
+          {quickView && (
+            <button
+              type="button"
+              onClick={() => quickView.open(product.slug)}
+              aria-label={`Quick view: ${product.name}`}
+              className="grid size-10 place-items-center rounded-full bg-sf-surface text-sf-heading shadow-md transition hover:bg-sf-accent hover:text-sf-accent-foreground focus-visible:bg-sf-accent focus-visible:text-sf-accent-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
+            >
+              <EyeIcon aria-hidden className="size-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={cn('flex flex-1 flex-col gap-1.5 p-4', layout === 'grid' && 'border-t')}>
@@ -75,6 +82,9 @@ export function ProductCard({ product, layout = 'grid', eager = false }: { produ
         </h3>
         {layout === 'list' && product.short_description && <p className="line-clamp-3 text-sm">{product.short_description}</p>}
         <Price price={product.price} priceMax={priceMax} compareAt={compareAt} size="sm" className="mt-auto pt-1" />
+        <div className={cn('pt-2', layout === 'list' && 'sm:max-w-56')}>
+          {actions ?? <CardCartAction product={product} />}
+        </div>
       </div>
     </article>
   )

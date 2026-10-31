@@ -14,3 +14,6 @@ Schedule::command('model:prune', ['--model' => [IdempotencyKey::class]])->daily(
 
 // Storefront popularity ("best sellers", popularity sort) from completed sales.
 Schedule::command('storefront:refresh-product-stats')->hourly()->withoutOverlapping();
+
+// Guest carts expire 30 days after their last change.
+Schedule::command('cart:prune')->daily();

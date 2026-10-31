@@ -2,10 +2,12 @@ import { useEffect, useLayoutEffect } from 'react'
 import { Outlet } from 'react-router'
 import { ApiError } from '@/lib/api/client'
 import { BootstrapContext, useBootstrapQuery } from '../api'
+import { CartDrawerProvider } from '../cart/mini-cart'
 import { QuickViewProvider } from '../catalog/quick-view'
 import { applyCssVars, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
 import { AnnouncementBar, PreviewRibbon } from './announcement-bar'
+import { NoticeProvider } from './notice-provider'
 import { SiteFooter } from './site-footer'
 import { SiteHeader } from './site-header'
 import { StoreErrorView, StoreLoadingView, StoreNotFoundView } from './state-views'
@@ -21,20 +23,24 @@ export function StorefrontLayout() {
     return (
       <BootstrapContext value={query.data}>
         <ThemeEffects bootstrap={query.data} />
-        <div className="flex min-h-screen flex-col">
-          <a href="#main" className="sr-only z-50 bg-sf-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
-            Skip to content
-          </a>
-          {query.data.preview && <PreviewRibbon />}
-          {query.data.theme.announcement && <AnnouncementBar announcement={query.data.theme.announcement} />}
-          <SiteHeader />
-          <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-            <QuickViewProvider>
-              <Outlet />
-            </QuickViewProvider>
-          </main>
-          <SiteFooter />
-        </div>
+        <NoticeProvider>
+          <CartDrawerProvider>
+            <div className="flex min-h-screen flex-col">
+              <a href="#main" className="sr-only z-50 bg-sf-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
+                Skip to content
+              </a>
+              {query.data.preview && <PreviewRibbon />}
+              {query.data.theme.announcement && <AnnouncementBar announcement={query.data.theme.announcement} />}
+              <SiteHeader />
+              <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+                <QuickViewProvider>
+                  <Outlet />
+                </QuickViewProvider>
+              </main>
+              <SiteFooter />
+            </div>
+          </CartDrawerProvider>
+        </NoticeProvider>
       </BootstrapContext>
     )
   }

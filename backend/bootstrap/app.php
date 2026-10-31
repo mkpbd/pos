@@ -1,11 +1,14 @@
 <?php
 
+use App\Modules\CustomerAccounts\Presentation\Http\Middleware\EnsureCustomerIsActive;
 use App\Modules\Organizations\Presentation\Http\Middleware\EnsurePlatformAdmin;
 use App\Modules\Organizations\Presentation\Http\Middleware\ResolveTenant;
 use App\Modules\Shared\Infrastructure\Exceptions\ApiExceptionRenderer;
 use App\Modules\Shared\Infrastructure\Http\Middleware\AssignRequestId;
 use App\Modules\Shared\Infrastructure\Http\Middleware\EnsureIdempotency;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
+use App\Modules\Storefront\Presentation\Http\Middleware\StartStorefrontSession;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -30,11 +33,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'platform' => EnsurePlatformAdmin::class,
             'idempotent' => EnsureIdempotency::class,
             'storefront' => ResolveStorefront::class,
+            'storefront.session' => StartStorefrontSession::class,
+            'customer.active' => EnsureCustomerIsActive::class,
         ]);
 
         // Tenant must be resolved before route-model binding so bound models are tenant-scoped.
         $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
-        $middleware->prependToPriorityList(SubstituteBindings::class, ResolveStorefront::class);
+        // The storefront's organization (from the host) and its session come before
+        // authentication (auth:customer looks accounts up inside that organization), throttling
+        // and route-model binding.
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, ResolveStorefront::class);
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, StartStorefrontSession::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

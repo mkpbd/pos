@@ -2,7 +2,9 @@ import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowRightIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { AddToCartForm } from '../cart/add-to-cart'
 import type { ProductDetail } from '../types'
+import { WishlistButton } from '../wishlist/wishlist-button'
 import { isNotFound, useProductQuery } from './api'
 import { ProductGallery } from './product-gallery'
 import { ProductSummary } from './product-summary'
@@ -80,10 +82,12 @@ function QuickViewProduct({ product, onNavigate }: { product: ProductDetail; onN
       <div className="flex flex-col gap-4">
         <DialogTitle className="pr-8 font-heading text-2xl leading-tight font-extrabold text-sf-heading">{product.name}</DialogTitle>
         <ProductSummary product={product} variant={variant} selection={selection} onChoose={choose} />
+        <AddToCartForm key={variant?.id ?? 'none'} product={product} variant={variant} onAdded={onNavigate} />
+        <WishlistButton product={product} name={product.name} appearance="text" />
         <Link
           to={href}
           onClick={onNavigate}
-          className="mt-auto inline-flex items-center gap-2 self-start rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-accent-foreground transition hover:brightness-110"
+          className="mt-auto inline-flex items-center gap-2 self-start text-sm font-bold text-sf-accent underline-offset-4 hover:underline"
         >
           View full details
           <ArrowRightIcon aria-hidden className="size-4" />

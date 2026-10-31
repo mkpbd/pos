@@ -20,10 +20,16 @@ use Illuminate\Http\Response;
 class StorefrontShellController
 {
     /** Storefront routes that exist in this phase (exact paths); content pages are looked up. */
-    private const KNOWN_PATHS = ['/', '/shop', '/search', '/newsletter/confirm', '/newsletter/unsubscribe'];
+    private const KNOWN_PATHS = ['/', '/shop', '/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
+
+    /** Shopper pages (E7): account, cart and wishlist. Personal, never indexed. */
+    private const ACCOUNT_PATHS = [
+        '/account', '/account/login', '/account/register', '/account/forgot-password', '/account/reset-password',
+        '/account/verify-email', '/account/profile', '/account/addresses', '/cart', '/wishlist',
+    ];
 
     /** Utility pages that search engines should not index. */
-    private const NOINDEX_PATHS = ['/search', '/newsletter/confirm', '/newsletter/unsubscribe'];
+    private const NOINDEX_PATHS = ['/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
 
     public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog): Response
     {
@@ -49,6 +55,13 @@ class StorefrontShellController
         }
         if ($path === '/search') {
             $meta['title'] = 'Search | '.$data['store']['name'];
+        }
+        if (in_array($path, self::ACCOUNT_PATHS, true)) {
+            $meta['title'] = match ($path) {
+                '/cart' => 'Cart',
+                '/wishlist' => 'Wishlist',
+                default => 'My account',
+            }.' | '.$data['store']['name'];
         }
         if (preg_match('#^/(category|brand|product)/([A-Za-z0-9-]{1,120})$#', $path, $m) === 1 && ($found = $catalog->pageMeta($m[1], $m[2])) !== null) {
             $status = 200;

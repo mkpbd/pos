@@ -4,10 +4,10 @@ namespace App\Modules\Audit\Infrastructure\Services;
 
 use App\Modules\Audit\Infrastructure\Models\AuditLog;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
 
 class DatabaseAuditTrail implements AuditTrail
@@ -31,7 +31,7 @@ class DatabaseAuditTrail implements AuditTrail
         $this->tenant->runAs($organizationId, fn () => AuditLog::query()->create([
             'organization_id' => $organizationId,
             'branch_id' => $this->tenant->branchId(),
-            'user_id' => Auth::id(),
+            'user_id' => StaffActor::id(),
             'action' => $action,
             'subject_type' => $subject?->getTable(),
             'subject_id' => $subject?->getKey(),

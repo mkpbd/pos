@@ -215,6 +215,8 @@ class CatalogReadModel
             'brand' => $this->brandLink($record['brand_id']),
             'category' => $this->categoryLink($record['category_id']),
             'variant_count' => count($variants),
+            // Lets a card add a single-variant product to the cart; null when options must be chosen.
+            'default_variant_id' => count($variants) === 1 ? $variants[0]['id'] : null,
             'short_description' => $listing->short_description,
         ];
     }

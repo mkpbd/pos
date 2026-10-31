@@ -3,6 +3,8 @@
 namespace App\Modules\Customers;
 
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
+use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
+use App\Modules\Customers\Application\Services\NoOnlineAccounts;
 use App\Modules\Customers\Infrastructure\Directory\EloquentCustomerDirectory;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
@@ -15,6 +17,8 @@ class CustomersServiceProvider extends ModuleServiceProvider
     public function register(): void
     {
         $this->app->bind(CustomerDirectory::class, EloquentCustomerDirectory::class);
+        // Replaced by the CustomerAccounts module when it is installed.
+        $this->app->bindIf(CustomerOnlineAccounts::class, NoOnlineAccounts::class);
     }
 
     protected function permissions(): array
