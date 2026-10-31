@@ -25,6 +25,7 @@ import {
   type CustomerGroup,
 } from '@/features/customers/api'
 import { CustomerDialog } from '@/features/customers/components/customer-dialog'
+import { useCustomerBalancesQuery } from '@/features/sales/api'
 import { decimalPattern, formatMoney } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -126,6 +127,8 @@ export function CustomersPage() {
   const groups = useCustomerGroupsQuery()
   const archive = useArchiveCustomerMutation()
   const { data, error, isPending, refetch } = useCustomersQuery({ page, search: debouncedSearch || undefined, customer_group_id: groupId === ALL ? undefined : groupId, archived })
+  const canSeeBalances = can('sales.view')
+  const balances = useCustomerBalancesQuery(data?.items.map((c) => c.id) ?? [], canSeeBalances)
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,6 +178,7 @@ export function CustomersPage() {
                       <TableHead>Phone</TableHead>
                       <TableHead className="hidden md:table-cell">Group</TableHead>
                       <TableHead className="hidden lg:table-cell text-right">Credit limit</TableHead>
+                      {canSeeBalances && <TableHead className="text-right">Balance owed</TableHead>}
                       <TableHead>Status</TableHead>
                       {canManage && <TableHead className="w-24"><span className="sr-only">Actions</span></TableHead>}
                     </TableRow>
@@ -186,6 +190,9 @@ export function CustomersPage() {
                         <TableCell className="font-mono text-sm">{c.phone ?? '—'}</TableCell>
                         <TableCell className="hidden md:table-cell">{c.group ? `${c.group.name} (${formatMoney(c.group.discount_percent)} %)` : '—'}</TableCell>
                         <TableCell className="hidden text-right font-mono text-sm lg:table-cell">{c.credit_limit === '0.00' ? 'No credit' : formatMoney(c.credit_limit, currency)}</TableCell>
+                        {canSeeBalances && (
+                          <TableCell className="text-right font-mono text-sm">{balances.data?.[c.id] !== undefined ? formatMoney(balances.data[c.id], currency) : '…'}</TableCell>
+                        )}
                         <TableCell>{c.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={c.is_active ? 'secondary' : 'outline'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
                         {canManage && (
                           <TableCell className="text-right">

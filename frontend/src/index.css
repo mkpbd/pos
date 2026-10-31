@@ -131,3 +131,18 @@
     @apply font-sans;
     }
 }
+/* Receipt printing: only the receipt portal is printed; page size is set per receipt format. */
+.print-root {
+  display: none;
+}
+
+@media print {
+  body > *:not(.print-root) {
+    display: none !important;
+  }
+  .print-root {
+    display: block !important;
+    color: #000;
+    background: #fff;
+  }
+}

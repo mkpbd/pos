@@ -15,13 +15,19 @@ interface StockLedger
 {
     /**
      * Locks the affected stock levels in deterministic order, applies the changes, writes
-     * one ledger movement per change and returns the movements in input order.
-     * Services and other untracked variants are skipped (null in the result).
+     * one ledger movement per change (per batch for allocated changes) and returns the
+     * result in input order. Services and other untracked variants are skipped (null).
+     *
+     * `unit_cost` is the cost of the whole change (weighted over its batches);
+     * `allocations` lists what was taken from or added to each batch.
      *
      * @param  list<StockChange>  $changes
-     * @return list<array{movement_id: string, unit_cost: string, balance_after: string}|null>
+     * @return list<array{
+     *   movement_id: string, unit_cost: string, balance_after: string,
+     *   allocations: list<array{batch_id: ?string, quantity: string, unit_cost: string, movement_id: string}>
+     * }|null>
      *
-     * @throws BusinessRuleViolation INSUFFICIENT_STOCK, STORE_INACTIVE
+     * @throws BusinessRuleViolation INSUFFICIENT_STOCK, STORE_INACTIVE, UNKNOWN_PRODUCT
      */
     public function post(array $changes, StockReference $reference): array;
 }

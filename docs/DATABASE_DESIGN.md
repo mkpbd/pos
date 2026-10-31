@@ -71,14 +71,27 @@ Deviations from the original sketch, by design:
 - No separate `purchase_invoices` table: a goods receipt *is* the supplier invoice (stock and payable are posted in one transaction), which removes a class of "received but not invoiced" mismatches for retail use. Invoice-before-goods workflows can be added later as a status on the receipt.
 - `stock_levels` has no `reserved` or `version` column: stock is decremented under a row lock at the moment of sale, so reservations and optimistic versions are unnecessary.
 - No `CHECK (quantity >= 0)`: negative stock is a per-branch setting, enforced in the ledger after the row lock.
-- `serial_numbers` are deferred: products can be flagged `track_serials`, but serial capture lands with the POS (Phase 5), where serials are scanned at sale time.
+- `serial_numbers` as a stock register are deferred; Phase 5 captures serial numbers at sale time (`sale_line_serials`).
 
-### Phase 5 — POS & sales
-- `pos_terminals`, `register_sessions` (opening cash, closing cash, expected vs counted)
-- `sales` (posted invoices, immutable: number, branch, customer, cashier, subtotal, discount_total, tax_total, grand_total, paid_total, due_total, status `completed|cancelled`, tax_mode snapshot)
-- `sale_items` (variant, batch, quantity, unit_price, discount, tax_rate, tax_amount, line_total — all snapshot values)
-- `held_sales` (draft carts, mutable until posted or discarded)
-- `idempotency_keys` (key, user_id, route, request_hash, response_status, response_body jsonb, created_at; unique (user_id, key))
+### Phase 5 — POS & sales (implemented)
+Sales module (money `NUMERIC(18,2)`, quantities `NUMERIC(18,3)`, costs `NUMERIC(18,4)`, rates `NUMERIC(9,4)`):
+- `sales` — the posted invoice: number `INV-{BRANCH}-000001` (per-branch sequence, prefix from the organization's `invoice_prefix`), branch, store, customer (NULL = walk-in), status `completed|cancelled`, `tax_mode` snapshot, currency, subtotal, item/invoice discount totals (+ invoice discount type, value and source `manual|customer_group`), tax_total, total, paid_total, change_total, due_total, cost_total (COGS snapshot), sold_at, created_by (cashier), cancellation fields. Immutable except for its cancellation (model guard). Indexes `(organization_id, branch_id, sold_at)`, `(organization_id, customer_id, status)`, `(organization_id, created_by, sold_at)`.
+- `sale_lines` — snapshot of product name, variant, SKU, unit; quantity, unit_price, line discount (type/value/amount), invoice discount share, net_amount, tax_rate, tax_amount, line_total, unit_cost and cost_total.
+- `sale_line_stock` — which batch (or untracked stock, batch NULL) each line was taken from, quantity and unit cost; used to restock cancellations (and returns in Phase 6) exactly.
+- `sale_line_serials` — serial numbers sold; partial unique index `(organization_id, variant_id, lower(serial)) WHERE released_at IS NULL` stops selling the same serial twice; cancellation sets `released_at`.
+- `sale_payments` — cash/card/mobile banking: kind `payment|reversal`, signed amount, tendered (cash), reference, branch, created_by, created_at. Reversals (negative) are written when a sale is cancelled.
+- PostgreSQL triggers (`prevent_sales_mutation()`) make `sale_lines`, `sale_line_stock` and `sale_payments` append-only.
+
+POS module:
+- `held_sales` — parked carts per branch/store: label, customer, cart JSON (lines with quantities/discounts/serials, invoice discount, notes), lines_count, created_by. No prices: carts are priced again on resume. Deleted on checkout (inside the checkout transaction) or discard.
+
+Shared:
+- `idempotency_keys` — user_id, key, sha256 fingerprint (method, path, branch header, canonical body), status `processing|completed`, response status and body; unique `(user_id, key)`; pruned after 24 h by the scheduler (`model:prune`).
+
+Deviations from the original sketch, by design:
+- No `pos_terminals` / `register_sessions` yet: they belong to the cash register (Phase 6). Sales already record branch, store and cashier.
+- Customer balances are computed (opening balance + dues of completed sales); due collections arrive with Phase 6 payments.
+- Payments of a sale live in `sale_payments` (Sales module). Phase 6 adds the organization-wide payments ledger and cash register on top.
 
 ### Phase 6 — Money flows
 - `payment_methods`, `payments` (**ledger**: direction in/out, method, amount, reference to sale/purchase/expense, register_session_id)

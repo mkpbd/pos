@@ -12,6 +12,7 @@ enum MovementType: string
     case PurchaseReceipt = 'purchase_receipt';
     case PurchaseReturn = 'purchase_return';
     case Sale = 'sale';
+    case SaleCancellation = 'sale_cancellation';
     case SaleReturn = 'sale_return';
 
     /**
@@ -20,6 +21,6 @@ enum MovementType: string
      */
     public function isInbound(): bool
     {
-        return in_array($this, [self::Opening, self::AdjustmentIn, self::TransferIn, self::PurchaseReceipt, self::SaleReturn], true);
+        return in_array($this, [self::Opening, self::AdjustmentIn, self::TransferIn, self::PurchaseReceipt, self::SaleCancellation, self::SaleReturn], true);
     }
 }

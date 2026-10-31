@@ -21,4 +21,17 @@ class EloquentUserDirectory implements UserDirectory
             ->filter(fn (User $user) => $user->canAccessBranch($branchId))
             ->values();
     }
+
+    public function names(string $organizationId, array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        return User::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $organizationId)
+            ->whereKey(array_values(array_unique($userIds)))
+            ->pluck('name', 'id')
+            ->all();
+    }
 }

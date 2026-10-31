@@ -70,9 +70,9 @@ Create only the folders a module actually needs.
 | Customers | Customers, customer groups (default discount), credit limits, opening balance (statements/loyalty in Phases 5–6) | Shared | 3 ✅ |
 | Inventory | Stock levels, append-only stock ledger (`StockLedger` — the only stock write path), batches/expiry (`BatchDirectory`), adjustments, two-step transfers, weighted-average valuation, low-stock event | Products (`ProductDirectory`), Branches (`BranchDirectory`), Users (`UserDirectory`, notification recipients) | 4 ✅ (serials with POS in 5) |
 | Purchasing | Purchase orders, goods receipts (= supplier invoices), purchase returns, supplier payments, supplier balances and statements | Suppliers (`SupplierDirectory`), Products (`ProductDirectory`), Branches, Inventory (`StockLedger`, `StockLineRules`, `StoreAccess`, `ResolveBatch`, `BatchDirectory`) | 4 ✅ |
-| Discounts | Discount rules and limits | Products, Customers | 5 |
-| POS | Terminal sessions, holds/drafts, cart pricing, checkout orchestration | Sales, Inventory, Payments, Discounts | 5 |
-| Sales | Sale invoices (immutable), cancellation, history | Products, Customers | 5 |
+| Discounts | Manual discount rules live in Sales (`CartPricer`: `sales.discount`, product max. %, customer group discount). A separate module for promotions/coupons is added only when such rules are needed | — | later |
+| Pos | POS terminal API: product grid and scan lookup, live cart pricing, held carts (`held_sales`), idempotent checkout that hands the cart to Sales (`Checkout` → `CompleteSale`) | Sales (actions, `CartPricer`, presenter), Products (`ProductDirectory`, `FindSellableVariant`), Catalog, Inventory (`StockLevels`, `StoreAccess`), Customers, Users | 5 ✅ |
+| Sales | Sale invoices (immutable lines, stock allocations, serials, payments), `SaleCalculator` (discounts, inclusive/exclusive tax), `PaymentSettlement` (split/partial/due, change), customer credit, cancellation, history, daily summary | Inventory (`StockLedger`, `BatchDirectory`, `StockLevels`), Products, Customers (`CustomerDirectory`), Organizations, Branches, Users | 5 ✅ |
 | Payments | Payment methods, payment ledger, split/partial/due payments, cash register | Sales, Purchasing | 6 |
 | Returns, Refunds | Sales returns, approval workflow, refunds, restocking rules (purchase returns live in Purchasing) | Sales, Inventory, Payments | 6 |
 | Expenses | Expense categories and entries, income | Payments | 6 |

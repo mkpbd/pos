@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, BoxesIcon, BuildingIcon, Building2Icon, ContactIcon, PackageIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingCartIcon, StoreIcon, TagsIcon, TruckIcon, UsersIcon } from 'lucide-react'
+import { ActivityIcon, BoxesIcon, BuildingIcon, Building2Icon, ContactIcon, PackageIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingCartIcon, StoreIcon, TagsIcon, TruckIcon, UsersIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -17,6 +17,8 @@ export type NavItem = {
  * working API endpoints — no placeholder links.
  */
 export const NAV_ITEMS: NavItem[] = [
+  { to: '/pos', label: 'POS Terminal', icon: ScanBarcodeIcon, permission: 'pos.sell' },
+  { to: '/sales', label: 'Sales', icon: ReceiptTextIcon, permission: 'sales.view' },
   { to: '/products', label: 'Products', icon: PackageIcon, permission: 'products.view' },
   { to: '/catalog', label: 'Catalog', icon: TagsIcon, permission: 'products.view' },
   { to: '/inventory', label: 'Inventory', icon: BoxesIcon, permission: 'inventory.view' },

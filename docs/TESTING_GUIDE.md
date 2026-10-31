@@ -42,13 +42,13 @@ PostgreSQL-only tests (`StockLockingTest`: two real connections, committed data 
 |---|----------|-------|--------|
 | 1 | Product creation | 3 | ✅ `ProductManagementTest`, `ProductDefinitionRulesTest`, editor UI tests, full-stack spec |
 | 2 | Purchase and stock receiving | 4 | ✅ `PurchasingWorkflowTest` (order → partial receipt → over-receipt refused → return → payment → statement), `PurchaseTotalsTest`, receipt/return UI tests, full-stack spec (receive PO-000001: stock 60 → 156, supplier balance) |
-| 3 | POS product selection | 5 | ☐ |
-| 4 | Barcode scanning | 5 | ☐ |
-| 5 | Discount calculation | 5 | ☐ (Money allocation ✅) |
-| 6 | Tax calculation | 5 | ☐ |
-| 7 | Multiple payment processing | 6 | ☐ |
-| 8 | Successful checkout | 5 | ☐ |
-| 9 | Inventory deduction | 5 | ◐ ledger side done in Phase 4: `StockLedgerTest` (insufficient stock, negative-stock branches, WAC, batches, immutability), `StockTransferTest`, PostgreSQL-only `StockLockingTest` (row lock held across connections; last unit cannot be issued twice). Checkout integration in Phase 5 |
+| 3 | POS product selection | 5 | ✅ `PosTerminalTest` (grid with price/tax/stock, categories, inactive products hidden), `cart-store.test.ts`, POS page tests |
+| 4 | Barcode scanning | 5 | ✅ `PosTerminalTest::test_scanning_a_barcode_finds_the_variant`, POS page scan test, full-stack spec (scan → pay → receipt) |
+| 5 | Discount calculation | 5 | ✅ `SaleCalculatorTest` (item/invoice, percent/amount, exact allocation), `DiscountAndTaxTest` (permission, product limit, customer group, preview = checkout) |
+| 6 | Tax calculation | 5 | ✅ `SaleCalculatorTest` (exclusive and inclusive, per-line rounding), `DiscountAndTaxTest::test_tax_inclusive_prices_contain_the_tax` |
+| 7 | Multiple payment processing | 5–6 | ◐ at checkout: `PaymentSettlementTest` (split, change from cash only, partial, credit), `CheckoutTest::test_split_partial_and_credit_payments`; due collection and register in Phase 6 |
+| 8 | Successful checkout | 5 | ✅ `CheckoutTest` (invoice, immutability, client prices ignored, idempotent replay, rollback, numbering), POS page tests, full-stack spec |
+| 9 | Inventory deduction | 5 | ✅ `CheckoutTest` (deduction, rollback on `INSUFFICIENT_STOCK`, negative-stock branches, FEFO batches, services), `SalesManagementTest` (cancellation restocks exact batches), ledger tests from Phase 4; PostgreSQL-only `StockLockingTest` |
 | 10 | Sales return and refund | 6 | ☐ |
 | 11 | Cash register closing | 6 | ☐ |
 | 12 | Branch-level data isolation | 2+ | ✅ organization/branch/user/role level (`TenantIsolationTest`); extended per module in later phases |

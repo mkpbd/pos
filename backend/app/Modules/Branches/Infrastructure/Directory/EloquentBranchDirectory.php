@@ -48,6 +48,7 @@ class EloquentBranchDirectory implements BranchDirectory
             'code' => $store->code,
             'name' => $store->name,
             'branch_id' => $store->branch_id,
+            'branch_code' => $store->branch->code,
             'branch_name' => $store->branch->name,
             'is_active' => $store->is_active,
             'branch_is_active' => $store->branch->is_active,
@@ -74,6 +75,20 @@ class EloquentBranchDirectory implements BranchDirectory
                 'branch_name' => $s->branch->name,
             ]])
             ->all();
+    }
+
+    public function profile(string $branchId, string $organizationId): ?array
+    {
+        $branch = $this->query($organizationId)->find($branchId);
+
+        return $branch === null ? null : [
+            'id' => $branch->id,
+            'code' => $branch->code,
+            'name' => $branch->name,
+            'address' => $branch->address,
+            'phone' => $branch->phone,
+            'email' => $branch->email,
+        ];
     }
 
     /**

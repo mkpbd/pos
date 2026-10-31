@@ -28,4 +28,11 @@ interface CatalogDirectory
      * }
      */
     public function describe(string $organizationId, array $ids): array;
+
+    /**
+     * The category and all categories below it (empty when it does not exist).
+     *
+     * @return list<string>
+     */
+    public function categoryWithDescendants(string $organizationId, string $categoryId): array;
 }

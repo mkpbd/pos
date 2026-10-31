@@ -116,6 +116,17 @@ Each module's provider returns its permissions from `permissions()` (e.g. `'user
 - **Purchasing documents.** A purchase order commits nothing to stock. A goods receipt is the supplier invoice: one transaction posts stock in, the payable, and the received quantities back onto the order (`partially_received`/`received`). Returns are limited per receipt line to the quantity not yet returned and leave at the receipt's unit cost and batch. Supplier balances and statements are computed from documents (opening balance + receipts − returns − payments), not stored, so they can never drift.
 - **Low stock** is detected inside the ledger when a level crosses its reorder level downward. `StockFellBelowReorderLevel` is dispatched **after commit** (a rolled-back sale never alerts) and handled by a queued listener that notifies users holding `inventory.view` for that branch through Laravel database notifications (`/notifications`).
 
+## 3c. POS and sales (Phase 5)
+
+- **The server prices every cart.** The client sends variant ids, quantities, requested discounts and payments — never prices or totals. `CartPricer` loads current selling prices and tax rates, applies the discount rules and runs the pure `SaleCalculator`; the POS preview (`POST /pos/price`) and checkout use the same code, so they always agree to the cent.
+- **Calculation order** per line: subtotal = quantity × price (rounded once) → item discount → share of the invoice discount (allocated in proportion with largest-remainder rounding, so shares add up exactly) → tax: added on top (exclusive) or extracted as amount × rate / (100 + rate) (inclusive, the organization's `tax_mode`, snapshotted on the sale). Invoice totals are sums of rounded line values.
+- **Discount rules** (critical rule #4): manual discounts need `sales.discount`; an item discount may not exceed the product's max. discount %; the customer's group discount is applied automatically as the invoice discount and needs no permission. Violations are `DISCOUNT_NOT_ALLOWED`.
+- **Payments** (`PaymentSettlement`): any mix of cash, card and mobile banking. Only cash can be over-tendered (change is taken from the last cash payments); a shortfall stays due and needs a customer, `sales.credit` and room in the customer's credit limit, checked under a per-customer advisory lock.
+- **Checkout transaction** (`CompleteSale`, critical rules #1–3, #9): number the invoice from the branch's locked sequence row → post stock through the ledger (batch-tracked goods first-expiry-first-out, expired batches never) → write the invoice with its cost snapshot, batch allocations, serial numbers and payments. Anything failing (stock, credit, serial already sold) rolls everything back, including the invoice number.
+- **Idempotency** (critical rule #5): `POST /pos/checkout` requires `Idempotency-Key`. The `idempotent` middleware claims the key before the controller runs, stores a successful response and replays it for retries with the same payload; a different payload with the same key is `409 IDEMPOTENCY_KEY_REUSED`, a concurrent duplicate `409 IDEMPOTENCY_REQUEST_IN_PROGRESS`. Failed attempts release the key. The SPA keeps the key with the pending cart, so a retry after a time-out or reload cannot sell twice.
+- **Immutability** (critical rule #6): lines, stock allocations and payments are append-only (model guards + PostgreSQL triggers). Cancelling a sale changes only its status: stock goes back to the exact batches at the cost it left with, payments get negative reversal entries, serials are released, and the cancellation is audited.
+- **Visibility:** `sales.view` sees the sales of accessible branches; a POS-only role sees the sales it rang up. Cost figures need `products.view_cost`.
+
 ## 4. Authentication and authorization
 
 - **Web SPA:** Laravel Sanctum **cookie-based SPA authentication** (session + CSRF via `XSRF-TOKEN`). No bearer tokens in browser storage, so XSS cannot exfiltrate long-lived credentials. The Vite dev server proxies `/api` and `/sanctum` so the SPA is same-origin.
@@ -134,7 +145,7 @@ Each module's provider returns its permissions from `permissions()` (e.g. `'user
 | No overselling (unless configured) | Stock level rows locked with `SELECT … FOR UPDATE` in deterministic store/variant/batch order (prevents deadlocks); quantity checked after the lock; `INSUFFICIENT_STOCK` unless the branch allows negative stock (implemented in Phase 4, see §3b). |
 | Server-side totals | Client sends only product ids, quantities, requested discounts and payments. Prices, taxes, discounts and totals are recomputed from the database with `Money`. |
 | Price/discount validation | Discounts checked against product/role limits and active promotions on the server. |
-| Idempotency | `Idempotency-Key` header required on checkout and payment endpoints; key + user + request hash stored with the response; replays return the stored response, mismatched payloads get 409. |
+| Idempotency | `Idempotency-Key` header required on checkout (payments in Phase 6); key + user + request fingerprint stored with the response; replays return the stored response (`Idempotent-Replayed: true`), mismatched payloads get 409, failed attempts release the key (implemented in Phase 5, see §3c). |
 | Immutable history | Posted sales, stock ledger and payment ledger rows are append-only (enforced in code and by database triggers that reject `UPDATE`/`DELETE`). |
 | Returns reference original sale | `sale_returns.sale_id` FK + per-line quantity ceilings. |
 | Decimal types only | `NUMERIC(18,2)` money, `NUMERIC(18,3)` quantities, `NUMERIC(9,4)` rates. No `float`/`double`/`real` anywhere. |
@@ -171,7 +182,8 @@ e2e/              Playwright specs
 - **Client state** (theme, cart drafts, UI) in Zustand. Server data is never duplicated into Zustand.
 - **Forms:** React Hook Form + Zod; server `VALIDATION_FAILED` details are mapped back onto fields.
 - **Navigation** lists a module only once it is backed by working endpoints (no placeholder UI).
-- The POS terminal is optimized for keyboard and barcode scanners (Phase 5): focus-managed scan input, shortcut map, optimistic cart with server-side pricing confirmation.
+- The POS terminal is optimized for keyboard and barcode scanners: an always-focused scan field (scanners type the code and press Enter → exact barcode/SKU lookup), shortcuts F2 search, F4 customer, F8 hold, F9 pay; the cart lives in a persisted Zustand store per branch while every amount shown comes from the server's pricing endpoint.
+- Receipts print from the browser: the receipt is rendered into a print-only portal with an `@page` size for 58 mm or 80 mm thermal rolls or A4. Cash drawers wired to the receipt printer open through the printer driver's "open drawer on print" setting; browsers cannot drive a drawer directly.
 
 ## 9. Optional AI module
 

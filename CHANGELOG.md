@@ -4,6 +4,23 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Phase 5 — POS terminal and sales processing
+
+#### Added
+- **Sales module:** immutable sale invoices numbered per branch (`INV-{BRANCH}-000001`, prefix from organization settings) with product snapshots, cost of goods, batch allocations, serial numbers and payments; `SaleCalculator` (item and invoice discounts as percent or amount, exact allocation of invoice discounts, tax-inclusive and tax-exclusive pricing with per-line rounding); `PaymentSettlement` (split payments, change from cash only, partial payments leaving a due); customer credit limits under a per-customer lock; discount rules (`sales.discount`, product max. discount %, automatic customer group discount); cancellation (restock to the exact batches, negative payment reversals, serials released, audited); sales history with filters; daily sales summary with payments by method; customer balances.
+- **POS module:** product grid with stock of the selling store, barcode/SKU lookup, live server pricing of the cart, held (parked) carts per branch, idempotent checkout that also consumes a resumed held cart.
+- **Shared idempotency:** `idempotent` route middleware and `idempotency_keys` table (replay of successful responses, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_REQUEST_IN_PROGRESS`, `IDEMPOTENCY_KEY_REQUIRED`), pruned daily by the scheduler.
+- Inventory: first-expiry-first-out batch allocation inside the stock ledger (expired batches are never sold), `StockLevels` contract for availability, movement type `sale_cancellation`.
+- Directories: `CustomerDirectory` (Customers), `CatalogDirectory::categoryWithDescendants`, `ProductDirectory::sellablePage` and `max_discount_percent`, `BranchDirectory::profile` and store `branch_code`, `OrganizationDirectory` document settings, `UserDirectory::names`.
+- Permissions: `pos.sell`, `sales.view`, `sales.discount`, `sales.credit`, `sales.cancel` (Cashier: `pos.*`, `sales.view`; Branch Manager: `pos.*`, `sales.*`).
+- Demo sales seeder (a walk-in cash sale with change and a wholesale customer on account).
+- Frontend: POS terminal (scan field, categories and product grid with stock, cart with quantity steppers, line and invoice discounts, serial capture, customer picker with credit position, held sales, recent sales, payment dialog with split/partial payments and change, receipt preview and printing for 58 mm / 80 mm thermal and A4, shortcuts F2/F4/F8/F9, cart persisted per branch, idempotency key reused on retry), Sales pages (daily summary, history, invoice detail with receipt and cancellation), customer balances on the Customers page.
+- Tests: 217 backend tests (2 PostgreSQL-only skipped on SQLite); 74 Vitest tests; 6 Playwright smoke tests; 5 full-stack Playwright tests (new: a cashier scans, takes cash and the sale reaches stock and history).
+
+#### Changed
+- Users land on the POS terminal when they may sell (first navigation entry), otherwise on the first page their role may open.
+- The stock ledger reports per-batch allocations for every change.
+
 ### Phase 4 — Purchasing and inventory
 
 #### Added

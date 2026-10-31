@@ -14,7 +14,7 @@ test('organization admin signs in with a real Sanctum session and manages users'
   await page.getByRole('button', { name: 'Sign in' }).click()
 
   // Lands on the first page the role may open.
-  await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
   await page.getByRole('link', { name: 'Branches' }).first().click()
   await expect(page.getByRole('cell', { name: 'Dhaka Main', exact: true })).toBeVisible()
 
@@ -76,10 +76,10 @@ test('receiving a purchase order moves stock and the supplier balance', async ({
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  // Opening stock from the demo seed.
+  // Opening stock 60 from the demo seed, minus the 4 of the demo sale.
   await page.getByRole('link', { name: 'Inventory' }).first().click()
   const juice = page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })
-  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^60(\s|$)/)
+  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^56(\s|$)/)
 
   // Receive the seeded order for 96 in full.
   await page.getByRole('link', { name: 'Purchasing' }).first().click()
@@ -95,11 +95,49 @@ test('receiving a purchase order moves stock and the supplier balance', async ({
   await expect(page.getByText('BDT 1,987.20')).toBeVisible()
 
   await page.getByRole('link', { name: 'Inventory' }).first().click()
-  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^156(\s|$)/)
+  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^152(\s|$)/)
 
   await page.getByRole('link', { name: 'Suppliers' }).first().click()
   const pran = page.getByRole('row').filter({ hasText: 'Pran Distribution Ltd' })
   await expect(pran).toContainText('BDT 1,987.20')
+})
+
+test('cashier scans, takes cash and the sale reaches stock and history', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByLabel('E-mail').fill('cashier@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  // Cashiers land on the till.
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  const scanner = page.getByRole('textbox', { name: 'Scan barcode or search products' })
+  const cart = page.getByRole('complementary', { name: 'Current sale' })
+  await expect(page.getByRole('button', { name: /Pran Mango Juice 250ml/ })).toBeVisible()
+  for (let i = 0; i < 2; i++) {
+    await scanner.fill('4006381333931')
+    await scanner.press('Enter')
+    await expect(scanner).toHaveValue('')
+  }
+  await expect(cart.getByRole('textbox', { name: 'Quantity of Pran Mango Juice 250ml' })).toHaveValue('2')
+  // 2 × 25.00 + 15 % VAT, priced by the server.
+  await expect(cart.getByTestId('cart-total')).toHaveText('BDT 57.50')
+
+  await page.keyboard.press('F9')
+  const payment = page.getByRole('dialog', { name: 'Payment' })
+  await payment.getByRole('textbox', { name: 'Amount of payment 1' }).fill('100')
+  await expect(payment.getByTestId('change-due')).toHaveText('BDT 42.50')
+  await payment.getByRole('button', { name: 'Complete sale' }).click()
+
+  const done = page.getByRole('dialog', { name: /^Sale INV-MAIN-\d{6} completed$/ })
+  await expect(done).toContainText('Change due: BDT 42.50')
+  await expect(done.getByTestId('receipt')).toContainText('Pran Mango Juice 250ml')
+  await done.getByRole('button', { name: 'New sale' }).click()
+
+  // 152 after the receipt test, minus 2.
+  await expect(page.getByRole('button', { name: /Pran Mango Juice 250ml/ })).toContainText('150 pcs')
+
+  await page.getByRole('link', { name: 'Sales' }).first().click()
+  await expect(page.getByRole('row').filter({ hasText: 'BDT 57.50' })).toBeVisible()
 })
 
 test('cashier only sees what the role allows, and the API agrees', async ({ page }) => {
@@ -108,6 +146,8 @@ test('cashier only sees what the role allows, and the API agrees', async ({ page
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await page.getByRole('link', { name: 'Products' }).first().click()
   await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Users' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'New product' })).toHaveCount(0)

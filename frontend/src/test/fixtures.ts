@@ -96,3 +96,17 @@ export const branchesWithStores = () => [
     ],
   },
 ]
+
+export const posCashier = (): CurrentUser =>
+  makeCurrentUser({
+    user: { id: 'u-4', name: 'Pos Cashier', email: 'pos@corner.test', phone: null, is_platform_admin: false, last_login_at: null },
+    roles: [{ id: 'r-3', name: 'Cashier', system_key: 'cashier' }],
+    permissions: ['branches.view', 'customers.create', 'customers.view', 'pos.sell', 'products.view', 'sales.view'],
+    branches: [{ id: 'b-1', code: 'MAIN', name: 'Main Branch', is_active: true }],
+  })
+
+export const salesManager = (): CurrentUser =>
+  makeCurrentUser({
+    roles: [{ id: 'r-2', name: 'Branch Manager', system_key: 'branch_manager' }],
+    permissions: ['branches.view', 'customers.view', 'pos.sell', 'products.view', 'products.view_cost', 'sales.cancel', 'sales.credit', 'sales.discount', 'sales.view'],
+  })

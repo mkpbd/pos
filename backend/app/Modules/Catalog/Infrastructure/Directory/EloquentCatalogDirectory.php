@@ -60,4 +60,20 @@ class EloquentCatalogDirectory implements CatalogDirectory
                 ->map(fn (TaxRate $t) => ['id' => $t->id, 'name' => $t->name, 'rate' => $t->rate])->all(),
         ];
     }
+
+    public function categoryWithDescendants(string $organizationId, string $categoryId): array
+    {
+        $ids = [];
+        $level = Category::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $organizationId)->whereKey($categoryId)->pluck('id')->all();
+
+        // The tree is at most four levels deep, so this is at most four small queries.
+        while ($level !== []) {
+            $ids = [...$ids, ...$level];
+            $level = Category::query()->withoutGlobalScope('organization')
+                ->where('organization_id', $organizationId)->whereIn('parent_id', $level)->pluck('id')->all();
+        }
+
+        return $ids;
+    }
 }

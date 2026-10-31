@@ -58,6 +58,9 @@ const pages = {
   receipt: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReceiptPage'),
   purchaseReturns: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReturnsPage'),
   payments: page(() => import('@/features/purchasing/pages/payment-pages'), 'PaymentsPage'),
+  posTerminal: page(() => import('@/features/pos/pages/pos-terminal-page'), 'PosTerminalPage'),
+  sales: page(() => import('@/features/sales/pages/sales-pages'), 'SalesPage'),
+  sale: page(() => import('@/features/sales/pages/sales-pages'), 'SalePage'),
 }
 
 export const routes: RouteObject[] = [
@@ -86,6 +89,9 @@ export const routes: RouteObject[] = [
             element: <AppLayout />,
             children: [
               { index: true, element: <HomeRedirect /> },
+              guarded('pos.sell', 'pos', pages.posTerminal),
+              guarded('sales.view', 'sales', pages.sales),
+              guarded('sales.view', 'sales/:saleId', pages.sale),
               guarded('products.view', 'products', pages.products),
               // Editing needs cost prices, so it requires both permissions.
               {

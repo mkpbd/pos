@@ -2,6 +2,8 @@
 
 namespace App\Modules\Customers;
 
+use App\Modules\Customers\Application\Contracts\CustomerDirectory;
+use App\Modules\Customers\Infrastructure\Directory\EloquentCustomerDirectory;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
 /**
@@ -10,6 +12,11 @@ use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
  */
 class CustomersServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(CustomerDirectory::class, EloquentCustomerDirectory::class);
+    }
+
     protected function permissions(): array
     {
         return [

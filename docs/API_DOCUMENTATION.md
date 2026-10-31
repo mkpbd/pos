@@ -52,7 +52,8 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 403 | `FORBIDDEN` | Authenticated but lacking permission or branch access. |
 | 404 | `NOT_FOUND` | Unknown route or resource (also returned for resources of other tenants). |
 | 405 | `METHOD_NOT_ALLOWED` | |
-| 409 | `CONFLICT` / `IDEMPOTENCY_KEY_REUSED` | State conflict / same key with a different payload. |
+| 409 | `CONFLICT` / `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_REQUEST_IN_PROGRESS` | State conflict / same key with a different payload / the first request with this key is still running (`Retry-After`). |
+| 428 | `IDEMPOTENCY_KEY_REQUIRED` | Checkout sent without an `Idempotency-Key` header. |
 | 419 | `CSRF_TOKEN_MISMATCH` | SPA must refresh `/sanctum/csrf-cookie`. |
 | 422 | `VALIDATION_FAILED` | Field-level errors in `details`. |
 | 422 | *domain code* | Business rule violation, e.g. `INSUFFICIENT_STOCK`, `CREDIT_LIMIT_EXCEEDED`, `DISCOUNT_NOT_ALLOWED`. Context in `details`. |
@@ -67,6 +68,10 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `TRANSFER_NOT_IN_TRANSIT` | Transfer was already received or cancelled. |
 | 422 | `PURCHASE_ORDER_LOCKED`, `INVALID_STATUS_CHANGE`, `PURCHASE_ORDER_NOT_OPEN` | Only drafts can be edited; illegal status transition; receiving against a draft/cancelled/fully received order. |
 | 409 | `CONFLICT` | A concurrent request saved a conflicting record (unique index); reload and retry. |
+| 422 | `DISCOUNT_NOT_ALLOWED` | Manual discount without `sales.discount`, above the product's max. %, or larger than the amount (`details.line`, `details.max_percent`). |
+| 422 | `CUSTOMER_REQUIRED`, `CREDIT_SALE_NOT_ALLOWED`, `CREDIT_LIMIT_EXCEEDED` | An amount left due needs a customer, `sales.credit` and room in the credit limit (`details.outstanding`, `credit_limit`, `available`, `due`). |
+| 422 | `NON_CASH_OVERPAYMENT` | Card/mobile payments exceed the total (only cash gives change). |
+| 422 | `PRODUCT_NOT_SELLABLE`, `HELD_SALE_GONE`, `SALE_ALREADY_CANCELLED` | Scanned product archived/inactive; held cart already checked out or discarded; repeated cancellation. |
 | 422 | `PRIVILEGE_ESCALATION` | Granting/assigning permissions the actor lacks, or editing a more powerful user. `details.permissions` lists what is missing. |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
@@ -77,7 +82,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | Header | Direction | Purpose |
 |--------|-----------|---------|
 | `X-Request-Id` | both | Correlation id. Clients may send one (8–64 chars `[A-Za-z0-9-_.]`); the server always returns it. |
-| `Idempotency-Key` | request | Required on checkout and payment endpoints (Phase 5+). A UUID per user action; retries reuse it. |
+| `Idempotency-Key` | request | Required on `POST /pos/checkout` (and payment endpoints from Phase 6): 8–100 characters, one per logical operation (the SPA uses a UUID); reuse it when retrying. A replayed response carries `Idempotent-Replayed: true`. |
 | `X-Branch-Id` | request | Active branch. Optional; when sent it must be an active branch of the organization that the user is assigned to (or `branches.access_all`). Branch-scoped endpoints (Phase 4+) require it. |
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). |
@@ -161,6 +166,17 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET / POST | `/purchasing/payments` | tenant | `purchases.view` / `purchases.pay` | Supplier payments (`method`: `cash`, `bank_transfer`, `mobile_banking`, `cheque`, `card`, `other`); `supplier_id`, `from`, `to`. Numbered `SPAY-000001`. |
 | GET | `/purchasing/supplier-balances?supplier_ids[]=` | tenant | `purchases.view` | `{supplier_id: "amount owed"}` = opening balance + receipts − returns − payments. |
 | GET | `/purchasing/suppliers/{id}/statement` | tenant | `purchases.view` | Running statement; optional `from`/`to` (earlier activity is folded into `opening_balance`). |
+| GET | `/pos/catalog` | tenant | `pos.sell` | Product grid for `store_id`: sellable variants with `price`, `tax_rate`, `on_hand` (null for untracked items), `image_url`. `category_id` includes sub-categories; `search` matches name, SKU or exact barcode; `page`, `per_page` (≤ 100, default 48). |
+| GET | `/pos/lookup?store_id=&code=` | tenant | `pos.sell` | Scanned/typed code → item (exact barcode, then SKU). `404` unknown, `PRODUCT_NOT_SELLABLE`. |
+| POST | `/pos/price` | tenant | `pos.sell` | Prices a cart without saving: lines with amounts and informational `available`, `invoice_discount` (+ `source`), totals, customer credit position. Same rules as checkout. |
+| POST | `/pos/checkout` | tenant | `pos.sell` + `Idempotency-Key` | Cart + `payments[]` (+ optional `held_sale_id`, `lines.*.serials`). `201` with the invoice (same shape as `GET /sales/{id}`). |
+| GET / POST | `/pos/held` | tenant | `pos.sell` | Held carts of accessible branches (`store_id` filter) / hold a cart (`label` optional). |
+| GET / DELETE | `/pos/held/{id}` | tenant | `pos.sell` | Resume (returns `cart`) / discard. |
+| GET | `/sales` | tenant | `sales.view` (or `pos.sell`: own sales) | History: `branch_id`, `store_id`, `customer_id`, `cashier_id`, `status`, `from`/`to` (days in the organization's timezone), `search` (invoice number); sort `sold_at`, `number`, `total`. |
+| GET | `/sales/{id}` | tenant | as above | Invoice with lines (batches, serials), payments and `receipt` data (organization, header/footer, branch contacts). `cost_total`/`unit_cost` only with `products.view_cost`. |
+| POST | `/sales/{id}/cancel` | tenant | `sales.cancel` | `{reason}` → restock, payment reversals, serials released; `SALE_ALREADY_CANCELLED`. |
+| GET | `/sales/summary` | tenant | `sales.view` | Daily summary (`date`, `branch_id`): counts, gross/net sales, tax, discounts, due, cancelled, payments by method; `cost`/`gross_profit` only with `products.view_cost`. |
+| GET | `/sales/customer-balances?customer_ids[]=` | tenant | `sales.view` | `{customer_id: amount owed}` = opening balance + dues of completed sales. |
 | GET | `/notifications` | auth | — | Own in-app notifications (paginated), `unread=1`. Currently `inventory.low_stock`. |
 | GET | `/notifications/unread-count` | auth | — | `{count}` for the bell. |
 | POST | `/notifications/{id}/read`, `/notifications/read-all` | auth | — | Mark as read. |
@@ -181,6 +197,23 @@ POST /api/v1/products
 }
 ```
 Prices are decimal strings (2 places; reorder level 3). Blank SKUs become `SKU-000001`, … Numeric 8/12/13/14-digit barcodes must have a valid GS1 check digit. Field errors use dotted paths (`variants.1.barcodes.0`).
+
+Example — checkout (split payment with change):
+```http
+POST /api/v1/pos/checkout
+Idempotency-Key: 6f1c2a9e-4c1b-4f55-9a0e-1f3f0b7d2c11
+```
+```json
+{
+  "store_id": "0193…", "customer_id": null,
+  "lines": [
+    { "variant_id": "0193…", "quantity": "2", "discount": null },
+    { "variant_id": "0193…", "quantity": "1.250", "discount": { "type": "percent", "value": "5" } }
+  ],
+  "payments": [ { "method": "card", "amount": "100.00", "reference": "VISA 4242" }, { "method": "cash", "amount": "50" } ]
+}
+```
+Response `201` `data`: `number` `INV-MAIN-000042`, `subtotal`, `item_discount_total`, `invoice_discount_total`, `tax_total`, `total`, `paid_total`, `change_total`, `due_total`, `lines[]` (with `batches`, `serials`), `payments[]` (cash shows `tendered`), `receipt{}`. Prices in the request are ignored; leaving out `invoice_discount` applies the customer's group discount, `null` removes it.
 
 Example — receive goods against a purchase order (stock in + supplier invoice in one transaction):
 ```json
@@ -246,7 +279,6 @@ GET /api/v1/health
 
 | Phase | Resource paths |
 |-------|----------------|
-| 5 | `/pos/products/lookup`, `/pos/cart/price`, `/pos/hold`, `/pos/checkout`, `/pos/sales` |
 | 6 | `/payments`, `/cash-registers`, `/returns`, `/refunds`, `/expenses` |
 | 7 | `/reports/*`, `/dashboard` |
 | 8 | `/ai/insights`, `/ai/ask` |

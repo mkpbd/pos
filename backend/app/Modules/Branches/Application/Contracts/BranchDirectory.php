@@ -29,7 +29,7 @@ interface BranchDirectory
     /**
      * A store (stock location) of the organization with its branch's stock policy.
      *
-     * @return array{id: string, code: string, name: string, branch_id: string, branch_name: string, is_active: bool, branch_is_active: bool, allow_negative_stock: bool}|null
+     * @return array{id: string, code: string, name: string, branch_id: string, branch_code: string, branch_name: string, is_active: bool, branch_is_active: bool, allow_negative_stock: bool}|null
      */
     public function store(string $storeId, string $organizationId): ?array;
 
@@ -38,4 +38,11 @@ interface BranchDirectory
      * @return array<string, array{id: string, code: string, name: string, branch_id: string, branch_name: string}>
      */
     public function storeSummaries(string $organizationId, array $storeIds): array;
+
+    /**
+     * Contact details printed on documents (receipts, invoices).
+     *
+     * @return array{id: string, code: string, name: string, address: ?string, phone: ?string, email: ?string}|null
+     */
+    public function profile(string $branchId, string $organizationId): ?array;
 }

@@ -24,6 +24,9 @@ class EloquentOrganizationDirectory implements OrganizationDirectory
             'timezone' => $organization->timezone,
             'tax_mode' => $organization->tax_mode->value,
             'status' => $organization->status->value,
+            'invoice_prefix' => $organization->settings['invoice_prefix'] ?? null,
+            'receipt_header' => $organization->settings['receipt_header'] ?? null,
+            'receipt_footer' => $organization->settings['receipt_footer'] ?? null,
         ];
     }
 }

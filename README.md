@@ -46,7 +46,7 @@ cd frontend; npm install; npm run dev     # http://localhost:5173
 | 2 | Authentication, RBAC, organizations, branches, audit trail | ✅ (PostgreSQL run pending) |
 | 3 | Products, categories, brands, units, suppliers, customers | ✅ (PostgreSQL run pending) |
 | 4 | Purchasing and inventory | ✅ (PostgreSQL run pending) |
-| 5 | POS terminal and sales processing | ☐ |
+| 5 | POS terminal and sales processing | ✅ (PostgreSQL run pending) |
 | 6 | Payments, returns, refunds, cash register, expenses, loyalty | ☐ |
 | 7 | Reports and dashboard analytics | ☐ |
 | 8 | AI features | ☐ |

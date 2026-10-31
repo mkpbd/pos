@@ -8,8 +8,10 @@ use App\Modules\Customers\CustomersServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Organizations\OrganizationsServiceProvider;
+use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
+use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Suppliers\SuppliersServiceProvider;
 use App\Modules\System\SystemServiceProvider;
 use App\Modules\Users\UsersServiceProvider;
@@ -32,4 +34,6 @@ return [
     InventoryServiceProvider::class,
     PurchasingServiceProvider::class,
     NotificationsServiceProvider::class,
+    SalesServiceProvider::class,
+    PosServiceProvider::class,
 ];

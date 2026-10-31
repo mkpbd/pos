@@ -4,9 +4,11 @@ namespace App\Modules\Inventory;
 
 use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
+use App\Modules\Inventory\Application\Contracts\StockLevels;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
 use App\Modules\Inventory\Infrastructure\Directory\EloquentBatchDirectory;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLedger;
+use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLevels;
 use App\Modules\Inventory\Infrastructure\Models\StockAdjustment;
 use App\Modules\Inventory\Infrastructure\Models\StockTransfer;
 use App\Modules\Inventory\Infrastructure\Notifications\NotifyLowStock;
@@ -23,6 +25,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(StockLedger::class, EloquentStockLedger::class);
         $this->app->bind(BatchDirectory::class, EloquentBatchDirectory::class);
+        $this->app->bind(StockLevels::class, EloquentStockLevels::class);
     }
 
     public function boot(): void

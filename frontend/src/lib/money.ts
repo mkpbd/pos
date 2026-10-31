@@ -90,3 +90,18 @@ export function subtractDecimal(a: string, b: string, scale = 3): string {
   return fromScaled(toScaled(a, scale) - toScaled(b, scale), scale)
 }
 
+
+/** Exact a + b for decimal strings (cart quantities, tendered amounts). */
+export function addDecimal(a: string, b: string, scale = 3): string {
+  return fromScaled(toScaled(a, scale) + toScaled(b, scale), scale)
+}
+
+/** Exact sum of decimal strings; empty or invalid entries count as zero. */
+export function sumDecimals(values: string[], scale = 2): string {
+  return values.reduce((sum, v) => addDecimal(sum, /^-?\d+(\.\d+)?$/.test(v.trim()) ? v.trim() : '0', scale), fromScaled(0n, scale))
+}
+
+/** True for "0", "0.00", "-0.000"… (no float parsing). */
+export function isZeroDecimal(value: string | null | undefined): boolean {
+  return /^-?0*(\.0*)?$/.test((value ?? '').trim())
+}

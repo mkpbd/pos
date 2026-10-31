@@ -7,12 +7,14 @@ use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
+use App\Modules\Inventory\Infrastructure\Models\Batch;
 use App\Modules\Inventory\Infrastructure\Models\StockLevel;
 use App\Modules\Inventory\Infrastructure\Models\StockMovement;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,7 +24,8 @@ use LogicException;
  * Concurrency model:
  *  1. All affected stock_levels rows are locked with SELECT … FOR UPDATE, always in the
  *     same (store, variant, batch) order, so two transactions can never wait on each other
- *     in a cycle (no deadlocks).
+ *     in a cycle (no deadlocks). A batch allocation locks all batch rows of its store ×
+ *     variant at that position, in batch order, before choosing batches.
  *  2. The quantity check happens after the lock, so two sales of the last unit cannot both
  *     succeed: the second waits for the first to commit and then sees the reduced quantity.
  *  3. Level update and ledger row are written in the caller's transaction.
@@ -67,66 +70,182 @@ class EloquentStockLedger implements StockLedger
             }
 
             $store = $stores[$change->storeId];
-            $level = $this->lockLevel($organizationId, $store['branch_id'], $change);
             $pairKey = $change->storeId.'|'.$change->variantId;
             $totalsBefore[$pairKey] ??= [$store, $variant, $this->storeTotal($change->storeId, $change->variantId)];
 
-            $signed = $change->signedQuantity();
-            $newQuantity = Decimal::add($level->quantity, $signed, 3);
+            $pieces = $change->allocateBatches && $variant['track_batches']
+                ? $this->allocate($store, $variant, $change)
+                : [$change->withBatch($change->batchId, $change->quantity)];
 
-            if ($change->type->isInbound()) {
-                $cost = Decimal::round((string) $change->unitCost, 4);
-                $newAverage = Decimal::compare($level->quantity, '0') <= 0
-                    ? $cost
-                    : Decimal::div(
-                        Decimal::add(Decimal::mul($level->quantity, $level->average_cost, 8), Decimal::mul($signed, $cost, 8), 8),
-                        $newQuantity,
-                        4,
-                    );
-            } else {
-                if (Decimal::isNegative($newQuantity) && ! $store['allow_negative_stock']) {
-                    throw new BusinessRuleViolation('INSUFFICIENT_STOCK', "Not enough stock of {$variant['product_name']} ({$variant['sku']}) in {$store['name']}.", [
-                        'variant_id' => $change->variantId,
-                        'sku' => $variant['sku'],
-                        'store_id' => $change->storeId,
-                        'batch_id' => $change->batchId,
-                        'available' => Decimal::round($level->quantity, 3),
-                        'requested' => Decimal::round($change->quantity, 3),
-                    ]);
-                }
-                $cost = $change->unitCost !== null ? Decimal::round($change->unitCost, 4) : $level->average_cost;
-                $newAverage = $level->average_cost;
+            $allocations = [];
+            foreach ($pieces as $piece) {
+                $allocations[] = $this->apply($organizationId, $store, $variant, $piece, $reference, $now);
             }
 
-            StockLevel::query()->whereKey($level->id)->update([
-                'quantity' => $newQuantity,
-                'average_cost' => $newAverage,
-                'updated_at' => $now,
-            ]);
-
-            $movement = StockMovement::query()->create([
-                'organization_id' => $organizationId,
-                'branch_id' => $store['branch_id'],
-                'store_id' => $change->storeId,
-                'variant_id' => $change->variantId,
-                'batch_id' => $change->batchId,
-                'type' => $change->type,
-                'quantity' => $signed,
-                'unit_cost' => $cost,
-                'balance_after' => $newQuantity,
-                'reference_type' => $reference->type,
-                'reference_id' => $reference->id,
-                'reference_number' => $reference->number,
-                'created_by' => Auth::id(),
-                'created_at' => $now,
-            ]);
-
-            $results[$index] = ['movement_id' => $movement->id, 'unit_cost' => $cost, 'balance_after' => $newQuantity];
+            $results[$index] = [
+                'movement_id' => $allocations[0]['movement_id'],
+                'unit_cost' => $this->weightedCost($allocations),
+                'balance_after' => $allocations[array_key_last($allocations)]['balance_after'],
+                'allocations' => array_map(fn (array $a) => array_diff_key($a, ['balance_after' => true]), $allocations),
+            ];
         }
 
         $this->detectReorderCrossings($organizationId, $totalsBefore);
 
         return $results;
+    }
+
+    /**
+     * Locks one level row, applies the change and writes its ledger movement.
+     *
+     * @param  array<string, mixed>  $store
+     * @param  array<string, mixed>  $variant
+     * @return array{batch_id: ?string, quantity: string, unit_cost: string, movement_id: string, balance_after: string}
+     */
+    private function apply(string $organizationId, array $store, array $variant, StockChange $change, StockReference $reference, Carbon $now): array
+    {
+        $level = $this->lockLevel($organizationId, $store['branch_id'], $change);
+        $signed = $change->signedQuantity();
+        $newQuantity = Decimal::add($level->quantity, $signed, 3);
+
+        if ($change->type->isInbound()) {
+            $cost = Decimal::round((string) $change->unitCost, 4);
+            $newAverage = Decimal::compare($level->quantity, '0') <= 0
+                ? $cost
+                : Decimal::div(
+                    Decimal::add(Decimal::mul($level->quantity, $level->average_cost, 8), Decimal::mul($signed, $cost, 8), 8),
+                    $newQuantity,
+                    4,
+                );
+        } else {
+            if (Decimal::isNegative($newQuantity) && ! $store['allow_negative_stock']) {
+                throw $this->insufficient($store, $variant, $change, $level->quantity);
+            }
+            $cost = $change->unitCost !== null ? Decimal::round($change->unitCost, 4) : $level->average_cost;
+            $newAverage = $level->average_cost;
+        }
+
+        StockLevel::query()->whereKey($level->id)->update([
+            'quantity' => $newQuantity,
+            'average_cost' => $newAverage,
+            'updated_at' => $now,
+        ]);
+
+        $movement = StockMovement::query()->create([
+            'organization_id' => $organizationId,
+            'branch_id' => $store['branch_id'],
+            'store_id' => $change->storeId,
+            'variant_id' => $change->variantId,
+            'batch_id' => $change->batchId,
+            'type' => $change->type,
+            'quantity' => $signed,
+            'unit_cost' => $cost,
+            'balance_after' => $newQuantity,
+            'reference_type' => $reference->type,
+            'reference_id' => $reference->id,
+            'reference_number' => $reference->number,
+            'created_by' => Auth::id(),
+            'created_at' => $now,
+        ]);
+
+        return [
+            'batch_id' => $change->batchId,
+            'quantity' => Decimal::round($change->quantity, 3),
+            'unit_cost' => $cost,
+            'movement_id' => $movement->id,
+            'balance_after' => $newQuantity,
+        ];
+    }
+
+    /**
+     * First-expiry-first-out split of an outbound change over the store's batches.
+     * Expired batches are never picked. When negative stock is allowed, a shortfall is
+     * booked on the last batch used (or the newest batch, or untracked stock).
+     *
+     * @param  array<string, mixed>  $store
+     * @param  array<string, mixed>  $variant
+     * @return list<StockChange>
+     */
+    private function allocate(array $store, array $variant, StockChange $change): array
+    {
+        $levels = StockLevel::query()
+            ->where('store_id', $change->storeId)
+            ->where('variant_id', $change->variantId)
+            ->whereNotNull('batch_id')
+            ->orderBy('batch_id')
+            ->lockForUpdate()
+            ->get();
+        $batches = Batch::query()->whereKey($levels->pluck('batch_id')->all())->get()->keyBy('id');
+        $today = now()->toDateString();
+
+        $candidates = $levels
+            ->map(fn (StockLevel $l) => ['level' => $l, 'batch' => $batches[$l->batch_id]])
+            ->sort(fn (array $a, array $b) => [$a['batch']->expires_on === null, $a['batch']->expires_on?->toDateString(), $a['batch']->batch_number]
+                <=> [$b['batch']->expires_on === null, $b['batch']->expires_on?->toDateString(), $b['batch']->batch_number])
+            ->values();
+        $usable = $candidates->filter(fn (array $c) => Decimal::compare($c['level']->quantity, '0') > 0
+            && ($c['batch']->expires_on === null || $c['batch']->expires_on->toDateString() >= $today));
+
+        $remaining = Decimal::round($change->quantity, 3);
+        $pieces = [];
+        foreach ($usable as $candidate) {
+            if (Decimal::compare($remaining, '0') <= 0) {
+                break;
+            }
+            $take = Decimal::compare($candidate['level']->quantity, $remaining) < 0 ? Decimal::round($candidate['level']->quantity, 3) : $remaining;
+            $pieces[] = [$candidate['batch']->id, $take];
+            $remaining = Decimal::sub($remaining, $take, 3);
+        }
+
+        if (Decimal::compare($remaining, '0') > 0) {
+            if (! $store['allow_negative_stock']) {
+                $available = $usable->reduce(fn (string $sum, array $c) => Decimal::add($sum, $c['level']->quantity, 3), '0.000');
+                throw $this->insufficient($store, $variant, $change, $available);
+            }
+            if ($pieces !== []) {
+                $last = array_key_last($pieces);
+                $pieces[$last][1] = Decimal::add($pieces[$last][1], $remaining, 3);
+            } else {
+                $pieces[] = [$candidates->last()['batch']->id ?? null, $remaining];
+            }
+        }
+
+        return array_map(fn (array $p) => $change->withBatch($p[0], $p[1]), $pieces);
+    }
+
+    /**
+     * @param  array<string, mixed>  $store
+     * @param  array<string, mixed>  $variant
+     */
+    private function insufficient(array $store, array $variant, StockChange $change, string $available): BusinessRuleViolation
+    {
+        return new BusinessRuleViolation('INSUFFICIENT_STOCK', "Not enough stock of {$variant['product_name']} ({$variant['sku']}) in {$store['name']}.", [
+            'variant_id' => $change->variantId,
+            'sku' => $variant['sku'],
+            'store_id' => $change->storeId,
+            'batch_id' => $change->batchId,
+            'available' => Decimal::round($available, 3),
+            'requested' => Decimal::round($change->quantity, 3),
+        ]);
+    }
+
+    /**
+     * @param  list<array{quantity: string, unit_cost: string}>  $allocations
+     */
+    private function weightedCost(array $allocations): string
+    {
+        if (count($allocations) === 1) {
+            return $allocations[0]['unit_cost'];
+        }
+
+        $quantity = '0';
+        $value = '0';
+        foreach ($allocations as $a) {
+            $quantity = Decimal::add($quantity, $a['quantity'], 3);
+            $value = Decimal::add($value, Decimal::mul($a['quantity'], $a['unit_cost'], 8), 8);
+        }
+
+        return Decimal::div($value, $quantity, 4);
     }
 
     /**

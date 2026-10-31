@@ -4,6 +4,7 @@ use App\Modules\Organizations\Presentation\Http\Middleware\EnsurePlatformAdmin;
 use App\Modules\Organizations\Presentation\Http\Middleware\ResolveTenant;
 use App\Modules\Shared\Infrastructure\Exceptions\ApiExceptionRenderer;
 use App\Modules\Shared\Infrastructure\Http\Middleware\AssignRequestId;
+use App\Modules\Shared\Infrastructure\Http\Middleware\EnsureIdempotency;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant' => ResolveTenant::class,
             'platform' => EnsurePlatformAdmin::class,
+            'idempotent' => EnsureIdempotency::class,
         ]);
 
         // Tenant must be resolved before route-model binding so bound models are tenant-scoped.
