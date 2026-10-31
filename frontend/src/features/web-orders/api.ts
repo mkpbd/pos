@@ -32,7 +32,13 @@ export type WebOrderLine = {
   unit_price: string
   line_total: string
   product_url?: string | null
+  /** Product offer plus this line's share of the order discount (E8b). */
+  discount_amount?: string
 }
+
+export type WebOrderPromotionKind = 'product' | 'order' | 'shipping'
+/** A promotion snapshot on the order (E8b). */
+export type WebOrderPromotion = { promotion_id?: string | null; name: string; kind: WebOrderPromotionKind; amount: string }
 
 export type WebOrderAddress = {
   recipient_name: string
@@ -82,6 +88,12 @@ export type WebOrder = {
   eta_max_days: number | null
   lines: WebOrderLine[]
   subtotal: string
+  /** Product and order discounts (E8b); free shipping is in `shipping_discount`. */
+  discount_total?: string
+  /** Delivery fee waived by a free-shipping promotion (E8b). */
+  shipping_discount?: string
+  promotions?: WebOrderPromotion[]
+  coupon_code?: string | null
   tax_total: string
   shipping_total: string
   cod_fee: string

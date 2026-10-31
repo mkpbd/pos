@@ -16,9 +16,11 @@ export function goodsTotal(preview: Pick<CheckoutPreview, 'total' | 'shipping_to
 
 /**
  * The fee shown next to a delivery method (display only — the summary's delivery line is the
- * server's): "0.00" once the goods total reaches its free-delivery threshold.
+ * server's): "0.00" once the goods total reaches its free-delivery threshold, or when a
+ * free-shipping promotion waives the delivery fee (E8b).
  */
-export function methodFee(method: ShippingMethod, goods: string): string {
+export function methodFee(method: ShippingMethod, goods: string, freeShipping = false): string {
+  if (freeShipping) return '0.00'
   if (method.free_over !== null && compareDecimal(goods, method.free_over) >= 0) return '0.00'
   return method.fee
 }

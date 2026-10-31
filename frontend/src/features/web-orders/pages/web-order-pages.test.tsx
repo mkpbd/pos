@@ -102,6 +102,52 @@ describe('web order page', () => {
     expect(within(screen.getByRole('list', { name: 'Status history' })).getByText(/System or customer/)).toBeInTheDocument()
   })
 
+  it('shows promotions, the coupon code, line discounts and waived delivery', async () => {
+    mockApi({
+      'GET /auth/me': ok(orderViewer()),
+      'GET /web-orders/wo-1': ok(webOrder({
+        lines: [
+          { product_name: 'Mango Juice', variant_name: null, sku: 'MJ-1', image_url: null, quantity: '2.000', unit_price: '100.00', line_total: '200.00', discount_amount: '30.00' },
+          { product_name: 'Baby Romper', variant_name: 'Size M', sku: 'ROMP-M', image_url: null, quantity: '1.000', unit_price: '3000.00', line_total: '3000.00', discount_amount: '40.00' },
+        ],
+        subtotal: '3200.00',
+        discount_total: '70.00',
+        shipping_discount: '60.00',
+        shipping_total: '0.00',
+        promotions: [
+          { name: 'Juice week', kind: 'product', amount: '20.00' },
+          { name: 'Welcome 50', kind: 'order', amount: '50.00' },
+          { name: 'Free delivery over 3000', kind: 'shipping', amount: '60.00' },
+        ],
+        coupon_code: 'WELCOME50',
+        total: '3130.00',
+      })),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    const dl = await screen.findByLabelText('Order totals')
+    expect(within(dl).getByText('Juice week')).toBeInTheDocument()
+    expect(within(dl).getByText('Product offer')).toBeInTheDocument()
+    expect(within(dl).getByText('−20.00')).toBeInTheDocument()
+    expect(within(dl).getByText('Welcome 50')).toBeInTheDocument()
+    expect(within(dl).getByText('Order discount')).toBeInTheDocument()
+    expect(within(dl).getByText('−50.00')).toBeInTheDocument()
+    expect(within(dl).getByText(/Free delivery over 3000 · 60.00 waived/)).toBeInTheDocument()
+    expect(screen.getByTestId('order-delivery')).toHaveTextContent('60.00Free')
+    expect(screen.getByTestId('order-coupon')).toHaveTextContent('Coupon code: WELCOME50')
+    expect(screen.getAllByTestId('line-discount').map((c) => c.textContent)).toEqual(['−30.00', '−40.00'])
+    expect(screen.getByTestId('order-total')).toHaveTextContent('BDT 3,130.00')
+  })
+
+  it('shows no discount column for orders without discounts', async () => {
+    mockApi({ 'GET /auth/me': ok(orderViewer()), 'GET /web-orders/wo-1': ok(webOrder()) })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    expect(await screen.findByRole('heading', { name: 'WEB-000001' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Discount' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('order-coupon')).not.toBeInTheDocument()
+  })
+
   it('hides every action from staff who may only view orders', async () => {
     mockApi({
       'GET /auth/me': ok(orderViewer()),

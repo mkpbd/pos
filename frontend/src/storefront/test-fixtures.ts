@@ -1,4 +1,4 @@
-import type { Cart, CartLine, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, OrderView, ShippingMethod, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
+import type { Cart, CartLine, DisplayPromotion, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, OrderView, ShippingMethod, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
 
 let nextId = 0
 
@@ -85,6 +85,7 @@ export function productCard(slug: string, overrides: Partial<ProductCard> = {}):
     variant_count: 1,
     default_variant_id: `v-${slug}`,
     short_description: null,
+    promotion: null,
     ...overrides,
   }
 }
@@ -142,6 +143,7 @@ export function productDetail(overrides: Partial<ProductDetail> = {}): ProductDe
     in_stock: true,
     low_stock: false,
     image_id: null,
+    promo_price: null,
     ...extra,
   })
   return {
@@ -178,6 +180,7 @@ export function productDetail(overrides: Partial<ProductDetail> = {}): ProductDe
     in_stock: true,
     is_new: true,
     default_variant_id: 'v-red-m',
+    promotion: null,
     unit: 'pcs',
     seo: { title: null, description: null, image_url: null },
     ...overrides,
@@ -207,6 +210,8 @@ export function cartLine(id: string, overrides: Partial<CartLine> = {}): CartLin
     max_quantity: null,
     exceeds_stock: false,
     allow_decimal: false,
+    discount_amount: '0.00',
+    promotion: null,
     ...overrides,
   }
 }
@@ -218,11 +223,15 @@ export function cartFixture(items: CartLine[] = [], overrides: Partial<Cart> = {
     items,
     item_count: items.length > 0 ? '2' : '0',
     subtotal: items.length > 0 ? '900.00' : '0.00',
+    discount_total: '0.00',
     tax_total: '0.00',
     total: items.length > 0 ? '900.00' : '0.00',
     prices_include_tax: true,
     currency: 'BDT',
     issues: [],
+    promotions: [],
+    free_shipping: null,
+    coupon: null,
     ...overrides,
   }
 }
@@ -280,6 +289,10 @@ export function previewFixture(overrides: Partial<CheckoutPreview> = {}): Checko
   return {
     lines: [cartLine('l-1')],
     subtotal: '900.00',
+    discount_total: '0.00',
+    shipping_discount: '0.00',
+    promotions: [],
+    coupon_code: null,
     tax_total: '0.00',
     shipping_total: '0.00',
     cod_fee: '0.00',
@@ -310,8 +323,12 @@ export function orderFixture(overrides: Partial<OrderView> = {}): OrderView {
     shipping_method_name: 'Home delivery',
     eta_min_days: 1,
     eta_max_days: 2,
-    lines: [{ product_name: 'Kids Tee', variant_name: 'Red / M', sku: 'TEE-RM', image_url: null, quantity: '2.000', unit_price: '450.00', line_total: '900.00', product_url: '/product/kids-tee' }],
+    lines: [{ product_name: 'Kids Tee', variant_name: 'Red / M', sku: 'TEE-RM', image_url: null, quantity: '2.000', unit_price: '450.00', line_total: '900.00', product_url: '/product/kids-tee', discount_amount: '0.00' }],
     subtotal: '900.00',
+    discount_total: '0.00',
+    shipping_discount: '0.00',
+    promotions: [],
+    coupon_code: null,
     tax_total: '0.00',
     shipping_total: '60.00',
     cod_fee: '0.00',
@@ -321,6 +338,22 @@ export function orderFixture(overrides: Partial<OrderView> = {}): OrderView {
     courier_name: null,
     tracking_number: null,
     history: [{ status: 'confirmed', label: 'Confirmed', at: '2026-10-31T10:00:00+06:00' }],
+    ...overrides,
+  }
+}
+
+/* E8b: promotions ---------------------------------------------------------------------- */
+
+/** An automatic product promotion as cards and product pages carry it (10 % off, a flash sale by default). */
+export function promotionFixture(overrides: Partial<DisplayPromotion> = {}): DisplayPromotion {
+  return {
+    id: 'pr-1',
+    name: 'Juice week',
+    type: 'percent',
+    value: '10.00',
+    ends_at: new Date(Date.now() + 2 * 86_400_000 + 3_600_000).toISOString(),
+    show_countdown: true,
+    price: '108.00',
     ...overrides,
   }
 }

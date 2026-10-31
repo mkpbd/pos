@@ -1,4 +1,4 @@
-import type { WebOrderAction, WebOrderHistoryEntry, WebOrderPayment, WebOrdersListParams, WebOrderStatus, WebPaymentMethod, WebPaymentStatus } from '@/features/web-orders/api'
+import type { WebOrderAction, WebOrderPromotionKind, WebOrderHistoryEntry, WebOrderPayment, WebOrdersListParams, WebOrderStatus, WebPaymentMethod, WebPaymentStatus } from '@/features/web-orders/api'
 import { ApiError } from '@/lib/api/client'
 
 /** Button label on the order page for each action. */
@@ -138,4 +138,14 @@ export function actionErrorMessage(error: unknown): string {
 /** Whether a refused action means the dialog's premise is gone (close it and show the fresh order). */
 export function isStaleOrderError(error: unknown): boolean {
   return error instanceof ApiError && error.code in ACTION_ERRORS
+}
+
+export const PROMOTION_KIND_LABELS: Record<WebOrderPromotionKind, string> = {
+  product: 'Product offer',
+  order: 'Order discount',
+  shipping: 'Free shipping',
+}
+
+export function promotionKindLabel(kind: string): string {
+  return PROMOTION_KIND_LABELS[kind as WebOrderPromotionKind] ?? kind
 }

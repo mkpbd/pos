@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BanknoteIcon, CircleCheckIcon, PackageSearchIcon } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
+import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { useCustomer } from '../account/api'
 import { Spinner, primaryButtonClass, secondaryButtonClass } from '../account/form-controls'
@@ -12,7 +13,7 @@ import { useOrderQuery } from '../checkout/api'
 import { etaLabel, formatDateTime } from '../checkout/delivery'
 import { readOrderToken, rememberOrderToken } from '../checkout/order-token'
 import { SummaryTotals } from '../checkout/summary-totals'
-import { formatPrice } from '../money'
+import { formatDiscount, formatPrice } from '../money'
 import type { OrderView } from '../types'
 import { useDocumentTitle } from '../use-document-title'
 
@@ -170,6 +171,11 @@ function OrderDetails({ order, thankYou }: { order: OrderView; thankYou: boolean
                     <p className="text-xs">
                       {displayQuantity(line.quantity)} × {price(line.unit_price)}
                     </p>
+                    {!isZeroDecimal(line.discount_amount ?? '0') && (
+                      <p className="text-xs font-semibold text-sf-sale" data-testid="order-line-discount">
+                        Discount: {formatDiscount(line.discount_amount, currency)}
+                      </p>
+                    )}
                   </div>
                   <span className="shrink-0 text-sm font-semibold text-sf-heading">{price(line.line_total)}</span>
                 </li>

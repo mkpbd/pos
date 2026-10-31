@@ -27,11 +27,12 @@ import {
   PAYMENT_STATUS,
   paymentBadge,
   paymentRecorder,
+  promotionKindLabel,
   statusBadge,
   toListParams,
   type WebOrderFilters,
 } from '@/features/web-orders/orders'
-import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
+import { addDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
 const ALL = 'all'
@@ -175,6 +176,19 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+/** A discount in the totals: the promotion's name, its kind and the amount taken off. */
+function DiscountRow({ label, detail, amount }: { label: string; detail?: string; amount: string }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">
+        {label}
+        {detail && <span className="block text-xs">{detail}</span>}
+      </dt>
+      <dd className="text-right font-mono text-success-soft-foreground">−{formatMoney(amount)}</dd>
+    </>
+  )
+}
+
 function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | undefined }) {
   const payment = paymentBadge(order.payment_status)
   const awaitingTransfer = order.payment_method === 'bank_transfer' && order.status === 'pending_payment'
@@ -236,6 +250,10 @@ export function WebOrderPage() {
   const actions = can('web_orders.manage') ? WEB_ORDER_ACTIONS.filter((a) => order.allowed_actions.includes(a)) : []
   const address = order.shipping_address
   const eta = etaLabel(order.eta_min_days, order.eta_max_days)
+  const lineDiscounts = order.lines.some((l) => !isZeroDecimal(l.discount_amount))
+  const discountLines = (order.promotions ?? []).filter((p) => p.kind !== 'shipping')
+  const shippingPromotion = (order.promotions ?? []).find((p) => p.kind === 'shipping')
+  const shippingWaived = !isZeroDecimal(order.shipping_discount)
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -318,6 +336,7 @@ export function WebOrderPage() {
               <TableHead>Item</TableHead>
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="hidden text-right sm:table-cell">Price</TableHead>
+              {lineDiscounts && <TableHead className="text-right">Discount</TableHead>}
               <TableHead className="text-right">Amount</TableHead>
             </TableRow>
           </TableHeader>
@@ -339,6 +358,9 @@ export function WebOrderPage() {
                 </TableCell>
                 <TableCell className="text-right">{trimDecimal(l.quantity)}</TableCell>
                 <TableCell className="hidden text-right font-mono sm:table-cell">{formatMoney(l.unit_price)}</TableCell>
+                {lineDiscounts && (
+                  <TableCell className="text-right font-mono whitespace-nowrap" data-testid="line-discount">{isZeroDecimal(l.discount_amount) ? '—' : `−${formatMoney(l.discount_amount)}`}</TableCell>
+                )}
                 <TableCell className="text-right font-mono">{formatMoney(l.line_total)}</TableCell>
               </TableRow>
             ))}
@@ -352,11 +374,28 @@ export function WebOrderPage() {
           <CardContent>
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 text-sm" aria-label="Order totals">
               <dt className="text-muted-foreground">Subtotal</dt><dd className="text-right font-mono">{formatMoney(order.subtotal)}</dd>
+              {discountLines.map((p, i) => (
+                <DiscountRow key={i} label={p.name} detail={promotionKindLabel(p.kind)} amount={p.amount} />
+              ))}
+              {discountLines.length === 0 && !isZeroDecimal(order.discount_total) && <DiscountRow label="Discounts" amount={order.discount_total ?? '0'} />}
               <dt className="text-muted-foreground">{order.prices_include_tax ? 'VAT (included)' : 'VAT'}</dt><dd className="text-right font-mono">{formatMoney(order.tax_total)}</dd>
-              <dt className="text-muted-foreground">Delivery</dt><dd className="text-right font-mono">{isZeroDecimal(order.shipping_total) ? 'Free' : formatMoney(order.shipping_total)}</dd>
+              <dt className="text-muted-foreground">
+                Delivery
+                {shippingWaived && <span className="block text-xs">{shippingPromotion?.name ?? 'Free shipping'} · {formatMoney(order.shipping_discount)} waived</span>}
+              </dt>
+              <dd className="text-right font-mono" data-testid="order-delivery">
+                {shippingWaived && <s className="mr-1 text-muted-foreground">{formatMoney(addDecimal(order.shipping_total, order.shipping_discount ?? '0', 2))}</s>}
+                {isZeroDecimal(order.shipping_total) ? 'Free' : formatMoney(order.shipping_total)}
+              </dd>
               {!isZeroDecimal(order.cod_fee) && <><dt className="text-muted-foreground">Cash on delivery fee</dt><dd className="text-right font-mono">{formatMoney(order.cod_fee)}</dd></>}
               <dt className="font-semibold">Total</dt><dd className="text-right font-mono font-semibold" data-testid="order-total">{formatMoney(order.total, c)}</dd>
             </dl>
+            {order.coupon_code && (
+              <p className="mt-4 text-sm" data-testid="order-coupon"><span className="text-muted-foreground">Coupon code:</span> <span className="font-mono font-medium">{order.coupon_code}</span></p>
+            )}
+            {!isZeroDecimal(order.discount_total) && (
+              <p className="mt-1 text-sm text-muted-foreground">Total discount {formatMoney(order.discount_total, c)}{shippingWaived && ` plus ${formatMoney(order.shipping_discount)} delivery`}.</p>
+            )}
             {order.notes && <p className="mt-4 text-sm"><span className="text-muted-foreground">Customer note:</span> {order.notes}</p>}
           </CardContent>
         </Card>

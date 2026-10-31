@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { CircleAlertIcon, Trash2Icon } from 'lucide-react'
+import { CircleAlertIcon, TagIcon, Trash2Icon, TruckIcon } from 'lucide-react'
 import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { ProductImage } from '../catalog/product-image'
-import { formatPrice } from '../money'
+import { formatDiscount, formatPrice } from '../money'
 import type { Cart, CartLine } from '../types'
 import { useRemoveCartItemMutation, useUpdateCartItemMutation } from './api'
 import { isExcluded, useCartCurrency } from './cart-helpers'
@@ -87,6 +87,17 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
           {!compact && <span className="text-xs">each</span>}
         </p>
 
+        {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
+          <p className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-sf-sale" data-testid="line-discount">
+            <TagIcon aria-hidden className="size-3.5 shrink-0" />
+            <span>{line.promotion?.name ?? 'Discount'}:</span>
+            <span>
+              <span className="sr-only">saves </span>
+              {formatDiscount(line.discount_amount, currency)}
+            </span>
+          </p>
+        )}
+
         <LineFlags line={line} max={max} busy={busy} onFix={setQuantity} />
 
         <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
@@ -139,11 +150,18 @@ function LineFlags({ line, max, busy, onFix }: { line: CartLine; max: string | n
   )
 }
 
-/** Subtotal, VAT and total as the server computed them (lines that are not available are left out). */
+/**
+ * Subtotal (before discounts), the discounts with the promotions behind them, VAT and total as
+ * the server computed them (lines that are not available are left out), and the free-delivery
+ * note when a free-shipping promotion applies.
+ */
 export function CartTotals({ cart, compact = false }: { cart: Cart; compact?: boolean }) {
   const currency = useCartCurrency(cart)
   const price = (amount: string) => formatPrice(amount, currency)
   const hasTax = !isZeroDecimal(cart.tax_total)
+  const discount = cart.discount_total ?? '0'
+  const promotions = cart.promotions ?? []
+  const freeShipping = cart.free_shipping ?? null
 
   return (
     <dl className="flex flex-col gap-2 text-sm" data-testid="cart-totals">
@@ -151,6 +169,27 @@ export function CartTotals({ cart, compact = false }: { cart: Cart; compact?: bo
         <dt>Subtotal</dt>
         <dd className="font-semibold text-sf-heading" data-testid="cart-subtotal">{price(cart.subtotal)}</dd>
       </div>
+      {!isZeroDecimal(discount) && (
+        <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+          <dt>Discounts</dt>
+          <dd className="text-right font-semibold text-sf-sale" data-testid="cart-discount">{formatDiscount(discount, currency)}</dd>
+          {promotions.length > 0 && (
+            <dd className="col-span-2">
+              <ul className="flex flex-col gap-0.5 pl-3 text-xs" aria-label="Promotions applied">
+                {promotions.map((promotion) => (
+                  <li key={`${promotion.kind}-${promotion.id}`} className="flex justify-between gap-4" data-testid="cart-promotion">
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                      <TagIcon aria-hidden className="size-3 shrink-0" />
+                      {promotion.name}
+                    </span>
+                    <span className="shrink-0">{formatDiscount(promotion.amount, currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          )}
+        </div>
+      )}
       {!compact && hasTax && !cart.prices_include_tax && (
         <div className="flex justify-between gap-4">
           <dt>VAT</dt>
@@ -162,6 +201,12 @@ export function CartTotals({ cart, compact = false }: { cart: Cart; compact?: bo
           <dt className="font-bold text-sf-heading">Total</dt>
           <dd className="font-heading text-xl font-extrabold text-sf-heading" data-testid="cart-total">{price(cart.total)}</dd>
         </div>
+      )}
+      {freeShipping && (
+        <p className="flex items-start gap-1.5 text-xs font-semibold text-sf-highlight" data-testid="free-shipping-note">
+          <TruckIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+          Free delivery with {freeShipping.name} — applied at checkout.
+        </p>
       )}
       {cart.prices_include_tax ? (
         <p className="text-xs" data-testid="vat-note">

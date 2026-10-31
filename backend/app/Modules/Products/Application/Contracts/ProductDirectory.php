@@ -24,6 +24,14 @@ interface ProductDirectory
     public function variants(string $organizationId, array $variantIds): array;
 
     /**
+     * Products of the organization that are not archived, keyed by id (unknown ids left out).
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array{id: string, name: string}>
+     */
+    public function products(string $organizationId, array $productIds): array;
+
+    /**
      * Ids of variants whose SKU, barcode or product name matches the search (for stock lists).
      *
      * @return list<string>

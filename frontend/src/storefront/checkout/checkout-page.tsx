@@ -12,9 +12,10 @@ import { FormAlert, Spinner, TextField, inputClass, primaryButtonClass, secondar
 import { loginPathFor } from '../account/safe-next'
 import { useCartQuery } from '../cart/api'
 import { cartNeedsAttention } from '../cart/cart-helpers'
+import { couponNote } from '../cart/coupon-messages'
 import { formatPrice } from '../money'
 import { checkoutKeys, customerKeys } from '../store-keys'
-import type { Cart, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
+import type { Cart, CartCoupon, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
 import { useDocumentTitle } from '../use-document-title'
 import { useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
 import { etaLabel, goodsTotal, methodFee } from './delivery'
@@ -296,12 +297,29 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       )}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_24rem]">
-        <OrderSummaryPanel preview={shown} error={preview.error} updating={updating} deliveryPending={deliveryPending} currency={shown?.currency ?? cart?.currency ?? null} onRetry={() => void preview.refetch()} />
+        <OrderSummaryPanel
+          preview={shown}
+          error={preview.error}
+          updating={updating}
+          deliveryPending={deliveryPending}
+          currency={shown?.currency ?? cart?.currency ?? null}
+          coupon={cart?.coupon ?? null}
+          onRetry={() => void preview.refetch()}
+        />
 
         <form ref={formRef} noValidate onSubmit={onSubmit} aria-label="Checkout" className="flex min-w-0 flex-col gap-6 lg:order-first">
           <ContactSection form={form} />
           <AddressSection form={form} customer={customer} addresses={addresses} divisions={divisions} districts={districts} />
-          <DeliverySection form={form} methods={methods} preview={shown} deliveryPending={deliveryPending} loading={updating && methods.length === 0} error={preview.error} currency={shown?.currency ?? null} />
+          <DeliverySection
+            form={form}
+            methods={methods}
+            preview={shown}
+            deliveryPending={deliveryPending}
+            loading={updating && methods.length === 0}
+            error={preview.error}
+            currency={shown?.currency ?? null}
+            freeShipping={Boolean(cart?.free_shipping) || (shown?.promotions ?? []).some((p) => p.kind === 'shipping')}
+          />
           <PaymentSection form={form} options={options} selectedMethod={selectedMethod} currency={shown?.currency ?? null} />
           <NotesSection form={form} />
 
@@ -482,6 +500,7 @@ function DeliverySection({
   loading,
   error,
   currency,
+  freeShipping,
 }: {
   form: Form
   methods: ShippingMethod[]
@@ -490,6 +509,8 @@ function DeliverySection({
   loading: boolean
   error: unknown
   currency: string | null
+  /** A free-shipping promotion waives the delivery fee whichever method is chosen. */
+  freeShipping: boolean
 }) {
   const errors = form.formState.errors
   const errorId = useId()
@@ -512,7 +533,7 @@ function DeliverySection({
     body = (
       <div className="flex flex-col gap-3">
         {methods.map((method) => {
-          const fee = methodFee(method, goods)
+          const fee = methodFee(method, goods, freeShipping)
           const eta = etaLabel(method.eta_min_days, method.eta_max_days)
           return (
             <RadioCard key={method.id} value={method.id} registered={form.register('shipping_method_id')} invalid={invalid} testId="shipping-option">
@@ -660,6 +681,7 @@ function OrderSummaryPanel({
   updating,
   deliveryPending,
   currency,
+  coupon,
   onRetry,
 }: {
   preview: CheckoutPreview | null
@@ -667,6 +689,8 @@ function OrderSummaryPanel({
   updating: boolean
   deliveryPending: boolean
   currency: string | null
+  /** The cart's coupon: when it is not used in these totals, the summary says why. */
+  coupon: CartCoupon | null
   onRetry: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -701,6 +725,17 @@ function OrderSummaryPanel({
           <>
             <SummaryLines lines={preview.lines} currency={currency} />
             <SummaryTotals amounts={preview} currency={currency} deliveryPending={deliveryPending} />
+            {coupon && !coupon.applied && (
+              <p className="flex items-start gap-2 rounded-lg bg-sf-sale/10 px-3 py-2 text-xs font-medium text-sf-sale" data-testid="summary-coupon-note">
+                <CircleAlertIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+                <span>
+                  Coupon {coupon.code} is not applied: {couponNote(coupon)}{' '}
+                  <Link to="/cart" className="font-bold underline underline-offset-4 hover:no-underline">
+                    Change it in your cart
+                  </Link>
+                </span>
+              </p>
+            )}
           </>
         ) : problem ? (
           <div className="text-sm">

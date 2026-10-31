@@ -5,12 +5,13 @@ import { useDocumentTitle } from '../use-document-title'
 import { useCartQuery } from './api'
 import { CartLines, CartTotals } from './cart-lines'
 import { CheckoutButton } from './checkout-button'
+import { CouponBox } from './coupon-box'
 import { displayQuantity } from './quantity'
 
 /**
  * The cart as the server prices it right now. Lines that are no longer available or above the
- * stock stay listed and flagged (with a one-click fix); the totals leave them out. Checkout
- * arrives in a later phase, so there is no checkout button yet.
+ * stock stay listed and flagged (with a one-click fix); the totals leave them out. Discounts
+ * and the coupon box sit with the totals.
  */
 export function CartPage() {
   useDocumentTitle('Cart')
@@ -55,6 +56,7 @@ export function CartPage() {
               <h2 id="cart-summary-heading" className="text-xl font-bold">
                 Cart totals
               </h2>
+              <CouponBox cart={data} />
               <CartTotals cart={data} />
               <CheckoutButton cart={data} />
               <Link to="/shop" className={secondaryButtonClass}>

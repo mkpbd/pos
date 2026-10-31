@@ -1,4 +1,5 @@
-import type { PromotionListParams, PromotionRow } from '@/features/promotions/api'
+import { useCan } from '@/features/auth/use-auth'
+import { usePromotionsQuery, type PromotionListParams, type PromotionRow } from '@/features/promotions/api'
 import type { SectionConfigs } from '@/features/storefront/api'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 
@@ -28,4 +29,12 @@ export function validateHotDeals(c: HotDealsConfig): Record<string, string> {
 
 export function normalizeHotDeals(c: HotDealsConfig): HotDealsConfig {
   return { promotion_id: c.promotion_id || null, limit: c.limit, view_all_url: c.view_all_url?.trim() || null }
+}
+
+/** Active flash sales for the picker and the row summary; only fetched for staff who may see promotions. */
+export function useFlashSales(): { items: PromotionRow[]; allowed: boolean; isPending: boolean; error: Error | null } {
+  const can = useCan()
+  const allowed = can('promotions.view')
+  const query = usePromotionsQuery(ACTIVE_PROMOTIONS_PARAMS, allowed)
+  return { items: (query.data?.items ?? []).filter(isFlashSale), allowed, isPending: allowed && query.isPending, error: query.error }
 }

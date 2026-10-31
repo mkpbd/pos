@@ -30,6 +30,20 @@ class EloquentProductDirectory implements ProductDirectory
         return $this->describe($organizationId, $variants)->all();
     }
 
+    public function products(string $organizationId, array $productIds): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        return Product::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $organizationId)
+            ->whereKey(array_values(array_unique($productIds)))
+            ->get(['id', 'name'])
+            ->mapWithKeys(fn (Product $p) => [$p->id => ['id' => $p->id, 'name' => $p->name]])
+            ->all();
+    }
+
     public function searchVariantIds(string $organizationId, string $search, int $limit = 500): array
     {
         $like = '%'.addcslashes($search, '%_\\').'%';

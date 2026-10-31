@@ -1,20 +1,10 @@
 import { FormField } from '@/components/common/form-field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useCan } from '@/features/auth/use-auth'
-import { usePromotionsQuery, type PromotionRow } from '@/features/promotions/api'
-import { ACTIVE_PROMOTIONS_PARAMS, HOT_DEALS_LIMIT, isFlashSale, type HotDealsConfig } from '@/features/storefront/hot-deals'
+import { HOT_DEALS_LIMIT, useFlashSales, type HotDealsConfig } from '@/features/storefront/hot-deals'
 
 const ALL = 'all'
 const range = (min: number, max: number) => Array.from({ length: max - min + 1 }, (_, i) => min + i)
-
-/** Active flash sales for the picker and the row summary; only fetched for staff who may see promotions. */
-export function useFlashSales(): { items: PromotionRow[]; allowed: boolean; isPending: boolean; error: Error | null } {
-  const can = useCan()
-  const allowed = can('promotions.view')
-  const query = usePromotionsQuery(ACTIVE_PROMOTIONS_PARAMS, allowed)
-  return { items: (query.data?.items ?? []).filter(isFlashSale), allowed, isPending: allowed && query.isPending, error: query.error }
-}
 
 /** Config of the `hot_deals` homepage section. */
 export function HotDealsFields({ config, onChange, errors }: { config: HotDealsConfig; onChange: (config: HotDealsConfig) => void; errors: Record<string, string> }) {

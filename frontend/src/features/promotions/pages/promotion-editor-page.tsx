@@ -125,7 +125,7 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Discount type" error={errors.type}>
                   <Select value={draft.type} onValueChange={(v) => set({ type: v as PromotionType })}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full" aria-label="Discount type"><SelectValue /></SelectTrigger>
                     <SelectContent>{PROMOTION_TYPES.map((t) => <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
                   </Select>
                 </FormField>
@@ -141,7 +141,7 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
               </div>
               <FormField label="Applies to" error={errors.scope} hint={draft.type === 'free_shipping' ? 'Free shipping always applies to the whole order. The cash-on-delivery fee is still charged.' : undefined}>
                 <Select value={draft.scope} disabled={draft.type === 'free_shipping' || readOnly} onValueChange={(v) => set({ scope: v as PromotionScope, targets: [] })}>
-                  <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-72" aria-label="Applies to"><SelectValue /></SelectTrigger>
                   <SelectContent>{PROMOTION_SCOPES.map((s) => <SelectItem key={s} value={s}>{SCOPE_LABELS[s]}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
@@ -178,7 +178,7 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
                 hint={draft.trigger === 'coupon' ? (promotion ? 'Shoppers enter one of its codes in the cart. Manage codes on the Coupons tab.' : 'Shoppers enter a code in the cart. Add codes after creating the promotion.') : 'Applies by itself to every qualifying cart.'}
               >
                 <Select value={draft.trigger} onValueChange={(v) => set({ trigger: v as PromotionTrigger })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full" aria-label="Trigger"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="automatic">Automatic</SelectItem>
                     <SelectItem value="coupon">Coupon code</SelectItem>

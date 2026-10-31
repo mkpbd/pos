@@ -7,6 +7,7 @@ import { useCartQuery } from './api'
 import { CartDrawerContext } from './cart-drawer-context'
 import { CartLines, CartTotals } from './cart-lines'
 import { CheckoutButton } from './checkout-button'
+import { CouponBox } from './coupon-box'
 import { displayQuantity } from './quantity'
 
 /**
@@ -89,6 +90,7 @@ function MiniCartBody({ onClose }: { onClose: () => void }) {
 
       {data && data.items.length > 0 && (
         <div className="flex flex-col gap-3 border-t px-5 py-4">
+          <CouponBox cart={data} compact />
           <CartTotals cart={data} compact />
           <CheckoutButton cart={data} onNavigate={onClose} />
           <Link to="/cart" onClick={onClose} className={secondaryButtonClass}>

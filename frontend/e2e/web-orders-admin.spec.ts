@@ -119,3 +119,29 @@ test('creates a shipping zone from districts', async ({ page }) => {
   await expect(page.getByText('Outside Dhaka saved.')).toBeVisible()
   await expect(page.getByText('2 districts')).toBeVisible()
 })
+
+test('shows the discounts, coupon and free delivery of a promotional order', async ({ page }) => {
+  await mockBackend(page)
+  const discounted = {
+    ...order,
+    lines: [{ product_name: 'Mango Juice', variant_name: null, sku: 'MJ-1', image_url: null, quantity: '2.000', unit_price: '100.00', line_total: '200.00', product_url: null, discount_amount: '30.00' }],
+    subtotal: '200.00', discount_total: '30.00', shipping_discount: '60.00', shipping_total: '0.00', total: '170.00',
+    promotions: [
+      { name: 'Juice week', kind: 'product', amount: '20.00' },
+      { name: 'Welcome 10', kind: 'order', amount: '10.00' },
+      { name: 'Free delivery', kind: 'shipping', amount: '60.00' },
+    ],
+    coupon_code: 'WELCOME10',
+  }
+  await page.route('**/api/v1/web-orders/wo-1', (route) => route.fulfill({ json: envelope(discounted) }))
+
+  await page.goto('/admin/web-orders/wo-1')
+  const totals = page.getByLabel('Order totals')
+  await expect(totals.getByText('Juice week')).toBeVisible()
+  await expect(totals.getByText('−20.00')).toBeVisible()
+  await expect(totals.getByText('Order discount')).toBeVisible()
+  await expect(totals.getByText('Free delivery · 60.00 waived')).toBeVisible()
+  await expect(page.getByTestId('order-coupon')).toContainText('WELCOME10')
+  await expect(page.getByTestId('line-discount')).toHaveText('−30.00')
+  await expect(page.getByTestId('order-total')).toHaveText('BDT 170.00')
+})

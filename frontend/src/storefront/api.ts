@@ -9,6 +9,7 @@ export const BOOTSTRAP_ELEMENT_ID = 'storefront-bootstrap'
 export const storefrontKeys = {
   bootstrap: ['store', 'bootstrap'] as const,
   homepage: (preview: boolean) => ['store', 'homepage', { preview }] as const,
+  homepageAll: ['store', 'homepage'] as const,
   page: (slug: string) => ['store', 'pages', slug] as const,
 }
 
