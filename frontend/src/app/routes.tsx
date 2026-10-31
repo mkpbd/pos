@@ -87,6 +87,8 @@ const pages = {
   loyalty: page(() => import('@/features/loyalty/pages/loyalty-page'), 'LoyaltyPage'),
   webOrders: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrdersPage'),
   webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
+  promotions: page(() => import('@/features/promotions/pages/promotions-page'), 'PromotionsPage'),
+  promotion: page(() => import('@/features/promotions/pages/promotion-editor-page'), 'PromotionEditorPage'),
   storefrontShipping: page(() => import('@/features/shipping/pages/shipping-page'), 'ShippingPage'),
   storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
 }
@@ -129,6 +131,10 @@ export const routes: RouteObject[] = [
               },
               guarded('web_orders.view', 'web-orders', pages.webOrders),
               guarded('web_orders.view', 'web-orders/:orderId', pages.webOrder),
+              guarded('promotions.view', 'promotions', pages.promotions),
+              guarded('promotions.manage', 'promotions/new', pages.promotion),
+              // Viewers see the same page read-only; write actions need promotions.manage.
+              guarded('promotions.view', 'promotions/:promotionId', pages.promotion),
               guarded('returns.view', 'returns', pages.returns),
               guarded('returns.view', 'returns/:returnId', pages.saleReturn),
               guarded(REGISTER_PERMISSIONS, 'cash-registers', pages.cashRegisters),

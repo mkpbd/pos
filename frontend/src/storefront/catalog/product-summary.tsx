@@ -1,7 +1,10 @@
 import { Link } from 'react-router'
-import { CheckCircle2Icon, CircleAlertIcon, XCircleIcon } from 'lucide-react'
+import { CheckCircle2Icon, CircleAlertIcon, TagIcon, XCircleIcon } from 'lucide-react'
+import { compareDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
+import { Countdown } from '../promotions/countdown-timer'
+import { usePromotionPricing } from '../promotions/display'
 import type { ProductDetail, ProductVariant } from '../types'
 import { Price } from './price'
 import { VariantSelector } from './variant-selector'
@@ -39,6 +42,8 @@ export function ProductSummary({
 }) {
   const { store } = useStorefront()
   const inStock = variant ? variant.in_stock : product.in_stock
+  const promo = usePromotionPricing(product, variant)
+  const range = compareDecimal(product.price, product.price_max) !== 0
 
   return (
     <div className="flex flex-col gap-5">
@@ -57,12 +62,21 @@ export function ProductSummary({
 
       <div aria-live="polite" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          {variant ? (
+          {promo ? (
+            <Price price={promo.price} compareAt={promo.base} from={!variant && range} size="lg" />
+          ) : variant ? (
             <Price price={variant.price} compareAt={variant.on_sale ? variant.compare_at_price : null} size="lg" />
           ) : (
             <Price price={product.price} priceMax={product.price_max} size="lg" />
           )}
-          {variant?.on_sale && variant.discount_percent ? (
+          {promo ? (
+            promo.label && (
+              <span className="rounded-full bg-sf-sale px-2.5 py-0.5 text-sm font-bold text-white" data-testid="promotion-badge">
+                <span className="sr-only">Offer: </span>
+                {promo.label}
+              </span>
+            )
+          ) : variant?.on_sale && variant.discount_percent ? (
             <span className="rounded-full bg-sf-sale px-2.5 py-0.5 text-sm font-bold text-white">−{variant.discount_percent} %</span>
           ) : null}
           {store.prices_include_tax === false && <span className="text-sm">Excl. VAT</span>}
@@ -77,6 +91,16 @@ export function ProductSummary({
         </div>
         {!variant && product.options.length > 0 && <p className="text-sm">Choose the options to see the price and availability.</p>}
       </div>
+
+      {promo && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sf-card bg-sf-sale/10 px-4 py-3" data-testid="product-promotion">
+          <p className="inline-flex items-center gap-2 text-sm font-bold text-sf-sale">
+            <TagIcon aria-hidden className="size-4 shrink-0" />
+            {promo.promotion.name}
+          </p>
+          {promo.promotion.show_countdown && <Countdown endsAt={promo.promotion.ends_at} />}
+        </div>
+      )}
 
       <VariantSelector product={product} selection={selection} onChoose={onChoose} />
 

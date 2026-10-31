@@ -13,6 +13,7 @@ import { Tabs, type TabItem } from '../catalog/product-tabs'
 import { readRecentlyViewed, recordRecentlyViewed } from '../catalog/recently-viewed'
 import { imageIndexOf, useVariantSelection } from '../catalog/use-variant-selection'
 import { initialVariant } from '../catalog/variant-selection'
+import { usePromotionPricing } from '../promotions/display'
 import { RichText } from '../components/rich-text'
 import type { ProductCard as Card, ProductDetail } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
@@ -83,7 +84,7 @@ function ProductView({ product }: { product: ProductDetail }) {
     const i = imageIndexOf(product, next?.image_id)
     if (i >= 0) setImageIndex(i)
   })
-
+  const promo = usePromotionPricing(product, variant)
 
   const tabs: TabItem[] = []
   if (product.description_html) tabs.push({ id: 'description', label: 'Description', content: <RichText html={product.description_html} className="max-w-3xl" /> })
@@ -130,6 +131,7 @@ function ProductView({ product }: { product: ProductDetail }) {
               discountPercent={null}
               isNew={product.is_new}
               inStock={variant ? variant.in_stock : product.in_stock}
+              promotionLabel={promo?.label}
               className="absolute top-3 left-3"
             />
           </div>

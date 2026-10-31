@@ -126,6 +126,14 @@ export type StoreSection =
     })
   | (SectionBase & { type: 'category_strip'; config: { source: 'manual' | 'top_level'; limit: number }; categories: StripCategory[] })
   | (SectionBase & { type: 'brand_strip'; config: { source: 'manual' | 'all'; limit: number }; brands: StripBrand[] })
+  | (SectionBase & {
+      type: 'hot_deals'
+      /** promotion_id null = every live countdown promotion (E8b). */
+      config: { promotion_id: string | null; limit: number; view_all_url?: string | null }
+      /** The earliest end among the promotions shown; the section hides itself when it passes. */
+      ends_at: string | null
+      products: ProductCard[]
+    })
 
 export type ProductSource = 'manual' | 'featured' | 'new_arrivals' | 'best_sellers' | 'on_sale' | 'category'
 
@@ -163,6 +171,29 @@ export type CatalogImage = { url: string; alt: string | null }
 
 export type NamedLink = { name: string; slug: string | null }
 
+/* ---------------------------------------------------------------------------------------
+ * Promotions (E8b) — automatic product offers on cards and product pages, coupons on the cart
+ * ------------------------------------------------------------------------------------- */
+
+export type PromotionType = 'percent' | 'fixed' | 'free_shipping'
+
+/**
+ * The automatic product promotion shown on a card or product page. The badge ("−10 %", "−৳20")
+ * is formatted here from `type` + `value`; `price` is the promotional unit price of the variant
+ * that gives the card's (product's) `price`. Coupon promotions are never shown this way.
+ */
+export type DisplayPromotion = {
+  id: string
+  name: string
+  type: PromotionType
+  /** Percent (0.01–100) or a fixed amount per unit, as a decimal string. */
+  value: string
+  ends_at: string | null
+  /** A flash sale: show a countdown to `ends_at`. */
+  show_countdown: boolean
+  price: string
+}
+
 /** The common product card. Amounts are decimal strings, exactly as stored. */
 export type ProductCard = {
   id: string
@@ -187,6 +218,8 @@ export type ProductCard = {
   /** The variant to add straight from the card; set when the product has exactly one active variant (E7). */
   default_variant_id: string | null
   short_description: string | null
+  /** The live automatic product promotion (E8b); listing filters and sort keep the base price. */
+  promotion: DisplayPromotion | null
 }
 
 export type SortKey = 'featured' | 'popularity' | 'latest' | 'price_asc' | 'price_desc' | 'name'
@@ -251,6 +284,8 @@ export type ProductVariant = {
   in_stock: boolean
   low_stock: boolean
   image_id: string | null
+  /** The unit price after the product's promotion (E8b); null when none applies to this variant. */
+  promo_price: string | null
 }
 
 /** GET /store/products/{slug} */
@@ -274,6 +309,8 @@ export type ProductDetail = {
   in_stock: boolean
   is_new: boolean
   default_variant_id: string | null
+  /** The live automatic product promotion (E8b); `price` is for the variant that gives `price`. */
+  promotion: DisplayPromotion | null
   unit: string | null
   /** Sold in fractions (e.g. by weight). Not part of the E6 contract: integer quantities when absent. */
   allow_decimal?: boolean
@@ -355,9 +392,27 @@ export type CartLine = {
   max_quantity: string | null
   exceeds_stock: boolean
   allow_decimal: boolean
+  /** The discount on this line (E8b); `line_total` stays quantity × unit price. */
+  discount_amount: string
+  /** The product promotion applied to this line. */
+  promotion: { id: string; name: string } | null
 }
 
 export type CartIssue = 'exceeds_stock' | 'unavailable' | (string & {})
+
+/** Why a coupon was refused (422 COUPON_INVALID details.reason) or is not used any more (cart.coupon.reason). */
+export type CouponReason = 'not_found' | 'not_started' | 'expired' | 'usage_limit_reached' | 'customer_limit_reached' | 'min_subtotal' | 'not_applicable' | (string & {})
+
+/** The coupon on the cart (one per cart). `applied: false` — not used in the totals (a better offer applies, or it became invalid). */
+export type CartCoupon = {
+  code: string
+  applied: boolean
+  reason: CouponReason | null
+  message: string | null
+  promotion_name: string | null
+}
+
+export type CartPromotion = { id: string; name: string; kind: 'product' | 'order'; amount: string }
 
 /** GET /store/cart — repriced by the server on every read. */
 export type Cart = {
@@ -365,12 +420,18 @@ export type Cart = {
   items: CartLine[]
   /** Sum of the purchasable lines' quantities, trimmed ("3", "1.5"). */
   item_count: string
+  /** Before discounts. */
   subtotal: string
+  discount_total: string
   tax_total: string
   total: string
   prices_include_tax: boolean
   currency: string | null
   issues: CartIssue[]
+  promotions: CartPromotion[]
+  /** The free-shipping promotion the cart qualifies for (delivery fee waived at checkout). */
+  free_shipping: { id: string; name: string } | null
+  coupon: CartCoupon | null
 }
 
 export type WishlistItem = { id: string; product: ProductCard; variant_id: string | null }
@@ -407,10 +468,20 @@ export type ShippingMethod = {
   eta_max_days: number
 }
 
+/** A promotion used by a priced order (checkout preview, placed order). */
+export type AppliedPromotion = { name: string; kind: 'product' | 'order' | 'shipping'; amount: string }
+
 /** POST /store/checkout/preview — the cart repriced with delivery and COD fees. */
 export type CheckoutPreview = {
   lines: CartLine[]
   subtotal: string
+  /** Product and order discounts (E8b). */
+  discount_total: string
+  /** The delivery fee waived by a free-shipping promotion. */
+  shipping_discount: string
+  promotions: AppliedPromotion[]
+  /** The coupon used in these totals; null when none (or when the cart's coupon is not applied). */
+  coupon_code: string | null
   tax_total: string
   shipping_total: string
   cod_fee: string
@@ -472,8 +543,23 @@ export type OrderView = {
   shipping_method_name: string | null
   eta_min_days: number | null
   eta_max_days: number | null
-  lines: { product_name: string; variant_name: string | null; sku: string; image_url: string | null; quantity: string; unit_price: string; line_total: string; product_url: string | null }[]
+  lines: {
+    product_name: string
+    variant_name: string | null
+    sku: string
+    image_url: string | null
+    quantity: string
+    unit_price: string
+    line_total: string
+    product_url: string | null
+    /** Item discount plus the line's share of the order discount (E8b). */
+    discount_amount: string
+  }[]
   subtotal: string
+  discount_total: string
+  shipping_discount: string
+  promotions: AppliedPromotion[]
+  coupon_code: string | null
   tax_total: string
   shipping_total: string
   cod_fee: string

@@ -9,12 +9,15 @@ export function Price({
   price,
   priceMax,
   compareAt,
+  from = false,
   size = 'md',
   className,
 }: {
   price: string
   priceMax?: string
   compareAt?: string | null
+  /** "From …": the lowest of prices that differ (a promotion on a product whose variants differ). */
+  from?: boolean
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }) {
@@ -25,10 +28,11 @@ export function Price({
     <p className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
       <span className={cn('font-bold text-sf-heading', size === 'lg' ? 'text-3xl' : size === 'md' ? 'text-lg' : 'text-base')} data-testid="price">
         {compareAt && <span className="sr-only">Sale price: </span>}
+        {from && <span className="text-[0.8em] font-semibold">From </span>}
         {current}
       </span>
       {compareAt && (
-        <s className={cn('text-sf-text', size === 'lg' ? 'text-lg' : 'text-sm')}>
+        <s className={cn('text-sf-text', size === 'lg' ? 'text-lg' : 'text-sm')} data-testid="compare-price">
           <span className="sr-only">Original price: </span>
           {format.price(compareAt)}
         </s>

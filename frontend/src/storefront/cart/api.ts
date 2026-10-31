@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
-import { customerKeys } from '../store-keys'
+import { checkoutKeys, customerKeys } from '../store-keys'
 import type { Cart } from '../types'
 
 /**
@@ -25,6 +25,8 @@ function useCartMutation<V>(request: (variables: V) => Promise<Cart>) {
     onSuccess: (cart) => {
       if (cart) queryClient.setQueryData(customerKeys.cart, cart)
       else void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
+      // A cached checkout summary priced the old cart (lines, coupon): price it afresh next time.
+      void queryClient.invalidateQueries({ queryKey: checkoutKeys.previewAll })
     },
     onError: (error) => {
       // A line removed elsewhere (another tab): show the cart as it is now.
@@ -49,4 +51,13 @@ export function useRemoveCartItemMutation() {
 
 export function useClearCartMutation() {
   return useCartMutation(() => storeApi.delete<Cart>('/store/cart').then((r) => r.data))
+}
+
+/** POST /store/cart/coupon — the repriced cart, or 422 COUPON_INVALID with details.reason (see coupon-messages.ts). */
+export function useApplyCouponMutation() {
+  return useCartMutation((code: string) => storeApi.post<Cart>('/store/cart/coupon', { code }).then((r) => r.data))
+}
+
+export function useRemoveCouponMutation() {
+  return useCartMutation(() => storeApi.delete<Cart>('/store/cart/coupon').then((r) => r.data))
 }

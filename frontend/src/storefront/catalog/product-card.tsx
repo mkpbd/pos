@@ -4,19 +4,44 @@ import { EyeIcon } from 'lucide-react'
 import { compareDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { CardCartAction } from '../cart/add-to-cart'
+import { usePriceFormat } from '../money'
+import { Countdown } from '../promotions/countdown-timer'
+import { isReduced, useLivePromotion } from '../promotions/display'
 import type { ProductCard as Card } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { Price } from './price'
 import { ProductImage } from './product-image'
 import { useQuickView } from './quick-view-context'
 
-/** Sale / New / Out of stock badges over a product image. */
-export function ProductBadges({ onSale, discountPercent, isNew, inStock, className }: { onSale: boolean; discountPercent: number | null; isNew: boolean; inStock: boolean; className?: string }) {
-  if (!onSale && !isNew && inStock) return null
+/**
+ * Offer / Sale / New / Out of stock badges over a product image. A promotion's badge ("−10 %",
+ * "−৳20") replaces the compare-at sale badge: its price is the one shown.
+ */
+export function ProductBadges({
+  onSale,
+  discountPercent,
+  isNew,
+  inStock,
+  promotionLabel = null,
+  className,
+}: {
+  onSale: boolean
+  discountPercent: number | null
+  isNew: boolean
+  inStock: boolean
+  promotionLabel?: string | null
+  className?: string
+}) {
+  if (!promotionLabel && !onSale && !isNew && inStock) return null
 
   return (
     <ul className={cn('pointer-events-none flex flex-col items-start gap-1.5', className)} aria-label="Product labels">
-      {onSale && (
+      {promotionLabel ? (
+        <li className="rounded-full bg-sf-sale px-2.5 py-0.5 text-xs font-bold text-white" data-testid="promotion-badge">
+          <span className="sr-only">Offer: </span>
+          {promotionLabel}
+        </li>
+      ) : onSale && (
         <li className="rounded-full bg-sf-sale px-2.5 py-0.5 text-xs font-bold text-white">
           {discountPercent ? `Sale −${discountPercent} %` : 'Sale'}
         </li>
@@ -33,10 +58,28 @@ export function ProductBadges({ onSale, discountPercent, isNew, inStock, classNa
  * buy action (add to cart for single-variant products, else a link to choose options). Hover-only parts
  * also show on keyboard focus, and the quick view button is always visible on touch screens.
  */
-export function ProductCard({ product, layout = 'grid', eager = false, actions }: { product: Card; layout?: 'grid' | 'list'; eager?: boolean; actions?: ReactNode }) {
+export function ProductCard({
+  product,
+  layout = 'grid',
+  eager = false,
+  actions,
+  countdown = true,
+}: {
+  product: Card
+  layout?: 'grid' | 'list'
+  eager?: boolean
+  actions?: ReactNode
+  /** Show a flash sale's countdown chip (off where the section shows the same countdown). */
+  countdown?: boolean
+}) {
   const quickView = useQuickView()
-  const priceMax = compareDecimal(product.price, product.price_max) !== 0 ? product.price_max : undefined
+  const format = usePriceFormat()
+  const promotion = useLivePromotion(product.promotion)
+  const range = compareDecimal(product.price, product.price_max) !== 0
+  const priceMax = range ? product.price_max : undefined
   const compareAt = product.on_sale && !priceMax ? product.compare_at_price : null
+  const promoPrice = promotion && isReduced(promotion.price, product.price) ? promotion.price : null
+  const promotionLabel = promotion ? format.badge(promotion) : null
 
   return (
     <article
@@ -57,7 +100,15 @@ export function ProductCard({ product, layout = 'grid', eager = false, actions }
             />
           )}
         </Link>
-        <ProductBadges onSale={product.on_sale} discountPercent={product.discount_percent} isNew={product.is_new} inStock={product.in_stock} className="absolute top-3 left-3" />
+        <ProductBadges
+          onSale={product.on_sale}
+          discountPercent={product.discount_percent}
+          isNew={product.is_new}
+          inStock={product.in_stock}
+          promotionLabel={promotionLabel}
+          className="absolute top-3 left-3"
+        />
+        {countdown && promotion?.show_countdown && <Countdown endsAt={promotion.ends_at} variant="chip" prefix="" className="absolute bottom-3 left-3" />}
         <div className="absolute top-3 right-3 flex flex-col gap-2">
           <WishlistButton product={product} name={product.name} />
           {quickView && (
@@ -81,7 +132,11 @@ export function ProductCard({ product, layout = 'grid', eager = false, actions }
           </Link>
         </h3>
         {layout === 'list' && product.short_description && <p className="line-clamp-3 text-sm">{product.short_description}</p>}
-        <Price price={product.price} priceMax={priceMax} compareAt={compareAt} size="sm" className="mt-auto pt-1" />
+        {promoPrice ? (
+          <Price price={promoPrice} compareAt={product.price} from={range} size="sm" className="mt-auto pt-1" />
+        ) : (
+          <Price price={product.price} priceMax={priceMax} compareAt={compareAt} size="sm" className="mt-auto pt-1" />
+        )}
         <div className={cn('pt-2', layout === 'list' && 'sm:max-w-56')}>
           {actions ?? <CardCartAction product={product} />}
         </div>

@@ -132,7 +132,7 @@ export type BannerInput = Omit<Banner, 'id' | 'is_live' | 'state' | 'sort_order'
 
 export const SECTION_TYPES = [
   'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
-  'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip',
+  'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'hot_deals',
 ] as const
 export type SectionType = (typeof SECTION_TYPES)[number]
 export type SectionState = 'live' | 'disabled' | 'scheduled' | 'expired'
@@ -163,6 +163,8 @@ export type SectionConfigs = {
   product_tabs: { tabs: ProductTab[]; limit: number }
   category_strip: { source: 'manual' | 'top_level'; limit: number }
   brand_strip: { source: 'manual' | 'all'; limit: number }
+  /** Flash-sale products (E8b): one countdown promotion, or every live one when `promotion_id` is null. */
+  hot_deals: { promotion_id: string | null; limit: number; view_all_url: string | null }
 }
 export type AnySectionConfig = SectionConfigs[SectionType]
 
