@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { MediaField } from '@/features/media/components/media-picker'
+import type { LinkTargetPage } from '@/features/storefront/api'
 import { addNode, errorKey, MAX_MENU_DEPTH, moveNode, removeNode, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
 import { cn } from '@/lib/utils'
 
@@ -17,12 +18,17 @@ type Props = {
   /** Keyed like the API ("items.0.children.1.url"). */
   errors: Record<string, string>
   readOnly: boolean
+  /** Content pages an item can link to. */
+  pages: LinkTargetPage[]
 }
+
+const CUSTOM = 'custom'
 
 const itemName = (path: NodePath) => `Item ${path.map((i) => i + 1).join('.')}`
 
 function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNode; path: NodePath; siblings: number }) {
-  const { nodes, onChange, allowsMega, errors, readOnly } = props
+  const { nodes, onChange, allowsMega, errors, readOnly, pages } = props
+  const linkError = errors[`${errorKey(path)}.url`] ?? errors[`${errorKey(path)}.target_id`]
   const name = itemName(path)
   const key = errorKey(path)
   const index = path[path.length - 1]
@@ -38,8 +44,29 @@ function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNo
             {errors[`${key}.label`] && <p className="text-sm text-destructive">{errors[`${key}.label`]}</p>}
           </div>
           <div className="flex flex-col gap-1">
-            <Input aria-label={`${name} link`} placeholder="/sale or https://…" value={node.url} disabled={readOnly} spellCheck={false} aria-invalid={errors[`${key}.url`] ? true : undefined} onChange={(e) => patch({ url: e.target.value })} />
-            {errors[`${key}.url`] && <p className="text-sm text-destructive">{errors[`${key}.url`]}</p>}
+            <div className="flex gap-2">
+              <Select
+                value={node.type === 'page' ? (node.target_id ?? '') : CUSTOM}
+                onValueChange={(v) => patch(v === CUSTOM ? { type: 'custom' } : { type: 'page', target_id: v })}
+                disabled={readOnly}
+              >
+                <SelectTrigger aria-label={`${name} link type`} className={cn(node.type === 'page' ? 'w-full' : 'w-36 shrink-0')}>
+                  <SelectValue placeholder="Choose a page" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CUSTOM}>Custom link</SelectItem>
+                  {pages.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      Page: {p.title}{p.status === 'draft' ? ' (draft)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {node.type === 'custom' && (
+                <Input aria-label={`${name} link`} placeholder="/sale or https://…" value={node.url} disabled={readOnly} spellCheck={false} aria-invalid={linkError ? true : undefined} onChange={(e) => patch({ url: e.target.value })} />
+              )}
+            </div>
+            {linkError && <p className="text-sm text-destructive">{linkError}</p>}
           </div>
         </div>
 

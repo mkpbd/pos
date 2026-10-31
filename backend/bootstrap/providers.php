@@ -4,6 +4,7 @@ use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Authentication\AuthenticationServiceProvider;
 use App\Modules\Branches\BranchesServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
+use App\Modules\Cms\CmsServiceProvider;
 use App\Modules\Customers\CustomersServiceProvider;
 use App\Modules\Expenses\ExpensesServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
@@ -45,6 +46,7 @@ return [
     LoyaltyServiceProvider::class,
     PosServiceProvider::class,
     MediaServiceProvider::class,
+    CmsServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

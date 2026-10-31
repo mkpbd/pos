@@ -1,4 +1,4 @@
-import type { MenuItemNode } from '@/features/storefront/api'
+import type { MenuItemNode, MenuItemType } from '@/features/storefront/api'
 
 /**
  * Pure operations for the menu tree editor. Nodes are addressed by their index path
@@ -8,21 +8,30 @@ import type { MenuItemNode } from '@/features/storefront/api'
 export const MAX_MENU_DEPTH = 3
 export const MAX_MENU_ITEMS = 200
 
-export type EditorNode = Omit<MenuItemNode, 'id' | 'type' | 'children'> & { key: string; children: EditorNode[] }
+export type EditorNode = Omit<MenuItemNode, 'id' | 'type' | 'url' | 'target_id' | 'children'> & {
+  key: string
+  type: MenuItemType
+  /** Custom links; kept while the item points at a page so switching back loses nothing. */
+  url: string
+  target_id: string | null
+  children: EditorNode[]
+}
 export type NodePath = number[]
 
 let sequence = 0
 const nextKey = () => `n${++sequence}`
 
 export function emptyNode(): EditorNode {
-  return { key: nextKey(), label: '', url: '', open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }
+  return { key: nextKey(), type: 'custom', label: '', url: '', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }
 }
 
 export function fromApi(items: MenuItemNode[]): EditorNode[] {
   return items.map((i) => ({
     key: nextKey(),
+    type: i.type ?? 'custom',
     label: i.label,
-    url: i.url,
+    url: i.url ?? '',
+    target_id: i.target_id ?? null,
     open_in_new_tab: i.open_in_new_tab,
     is_visible: i.is_visible,
     is_mega: i.is_mega,
@@ -32,12 +41,13 @@ export function fromApi(items: MenuItemNode[]): EditorNode[] {
   }))
 }
 
-/** The PUT payload: mega fields only on mega items, trimmed text. */
+/** The PUT payload: mega fields only on mega items, a URL or a page per type, trimmed text. */
 export function toApi(nodes: EditorNode[]): MenuItemNode[] {
   return nodes.map((n) => ({
-    type: 'custom',
+    type: n.type,
     label: n.label.trim(),
-    url: n.url.trim(),
+    url: n.type === 'custom' ? n.url.trim() : null,
+    target_id: n.type === 'page' ? n.target_id : null,
     open_in_new_tab: n.open_in_new_tab,
     is_visible: n.is_visible,
     is_mega: n.is_mega,
@@ -123,7 +133,9 @@ export function validateTree(nodes: EditorNode[], allowsMega: boolean): Record<s
       const key = errorKey(path)
       if (!n.label.trim()) errors[`${key}.label`] = 'Enter a label.'
       else if (n.label.trim().length > 80) errors[`${key}.label`] = 'At most 80 characters.'
-      if (!isSafeLink(n.url)) errors[`${key}.url`] = 'Use a site path such as /sale or an http(s) URL.'
+      if (n.type === 'page') {
+        if (!n.target_id) errors[`${key}.target_id`] = 'Choose a page.'
+      } else if (!isSafeLink(n.url)) errors[`${key}.url`] = 'Use a site path such as /sale or an http(s) URL.'
       if (n.is_mega && (path.length > 1 || !allowsMega)) errors[`${key}.is_mega`] = 'Only top-level items of the main navigation can open a mega menu.'
       walk(n.children, path)
     })

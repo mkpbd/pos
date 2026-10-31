@@ -134,6 +134,22 @@ Storefront module:
 
 No existing table changed in E4 (the idempotency scope change of ADR-014 lands with checkout in E8).
 
+### E-commerce E5 — Content and homepage (implemented)
+
+Storefront module:
+- `banners` — placement (`hero_slider|home_promo`, CHECK), name (admin label), kicker, title, subtitle, link_url, button_label, secondary_link_url, secondary_button_label, desktop_media_id → media (`RESTRICT`, required), mobile_media_id → media (`RESTRICT`), text_color char(7), text_position (`left|center|right`), starts_at/ends_at (CHECK end > start), is_active, sort_order. Index `(organization_id, placement, is_active, sort_order)`.
+- `homepage_sections` — type (validated by `Domain\SectionType`), title, subtitle, config jsonb (normalized per type; media ids for testimonial photos and the newsletter picture are protected by a tagged `MediaReferences` checker), is_enabled, starts_at/ends_at (CHECK), sort_order.
+- `homepage_section_items` — section (cascade), item_type (`banner` now; products/categories/brands later), item_id, sort_order; unique `(section_id, item_type, item_id)`. Banner deletion is refused while an item points at it.
+- `menu_items` (changed, additive): `target_id uuid NULL` and type `page`; CHECK `(type = 'custom' AND url IS NOT NULL) OR (type <> 'custom' AND target_id IS NOT NULL)`; index `(organization_id, type, target_id)`.
+
+Cms module:
+- `cms_pages` — slug (unique per organization, case-insensitive, among non-deleted rows), title, body_html (sanitized), template (`default|faq|contact`), status (`draft|published`), published_at, seo_title, seo_description, soft delete.
+- `faq_items` — group, question, answer_html (sanitized), is_active, sort_order.
+- `contact_messages` — name, email, phone, subject, message, ip, handled_at, handled_by → users. Never edited.
+- `newsletter_subscribers` — email (unique per organization, case-insensitive), status (`pending|subscribed|unsubscribed`), confirm_token_hash and unsubscribe_token_hash (sha-256, unique), confirmation_sent_at, confirmed_at, unsubscribed_at, ip.
+
+All timestamps with an offset are converted to the application timezone before they are stored (`Shared\Application\Support\Instants`).
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.

@@ -148,8 +148,8 @@ describe('online store admin', () => {
       expect(saved).toEqual({
         items: [
           {
-            type: 'custom', label: 'Boys', url: '/boys', open_in_new_tab: false, is_visible: true, is_mega: true, mega_columns: 4, image_media_id: null,
-            children: [{ type: 'custom', label: 'Shirts', url: '/boys/shirts', open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }],
+            type: 'custom', label: 'Boys', url: '/boys', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: true, mega_columns: 4, image_media_id: null,
+            children: [{ type: 'custom', label: 'Shirts', url: '/boys/shirts', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }],
           },
         ],
       }),

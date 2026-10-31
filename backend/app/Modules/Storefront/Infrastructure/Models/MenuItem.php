@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property MenuItemType $type
  * @property string $label
  * @property ?string $url
+ * @property ?string $target_id
  * @property bool $open_in_new_tab
  * @property bool $is_visible
  * @property bool $is_mega
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $image_media_id
  * @property int $sort_order
  */
-#[Fillable(['organization_id', 'menu_id', 'parent_id', 'type', 'label', 'url', 'open_in_new_tab', 'is_visible', 'is_mega', 'mega_columns', 'image_media_id', 'sort_order'])]
+#[Fillable(['organization_id', 'menu_id', 'parent_id', 'type', 'label', 'url', 'target_id', 'open_in_new_tab', 'is_visible', 'is_mega', 'mega_columns', 'image_media_id', 'sort_order'])]
 class MenuItem extends Model
 {
     use BelongsToOrganization, HasUuids;

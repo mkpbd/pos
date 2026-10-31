@@ -44,6 +44,7 @@ async function mockBackend(page: Page) {
       : route.fulfill({ json: envelope(theme) }),
   )
   await page.route('**/api/v1/storefront/menus', (route) => route.fulfill({ json: envelope([mainMenu]) }))
+  await page.route('**/api/v1/storefront/link-targets', (route) => route.fulfill({ json: envelope({ pages: [] }) }))
   await page.route('**/api/v1/storefront/menus/m-1', (route) => route.fulfill({ json: envelope({ ...mainMenu, items: [] }) }))
   await page.route('**/api/v1/storefront/menus/m-1/items', (route) =>
     route.fulfill({ json: envelope({ ...mainMenu, items: (route.request().postDataJSON() as { items: unknown[] }).items }) }),
@@ -72,10 +73,10 @@ test('builds a menu with a child item and saves the tree', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Add item' }).click()
   await page.getByLabel('Item 1 label').fill('Boys')
-  await page.getByLabel('Item 1 link').fill('/boys')
+  await page.getByLabel('Item 1 link', { exact: true }).fill('/boys')
   await page.getByRole('button', { name: 'Add child to Item 1' }).click()
   await page.getByLabel('Item 1.1 label').fill('Shirts')
-  await page.getByLabel('Item 1.1 link').fill('/boys/shirts')
+  await page.getByLabel('Item 1.1 link', { exact: true }).fill('/boys/shirts')
 
   const put = page.waitForRequest((r: Request) => r.url().endsWith('/api/v1/storefront/menus/m-1/items') && r.method() === 'PUT')
   await page.getByRole('button', { name: 'Save items' }).click()

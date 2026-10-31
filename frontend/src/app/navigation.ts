@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, BoxesIcon, BuildingIcon, Building2Icon, ContactIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingCartIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, BoxesIcon, BuildingIcon, Building2Icon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingCartIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -31,6 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/suppliers', label: 'Suppliers', icon: TruckIcon, permission: 'suppliers.view' },
   { to: '/loyalty', label: 'Loyalty', icon: GiftIcon, permission: ['loyalty.view', 'loyalty.manage'] },
   { to: '/storefront', label: 'Online store', icon: GlobeIcon, permission: 'storefront.view' },
+  { to: '/content/pages', label: 'Content', icon: FileTextIcon, permission: 'cms.manage' },
   { to: '/media', label: 'Media library', icon: ImagesIcon, permission: 'media.manage' },
   { to: '/branches', label: 'Branches', icon: StoreIcon, permission: 'branches.view' },
   { to: '/users', label: 'Users', icon: UsersIcon, permission: 'users.view' },

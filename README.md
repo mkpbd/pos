@@ -61,7 +61,7 @@ BerryKid-inspired storefront on the same backend; plan, decisions and API in [do
 |-------|-------|--------|
 | E1–E3 | Project analysis, reference investigation, architecture and database plan | ✅ |
 | E4 | Storefront shell: host-based storefronts, theme, menus, media library, storefront layout, admin under `/admin` | ✅ (PostgreSQL run pending) |
-| E5 | Content and homepage builder | ☐ |
+| E5 | Content and homepage builder: banners, homepage sections, content pages, FAQ, contact form, newsletter | ✅ (PostgreSQL run pending) |
 | E6 | Online catalog and product pages | ☐ |
 | E7 | Customer accounts, cart, wishlist | ☐ |
 | E8 | Checkout, orders, payments, shipping, promotions | ☐ |

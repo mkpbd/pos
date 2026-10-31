@@ -85,6 +85,7 @@ final class StorefrontPresenter
             'type' => $i->type->value,
             'label' => $i->label,
             'url' => $i->url,
+            'target_id' => $i->target_id,
             'open_in_new_tab' => $i->open_in_new_tab,
             'is_visible' => $i->is_visible,
             'is_mega' => $i->is_mega,

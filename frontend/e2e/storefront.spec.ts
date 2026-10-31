@@ -44,9 +44,16 @@ function bootstrap(overrides: Record<string, unknown> = {}) {
   }
 }
 
-async function serveStore(page: Page, data: unknown) {
+async function serveStore(page: Page, data: unknown, sections: unknown[] = []) {
   await page.route('**/api/v1/store/bootstrap', (route) => route.fulfill({ json: envelope(data) }))
+  await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections, preview: false }) }))
 }
+
+const image = { id: 'img-1', url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 600, alt: null }
+const banner = (id: string, extra: Record<string, unknown> = {}) => ({
+  id, kicker: null, title: null, subtitle: null, link_url: null, button_label: null, secondary_link_url: null, secondary_button_label: null,
+  image, mobile_image: null, text_color: '#3d3d3d', text_position: 'left', ...extra,
+})
 
 test('the storefront shows the store with its header, navigation and footer', async ({ page }) => {
   await serveStore(page, bootstrap())
@@ -111,7 +118,7 @@ test('the announcement links inside the store and unknown pages are not found', 
 test('a closed store can be previewed and an unknown address explains itself', async ({ page }) => {
   await serveStore(page, bootstrap({ preview: true }))
   await page.goto('/')
-  await expect(page.getByRole('status')).toHaveText('Preview — this store is not open to customers yet.')
+  await expect(page.getByText('Preview — this store is not open to customers yet.')).toHaveAttribute('role', 'status')
 
   await page.unroute('**/api/v1/store/bootstrap')
   await page.route('**/api/v1/store/bootstrap', (route) =>
@@ -122,4 +129,40 @@ test('a closed store can be previewed and an unknown address explains itself', a
   )
   await page.reload()
   await expect(page.getByRole('heading', { name: 'There is no open store at this address' })).toBeVisible()
+})
+
+test('homepage sections render in order and link to content pages', async ({ page }) => {
+  await serveStore(page, bootstrap(), [
+    { id: 's-1', type: 'hero_slider', title: null, subtitle: null, config: { autoplay_seconds: 0, height: 'large' }, banners: [
+      banner('b-1', { kicker: 'Online', title: 'Flat 20% off', button_label: 'Our story', link_url: '/pages/about' }),
+      banner('b-2', { title: 'New arrivals' }),
+    ] },
+    { id: 's-2', type: 'features_strip', title: 'Why us', subtitle: null, config: { items: [{ icon: 'truck', title: 'Fast delivery', text: null }], background: null } },
+    { id: 's-3', type: 'newsletter', title: 'Weekly offers', subtitle: null, config: { text: null, button_label: 'Subscribe', image: null, background: '#c2410c', foreground: '#ffffff' } },
+  ])
+  await page.route('**/api/v1/store/pages/about', (route) =>
+    route.fulfill({ json: envelope({ slug: 'about', title: 'About us', template: 'default', body_html: '<h2>Since 2020</h2><p>Clothes for little ones.</p>', published_at: null, seo_title: null, seo_description: null, updated_at: null }) }),
+  )
+  await page.route('**/api/v1/store/newsletter', (route) => route.fulfill({ status: 202, json: envelope({ message: 'Almost done: check your inbox and confirm your subscription.' }) }))
+  await page.goto('/')
+
+  await expect(page.getByTestId('homepage-section')).toHaveCount(3)
+  const types = await page.getByTestId('homepage-section').evaluateAll((els) => els.map((el) => el.getAttribute('data-section-type')))
+  expect(types).toEqual(['hero_slider', 'features_strip', 'newsletter'])
+
+  const carousel = page.getByRole('region', { name: 'Featured' })
+  await expect(carousel.getByRole('heading', { name: 'Flat 20% off' })).toBeVisible()
+  await carousel.getByRole('button', { name: 'Next slide' }).click()
+  await expect(carousel.getByRole('heading', { name: 'New arrivals' })).toBeVisible()
+  await carousel.getByRole('button', { name: 'Previous slide' }).click()
+
+  await page.getByLabel('E-mail address').fill('mina@example.com')
+  await page.getByRole('button', { name: 'Subscribe' }).click()
+  await expect(page.getByText('Almost done: check your inbox and confirm your subscription.')).toBeVisible()
+
+  await carousel.getByRole('link', { name: 'Our story' }).click()
+  await expect(page).toHaveURL(/\/pages\/about$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'About us' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Since 2020' })).toBeVisible()
+  await expect(page).toHaveTitle('About us | Berry Kids')
 })

@@ -17,6 +17,7 @@ import {
   MENU_LOCATION_LABELS,
   MENU_LOCATIONS,
   useDeleteMenuMutation,
+  useLinkTargetsQuery,
   useMenuQuery,
   useMenusQuery,
   useReplaceMenuItemsMutation,
@@ -87,6 +88,7 @@ function CreateMenuDialog({ location, onClose, onCreated }: { location: MenuLoca
 
 function MenuEditor({ menu, canManage, onDeleted }: { menu: MenuDetail; canManage: boolean; onDeleted: () => void }) {
   const saveMenu = useSaveMenuMutation()
+  const linkTargets = useLinkTargetsQuery()
   const replaceItems = useReplaceMenuItemsMutation(menu.id)
   const remove = useDeleteMenuMutation()
   const [nodes, setNodes] = useState<EditorNode[]>(() => fromApi(menu.items))
@@ -129,7 +131,7 @@ function MenuEditor({ menu, canManage, onDeleted }: { menu: MenuDetail; canManag
           {menu.name} <Badge variant="outline">{menu.location_label}</Badge>
           {!menu.is_active && <Badge variant="warning">Hidden</Badge>}
         </CardTitle>
-        <CardDescription>Links are site paths (/sale) or full web addresses. Up to {MAX_MENU_ITEMS} items, three levels deep.</CardDescription>
+        <CardDescription>Link to a content page, or type a site path (/sale) or full web address. Links to pages follow renames and appear once the page is published. Up to {MAX_MENU_ITEMS} items, three levels deep.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {canManage && (
@@ -160,7 +162,7 @@ function MenuEditor({ menu, canManage, onDeleted }: { menu: MenuDetail; canManag
           </div>
         )}
 
-        <MenuTreeEditor nodes={nodes} onChange={change} allowsMega={allowsMega} errors={errors} readOnly={!canManage} />
+        <MenuTreeEditor nodes={nodes} onChange={change} allowsMega={allowsMega} errors={errors} readOnly={!canManage} pages={linkTargets.data?.pages ?? []} />
 
         {canManage && (
           <div className="flex items-center justify-end gap-3 border-t pt-4">

@@ -66,11 +66,16 @@ export const MENU_LOCATION_LABELS: Record<MenuLocation, string> = {
 
 export type MenuSummary = { id: string; name: string; location: MenuLocation; location_label: string; is_active: boolean; updated_at: string | null }
 
+export type MenuItemType = 'custom' | 'page'
+
 export type MenuItemNode = {
   id?: string
-  type?: 'custom'
+  type?: MenuItemType
   label: string
-  url: string
+  /** Custom links only; page items resolve their address on the storefront. */
+  url: string | null
+  /** The linked content page (type "page"). */
+  target_id?: string | null
   open_in_new_tab: boolean
   is_visible: boolean
   is_mega: boolean
@@ -81,6 +86,103 @@ export type MenuItemNode = {
 
 export type MenuDetail = MenuSummary & { items: MenuItemNode[] }
 
+export type LinkTargetPage = { id: string; slug: string; title: string; status: 'draft' | 'published' }
+export type LinkTargets = { pages: LinkTargetPage[] }
+
+export const BANNER_PLACEMENTS = ['hero_slider', 'home_promo'] as const
+export type BannerPlacement = (typeof BANNER_PLACEMENTS)[number]
+export const BANNER_PLACEMENT_LABELS: Record<BannerPlacement, string> = {
+  hero_slider: 'Hero slider',
+  home_promo: 'Homepage promo tiles',
+}
+export type TextPosition = 'left' | 'center' | 'right'
+
+export type Banner = {
+  id: string
+  placement: BannerPlacement
+  name: string
+  kicker: string | null
+  title: string | null
+  subtitle: string | null
+  link_url: string | null
+  button_label: string | null
+  secondary_link_url: string | null
+  secondary_button_label: string | null
+  desktop_media_id: string
+  mobile_media_id: string | null
+  text_color: string
+  text_position: TextPosition
+  starts_at: string | null
+  ends_at: string | null
+  is_active: boolean
+  /** Active and inside its schedule right now. */
+  is_live: boolean
+  state: 'live' | 'inactive' | 'scheduled' | 'ended'
+  sort_order: number
+  updated_at: string | null
+}
+
+export type BannerInput = Omit<Banner, 'id' | 'is_live' | 'state' | 'sort_order' | 'updated_at'>
+
+export const SECTION_TYPES = ['hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter'] as const
+export type SectionType = (typeof SECTION_TYPES)[number]
+export type SectionState = 'live' | 'disabled' | 'scheduled' | 'expired'
+
+export const BANNER_GRID_LAYOUTS = ['2-col', '3-col', '3-col-split', '4-col'] as const
+export type BannerGridLayout = (typeof BANNER_GRID_LAYOUTS)[number]
+export const FEATURE_ICONS = ['truck', 'shield-check', 'credit-card', 'headset', 'gift', 'rotate-ccw', 'badge-percent', 'clock', 'leaf', 'heart', 'star', 'store'] as const
+export type FeatureIcon = (typeof FEATURE_ICONS)[number]
+
+export type FeatureItem = { icon: FeatureIcon; title: string; text: string | null }
+export type TestimonialItem = { quote: string; name: string; role: string | null; rating: number | null; avatar_media_id: string | null }
+
+/** Section configs exactly as the API stores them (backend Domain/SectionType). */
+export type SectionConfigs = {
+  hero_slider: { autoplay_seconds: number; height: 'medium' | 'large' }
+  banner_grid: { layout: BannerGridLayout }
+  rich_text: { body_html: string; alignment: 'left' | 'center'; width: 'narrow' | 'wide'; background: string | null }
+  features_strip: { items: FeatureItem[]; background: string | null }
+  testimonials: { items: TestimonialItem[]; background: string | null }
+  newsletter: { text: string | null; button_label: string; image_media_id: string | null; background: string; foreground: string }
+}
+export type AnySectionConfig = SectionConfigs[SectionType]
+
+export type HomepageSection = {
+  id: string
+  type: SectionType
+  type_label: string
+  title: string | null
+  subtitle: string | null
+  config: AnySectionConfig
+  banner_ids: string[]
+  is_enabled: boolean
+  starts_at: string | null
+  ends_at: string | null
+  state: SectionState
+  sort_order: number
+  updated_at: string | null
+}
+
+export type SectionTypeInfo = {
+  type: SectionType
+  label: string
+  description: string
+  banner_placement: BannerPlacement | null
+  items: { min: number; max: number } | null
+  defaults: AnySectionConfig
+}
+
+export type SectionInput = {
+  type?: SectionType
+  title: string | null
+  subtitle: string | null
+  config: AnySectionConfig
+  banner_ids?: string[]
+  is_enabled: boolean
+  starts_at: string | null
+  ends_at: string | null
+}
+
 export const storefrontKeys = {
   all: ['storefront'] as const,
   settings: ['storefront', 'settings'] as const,
@@ -88,6 +190,10 @@ export const storefrontKeys = {
   theme: ['storefront', 'theme'] as const,
   menus: ['storefront', 'menus'] as const,
   menu: (id: string) => ['storefront', 'menus', id] as const,
+  linkTargets: ['storefront', 'link-targets'] as const,
+  banners: ['storefront', 'banners'] as const,
+  sections: ['storefront', 'homepage-sections'] as const,
+  sectionTypes: ['storefront', 'homepage-sections', 'types'] as const,
 }
 
 export function useStorefrontSettingsQuery() {
@@ -209,5 +315,100 @@ export function useDeleteMenuMutation() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/storefront/menus/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.menus, exact: true }),
+  })
+}
+
+export function useLinkTargetsQuery() {
+  return useQuery({
+    queryKey: storefrontKeys.linkTargets,
+    queryFn: ({ signal }) => api.get<LinkTargets>('/storefront/link-targets', { signal }).then((r) => r.data),
+    staleTime: 60_000,
+  })
+}
+
+export function useBannersQuery() {
+  return useQuery({
+    queryKey: storefrontKeys.banners,
+    queryFn: ({ signal }) => api.get<Banner[]>('/storefront/banners', { signal }).then((r) => r.data),
+  })
+}
+
+export function useSaveBannerMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: Partial<BannerInput> }) =>
+      (id ? api.patch<Banner>(`/storefront/banners/${id}`, input) : api.post<Banner>('/storefront/banners', input)).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.banners }),
+  })
+}
+
+export function useDeleteBannerMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/storefront/banners/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.banners }),
+  })
+}
+
+export function useReorderBannersMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: { placement: BannerPlacement; ids: string[] }) => api.put<Banner[]>('/storefront/banners/order', input).then((r) => r.data),
+    onSuccess: (banners) => queryClient.setQueryData(storefrontKeys.banners, banners),
+  })
+}
+
+export function useSectionTypesQuery() {
+  return useQuery({
+    queryKey: storefrontKeys.sectionTypes,
+    queryFn: ({ signal }) => api.get<SectionTypeInfo[]>('/storefront/homepage-sections/types', { signal }).then((r) => r.data),
+    staleTime: Infinity,
+  })
+}
+
+export function useSectionsQuery() {
+  return useQuery({
+    queryKey: storefrontKeys.sections,
+    queryFn: ({ signal }) => api.get<HomepageSection[]>('/storefront/homepage-sections', { signal }).then((r) => r.data),
+  })
+}
+
+export function useSaveSectionMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: Partial<SectionInput> }) =>
+      (id ? api.patch<HomepageSection>(`/storefront/homepage-sections/${id}`, input) : api.post<HomepageSection>('/storefront/homepage-sections', input)).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.sections, exact: true }),
+  })
+}
+
+export function useDuplicateSectionMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.post<HomepageSection>(`/storefront/homepage-sections/${id}/duplicate`).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.sections, exact: true }),
+  })
+}
+
+export function useDeleteSectionMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/storefront/homepage-sections/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.sections, exact: true }),
+  })
+}
+
+export function useReorderSectionsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (ids: string[]) => api.put<HomepageSection[]>('/storefront/homepage-sections/order', { ids }).then((r) => r.data),
+    onSuccess: (sections) => queryClient.setQueryData(storefrontKeys.sections, sections),
   })
 }

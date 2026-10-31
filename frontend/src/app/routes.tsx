@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { RouteObject } from 'react-router'
+import { Navigate, type RouteObject } from 'react-router'
 import { HomeRedirect } from '@/app/home-redirect'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { NotFoundPage, RouteError } from '@/app/route-error'
@@ -65,6 +65,13 @@ const pages = {
   storefrontTheme: page(() => import('@/features/storefront/pages/theme-page'), 'ThemePage'),
   storefrontMenus: page(() => import('@/features/storefront/pages/menus-page'), 'MenusPage'),
   mediaLibrary: page(() => import('@/features/media/pages/media-library-page'), 'MediaLibraryPage'),
+  storefrontHomepage: page(() => import('@/features/storefront/pages/homepage-page'), 'HomepagePage'),
+  storefrontBanners: page(() => import('@/features/storefront/pages/banners-page'), 'BannersPage'),
+  contentPages: page(() => import('@/features/content/pages/pages-page'), 'PagesPage'),
+  contentPage: page(() => import('@/features/content/pages/page-editor-page'), 'PageEditorPage'),
+  contentFaq: page(() => import('@/features/content/pages/faq-page'), 'FaqPage'),
+  contentMessages: page(() => import('@/features/content/pages/messages-page'), 'MessagesPage'),
+  contentNewsletter: page(() => import('@/features/content/pages/newsletter-page'), 'NewsletterPage'),
   newReturn: page(() => import('@/features/returns/pages/return-pages'), 'NewReturnPage'),
   returns: page(() => import('@/features/returns/pages/return-pages'), 'ReturnsPage'),
   saleReturn: page(() => import('@/features/returns/pages/return-pages'), 'ReturnPage'),
@@ -152,6 +159,15 @@ export const routes: RouteObject[] = [
               guarded('storefront.view', 'storefront', pages.storefrontSettings),
               guarded('storefront.view', 'storefront/theme', pages.storefrontTheme),
               guarded('storefront.view', 'storefront/menus', pages.storefrontMenus),
+              guarded('storefront.view', 'storefront/homepage', pages.storefrontHomepage),
+              guarded('storefront.view', 'storefront/banners', pages.storefrontBanners),
+              { path: 'content', element: <Navigate to="/content/pages" replace /> },
+              guarded('cms.manage', 'content/pages', pages.contentPages),
+              guarded('cms.manage', 'content/pages/new', pages.contentPage),
+              guarded('cms.manage', 'content/pages/:pageId', pages.contentPage),
+              guarded('cms.manage', 'content/faq', pages.contentFaq),
+              guarded('cms.manage', 'content/messages', pages.contentMessages),
+              guarded('cms.manage', 'content/newsletter', pages.contentNewsletter),
               guarded('media.manage', 'media', pages.mediaLibrary),
               guarded('branches.view', 'branches', pages.branches),
               guarded('users.view', 'users', pages.users),

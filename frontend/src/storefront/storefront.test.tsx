@@ -8,8 +8,10 @@ import type { StorefrontBootstrap } from './types'
 
 const logo = { id: 'logo-1', url: '/storage/media/o/logo.png', srcset: '/storage/media/o/logo-320.webp 320w, /storage/media/o/logo.png 400w', width: 400, height: 120, alt: null }
 
+const emptyHomepage = ok({ sections: [], preview: false })
+
 function serve(bootstrap: StorefrontBootstrap) {
-  return mockApi({ 'GET /store/bootstrap': ok(bootstrap) })
+  return mockApi({ 'GET /store/bootstrap': ok(bootstrap), 'GET /store/homepage': emptyHomepage })
 }
 
 afterEach(() => {
@@ -31,7 +33,7 @@ describe('storefront layout', () => {
   })
 
   it('uses the payload written into the page instead of fetching', async () => {
-    const fetchMock = mockApi({})
+    const fetchMock = mockApi({ 'GET /store/homepage': emptyHomepage })
     const script = document.createElement('script')
     script.id = 'storefront-bootstrap'
     script.type = 'application/json'
@@ -41,7 +43,7 @@ describe('storefront layout', () => {
     renderRoutes(storefrontRoutes)
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Inline Store' })).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContainEqual(expect.stringContaining('/store/bootstrap'))
   })
 
   it('shows the logo with its renditions when the theme has one', async () => {
@@ -142,7 +144,7 @@ describe('storefront layout', () => {
     renderRoutes(storefrontRoutes)
 
     expect(await screen.findByRole('link', { name: 'Free delivery over ৳2000' })).toHaveAttribute('href', '/shipping')
-    expect(screen.getByRole('status')).toHaveTextContent('Preview — this store is not open to customers yet.')
+    expect(screen.getByText('Preview — this store is not open to customers yet.')).toHaveAttribute('role', 'status')
     expect(screen.getByTestId('custom-css').textContent).toBe('.x{color:red}')
   })
 
@@ -163,7 +165,7 @@ describe('storefront layout', () => {
 
   it('offers a retry when the store cannot be loaded', async () => {
     let calls = 0
-    mockApi({ 'GET /store/bootstrap': () => (++calls === 1 ? fail(500, 'SERVER_ERROR') : ok(bootstrapFixture())) })
+    mockApi({ 'GET /store/bootstrap': () => (++calls === 1 ? fail(500, 'SERVER_ERROR') : ok(bootstrapFixture())), 'GET /store/homepage': emptyHomepage })
     renderRoutes(storefrontRoutes)
     const user = userEvent.setup()
 

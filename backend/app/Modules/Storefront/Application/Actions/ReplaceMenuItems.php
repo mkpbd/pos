@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Application\Actions;
 
+use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
@@ -20,6 +21,7 @@ class ReplaceMenuItems
 
     public function __construct(
         private readonly MediaLibrary $media,
+        private readonly PageDirectory $pages,
         private readonly AuditTrail $audit,
     ) {}
 
@@ -45,6 +47,15 @@ class ReplaceMenuItems
             throw new BusinessRuleViolation('MEDIA_NOT_FOUND', 'Some selected images no longer exist in the media library.', ['media_ids' => $missing]);
         }
 
+        $pageIds = array_values(array_unique(array_filter(array_map(
+            fn (array $pair) => ($pair[0]['type'] ?? null) === MenuItemType::Page->value ? ($pair[0]['target_id'] ?? null) : null,
+            $flat,
+        ))));
+        $missingPages = array_values(array_diff($pageIds, array_column($this->pages->all(), 'id')));
+        if ($missingPages !== []) {
+            throw new BusinessRuleViolation('PAGE_NOT_FOUND', 'Some linked pages no longer exist.', ['page_ids' => $missingPages]);
+        }
+
         return DB::transaction(function () use ($menu, $items, $flat) {
             Menu::query()->whereKey($menu->id)->lockForUpdate()->first();
             $previous = $menu->items()->count();
@@ -65,12 +76,14 @@ class ReplaceMenuItems
     {
         foreach (array_values($items) as $position => $item) {
             $isMega = (bool) ($item['is_mega'] ?? false);
+            $type = MenuItemType::from($item['type'] ?? MenuItemType::Custom->value);
             $created = MenuItem::query()->create([
                 'menu_id' => $menu->id,
                 'parent_id' => $parentId,
-                'type' => MenuItemType::from($item['type'] ?? MenuItemType::Custom->value),
+                'type' => $type,
                 'label' => trim((string) $item['label']),
-                'url' => $item['url'],
+                'url' => $type === MenuItemType::Custom ? $item['url'] : null,
+                'target_id' => $type === MenuItemType::Custom ? null : $item['target_id'],
                 'open_in_new_tab' => (bool) ($item['open_in_new_tab'] ?? false),
                 'is_visible' => (bool) ($item['is_visible'] ?? true),
                 'is_mega' => $isMega,

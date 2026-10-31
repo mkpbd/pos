@@ -1,13 +1,18 @@
 <?php
 
+use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
+use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
+use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
 use App\Modules\Storefront\Presentation\Http\Controllers\MenuController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBootstrapController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontAdminController;
+use App\Modules\Storefront\Presentation\Http\Controllers\StoreHomepageController;
 use Illuminate\Support\Facades\Route;
 
 // Public storefront API: organization from the host name, no authentication.
 Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group(function () {
     Route::get('bootstrap', StoreBootstrapController::class)->name('store.bootstrap');
+    Route::get('homepage', StoreHomepageController::class)->name('store.homepage');
 });
 
 // Storefront administration.
@@ -18,6 +23,12 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::get('theme', [StorefrontAdminController::class, 'showTheme']);
         Route::get('menus', [MenuController::class, 'index']);
         Route::get('menus/{menu}', [MenuController::class, 'show'])->whereUuid('menu');
+        Route::get('link-targets', LinkTargetController::class);
+        Route::get('banners', [BannerController::class, 'index']);
+        Route::get('banners/{banner}', [BannerController::class, 'show'])->whereUuid('banner');
+        Route::get('homepage-sections', [HomepageSectionController::class, 'index']);
+        Route::get('homepage-sections/types', [HomepageSectionController::class, 'types']);
+        Route::get('homepage-sections/{section}', [HomepageSectionController::class, 'show'])->whereUuid('section');
     });
 
     Route::middleware('can:storefront.manage')->group(function () {
@@ -30,6 +41,15 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::patch('menus/{menu}', [MenuController::class, 'update'])->whereUuid('menu');
         Route::put('menus/{menu}/items', [MenuController::class, 'replaceItems'])->whereUuid('menu');
         Route::delete('menus/{menu}', [MenuController::class, 'destroy'])->whereUuid('menu');
+        Route::post('banners', [BannerController::class, 'store']);
+        Route::put('banners/order', [BannerController::class, 'reorder']);
+        Route::patch('banners/{banner}', [BannerController::class, 'update'])->whereUuid('banner');
+        Route::delete('banners/{banner}', [BannerController::class, 'destroy'])->whereUuid('banner');
+        Route::post('homepage-sections', [HomepageSectionController::class, 'store']);
+        Route::put('homepage-sections/order', [HomepageSectionController::class, 'reorder']);
+        Route::patch('homepage-sections/{section}', [HomepageSectionController::class, 'update'])->whereUuid('section');
+        Route::post('homepage-sections/{section}/duplicate', [HomepageSectionController::class, 'duplicate'])->whereUuid('section');
+        Route::delete('homepage-sections/{section}', [HomepageSectionController::class, 'destroy'])->whereUuid('section');
     });
 
     Route::put('theme/custom-css', [StorefrontAdminController::class, 'updateCustomCss'])->middleware('can:storefront.custom_css');

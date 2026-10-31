@@ -86,7 +86,11 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `MEDIA_NOT_FOUND` | A theme or menu points at media ids that are not in the organization's library (`details.media_ids`). |
 | 422 | `MEGA_MENU_NOT_ALLOWED`, `MENU_TOO_LARGE` | Mega menu outside top-level items of the main menu; more than 200 menu items. |
 | 422 | `CUSTOM_CSS_REJECTED` | Custom CSS breaks the policy (`<`, `@import`, `expression(`, escapes, `url()` outside `/storage/`, > 20 KB). |
-| 422 | `INVALID_IMAGE`, `IN_USE` | Upload is not a readable image; media still used by the theme or a menu. |
+| 422 | `INVALID_IMAGE`, `IN_USE` | Upload is not a readable image; media still used by the theme, a menu, a banner or a section. Also: a banner shown by a section (`details.sections`), a page a menu links to. |
+| 422 | `BANNER_IN_USE`, `BANNER_NOT_FOUND`, `SECTION_ITEMS_INVALID` | Moving a banner used by a section to another placement; a section's banners missing or of the wrong placement (`details.banner_ids`); too few/many banners for the section or layout. |
+| 422 | `BUTTON_LINK_REQUIRED`, `SCHEDULE_INVALID` | A banner button without label or link; a schedule whose end is not after its start. |
+| 422 | `CONTENT_EMPTY`, `PAGE_NOT_FOUND`, `ORDER_MISMATCH`, `LIMIT_REACHED` | Rich text empty after sanitizing; a menu item linking to a missing page; a reorder that does not list every item exactly once; too many sections/banners/FAQ entries. |
+| 422 | `TOKEN_INVALID` | Newsletter confirm/unsubscribe token unknown or expired. |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -376,6 +380,48 @@ Host: shop.example.com
     "menus": {
       "main": { "name": "Main navigation", "items": [{ "id": "0193…", "label": "Home", "url": "/", "open_in_new_tab": false, "is_mega": false, "mega_columns": null, "image": null, "children": [] }] }
     },
+    "preview": false
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+### E-commerce track — content and homepage (E5)
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/store/homepage` | public | `{sections, preview}`: live sections in order. Each `{id, type, title, subtitle, config}`; banner types add `banners: [{id, kicker, title, subtitle, link_url, button_label, secondary_link_url, secondary_button_label, image, mobile_image, text_color, text_position}]`. Media ids in configs are resolved (`avatar`, `image`). Sections whose banners are all not live are omitted. `?preview=1` (staff with `storefront.view` of this store) includes every section with `state`: `live`, `disabled`, `scheduled`, `expired`, `empty`. `ETag`. |
+| GET `/store/pages/{slug}` | public | Published page whose publication time has come: `{slug, title, template, body_html, published_at, seo_title, seo_description, updated_at}`; `faq` template adds `faq: [{group, items: [{id, question, answer_html}]}]`. Otherwise `404 NOT_FOUND`. |
+| GET `/store/faq` | public | Active FAQ entries, grouped (entries without a group first). |
+| POST `/store/contact` | public, 5/hour/IP | `{name, email, phone?, subject?, message (10–5000), website}` — `website` is a honeypot (filled → accepted and dropped). 202. |
+| POST `/store/newsletter` | public, 5/hour/IP | `{email}` → 202 with the same message whether new, pending or subscribed; sends a confirmation e-mail (links `/newsletter/confirm?token=`, `/newsletter/unsubscribe?token=` on the visitor's host). |
+| POST `/store/newsletter/confirm` · `/unsubscribe` | public | `{token}`; `TOKEN_INVALID` when unknown/expired (confirm: 7 days). Unsubscribing twice succeeds. |
+| GET `/storefront/banners` (`?placement=`) · GET `/{id}` | `storefront.view` | Ordered by placement and position; `is_live` and `state` (`live`, `inactive`, `scheduled`, `ended`). |
+| POST · PATCH `/{id}` · DELETE `/{id}` `/storefront/banners`; PUT `/storefront/banners/order` | `storefront.manage` | Placements `hero_slider`, `home_promo`; links `/path` or http(s); `{placement, ids}` reorders a whole placement. |
+| GET `/storefront/homepage-sections` · `/types` · `/{id}` | `storefront.view` | Sections with `config` (normalized), `banner_ids`, `state`; `types` lists each type's label, description, banner placement, item limits and default config. |
+| POST · PATCH `/{id}` · DELETE `/{id}` `/storefront/homepage-sections`; POST `/{id}/duplicate`; PUT `/order` | `storefront.manage` | `{type (create only), title, subtitle, config, banner_ids, is_enabled, starts_at, ends_at}`; `config` validated per type and replaced as a whole. New sections go last; duplicates are disabled and placed after the original. |
+| GET `/storefront/link-targets` | `storefront.view` | `{pages: [{id, slug, title, status}]}` for page links in menus (`{type: "page", label, target_id}` in `PUT /storefront/menus/{id}/items`). |
+| GET · POST `/cms/pages`; GET · PATCH · DELETE `/cms/pages/{id}` | `cms.manage` | `{slug (a-z0-9-, unique), title, body_html (sanitized), template default/faq/contact, status draft/published, published_at, seo_title, seo_description}`; list `?search=&status=`; publishing without a date publishes now. |
+| GET · POST `/cms/faq`; PATCH · DELETE `/cms/faq/{id}`; PUT `/cms/faq/order` | `cms.manage` | `{group, question, answer_html, is_active}`. |
+| GET `/cms/contact-messages` (`?status=open\|handled&search=`) · PATCH `/{id}` | `cms.manage` | `meta.open` counts unhandled messages; PATCH `{is_handled}`. |
+| GET `/cms/newsletter-subscribers` (`?status=&search=`) · GET `/export` | `cms.manage` | `meta.counts` per status; export = CSV of confirmed subscribers (`email, confirmed_at`). |
+
+Pages: the shell also answers `/pages/{slug}` (200 with the page's title and description when published, else 404) and `/newsletter/confirm`, `/newsletter/unsubscribe` (`noindex`).
+
+Example — homepage:
+
+```json
+{
+  "success": true,
+  "data": {
+    "sections": [
+      {
+        "id": "0193…", "type": "hero_slider", "title": null, "subtitle": null,
+        "config": { "autoplay_seconds": 6, "height": "large" },
+        "banners": [{ "id": "0193…", "kicker": "This week", "title": "Fresh vegetables every morning", "subtitle": "…", "link_url": "/pages/about-us", "button_label": "About us", "secondary_link_url": null, "secondary_button_label": null, "image": { "id": "0193…", "url": "/storage/media/…/….jpg", "srcset": "… 640w, … 1600w", "width": 1600, "height": 600, "alt": null }, "mobile_image": null, "text_color": "#ffffff", "text_position": "left" }]
+      },
+      { "id": "0193…", "type": "features_strip", "title": null, "subtitle": null, "config": { "items": [{ "icon": "truck", "title": "Same-day delivery", "text": "Inside Dhaka, order before 4 pm" }], "background": null } }
+    ],
     "preview": false
   },
   "meta": { "request_id": "0193…" }

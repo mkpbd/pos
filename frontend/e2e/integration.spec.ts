@@ -231,11 +231,11 @@ test('theme colour and menu changes made in the admin reach the storefront', asy
   await page.getByRole('button', { name: 'Save theme' }).click()
   await expect(page.getByText('Theme saved.')).toBeVisible()
 
-  // The seeded main menu has "Home"; add a second top-level link.
+  // The seeded main menu has Home, About us, FAQ and Contact; add a fifth top-level link.
   await page.goto('/admin/storefront/menus')
   await page.getByRole('button', { name: 'Add item' }).click()
-  await page.getByLabel('Item 2 label').fill('Gift ideas')
-  await page.getByLabel('Item 2 link').fill('/gifts')
+  await page.getByLabel('Item 5 label').fill('Gift ideas')
+  await page.getByLabel('Item 5 link', { exact: true }).fill('/gifts')
   await page.getByRole('button', { name: 'Save items' }).click()
   await expect(page.getByText('Menu items saved.')).toBeVisible()
 
@@ -250,4 +250,56 @@ test('theme colour and menu changes made in the admin reach the storefront', asy
   await nav.getByRole('link', { name: 'Gift ideas' }).click()
   await expect(page).toHaveURL(/\/gifts$/)
   await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Demo Mart')
+})
+
+test('a banner edited and a section added in the admin show on the storefront in order', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin sidebar flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // Brief checks 1-2: change the seeded hero banner's headline.
+  await page.goto('/admin/storefront/banners')
+  await page.getByRole('button', { name: 'Edit Fresh week' }).click()
+  const bannerDialog = page.getByRole('dialog', { name: 'Edit banner' })
+  await bannerDialog.getByLabel('Headline').fill('Eid offers all week')
+  await bannerDialog.getByRole('button', { name: 'Save banner' }).click()
+  await expect(page.getByText('Banner saved.')).toBeVisible()
+
+  await page.goto('/')
+  await expect(page.getByRole('region', { name: 'Featured' }).getByRole('heading', { name: 'Eid offers all week' })).toBeVisible()
+
+  // Brief checks 5-6: add a text section (it goes last), then move it to the top.
+  await page.goto('/admin/storefront/homepage')
+  await page.getByRole('button', { name: 'Add section' }).click()
+  await page.getByRole('button', { name: /Text block/ }).click()
+  const sectionDialog = page.getByRole('dialog', { name: 'New text block' })
+  await sectionDialog.getByLabel('Title', { exact: true }).fill('Store news')
+  await sectionDialog.getByRole('textbox', { name: 'Section text' }).fill('We now deliver on Fridays.')
+  await sectionDialog.getByRole('button', { name: 'Add section' }).click()
+  await expect(page.getByText('Section added at the end of the homepage.')).toBeVisible()
+
+  const rows = page.getByRole('list', { name: 'Homepage sections' }).getByRole('listitem')
+  await expect(rows.last()).toContainText('Store news')
+  const count = await rows.count()
+  for (let i = 1; i < count; i++) {
+    await page.getByRole('button', { name: 'Move Store news up' }).click()
+    await expect(rows.nth(count - 1 - i)).toContainText('Store news')
+  }
+
+  await page.goto('/')
+  const sections = page.getByTestId('homepage-section')
+  await expect(sections.first()).toHaveAttribute('data-section-type', 'rich_text')
+  await expect(sections.first()).toContainText('We now deliver on Fridays.')
+  await expect(sections.nth(1)).toHaveAttribute('data-section-type', 'hero_slider')
+
+  // Hidden again, it disappears from the storefront.
+  await page.goto('/admin/storefront/homepage')
+  await page.getByRole('switch', { name: 'Show Store news' }).click()
+  await expect(rows.first()).toContainText('Hidden')
+  await page.goto('/')
+  await expect(page.getByText('We now deliver on Fridays.')).toHaveCount(0)
 })

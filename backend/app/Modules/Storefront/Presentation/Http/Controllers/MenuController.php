@@ -56,7 +56,7 @@ class MenuController
      */
     public function replaceItems(ReplaceMenuItemsRequest $request, Menu $menu, ReplaceMenuItems $replace): JsonResponse
     {
-        return ApiResponse::success(StorefrontPresenter::menu($replace($menu, $request->validated()['items']), true));
+        return ApiResponse::success(StorefrontPresenter::menu($replace($menu, $request->items()), true));
     }
 
     public function destroy(Menu $menu, SaveMenu $save): JsonResponse

@@ -2,22 +2,27 @@
 
 namespace App\Modules\Storefront;
 
+use App\Modules\Cms\Application\Contracts\PageReferences;
 use App\Modules\Media\Application\Contracts\MediaReferences;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Infrastructure\MenuPageReferences;
+use App\Modules\Storefront\Infrastructure\SectionMediaReferences;
 use App\Modules\Storefront\Infrastructure\ThemeMediaReferences;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * The online storefront's configuration (settings, domains, theme, menus), host-based
- * storefront resolution, the public bootstrap API and the HTML shell.
+ * The online storefront's configuration (settings, domains, theme, menus, banners,
+ * homepage sections), host-based storefront resolution, the public bootstrap and
+ * homepage API and the HTML shell.
  */
 class StorefrontServiceProvider extends ModuleServiceProvider
 {
     public function register(): void
     {
-        $this->app->tag([ThemeMediaReferences::class], MediaReferences::TAG);
+        $this->app->tag([ThemeMediaReferences::class, SectionMediaReferences::class], MediaReferences::TAG);
+        $this->app->tag([MenuPageReferences::class], PageReferences::TAG);
     }
 
     public function boot(): void
@@ -33,8 +38,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
     protected function permissions(): array
     {
         return [
-            'storefront.view' => 'View online store settings, theme and menus; preview a closed storefront',
-            'storefront.manage' => 'Change online store settings, domains, theme and menus',
+            'storefront.view' => 'View online store settings, theme, menus, banners and homepage; preview the storefront',
+            'storefront.manage' => 'Change online store settings, domains, theme, menus, banners and homepage sections',
             'storefront.custom_css' => 'Edit the online store\'s custom CSS',
         ];
     }

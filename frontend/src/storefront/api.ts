@@ -1,12 +1,14 @@
 import { createContext, useContext } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api/client'
-import type { StorefrontBootstrap } from './types'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { api, ApiError } from '@/lib/api/client'
+import type { ContactInput, StorefrontBootstrap, StorefrontHomepage, StorePage } from './types'
 
 export const BOOTSTRAP_ELEMENT_ID = 'storefront-bootstrap'
 
 export const storefrontKeys = {
   bootstrap: ['store', 'bootstrap'] as const,
+  homepage: (preview: boolean) => ['store', 'homepage', { preview }] as const,
+  page: (slug: string) => ['store', 'pages', slug] as const,
 }
 
 /**
@@ -43,4 +45,36 @@ export function useStorefront(): StorefrontBootstrap {
   const value = useContext(BootstrapContext)
   if (!value) throw new Error('useStorefront must be used inside the storefront layout')
   return value
+}
+
+/** The homepage sections. `preview` asks for hidden and scheduled sections too (staff only; ignored otherwise). */
+export function useHomepageQuery(preview: boolean) {
+  return useQuery({
+    queryKey: storefrontKeys.homepage(preview),
+    queryFn: ({ signal }) => api.get<StorefrontHomepage>('/store/homepage', { signal, query: preview ? { preview: 1 } : undefined }).then((r) => r.data),
+    staleTime: preview ? 0 : 60_000,
+  })
+}
+
+export function useStorePageQuery(slug: string) {
+  return useQuery({
+    queryKey: storefrontKeys.page(slug),
+    queryFn: ({ signal }) => api.get<StorePage>(`/store/pages/${encodeURIComponent(slug)}`, { signal }).then((r) => r.data),
+    staleTime: 60_000,
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
+  })
+}
+
+type Message = { message: string }
+
+export function useContactMutation() {
+  return useMutation({ mutationFn: (input: ContactInput) => api.post<Message>('/store/contact', input).then((r) => r.data) })
+}
+
+export function useNewsletterMutation() {
+  return useMutation({ mutationFn: (email: string) => api.post<Message>('/store/newsletter', { email }).then((r) => r.data) })
+}
+
+export function useNewsletterTokenMutation(action: 'confirm' | 'unsubscribe') {
+  return useMutation({ mutationFn: (token: string) => api.post<Message>(`/store/newsletter/${action}`, { token }).then((r) => r.data) })
 }

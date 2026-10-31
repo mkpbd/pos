@@ -4,6 +4,26 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### E-commerce E5 — Content and homepage builder (online store track)
+
+#### Added
+- **Homepage builder** (Storefront module): `homepage_sections` + `homepage_section_items` with a typed config per section type (`Domain\SectionType`: defaults, normalization, media references). Types shipped: **hero slider**, **banner grid** (2, 3, 3-split or 4 columns), **text block** (rich text), **features strip** (icon, title, text), **testimonials** (quote, name, role, stars, photo) and **newsletter sign-up**. Sections can be added (go last), edited, duplicated (disabled copy right below), enabled/disabled, scheduled (`starts_at`/`ends_at`), reordered and deleted.
+- **Banners** with placements `hero_slider` and `home_promo`: kicker, headline, text, one or two buttons (or the whole banner as link), desktop and mobile image, text colour and position, schedule, active flag, order per placement. Banners shown by a section cannot be deleted or moved to another placement (`IN_USE`, `BANNER_IN_USE`).
+- **Public homepage API** `GET /store/homepage`: live sections in order with banners and media resolved; a section whose banners are all inactive or outside their schedule is left out, so empty blocks never render. `?preview=1` from staff of the store with `storefront.view` adds hidden, scheduled, ended and empty sections with their `state`. `ETag` support.
+- **Cms module:** content pages (`/pages/{slug}`, layouts *standard*, *FAQ*, *contact*; draft/published with optional publication time; SEO title and description), FAQ entries (topic groups, order, active flag), contact form messages (honeypot, 5 per hour per visitor, handled/open in the admin), newsletter subscribers with **double opt-in** (confirmation e-mail with hashed tokens valid 7 days, one e-mail per address per 10 minutes, identical answers whether or not an address is known, click-to-unsubscribe) and a CSV export of confirmed subscribers.
+- **Rich text** sanitized on the server with HTMLPurifier (`ezyang/htmlpurifier` 4.19, ADR-009 whitelist; images only from the media disk) through the new shared `HtmlSanitizer` contract; edited with **TipTap 3.32** in the admin (headings 2–4, emphasis, lists, quote, divider, safe links, images from the media library).
+- **Menus link to content pages** (`type: page`, `target_id`): the storefront resolves the address, so renames follow and unpublished pages drop out of the navigation. A page linked from a menu cannot be deleted. `GET /storefront/link-targets` lists the pages for the editor.
+- **Storefront:** homepage renderer (accessible hero carousel with optional autoplay that pauses on hover/focus, can be stopped and respects reduced motion; banner grids; text; features; testimonials; newsletter form), content pages with breadcrumb, FAQ accordion and contact form plus the store's contact details, newsletter confirm/unsubscribe pages, staff preview markers. The shell answers 200 with the page's title and description for published pages and `noindex` for the newsletter pages.
+- **Admin:** *Online store → Homepage* (builder with type picker, per-type editors, banner chooser, preview link) and *→ Banners*; new *Content* area (`cms.manage`): Pages (list and editor), FAQ, Messages, Newsletter.
+- Permission `cms.manage` (in the Online Store Manager role through `cms.*`).
+- Demo data: Demo Mart gets About, FAQ, Contact and Privacy pages, four FAQ entries, generated banner artwork, a six-section homepage and menus linking to the pages.
+- Tests: 295 backend tests (2 PostgreSQL-only skipped on SQLite) — new `CmsPagesTest`, `ContactAndNewsletterTest`, `HomepageBuilderTest`, `HtmlSanitizerTest`; 139 Vitest tests (20 new); Playwright: homepage sections and content pages (mocked) and a full-stack test for brief checks 1–2 and 5–6 (a banner edited in the admin shows on the storefront; a section added and moved to the top shows first; hidden again, it disappears).
+
+#### Changed
+- `PUT /storefront/menus/{id}/items` keeps the items in the order sent even when only some items carry optional keys (Laravel's `validated()` could reorder them).
+- Timestamps with an offset (`2026-11-03T00:00:00+06:00`) are moved to the application timezone before Eloquent stores them (`Shared\Application\Support\Instants`), so schedules keep their instant.
+- E5 ships the section types whose content and link targets exist. Product, category and brand sections follow with the online catalog (E6), deal countdowns with promotions (E8) and blog teasers with the blog (E11) — no section may link to a page that does not exist yet.
+
 ### E-commerce E4 — Storefront shell (online store track)
 
 Plan, decisions and API surface of the e-commerce track: `docs/ecommerce/` (analysis E1, reference investigation E2, ADR-001…017 and API plan E3).

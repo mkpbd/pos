@@ -3,13 +3,16 @@
 namespace App\Providers;
 
 use App\Modules\Shared\Application\Authorization\PermissionRegistry;
+use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Infrastructure\Html\PurifierHtmlSanitizer;
 use App\Modules\Shared\Infrastructure\Sequences\DatabaseSequenceGenerator;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +26,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(TenantContext::class);
         $this->app->singleton(PermissionRegistry::class);
         $this->app->bind(SequenceGenerator::class, DatabaseSequenceGenerator::class);
+        // Rich-text images may only come from the media disk (same-origin /storage locally, the CDN URL otherwise).
+        $this->app->singleton(HtmlSanitizer::class, function () {
+            $disk = (string) config('media.disk');
+
+            return new PurifierHtmlSanitizer($disk === 'public' ? ['/storage/'] : [rtrim(Storage::disk($disk)->url(''), '/').'/']);
+        });
     }
 
     /**

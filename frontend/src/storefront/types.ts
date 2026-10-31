@@ -75,3 +75,57 @@ export type StorefrontBootstrap = {
   theme: StorefrontTheme
   menus: Partial<Record<MenuLocation, StorefrontMenu>>
 }
+
+/** GET /api/v1/store/homepage — see backend Storefront\Application\Queries\StorefrontHomepage. */
+
+export type StoreBanner = {
+  id: string
+  kicker: string | null
+  title: string | null
+  subtitle: string | null
+  link_url: string | null
+  button_label: string | null
+  secondary_link_url: string | null
+  secondary_button_label: string | null
+  image: MediaRef
+  mobile_image: MediaRef | null
+  text_color: string
+  text_position: 'left' | 'center' | 'right'
+}
+
+/** Only in previews: why a section would (not) show. */
+export type SectionPreviewState = 'live' | 'disabled' | 'scheduled' | 'expired' | 'empty'
+
+type SectionBase = { id: string; title: string | null; subtitle: string | null; state?: SectionPreviewState }
+
+export type FeatureIconKey = 'truck' | 'shield-check' | 'credit-card' | 'headset' | 'gift' | 'rotate-ccw' | 'badge-percent' | 'clock' | 'leaf' | 'heart' | 'star' | 'store'
+
+export type StoreSection =
+  | (SectionBase & { type: 'hero_slider'; config: { autoplay_seconds: number; height: 'medium' | 'large' }; banners: StoreBanner[] })
+  | (SectionBase & { type: 'banner_grid'; config: { layout: '2-col' | '3-col' | '3-col-split' | '4-col' }; banners: StoreBanner[] })
+  | (SectionBase & { type: 'rich_text'; config: { body_html: string; alignment: 'left' | 'center'; width: 'narrow' | 'wide'; background: string | null } })
+  | (SectionBase & { type: 'features_strip'; config: { items: { icon: FeatureIconKey; title: string; text: string | null }[]; background: string | null } })
+  | (SectionBase & {
+      type: 'testimonials'
+      config: { items: { quote: string; name: string; role: string | null; rating: number | null; avatar: MediaRef | null }[]; background: string | null }
+    })
+  | (SectionBase & { type: 'newsletter'; config: { text: string | null; button_label: string; image: MediaRef | null; background: string; foreground: string } })
+
+export type StorefrontHomepage = { sections: StoreSection[]; preview: boolean }
+
+export type FaqGroup = { group: string | null; items: { id: string; question: string; answer_html: string }[] }
+
+/** GET /api/v1/store/pages/{slug} */
+export type StorePage = {
+  slug: string
+  title: string
+  template: 'default' | 'faq' | 'contact'
+  body_html: string | null
+  published_at: string | null
+  seo_title: string | null
+  seo_description: string | null
+  updated_at: string | null
+  faq?: FaqGroup[]
+}
+
+export type ContactInput = { name: string; email: string; phone?: string; subject?: string; message: string; website?: string }

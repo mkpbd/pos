@@ -78,7 +78,8 @@ Create only the folders a module actually needs.
 | Expenses | Expense and income categories, expense/other-income entries, voiding | Payments (`PaymentLedger`), Branches, Users | 6 ✅ |
 | Loyalty | Program settings, point accounts and the points ledger; implements Sales' `LoyaltyProgram` (earn, redeem as a payment method, reversals) | Sales (contract), Customers (`CustomerDirectory`) | 6 ✅ |
 | Media | Image library: uploads, alt text, WebP renditions, in-use protection; `MediaLibrary` (existence + public refs), `MediaReferences` (tagged checkers for JSON references) | Shared | E4 ✅ |
-| Storefront | Storefront settings, domains (host → organization), theme document + custom CSS, menus; `storefront` middleware, public `GET /store/bootstrap`, HTML shell | Media (`MediaLibrary`, implements `MediaReferences`), Organizations (`OrganizationDirectory`) | E4 ✅ |
+| Storefront | Storefront settings, domains (host → organization), theme document + custom CSS, menus (custom and page links), banners, homepage sections; `storefront` middleware, public `GET /store/bootstrap` and `/store/homepage`, HTML shell | Media (`MediaLibrary`, implements `MediaReferences`), Cms (`PageDirectory`, implements `PageReferences`), Organizations (`OrganizationDirectory`) | E4–E5 ✅ |
+| Cms | Content pages, FAQ, contact messages, newsletter subscribers (double opt-in); public `/store/pages`, `/store/faq`, `/store/contact`, `/store/newsletter`; `PageDirectory`, `PageReferences` | Shared (`HtmlSanitizer`), Organizations (`OrganizationDirectory`) | E5 ✅ |
 | Reports | Read-only views, report definitions, exports | All (read-only views) | 7 |
 | Notifications | In-app notification inbox API (database channel); notifications themselves are sent by the module that owns the event (low stock: Inventory). Expiry alerts and daily summaries follow | Shared | 4 ✅ (inbox) / 7 |
 | AI | Provider abstraction, insights, NL reporting over Reports definitions | Reports | 8 |
