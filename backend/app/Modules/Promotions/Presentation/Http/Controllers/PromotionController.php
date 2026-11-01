@@ -4,6 +4,7 @@ namespace App\Modules\Promotions\Presentation\Http\Controllers;
 
 use App\Modules\Promotions\Application\Actions\DeletePromotion;
 use App\Modules\Promotions\Application\Actions\SavePromotion;
+use App\Modules\Promotions\Application\Queries\PromotionReport;
 use App\Modules\Promotions\Domain\PromotionState;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
@@ -12,11 +13,13 @@ use App\Modules\Promotions\Presentation\Http\Requests\SavePromotionRequest;
 use App\Modules\Promotions\Presentation\Http\Support\PromotionPresenter;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Promotions of the online store (E8b, web only). Viewing needs `promotions.view`, changes
@@ -105,6 +108,31 @@ class PromotionController
         $delete($promotion);
 
         return ApiResponse::noContent();
+    }
+
+    /**
+     * Promotion report
+     *
+     * `?date_from=&date_to=` (Y-m-d, optional, calendar days in the organization's timezone;
+     * at most 366 days when both are given). `{date_from, date_to, timezone, currency,
+     * redemptions, orders, cancelled_orders, discount_total, order_revenue (sum of those
+     * orders' totals), average_discount (per redemption), by_day: [{date, redemptions,
+     * discount}]}` — with both dates every day of the range is listed, otherwise only days
+     * with redemptions. Redemptions of orders cancelled later stay counted.
+     */
+    public function report(Request $request, Promotion $promotion, PromotionReport $report): JsonResponse
+    {
+        $data = $request->validate([
+            'date_from' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'date_to' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+        $from = $data['date_from'] ?? null;
+        $to = $data['date_to'] ?? null;
+        if ($from !== null && $to !== null && CarbonImmutable::parse($from)->diffInDays(CarbonImmutable::parse($to)) >= PromotionReport::MAX_DAYS) {
+            throw ValidationException::withMessages(['date_to' => ['Choose at most '.PromotionReport::MAX_DAYS.' days.']]);
+        }
+
+        return ApiResponse::success($report->for($promotion, $from, $to));
     }
 
     /**

@@ -16,6 +16,8 @@ enum MovementType: string
     case SaleReturn = 'sale_return';
     case OnlineOrder = 'online_order';
     case OnlineOrderCancel = 'online_order_cancel';
+    /** Goods of a delivered web order coming back on an online return (E10b). */
+    case OnlineReturn = 'online_return';
 
     /**
      * Inbound movements bring their own unit cost and update the weighted average;
@@ -23,7 +25,7 @@ enum MovementType: string
      */
     public function isInbound(): bool
     {
-        return in_array($this, [self::Opening, self::AdjustmentIn, self::TransferIn, self::PurchaseReceipt, self::SaleCancellation, self::SaleReturn, self::OnlineOrderCancel], true);
+        return in_array($this, [self::Opening, self::AdjustmentIn, self::TransferIn, self::PurchaseReceipt, self::SaleCancellation, self::SaleReturn, self::OnlineOrderCancel, self::OnlineReturn], true);
     }
 
     /**

@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeftIcon, PencilIcon, RotateCcwIcon, StarIcon, XCircleIcon } from 'lucide-react'
+import { ArrowLeftIcon, PackageOpenIcon, PencilIcon, RotateCcwIcon, StarIcon, XCircleIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -14,9 +14,12 @@ import { useNotice } from '../notices'
 import { reviewStatusLabel, useMyReviewsQuery } from '../reviews/api'
 import { ReviewDialog, type ReviewTarget } from '../reviews/review-dialog'
 import { Stars } from '../reviews/stars'
-import type { AccountOrder, AccountOrderLine } from '../types'
+import type { AccountOrder, AccountOrderLine, OrderReturnSummary } from '../types'
 import { useDocumentTitle } from '../use-document-title'
 import { reorderNotice, useAccountOrderQuery, useCancelOrderMutation, useReorderMutation } from './account-api'
+import { ReturnRequestDialog } from './return-request-dialog'
+import { canRequestReturn } from './returns-api'
+import { CancelReturnDialog, OrderReturnsCard } from './returns-view'
 import { OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
 
 const REASON_MAX = 200
@@ -69,6 +72,9 @@ export function AccountOrderPage() {
 function AccountOrderDetails({ order }: { order: AccountOrder }) {
   const [cancelling, setCancelling] = useState(false)
   const [reviewing, setReviewing] = useState<ReviewTarget | null>(null)
+  const [returning, setReturning] = useState(false)
+  const [cancellingReturn, setCancellingReturn] = useState<OrderReturnSummary | null>(null)
+  const returnable = canRequestReturn(order)
   const reorder = useReorderMutation()
   const drawer = useCartDrawer()
   const notify = useNotice()
@@ -138,6 +144,12 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
             <RotateCcwIcon aria-hidden className="size-4" />
             {reorder.isPending ? 'Adding to cart…' : 'Buy again'}
           </button>
+          {returnable && (
+            <button type="button" className={secondaryButtonClass} onClick={() => setReturning(true)}>
+              <PackageOpenIcon aria-hidden className="size-4" />
+              Return items
+            </button>
+          )}
           {order.can_cancel && (
             <button type="button" className={cn(secondaryButtonClass, 'hover:border-sf-sale hover:text-sf-sale')} onClick={() => setCancelling(true)}>
               <XCircleIcon aria-hidden className="size-4" />
@@ -145,6 +157,11 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
             </button>
           )}
         </div>
+        {returnable && order.return_deadline && (
+          <p className="text-sm" data-testid="return-deadline">
+            Returns accepted until <time dateTime={order.return_deadline} className="font-semibold text-sf-heading">{formatDateTime(order.return_deadline)}</time>
+          </p>
+        )}
       </header>
 
       <PaymentInstructionsCard order={order} />
@@ -152,6 +169,7 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <OrderItemsCard lines={order.lines} currency={order.currency} lineActions={lineActions} />
+          <OrderReturnsCard returns={order.returns ?? []} currency={order.currency} orderLines={order.lines} onCancel={setCancellingReturn} />
           <div className="grid gap-6 md:grid-cols-2">
             <OrderAddressCard address={order.shipping_address} />
             <OrderDeliveryCard order={order} showCourier={false} />
@@ -165,6 +183,8 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
 
       <CancelOrderDialog order={order} open={cancelling} onClose={() => setCancelling(false)} />
       <ReviewDialog target={reviewing} onClose={() => setReviewing(null)} />
+      <ReturnRequestDialog order={order} open={returning} onClose={() => setReturning(false)} />
+      <CancelReturnDialog target={cancellingReturn} onClose={() => setCancellingReturn(null)} />
     </>
   )
 }

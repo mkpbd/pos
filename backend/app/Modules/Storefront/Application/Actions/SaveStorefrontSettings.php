@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 class SaveStorefrontSettings
 {
-    private const AUDITED = ['is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled'];
+    private const AUDITED = ['is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
@@ -24,7 +24,7 @@ class SaveStorefrontSettings
     ) {}
 
     /**
-     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool}  $attributes
+     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {

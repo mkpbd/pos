@@ -4,7 +4,11 @@ namespace App\Modules\Customers;
 
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
+use App\Modules\Customers\Application\Contracts\CustomerReviewStats;
+use App\Modules\Customers\Application\Contracts\CustomerShoppingLists;
+use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
 use App\Modules\Customers\Application\Services\NoOnlineAccounts;
+use App\Modules\Customers\Application\Services\NoWebActivity;
 use App\Modules\Customers\Infrastructure\Directory\EloquentCustomerDirectory;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
@@ -19,6 +23,10 @@ class CustomersServiceProvider extends ModuleServiceProvider
         $this->app->bind(CustomerDirectory::class, EloquentCustomerDirectory::class);
         // Replaced by the CustomerAccounts module when it is installed.
         $this->app->bindIf(CustomerOnlineAccounts::class, NoOnlineAccounts::class);
+        // E10b web activity: replaced by the Orders, Reviews and Cart modules when installed.
+        $this->app->bindIf(CustomerWebOrders::class, NoWebActivity::class);
+        $this->app->bindIf(CustomerReviewStats::class, NoWebActivity::class);
+        $this->app->bindIf(CustomerShoppingLists::class, NoWebActivity::class);
     }
 
     protected function permissions(): array

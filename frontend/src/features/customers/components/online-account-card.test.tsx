@@ -36,6 +36,7 @@ function setup(me: CurrentUser, onlineAccount: OnlineAccount | null, extra: Para
     'GET /loyalty/settings': ok({ is_enabled: false, spend_amount: '100.00', points_per_spend: 1, point_value: '1.00', min_redeem_points: 0 }),
     'GET /loyalty/customers/c-1': ok({ customer: { id: 'c-1', code: 'CUS-000001', name: 'Rina Akter' }, balance: 0, lifetime_earned: 0, lifetime_redeemed: 0, transactions: [] }),
     'GET /customers/c-1': ok({ ...customer, online_account: onlineAccount }),
+    'GET /customers/c-1/web-activity': ok({ account: null, orders: { count: 0, total_spent: '0.00', last_order_at: null, average_order: null }, returns_count: 0, reviews: { count: 0, pending: 0 }, wishlist_count: 0, cart: null, recent_orders: [] }),
     ...extra,
   })
 }

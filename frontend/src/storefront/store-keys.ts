@@ -23,6 +23,9 @@ export const accountKeys = {
   orderList: (status: string, page: number) => ['store', 'account', 'orders', 'list', status, page] as const,
   order: (number: string) => ['store', 'account', 'orders', 'detail', number] as const,
   reviews: ['store', 'account', 'reviews'] as const,
+  /** Online returns (E10b). */
+  returns: ['store', 'account', 'returns'] as const,
+  returnList: (page: number) => ['store', 'account', 'returns', 'list', page] as const,
 }
 
 /** Approved reviews of a product (public). */

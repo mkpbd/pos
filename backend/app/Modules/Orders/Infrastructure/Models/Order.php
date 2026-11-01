@@ -44,6 +44,7 @@ use LogicException;
  * @property string $cod_fee
  * @property string $total
  * @property string $paid_total
+ * @property string $refunded_total refunds booked on returns (E10b)
  * @property string $cost_total
  * @property string $contact_name
  * @property string $contact_email
@@ -67,7 +68,7 @@ use LogicException;
 #[Fillable([
     'id', 'organization_id', 'number', 'customer_id', 'customer_account_id', 'branch_id', 'store_id', 'status',
     'payment_status', 'payment_method', 'shipping_method_id', 'shipping_method_name', 'eta_min_days', 'eta_max_days',
-    'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'paid_total', 'cost_total',
+    'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'paid_total', 'refunded_total', 'cost_total',
     'contact_name', 'contact_email', 'contact_phone', 'notes', 'access_token_hash', 'courier_name', 'tracking_number',
     'placed_at', 'expires_at', 'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by',
     'cancel_reason', 'ip', 'user_agent',
@@ -78,7 +79,7 @@ class Order extends Model
 
     /** What the workflow may change after placement. */
     private const MUTABLE = [
-        'status', 'payment_status', 'paid_total', 'shipping_method_id', 'courier_name', 'tracking_number', 'expires_at',
+        'status', 'payment_status', 'paid_total', 'refunded_total', 'shipping_method_id', 'courier_name', 'tracking_number', 'expires_at',
         'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at',
     ];
 
@@ -99,6 +100,7 @@ class Order extends Model
             'cod_fee' => 'decimal:2',
             'total' => 'decimal:2',
             'paid_total' => 'decimal:2',
+            'refunded_total' => 'decimal:2',
             'cost_total' => 'decimal:2',
             'placed_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
@@ -153,6 +155,16 @@ class Order extends Model
     public function shipment(): HasOne
     {
         return $this->hasOne(Shipment::class);
+    }
+
+    /**
+     * Online returns of the order (E10b), oldest first.
+     *
+     * @return HasMany<OrderReturn, $this>
+     */
+    public function returns(): HasMany
+    {
+        return $this->hasMany(OrderReturn::class)->orderBy('created_at')->orderBy('id');
     }
 
     /**

@@ -204,3 +204,27 @@ export function useRedemptionsQuery(promotionId: string, page: number) {
     placeholderData: (previous) => previous,
   })
 }
+
+// ── Report (E10b) ────────────────────────────────────────────────────────────
+
+export type PromotionReport = {
+  redemptions: number
+  orders: number
+  discount_total: string
+  /** Sum of the totals of the orders that got the offer. */
+  order_revenue: string
+  average_discount: string | null
+  /** Organization-timezone days (Y-m-d). */
+  by_day: { date: string; redemptions: number; discount: string }[]
+}
+
+export type PromotionReportRange = { date_from: string; date_to: string }
+
+export function usePromotionReportQuery(promotionId: string, range: PromotionReportRange, enabled = true) {
+  return useQuery({
+    queryKey: ['promotions', 'report', promotionId, range] as const,
+    queryFn: ({ signal }) => api.get<PromotionReport>(`/promotions/${promotionId}/report`, { signal, query: range }).then((r) => r.data),
+    placeholderData: (previous) => previous,
+    enabled,
+  })
+}

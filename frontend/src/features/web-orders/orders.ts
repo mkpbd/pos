@@ -29,6 +29,8 @@ export const FILTER_STATUSES: WebOrderStatus[] = ['pending_payment', 'confirmed'
 export const PAYMENT_STATUS: Record<WebPaymentStatus, { label: string; variant: BadgeVariant }> = {
   unpaid: { label: 'Unpaid', variant: 'outline' },
   paid: { label: 'Paid', variant: 'success' },
+  partially_refunded: { label: 'Partially refunded', variant: 'warning' },
+  refunded: { label: 'Refunded', variant: 'soft' },
 }
 
 export const PAYMENT_METHOD_LABELS: Record<WebPaymentMethod, string> = {

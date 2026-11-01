@@ -6,6 +6,7 @@ use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Actions\CancelOwnOrder;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
+use App\Modules\Orders\Application\Services\ReturnPolicy;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -37,6 +38,8 @@ class OrderPresenter
         private readonly CustomerDirectory $customers,
         private readonly OrderLineReviews $reviews,
         private readonly CourierDirectory $couriers,
+        private readonly ReturnPolicy $returnPolicy,
+        private readonly ReturnPresenter $returns,
     ) {}
 
     /**
@@ -118,6 +121,12 @@ class OrderPresenter
      * customer's `review` of the product (`{id, rating, status}` or null) and `reviewable`
      * (delivered and not reviewed yet).
      *
+     * E10b: per line `id` (the order line id returns refer to) and `returnable_quantity`;
+     * `returnable` (a return can be requested now), `return_deadline` (ISO; null before
+     * delivery or with returns off), `return_unavailable_reason` (null | not_delivered |
+     * not_paid | returns_disabled | window_closed | nothing_left), `payment_status_label`,
+     * `refunded_total` and `returns` (ReturnPresenter::customer of each, oldest first).
+     *
      * @return array<string, mixed>
      */
     public function account(Order $order, string $customerId): array
@@ -126,14 +135,21 @@ class OrderPresenter
         $lines = $order->lines->values();
         $reviews = $this->reviews->ofCustomer($customerId, array_values(array_unique($lines->pluck('product_id')->all())));
         $delivered = $order->status === OrderStatus::Delivered;
+        $blocker = $this->returnPolicy->blocker($order);
+        $returnable = $this->returnPolicy->returnable($order);
+        $returns = $order->returns()->with(['order', 'lines.orderLine'])->get();
+        if ($blocker === null && array_filter($returnable, fn (string $q) => Decimal::compare($q, '0') > 0) === []) {
+            $blocker = 'nothing_left';
+        }
 
         foreach ($view['lines'] as $i => $line) {
             /** @var OrderLine $source */
             $source = $lines[$i];
             $review = $reviews[$source->product_id] ?? null;
-            $view['lines'][$i] = ['product_id' => $source->product_id, 'variant_id' => $source->variant_id] + $line + [
+            $view['lines'][$i] = ['id' => $source->id, 'product_id' => $source->product_id, 'variant_id' => $source->variant_id] + $line + [
                 'review' => $review,
                 'reviewable' => $delivered && $review === null,
+                'returnable_quantity' => self::quantity($blocker === null || $blocker === 'nothing_left' ? $returnable[$source->id] ?? '0' : '0'),
             ];
         }
 
@@ -141,6 +157,12 @@ class OrderPresenter
             'can_cancel' => CancelOwnOrder::allowed($order),
             'cancelled_at' => $order->cancelled_at?->toIso8601String(),
             'cancel_reason' => $order->cancel_reason,
+            'payment_status_label' => $order->payment_status->label(),
+            'refunded_total' => (string) $order->refunded_total,
+            'returnable' => $blocker === null,
+            'return_deadline' => $this->returnPolicy->deadline($order)?->toIso8601String(),
+            'return_unavailable_reason' => $blocker,
+            'returns' => $returns->map(fn ($r) => $this->returns->customer($r))->values()->all(),
         ];
     }
 
@@ -182,10 +204,20 @@ class OrderPresenter
      *
      * @return array<string, mixed>
      */
-    public function staff(Order $order, bool $canManage): array
+    public function staff(Order $order, bool $canManage, bool $canRefund = false): array
     {
         $view = $this->storefront($order);
+        $returns = $order->returns()->get();
         $payments = $this->payments->entriesOf(PaymentSource::ONLINE_ORDER, $order->id);
+        foreach ($returns as $return) {
+            array_push($payments, ...$this->payments->entriesOf(PaymentSource::ONLINE_ORDER_REFUND, $return->id));
+        }
+        $returnable = $this->returnPolicy->returnable($order);
+        foreach ($view['lines'] as $i => $line) {
+            $source = $order->lines->values()[$i];
+            $view['lines'][$i] = ['id' => $source->id] + $line + ['returnable_quantity' => self::quantity($returnable[$source->id] ?? '0')];
+        }
+        $deadline = $this->returnPolicy->deadline($order);
         $shipment = $order->shipment;
         $shipment?->loadMissing('events');
         $actorIds = array_values(array_filter([
@@ -210,6 +242,11 @@ class OrderPresenter
         return ['id' => $order->id] + $view + [
             'payment_status_label' => $order->payment_status->label(),
             'paid_total' => (string) $order->paid_total,
+            // E10b: refunds booked on returns, the return window and the order's returns.
+            'refunded_total' => (string) $order->refunded_total,
+            'return_deadline' => $deadline?->toIso8601String(),
+            'return_window_open' => $this->returnPolicy->blocker($order) === null,
+            'returns' => ReturnPresenter::summaries($returns),
             'customer' => $customer === null ? null : ['id' => $customer['id'], 'name' => $customer['name'], 'code' => $customer['code']],
             'customer_account_id' => $order->customer_account_id,
             'ip' => $order->ip,
@@ -254,7 +291,11 @@ class OrderPresenter
                 ])->values()->all(),
             ],
             'cod_remittance' => $this->remittanceOf($order),
-            'allowed_actions' => $canManage ? self::allowedActions($order) : [],
+            'allowed_actions' => [
+                ...($canManage ? self::allowedActions($order) : []),
+                // E10b: a return can be created (after the window only with override_window).
+                ...($canRefund && $this->returnPolicy->blocker($order, ignoreWindow: true) === null && $this->returnPolicy->anythingLeft($order) ? ['create_return'] : []),
+            ],
         ];
     }
 

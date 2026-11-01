@@ -220,9 +220,12 @@ export type ProductCard = {
   short_description: string | null
   /** The live automatic product promotion (E8b); listing filters and sort keep the base price. */
   promotion: DisplayPromotion | null
+  /** Approved reviews (E10b): average as a one-decimal string; null (or absent) without reviews. */
+  rating?: { average: string; count: number } | null
 }
 
-export type SortKey = 'featured' | 'popularity' | 'latest' | 'price_asc' | 'price_desc' | 'name'
+/** `rating` (E10b): average desc, then review count desc, unrated last. */
+export type SortKey = 'featured' | 'popularity' | 'latest' | 'price_asc' | 'price_desc' | 'name' | 'rating'
 
 export type AttributeDisplay = 'button' | 'swatch' | 'text'
 
@@ -603,17 +606,72 @@ export type ReviewStatus = 'pending' | 'approved' | 'rejected' | (string & {})
 export type LineReview = { id: string; rating: number; status: ReviewStatus }
 
 export type AccountOrderLine = OrderView['lines'][number] & {
+  /** The order line's id — `order_line_id` of a return request (E10b). */
+  id?: string
   /** The product to review (POST /store/account/reviews takes it). */
   product_id?: string | null
   review: LineReview | null
   /** A delivered line whose product the customer has not reviewed yet. */
   reviewable: boolean
+  /** What can still be returned (E10b): ordered minus the quantity in open or completed returns. */
+  returnable_quantity?: string | null
 }
 
 /** GET /store/account/orders/{number}: the order view plus what the customer may do with it. */
 export type AccountOrder = Omit<OrderView, 'lines'> & {
   lines: AccountOrderLine[]
   can_cancel: boolean
+  /** E10b: delivered, paid and within the store's return window. */
+  returnable?: boolean
+  /** E10b: the last moment a return can be requested (null when returns do not apply). */
+  return_deadline?: string | null
+  returns?: OrderReturnSummary[]
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Online returns (E10b) — /api/v1/store/account/orders/{number}/returns, /store/account/returns*
+ * ------------------------------------------------------------------------------------- */
+
+export type ReturnStatus = 'requested' | 'approved' | 'received' | 'refunded' | 'rejected' | 'cancelled' | (string & {})
+
+export type ReturnReasonCode = 'damaged' | 'wrong_item' | 'not_as_described' | 'changed_mind' | 'other'
+
+/** A returned line; the name fields may be absent where the order's own lines name it. */
+export type OrderReturnLine = {
+  order_line_id?: string | null
+  product_name?: string | null
+  variant_name?: string | null
+  sku?: string | null
+  quantity: string
+  amount?: string | null
+}
+
+/** A return as the order detail lists it. */
+export type OrderReturnSummary = {
+  number: string
+  status: ReturnStatus
+  status_label: string
+  lines: OrderReturnLine[]
+  /** Computed by the server (proportional share of what was paid); final once refunded. */
+  refund_amount: string | null
+  created_at: string
+}
+
+/** A row of GET /store/account/returns and the answer of create / cancel. */
+export type AccountReturn = OrderReturnSummary & {
+  order?: { number: string } | null
+  order_number?: string | null
+  reason_code?: ReturnReasonCode | (string & {}) | null
+  reason_label?: string | null
+  rejection_reason?: string | null
+  refunded_at?: string | null
+  currency?: string | null
+}
+
+export type ReturnRequestInput = {
+  reason_code: ReturnReasonCode
+  note?: string
+  lines: { order_line_id: string; quantity: string }[]
 }
 
 export type ReorderSkipReason = 'unavailable' | 'out_of_stock' | 'limit' | (string & {})

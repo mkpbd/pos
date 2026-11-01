@@ -12,6 +12,7 @@ import { BrandPage, CategoryPage, SearchPage, ShopPage } from './pages/listing-p
 import { NewsletterConfirmPage, NewsletterUnsubscribePage } from './pages/newsletter-pages'
 import { AccountOrderPage } from './orders/account-order-page'
 import { AccountOrdersPage } from './orders/account-orders-page'
+import { AccountReturnsPage } from './orders/account-returns-page'
 import { OrderPage } from './orders/order-page'
 import { NotFoundPage } from './pages/not-found-page'
 import { ProductPage } from './pages/product-page'
@@ -61,6 +62,7 @@ export const storefrontRoutes: RouteObject[] = [
           { path: 'account/addresses', element: <AddressesPage /> },
           { path: 'account/orders', element: <AccountOrdersPage /> },
           { path: 'account/orders/:number', element: <AccountOrderPage /> },
+          { path: 'account/returns', element: <AccountReturnsPage /> },
           { path: 'account/reviews', element: <MyReviewsPage /> },
         ],
       },

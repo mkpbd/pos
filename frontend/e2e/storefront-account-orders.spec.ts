@@ -3,7 +3,8 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 /**
  * Mocked customer account area (E9 contract): order history, order detail with tracking,
  * buy again, customer cancel (Idempotency-Key), reviews from delivered orders, own reviews and
- * the product page's rating summary and Reviews tab.
+ * the product page's rating summary and Reviews tab; online returns (E10b): request with an
+ * Idempotency-Key reused on retry, the order's returns, My returns and cancelling a return.
  */
 
 const envelope = (data: unknown, meta: Record<string, unknown> = {}) => ({ success: true, data, meta: { request_id: 'e2e', ...meta } })
@@ -91,6 +92,18 @@ async function serveAccount(page: Page) {
       lines: [line({ reviewable: true })],
     }),
     open: order('WEB-000003', 'confirmed', 'Confirmed', { placed_at: '2026-10-30T10:00:00+06:00', can_cancel: true }),
+    returnable: {
+      ...order('WEB-000004', 'delivered', 'Delivered', {
+        payment_status: 'paid', returnable: true, return_deadline: '2026-11-05T23:59:59+06:00',
+        history: [{ status: 'delivered', label: 'Delivered', at: '2026-10-29T10:00:00+06:00' }],
+        lines: [line({ id: 'ol-1', returnable_quantity: '2.000' })],
+      }),
+      returns: [] as Record<string, unknown>[],
+    },
+    returns: [] as Record<string, unknown>[],
+    returnKeys: [] as (string | undefined)[],
+    returnBodies: [] as unknown[],
+    cancelReturnKeys: [] as (string | undefined)[],
     cartQuantity: 0,
     reviews: [] as Record<string, unknown>[],
     cancelKeys: [] as (string | undefined)[],
@@ -126,6 +139,30 @@ async function serveAccount(page: Page) {
           return route.fulfill({ json: envelope(state.delivered) })
         case 'GET /store/account/orders/WEB-000003':
           return route.fulfill({ json: envelope(state.open) })
+        case 'GET /store/account/orders/WEB-000004':
+          return route.fulfill({ json: envelope(state.returnable) })
+        case 'POST /store/account/orders/WEB-000004/returns': {
+          state.returnKeys.push(request.headers()['idempotency-key'])
+          state.returnBodies.push(body)
+          // The first answer is lost (a 503): the retry must carry the same key.
+          if (state.returnKeys.length === 1) return route.fulfill(failure(503, 'SERVICE_UNAVAILABLE', 'Try again'))
+          const quantity = String((body?.lines as { quantity: string }[] | undefined)?.[0]?.quantity)
+          const summary = {
+            number: 'RTN-WEB-000001', status: 'requested', status_label: 'Requested', refund_amount: '120.00', created_at: '2026-11-01T10:00:00+06:00',
+            lines: [{ order_line_id: 'ol-1', product_name: 'Pran Mango Juice', variant_name: '1 L', quantity }],
+          }
+          state.returns = [{ ...summary, order: { number: 'WEB-000004' }, currency: 'BDT' }]
+          state.returnable = { ...state.returnable, returns: [summary], lines: [line({ id: 'ol-1', returnable_quantity: '1.000' })] }
+          return route.fulfill({ status: 201, json: envelope(state.returns[0]) })
+        }
+        case 'GET /store/account/returns':
+          return route.fulfill({ json: envelope(state.returns, paging(1, 1, state.returns.length)) })
+        case 'POST /store/account/returns/RTN-WEB-000001/cancel': {
+          state.cancelReturnKeys.push(request.headers()['idempotency-key'])
+          state.returns = state.returns.map((r) => ({ ...r, status: 'cancelled', status_label: 'Cancelled' }))
+          state.returnable = { ...state.returnable, returns: state.returnable.returns.map((r) => ({ ...r, status: 'cancelled', status_label: 'Cancelled' })) }
+          return route.fulfill({ json: envelope(state.returns[0]) })
+        }
         case 'POST /store/account/orders/WEB-000002/reorder':
           state.cartQuantity += 2
           return route.fulfill({ json: envelope({ cart: cartBody(state.cartQuantity), added: [{ variant_id: 'v-juice', name: 'Pran Mango Juice', quantity: '2' }], skipped: [{ name: 'Gift Wrap', reason: 'unavailable' }] }) })
@@ -251,4 +288,48 @@ test('the product page shows the rating and the approved reviews', async ({ page
   await expect(reviews.getByTestId('review')).toHaveCount(1)
   await expect(reviews.getByText('Sadia R.')).toBeVisible()
   expect(state.reviewQueries).toContain('?sort=newest&rating=4')
+})
+
+test('a customer returns part of a delivered order and cancels the request', async ({ page }) => {
+  const state = await serveAccount(page)
+  await page.goto('/account/orders/WEB-000004')
+
+  await expect(page.getByTestId('return-deadline')).toContainText('Returns accepted until')
+  await page.getByRole('button', { name: 'Return items' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Return items' })
+  await dialog.getByLabel('Return Pran Mango Juice (1 L)').check()
+  const quantity = dialog.getByRole('textbox', { name: 'Quantity of Pran Mango Juice (1 L) to return', exact: true })
+  await expect(quantity).toHaveValue('2')
+  await expect(dialog.getByRole('button', { name: 'Increase: Quantity of Pran Mango Juice (1 L) to return' })).toBeDisabled()
+  await dialog.getByRole('button', { name: 'Decrease: Quantity of Pran Mango Juice (1 L) to return' }).click()
+  await expect(quantity).toHaveValue('1')
+  await dialog.getByLabel('Reason').selectOption({ label: 'Arrived damaged' })
+  await dialog.getByLabel('Comments (optional)').fill('The bottle leaked.')
+
+  await dialog.getByRole('button', { name: 'Request return' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('Something went wrong. Please try again.')
+  await dialog.getByRole('button', { name: 'Request return' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('Return RTN-WEB-000001 was requested.', { exact: false })).toBeVisible()
+  expect(state.returnKeys).toHaveLength(2)
+  expect(state.returnKeys[0]).toMatch(/^[0-9a-f-]{36}$/)
+  expect(state.returnKeys[1]).toBe(state.returnKeys[0])
+  expect(state.returnBodies[1]).toEqual({ reason_code: 'damaged', note: 'The bottle leaked.', lines: [{ order_line_id: 'ol-1', quantity: '1' }] })
+
+  const returns = page.getByTestId('order-returns')
+  await expect(returns.getByRole('article', { name: 'Return RTN-WEB-000001' }).getByTestId('return-status')).toHaveText('Requested')
+  await expect(returns.getByTestId('return-refund')).toHaveText('Refund due once the items are received: ৳120.00')
+
+  // My returns lists it with its order; cancelling withdraws it.
+  await page.getByRole('navigation', { name: 'Account' }).getByRole('link', { name: 'Returns' }).click()
+  await expect(page).toHaveTitle('My returns | Berry Kids')
+  const item = page.getByRole('article', { name: 'Return RTN-WEB-000001' })
+  await expect(item.getByRole('link', { name: 'WEB-000004' })).toHaveAttribute('href', '/account/orders/WEB-000004')
+  await item.getByRole('button', { name: 'Cancel return RTN-WEB-000001' }).click()
+  const confirm = page.getByRole('dialog', { name: 'Cancel return RTN-WEB-000001?' })
+  await confirm.getByRole('button', { name: 'Cancel return' }).click()
+  await expect(confirm).toBeHidden()
+  await expect(item.getByTestId('return-status')).toHaveText('Cancelled')
+  await expect(item.getByRole('button', { name: 'Cancel return RTN-WEB-000001' })).toHaveCount(0)
+  expect(state.cancelReturnKeys[0]).toMatch(/^[0-9a-f-]{36}$/)
 })

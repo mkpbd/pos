@@ -33,13 +33,13 @@ const card = (slug: string, name: string, brand: { name: string; slug: string },
 const freshCo = { name: 'Fresh Co', slug: 'fresh-co' }
 const sunny = { name: 'Sunny', slug: 'sunny' }
 const cards = [
-  card('kids-tee', 'Kids Tee', freshCo, { price_max: '480.00', variant_count: 3, default_variant_id: null, on_sale: true, is_new: true }),
+  card('kids-tee', 'Kids Tee', freshCo, { price_max: '480.00', variant_count: 3, default_variant_id: null, on_sale: true, is_new: true, rating: { average: '4.5', count: 12 } }),
   // A flash sale (E8b): 10 % off, ending in two days.
   card('kids-shorts', 'Kids Shorts', sunny, {
     price: '350.00', price_max: '350.00',
     promotion: { id: 'pr-1', name: 'Summer flash sale', type: 'percent', value: '10.00', ends_at: new Date(Date.now() + 2 * 86_400_000).toISOString(), show_countdown: true, price: '315.00' },
   }),
-  card('kids-cap', 'Kids Cap', sunny, { in_stock: false }),
+  card('kids-cap', 'Kids Cap', sunny, { in_stock: false, rating: null }),
 ]
 
 function facets(brands: string[]) {
@@ -177,6 +177,22 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   await page.getByRole('tab', { name: 'Specifications' }).click()
   await expect(page.getByRole('rowheader', { name: 'Material' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Related products' }).getByRole('link', { name: 'Kids Shorts' })).toBeVisible()
+})
+
+test('cards show the rating with a text alternative and the shop sorts by top rated (E10b)', async ({ page }) => {
+  const requests = await serveCatalog(page)
+  await page.goto('/shop')
+
+  const teeCard = page.getByTestId('product-card').filter({ hasText: 'Kids Tee' })
+  const rating = teeCard.getByTestId('card-rating')
+  await expect(rating.getByRole('img', { name: 'Rated 4.5 out of 5' })).toBeVisible()
+  await expect(rating).toContainText('(12)')
+  await expect(rating).toContainText('12 reviews')
+  await expect(page.getByTestId('product-card').filter({ hasText: 'Kids Cap' }).getByTestId('card-rating')).toHaveCount(0)
+
+  await page.getByLabel('Sort by').selectOption({ label: 'Top rated' })
+  await expect(page).toHaveURL(/\/shop\?sort=rating$/)
+  await expect.poll(() => requests.at(-1)?.get('sort')).toBe('rating')
 })
 
 test('search suggestions lead to a product; the quick view links to its page', async ({ page, isMobile }) => {

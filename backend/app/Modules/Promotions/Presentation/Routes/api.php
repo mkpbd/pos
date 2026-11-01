@@ -12,6 +12,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
             Route::get('{promotion}', [PromotionController::class, 'show'])->whereUuid('promotion');
             Route::get('{promotion}/coupons', [CouponController::class, 'index'])->whereUuid('promotion');
             Route::get('{promotion}/redemptions', [PromotionController::class, 'redemptions'])->whereUuid('promotion');
+            Route::get('{promotion}/report', [PromotionController::class, 'report'])->whereUuid('promotion');
         });
 
         Route::middleware('can:promotions.manage')->group(function () {

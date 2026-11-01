@@ -195,7 +195,7 @@ class StoreCatalogTest extends TestCase
 
         $this->getJson('http://berry.test/api/v1/store/products?per_page=5')->assertUnprocessable()->assertJsonValidationErrors('per_page', 'error.details');
         $this->getJson('http://berry.test/api/v1/store/products?price_min=1.5.5')->assertUnprocessable();
-        $this->getJson('http://berry.test/api/v1/store/products?sort=rating')->assertUnprocessable();
+        $this->getJson('http://berry.test/api/v1/store/products?sort=stars')->assertUnprocessable();
 
         $this->assertSame(['Mango Juice', 'Orange Juice'], $this->names($this->list('q=JUICE')));
         $this->assertSame(['Polo Shirt'], $this->names($this->list('q=polo-m')));

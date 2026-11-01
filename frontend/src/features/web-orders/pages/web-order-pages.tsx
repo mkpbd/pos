@@ -10,6 +10,7 @@ import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useWebOrderQuery, WEB_ORDER_ACTIONS, type WebOrder, type WebOrderAction } from '@/features/web-orders/api'
 import { OrderActionDialog } from '@/features/web-orders/components/order-action-dialog'
 import { ShipmentCard } from '@/features/web-orders/components/shipment-card'
+import { OrderReturnsCard } from '@/features/web-returns/components/order-returns-card'
 import {
   ACTION_LABELS,
   customerCancellation,
@@ -97,6 +98,9 @@ function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | 
             )}
           </p>
         )}
+        {!isZeroDecimal(order.refunded_total) && (
+          <p data-testid="order-refunded">Refunded <span className="font-mono font-medium">{formatMoney(order.refunded_total, order.currency)}</span> on returns.</p>
+        )}
         {order.payments.length === 0 ? (
           <p className="text-muted-foreground">No payment recorded yet.</p>
         ) : (
@@ -104,11 +108,12 @@ function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | 
             {order.payments.map((p, i) => (
               <li key={i} className="flex justify-between gap-2 border-t pt-2">
                 <span>
+                  {p.direction === 'out' && 'Refund · '}
                   {p.method_label ?? p.method.replaceAll('_', ' ')}
                   {p.reference && <span className="font-mono text-muted-foreground"> · {p.reference}</span>}
                   <span className="block text-xs text-muted-foreground">{formatDateTime(p.recorded_at, timeZone)} · {paymentRecorder(p)}</span>
                 </span>
-                <span className="font-mono">{formatMoney(p.amount, order.currency)}</span>
+                <span className="font-mono" data-testid={p.direction === 'out' ? 'payment-refund' : undefined}>{p.direction === 'out' && '−'}{formatMoney(p.amount, order.currency)}</span>
               </li>
             ))}
           </ul>
@@ -230,6 +235,8 @@ export function WebOrderPage() {
       </div>
 
       {order.shipment && <ShipmentCard order={order} shipment={order.shipment} timeZone={timeZone} canManage={can('web_orders.manage')} />}
+
+      <OrderReturnsCard order={order} timeZone={timeZone} />
 
       <div className="overflow-x-auto rounded-md border">
         <Table>

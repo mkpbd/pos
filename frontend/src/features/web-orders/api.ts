@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated, type Paginated } from '@/lib/api/client'
+import type { OrderReturnSummary } from '@/features/web-returns/api'
 
 export type WebOrderStatus = 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed'
-export type WebPaymentStatus = 'unpaid' | 'paid'
+export type WebPaymentStatus = 'unpaid' | 'paid' | 'partially_refunded' | 'refunded'
 export type WebPaymentMethod = 'cod' | 'bank_transfer'
 
 /** Staff actions, in the order they are offered; the server decides which apply (`allowed_actions`). */
@@ -29,6 +30,8 @@ export type WebOrderRow = {
 }
 
 export type WebOrderLine = {
+  /** Order line id (E10b; needed to return the line). */
+  id?: string
   product_name: string
   variant_name: string | null
   sku: string | null
@@ -39,6 +42,8 @@ export type WebOrderLine = {
   product_url?: string | null
   /** Product offer plus this line's share of the order discount (E8b). */
   discount_amount?: string
+  /** What can still be returned (E10b): quantity minus open and completed returns. */
+  returnable_quantity?: string
 }
 
 export type WebOrderPromotionKind = 'product' | 'order' | 'shipping'
@@ -74,6 +79,8 @@ export type WebOrderHistoryEntry = {
 }
 
 export type WebOrderPayment = {
+  /** `out` for a refund booked on a return (E10b). */
+  direction?: 'in' | 'out'
   method: string
   method_label?: string
   amount: string
@@ -121,7 +128,17 @@ export type WebOrder = {
   notes: string | null
   cancel_reason: string | null
   payments: WebOrderPayment[]
-  allowed_actions: WebOrderAction[]
+  /** Status actions plus `create_return` (E10b) when a return can be created. */
+  allowed_actions: (WebOrderAction | 'create_return')[]
+  /** Returns on this order (E10b). */
+  returns?: OrderReturnSummary[]
+  /** End of the customer return window (E10b); staff may still create a return after it with an override. */
+  return_deadline?: string | null
+  /** Whether a customer could request a return now (E10b); staff override when false. */
+  return_window_open?: boolean
+  paid_total?: string
+  refunded_total?: string
+  delivered_at?: string | null
   /** The order's shipment (E10a); null before shipping and for orders shipped before couriers existed (legacy text fields). */
   shipment?: Shipment | null
   /** The courier remittance that paid this COD order (E10a), if any. */

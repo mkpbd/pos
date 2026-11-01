@@ -7,6 +7,7 @@ import { CardCartAction } from '../cart/add-to-cart'
 import { usePriceFormat } from '../money'
 import { Countdown } from '../promotions/countdown-timer'
 import { isReduced, useLivePromotion } from '../promotions/display'
+import { Stars } from '../reviews/stars'
 import type { ProductCard as Card } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { Price } from './price'
@@ -49,6 +50,22 @@ export function ProductBadges({
       {isNew && <li className="rounded-full bg-sf-highlight px-2.5 py-0.5 text-xs font-bold text-white">New</li>}
       {!inStock && <li className="rounded-full bg-sf-heading px-2.5 py-0.5 text-xs font-bold text-white">Out of stock</li>}
     </ul>
+  )
+}
+
+/**
+ * The approved reviews' average as stars plus the review count, read as "Rated 4.5 out of 5,
+ * 12 reviews". Nothing for a product without reviews.
+ */
+export function CardRating({ rating }: { rating: Card['rating'] }) {
+  if (!rating || rating.count <= 0) return null
+  const reviews = `${rating.count} ${rating.count === 1 ? 'review' : 'reviews'}`
+  return (
+    <p className="flex items-center gap-1.5 text-xs" data-testid="card-rating">
+      <Stars rating={rating.average} size="size-3.5" />
+      <span aria-hidden>({rating.count})</span>
+      <span className="sr-only">{reviews}</span>
+    </p>
   )
 }
 
@@ -131,6 +148,7 @@ export function ProductCard({
             {product.name}
           </Link>
         </h3>
+        <CardRating rating={product.rating} />
         {layout === 'list' && product.short_description && <p className="line-clamp-3 text-sm">{product.short_description}</p>}
         {promoPrice ? (
           <Price price={promoPrice} compareAt={product.price} from={range} size="sm" className="mt-auto pt-1" />

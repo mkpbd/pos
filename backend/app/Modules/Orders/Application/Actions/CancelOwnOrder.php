@@ -38,7 +38,7 @@ class CancelOwnOrder
             if (! self::allowed($locked)) {
                 throw new BusinessRuleViolation(
                     'ORDER_NOT_CANCELLABLE',
-                    $locked->payment_status === PaymentStatus::Paid
+                    $locked->payment_status->isPaid()
                         ? "{$locked->number} is paid; please contact us to cancel it."
                         : "{$locked->number} is {$locked->status->label()} and can no longer be cancelled.",
                     ['status' => $locked->status->value, 'payment_status' => $locked->payment_status->value],

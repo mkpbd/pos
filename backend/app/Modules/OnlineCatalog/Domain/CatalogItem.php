@@ -26,5 +26,8 @@ final readonly class CatalogItem
         public string $unitsSold30d,
         public string $unitsSoldTotal,
         public array $attributeValues = [],
+        /** Average of the approved reviews (one decimal) â€” null when unrated (E10b). */
+        public ?string $ratingAverage = null,
+        public int $ratingCount = 0,
     ) {}
 }

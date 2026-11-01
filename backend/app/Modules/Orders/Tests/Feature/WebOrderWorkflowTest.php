@@ -116,7 +116,8 @@ class WebOrderWorkflowTest extends TestCase
 
         $done = $this->act($id, 'deliver')->assertOk()->json('data');
         $this->assertSame('delivered', $done['status']);
-        $this->assertSame([], $done['allowed_actions']);
+        // E10b: a delivered, paid order can be returned (the admin holds web_orders.refund).
+        $this->assertSame(['create_return'], $done['allowed_actions']);
         $this->assertSame(['confirmed', 'processing', 'shipped', 'delivered'], array_column($done['history'], 'status'));
         $this->assertNull($done['history'][0]['actor']);
         $this->assertSame($this->tenant['admin']->id, $done['history'][1]['actor']['id']);

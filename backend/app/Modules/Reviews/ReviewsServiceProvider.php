@@ -2,8 +2,10 @@
 
 namespace App\Modules\Reviews;
 
+use App\Modules\Customers\Application\Contracts\CustomerReviewStats;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
+use App\Modules\Reviews\Infrastructure\EloquentCustomerReviewStats;
 use App\Modules\Reviews\Infrastructure\EloquentOrderLineReviews;
 use App\Modules\Reviews\Infrastructure\EloquentProductRatings;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
@@ -24,6 +26,8 @@ class ReviewsServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(ProductRatings::class, EloquentProductRatings::class);
         $this->app->bind(OrderLineReviews::class, EloquentOrderLineReviews::class);
+        // E10b: review counts on the admin customer card.
+        $this->app->bind(CustomerReviewStats::class, EloquentCustomerReviewStats::class);
     }
 
     public function boot(): void

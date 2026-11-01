@@ -233,3 +233,34 @@ export function useReceiveCustomerPaymentMutation() {
     },
   })
 }
+
+// ── Web activity (E10b) ──────────────────────────────────────────────────────
+
+export type WebActivityOrder = {
+  id: string
+  number: string
+  placed_at: string
+  status: string
+  status_label?: string
+  payment_status?: string
+  total: string
+  currency?: string
+}
+
+/** The customer's online store activity: account, orders, returns, reviews, wishlist and cart. */
+export type WebActivity = {
+  account: { email: string; verified: boolean; created_at: string; last_login_at: string | null; status: OnlineAccountStatus } | null
+  orders: { count: number; total_spent: string; last_order_at: string | null; average_order: string | null }
+  returns_count: number
+  reviews: { count: number; pending: number }
+  wishlist_count: number
+  cart: { item_count: number; updated_at: string | null } | null
+  recent_orders: WebActivityOrder[]
+}
+
+export function useWebActivityQuery(customerId: string) {
+  return useQuery({
+    queryKey: ['customers', 'web-activity', customerId] as const,
+    queryFn: ({ signal }) => api.get<WebActivity>(`/customers/${customerId}/web-activity`, { signal }).then((r) => r.data),
+  })
+}

@@ -276,7 +276,7 @@ class AccountOrdersTest extends TestCase
         file_put_contents($shell, '<html><head><title>x</title></head><body></body></html>');
         config(['storefront.shell_path' => $shell]);
 
-        foreach (['/account/orders', '/account/orders/WEB-000123', '/account/reviews'] as $path) {
+        foreach (['/account/orders', '/account/orders/WEB-000123', '/account/reviews', '/account/returns'] as $path) {
             $this->get('http://'.self::HOST.$path)->assertOk()->assertHeader('X-Robots-Tag', 'noindex');
         }
         $this->get('http://'.self::HOST.'/account/orders/a/b')->assertNotFound();

@@ -19,7 +19,7 @@ Columns `id`, `organization_id`, timestamps and author columns are omitted from 
 | payment_transactions | **New** (OnlinePayments). |
 | shipping_methods, shipments | **New** (Shipping). |
 | coupons, discounts | **New** (Promotions) as `promotions` + `coupons`. |
-| returns, refunds | POS has `sale_returns`/`sale_return_refunds`. Online: new `order_returns`, `order_refunds` (they reference orders, not invoices). |
+| returns, refunds | POS has `sale_returns`/`sale_return_refunds`. Online: new `order_returns`, `order_refunds` (they reference orders, not invoices). *As built (E10b):* `order_returns` + `order_return_lines` + `order_return_line_stock` + `order_return_history`; no `order_refunds` (refund fields on the return, money in `payments`). |
 | reviews | **New**. |
 | banners, sliders | **New** as one `banners` table with a `placement` (a slider is a placement with several banners). |
 | homepage_sections, homepage_section_items | **New** (Storefront). |
@@ -32,8 +32,8 @@ Columns `id`, `organization_id`, timestamps and author columns are omitted from 
 
 | Table | Change | Why |
 |-------|--------|-----|
-| `stock_movements.type` | **No schema change** (verified: plain string, constrained only by PHP `MovementType`). Add enum cases `online_order`, `online_order_cancel`, `online_return`. | Online stock posts through the same ledger. |
-| `payments.source_type`, `payments.method` | **No schema change** (verified: strings + PHP enums; `created_by` already nullable). Add `PaymentSource` cases `online_order`, `online_order_refund`; `PaymentMethod` cases `online_gateway`, `cash_on_delivery` (ADR-006). | Gateway-verified money in the ledger. |
+| `stock_movements.type` | **No schema change** (verified: plain string, constrained only by PHP `MovementType`). Add enum cases `online_order`, `online_order_cancel`, `online_return`. *As built: `online_order`, `online_order_cancel` (E8a), `online_return` (E10b).* | Online stock posts through the same ledger. |
+| `payments.source_type`, `payments.method` | **No schema change** (verified: strings + PHP enums; `created_by` already nullable). Add `PaymentSource` cases `online_order`, `online_order_refund`; `PaymentMethod` cases `online_gateway`, `cash_on_delivery` (ADR-006). *As built: `online_order_refund` used from E10b (return refunds; cash with a register session, bank transfer and mobile banking without).* | Gateway-verified money in the ledger. |
 | `idempotency_keys` | `user_id` → nullable; add `scope varchar(80)` backfilled `user:{user_id}`; unique `(scope, key)` replaces `(user_id, key)` (ADR-014). *Built in E8a as planned.* | Guests and customers have no staff user id. |
 | `product_variants` | Index: `CREATE INDEX … USING gin (option_values jsonb_path_ops)` | Attribute facet filtering. |
 | `products` | `pg_trgm` GIN index on `lower(name)` (already planned for Phase 9) | Search suggestions. |
@@ -115,6 +115,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 *As built (E8a):* `orders.customer_id` is **NULL for guests** (no customer record; contact snapshot `contact_name/email/phone`), `customer_account_id` is set for signed-in shoppers. Status has no `returned` yet; `payment_status` is `unpaid|paid`; `payment_method` (not `payment_method_code`); no `discount_total`, `coupon_code` (E8b) or `refunded_total` (E10). Added: `shipping_method_name`, `eta_min_days/eta_max_days` (snapshot), `access_token_hash` (guest order page), `courier_name`, `tracking_number`, `confirmed_at`, `shipped_at`, `delivered_at`, index `(status, expires_at)` and an amounts CHECK. `order_lines` adds `position`, `product_slug` and `line_subtotal` (quantity × unit price), no `discount_amount` yet. `order_addresses` stores division/district ids **and** names plus the contact e-mail; one `shipping` row (billing = shipping). Append-only triggers on `order_lines`, `order_line_stock`, `order_status_history`. `order_returns`/`order_refunds` wait for E10.
 
+*As built (E10b):* `order_returns` (number `RTN-WEB-000001`, sequence key `order_return`; status `requested|approved|received|refunded|rejected|cancelled`; reason code; customer/staff notes; `requested_by customer|staff` and `requested_by_user_id`; `override_window`; `items_amount` + `shipping_refund` = `refund_amount`; refund method `cash|bank_transfer|mobile_banking` and reference; per-step times and actors), `order_return_lines` (immutable `requested_quantity`, approved `quantity`, amount/tax/cost, `restock` decided at receipt, `restocked_quantity`; guard trigger: no delete, identity columns fixed), the append-only `order_return_line_stock` (allocation, batch, unit cost, movement id per restocked piece) and the append-only `order_return_history`. **No `order_refunds` table**: the refund fields are on the return and the money is a `payments` row (`online_order_refund`, out). `orders.refunded_total` (CHECK `0 ≤ refunded_total ≤ paid_total`); `payment_status` gains `partially_refunded|refunded` (no CHECK list). `storefront_settings.return_window_days` (0–60, default 7). Refunds are manual only (no gateways yet, E8c). See DATABASE_DESIGN.md "E-commerce E10b".
+
 ### OnlinePayments
 - `payment_gateways` — code `cod|bank_transfer|sslcommerz|bkash|nagad`, display_name, is_enabled, mode `sandbox|live`, credentials **encrypted text**, settings jsonb (bank details text, COD limits), sort_order. Unique `(organization_id, code)`.
 - `payment_intents` — order_id, gateway_code, amount, currency, status `created|pending|succeeded|failed|cancelled|expired|refunded`, provider_reference (session/payment id), idempotency_key, verified_at. Unique `(gateway_code, provider_reference)` where not null.
@@ -125,7 +127,7 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 ### Reviews
 - `reviews` — product_id, customer_id, order_line_id NULL (verified purchase), rating smallint CHECK 1–5, title, body, status `pending|approved|rejected`, moderated_by/at. Unique `(customer_id, product_id)`.
-- `review_media` (optional, E10).
+- `review_media` (optional, E10). *Not built in E10.*
 
 ### Cms
 - `cms_pages` — slug unique per org, title, body_html (purified), template `default|faq|contact`, status `draft|published`, published_at, seo fields, translations jsonb, soft delete.

@@ -4,6 +4,7 @@ namespace App\Modules\OnlineCatalog\Infrastructure\ReadModels;
 
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
 use App\Modules\Inventory\Application\Contracts\StockLevels;
+use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\OnlineCatalog\Domain\CatalogItem;
 use App\Modules\OnlineCatalog\Domain\CategoryTree;
 use App\Modules\OnlineCatalog\Domain\ListingState;
@@ -35,7 +36,7 @@ use Illuminate\Support\Facades\DB;
  * their lifetime, so resolve a fresh instance per request.
  *
  * @phpstan-type VariantRecord array{id: string, sku: string, name: ?string, option_values: array<string, string>, price: string, compare_at_price: ?string, raw_compare_at_price: ?string, image_id: ?string, is_active: bool, tracked: bool, in_stock: bool, low_stock: bool}
- * @phpstan-type ProductRecord array{id: string, name: string, category_id: ?string, brand_id: ?string, unit_id: ?string, options: list<array{name: string, values: list<string>}>, is_active: bool, listing: ProductListing, variants: list<VariantRecord>, images: list<array{id: string, url: string}>, units_sold_30d: string, units_sold_total: string}
+ * @phpstan-type ProductRecord array{id: string, name: string, category_id: ?string, brand_id: ?string, unit_id: ?string, options: list<array{name: string, values: list<string>}>, is_active: bool, listing: ProductListing, variants: list<VariantRecord>, images: list<array{id: string, url: string}>, units_sold_30d: string, units_sold_total: string, rating?: array{average: string, count: int}|null}
  */
 class CatalogReadModel
 {
@@ -68,6 +69,7 @@ class CatalogReadModel
         private readonly StockLevels $stock,
         private readonly OrganizationDirectory $organizations,
         private readonly CatalogPromotions $promotions,
+        private readonly ProductRatings $ratings,
     ) {}
 
     public function organizationId(): string
@@ -133,6 +135,8 @@ class CatalogReadModel
         $variants = $this->variants($productIds, ! ($options['include_inactive_variants'] ?? false));
         $images = $this->images($productIds);
         $stats = $this->stats($productIds);
+        // E10b: approved-review ratings of all candidates in one query (cards, "top rated" sort).
+        $ratings = $this->ratings->summaries($productIds);
 
         $tracked = [];
         foreach ($listings as $listing) {
@@ -178,6 +182,7 @@ class CatalogReadModel
                 'images' => $images[$listing->product_id] ?? [],
                 'units_sold_30d' => $stats[$listing->product_id]['30d'] ?? '0.000',
                 'units_sold_total' => $stats[$listing->product_id]['total'] ?? '0.000',
+                'rating' => $ratings[$listing->product_id] ?? null,
             ];
         }
 
@@ -222,6 +227,8 @@ class CatalogReadModel
             'short_description' => $listing->short_description,
             // Live automatic promotion of the variant giving `price` (E8b): {id, name, type, value, ends_at, show_countdown, price}.
             'promotion' => $variants === [] ? null : $this->promotion($record, $pricing['price']),
+            // E10b: {average (one decimal), count} of the approved reviews, null when unrated.
+            'rating' => $record['rating'] ?? null,
         ];
     }
 
@@ -271,6 +278,8 @@ class CatalogReadModel
             unitsSold30d: $record['units_sold_30d'],
             unitsSoldTotal: $record['units_sold_total'],
             attributeValues: $this->attributeValues($record),
+            ratingAverage: $record['rating']['average'] ?? null,
+            ratingCount: $record['rating']['count'] ?? 0,
         );
     }
 

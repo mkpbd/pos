@@ -13,4 +13,9 @@ final class NoProductRatings implements ProductRatings
     {
         return null;
     }
+
+    public function summaries(array $productIds): array
+    {
+        return [];
+    }
 }

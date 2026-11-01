@@ -88,6 +88,8 @@ const pages = {
   webOrders: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrdersPage'),
   webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
   webOrdersPrint: page(() => import('@/features/web-orders/pages/print-page'), 'WebOrdersPrintPage'),
+  webReturns: page(() => import('@/features/web-returns/pages/web-return-pages'), 'WebReturnsPage'),
+  webReturn: page(() => import('@/features/web-returns/pages/web-return-pages'), 'WebReturnPage'),
   codRemittances: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'CodRemittancesPage'),
   newCodRemittance: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'NewCodRemittancePage'),
   codRemittance: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'CodRemittancePage'),
@@ -139,6 +141,9 @@ export const routes: RouteObject[] = [
               },
               guarded('web_orders.view', 'web-orders', pages.webOrders),
               guarded('web_orders.view', 'web-orders/:orderId', pages.webOrder),
+              // Viewers see returns read-only; approve / reject / receive / refund need web_orders.refund (E10b).
+              guarded('web_orders.view', 'web-returns', pages.webReturns),
+              guarded('web_orders.view', 'web-returns/:returnId', pages.webReturn),
               guarded('web_orders.remit', 'cod-remittances', pages.codRemittances),
               guarded('web_orders.remit', 'cod-remittances/new', pages.newCodRemittance),
               guarded('web_orders.remit', 'cod-remittances/:remittanceId', pages.codRemittance),

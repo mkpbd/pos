@@ -33,6 +33,8 @@ class StorefrontAdminController
      * Opening the storefront (`is_enabled: true`) needs at least one domain (`STOREFRONT_DOMAIN_REQUIRED`).
      * `fulfilment_store_id` must be an active store of the organization (`STORE_NOT_FOUND`); its stock
      * decides online availability (null: stock-tracked products show as out of stock).
+     * `return_window_days` (0–60, default 7; 0 = no online returns): days after delivery a
+     * customer may ask to return goods of a web order (E10b).
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save): JsonResponse
     {
@@ -42,6 +44,7 @@ class StorefrontAdminController
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:300'],
             'fulfilment_store_id' => ['sometimes', 'nullable', 'uuid'],
             'guest_checkout_enabled' => ['sometimes', 'boolean'],
+            'return_window_days' => ['sometimes', 'integer', 'min:0', 'max:60'],
         ]);
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)));

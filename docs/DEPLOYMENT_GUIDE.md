@@ -101,6 +101,14 @@ Fulfilment: couriers, shipments, printing and COD remittances (E10a):
 - No new scheduler job, queue job, environment variable or rate limiter.
 - The new PostgreSQL CHECKs and triggers have not run yet (the local PostgreSQL run is still blocked) — run the full suite on PostgreSQL before production.
 
+Online returns and refunds, customer web activity, promotion report, ratings on cards (E10b):
+- Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive the new `web_orders.refund` (Organization Admin through `*`, Online Store Manager through `web_orders.*`, the **Accountant** explicitly). Until then nobody but platform admins can approve, receive or refund returns, and nobody gets the "return requested" inbox notification; *Web returns* is visible (read-only) to anyone with `web_orders.view`.
+- Migrations: `return_window_days` on `storefront_settings` (default 7 — online returns are **on** for every storefront after the upgrade; set `0` under *Online store → Settings → Checkout → Return window* to switch them off), `orders.refunded_total` (default 0) and the new tables `order_returns`, `order_return_lines`, `order_return_line_stock`, `order_return_history` — additive, no backfill. On PostgreSQL they add the CHECKs (`storefront_settings_return_window_check`, `orders_refunded_total_check`, `order_returns_rules_check`, `order_return_lines_rules_check`, …), the append-only triggers on `order_return_line_stock` and `order_return_history` (reusing `prevent_order_detail_mutation()` from the E8a orders migration — run the migrations in order) and the `order_return_lines_guard` trigger with its function `guard_order_return_line()`.
+- **Mail and a queue worker:** approved, rejected and refunded returns send a queued e-mail to the order's contact address. Its link to the account order page uses the organization's primary storefront domain (scheme from `APP_URL`); without a domain, or for guest orders, the e-mail has no link. A customer's new request creates a database notification for staff with `web_orders.refund`.
+- **Cash refunds** come out of the refunding user's open register session in the order's branch (`CASH_SESSION_REQUIRED` without one); bank transfer and mobile banking refunds need no session. Refunds appear in the payments ledger as `online_order_refund`.
+- No new scheduler job, environment variable or rate limiter (return writes use the shopper write limit). No cache: card ratings come from one grouped query per listing.
+- The new PostgreSQL CHECKs and triggers have not run yet (the local PostgreSQL run is still pending) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash

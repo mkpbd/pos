@@ -22,10 +22,10 @@ class StorefrontShellController
     /** Storefront routes that exist in this phase (exact paths); content pages are looked up. */
     private const KNOWN_PATHS = ['/', '/shop', '/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
 
-    /** Shopper pages (E7, E8a, E9): account, cart, wishlist and checkout. Personal, never indexed. */
+    /** Shopper pages (E7, E8a, E9, E10b returns): account, cart, wishlist and checkout. Personal, never indexed. */
     private const ACCOUNT_PATHS = [
         '/account', '/account/login', '/account/register', '/account/forgot-password', '/account/reset-password',
-        '/account/verify-email', '/account/profile', '/account/addresses', '/account/orders', '/account/reviews',
+        '/account/verify-email', '/account/profile', '/account/addresses', '/account/orders', '/account/reviews', '/account/returns',
         '/cart', '/wishlist', '/checkout',
     ];
 

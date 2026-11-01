@@ -163,7 +163,12 @@ class WebOrderController
      * guests), `ip`, `user_agent`, `notes`, cancellation, status history with actor names,
      * `payments` (`[{method, amount, reference, recorded_at, recorded_by}]`) and
      * `allowed_actions` (subset of confirm_payment, process, ship, deliver, record_cod_payment,
-     * cancel; empty without `web_orders.manage`).
+     * cancel; empty without `web_orders.manage`). E10b: per line `id` and
+     * `returnable_quantity`, `refunded_total`, `return_deadline`, `return_window_open`,
+     * `returns [{id, number, status, status_label, refund_amount, created_at}]`, refunds in
+     * `payments` (direction `out`) and `create_return` in `allowed_actions` (with
+     * `web_orders.refund`, delivered and paid orders with something left to return â€”
+     * after the window only with `override_window`).
      */
     public function show(Request $request, Order $webOrder): JsonResponse
     {
@@ -296,7 +301,7 @@ class WebOrderController
 
     private function document(Request $request, Order $webOrder): JsonResponse
     {
-        return ApiResponse::success($this->presenter->staff($webOrder->fresh() ?? $webOrder, $request->user()->can('web_orders.manage')));
+        return ApiResponse::success($this->presenter->staff($webOrder->fresh() ?? $webOrder, $request->user()->can('web_orders.manage'), $request->user()->can('web_orders.refund')));
     }
 
     /**

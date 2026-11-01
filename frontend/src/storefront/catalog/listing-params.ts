@@ -12,6 +12,7 @@ import type { ListingPagination, SortKey } from '../types'
 export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'featured', label: 'Featured' },
   { value: 'popularity', label: 'Best selling' },
+  { value: 'rating', label: 'Top rated' },
   { value: 'latest', label: 'Newest' },
   { value: 'price_asc', label: 'Price: low to high' },
   { value: 'price_desc', label: 'Price: high to low' },

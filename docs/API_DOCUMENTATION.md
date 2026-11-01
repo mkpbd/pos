@@ -112,7 +112,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 409 | `TOTAL_CHANGED` | The server total differs from the `expected_total` the shopper confirmed (`details.expected_total`, `total`, `preview` — the fresh preview). Nothing was placed. |
 | 422 | `INSUFFICIENT_STOCK` | Also: order placement — stock at the fulfilment store went below the order quantity (names the first failing variant; web orders never use the branch's negative-stock allowance). The whole placement rolls back. |
 | 422 | `INVALID_STATUS_TRANSITION` | Web order step not allowed from the current status (`details.from`, `to`, `allowed`); also confirming payment of a COD order and recording a COD payment for a bank-transfer order or one not shipped/delivered (`details.status`, `payment_method`). |
-| 422 | `ORDER_PAID`, `ORDER_ALREADY_PAID` | Cancelling a paid web order (needs a refund, E10); confirming or recording a payment twice. |
+| 422 | `ORDER_PAID`, `ORDER_ALREADY_PAID` | Cancelling a paid (or partly or fully refunded) web order — not supported; once delivered, goods come back through an online return (E10b); confirming or recording a payment twice. |
 | 422 | `DISTRICT_IN_OTHER_ZONE` | Delivery zone with a district another zone covers (`details.district_ids`, `districts: [{id, name, zone_id, zone_name}]`). |
 | 422 | `COUPON_INVALID` | Applying a coupon code that cannot be used now (`details.reason` `not_found` \| `not_started` \| `expired` \| `usage_limit_reached` \| `customer_limit_reached` \| `min_subtotal` \| `not_applicable`, `details.code`, `details.min_subtotal` for `min_subtotal`). The cart keeps its previous coupon. |
 | 422 | `NOT_A_COUPON_PROMOTION`, `CODES_EXHAUSTED` | Adding codes to an automatic promotion; no free random codes left for the prefix after several attempts (try another prefix). |
@@ -123,6 +123,11 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `SHIPMENT_NOT_FOUND` | A tracking update for a web order without a courier shipment — not shipped yet, or shipped before E10a (`details.status`). |
 | 422 | `REMITTANCE_INVALID` | A COD remittance names orders that cannot be settled by it (`details.orders: [{id, number, reason}]`, `reason` `not_found` \| `not_cod` \| `already_paid` \| `not_delivered` \| `other_courier`). Nothing is recorded. |
 | 422 | `IN_USE` | Also: deleting a courier that carried a shipment or sent a COD remittance (deactivate it instead). |
+| 422 | `RETURN_NOT_ALLOWED` | Online return of a web order that cannot be returned now (`details.reason` `not_delivered` \| `not_paid` \| `returns_disabled` \| `window_closed`). |
+| 422 | `QUANTITY_EXCEEDS_RETURNABLE` | Online return quantity above what is left after the order's active returns (`details.lines: [{order_line_id, product_name, requested, returnable}]`). |
+| 422 | `RETURN_NOT_CANCELLABLE` | A customer cancelling an online return that is no longer `requested` (`details.status`). |
+| 422 | `REFUND_EXCEEDS_PAID` | An online return refund that would take the order's refunds above its paid total (`details.paid_total`, `refunded_total`, `amount`). |
+| 422 | `INVALID_STATUS_TRANSITION` | Also: an online return step not allowed from the return's status (`details.from`, `to`, `allowed`). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -1027,6 +1032,89 @@ The same body with an order of another courier and one already paid:
 { "success": false, "error": { "code": "REMITTANCE_INVALID", "message": "2 orders cannot be part of this remittance.",
   "details": { "orders": [ { "id": "0193…", "number": "WEB-000001", "reason": "already_paid" },
                            { "id": "0193…", "number": "WEB-000007", "reason": "other_courier" } ] } }, "meta": { "request_id": "0193…" } }
+```
+
+### E-commerce track — online returns and refunds, customer web activity, promotion report, ratings on cards (E10b)
+
+Returns belong to the Orders module. Steps marked **I** need `Idempotency-Key` (shopper routes: `idempotent:shopper`). A return can be requested for a `delivered` web order whose payment status is `paid` or `partially_refunded`, within `return_window_days` of `delivered_at` (storefront settings; default 7, `0` = no online returns). Return statuses: `requested` → `approved` | `rejected` | `cancelled` (customer); `approved` → `received`; `received` → `refunded` — any other step → `422 INVALID_STATUS_TRANSITION` (`details.from`, `to`, `allowed`). A line's `amount` is its share of what the order line charged (discount and tax included; the return taking the last unit takes the exact remainder). Quantities of active returns (not rejected or cancelled) are no longer returnable. Delivery and COD fees are not refunded unless staff add `shipping_refund` at approval.
+
+Settings:
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| PATCH `/storefront/settings` | `storefront.manage` | Also accepts `return_window_days` (integer 0–60, default 7; `0` = no online returns); GET returns it. Audited with the other settings. |
+
+Storefront (signed-in customer: `auth:customer`; another customer's or another store's order or return → 404; guests → 401; `Cache-Control: no-store`):
+
+| Method & path | Notes |
+|---------------|-------|
+| GET `/store/account/orders/{number}` | Adds `returnable` (a return can be requested now), `return_deadline` (ISO; `null` before delivery or with returns off), `return_unavailable_reason` (`null` \| `not_delivered` \| `not_paid` \| `returns_disabled` \| `window_closed` \| `nothing_left`), `payment_status_label`, `refunded_total`, `returns` (the return view below, oldest first) and per line `id` (the order line id) and `returnable_quantity` (`"0"` while the order is not returnable). |
+| POST `/store/account/orders/{number}/returns` · I | `{reason_code: damaged\|wrong_item\|not_as_described\|changed_mind\|other, note? (≤ 500), lines: [{order_line_id, quantity (> 0, ≤ 3 decimals; whole units for whole-unit lines)}] (1–50)}` → `201` with the return view. `422 RETURN_NOT_ALLOWED` (`details.reason`: `not_delivered`, `not_paid`, `returns_disabled`, `window_closed`), `QUANTITY_EXCEEDS_RETURNABLE` (`details.lines: [{order_line_id, product_name, requested, returnable}]`), `VALIDATION_FAILED` (unknown or repeated lines, quantity). Staff holding `web_orders.refund` get an inbox notification. Write-throttled. |
+| GET `/store/account/returns` | Own returns, newest first, 10 per page (`meta.pagination`). Return view: `{number, order_number, order {number}, status, status_label, reason_code, reason_label, note, rejection_reason, lines: [{order_line_id, product_name, variant_name, sku, image_url, quantity, requested_quantity, amount}], items_amount, shipping_refund, refund_amount, currency, refund_method, refund_method_label, refunded_at, can_cancel, created_at}`. |
+| POST `/store/account/returns/{number}/cancel` · I | Own return while `requested` → `cancelled` (its quantities are free again); otherwise `422 RETURN_NOT_CANCELLABLE` (`details.status`). → the return view. |
+| GET `/store/products` | Cards add `rating` (`{average (one decimal, e.g. "4.5"), count}` of approved reviews, `null` when unrated; one grouped query per listing). New `sort=rating`: average descending, then count descending, unrated products last. |
+
+Staff (`auth:sanctum` + `tenant`; ids of another organization → 404). New permission `web_orders.refund`.
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/web-order-returns` | `web_orders.view` | Filters `status`, `search` (return number, order number, contact name, phone, e-mail); newest first, 25 per page (`per_page` ≤ 100). Rows `{id, number, order {id, number}, customer_name, status, status_label, reason_code, reason_label, requested_by, refund_amount, currency, created_at}`. `meta.status_counts`: `{all, requested, approved, received, refunded, rejected, cancelled}` for the search without `status`. |
+| GET `/web-order-returns/{id}` | `web_orders.view` | The row plus `order {id, number, status, payment_status, payment_status_label, payment_method, delivered_at, shipping_total, total, paid_total, refunded_total}`, `customer {id, name, code}\|null`, `contact`, `customer_note`, `staff_note`, `rejection_reason`, `override_window`, `lines: [{id, order_line_id, product_id, variant_id, product_name, variant_name, sku, image_url, quantity, requested_quantity, amount, ordered_quantity, unit_price, tax_amount, restock, restocked_quantity}]`, `items_amount`, `shipping_refund`, `refund_method`, `refund_method_label`, `refund_reference`, step times and actors (`requested_by_user`, `approved_at/by`, `rejected_at/by`, `received_at/by`, `refunded_at/by`, `cancelled_at`), `history: [{from_status, status, label, note, at, actor_type, actor}]`, `payments` (the refund ledger entries) and `allowed_actions` (`approve`, `reject` \| `receive` \| `refund`; empty without `web_orders.refund`). |
+| POST `/web-orders/{id}/returns` | `web_orders.refund` · I | Body as the customer's request plus `override_window` (bool). After the window, or with returns switched off, only with `override_window: true` and a `note` (else `RETURN_NOT_ALLOWED` / field error on `note`); not delivered or not paid → `RETURN_NOT_ALLOWED` regardless. → `201` with the staff return (`requested`, `requested_by: staff`). |
+| POST `/web-order-returns/{id}/approve` | `web_orders.refund` · I | `{lines?: [{order_line_id, quantity (0 … requested)}], shipping_refund? (≥ 0, ≤ the order's delivery fee minus shipping refunds of its other active returns), note? (≤ 500)}`. `requested` → `approved`; lowered lines are re-valued (0 drops a line; at least one item must stay). E-mail to the customer. |
+| POST `/web-order-returns/{id}/reject` | `web_orders.refund` · I | `{reason (≤ 200)}`. `requested` → `rejected`; quantities are free again. E-mail to the customer. |
+| POST `/web-order-returns/{id}/receive` | `web_orders.refund` · I | `{lines: [{order_line_id, restock: bool}]}` (`lines` may be empty; unlisted lines are restocked). `approved` → `received`. Restocked lines go back to the exact `order_line_stock` batches at their unit cost (movement `online_return`, reference the return number); `restock: false` lines are written off (no stock movement). |
+| POST `/web-order-returns/{id}/refund` | `web_orders.refund` · I | `{method: cash\|bank_transfer\|mobile_banking, reference? (≤ 80)}`. `received` → `refunded`: ledger out for `refund_amount`, source `online_order_refund`; bank transfer and mobile banking without a drawer, cash from the caller's open register session in the order's branch (`CASH_SESSION_REQUIRED`, `INSUFFICIENT_CASH`). The order's `refunded_total` grows; payment status `partially_refunded`, or `refunded` when refunds equal `paid_total`; the order status stays `delivered`. Refunds above `paid_total` → `422 REFUND_EXCEEDS_PAID` (`details.paid_total`, `refunded_total`, `amount`). E-mail to the customer. |
+| GET `/web-orders/{id}` | `web_orders.view` | Adds per line `id` and `returnable_quantity`, `refunded_total`, `return_deadline`, `return_window_open`, `returns: [{id, number, status, status_label, refund_amount, created_at}]`, refunds in `payments` (direction `out`) and the allowed action `create_return` (with `web_orders.refund`: delivered, paid, something left to return — after the window only with `override_window`). |
+| GET `/customers/{id}/web-activity` | `customers.view` | `{account: {email, verified, created_at, last_login_at, status} \| null, orders: {count (not cancelled or failed), total_spent (paid − refunded), last_order_at, average_order}, returns_count (not cancelled), reviews: {count, pending}, wishlist_count, cart: {item_count, updated_at} \| null, recent_orders: [{id, number, placed_at, status, status_label, payment_status, total, currency}] (5 newest)}`. |
+| GET `/promotions/{id}/report` | `promotions.view` | `?date_from=&date_to=` (`Y-m-d`, optional, calendar days in the organization's timezone; ≤ 366 days when both are given — else a field error on `date_to`). → `{date_from, date_to, timezone, currency, redemptions, orders, cancelled_orders, discount_total, order_revenue (sum of those orders' totals), average_discount (per redemption), by_day: [{date, redemptions, discount}]}`; with both dates every day is listed, otherwise only days with redemptions. Redemptions of orders cancelled later stay counted. |
+
+New error codes:
+
+| HTTP | Code | When |
+|------|------|------|
+| 422 | `RETURN_NOT_ALLOWED` | Requesting a return of an order that cannot be returned now (`details.reason`: `not_delivered`, `not_paid`, `returns_disabled`, `window_closed`). |
+| 422 | `QUANTITY_EXCEEDS_RETURNABLE` | A requested quantity above what is left after active returns (`details.lines: [{order_line_id, product_name, requested, returnable}]`). |
+| 422 | `RETURN_NOT_CANCELLABLE` | A customer cancelling a return that is no longer `requested` (`details.status`). |
+| 422 | `REFUND_EXCEEDS_PAID` | A refund that would take the order's refunds above its paid total (`details.paid_total`, `refunded_total`, `amount`). |
+
+`web_orders.refund` is new: Organization Admin (`*`), Online Store Manager (`web_orders.*`) and the built-in Accountant. Existing databases: `php artisan pos:permissions:sync`. Audited `web_order_return.requested`, `.approved`, `.rejected`, `.cancelled`, `.received`, `.refunded` and `web_order.refunded`.
+
+Example — the demo shopper returns one of the two juices of `WEB-000001` (amounts illustrative):
+
+```http
+POST /api/v1/store/account/orders/WEB-000001/returns
+Content-Type: application/json
+Idempotency-Key: 7f3d9a20-5c41-4e8b-9b6a-1d2e3f4a5b6c
+X-XSRF-TOKEN: …
+
+{ "reason_code": "changed_mind", "note": null, "lines": [ { "order_line_id": "0193…", "quantity": 1 } ] }
+```
+```json
+{
+  "success": true,
+  "data": {
+    "number": "RTN-WEB-000001", "order_number": "WEB-000001", "order": { "number": "WEB-000001" },
+    "status": "requested", "status_label": "Requested",
+    "reason_code": "changed_mind", "reason_label": "Changed my mind",
+    "note": null, "rejection_reason": null,
+    "lines": [
+      { "order_line_id": "0193…", "product_name": "Pran Mango Juice 250ml", "variant_name": null, "sku": "…",
+        "image_url": "…", "quantity": "1", "requested_quantity": "1", "amount": "25.80" }
+    ],
+    "items_amount": "25.80", "shipping_refund": "0.00", "refund_amount": "25.80", "currency": "BDT",
+    "refund_method": null, "refund_method_label": null, "refunded_at": null,
+    "can_cancel": true, "created_at": "2026-11-01T09:10:00+00:00"
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+Asking for both juices again while this return is active:
+
+```json
+{ "success": false, "error": { "code": "QUANTITY_EXCEEDS_RETURNABLE", "message": "Only 1 of Pran Mango Juice 250ml can still be returned.",
+  "details": { "lines": [ { "order_line_id": "0193…", "product_name": "Pran Mango Juice 250ml", "requested": "2", "returnable": "1" } ] } }, "meta": { "request_id": "0193…" } }
 ```
 
 ### Planned (by phase)

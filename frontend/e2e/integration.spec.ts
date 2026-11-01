@@ -176,7 +176,7 @@ test('cashier requests a return; the owner approves it and refunds cash from the
   await expect(owner.getByTestId('expected-cash')).toHaveText('BDT 100.00')
 
   // Approving pays the refund in cash out of that shift.
-  await owner.getByRole('link', { name: 'Returns' }).first().click()
+  await owner.getByRole('link', { name: 'Returns', exact: true }).first().click()
   await owner.getByRole('link', { name: number }).click()
   await owner.getByRole('button', { name: 'Approve' }).click()
   const dialog = owner.getByRole('dialog', { name: `Approve ${number}` })
@@ -657,4 +657,60 @@ test('a COD parcel is delivered and paid through a courier remittance in the adm
   await page.getByRole('link', { name: 'Web orders' }).first().click()
   await page.getByRole('row').filter({ hasText: 'WEB-000003' }).getByRole('link', { name: 'WEB-000003' }).click()
   await expect(page.getByTestId('order-remittance')).toContainText('REM-000001')
+})
+
+test('a shopper returns a delivered item; staff approve, receive it back into stock and refund it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin returns flow runs on desktop')
+
+  await page.goto('/account/login?next=/account/orders/WEB-000001')
+  const form = page.getByRole('form', { name: 'Sign in' })
+  await form.getByLabel('E-mail').fill('shopper@demo.test')
+  await form.getByLabel('Password').fill('password')
+  await form.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page).toHaveURL(/\/account\/orders\/WEB-000001$/)
+
+  // One of the two juices goes back (seeded: delivered, paid, return window 7 days).
+  await page.getByRole('button', { name: 'Return items' }).click()
+  const request = page.getByRole('form', { name: 'Return items' })
+  await request.getByRole('checkbox').first().check()
+  const quantity = request.getByRole('textbox', { name: 'Quantity of Pran Mango Juice 250ml to return' })
+  await quantity.fill('1')
+  await quantity.press('Tab')
+  await request.getByLabel('Reason').selectOption('changed_mind')
+  await request.getByRole('button', { name: 'Request return' }).click()
+  await expect(page.getByText('RTN-WEB-000001').first()).toBeVisible()
+
+  // Staff take it through approval, receipt (restocked) and a bank-transfer refund.
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.getByRole('link', { name: 'Web returns' }).first().click()
+  await page.getByRole('row').filter({ hasText: 'RTN-WEB-000001' }).getByRole('link').first().click()
+  const actions = page.getByRole('group', { name: 'Return actions' })
+
+  await actions.getByRole('button', { name: 'Approve' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Approve return' }).click()
+  await expect(actions.getByRole('button', { name: 'Receive goods' })).toBeVisible()
+
+  await actions.getByRole('button', { name: 'Receive goods' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Mark received' }).click()
+  await expect(actions.getByRole('button', { name: 'Record refund' })).toBeVisible()
+
+  await actions.getByRole('button', { name: 'Record refund' }).click()
+  const refund = page.getByRole('dialog')
+  await refund.getByLabel('Paid back by').click()
+  await page.getByRole('option', { name: 'Bank transfer' }).click()
+  await refund.getByLabel('Reference (optional)').fill('BANK-REF-9')
+  await refund.getByRole('button', { name: 'Record refund' }).click()
+  await expect(refund).toHaveCount(0)
+  await expect(page.getByText('Refunded').first()).toBeVisible()
+  await expect(page.getByTestId('refund-amount')).toContainText('25.8')
+
+  // The shopper sees the refund on the order.
+  await page.goto('/account/orders/WEB-000001')
+  await expect(page.getByText('RTN-WEB-000001').first()).toBeVisible()
+  await expect(page.getByText(/Refunded: .*25\.8/).first()).toBeVisible()
 })

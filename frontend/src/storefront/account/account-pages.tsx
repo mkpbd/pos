@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { HeartIcon, LogOutIcon, MapPinIcon, PackageIcon, ShoppingBagIcon, StarIcon, UserIcon } from 'lucide-react'
+import { HeartIcon, LogOutIcon, MapPinIcon, PackageIcon, ShoppingBagIcon, StarIcon, Undo2Icon, UserIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { applyServerErrors, storeFormError } from '../form-errors'
 import type { Customer } from '../types'
@@ -23,6 +23,7 @@ import { normalizeBdPhone, passwordSchema, profileSchema, type PasswordValues, t
 const NAV = [
   { to: '/account', label: 'Overview', end: true },
   { to: '/account/orders', label: 'Orders' },
+  { to: '/account/returns', label: 'Returns' },
   { to: '/account/reviews', label: 'Reviews' },
   { to: '/account/profile', label: 'Profile' },
   { to: '/account/addresses', label: 'Addresses' },
@@ -93,6 +94,7 @@ function VerificationBanner({ customer }: { customer: Customer }) {
 
 const TILES = [
   { to: '/account/orders', label: 'Orders', text: 'Track, cancel or buy again.', icon: PackageIcon },
+  { to: '/account/returns', label: 'Returns', text: 'Follow your returns and refunds.', icon: Undo2Icon },
   { to: '/account/reviews', label: 'Reviews', text: 'What you said about your purchases.', icon: StarIcon },
   { to: '/account/profile', label: 'Profile', text: 'Your name, mobile number and password.', icon: UserIcon },
   { to: '/account/addresses', label: 'Addresses', text: 'Where we deliver your orders.', icon: MapPinIcon },

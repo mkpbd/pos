@@ -4,10 +4,12 @@ namespace App\Modules\Cart;
 
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Infrastructure\Console\PruneCartsCommand;
+use App\Modules\Cart\Infrastructure\EloquentCustomerShoppingLists;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
 use App\Modules\Cart\Presentation\Http\Support\CartIdempotencyScope;
 use App\Modules\Cart\Presentation\Http\Support\CookieGuestCartMerger;
 use App\Modules\CustomerAccounts\Application\Contracts\GuestCartMerger;
+use App\Modules\Customers\Application\Contracts\CustomerShoppingLists;
 use App\Modules\Shared\Infrastructure\Http\Middleware\ShopperIdempotencyScope;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -26,6 +28,8 @@ class CartServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(GuestCartMerger::class, CookieGuestCartMerger::class);
         $this->app->bind(ShopperIdempotencyScope::class, CartIdempotencyScope::class);
+        // E10b: wishlist and cart on the admin customer card.
+        $this->app->bind(CustomerShoppingLists::class, EloquentCustomerShoppingLists::class);
     }
 
     public function boot(): void

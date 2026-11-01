@@ -134,11 +134,53 @@ function CheckoutCard({ settings, canManage }: { settings: StorefrontSettings; c
         <CardTitle>Checkout</CardTitle>
         <CardDescription>Guests give their name, e-mail and phone at checkout instead of creating an account.</CardDescription>
       </CardHeader>
-      <CardContent className="flex items-center gap-2">
-        <Switch id="guest-checkout" checked={allowed} disabled={!canManage || save.isPending} onCheckedChange={toggle} />
-        <Label htmlFor="guest-checkout">Allow guest checkout</Label>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Switch id="guest-checkout" checked={allowed} disabled={!canManage || save.isPending} onCheckedChange={toggle} />
+          <Label htmlFor="guest-checkout">Allow guest checkout</Label>
+        </div>
+        {/* Keyed by the saved value, so the field resets when the setting changes. */}
+        <ReturnWindowForm key={settings.return_window_days ?? 7} settings={settings} canManage={canManage} />
       </CardContent>
     </Card>
+  )
+}
+
+/** Days after delivery in which signed-in customers may request a return; 0 turns customer returns off. */
+function ReturnWindowForm({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
+  const save = useSaveStorefrontSettingsMutation()
+  const current = String(settings.return_window_days ?? 7)
+  const [value, setValue] = useState(current)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    const days = Number(value)
+    if (!/^\d{1,2}$/.test(value.trim()) || days > 60) {
+      setError('Enter a whole number of days from 0 to 60.')
+      return
+    }
+    setError(null)
+    save.mutate(
+      { return_window_days: days },
+      {
+        onSuccess: (s) => toast.success((s.return_window_days ?? days) === 0 ? 'Customers can no longer request returns online.' : `Customers can request returns for ${s.return_window_days ?? days} days after delivery.`),
+        onError: (err) => setError(fieldErrorMap(err).return_window_days ?? err.message),
+      },
+    )
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="flex flex-wrap items-end gap-3">
+      <FormField label="Return window (days)" error={error ?? undefined} hint="Counted from delivery; 0 turns customer returns off. Staff can still accept a return later." className="w-56">
+        <Input inputMode="numeric" value={value} disabled={!canManage} onChange={(e) => setValue(e.target.value)} />
+      </FormField>
+      {canManage && (
+        <Button type="submit" variant="outline" disabled={save.isPending || value.trim() === current}>
+          Save return window
+        </Button>
+      )}
+    </form>
   )
 }
 

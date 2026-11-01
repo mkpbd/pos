@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { STATEMENT_ENTRY_LABELS, useCustomerStatementQuery, type Customer, type CustomerStatementEntry } from '@/features/customers/api'
 import { OnlineAccountCard } from '@/features/customers/components/online-account-card'
+import { WebActivityCard } from '@/features/customers/components/web-activity-card'
 import { ReceivePaymentDialog } from '@/features/customers/components/receive-payment-dialog'
 import { LOYALTY_TRANSACTION_LABELS, pointsValue, useAdjustPointsMutation, useLoyaltyAccountQuery, useLoyaltySettingsQuery } from '@/features/loyalty/api'
 import { fieldErrorMap } from '@/lib/forms'
@@ -175,7 +176,10 @@ export function CustomerAccountSheet({ customer, onOpenChange }: { customer: Cus
           <SheetDescription>Sales and returns move the balance; payments reduce it. Points are earned on purchases.</SheetDescription>
         </SheetHeader>
         {customer && (
-          <div className="px-4"><OnlineAccountCard customerId={customer.id} /></div>
+          <div className="flex flex-col gap-4 px-4">
+            <OnlineAccountCard customerId={customer.id} />
+            <WebActivityCard customerId={customer.id} />
+          </div>
         )}
         {customer && (
           <Tabs defaultValue={canStatement ? 'statement' : 'loyalty'} className="px-4 pb-4">

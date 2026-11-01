@@ -266,7 +266,7 @@ class OrderWorkflow
 
     private function assertUnpaid(Order $o): void
     {
-        if ($o->payment_status === PaymentStatus::Paid) {
+        if ($o->payment_status->isPaid()) {
             throw new BusinessRuleViolation('ORDER_ALREADY_PAID', "{$o->number} is already paid.");
         }
     }

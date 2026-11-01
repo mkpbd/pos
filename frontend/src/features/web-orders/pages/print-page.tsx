@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/use-auth'
 import { usePrintQuery, type PrintDocument, type PrintKind, type PrintOrder, type PrintOrganization } from '@/features/web-orders/api'
-import { formatDateTime, PAYMENT_METHOD_LABELS, PRINT_KIND_LABELS, printParams, promotionKindLabel } from '@/features/web-orders/orders'
+import { formatDateTime, PAYMENT_METHOD_LABELS, paymentBadge, PRINT_KIND_LABELS, printParams, promotionKindLabel } from '@/features/web-orders/orders'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 
 // Page set-up and colours for paper; the screen view mimics A4 sheets.
@@ -98,7 +98,7 @@ function Sheet({ doc, order, timeZone }: { doc: PrintDocument; order: PrintOrder
         <div>
           <div className="text-xs font-semibold text-neutral-600 uppercase">Payment & delivery</div>
           <div>
-            {order.payment_method_label ?? PAYMENT_METHOD_LABELS[order.payment_method] ?? order.payment_method} · {order.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
+            {order.payment_method_label ?? PAYMENT_METHOD_LABELS[order.payment_method] ?? order.payment_method} · {paymentBadge(order.payment_status).label}
           </div>
           {order.shipping_method_name && <div>{order.shipping_method_name}</div>}
           {order.courier_name && <div>{order.courier_name}{order.tracking_number && <> · <span className="font-mono">{order.tracking_number}</span></>}</div>}

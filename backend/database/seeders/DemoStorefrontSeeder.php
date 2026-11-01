@@ -78,6 +78,8 @@ class DemoStorefrontSeeder extends Seeder
                 'site_name' => 'Demo Mart',
                 'meta_description' => 'Groceries and household goods from Demo Mart, Dhaka.',
                 'fulfilment_store_id' => Store::query()->where('code', 'MAIN')->value('id'),
+                // E10b: online returns within 7 days of delivery.
+                'return_window_days' => 7,
             ]);
             $catalog = $this->onlineCatalog($adminId, $upload);
 

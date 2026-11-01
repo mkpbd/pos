@@ -4,15 +4,20 @@ namespace App\Modules\Orders;
 
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
+use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Contracts\PurchaseVerifier;
 use App\Modules\Orders\Application\Events\OrderCancelledByCustomer;
 use App\Modules\Orders\Application\Events\OrderPlaced;
+use App\Modules\Orders\Application\Events\OrderReturnRequested;
+use App\Modules\Orders\Application\Events\OrderReturnUpdated;
 use App\Modules\Orders\Application\Services\NoOrderLineReviews;
 use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
+use App\Modules\Orders\Infrastructure\EloquentCustomerWebOrders;
 use App\Modules\Orders\Infrastructure\EloquentPurchaseVerifier;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderPlacedNotifications;
+use App\Modules\Orders\Infrastructure\Notifications\SendOrderReturnNotifications;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,13 +33,17 @@ use Illuminate\Support\Facades\RateLimiter;
  * expiry of unpaid bank-transfer orders (`orders:expire-pending`); the customer's own orders
  * (E9: history, detail, cancel, re-order) and the `PurchaseVerifier` the Reviews module asks;
  * fulfilment (E10a): shipments with courier events, the orders board (filters, counts, bulk
- * processing), print data and couriers' COD remittances.
+ * processing), print data and couriers' COD remittances; online returns and refunds (E10b):
+ * customer requests, staff approval, receipt with restock to the original batches, refunds
+ * through the payments ledger, and the `CustomerWebOrders` summary for the customer card.
  */
 class OrdersServiceProvider extends ModuleServiceProvider
 {
     public function register(): void
     {
         $this->app->bind(PurchaseVerifier::class, EloquentPurchaseVerifier::class);
+        // E10b: web orders and returns on the admin customer card.
+        $this->app->bind(CustomerWebOrders::class, EloquentCustomerWebOrders::class);
         // Replaced by the Reviews module when it is installed.
         $this->app->bindIf(OrderLineReviews::class, NoOrderLineReviews::class);
     }
@@ -45,6 +54,8 @@ class OrdersServiceProvider extends ModuleServiceProvider
 
         Event::listen(OrderPlaced::class, SendOrderPlacedNotifications::class);
         Event::listen(OrderCancelledByCustomer::class, SendOrderCancelledNotifications::class);
+        Event::listen(OrderReturnRequested::class, [SendOrderReturnNotifications::class, 'requested']);
+        Event::listen(OrderReturnUpdated::class, [SendOrderReturnNotifications::class, 'updated']);
 
         // Checkout preview and placement: per IP and cart (ADR-015).
         RateLimiter::for('checkout', function (Request $request) {
@@ -66,6 +77,7 @@ class OrdersServiceProvider extends ModuleServiceProvider
             'web_orders.view' => 'View online store orders',
             'web_orders.manage' => 'Process online store orders: confirm payments, ship, deliver, record cash on delivery, cancel',
             'web_orders.remit' => 'Record and view couriers\' cash-on-delivery remittances',
+            'web_orders.refund' => 'Handle online returns of web orders: create, approve, reject, receive and refund',
         ];
     }
 }

@@ -52,6 +52,30 @@ class ReviewQueries
     }
 
     /**
+     * Rating summaries of many products in one grouped query (E10b: product cards and the
+     * "top rated" sort). Products without approved reviews are absent.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array{average: string, count: int}>
+     */
+    public function summaries(array $productIds): array
+    {
+        $result = [];
+        foreach (array_chunk(array_values(array_unique($productIds)), 500) as $chunk) {
+            $rows = Review::query()->whereIn('product_id', $chunk)->where('status', ReviewStatus::Approved->value)
+                ->groupBy('product_id')
+                ->select('product_id', DB::raw('count(*) as n'), DB::raw('sum(rating) as total'))
+                ->toBase()->get();
+            foreach ($rows as $row) {
+                $count = (int) $row->n;
+                $result[(string) $row->product_id] = ['average' => Decimal::div((string) $row->total, (string) $count, 1), 'count' => $count];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * @return array{average: ?string, count: int, distribution: array<string, int>}
      */
     public function summary(string $productId): array

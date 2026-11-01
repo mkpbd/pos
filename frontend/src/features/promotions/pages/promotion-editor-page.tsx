@@ -29,6 +29,7 @@ import {
 } from '@/features/promotions/api'
 import { CouponsPanel } from '@/features/promotions/components/coupons-panel'
 import { RedemptionsPanel } from '@/features/promotions/components/redemptions-panel'
+import { ReportPanel } from '@/features/promotions/components/report-panel'
 import { TargetPicker } from '@/features/promotions/components/target-picker'
 import {
   APPLICATION_RULE,
@@ -51,7 +52,7 @@ type Errors = Record<string, string>
 /** Error keys the form shows next to a field; anything else is listed above the form. */
 const SHOWN = new Set(['name', 'description', 'type', 'value', 'scope', 'target_ids', 'min_subtotal', 'max_discount', 'trigger', 'starts_at', 'ends_at', 'show_countdown', 'usage_limit', 'usage_limit_per_customer', 'form'])
 
-const TABS = ['details', 'coupons', 'redemptions'] as const
+const TABS = ['details', 'coupons', 'redemptions', 'report'] as const
 type Tab = (typeof TABS)[number]
 
 function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; readOnly: boolean; onSaved: (saved: Promotion) => void }) {
@@ -353,10 +354,12 @@ function PromotionView({ promotion }: { promotion?: Promotion }) {
             <TabsTrigger value="details">Details</TabsTrigger>
             {hasCoupons && <TabsTrigger value="coupons">Coupons ({promotion.coupon_count})</TabsTrigger>}
             <TabsTrigger value="redemptions">Redemptions ({promotion.redemption_count})</TabsTrigger>
+            <TabsTrigger value="report">Report</TabsTrigger>
           </TabsList>
           <TabsContent value="details" className="pt-2">{form}</TabsContent>
           {hasCoupons && <TabsContent value="coupons" className="pt-2"><CouponsPanel promotion={promotion} canManage={canManage} /></TabsContent>}
           <TabsContent value="redemptions" className="pt-2"><RedemptionsPanel promotion={promotion} /></TabsContent>
+          <TabsContent value="report" className="pt-2"><ReportPanel promotion={promotion} /></TabsContent>
         </Tabs>
       ) : (
         form

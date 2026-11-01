@@ -34,10 +34,14 @@ describe('listing state ↔ URL', () => {
   })
 
   it('falls back to defaults for invalid values', () => {
-    expect(parse('sort=rating&page=-2&per_page=1000&price_min=abc&price_max=1.234&in_stock=yes&view=table&brand=&brand=a&brand=a')).toEqual({
+    expect(parse('sort=stars&page=-2&per_page=1000&price_min=abc&price_max=1.234&in_stock=yes&view=table&brand=&brand=a&brand=a')).toEqual({
       ...EMPTY_LISTING_STATE,
       brands: ['a'],
     })
+  })
+
+  it('accepts the Top rated sort (E10b)', () => {
+    expect(parse('sort=rating').sort).toBe('rating')
   })
 
   it('round-trips and leaves defaults out of the URL', () => {

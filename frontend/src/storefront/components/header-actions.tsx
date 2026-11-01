@@ -71,6 +71,9 @@ function AccountMenu() {
           <Link to="/account/orders">Orders</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+          <Link to="/account/returns">Returns</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link to="/account/reviews">Reviews</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

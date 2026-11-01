@@ -15,4 +15,9 @@ final class EloquentProductRatings implements ProductRatings
 
         return $summary['count'] === 0 ? null : ['average' => (string) $summary['average'], 'count' => $summary['count']];
     }
+
+    public function summaries(array $productIds): array
+    {
+        return $this->reviews->summaries($productIds);
+    }
 }

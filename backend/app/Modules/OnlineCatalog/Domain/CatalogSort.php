@@ -15,6 +15,8 @@ enum CatalogSort: string
     case PriceAsc = 'price_asc';
     case PriceDesc = 'price_desc';
     case Name = 'name';
+    /** Top rated (E10b): average rating, then number of ratings, unrated products last. */
+    case Rating = 'rating';
 
     /**
      * @param  list<CatalogItem>  $items
@@ -38,7 +40,17 @@ enum CatalogSort: string
             self::PriceAsc => Decimal::compare($a->price, $b->price),
             self::PriceDesc => Decimal::compare($b->price, $a->price),
             self::Name => 0,
+            self::Rating => self::rating($a, $b),
         };
+    }
+
+    private static function rating(CatalogItem $a, CatalogItem $b): int
+    {
+        if ($a->ratingAverage === null || $b->ratingAverage === null) {
+            return ($a->ratingAverage === null) <=> ($b->ratingAverage === null);
+        }
+
+        return Decimal::compare($b->ratingAverage, $a->ratingAverage) ?: ($b->ratingCount <=> $a->ratingCount);
     }
 
     private static function featured(CatalogItem $a, CatalogItem $b): int

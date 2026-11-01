@@ -7,7 +7,6 @@ use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Orders\Domain\OrderStatus;
-use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
@@ -52,7 +51,7 @@ class CancelOrder
         if (! self::returnedToSender($locked)) {
             $from->assertCanBecome(OrderStatus::Cancelled, $locked->number);
         }
-        if ($locked->payment_status === PaymentStatus::Paid) {
+        if ($locked->payment_status->isPaid()) {
             throw new BusinessRuleViolation('ORDER_PAID', "{$locked->number} is paid; refund it instead of cancelling.");
         }
 

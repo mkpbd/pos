@@ -5,7 +5,6 @@ namespace App\Modules\Orders\Application\Actions;
 use App\Modules\Expenses\Application\Contracts\ExpenseRecorder;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
-use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\RemittanceMethod;
 use App\Modules\Orders\Infrastructure\Models\CodRemittance;
 use App\Modules\Orders\Infrastructure\Models\CodRemittanceLine;
@@ -75,7 +74,7 @@ class RecordCodRemittance
                 $reason = match (true) {
                     $order === null => 'not_found',
                     $order->payment_method !== OrderPaymentMethod::CashOnDelivery => 'not_cod',
-                    $order->payment_status === PaymentStatus::Paid => 'already_paid',
+                    $order->payment_status->isPaid() => 'already_paid',
                     $order->status !== OrderStatus::Delivered => 'not_delivered',
                     $shipments->get($id)?->courier_id !== $courier['id'] => 'other_courier',
                     default => null,
