@@ -214,7 +214,25 @@ Changes to existing tables:
 - `carts.converted_order_id` → orders NULL (set null): a converted cart keeps its row and loses its lines. The one-cart-per-customer index becomes `carts_customer_unique (customer_id) WHERE customer_id IS NOT NULL AND converted_order_id IS NULL`.
 - `storefront_settings.guest_checkout_enabled` boolean, default true.
 - No schema change for the new values `stock_movements.type` `online_order` / `online_order_cancel`, `payments.source_type` `online_order` (`online_order_refund` reserved for E10) and `payments.method` `cash_on_delivery` (`online_gateway` reserved for E8c): those columns are plain strings checked by PHP enums.
-- Not built in E8a: `carts.coupon_code`, promotions tables (E8b); `payment_intents`, `payment_transactions`, `webhook_receipts` (E8c); couriers and shipments (E10).
+- Not built in E8a: `payment_intents`, `payment_transactions`, `webhook_receipts` (E8c); couriers and shipments (E10). `carts.coupon_code` and the promotions tables came with E8b.
+
+### E-commerce E8b — Promotions, coupons and order discounts (implemented)
+
+Promotions module (web channel only):
+- `promotions` — name varchar(80), description varchar(200) NULL (shown to shoppers), type varchar(20) (`percent|fixed|free_shipping`), value NUMERIC(18,2) (default 0; `0.00` for free shipping), scope varchar(20) (`order|products|categories|brands`), min_subtotal / max_discount NUMERIC(18,2) NULL, trigger varchar(20) (`automatic|coupon`), starts_at / ends_at timestamptz NULL, show_countdown (default false), is_active (default true), usage_limit / usage_limit_per_customer integer NULL, author columns, timestamps. Indexes `(organization_id, trigger, is_active)`, `(organization_id, created_at)`. PostgreSQL CHECK `promotions_rules_check`: the three enums; percent `0 < value ≤ 100`; fixed `value > 0`; free shipping only with scope `order`; `show_countdown` needs `ends_at`, trigger `automatic` and a non-order scope; `ends_at > starts_at` when both are set; `min_subtotal ≥ 0`; `max_discount > 0`; limits ≥ 1.
+- `promotion_targets` — organization_id, promotion_id → promotions (cascade), target_type varchar(10) (`product|category|brand`, CHECK on PostgreSQL), target_id uuid (no FK: products, categories or brands; existence is checked on save, deleted targets simply stop matching). Primary key `(promotion_id, target_type, target_id)`; index `(organization_id, target_type, target_id)`. Categories match their sub-categories at pricing time (not stored).
+- `coupons` — promotion_id → promotions (cascade), code varchar(40), usage_limit integer NULL, used_count integer (default 0; projection of the redemptions with this code, incremented at placement under the row lock), is_active, author columns, timestamps. **Unique `(organization_id, lower(code))`** (expression index `coupons_code_unique`); index `(promotion_id, code)`. PostgreSQL CHECK: `code ~ '^[A-Z0-9-]{3,40}$'` (stored upper-case), `used_count ≥ 0`, `usage_limit ≥ 1`.
+- `promotion_redemptions` — promotion_id → promotions (`RESTRICT`), coupon_id → coupons NULL (`RESTRICT`), order_id → orders (`RESTRICT`), order_number varchar(40), customer_id → customers NULL (set null), customer_account_id → customer_accounts NULL (set null), email varchar(255) (lower-case contact e-mail — per-customer limits of guests are counted by it), kind varchar(10) (`product|order|shipping`), amount NUMERIC(18,2), created_at. Indexes `(promotion_id, customer_id)`, `(promotion_id, email)`, `order_id`. PostgreSQL CHECK `amount ≥ 0` and kind; trigger `promotion_redemptions_append_only` (`prevent_promotion_redemption_mutation`) rejects `UPDATE`/`DELETE`. One row per promotion used by a placed order; cancelling the order does not remove it (E8b). The `RESTRICT` keys keep used promotions and codes from being deleted (the actions answer `IN_USE` first).
+
+Orders module:
+- `orders` gains discount_total NUMERIC(18,2) (default 0; goods discounts), shipping_discount NUMERIC(18,2) (default 0; the delivery fee waived by free delivery — `shipping_total` is what was charged) and coupon_code varchar(40) NULL (set only when the coupon was redeemed). PostgreSQL CHECK `orders_discounts_check`: both ≥ 0.
+- `order_lines` gains discount_amount NUMERIC(18,2) (default 0): the line's product discount plus its share of the order discount, as `SaleCalculator` allocates it. PostgreSQL CHECK `0 ≤ discount_amount ≤ line_subtotal`.
+- `order_promotions` — organization_id, order_id → orders (`RESTRICT`), promotion_id → promotions NULL (set null), name varchar(80) (snapshot), kind varchar(10) (`product|order|shipping`), amount NUMERIC(18,2), created_at. Index `order_id`. PostgreSQL CHECK amount ≥ 0 and kind; trigger `order_promotions_append_only` (the existing `prevent_order_detail_mutation`).
+
+Cart module:
+- `carts.coupon_code` varchar(40) NULL — one coupon per cart, normalized upper-case, re-checked on every pricing; an invalid code stays (ignored) until the shopper removes or replaces it.
+
+Promotions keep no price or discount projection on products: card and product prices are computed per request from the live promotions (listing filters and sorting use the base price; E12 may index promotional prices).
 
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
@@ -234,6 +252,7 @@ Changes to existing tables:
 ## 4. Concurrency model
 
 - Web order placement (E8a) locks the shopper's cart row first, then posts stock through the same ledger; staff steps and cancellation lock the `orders` row; the expiry job takes due orders with `FOR UPDATE SKIP LOCKED` (PostgreSQL) so it never waits on, or doubles, a staff action.
+- Promotion usage limits (E8b): inside the placement transaction, after the cart lock and a first pricing, the `promotions` rows that carry a usage limit and the order would use, and the `coupons` row of the code it would redeem, are locked `FOR UPDATE` (promotions in ascending id order, then the coupon); the cart is priced again under the locks (at most three rounds) and the redemptions are appended before commit, so two placements cannot both take the last use. Unlimited promotions are not locked. A limit reached meanwhile reprices without it → `409 TOTAL_CHANGED`. PostgreSQL-only `PromotionConcurrencyTest` covers two placements racing for a single-use coupon (not run yet).
 - Every stock posting (adjustment, transfer, receipt, return; checkout from Phase 5; web orders from E8a) locks `stock_levels` rows `FOR UPDATE` in ascending `store|variant|batch` order, creating missing rows first with `INSERT … ON CONFLICT DO NOTHING` so there is always a row to lock.
 - Receiving locks the purchase order row and returning locks the receipt lines first, so two concurrent receipts (or returns) cannot both take the last open (or returnable) quantity.
 - `register_sessions` row is locked when posting cash payments.

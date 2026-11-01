@@ -114,6 +114,10 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `INVALID_STATUS_TRANSITION` | Web order step not allowed from the current status (`details.from`, `to`, `allowed`); also confirming payment of a COD order and recording a COD payment for a bank-transfer order or one not shipped/delivered (`details.status`, `payment_method`). |
 | 422 | `ORDER_PAID`, `ORDER_ALREADY_PAID` | Cancelling a paid web order (needs a refund, E10); confirming or recording a payment twice. |
 | 422 | `DISTRICT_IN_OTHER_ZONE` | Delivery zone with a district another zone covers (`details.district_ids`, `districts: [{id, name, zone_id, zone_name}]`). |
+| 422 | `COUPON_INVALID` | Applying a coupon code that cannot be used now (`details.reason` `not_found` \| `not_started` \| `expired` \| `usage_limit_reached` \| `customer_limit_reached` \| `min_subtotal` \| `not_applicable`, `details.code`, `details.min_subtotal` for `min_subtotal`). The cart keeps its previous coupon. |
+| 422 | `NOT_A_COUPON_PROMOTION`, `CODES_EXHAUSTED` | Adding codes to an automatic promotion; no free random codes left for the prefix after several attempts (try another prefix). |
+| 422 | `IN_USE` | Also: deleting a promotion or a coupon code that an order used (deactivate it instead). |
+| 422 | `PROMOTION_NOT_FOUND` | A `hot_deals` homepage section naming a promotion that is not an automatic countdown promotion (flash sale) of the organization (`details.promotion_id`). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -135,7 +139,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 - **Sorting:** `?sort=name` / `?sort=-created_at` (prefix `-` for descending); only whitelisted columns.
 - **Filtering:** plain, validated query parameters per endpoint, e.g. `?status=active&role_id=…`; date ranges `?from=2026-10-01&to=2026-10-31` (inclusive).
 - **Search:** `?search=term` (case-insensitive, whitelisted columns).
-- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP; shopper credential endpoints (`customer-auth`) as `auth` (`POS_AUTH_RATE_LIMIT` per e-mail+IP, four times that per IP); shopper writes (`storefront-write`) 60/min per IP and 60/min per signed-in customer; checkout preview and placement (`checkout`) `POS_CHECKOUT_RATE_LIMIT` (default 10)/min per IP and shopper (customer account or guest cart).
+- **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP; shopper credential endpoints (`customer-auth`) as `auth` (`POS_AUTH_RATE_LIMIT` per e-mail+IP, four times that per IP); shopper writes (`storefront-write`) 60/min per IP and 60/min per signed-in customer; checkout preview and placement (`checkout`) `POS_CHECKOUT_RATE_LIMIT` (default 10)/min per IP and shopper (customer account or guest cart); coupon attempts (`coupon`, `POST /store/cart/coupon`) `POS_COUPON_RATE_LIMIT` (default 10)/min per signed-in customer, else per guest cart, else per IP.
 - **Identifiers:** UUIDv7 strings (device token ids are integers).
 - **Versioning:** breaking changes go to `/api/v2`; additive changes stay in v1.
 
@@ -656,7 +660,7 @@ Example — sign-in (`POST /store/account/login`, with `X-XSRF-TOKEN`):
 
 ### E-commerce track — shipping, checkout and orders (E8a)
 
-Checkout and order routes run like the cart: storefront host → organization, `storefront.session` (cookie session, CSRF on POST), `throttle:storefront`, and `customer.active:optional` (a disabled shopper is treated as a guest). They work for guests and signed-in shoppers (*P/C*). Promotions and coupons are E8b; online gateways, `POST /store/orders/{number}/pay` and the gateway return/webhook routes are E8c.
+Checkout and order routes run like the cart: storefront host → organization, `storefront.session` (cookie session, CSRF on POST), `throttle:storefront`, and `customer.active:optional` (a disabled shopper is treated as a guest). They work for guests and signed-in shoppers (*P/C*). Promotions and coupons are E8b (next section); online gateways, `POST /store/orders/{number}/pay` and the gateway return/webhook routes are E8c.
 
 | Method & path | Auth · limiter | Notes |
 |---------------|----------------|-------|
@@ -776,6 +780,123 @@ Cookie: cart_token=…; XSRF-TOKEN=…; …session cookie…
 ```
 
 The guest opens `/order/WEB-000001?token=q3Vh…`. With `"expected_total": "100.00"` the answer would be `409` with `error.code` `TOTAL_CHANGED`, `details: {expected_total: "100.00", total: "104.00", preview: {…}}`.
+
+### E-commerce track — promotions, coupons, flash sales and hot deals (E8b)
+
+Promotions apply to the **online store only** (the POS ignores them). Everything is computed on the server: the shopper never sends a discount, only a coupon code. A promotion is **live** when it is active and inside its schedule (`starts_at` ≤ now < `ends_at`, either end optional).
+
+**Application rule** (`PromotionEngine`, the same for the cart, the checkout preview, placement and product display):
+
+1. **Product level** (scope `products`, `categories` — sub-categories included — or `brands`): each counted line gets **at most one** product promotion — among the live automatic ones and the coupon's, the one giving that line the largest discount; ties → earliest `ends_at`, then smallest id. `percent` = line amount × value %; `fixed` = value × quantity (per unit), never more than the line amount. `min_subtotal` is compared with the subtotal of all the lines the promotion matches, before discounts. `max_discount` caps the promotion's total over its lines; the cap is shared out in proportion to the uncapped amounts.
+2. **Order level** (scope `order`, `percent`/`fixed`): the **single best** live automatic order promotion or the coupon's applies to the subtotal after product discounts; its `min_subtotal` is compared with the subtotal **before** any discount; `max_discount` caps a percentage. It is allocated over the lines as `SaleCalculator`'s invoice discount.
+3. **Free delivery** (`free_shipping`, order scope only): when any live automatic free-shipping promotion or the coupon's is eligible (`min_subtotal` on the subtotal before discounts), the delivery fee is waived — the COD fee is still charged. An automatic one is preferred over the coupon's.
+4. **Tax** is computed by `SaleCalculator` after the discounts (both tax modes).
+5. A valid coupon whose promotion ends up unused because an automatic offer gives more stays on the cart with `applied: false`, `reason: "better_offer"`, `message: "A better offer is already applied."`, and is not redeemed.
+
+There are no customer groups, stacking flags or priorities. Usage limits: `usage_limit` counts placed orders that used the promotion; `usage_limit_per_customer` counts them per customer record for signed-in shoppers and per lower-case contact e-mail for guests (known only at checkout); a coupon's own `usage_limit` counts its `used_count`. Automatic promotions whose limit the shopper has reached are skipped silently.
+
+Public endpoints (cart routes as in E7: `storefront.session`, `throttle:storefront`, writes `storefront-write`, `customer.active:optional`; *P/C*):
+
+| Method & path | Auth · limiter | Notes |
+|---------------|----------------|-------|
+| GET `/store/cart` (and every cart write) | P/C | Adds the promotion fields below. |
+| POST `/store/cart/coupon` | P/C · `storefront-write`, `coupon` | `{code}` (≤ 60; any case and surrounding spaces — normalized upper-case). One coupon per cart: replaces the current one. → the repriced cart (200), also when the code is valid but beaten by an automatic offer (`coupon.applied: false`, `reason: "better_offer"`). Otherwise `422 COUPON_INVALID` (reasons below) and the cart is unchanged. `coupon` limiter: `POS_COUPON_RATE_LIMIT` (default 10)/min per signed-in customer, else per guest cart, else per IP → 429. |
+| DELETE `/store/cart/coupon` | P/C · `storefront-write` | Removes the coupon → the repriced cart. |
+| POST `/store/checkout/preview` · POST `/store/checkout` · GET `/store/orders/{number}` | as E8a | Add `discount_total`, `shipping_discount`, `promotions`, `coupon_code` and line `discount_amount` (below); the preview also returns the cart's `coupon`. The placement body is unchanged — the coupon comes from the cart. |
+| GET `/store/products` · `/store/products/{slug}` · related · homepage sections | P | Cards add `promotion`; the product detail adds `promotion` and variants' `promo_price` (below). |
+| GET `/store/homepage` | P | New section type `hot_deals` (below). |
+
+`COUPON_INVALID` reasons (`details.reason`; `error.message` is the shopper-facing text, also returned as `coupon.message` when a stored coupon becomes invalid):
+
+| Reason | Message | When |
+|--------|---------|------|
+| `not_found` | This coupon code is not valid. | Unknown code, malformed code, code or promotion switched off, or a code of an automatic promotion — one generic answer. |
+| `not_started` | This coupon is not valid yet. | Before the promotion's `starts_at`. |
+| `expired` | This coupon has expired. | At or after `ends_at`. |
+| `usage_limit_reached` | This coupon has already been used up. | The code's `usage_limit` or the promotion's `usage_limit` is reached. |
+| `customer_limit_reached` | You have already used this coupon. | `usage_limit_per_customer` reached — checked when applying only for signed-in customers; guests are counted by e-mail at checkout. |
+| `min_subtotal` | Add products worth at least {min_subtotal} {currency} to use this coupon. | The relevant subtotal (whole cart for order scope, matching lines for product scopes) is below `min_subtotal`; `details.min_subtotal`. |
+| `not_applicable` | This coupon does not apply to the products in your cart. | No line matches the promotion's targets; also an empty cart. |
+| `better_offer` (never an error) | A better offer is already applied. | Valid, but an automatic promotion gives more. |
+
+A coupon that becomes invalid after it was applied (cart changed, schedule over, limit reached) **stays on the cart** with `applied: false` and its `reason`/`message`, is ignored in the totals, and never blocks checkout: the order is placed without it (the preview shows why). Only `DELETE /store/cart/coupon` or another code removes it.
+
+**Cart fields** (added to the E7 shape):
+
+- Lines: `discount_amount` — the line's product discount plus its share of the order discount (as `SaleCalculator` allocates it; `"0.00"` for flagged lines); `promotion` — `{id, name}` of the product promotion on that line, or `null`. `line_total` stays quantity × unit price.
+- Totals: `subtotal` (before discounts), `discount_total` (product + order discounts), `tax_total` (after discounts), `total`.
+- `promotions: [{id, name, kind: "product" | "order", amount}]` — the product promotions used, then the order promotion; `free_shipping: null | {id, name}` — the free-delivery promotion that will waive the delivery fee at checkout; `coupon: null | {code, applied, reason, message, promotion_name}` (`reason`/`message` `null` when applied; `promotion_name` `null` for an unknown code).
+
+**Checkout and order fields:** `discount_total` (goods discounts), `shipping_discount` (the delivery fee waived by free delivery; `shipping_total` is then `"0.00"`; the COD fee is unchanged), `promotions: [{name, kind: "product" | "order" | "shipping", amount}]` (shipping only when a fee was actually waived — a method that is already free by its `free_over` waives nothing), `coupon_code` (only when the coupon was redeemed, else `null`), `lines[].discount_amount`. `total` = cart total (after discounts and tax) + delivery after the waiver + COD fee. The confirmation e-mail lists the discounts, the coupon and the free-delivery saving.
+
+**Placement** (inside the E8a transaction, after the cart lock and the first repricing): the promotions the order would use **that have a usage limit** and the coupon are locked (`FOR UPDATE`, sorted by id) and the cart is priced again under the locks (at most three rounds, in case the new pricing picks another limited promotion). A limit reached meanwhile drops that promotion; the new total then differs from `expected_total` → `409 TOTAL_CHANGED` with the fresh preview, whose `coupon.reason` explains it. Then `order_promotions` gets one snapshot row and `promotion_redemptions` one row per promotion used (`coupons.used_count` + 1 for a redeemed code). An idempotent replay returns the stored response and redeems nothing. Cancelling or expiring the order does **not** free the redemption (E10 may revisit). Unlimited promotions are not locked.
+
+**Catalog display.** Cards (listing, search, related, homepage sections, wishlist) add `promotion: null | {id, name, type, value, ends_at, show_countdown, price}`: the best live **automatic product-scope** promotion for **one unit** of the variant giving the card's `price` (`price` = promotional unit price; `type`/`value` let the client format "−10 %" or "−৳20"). Promotions whose total `usage_limit` is reached are not shown; per-customer limits are not known there; coupon promotions are never shown; a product promotion whose `min_subtotal` is above the unit price does not show on cards. `GET /store/products/{slug}` adds `promotion` (same shape, for the product's `price`) and `variants[].promo_price` (`null` when no promotion applies). **Filters and sorting keep the base price** (`price_min`/`price_max` and the price sorts); `compare_at_price`, `on_sale` and `discount_percent` are unchanged (the storefront shows the promotion badge instead of the "Sale" badge when both exist).
+
+**Hot deals section** (`hot_deals`; staff `GET /storefront/homepage-sections/types` lists it): config `{promotion_id: uuid | null (null = every live flash sale), limit 4–12 (8), view_all_url: site path or http(s) | null}`. `promotion_id` must be an automatic promotion with `show_countdown` (`PROMOTION_NOT_FOUND`). Public payload `{products: [card…], ends_at}` — live products whose card shows a live countdown promotion (the one named, or any), in featured order; `ends_at` = the earliest `promotion.ends_at` among them. Without products the section is left out (preview: `state: "empty"`).
+
+Staff endpoints (`auth:sanctum` + `tenant`; ids of another organization → 404):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/promotions` | `promotions.view` | Filters `status` (`active` \| `scheduled` \| `expired` \| `inactive`), `trigger` (`automatic` \| `coupon`), `search` (name); `sort` `created_at` (default `-created_at`), `name`, `starts_at`, `ends_at`; paging (`per_page` ≤ 100). Rows `{id, name, type, value, scope, trigger, starts_at, ends_at, show_countdown, is_active, state, coupon_count, redemption_count, discount_total}` — `state`: `inactive` (switched off), `expired` (ended), `scheduled` (not started), else `active`; `discount_total` = sum of its redemptions. |
+| GET `/promotions/{id}` | `promotions.view` | The row plus `description, min_subtotal, max_discount, usage_limit, usage_limit_per_customer, targets: [{id, name}]` (by name; deleted records drop out), `coupons_preview` (the first 20 codes), `created_at, updated_at`. |
+| POST `/promotions` · PATCH `/promotions/{id}` | `promotions.manage` | `{name (≤ 80), description? (≤ 200), type (percent\|fixed\|free_shipping), value, scope (order\|products\|categories\|brands), target_ids? (≤ 500 uuids, replaces the targets), min_subtotal?, max_discount? (> 0), trigger (automatic\|coupon), starts_at?, ends_at?, show_countdown?, is_active?, usage_limit? (≥ 1), usage_limit_per_customer? (≥ 1)}` and on create only an optional first `coupon_code`. PATCH any subset (checked merged with the stored values). 201 / 200 with the detail. Field errors (`VALIDATION_FAILED`): `value` (> 0; percent ≤ 100), `scope` (free shipping needs `order`), `target_ids` (product scopes need 1–500 existing, non-archived targets; order scope none), `show_countdown` (needs `ends_at`; automatic product-scope only), `ends_at` (after `starts_at`), `trigger` (cannot change once the promotion has codes), `coupon_code` (coupon promotions only; format; taken). Free shipping stores `value` `0.00` and `max_discount` `null`. Audited `promotion.created` / `.updated`. |
+| DELETE `/promotions/{id}` | `promotions.manage` | 204; targets and codes go with it. Used by an order → `IN_USE` (deactivate instead). Audited `promotion.deleted`. |
+| GET `/promotions/{id}/coupons` | `promotions.view` | `search` (code), `sort` `code` (default), `created_at`, `used_count`; paging. Rows `{id, code, usage_limit, used_count, is_active, created_at}`. |
+| POST `/promotions/{id}/coupons` | `promotions.manage` | `{code, usage_limit?}` (one code: upper-cased, `[A-Z0-9-]{3,40}`, unique in the organization regardless of case — field errors on `code`) or `{generate: 1–500, prefix? ([A-Za-z0-9-]{0,32}), usage_limit?}` (random: prefix + 8 characters without look-alikes 0/O, 1/I/L). 201 with the created rows. Automatic promotion → `NOT_A_COUPON_PROMOTION`; no free codes after repeated attempts → `CODES_EXHAUSTED`. Audited `coupon.created` / `coupon.generated`. |
+| PATCH `/coupons/{id}` | `promotions.manage` | `{is_active?, usage_limit? (null = unlimited)}` → the row. Audited `coupon.updated`. |
+| DELETE `/coupons/{id}` | `promotions.manage` | 204 for an unused code; used → `IN_USE`. Audited `coupon.deleted`. |
+| GET `/promotions/{id}/redemptions` | `promotions.view` | Newest first, `per_page` ≤ 100 (`meta.pagination`): `[{id, order_id, order_number, customer: {id, name} \| null, email, kind (product\|order\|shipping), amount, coupon_code, created_at}]`. |
+| GET `/web-orders/{id}` | `web_orders.view` | Adds `discount_total`, `shipping_discount`, `promotions`, `coupon_code` and `lines[].discount_amount` (as the storefront order view). |
+| POST · PATCH `/storefront/homepage-sections` | `storefront.manage` | Type `hot_deals` with the config above. |
+
+Organization Admin holds `promotions.*` through `*`; Online Store Manager already had `promotions.*` (ADR-016). Existing databases: `php artisan pos:permissions:sync`.
+
+Example — a guest cart with the flash sale "Juice week" (10 % off Pran) and the coupon `WELCOME50` (50 off orders from 500), exclusive tax mode, 15 % VAT on this product (tax is computed after the discounts):
+
+```http
+POST /api/v1/store/cart/coupon
+Host: shop.example.com
+Content-Type: application/json
+X-XSRF-TOKEN: …
+Cookie: cart_token=…; XSRF-TOKEN=…; …session cookie…
+
+{ "code": "welcome50" }
+```
+```json
+{
+  "success": true,
+  "data": {
+    "id": "0193…",
+    "items": [
+      { "id": "0193…", "variant_id": "0193…",
+        "product": { "id": "0193…", "slug": "pran-mango-juice-250ml", "name": "Pran Mango Juice 250ml", "url": "/product/pran-mango-juice-250ml", "image": { "url": "/storage/products/…/….jpg", "alt": "Pran Mango Juice 250ml" } },
+        "variant_name": null, "option_values": {}, "sku": "…",
+        "quantity": "20", "unit_price": "25.00", "compare_at_price": "30.00", "line_total": "500.00",
+        "discount_amount": "100.00", "promotion": { "id": "0193…", "name": "Juice week" },
+        "purchasable": true, "in_stock": true, "max_quantity": null, "exceeds_stock": false, "allow_decimal": false }
+    ],
+    "item_count": "20",
+    "subtotal": "500.00",
+    "discount_total": "100.00",
+    "tax_total": "60.00",
+    "total": "460.00",
+    "promotions": [
+      { "id": "0193…", "name": "Juice week", "kind": "product", "amount": "50.00" },
+      { "id": "0193…", "name": "Welcome 50", "kind": "order", "amount": "50.00" }
+    ],
+    "free_shipping": null,
+    "coupon": { "code": "WELCOME50", "applied": true, "reason": null, "message": null, "promotion_name": "Welcome 50" },
+    "prices_include_tax": false,
+    "currency": "BDT",
+    "issues": []
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+The coupon's `min_subtotal` (500) is compared with the subtotal before discounts (500.00), and its 50 off applies after the product discount (450.00 → 400.00); 15 % VAT on 400.00 makes the goods total 460.00 (with a 60.00 home delivery, the placed order's `total` is 520.00). With 19 juices the answer would be `422` with `error.code` `COUPON_INVALID`, `details: {reason: "min_subtotal", code: "WELCOME50", min_subtotal: "500.00"}`. Placing the order gives `discount_total: "100.00"`, `coupon_code: "WELCOME50"` and `promotions: [{name: "Juice week", kind: "product", amount: "50.00"}, {name: "Welcome 50", kind: "order", amount: "50.00"}]`.
 
 ### Planned (by phase)
 
