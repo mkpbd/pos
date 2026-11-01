@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'section_id', 'item_type', 'item_id', 'sort_order'])]
 class HomepageSectionItem extends Model
 {
-    use BelongsToOrganization, HasUuids;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     public const TYPE_BANNER = 'banner';
 

@@ -283,6 +283,23 @@ Storefront module (`2026_11_01_140100_add_popup_banners_and_blog_menu_links`):
 
 No change to `orders`: cancelling a paid order sets `status = cancelled`, `payment_status = refunded`, `refunded_total = paid_total` and writes a `payments` row (source `online_order_refund`, direction out) — the E10b columns and values.
 
+### E-commerce E12a — SEO and storefront performance (implemented)
+
+Storefront module (`2026_11_01_150000_add_allow_indexing_to_storefront_settings`):
+- `storefront_settings.allow_indexing` boolean NOT NULL default `true` (after `return_window_days`). `false` = robots `Disallow: /`, sitemaps 404, every shell page noindex. Additive, no backfill (existing stores stay indexable).
+
+OnlineCatalog module (`2026_11_01_150100_add_storefront_performance_indexes`, from the E12a query review):
+
+| Index | PostgreSQL | SQLite | Serves |
+|-------|-----------|--------|--------|
+| `product_listings_live_window_index` | `(organization_id, published_at, unpublished_at) WHERE is_published` | `(organization_id, is_published, published_at, unpublished_at)` | the live candidate set, sitemap products, `MIN(published_at) > now` (cache expiry) |
+| `product_listings_unpublish_index` | `(organization_id, unpublished_at) WHERE is_published AND unpublished_at IS NOT NULL` | `(organization_id, unpublished_at)` | `MIN(unpublished_at) > now` (cache expiry) |
+| `product_variants_live_product_index` | `(product_id, sort_order) WHERE deleted_at IS NULL AND is_active` | `(product_id, is_active, sort_order)` | "has an active variant" (`EXISTS`) and the variant load of the candidate set |
+
+Created with `CREATE INDEX IF NOT EXISTS`; `StorefrontIndexesTest` (PostgreSQL only) asserts they exist. Reviewed and left as is: images `(product_id, sort_order)`, stock `(store_id, variant_id)`, reviews `(organization_id, product_id, status, created_at)`, promotions `(organization_id, trigger, is_active)`, blog `(organization_id, status, published_at)`, search on the `lower(name)` trigram index (SKU match is a scan; search results are not cached). Assumed scale: a few thousand products per organization. **`EXPLAIN` on PostgreSQL is pending** (no PostgreSQL access during E12a).
+
+No table for the server cache: entries and the per-organization content version live in the configured cache store (`cache` table with the `database` store).
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.
@@ -293,7 +310,7 @@ No change to `orders`: cancelling a paid order sets `status = cancelled`, `payme
 ## 3. Indexing strategy
 
 - Every tenant table: composite index starting with `(organization_id, …)`; branch tables `(organization_id, branch_id, …)`.
-- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6).
+- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6). Storefront live listings: partial indexes on published `product_listings` windows and live `product_variants` (E12a).
 - Case-insensitive uniqueness uses expression indexes, e.g. `brands (organization_id, lower(name))`, and partial indexes such as `customers (organization_id, phone) WHERE deleted_at IS NULL AND phone IS NOT NULL` — valid on PostgreSQL and SQLite alike.
 - Ledgers: `stock_movements (store_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down to the source document.
 - Reports: `sales (organization_id, branch_id, created_at)` and BRIN on large append-only `created_at` columns once volumes justify it.

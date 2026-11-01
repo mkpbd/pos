@@ -9,8 +9,10 @@ use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\ScheduleWindow;
 use App\Modules\Storefront\Domain\SectionType;
@@ -116,6 +118,8 @@ class ManageHomepageSections
                 throw new BusinessRuleViolation('LIMIT_REACHED', 'The homepage can have at most '.self::MAX_SECTIONS.' sections.');
             }
             HomepageSection::query()->where('sort_order', '>', $section->sort_order)->increment('sort_order');
+            // Mass updates fire no model events: invalidate cached storefront reads (E12).
+            app(StorefrontContentVersion::class)->bump(app(TenantContext::class)->requireOrganization());
 
             $copy = $section->replicate(['created_by', 'updated_by']);
             $copy->title = $section->title === null ? null : mb_substr($section->title.' (copy)', 0, 120);
@@ -154,6 +158,8 @@ class ManageHomepageSections
             foreach (array_values($ids) as $position => $id) {
                 HomepageSection::query()->whereKey($id)->update(['sort_order' => $position]);
             }
+            // Mass updates fire no model events: invalidate cached storefront reads (E12).
+            app(StorefrontContentVersion::class)->bump(app(TenantContext::class)->requireOrganization());
             $this->audit->record('homepage.reordered', null, [], ['ids' => array_values($ids)]);
         });
     }
@@ -248,6 +254,7 @@ class ManageHomepageSections
     private function replaceItems(HomepageSection $section, string $itemType, array $ids): void
     {
         $section->items()->where('item_type', $itemType)->delete();
+        app(StorefrontContentVersion::class)->bump($section->organization_id);
         foreach (array_values($ids) as $position => $id) {
             HomepageSectionItem::query()->create([
                 'section_id' => $section->id,

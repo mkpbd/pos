@@ -5,6 +5,7 @@ namespace App\Modules\Products\Infrastructure\Models;
 use App\Modules\Products\Domain\ProductType;
 use App\Modules\Products\Infrastructure\Database\Factories\ProductFactory;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -39,7 +40,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
-    use BelongsToOrganization, HasFactory, HasUuids, SoftDeletes, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasFactory, HasUuids, SoftDeletes, TracksAuthor;
 
     protected $attributes = [
         'type' => 'standard',

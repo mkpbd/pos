@@ -2,6 +2,9 @@
 
 namespace App\Modules\Cms\Application\Contracts;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
+
 /**
  * What other modules may ask about the blog (all scoped to the current organization).
  */
@@ -55,9 +58,22 @@ interface BlogDirectory
 
     /**
      * Search metadata of a readable post by slug (any post that is not deleted with
-     * `$includeUnpublished`, for staff previews), or null. `image_url` is site-relative.
+     * `$includeUnpublished`, for staff previews), or null. `image_url` is site-relative;
+     * `author` is the author's first name; `category` feeds the breadcrumbs (E12).
      *
-     * @return array{title: string, seo_title: ?string, description: ?string, image_url: ?string, published_at: ?string}|null
+     * @return array{slug: string, title: string, seo_title: ?string, description: ?string, image_url: ?string, published_at: ?string, updated_at: ?string, author: ?string, category: array{name: string, slug: string}|null}|null
      */
     public function postMeta(string $slug, bool $includeUnpublished = false): ?array;
+
+    /**
+     * The next instant a published post becomes readable (after now), or null (E12 caching).
+     */
+    public function nextPublicationAt(): ?CarbonImmutable;
+
+    /**
+     * Sitemap entries (E12): readable posts and the categories that are not deleted, by slug.
+     *
+     * @return array{posts: list<array{slug: string, updated_at: ?DateTimeInterface}>, categories: list<array{slug: string, updated_at: ?DateTimeInterface}>}
+     */
+    public function sitemapEntries(): array;
 }

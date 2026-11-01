@@ -9,7 +9,7 @@ import { useOrderQuery } from '../checkout/api'
 import { formatDateTime } from '../checkout/delivery'
 import { readOrderToken, rememberOrderToken } from '../checkout/order-token'
 import type { OrderView } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
 
 /**
@@ -43,7 +43,7 @@ export function OrderPage() {
   }, [urlToken, placedState, number, location.pathname, location.search, location.hash, navigate])
 
   const notFound = order.error instanceof ApiError && order.error.status === 404
-  useDocumentTitle(order.data ? (thankYou ? 'Thank you for your order' : `Order ${order.data.number}`) : notFound ? 'Order not found' : null)
+  useDocumentMeta(privatePage(order.data ? (thankYou ? 'Thank you for your order' : `Order ${order.data.number}`) : notFound ? 'Order not found' : null))
 
   // A signed-in customer's own order (opened without a guest token) is also in the account area.
   if (order.data) return <OrderDetails order={order.data} thankYou={thankYou} accountLink={customer !== null && !token} />

@@ -9,7 +9,8 @@
 Browser ──▶ │ Nginx                                                │
             │  /assets/*   → frontend/dist/assets (static)         │
             │  /admin/*    → frontend/dist/index.html (admin SPA)  │
-            │  /api, /sanctum, /docs, /storage, all other paths    │
+            │  /api, /sanctum, /docs, /storage, /robots.txt,       │
+            │  /sitemap*.xml, all other paths                      │
             │              → PHP-FPM (backend/public); storefront  │
             │                pages = Laravel shell around          │
             │                frontend/dist/storefront.html         │
@@ -118,6 +119,16 @@ Blog, popup banner and refunds for paid cancellations (E11):
 - The popup is off until a banner with placement *Popup* is active; at most one shows (the first live by sort order). Visitors' "already seen" state lives in their browser (`localStorage` / `sessionStorage`) — editing the banner shows it again.
 - No new scheduler job, environment variable, rate limiter or cache. Scheduled posts appear by time (`published_at ≤ now` at read time) — no job needed.
 - The new PostgreSQL CHECKs have not run yet (the local PostgreSQL run is still pending) — run the full suite on PostgreSQL before production.
+
+SEO and performance (E12a):
+- **Web server routing:** `/robots.txt`, `/sitemap.xml` and `/sitemaps/*.xml` are answered by Laravel per storefront host. `backend/public/robots.txt` was removed — delete any copy left on the server and make sure Nginx neither serves a static `robots.txt` / `sitemap*.xml` (e.g. from `frontend/dist` or a `location = /robots.txt` block) nor answers them from a static-file `location ~* \.(txt|xml)$` rule; `try_files $uri /index.php?$query_string` is fine once no file exists. Check after deploying: `curl -i https://{storefront host}/robots.txt` lists `Sitemap:` for an open store; `/sitemap.xml` returns `application/xml`.
+- **Cache store:** the storefront caches the bootstrap, homepage, catalog candidate set and sitemaps in the default cache store under a per-organization version counter (no cache tags). Use `CACHE_STORE=redis` (recommended) or `database` in production; the `array` store does not share entries between requests and is for tests only. With several app servers the store must be shared (Redis or the database). Flushing the cache is safe (counters restart from the current time).
+- **Keep `cache.serializable_classes` = `false`** (`config/cache.php`): cached values are plain arrays by rule; do not allow classes to work around an unserialize error — fix the cached value instead.
+- **Staging / preview stores:** switch off *Online store → Settings → Search engines → Allow search engines to index the store* (`allow_indexing`) on any storefront that must not appear in search results (robots `Disallow: /`, sitemaps 404, every page `noindex`). Secondary domains always get `Disallow: /`; the sitemap and `Sitemap:` line use the primary domain with the scheme of `APP_URL`.
+- **HTTP caching:** public storefront reads send `Cache-Control: public, max-age=60, stale-while-revalidate=300` and a weak `ETag` for anonymous visitors; answers with a session or cookie are `private`. A CDN or proxy in front must respect `Cache-Control` and must not cache responses that set cookies (no `Vary` header is sent; public answers carry no personal data). Browsers may show a changed page up to 60 s late (plus up to 300 s of stale-while-revalidate, refreshed in the background); the server cache itself is invalidated at commit.
+- Migrations: `storefront_settings.allow_indexing` (default `true` — existing stores stay indexable) and three indexes on `product_listings` / `product_variants` (partial on PostgreSQL; plain `CREATE INDEX`, which locks writes to those tables briefly — run at a quiet time on large catalogs). No permission, environment variable, scheduler job or rate limiter (`robots.txt` and sitemaps use the `storefront` limiter).
+- The frontend build splits the storefront into lazy chunks: deploy the whole `frontend/dist/assets` directory and keep the previous build's assets for a while, so open tabs can still load chunks they have not fetched yet.
+- PostgreSQL `EXPLAIN` of the storefront queries and the index test have not run yet (PostgreSQL run still pending).
 
 ## Release steps
 

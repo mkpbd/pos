@@ -12,6 +12,7 @@ use App\Modules\Promotions\Infrastructure\Models\Coupon;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionTarget;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Instants;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
@@ -145,6 +146,7 @@ class SavePromotion
 
             $organizationId = $this->tenant->requireOrganization();
             PromotionTarget::query()->where('promotion_id', $promotion->id)->delete();
+            app(StorefrontContentVersion::class)->bump($organizationId);
             foreach ($targetIds as $targetId) {
                 PromotionTarget::query()->create([
                     'organization_id' => $organizationId,

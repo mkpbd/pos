@@ -8,7 +8,7 @@ import { Pagination } from '../catalog/listing-toolbar'
 import { storeFormError } from '../form-errors'
 import { useStorefront } from '../api'
 import type { OrderReturnSummary } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { useAccountReturnsQuery } from './returns-api'
 import { CancelReturnDialog, ReturnItem } from './returns-view'
 
@@ -16,7 +16,7 @@ const hrefFor = (page: number) => (page > 1 ? `/account/returns?page=${page}` : 
 
 /** /account/returns — the customer's own returns, newest first, with status and refund (?page=). */
 export function AccountReturnsPage() {
-  useDocumentTitle('My returns')
+  useDocumentMeta(privatePage('My returns'))
   const [params] = useSearchParams()
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1)
   const returns = useAccountReturnsQuery(page)

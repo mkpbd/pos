@@ -3,6 +3,7 @@
 namespace App\Modules\Products\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'product_id', 'path', 'original_name', 'mime_type', 'size', 'sort_order'])]
 class ProductImage extends Model
 {
-    use BelongsToOrganization, HasUuids;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     protected function casts(): array
     {

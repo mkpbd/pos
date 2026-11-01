@@ -4,6 +4,7 @@ namespace App\Modules\Cms\Infrastructure\Models;
 
 use App\Modules\Cms\Domain\BlogPostStatus;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -35,7 +36,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['organization_id', 'category_id', 'slug', 'title', 'excerpt', 'body_html', 'cover_media_id', 'author_user_id', 'status', 'published_at', 'seo_title', 'seo_description', 'reading_minutes'])]
 class BlogPost extends Model
 {
-    use BelongsToOrganization, HasUuids, SoftDeletes, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, SoftDeletes, TracksAuthor;
 
     protected $attributes = [
         'status' => 'draft',

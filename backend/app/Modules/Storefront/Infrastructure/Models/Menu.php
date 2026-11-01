@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use App\Modules\Storefront\Domain\MenuLocation;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['organization_id', 'name', 'location', 'is_active'])]
 class Menu extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'is_active' => true,

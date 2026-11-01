@@ -258,7 +258,7 @@ class BlogTest extends TestCase
 
         $this->assertStringContainsString('<title>Blog | Berry Kids</title>', $this->get('http://berry.test/blog')->assertOk()->getContent());
         $category = $this->get('http://berry.test/blog/category/recipes')->assertOk()->getContent();
-        $this->assertStringContainsString('<title>Recipes | Blog | Berry Kids</title>', $category);
+        $this->assertStringContainsString('<title>Recipes | Berry Kids</title>', $category);
         $this->assertStringContainsString('<meta name="description" content="Cook with us">', $category);
         $html = $this->get('http://berry.test/blog/dal-soup')->assertOk()->assertHeader('X-Robots-Tag', 'all')->getContent();
         $this->assertStringContainsString('<title>Dal soup recipe | Berry Kids</title>', $html);

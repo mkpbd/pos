@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use Carbon\CarbonImmutable;
@@ -38,7 +39,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'placement', 'name', 'kicker', 'title', 'subtitle', 'link_url', 'button_label', 'secondary_link_url', 'secondary_button_label', 'desktop_media_id', 'mobile_media_id', 'text_color', 'text_position', 'popup_delay_seconds', 'popup_frequency', 'starts_at', 'ends_at', 'is_active', 'sort_order'])]
 class Banner extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'text_color' => '#ffffff',

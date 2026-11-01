@@ -17,19 +17,13 @@ class StoreHomepageController
      * Public. Live sections in order, with banners and media resolved; sections whose banners
      * are all inactive or out of schedule are left out. `?preview=1` from a signed-in staff
      * member of this store holding storefront.view also returns disabled, scheduled, expired
-     * and empty sections, each with its `state`. Supports `If-None-Match` (ETag).
+     * and empty sections, each with its `state` (never cached). Weak `ETag` + `If-None-Match`
+     * (304) and `Cache-Control: public, max-age=60, stale-while-revalidate=300` (E12).
      */
     public function __invoke(Request $request, StorefrontHomepage $homepage): Response
     {
         $preview = $request->boolean('preview') && $this->isStaff($request);
-        $data = $homepage->build($preview) + ['preview' => $preview];
-        $etag = hash('xxh128', (string) json_encode($data));
-
-        if (in_array('"'.$etag.'"', $request->getETags(), true)) {
-            return response()->noContent(304)->setEtag($etag)->setPrivate();
-        }
-
-        $response = ApiResponse::success($data)->setEtag($etag)->setPrivate();
+        $response = ApiResponse::success($homepage->build($preview) + ['preview' => $preview]);
 
         return $preview ? $response->header('Cache-Control', 'no-store, private') : $response;
     }

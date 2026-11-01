@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { MailCheckIcon } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
 import { applyServerErrors, storeFormError } from '../form-errors'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { FORGOT_PASSWORD_SENT, useForgotPasswordMutation, useLoginMutation, useRegisterMutation, useResetPasswordMutation } from './api'
 import { AuthCard, FormAlert, SubmitButton, TextField } from './form-controls'
 import { safeNextPath } from './safe-next'
@@ -23,7 +23,7 @@ const linkClass = 'font-semibold text-sf-accent underline-offset-4 hover:underli
  * the account; the guest cart and wishlist are merged into the account on the way.
  */
 export function LoginPage() {
-  useDocumentTitle('Sign in')
+  useDocumentMeta(privatePage('Sign in'))
   const [params] = useSearchParams()
   const next = safeNextPath(params.get('next'))
   const login = useLoginMutation()
@@ -69,7 +69,7 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
-  useDocumentTitle('Create an account')
+  useDocumentMeta(privatePage('Create an account'))
   const [params] = useSearchParams()
   const next = safeNextPath(params.get('next'))
   const register = useRegisterMutation()
@@ -117,7 +117,7 @@ export function RegisterPage() {
 }
 
 export function ForgotPasswordPage() {
-  useDocumentTitle('Forgot your password?')
+  useDocumentMeta(privatePage('Forgot your password?'))
   const forgot = useForgotPasswordMutation()
   const [formError, setFormError] = useState<string | null>(null)
   const form = useForm<ForgotValues>({ resolver: zodResolver(forgotSchema), defaultValues: { email: '' } })
@@ -155,7 +155,7 @@ export function ForgotPasswordPage() {
 
 /** Target of the reset e-mail (`?token&email`). A successful reset signs the customer in. */
 export function ResetPasswordPage() {
-  useDocumentTitle('Choose a new password')
+  useDocumentMeta(privatePage('Choose a new password'))
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const reset = useResetPasswordMutation()

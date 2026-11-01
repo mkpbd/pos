@@ -6,10 +6,12 @@ use App\Modules\Inventory\Application\Contracts\StockLevels;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\OnlineCatalog\Application\Queries\BrowseCatalog;
 use App\Modules\OnlineCatalog\Application\Queries\CatalogNavigation;
+use App\Modules\OnlineCatalog\Application\Queries\ProductPage;
 use App\Modules\OnlineCatalog\Domain\ListingState;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class ReadModelStorefrontCatalog implements StorefrontCatalog
@@ -20,6 +22,7 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         private readonly CatalogNavigation $navigation,
         private readonly ProductDirectory $products,
         private readonly StockLevels $stock,
+        private readonly ProductPage $productPage,
     ) {}
 
     public function productCards(array $productIds): array
@@ -248,6 +251,26 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
 
     public function pageMeta(string $type, string $slug): ?array
     {
-        return $this->navigation->meta($type, $slug);
+        $meta = $this->navigation->meta($type, $slug);
+        if ($meta !== null && $type === 'product' && ($product = $this->productPage->structuredData($slug)) !== null) {
+            $meta['breadcrumbs'] = $product['breadcrumbs'];
+            $meta['product'] = $product;
+        }
+
+        return $meta;
+    }
+
+    public function nextScheduledChange(): ?CarbonImmutable
+    {
+        return $this->catalog->nextScheduledChange();
+    }
+
+    public function sitemapEntries(string $type): array
+    {
+        return match ($type) {
+            'product' => $this->catalog->sitemapProducts(),
+            'category' => $this->navigation->sitemapCategories(),
+            'brand' => $this->navigation->sitemapBrands(),
+        };
     }
 }

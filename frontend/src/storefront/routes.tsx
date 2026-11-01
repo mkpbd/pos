@@ -1,24 +1,37 @@
+import { lazy, Suspense, type ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
-import { AccountPage, ProfilePage, VerifyEmailPage } from './account/account-pages'
-import { AddressesPage } from './account/addresses-page'
-import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './account/auth-pages'
 import { GuestOnly, RequireCustomer } from './account/guards'
-import { BlogIndexPage, BlogPostPage } from './blog/blog-pages'
-import { CartPage } from './cart/cart-page'
-import { CheckoutPage } from './checkout/checkout-page'
 import { StorefrontLayout } from './components/storefront-layout'
-import { ContentPage } from './pages/content-page'
+import { PageLoadingView } from './components/state-views'
 import { HomePage } from './pages/home-page'
 import { BrandPage, CategoryPage, SearchPage, ShopPage } from './pages/listing-page'
-import { NewsletterConfirmPage, NewsletterUnsubscribePage } from './pages/newsletter-pages'
-import { AccountOrderPage } from './orders/account-order-page'
-import { AccountOrdersPage } from './orders/account-orders-page'
-import { AccountReturnsPage } from './orders/account-returns-page'
-import { OrderPage } from './orders/order-page'
 import { NotFoundPage } from './pages/not-found-page'
 import { ProductPage } from './pages/product-page'
-import { MyReviewsPage } from './reviews/my-reviews-page'
-import { WishlistPage } from './wishlist/wishlist-page'
+
+/**
+ * A page whose code is fetched on first visit (React.lazy), with an accessible loading state
+ * meanwhile. The browse path (home, listings, product) stays in the entry bundle; checkout, the
+ * account area, order pages, cart, wishlist, blog, content and newsletter pages are split off.
+ */
+const lazyComponents = new WeakMap<() => Promise<unknown>, Map<string, ComponentType>>()
+
+function lazyPage<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M & string) {
+  // One component per export, so routes sharing a page (blog index and blog category) keep it mounted.
+  const byName = lazyComponents.get(load) ?? new Map<string, ComponentType>()
+  lazyComponents.set(load, byName)
+  const Page = byName.get(name) ?? lazy(() => load().then((module) => ({ default: module[name] as ComponentType })))
+  byName.set(name, Page)
+  return (
+    <Suspense fallback={<PageLoadingView />}>
+      <Page />
+    </Suspense>
+  )
+}
+
+const account = () => import('./account/account-pages')
+const auth = () => import('./account/auth-pages')
+const blog = () => import('./blog/blog-pages')
+const newsletter = () => import('./pages/newsletter-pages')
 
 /**
  * Storefront pages. Paths must match the server's list of known paths
@@ -38,36 +51,36 @@ export const storefrontRoutes: RouteObject[] = [
       { path: 'category/:slug', element: <CategoryPage /> },
       { path: 'brand/:slug', element: <BrandPage /> },
       { path: 'product/:slug', element: <ProductPage /> },
-      { path: 'pages/:slug', element: <ContentPage /> },
-      { path: 'blog', element: <BlogIndexPage /> },
-      { path: 'blog/category/:slug', element: <BlogIndexPage /> },
-      { path: 'blog/:slug', element: <BlogPostPage /> },
-      { path: 'newsletter/confirm', element: <NewsletterConfirmPage /> },
-      { path: 'newsletter/unsubscribe', element: <NewsletterUnsubscribePage /> },
-      { path: 'cart', element: <CartPage /> },
-      { path: 'wishlist', element: <WishlistPage /> },
-      { path: 'checkout', element: <CheckoutPage /> },
-      { path: 'order/:number', element: <OrderPage /> },
-      { path: 'account/verify-email', element: <VerifyEmailPage /> },
+      { path: 'pages/:slug', element: lazyPage(() => import('./pages/content-page'), 'ContentPage') },
+      { path: 'blog', element: lazyPage(blog, 'BlogIndexPage') },
+      { path: 'blog/category/:slug', element: lazyPage(blog, 'BlogIndexPage') },
+      { path: 'blog/:slug', element: lazyPage(blog, 'BlogPostPage') },
+      { path: 'newsletter/confirm', element: lazyPage(newsletter, 'NewsletterConfirmPage') },
+      { path: 'newsletter/unsubscribe', element: lazyPage(newsletter, 'NewsletterUnsubscribePage') },
+      { path: 'cart', element: lazyPage(() => import('./cart/cart-page'), 'CartPage') },
+      { path: 'wishlist', element: lazyPage(() => import('./wishlist/wishlist-page'), 'WishlistPage') },
+      { path: 'checkout', element: lazyPage(() => import('./checkout/checkout-page'), 'CheckoutPage') },
+      { path: 'order/:number', element: lazyPage(() => import('./orders/order-page'), 'OrderPage') },
+      { path: 'account/verify-email', element: lazyPage(account, 'VerifyEmailPage') },
       {
         element: <GuestOnly />,
         children: [
-          { path: 'account/login', element: <LoginPage /> },
-          { path: 'account/register', element: <RegisterPage /> },
-          { path: 'account/forgot-password', element: <ForgotPasswordPage /> },
-          { path: 'account/reset-password', element: <ResetPasswordPage /> },
+          { path: 'account/login', element: lazyPage(auth, 'LoginPage') },
+          { path: 'account/register', element: lazyPage(auth, 'RegisterPage') },
+          { path: 'account/forgot-password', element: lazyPage(auth, 'ForgotPasswordPage') },
+          { path: 'account/reset-password', element: lazyPage(auth, 'ResetPasswordPage') },
         ],
       },
       {
         element: <RequireCustomer />,
         children: [
-          { path: 'account', element: <AccountPage /> },
-          { path: 'account/profile', element: <ProfilePage /> },
-          { path: 'account/addresses', element: <AddressesPage /> },
-          { path: 'account/orders', element: <AccountOrdersPage /> },
-          { path: 'account/orders/:number', element: <AccountOrderPage /> },
-          { path: 'account/returns', element: <AccountReturnsPage /> },
-          { path: 'account/reviews', element: <MyReviewsPage /> },
+          { path: 'account', element: lazyPage(account, 'AccountPage') },
+          { path: 'account/profile', element: lazyPage(account, 'ProfilePage') },
+          { path: 'account/addresses', element: lazyPage(() => import('./account/addresses-page'), 'AddressesPage') },
+          { path: 'account/orders', element: lazyPage(() => import('./orders/account-orders-page'), 'AccountOrdersPage') },
+          { path: 'account/orders/:number', element: lazyPage(() => import('./orders/account-order-page'), 'AccountOrderPage') },
+          { path: 'account/returns', element: lazyPage(() => import('./orders/account-returns-page'), 'AccountReturnsPage') },
+          { path: 'account/reviews', element: lazyPage(() => import('./reviews/my-reviews-page'), 'MyReviewsPage') },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

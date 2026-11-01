@@ -87,6 +87,15 @@ class EloquentCatalogPromotions implements CatalogPromotions
             ->exists();
     }
 
+    public function nextChangeAt(): ?CarbonImmutable
+    {
+        $now = CarbonImmutable::now();
+        $base = fn () => Promotion::query()->where('trigger', PromotionTrigger::Automatic)->where('is_active', true);
+        $times = array_filter([$base()->where('starts_at', '>', $now)->min('starts_at'), $base()->where('ends_at', '>', $now)->min('ends_at')]);
+
+        return $times === [] ? null : CarbonImmutable::createFromTimestamp(min(array_map(fn ($t) => CarbonImmutable::parse($t)->getTimestamp(), $times)));
+    }
+
     /**
      * Live automatic product-scope promotions whose total usage limit is not reached
      * (per-customer limits are not known on a product page).

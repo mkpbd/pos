@@ -4,6 +4,7 @@ namespace App\Modules\OnlineCatalog\Infrastructure\Models;
 
 use App\Modules\OnlineCatalog\Domain\ListingState;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -34,7 +35,7 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 class ProductListing extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'is_published' => false,

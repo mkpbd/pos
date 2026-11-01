@@ -15,7 +15,7 @@ import { reviewStatusLabel, useMyReviewsQuery } from '../reviews/api'
 import { ReviewDialog, type ReviewTarget } from '../reviews/review-dialog'
 import { Stars } from '../reviews/stars'
 import type { AccountOrder, AccountOrderLine, OrderReturnSummary } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { reorderNotice, useAccountOrderQuery, useCancelOrderMutation, useReorderMutation } from './account-api'
 import { ReturnRequestDialog } from './return-request-dialog'
 import { canRequestReturn } from './returns-api'
@@ -29,7 +29,7 @@ export function AccountOrderPage() {
   const { number = '' } = useParams()
   const order = useAccountOrderQuery(number)
   const notFound = order.error instanceof ApiError && order.error.status === 404
-  useDocumentTitle(order.data ? `Order ${order.data.number}` : notFound ? 'Order not found' : null)
+  useDocumentMeta(privatePage(order.data ? `Order ${order.data.number}` : notFound ? 'Order not found' : null))
 
   const back = (
     <Link to="/account/orders" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-sf-accent hover:underline">

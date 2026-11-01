@@ -2,6 +2,9 @@
 
 namespace App\Modules\OnlineCatalog\Application\Contracts;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
+
 /**
  * What the Storefront module (menus, homepage sections, HTML shell) may ask the online
  * catalog. Everything is scoped to the organization in the tenant context; "visible"
@@ -127,10 +130,28 @@ interface StorefrontCatalog
     public function productSummaries(array $productIds): array;
 
     /**
-     * Search metadata for the HTML shell, or null when the page does not exist.
+     * Search metadata for the HTML shell, or null when the page does not exist: title,
+     * description (SEO description or a plain-text excerpt ≤ 160), first image, name and
+     * breadcrumbs (categories, brands); products add `product`, the schema.org data
+     * (ProductPage::structuredData) — E12.
      *
      * @param  'category'|'brand'|'product'  $type
-     * @return array{title: string, description: ?string, image_url: ?string}|null
+     * @return array{title: string, description: ?string, image_url: ?string, name: string, breadcrumbs: list<array{name: string, url: string}>, product?: array<string, mixed>}|null
      */
     public function pageMeta(string $type, string $slug): ?array;
+
+    /**
+     * The next instant a listing schedule or a live automatic promotion starts or ends, or
+     * null: cached storefront pages showing products expire then (E12).
+     */
+    public function nextScheduledChange(): ?CarbonImmutable;
+
+    /**
+     * Sitemap entries (E12), each by slug: live products with their last change and first
+     * image (site-relative URL), visible categories and visible brands.
+     *
+     * @param  'product'|'category'|'brand'  $type
+     * @return list<array{slug: string, updated_at: ?DateTimeInterface, image_url?: ?string, name?: string}>
+     */
+    public function sitemapEntries(string $type): array;
 }

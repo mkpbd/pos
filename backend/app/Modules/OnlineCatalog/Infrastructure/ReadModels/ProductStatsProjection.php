@@ -2,6 +2,7 @@
 
 namespace App\Modules\OnlineCatalog\Infrastructure\ReadModels;
 
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -82,6 +83,8 @@ class ProductStatsProjection
             foreach (array_chunk($rows, 500) as $chunk) {
                 DB::table('product_stats')->insert($chunk);
             }
+            // Popularity sorts and "best sellers" read these (E12).
+            app(StorefrontContentVersion::class)->bump($organizationId);
         });
     }
 }

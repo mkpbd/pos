@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,6 +6,7 @@ import { useStorefront, useStorePageQuery } from '../api'
 import { ContactForm } from '../components/contact-form'
 import { RichText } from '../components/rich-text'
 import type { FaqGroup } from '../types'
+import { useDocumentMeta } from '../use-document-meta'
 import { NotFoundPage } from './not-found-page'
 
 function PageTitle({ title }: { title: string }) {
@@ -67,12 +67,8 @@ function ContactDetails() {
 /** A content page (/pages/:slug) in its layout: standard, FAQ or contact. */
 export function ContentPage() {
   const { slug = '' } = useParams()
-  const { store } = useStorefront()
   const page = useStorePageQuery(slug)
-
-  useEffect(() => {
-    if (page.data) document.title = `${page.data.seo_title ?? page.data.title} | ${store.name}`
-  }, [page.data, store.name])
+  useDocumentMeta(page.data ? { title: page.data.seo_title ?? page.data.title, description: page.data.seo_description, canonical: `/pages/${page.data.slug}` } : null)
 
   if (page.isPending) {
     return (

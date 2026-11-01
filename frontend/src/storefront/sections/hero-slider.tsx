@@ -48,7 +48,7 @@ export function HeroSlider({ section }: Props) {
           const linkWhole = banner.link_url && !banner.button_label && !banner.secondary_button_label
           const content = (
             <>
-              <BannerPicture banner={banner} sizes="100vw" eager={i === 0} className="absolute inset-0" />
+              <BannerPicture banner={banner} sizes="100vw" priority={i === 0} className="absolute inset-0" />
               <div className={cn('absolute inset-0 flex items-center', JUSTIFY[banner.text_position])}>
                 <div className="mx-auto w-full max-w-sf px-6 lg:px-4">
                   <BannerText banner={banner} size="hero" />

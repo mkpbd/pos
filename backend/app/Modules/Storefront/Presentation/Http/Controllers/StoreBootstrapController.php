@@ -13,19 +13,13 @@ class StoreBootstrapController
     /**
      * Storefront bootstrap
      *
-     * Public. Store identity, theme tokens (media resolved to URLs), the live announcement
-     * and the active menus as trees. `preview` is true when a signed-in staff member views
-     * a storefront that is not open yet. Supports `If-None-Match` (ETag).
+     * Public. Store identity (with `allow_indexing`, E12), theme tokens (media resolved to
+     * URLs), the live announcement and the active menus as trees. `preview` is true when a
+     * signed-in staff member views a storefront that is not open yet. Weak `ETag` +
+     * `If-None-Match` (304); `private, no-cache` because the shopper session starts here.
      */
     public function __invoke(Request $request, StorefrontBootstrap $bootstrap): Response
     {
-        $data = $bootstrap->build() + ['preview' => $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview']];
-        $etag = '"'.hash('xxh128', (string) json_encode($data)).'"';
-
-        if (in_array($etag, $request->getETags(), true)) {
-            return response()->noContent(304)->setEtag(trim($etag, '"'))->setPrivate();
-        }
-
-        return ApiResponse::success($data)->setEtag(trim($etag, '"'))->setPrivate();
+        return ApiResponse::success($bootstrap->build() + ['preview' => $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview']]);
     }
 }

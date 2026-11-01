@@ -11,6 +11,8 @@ export type StorefrontSettings = {
   guest_checkout_enabled?: boolean
   /** Days after delivery in which customers may request a return (0 = returns off; E10b). */
   return_window_days?: number
+  /** Search engines may index the store (default on; off = robots.txt "Disallow: /" and noindex on every page; E12a). */
+  allow_indexing?: boolean
   updated_at: string | null
 }
 
@@ -263,7 +265,7 @@ export function useSaveStorefrontSettingsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id' | 'guest_checkout_enabled' | 'return_window_days'>>) =>
+    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id' | 'guest_checkout_enabled' | 'return_window_days' | 'allow_indexing'>>) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),
   })

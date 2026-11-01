@@ -384,7 +384,7 @@ Public storefront endpoints live under `/api/v1/store/*`: no authentication, the
 
 | Method & path | Permission | Notes |
 |---------------|------------|-------|
-| GET `/store/bootstrap` | public | Store name/description, theme tokens with media resolved to `{id, url, srcset, width, height, alt}`, live announcement (scheduled window applied), active menus as trees of visible items, `preview`. `ETag` / `If-None-Match` → 304. |
+| GET `/store/bootstrap` | public | Store name/description, theme tokens with media resolved to `{id, url, srcset, width, height, alt}`, live announcement (scheduled window applied), active menus as trees of visible items, `preview`. `ETag` / `If-None-Match` → 304 (since E12a weak, from the `storefront.cache` middleware). |
 | GET `/storefront/settings` · PATCH | `storefront.view` · `storefront.manage` | `is_enabled`, `site_name`, `meta_description`. Defaults (closed, organization name) until first saved. |
 | GET `/storefront/domains` · POST · PATCH `/{id}` · DELETE `/{id}` | view · manage | Host names only (lower-cased, globally unique); the first is primary; PATCH `{is_primary: true}`. |
 | GET `/storefront/theme` · PUT | view · manage | Whole theme document (`colors`, `typography`, `shape`, `layout`, `logo_media_id`, `favicon_media_id`, `announcement`, `footer`); missing keys take defaults, unknown keys are dropped. `custom_css` only returned with `storefront.custom_css`. |
@@ -1208,6 +1208,79 @@ Cancelling a paid order without choosing a refund method:
 { "success": false, "error": { "code": "REFUND_REQUIRED", "message": "WEB-000004 is paid; choose how the money is refunded to cancel it.",
   "details": { "refund_amount": "1250.00" } }, "meta": { "request_id": "0193…" } }
 ```
+
+### E-commerce track — SEO and performance (E12a)
+
+Crawler files are served by Laravel on the storefront host (outside `/api/v1`); they start no session and set no cookie (`throttle:storefront`). "Indexable" below means: the storefront is open (not a staff preview), `allow_indexing` is true and the request's host is the primary domain.
+
+| Method & path | Notes |
+|---------------|-------|
+| GET `/robots.txt` | Any host (unknown hosts too; no storefront resolution). Indexable → `User-agent: *`, `Disallow:` `/cart`, `/checkout`, `/account`, `/order/`, `/search`, `/admin`, `/api/`, blank line, `Sitemap: {scheme}://{host}/sitemap.xml` (scheme from `APP_URL`, default `https`). Otherwise (closed, indexing off, secondary domain, unknown host) → `User-agent: *` + `Disallow: /`. `text/plain; charset=UTF-8`, `Cache-Control: public, max-age=3600`. |
+| GET `/sitemap.xml` | Sitemap index: `/sitemaps/pages.xml`, `/sitemaps/products-1.xml` … `products-N.xml` (one per 5000 live products; none when there are no products), `/sitemaps/categories.xml`, `/sitemaps/brands.xml`, `/sitemaps/blog.xml`, each with `<lastmod>` = the latest of its entries (omitted when none has one). |
+| GET `/sitemaps/{name}.xml` | `pages`: `/`, `/shop`, `/blog` (no lastmod) and visible content pages `/pages/{slug}`. `products-{n}`: live products by slug (published listing within its window, active product, at least one active variant) `/product/{slug}` with `<lastmod>` = the later of listing and product `updated_at` and `<image:image><image:loc>` (first image, absolute). `categories` / `brands`: visible listings `/category/{slug}`, `/brand/{slug}`. `blog`: blog categories with at least one readable post `/blog/category/{slug}` and readable posts `/blog/{slug}`. URLs are absolute on the primary domain; `<lastmod>` is W3C, UTC (`2026-11-01T09:00:00+00:00`). |
+
+Sitemaps: indexable only, else 404 (the storefront's not-found page) — also an unknown name or a product file past the last. `application/xml; charset=UTF-8`, `Cache-Control: public, max-age=600`, `X-Robots-Tag: noindex`. Products per file: `config('storefront.sitemap_products_per_file')` (5000). Each document is cached server-side per content version (below).
+
+Settings and bootstrap:
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET · PATCH `/storefront/settings` | `storefront.view` · `storefront.manage` | Adds `allow_indexing` (boolean, default `true`; audited). `false` (staging stores): robots `Disallow: /`, sitemaps 404, every shell page `noindex`. |
+| GET `/store/bootstrap` | public | `store.allow_indexing` (boolean); the SPA keeps every page `noindex` when false. |
+
+**HTTP caching** (`storefront.cache` middleware) — successful `GET`/`HEAD` answers of these routes carry a weak `ETag` (xxh128 of the body with `request_id` removed) and answer `304 Not Modified` to a matching `If-None-Match`:
+
+| Endpoints | `Cache-Control` |
+|-----------|-----------------|
+| `/store/homepage`, `/store/categories`, `/store/categories/{slug}`, `/store/brands`, `/store/brands/{slug}`, `/store/products`, `/store/products/{slug}`, `/store/products/{slug}/related`, `/store/search/suggest`, `/store/products/{slug}/reviews`, `/store/pages/{slug}`, `/store/faq`, `/store/blog`, `/store/blog/categories`, `/store/blog/{slug}` | `public, max-age=60, stale-while-revalidate=300` for anonymous requests; `private, no-cache` when the request has a session or the answer sets a cookie |
+| `/store/bootstrap` (starts the shopper session) | `private, no-cache` (ETag + 304 still apply) |
+| Any of the above in staff preview (closed store, `?preview=1`), or when the controller already set `no-store` (blog post preview) | `no-store, private`, no ETag |
+
+Cart, account, checkout, order and wishlist endpoints are not cached (unchanged). Before E12a the bootstrap and homepage computed their own strong ETags with `private`; the homepage is now `public` for anonymous visitors.
+
+**Server cache:** the bootstrap, the public homepage (not the preview), the catalog candidate set behind `/store/products`, category and brand listings, related products and catalog homepage sections (not text search or id / slug lookups), and each sitemap file are cached per organization under a content version that every committed storefront-visible write bumps, for at most 10 minutes and never past the next scheduled change (banner, section, announcement, listing window, automatic promotion, blog post or page going live or ending). Answers are identical to uncached ones. Details: `docs/ARCHITECTURE.md` §3n.
+
+**Shell (HTML) rules** — on every storefront page served by `StorefrontShellController`:
+
+- Title: `{store}` on the homepage; `Shop | {store}`, `Search | {store}`, `Blog | {store}`; product / category / brand `{seo_title ?? name} | {store}`; content page and blog post `{seo_title ?? title} | {store}`; blog category `{name} | {store}` (was `{name} | Blog | {store}`).
+- Description: SEO description, else a plain-text excerpt of the listing text (≤ 160, cut at a word boundary), else the store description. `og:image` absolute (product: first image); `og:type` `product` on products, `article` on posts, else `website`.
+- Canonical: the URL without its query string. Listings (`/shop`, `/category/{slug}`, `/brand/{slug}`, `/blog`, `/blog/category/{slug}`) keep `?page=N` when N > 1.
+- `noindex`: `<meta name="robots" content="noindex, follow">` and `X-Robots-Tag: noindex` for previews, 404s, `/search`, newsletter confirm / unsubscribe, account, cart, wishlist, checkout and order pages, listings with any query parameter other than `page` and tracking parameters (`utm_*`, `gclid`, `fbclid`, `msclkid`, `ref`), and every page when `allow_indexing` is false. Indexable pages send `X-Robots-Tag: all`.
+- JSON-LD (`<script type="application/ld+json">`, one per document; encoded with `JSON_HEX_TAG|JSON_HEX_AMP` so store text cannot close the element):
+
+| Page | Documents |
+|------|-----------|
+| Every page | `Organization` `{name, url (home), logo?, contactPoint? {contactType: "customer service", telephone?, email?}}` from the theme logo and footer contact |
+| `/` | + `WebSite` `{name, url, potentialAction: SearchAction {target: EntryPoint {urlTemplate: "{base}/search?q={search_term_string}"}, query-input: "required name=search_term_string"}}` |
+| `/product/{slug}` | + `Product` (below) + `BreadcrumbList` (Home → category path → product) |
+| `/category/{slug}`, `/brand/{slug}` | + `CollectionPage` `{name, description?, url}` + `BreadcrumbList` |
+| `/blog/{slug}` | + `BlogPosting` `{headline (≤ 110), description?, image?, datePublished, dateModified, author? Person (first name), publisher (Organization without contactPoint), mainEntityOfPage WebPage}` + `BreadcrumbList` (Home → Blog → category? → post) |
+| `/pages/{slug}`, `/blog/category/{slug}` | + `BreadcrumbList` |
+| Any `noindex` page | `Organization` only |
+
+`Product`: `name`, `url`, `description` (plain text ≤ 5000) when set, `sku` when set, `image` (absolute URLs), `brand` `{@type: Brand, name}`; `offers`: one `Offer` for a single active variant, else an `AggregateOffer` `{lowPrice, highPrice, offerCount, priceCurrency, offers: [Offer per variant, with its name]}`. Each `Offer`: `sku`, `price` (string; the automatic-promotion price when one applies), `priceCurrency` (store currency), `priceValidUntil` (the promotion's end date, when it has one), `availability` (`https://schema.org/InStock`, `LimitedAvailability` at ≤ 5 left, `OutOfStock`), `url`. `aggregateRating` `{ratingValue, reviewCount, bestRating: 5, worstRating: 1}` only with at least one approved review.
+
+Example — a two-variant product on promotion with one approved review (values illustrative):
+
+```html
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Product","name":"Kids Cotton Tee","url":"https://shop.example.com/product/kids-cotton-tee",
+ "description":"Soft cotton tee for everyday play.","sku":"TEE-01",
+ "image":["https://shop.example.com/storage/media/0193…/tee-front.jpg"],
+ "brand":{"@type":"Brand","name":"Berry Basics"},
+ "offers":{"@type":"AggregateOffer","lowPrice":"22.50","highPrice":"27.00","offerCount":2,"priceCurrency":"BDT",
+   "offers":[
+     {"@type":"Offer","sku":"TEE-01-S","name":"Small","price":"22.50","priceCurrency":"BDT","priceValidUntil":"2026-11-08",
+      "availability":"https://schema.org/InStock","url":"https://shop.example.com/product/kids-cotton-tee"},
+     {"@type":"Offer","sku":"TEE-01-M","name":"Medium","price":"27.00","priceCurrency":"BDT","priceValidUntil":"2026-11-08",
+      "availability":"https://schema.org/LimitedAvailability","url":"https://shop.example.com/product/kids-cotton-tee"}]},
+ "aggregateRating":{"@type":"AggregateRating","ratingValue":"5.0","reviewCount":1,"bestRating":5,"worstRating":1}}
+</script>
+```
+
+(Written on one line by the server; wrapped here.) The SPA updates title, description, canonical, robots and `og:*` on in-app navigation with the same rules; JSON-LD is server-only (first load).
+
+No new error codes or permissions.
 
 ### Planned (by phase)
 

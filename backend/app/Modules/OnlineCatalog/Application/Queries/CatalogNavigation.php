@@ -6,6 +6,8 @@ use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Infrastructure\Models\BrandListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\CategoryListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
+use App\Modules\Shared\Domain\PlainText;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
@@ -18,6 +20,9 @@ class CatalogNavigation
     public const SUGGEST_PRODUCTS = 6;
 
     public const SUGGEST_CATEGORIES = 4;
+
+    /** Meta descriptions built from text are cut to this many characters. */
+    public const META_DESCRIPTION_LENGTH = 160;
 
     /** @var array<string, int>|null */
     private ?array $counts = null;
@@ -250,10 +255,13 @@ class CatalogNavigation
     }
 
     /**
-     * Search metadata of a storefront page, or null when it does not exist.
+     * Search metadata of a storefront page, or null when it does not exist: title (SEO title
+     * or name), description (SEO description, else a plain-text excerpt of at most 160
+     * characters), the first image, the name and, for categories and brands, the breadcrumb
+     * trail (E12).
      *
      * @param  'category'|'brand'|'product'  $type
-     * @return array{title: string, description: ?string, image_url: ?string}|null
+     * @return array{title: string, description: ?string, image_url: ?string, name: string, breadcrumbs: list<array{name: string, url: string}>}|null
      */
     public function meta(string $type, string $slug): ?array
     {
@@ -262,13 +270,21 @@ class CatalogNavigation
             if ($id === null) {
                 return null;
             }
+            $tree = $this->catalog->categoryTree();
             $listing = $this->catalog->categoryListings()[$id];
             $refs = $this->refs([$listing->banner_media_id, $listing->image_media_id]);
+            $name = $tree->node($id)['name'];
 
             return [
-                'title' => $listing->seo_title ?? $this->catalog->categoryTree()->node($id)['name'],
-                'description' => $listing->seo_description,
+                'title' => $listing->seo_title ?? $name,
+                'description' => $listing->seo_description ?? PlainText::excerpt($listing->description_html, self::META_DESCRIPTION_LENGTH),
                 'image_url' => ($refs[$listing->banner_media_id] ?? $refs[$listing->image_media_id] ?? null)['url'] ?? null,
+                'name' => $name,
+                'breadcrumbs' => [
+                    ['name' => 'Home', 'url' => '/'],
+                    ...array_map(fn (string $a) => ['name' => $tree->node($a)['name'], 'url' => '/category/'.$this->catalog->categoryListings()[$a]->slug], $tree->visibleAncestors($id)),
+                    ['name' => $name, 'url' => '/category/'.$listing->slug],
+                ],
             ];
         }
         if ($type === 'brand') {
@@ -280,8 +296,13 @@ class CatalogNavigation
 
             return [
                 'title' => $listing->seo_title ?? $brand['name'],
-                'description' => $listing->seo_description ?? $listing->description,
+                'description' => $listing->seo_description ?? PlainText::excerpt($listing->description, self::META_DESCRIPTION_LENGTH),
                 'image_url' => $this->refs([$listing->logo_media_id])[$listing->logo_media_id]['url'] ?? null,
+                'name' => $brand['name'],
+                'breadcrumbs' => [
+                    ['name' => 'Home', 'url' => '/'],
+                    ['name' => $brand['name'], 'url' => '/brand/'.$brand['slug']],
+                ],
             ];
         }
 
@@ -289,12 +310,48 @@ class CatalogNavigation
         if ($record === null) {
             return null;
         }
+        $listing = $record['listing'];
 
         return [
-            'title' => $record['listing']->seo_title ?? $record['name'],
-            'description' => $record['listing']->seo_description ?? $record['listing']->short_description,
+            'title' => $listing->seo_title ?? $record['name'],
+            'description' => $listing->seo_description
+                ?? PlainText::excerpt($listing->short_description ?? $listing->description_html, self::META_DESCRIPTION_LENGTH),
             'image_url' => $record['images'][0]['url'] ?? null,
+            'name' => $record['name'],
+            'breadcrumbs' => [],
         ];
+    }
+
+    /**
+     * Visible categories for the sitemap: slug and last change of the listing, by slug.
+     *
+     * @return list<array{slug: string, updated_at: ?DateTimeInterface}>
+     */
+    public function sitemapCategories(): array
+    {
+        $tree = $this->catalog->categoryTree();
+        $result = [];
+        foreach ($this->catalog->categoryListings() as $id => $listing) {
+            if ($tree->isVisible($id)) {
+                $result[] = ['slug' => $listing->slug, 'updated_at' => $listing->updated_at];
+            }
+        }
+        usort($result, fn (array $a, array $b) => strcmp($a['slug'], $b['slug']));
+
+        return $result;
+    }
+
+    /**
+     * Visible brands for the sitemap: slug and last change of the listing, by slug.
+     *
+     * @return list<array{slug: string, updated_at: ?DateTimeInterface}>
+     */
+    public function sitemapBrands(): array
+    {
+        $result = array_map(fn (array $b) => ['slug' => $b['slug'], 'updated_at' => $b['listing']->updated_at], array_values($this->catalog->visibleBrands()));
+        usort($result, fn (array $a, array $b) => strcmp($a['slug'], $b['slug']));
+
+        return $result;
     }
 
     private function productCount(string $categoryId): int

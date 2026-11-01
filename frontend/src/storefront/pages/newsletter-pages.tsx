@@ -2,8 +2,11 @@ import { useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useNewsletterTokenMutation } from '../api'
 import { storeFormError } from '../form-errors'
+import { useDocumentMeta } from '../use-document-meta'
 
 function Frame({ title, children }: { title: string; children: React.ReactNode }) {
+  useDocumentMeta({ title, noindex: true })
+
   return (
     <section className="mx-auto max-w-xl px-4 py-16 text-center">
       <h1 className="text-3xl font-extrabold">{title}</h1>

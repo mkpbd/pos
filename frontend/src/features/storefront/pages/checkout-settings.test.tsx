@@ -82,3 +82,42 @@ describe('return window setting', () => {
     await waitFor(() => expect(field).toHaveValue('14'))
   })
 })
+
+describe('search engine indexing setting', () => {
+  it('defaults to on, explains itself and saves allow_indexing', async () => {
+    const user = userEvent.setup()
+    let patched: unknown
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage'] })),
+      'GET /storefront/settings': ok(settings(true)),
+      'GET /storefront/domains': ok([]),
+      'GET /branches': ok([], { pagination: { current_page: 1, per_page: 100, total: 0, last_page: 1 } }),
+      'PATCH /storefront/settings': (init) => {
+        patched = JSON.parse(String(init.body))
+        return ok({ ...settings(true), allow_indexing: false })
+      },
+    })
+    renderRoutes(routes, '/storefront')
+
+    const toggle = await screen.findByRole('switch', { name: 'Allow search engines to index the store' })
+    expect(toggle).toBeChecked()
+    expect(toggle).toHaveAccessibleDescription(/staging or test store/)
+    await user.click(toggle)
+    await waitFor(() => expect(patched).toEqual({ allow_indexing: false }))
+    await waitFor(() => expect(toggle).not.toBeChecked())
+  })
+
+  it('shows a saved "off" and is read-only without storefront.manage', async () => {
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view'] })),
+      'GET /storefront/settings': ok({ ...settings(), allow_indexing: false }),
+      'GET /storefront/domains': ok([]),
+      'GET /branches': ok([], { pagination: { current_page: 1, per_page: 100, total: 0, last_page: 1 } }),
+    })
+    renderRoutes(routes, '/storefront')
+
+    const toggle = await screen.findByRole('switch', { name: 'Allow search engines to index the store' })
+    expect(toggle).not.toBeChecked()
+    expect(toggle).toBeDisabled()
+  })
+})

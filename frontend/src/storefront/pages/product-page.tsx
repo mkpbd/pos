@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { useStorefront } from '../api'
 import { AddToCartForm } from '../cart/add-to-cart'
 import { isNotFound, useProductQuery, useProductsBySlugsQuery, useRelatedProductsQuery } from '../catalog/api'
 import { Breadcrumbs } from '../catalog/breadcrumbs'
@@ -19,6 +18,7 @@ import { REVIEWS_SECTION_ID, REVIEWS_TAB_ID, reviewsTabLabel } from '../reviews/
 import { ProductReviews, RatingSummaryLink } from '../reviews/product-reviews'
 import type { ProductCard as Card, ProductDetail } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
+import { useDocumentMeta } from '../use-document-meta'
 import { NotFoundPage } from './not-found-page'
 
 const PREVIEW_STATES: Record<string, string> = {
@@ -33,14 +33,24 @@ export function ProductPage() {
 }
 
 function ProductPageContent({ slug }: { slug: string }) {
-  const { store } = useStorefront()
   const [params] = useSearchParams()
-  const product = useProductQuery(slug, params.get('preview') === '1')
+  const preview = params.get('preview') === '1'
+  const product = useProductQuery(slug, preview)
   const data = product.data
 
-  useEffect(() => {
-    if (data) document.title = `${data.seo.title || data.name} | ${store.name}`
-  }, [data, store.name])
+  // Canonical without ?variant= (one URL per product); previews are never indexed.
+  useDocumentMeta(
+    data
+      ? {
+          title: data.seo.title || data.name,
+          description: data.seo.description || data.short_description,
+          image: data.seo.image_url ?? data.images[0]?.url,
+          canonical: data.url,
+          type: 'product',
+          noindex: preview || Boolean(data.preview_state),
+        }
+      : null,
+  )
 
   useEffect(() => {
     if (data && !data.preview_state) recordRecentlyViewed(data.slug)

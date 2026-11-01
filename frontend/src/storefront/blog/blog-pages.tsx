@@ -10,7 +10,7 @@ import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
 import { NotFoundPage } from '../pages/not-found-page'
 import type { BlogCategory, Breadcrumb } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { useDocumentMeta } from '../use-document-meta'
 import { useBlogCategoriesQuery, useBlogListQuery, useBlogPostQuery } from './api'
 import { BlogGrid, CategoryChip, PostMeta } from './blog-card'
 import { blogCategoryUrl, blogListUrl, blogPostUrl, parsePage } from './display'
@@ -92,7 +92,7 @@ export function BlogIndexPage() {
   const listed = list.data?.category?.slug === category ? list.data?.category : undefined
   const current = category ? (categories.data?.find((c) => c.slug === category) ?? listed ?? undefined) : undefined
   const title = category ? (current?.name ?? null) : 'Blog'
-  useDocumentTitle(title)
+  useDocumentMeta(title === null || isNotFound(list.error) ? null : { title, description: current?.description })
 
   if (isNotFound(list.error)) return <NotFoundPage />
   if (list.error) return <LoadError onRetry={() => void list.refetch()} />
@@ -152,9 +152,21 @@ function AdjacentLink({ post, direction }: { post: { slug: string; title: string
 export function BlogPostPage() {
   const { slug = '' } = useParams()
   const [params] = useSearchParams()
-  const query = useBlogPostQuery(slug, params.get('preview') === '1')
+  const preview = params.get('preview') === '1'
+  const query = useBlogPostQuery(slug, preview)
   const post = query.data
-  useDocumentTitle(post ? (post.seo_title ?? post.title) : null)
+  useDocumentMeta(
+    post
+      ? {
+          title: post.seo_title ?? post.title,
+          description: post.seo_description ?? post.excerpt,
+          image: post.cover?.url,
+          canonical: blogPostUrl(post.slug),
+          type: 'article',
+          noindex: preview,
+        }
+      : null,
+  )
 
   if (query.isPending) return <Loading />
   if (isNotFound(query.error)) return <NotFoundPage />
@@ -179,7 +191,7 @@ export function BlogPostPage() {
           <PostMeta post={post} />
         </header>
         {post.cover && (
-          <MediaImage media={post.cover} alt="" loading="eager" sizes="(min-width: 768px) 768px, 100vw" className="mt-8 aspect-[16/9] w-full rounded-sf-card object-cover" />
+          <MediaImage media={post.cover} alt="" priority sizes="(min-width: 768px) 768px, 100vw" className="mt-8 aspect-[16/9] w-full rounded-sf-card object-cover" />
         )}
         <RichText html={post.body_html} className="mt-8" />
         {post.category && (

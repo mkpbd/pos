@@ -8,6 +8,7 @@ use App\Modules\Shared\Infrastructure\Http\Middleware\AssignRequestId;
 use App\Modules\Shared\Infrastructure\Http\Middleware\EnsureIdempotency;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use App\Modules\Storefront\Presentation\Http\Middleware\StartStorefrontSession;
+use App\Modules\Storefront\Presentation\Http\Middleware\StorefrontHttpCache;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'idempotent' => EnsureIdempotency::class,
             'storefront' => ResolveStorefront::class,
             'storefront.session' => StartStorefrontSession::class,
+            'storefront.cache' => StorefrontHttpCache::class,
             'customer.active' => EnsureCustomerIsActive::class,
         ]);
 

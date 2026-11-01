@@ -6,7 +6,7 @@ import { Spinner, primaryButtonClass } from '../account/form-controls'
 import { Pagination } from '../catalog/listing-toolbar'
 import { storeFormError } from '../form-errors'
 import type { AccountOrderFilter } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { parseOrderFilter, useAccountOrdersQuery } from './account-api'
 import { OrderRow } from './order-row'
 
@@ -34,7 +34,7 @@ function hrefFor(status: AccountOrderFilter | null, page = 1): string {
 
 /** /account/orders — the customer's own orders, newest first, filtered by status (?status=&page=). */
 export function AccountOrdersPage() {
-  useDocumentTitle('My orders')
+  useDocumentMeta(privatePage('My orders'))
   const [params] = useSearchParams()
   const status = parseOrderFilter(params.get('status'))
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1)

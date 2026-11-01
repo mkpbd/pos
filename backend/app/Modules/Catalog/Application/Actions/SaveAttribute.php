@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Application\Actions;
 use App\Modules\Catalog\Infrastructure\Models\Attribute;
 use App\Modules\Catalog\Infrastructure\Models\AttributeValue;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Domain\Slug;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +93,8 @@ class SaveAttribute
         }
 
         AttributeValue::query()->where('attribute_id', $attribute->id)->whereNotIn('id', $keptIds)->delete();
+        // Values are mass-updated below (no model events): storefront facets change (E12).
+        app(StorefrontContentVersion::class)->bump($attribute->organization_id);
         // Park kept values under unique placeholders first, so renames that swap values
         // never collide with the case-insensitive unique index halfway through.
         foreach ($keptIds as $id) {

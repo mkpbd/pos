@@ -5,9 +5,11 @@ namespace App\Modules\Cms\Infrastructure;
 use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Queries\BlogPostCards;
+use App\Modules\Cms\Domain\BlogPostStatus;
 use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 
 class EloquentBlogDirectory implements BlogDirectory
@@ -87,7 +89,7 @@ class EloquentBlogDirectory implements BlogDirectory
 
     public function postMeta(string $slug, bool $includeUnpublished = false): ?array
     {
-        $post = BlogPost::query()->when(! $includeUnpublished, fn ($q) => $q->visible())
+        $post = BlogPost::query()->when(! $includeUnpublished, fn ($q) => $q->visible())->with('category')
             ->whereRaw('lower(slug) = ?', [mb_strtolower($slug)])->first();
         if ($post === null) {
             return null;
@@ -95,11 +97,33 @@ class EloquentBlogDirectory implements BlogDirectory
         $cover = $post->cover_media_id === null ? null : ($this->media->refs([$post->cover_media_id])[$post->cover_media_id] ?? null);
 
         return [
+            'slug' => $post->slug,
             'title' => $post->title,
             'seo_title' => $post->seo_title,
             'description' => $post->seo_description ?? $post->excerpt,
             'image_url' => $cover['url'] ?? null,
             'published_at' => $post->published_at?->toIso8601String(),
+            'updated_at' => $post->updated_at?->toIso8601String(),
+            'author' => $this->cards->authorNames(collect([$post]))[$post->author_user_id ?? ''] ?? null,
+            'category' => $post->category === null ? null : ['name' => $post->category->name, 'slug' => $post->category->slug],
+        ];
+    }
+
+    public function nextPublicationAt(): ?CarbonImmutable
+    {
+        $next = BlogPost::query()->where('status', BlogPostStatus::Published)->where('published_at', '>', now())->min('published_at');
+
+        return $next === null ? null : CarbonImmutable::parse($next);
+    }
+
+    public function sitemapEntries(): array
+    {
+        return [
+            'posts' => BlogPost::query()->visible()->orderBy('slug')->get(['slug', 'updated_at'])
+                ->map(fn (BlogPost $p) => ['slug' => $p->slug, 'updated_at' => $p->updated_at])->all(),
+            // Only categories with a readable post: an empty category page has nothing to index.
+            'categories' => BlogCategory::query()->whereHas('posts', fn ($q) => $q->visible())->orderBy('slug')->get(['slug', 'updated_at'])
+                ->map(fn (BlogCategory $c) => ['slug' => $c->slug, 'updated_at' => $c->updated_at])->all(),
         ];
     }
 }

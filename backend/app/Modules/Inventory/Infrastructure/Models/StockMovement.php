@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\Infrastructure\Models;
 
 use App\Modules\Inventory\Domain\MovementType;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -54,6 +55,8 @@ class StockMovement extends Model
     {
         static::updating(fn () => throw new LogicException('Stock movements are immutable.'));
         static::deleting(fn () => throw new LogicException('Stock movements are immutable.'));
+        // E12: stock at the storefront's fulfilment store decides online availability.
+        static::created(fn (StockMovement $m) => app(StorefrontContentVersion::class)->stockChanged($m->organization_id, $m->store_id));
     }
 
     /**

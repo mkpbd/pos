@@ -2,6 +2,9 @@
 
 namespace App\Modules\Cms\Application\Contracts;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
+
 /**
  * What other modules may ask about content pages (all scoped to the current organization).
  */
@@ -28,4 +31,16 @@ interface PageDirectory
      * @return list<array{id: string, slug: string, title: string, status: string}>
      */
     public function all(): array;
+
+    /**
+     * The next instant a published page becomes visible (after now), or null (E12 caching).
+     */
+    public function nextPublicationAt(): ?CarbonImmutable;
+
+    /**
+     * Visible pages for the sitemap, by slug (E12).
+     *
+     * @return list<array{slug: string, updated_at: ?DateTimeInterface}>
+     */
+    public function sitemapEntries(): array;
 }

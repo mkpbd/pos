@@ -10,6 +10,7 @@ use App\Modules\OnlineCatalog\Domain\Pricing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\RelatedProduct;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
+use App\Modules\Shared\Domain\PlainText;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
@@ -19,6 +20,9 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class ProductPage
 {
     public const RELATED_FALLBACK = 8;
+
+    /** Product descriptions in structured data are cut to this many characters. */
+    public const STRUCTURED_DESCRIPTION_LENGTH = 5000;
 
     public function __construct(
         private readonly CatalogReadModel $catalog,
@@ -106,6 +110,57 @@ class ProductPage
         }
 
         return $data;
+    }
+
+    /**
+     * What the HTML shell writes as schema.org `Product` data (E12) for a live product, or
+     * null: plain-text description (≤ 5000 characters), images, brand, category breadcrumbs,
+     * one offer per active variant with the price a shopper pays now (the automatic
+     * promotion's price and its end when one applies), availability from storefront stock,
+     * and the approved-review rating.
+     *
+     * @return array{name: string, url: string, description: ?string, sku: ?string, images: list<string>, brand: ?string, breadcrumbs: list<array{name: string, url: string}>, offers: list<array{sku: string, name: string, price: string, price_valid_until: ?string, availability: string}>, rating: array{average: string, count: int}|null}|null
+     */
+    public function structuredData(string $slug): ?array
+    {
+        $record = $this->catalog->products(['slug' => $slug])[0] ?? null;
+        if ($record === null) {
+            return null;
+        }
+        /** @var ProductListing $listing */
+        $listing = $record['listing'];
+        $variants = $this->catalog->activeVariants($record);
+        $url = '/product/'.$listing->slug;
+
+        return [
+            'name' => $record['name'],
+            'url' => $url,
+            'description' => PlainText::excerpt($listing->description_html ?? $listing->short_description, self::STRUCTURED_DESCRIPTION_LENGTH),
+            'sku' => count($variants) === 1 ? $variants[0]['sku'] : null,
+            'images' => array_column($record['images'], 'url'),
+            'brand' => $this->catalog->brandLink($record['brand_id'])['name'] ?? null,
+            'breadcrumbs' => [
+                ['name' => 'Home', 'url' => '/'],
+                ...$this->categoryCrumbs($record['category_id']),
+                ['name' => $record['name'], 'url' => $url],
+            ],
+            'offers' => array_map(function (array $v) use ($record) {
+                $promotion = $this->catalog->promotion($record, $v['price']);
+
+                return [
+                    'sku' => $v['sku'],
+                    'name' => $this->variantName($record, $v),
+                    'price' => $promotion['price'] ?? $v['price'],
+                    'price_valid_until' => $promotion === null || $promotion['ends_at'] === null ? null : substr($promotion['ends_at'], 0, 10),
+                    'availability' => match (true) {
+                        ! $v['in_stock'] => 'OutOfStock',
+                        $v['low_stock'] => 'LimitedAvailability',
+                        default => 'InStock',
+                    },
+                ];
+            }, $variants),
+            'rating' => $record['rating'] ?? null,
+        ];
     }
 
     /**

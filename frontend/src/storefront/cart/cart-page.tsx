@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { CircleAlertIcon, ShoppingBagIcon } from 'lucide-react'
 import { primaryButtonClass, secondaryButtonClass, Spinner } from '../account/form-controls'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { useCartQuery } from './api'
 import { CartLines, CartTotals } from './cart-lines'
 import { CheckoutButton } from './checkout-button'
@@ -14,7 +14,7 @@ import { displayQuantity } from './quantity'
  * and the coupon box sit with the totals.
  */
 export function CartPage() {
-  useDocumentTitle('Cart')
+  useDocumentMeta(privatePage('Cart'))
   const cart = useCartQuery()
   const data = cart.data
 

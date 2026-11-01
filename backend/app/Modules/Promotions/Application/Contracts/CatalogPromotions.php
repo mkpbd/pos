@@ -2,6 +2,8 @@
 
 namespace App\Modules\Promotions\Application\Contracts;
 
+use Carbon\CarbonImmutable;
+
 /**
  * Promotions the storefront shows on products: live automatic product-scope promotions
  * (coupon promotions never show). The display object is
@@ -29,4 +31,10 @@ interface CatalogPromotions
      * Whether the id is a countdown promotion of the organization (any state), for section validation.
      */
     public function isCountdownPromotion(string $promotionId): bool;
+
+    /**
+     * The next instant an active automatic promotion starts or ends (after now), or null.
+     * Cached storefront pages expire then (E12).
+     */
+    public function nextChangeAt(): ?CarbonImmutable;
 }

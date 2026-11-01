@@ -5,7 +5,9 @@ namespace App\Modules\Storefront;
 use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Contracts\PageReferences;
 use App\Modules\Media\Application\Contracts\MediaReferences;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Infrastructure\Caching\CacheStorefrontContentVersion;
 use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
 use App\Modules\Storefront\Infrastructure\SectionBlogReferences;
@@ -25,6 +27,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
 {
     public function register(): void
     {
+        // E12: storefront content version counters in the default cache store.
+        $this->app->bind(StorefrontContentVersion::class, fn ($app) => new CacheStorefrontContentVersion($app->make('cache.store')));
         $this->app->tag([ThemeMediaReferences::class, SectionMediaReferences::class], MediaReferences::TAG);
         $this->app->tag([MenuPageReferences::class], PageReferences::TAG);
         $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class], BlogReferences::TAG);

@@ -16,4 +16,9 @@ return [
     */
     'shell_path' => env('STOREFRONT_SHELL_PATH', base_path('../frontend/dist/storefront.html')),
 
+    /*
+    | Product URLs per sitemap file (E12; the protocol allows 50 000, kept small for fast fetches).
+    */
+    'sitemap_products_per_file' => 5000,
+
 ];

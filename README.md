@@ -75,4 +75,6 @@ BerryKid-inspired storefront on the same backend; plan, decisions and API in [do
 | E10a | Fulfilment: couriers with tracking links, shipments with tracking updates, orders board with filters, counts and bulk processing, packing slip and invoice printing, returned parcels cancelled with restock, courier COD remittances that pay orders and book the courier fee | ✅ (PostgreSQL run pending) |
 | E10b | Online returns and refunds (customer request within the return window, staff approval, receipt with restock to the original batches, refund through the payments ledger), customers' web activity on the customer card, promotion report, ratings on product cards and the *Top rated* sort | ✅ (PostgreSQL run pending) |
 | E11 | CMS depth: blog with categories, scheduled posts, blog menu links and a homepage blog section; popup banner; cancelling a paid, undelivered web order with stock back and a full refund | ✅ (PostgreSQL run pending) |
-| E12–E14 | SEO/localization, AI, hardening | ☐ |
+| E12a | SEO and performance: JSON-LD structured data, meta / canonical / noindex rules, `robots.txt` and XML sitemaps served by the app, an *allow indexing* switch for staging stores, ETag and HTTP caching of public storefront reads, a versioned server cache invalidated on content writes, storefront indexes, client-side head tags, image loading priorities and code splitting | ✅ (PostgreSQL run pending) |
+| E12b | Bangla storefront UI and content translations | ☐ |
+| E13–E14 | AI, hardening | ☐ |

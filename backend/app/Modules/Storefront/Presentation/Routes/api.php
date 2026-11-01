@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Route;
 // Public storefront API: organization from the host name, no authentication.
 Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group(function () {
     // The session cookies (and XSRF-TOKEN) start here so the SPA's first unsafe request passes CSRF.
-    Route::get('bootstrap', StoreBootstrapController::class)->middleware('storefront.session')->name('store.bootstrap');
-    Route::get('homepage', StoreHomepageController::class)->name('store.homepage');
+    Route::get('bootstrap', StoreBootstrapController::class)->middleware(['storefront.session', 'storefront.cache'])->name('store.bootstrap');
+    Route::get('homepage', StoreHomepageController::class)->middleware('storefront.cache')->name('store.homepage');
 });
 
 // Storefront administration.

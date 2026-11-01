@@ -7,6 +7,7 @@ use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\MenuItemType;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
@@ -88,6 +89,7 @@ class ReplaceMenuItems
             $previous = $menu->items()->count();
 
             $menu->items()->whereNull('parent_id')->delete();
+            app(StorefrontContentVersion::class)->bump($menu->organization_id);
             $this->insert($menu, $items, null);
 
             $this->audit->record('menu.items_replaced', $menu, ['items' => $previous], ['items' => count($flat)]);

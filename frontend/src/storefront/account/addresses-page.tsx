@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { cn } from '@/lib/utils'
 import { applyServerErrors, storeFormError } from '../form-errors'
 import type { AddressInput, CustomerAddress, GeoId } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { AccountShell } from './account-pages'
 import { MAX_ADDRESSES, useAddressesQuery, useDeleteAddressMutation, useDistrictsQuery, useDivisionsQuery, useSaveAddressMutation } from './api'
 import { FormAlert, Spinner, SubmitButton, TextField, inputClass, primaryButtonClass, secondaryButtonClass } from './form-controls'
@@ -25,7 +25,7 @@ import { addressSchema, normalizeBdPhone, type AddressValues } from './schemas'
 type Editing = { mode: 'new' } | { mode: 'edit'; address: CustomerAddress } | null
 
 export function AddressesPage() {
-  useDocumentTitle('Addresses')
+  useDocumentMeta(privatePage('Addresses'))
   const addresses = useAddressesQuery()
   const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<CustomerAddress | null>(null)

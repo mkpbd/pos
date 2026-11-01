@@ -5,8 +5,8 @@ use App\Modules\OnlineCatalog\Presentation\Http\Controllers\StoreCatalogControll
 use App\Modules\OnlineCatalog\Presentation\Http\Controllers\TaxonomyListingController;
 use Illuminate\Support\Facades\Route;
 
-// Public shop API: organization from the host name, no authentication.
-Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group(function () {
+// Public shop API: organization from the host name, no authentication. ETag + public HTTP caching (E12).
+Route::middleware(['storefront', 'throttle:storefront', 'storefront.cache'])->prefix('store')->group(function () {
     Route::get('categories', [StoreCatalogController::class, 'categories'])->name('store.categories');
     Route::get('categories/{slug}', [StoreCatalogController::class, 'category'])->where('slug', '[A-Za-z0-9-]{1,120}');
     Route::get('brands', [StoreCatalogController::class, 'brands'])->name('store.brands');

@@ -45,6 +45,7 @@ class StorefrontAdminController
             'fulfilment_store_id' => ['sometimes', 'nullable', 'uuid'],
             'guest_checkout_enabled' => ['sometimes', 'boolean'],
             'return_window_days' => ['sometimes', 'integer', 'min:0', 'max:60'],
+            'allow_indexing' => ['sometimes', 'boolean'],
         ]);
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)));

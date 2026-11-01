@@ -8,7 +8,7 @@ import { ProductImage } from '../catalog/product-image'
 import { formatDateTime } from '../checkout/delivery'
 import { storeFormError } from '../form-errors'
 import type { MyReview } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { reviewStatusLabel, useMyReviewsQuery } from './api'
 import { ReviewDialog, type ReviewTarget } from './review-dialog'
 import { Stars } from './stars'
@@ -21,7 +21,7 @@ const STATUS_TONE: Record<string, string> = {
 
 /** /account/reviews — the customer's own reviews in every status, editable and deletable. */
 export function MyReviewsPage() {
-  useDocumentTitle('My reviews')
+  useDocumentMeta(privatePage('My reviews'))
   const reviews = useMyReviewsQuery()
   const [editing, setEditing] = useState<ReviewTarget | null>(null)
 

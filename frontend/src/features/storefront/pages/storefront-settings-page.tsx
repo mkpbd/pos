@@ -115,6 +115,38 @@ function DetailsCard({ settings, canManage }: { settings: StorefrontSettings; ca
   )
 }
 
+function SearchEnginesCard({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
+  const save = useSaveStorefrontSettingsMutation()
+  const allowed = settings.allow_indexing ?? true
+
+  const toggle = (on: boolean) =>
+    save.mutate(
+      { allow_indexing: on },
+      {
+        onSuccess: (s) => toast.success((s.allow_indexing ?? on) ? 'Search engines may index the store.' : 'Search engines are asked not to index the store.'),
+        onError: (e) => toast.error(e.message),
+      },
+    )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Search engines</CardTitle>
+        <CardDescription>Whether the store may appear in Google and other search results.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Switch id="allow-indexing" checked={allowed} disabled={!canManage || save.isPending} onCheckedChange={toggle} aria-describedby="allow-indexing-help" />
+          <Label htmlFor="allow-indexing">Allow search engines to index the store</Label>
+        </div>
+        <p id="allow-indexing-help" className="text-sm text-muted-foreground">
+          Turn this off for a staging or test store: robots.txt then disallows everything and every page is marked noindex. Pages already in search results drop out over time.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 function CheckoutCard({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
   const save = useSaveStorefrontSettingsMutation()
   const allowed = settings.guest_checkout_enabled ?? true
@@ -353,6 +385,7 @@ export function StorefrontSettingsPage() {
           <div className="flex flex-col gap-6">
             <StatusCard settings={settings.data} primary={domains.data.find((d) => d.is_primary)} canManage={canManage} />
             <DetailsCard settings={settings.data} canManage={canManage} />
+            <SearchEnginesCard settings={settings.data} canManage={canManage} />
             <AvailabilityCard settings={settings.data} canManage={canManage} />
             <CheckoutCard settings={settings.data} canManage={canManage} />
           </div>

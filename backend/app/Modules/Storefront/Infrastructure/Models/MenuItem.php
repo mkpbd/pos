@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Storefront\Domain\MenuItemType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -26,7 +27,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'menu_id', 'parent_id', 'type', 'label', 'url', 'target_id', 'open_in_new_tab', 'is_visible', 'is_mega', 'mega_columns', 'image_media_id', 'sort_order'])]
 class MenuItem extends Model
 {
-    use BelongsToOrganization, HasUuids;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     protected function casts(): array
     {

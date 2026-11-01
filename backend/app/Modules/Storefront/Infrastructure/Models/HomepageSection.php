@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use App\Modules\Storefront\Domain\SectionType;
 use Carbon\CarbonImmutable;
@@ -27,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['organization_id', 'type', 'title', 'subtitle', 'config', 'is_enabled', 'starts_at', 'ends_at', 'sort_order'])]
 class HomepageSection extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'config' => '{}',

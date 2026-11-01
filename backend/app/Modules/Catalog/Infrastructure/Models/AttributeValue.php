@@ -3,6 +3,7 @@
 namespace App\Modules\Catalog\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'attribute_id', 'value', 'swatch_hex', 'sort_order'])]
 class AttributeValue extends Model
 {
-    use BelongsToOrganization, HasUuids;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     protected function casts(): array
     {

@@ -8,8 +8,11 @@ const POSITION = {
   right: 'items-end text-right',
 } as const
 
-/** Responsive banner picture: the mobile image (if any) below 768px. */
-export function BannerPicture({ banner, sizes, eager = false, className }: { banner: StoreBanner; sizes: string; eager?: boolean; className?: string }) {
+/**
+ * Responsive banner picture: the mobile image (if any) below 768px. Lazy, unless `priority`
+ * (the hero's first slide, the homepage's LCP image: eager at high priority).
+ */
+export function BannerPicture({ banner, sizes, priority = false, className }: { banner: StoreBanner; sizes: string; priority?: boolean; className?: string }) {
   const { image, mobile_image: mobile } = banner
 
   return (
@@ -22,7 +25,8 @@ export function BannerPicture({ banner, sizes, eager = false, className }: { ban
         width={image.width}
         height={image.height}
         alt={image.alt ?? ''}
-        loading={eager ? 'eager' : 'lazy'}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : undefined}
         decoding="async"
         className={cn('size-full object-cover', className)}
       />

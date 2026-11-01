@@ -6,7 +6,7 @@ use App\Modules\Reviews\Presentation\Http\Controllers\StoreReviewController;
 use Illuminate\Support\Facades\Route;
 
 // Public: approved reviews of a live product (organization from the host name).
-Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group(function () {
+Route::middleware(['storefront', 'throttle:storefront', 'storefront.cache'])->prefix('store')->group(function () {
     Route::get('products/{slug}/reviews', [StoreReviewController::class, 'index'])->where('slug', '[A-Za-z0-9-]{1,120}')->name('store.products.reviews');
 });
 

@@ -3,6 +3,7 @@
 namespace App\Modules\Promotions\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'promotion_id', 'target_type', 'target_id'])]
 class PromotionTarget extends Model
 {
-    use BelongsToOrganization;
+    use BelongsToOrganization, ChangesStorefrontContent;
 
     public $incrementing = false;
 

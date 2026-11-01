@@ -16,7 +16,7 @@ import { couponNote } from '../cart/coupon-messages'
 import { formatPrice } from '../money'
 import { checkoutKeys, customerKeys } from '../store-keys'
 import type { Cart, CartCoupon, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
 import { etaLabel, goodsTotal, methodFee } from './delivery'
 import { PlacementAttempts } from './placement-attempt'
@@ -37,7 +37,7 @@ const REGISTER_PATH = `/account/register?next=${encodeURIComponent('/checkout')}
  * store requires one.
  */
 export function CheckoutPage() {
-  useDocumentTitle('Checkout')
+  useDocumentMeta(privatePage('Checkout'))
   const me = useMeQuery()
   const options = useCheckoutOptionsQuery()
   const cart = useCartQuery()

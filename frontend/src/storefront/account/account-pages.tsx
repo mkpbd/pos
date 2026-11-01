@@ -6,7 +6,7 @@ import { HeartIcon, LogOutIcon, MapPinIcon, PackageIcon, ShoppingBagIcon, StarIc
 import { cn } from '@/lib/utils'
 import { applyServerErrors, storeFormError } from '../form-errors'
 import type { Customer } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { RecentOrders } from '../orders/recent-orders'
 import {
   useChangePasswordMutation,
@@ -103,7 +103,7 @@ const TILES = [
 ]
 
 export function AccountPage() {
-  useDocumentTitle('My account')
+  useDocumentMeta(privatePage('My account'))
   const customer = useCustomer()
   if (!customer) return null
 
@@ -133,7 +133,7 @@ export function AccountPage() {
 }
 
 export function ProfilePage() {
-  useDocumentTitle('Profile')
+  useDocumentMeta(privatePage('Profile'))
   const profile = useProfileQuery()
 
   return (
@@ -219,7 +219,7 @@ function PasswordForm() {
 
 /** Target of the verification e-mail (`?token`): verifies once on arrival. */
 export function VerifyEmailPage() {
-  useDocumentTitle('Verify your e-mail address')
+  useDocumentMeta(privatePage('Verify your e-mail address'))
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const customer = useCustomer()

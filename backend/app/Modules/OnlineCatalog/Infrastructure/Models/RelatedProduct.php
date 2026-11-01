@@ -3,6 +3,7 @@
 namespace App\Modules\OnlineCatalog\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'product_id', 'related_product_id', 'kind', 'sort_order'])]
 class RelatedProduct extends Model
 {
-    use BelongsToOrganization;
+    use BelongsToOrganization, ChangesStorefrontContent;
 
     public const KINDS = ['related', 'frequently_bought'];
 

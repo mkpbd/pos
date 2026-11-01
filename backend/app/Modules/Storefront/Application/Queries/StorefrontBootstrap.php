@@ -7,6 +7,7 @@ use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use App\Modules\Storefront\Domain\MenuItemType;
@@ -33,12 +34,29 @@ class StorefrontBootstrap
         private readonly OrganizationDirectory $organizations,
         private readonly TenantContext $tenant,
         private readonly BlogDirectory $blog,
+        private readonly StorefrontContentVersion $version,
+        private readonly ContentSchedule $schedule,
     ) {}
+
+    /**
+     * Cached per organization content version until the next scheduled change (E12).
+     *
+     * @return array<string, mixed>
+     */
+    public function build(): array
+    {
+        return $this->version->remember(
+            $this->tenant->requireOrganization(),
+            'bootstrap',
+            fn () => $this->compute(),
+            fn () => $this->schedule->nextChange(),
+        );
+    }
 
     /**
      * @return array<string, mixed>
      */
-    public function build(): array
+    private function compute(): array
     {
         $settings = $this->config->settings();
         $theme = $this->config->theme();
@@ -89,6 +107,8 @@ class StorefrontBootstrap
                 'currency' => $organization['base_currency'] ?? null,
                 // Exclusive tax mode: the storefront shows prices "excl. VAT"; tax is added at checkout.
                 'prices_include_tax' => ($organization['tax_mode'] ?? 'exclusive') === 'inclusive',
+                // E12: false (staging) = every page is noindex; the SPA keeps that on navigation.
+                'allow_indexing' => $settings->allow_indexing,
             ],
             'theme' => [
                 'colors' => $t['colors'],

@@ -39,3 +39,13 @@ export function StoreLoadingView() {
     </div>
   )
 }
+
+/** While a page's code is fetched (lazy routes): announced politely, sized like a page body. */
+export function PageLoadingView() {
+  return (
+    <div role="status" aria-live="polite" className="grid min-h-[50vh] place-items-center" data-testid="page-loading">
+      <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent motion-reduce:animate-none" aria-hidden />
+      <span className="sr-only">Loading the page</span>
+    </div>
+  )
+}

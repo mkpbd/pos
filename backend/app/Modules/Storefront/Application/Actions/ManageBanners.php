@@ -4,8 +4,10 @@ namespace App\Modules\Storefront\Application\Actions;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use App\Modules\Storefront\Domain\ScheduleWindow;
@@ -106,6 +108,8 @@ class ManageBanners
             foreach (array_values($ids) as $position => $id) {
                 Banner::query()->whereKey($id)->update(['sort_order' => $position]);
             }
+            // Mass updates fire no model events: invalidate cached storefront reads (E12).
+            app(StorefrontContentVersion::class)->bump(app(TenantContext::class)->requireOrganization());
             $this->audit->record('banners.reordered', null, [], ['placement' => $placement->value, 'ids' => array_values($ids)]);
         });
     }

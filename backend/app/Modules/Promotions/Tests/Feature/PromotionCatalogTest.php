@@ -5,6 +5,7 @@ namespace App\Modules\Promotions\Tests\Feature;
 use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Tests\Concerns\BuildsPromotions;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -134,6 +135,8 @@ class PromotionCatalogTest extends TestCase
 
         // When the flash sales end, the sections render nothing (and show as empty in the preview).
         Promotion::query()->withoutGlobalScopes()->whereKey([$polo->id, $this->juiceWeek->id])->update(['is_active' => false]);
+        // A raw write bypasses the model events: invalidate the cached homepage as the app would (E12).
+        app(StorefrontContentVersion::class)->bump($polo->organization_id);
         $this->assertSame([], array_values(array_filter($this->getJson('http://'.self::HOST.'/api/v1/store/homepage')->json('data.sections'), fn ($s) => $s['type'] === 'hot_deals')));
         $preview = array_column($this->getJson('http://'.self::HOST.'/api/v1/store/homepage?preview=1')->json('data.sections'), null, 'id');
         $this->assertSame('empty', $preview[$all['id']]['state'] ?? null);

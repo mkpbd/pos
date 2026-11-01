@@ -1,6 +1,9 @@
 import { Link } from 'react-router'
+import { useDocumentMeta } from '../use-document-meta'
 
 export function NotFoundPage() {
+  useDocumentMeta({ title: 'Page not found', noindex: true })
+
   return (
     <section className="mx-auto max-w-sf px-4 py-20 text-center">
       <p className="font-heading text-7xl font-extrabold text-sf-accent">404</p>

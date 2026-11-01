@@ -147,6 +147,9 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   }
   await expect(page).toHaveURL(/\/shop\?brand=sunny$/)
   await expect(page.getByTestId('result-count')).toHaveText('Showing all 2 products')
+  // E12a head manager: a filtered listing is noindex and points at the unfiltered one.
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, follow')
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/shop$/)
   await expect(page.getByRole('button', { name: 'Remove filter: Sunny' })).toBeVisible()
   expect(requests.at(-1)?.getAll('brand[]')).toEqual(['sunny'])
 
@@ -159,6 +162,11 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   await expect(page).toHaveURL(/\/product\/kids-tee$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Kids Tee' })).toBeVisible()
   await expect(page).toHaveTitle('Kids Tee | Berry Kids')
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/product\/kids-tee$/)
+  await expect(page.locator('meta[property="og:type"]')).toHaveAttribute('content', 'product')
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Kids Tee | Berry Kids')
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', 'Soft cotton tee.')
+  await expect(page.locator('meta[name="robots"]')).toHaveCount(0)
   await expect(page.getByText('Excl. VAT')).toBeVisible()
   await expect(page.getByTestId('sku')).toHaveText('TEE-RM')
 
@@ -166,6 +174,7 @@ test('browse the shop, filter by brand, open a product and switch its variant', 
   await page.getByTestId('variant-selector').locator('label[title="Blue"]').click()
   await expect(page).toHaveURL(/\?variant=v-blue-l$/)
   await expect(page.getByTestId('sku')).toHaveText('TEE-BL')
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/product\/kids-tee$/)
   await expect(page.getByTestId('product-page').getByTestId('price').first()).toHaveText('৳480.00')
   await expect(page.getByTestId('availability')).toHaveText('Only a few left')
   await expect(page.getByRole('radio', { name: 'M', exact: true })).toBeDisabled()

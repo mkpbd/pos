@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useHomepageQuery, useStorefront } from '../api'
 import { SectionList } from '../sections/section-renderer'
+import { useDocumentMeta } from '../use-document-meta'
 
 /**
  * The store's front page: the homepage sections configured in the admin, in order.
@@ -10,7 +11,9 @@ import { SectionList } from '../sections/section-renderer'
 export function HomePage() {
   const { store } = useStorefront()
   const [params] = useSearchParams()
-  const homepage = useHomepageQuery(params.get('preview') === '1')
+  const previewParam = params.get('preview') === '1'
+  const homepage = useHomepageQuery(previewParam)
+  useDocumentMeta({ canonical: '/', noindex: previewParam })
 
   if (homepage.isPending) {
     return (

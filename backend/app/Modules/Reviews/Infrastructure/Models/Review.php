@@ -4,6 +4,7 @@ namespace App\Modules\Reviews\Infrastructure\Models;
 
 use App\Modules\Reviews\Domain\ReviewStatus;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -33,7 +34,7 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 class Review extends Model
 {
-    use BelongsToOrganization, HasUuids;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     protected $attributes = [
         'status' => 'pending',
@@ -48,5 +49,18 @@ class Review extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * Only approved reviews show on the storefront (ratings): writes that neither make nor
+     * were an approved review change nothing there.
+     */
+    protected function affectsStorefront(): bool
+    {
+        $approved = ReviewStatus::Approved->value;
+        $original = $this->getOriginal('status');
+
+        return $this->status === ReviewStatus::Approved
+            || ($original instanceof ReviewStatus ? $original === ReviewStatus::Approved : $original === $approved);
     }
 }

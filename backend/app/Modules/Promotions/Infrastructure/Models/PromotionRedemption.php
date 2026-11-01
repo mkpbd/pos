@@ -4,6 +4,7 @@ namespace App\Modules\Promotions\Infrastructure\Models;
 
 use App\Modules\Sales\Infrastructure\Models\AppendOnly;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -29,7 +30,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'promotion_id', 'coupon_id', 'order_id', 'order_number', 'customer_id', 'customer_account_id', 'email', 'kind', 'amount', 'created_at'])]
 class PromotionRedemption extends Model
 {
-    use AppendOnly, BelongsToOrganization, HasUuids;
+    use AppendOnly, BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     protected function casts(): array
     {

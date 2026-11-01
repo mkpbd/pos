@@ -147,8 +147,9 @@ class StorefrontPublicTest extends TestCase
         $this->assertStringContainsString('<title>Berry &lt;/script&gt; Kids</title>', $html);
         $this->assertStringContainsString('<meta name="description" content="Clothes &amp; toys &quot;for&quot; babies">', $html);
         $this->assertStringContainsString('<link rel="canonical" href="http://berry.test">', $html);
-        // The inline payload cannot close its <script> element.
-        $this->assertSame(1, substr_count($html, '</script>'));
+        // Organization + WebSite JSON-LD and the bootstrap payload; none can close its <script> element early.
+        $this->assertSame(3, substr_count($html, '</script>'));
+        $this->assertStringNotContainsString('</script> Kids', $html);
         $this->assertStringContainsString('<script id="storefront-bootstrap" type="application/json">', $html);
 
         $this->get('http://berry.test/no-such-page')->assertNotFound()->assertHeader('X-Robots-Tag', 'noindex');

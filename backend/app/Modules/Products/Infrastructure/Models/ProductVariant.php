@@ -3,6 +3,7 @@
 namespace App\Modules\Products\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class ProductVariant extends Model
 {
-    use BelongsToOrganization, HasUuids, SoftDeletes;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, SoftDeletes;
 
     protected $attributes = [
         'option_values' => '{}',

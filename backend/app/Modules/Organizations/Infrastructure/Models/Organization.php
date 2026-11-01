@@ -5,6 +5,7 @@ namespace App\Modules\Organizations\Infrastructure\Models;
 use App\Modules\Organizations\Domain\Enums\OrganizationStatus;
 use App\Modules\Organizations\Domain\Enums\TaxMode;
 use App\Modules\Organizations\Infrastructure\Database\Factories\OrganizationFactory;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -30,7 +31,7 @@ use Illuminate\Database\Eloquent\Model;
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
-    use HasFactory, HasUuids, TracksAuthor;
+    use ChangesStorefrontContent, HasFactory, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'settings' => '{}',
@@ -50,5 +51,11 @@ class Organization extends Model
     public function isActive(): bool
     {
         return $this->status === OrganizationStatus::Active;
+    }
+
+    /** The storefront shows the organization's currency, tax mode and contact details (E12). */
+    protected function storefrontOrganizationId(): ?string
+    {
+        return $this->exists ? $this->getKey() : null;
     }
 }

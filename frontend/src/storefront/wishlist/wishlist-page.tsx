@@ -8,7 +8,7 @@ import { cartErrorMessage } from '../cart/quantity'
 import { useAllProductsBySlugsQuery } from '../catalog/api'
 import { ProductCard } from '../catalog/product-card'
 import type { ProductCard as Card } from '../types'
-import { useDocumentTitle } from '../use-document-title'
+import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { useWishlist } from './api'
 
 type Tile = { product: Card; itemId?: string }
@@ -19,7 +19,7 @@ type Tile = { product: Card; itemId?: string }
  * cart in one click; others link to their page to choose options.
  */
 export function WishlistPage() {
-  useDocumentTitle('Wishlist')
+  useDocumentMeta(privatePage('Wishlist'))
   const wishlist = useWishlist()
   const guestProducts = useAllProductsBySlugsQuery(wishlist.signedIn ? [] : wishlist.local.map((entry) => entry.slug))
 

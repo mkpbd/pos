@@ -3,6 +3,7 @@
 namespace App\Modules\Media\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -26,7 +27,7 @@ use Illuminate\Support\Facades\Storage;
 #[Fillable(['organization_id', 'disk', 'path', 'original_name', 'mime_type', 'size', 'width', 'height', 'alt', 'renditions', 'checksum'])]
 class Media extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected $table = 'media';
 

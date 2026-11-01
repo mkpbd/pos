@@ -6,6 +6,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\RelatedProduct;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +53,7 @@ class SaveRelatedProducts
         DB::transaction(function () use ($productId, $lists) {
             $before = $this->lists($productId);
             RelatedProduct::query()->where('product_id', $productId)->delete();
+            app(StorefrontContentVersion::class)->bump($this->catalog->organizationId());
             foreach (RelatedProduct::KINDS as $kind) {
                 foreach (array_values($lists[$kind] ?? []) as $position => $id) {
                     RelatedProduct::query()->create([

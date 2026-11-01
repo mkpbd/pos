@@ -14,6 +14,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\CategoryListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Carbon\CarbonImmutable;
@@ -70,6 +71,7 @@ class CatalogReadModel
         private readonly OrganizationDirectory $organizations,
         private readonly CatalogPromotions $promotions,
         private readonly ProductRatings $ratings,
+        private readonly StorefrontContentVersion $version,
     ) {}
 
     public function organizationId(): string
@@ -86,6 +88,115 @@ class CatalogReadModel
      * @return list<ProductRecord>
      */
     public function products(array $options = []): array
+    {
+        // E12: the live candidate set of the shop, category and homepage listings is cached per
+        // organization content version (search, id and slug lookups are not: unbounded keys).
+        $cacheable = ($options['live'] ?? true) && array_diff(array_keys($options), ['category_ids', 'live']) === [];
+        if ($cacheable) {
+            $ids = $options['category_ids'] ?? null;
+            if (is_array($ids)) {
+                sort($ids);
+            }
+
+            // The cache never holds Eloquent objects: unserializing them is refused
+            // (`cache.serializable_classes` = false), so a listing travels as its raw attributes.
+            $cached = $this->version->remember(
+                $this->organizationId(),
+                'catalog:products:'.hash('xxh128', (string) json_encode($ids)),
+                fn () => array_map(fn (array $record) => ['listing' => $record['listing']->getAttributes()] + $record, $this->loadProducts($options)),
+                fn () => $this->nextListingChange(),
+            );
+
+            return array_map(fn (array $record) => ['listing' => (new ProductListing)->newFromBuilder($record['listing'])] + $record, $cached);
+        }
+
+        return $this->loadProducts($options);
+    }
+
+    /**
+     * The next instant a published listing's schedule starts or ends (after now), or null.
+     */
+    public function nextListingChange(): ?CarbonImmutable
+    {
+        $now = now();
+        $base = fn () => DB::table('product_listings')->where('organization_id', $this->organizationId())->where('is_published', true);
+
+        return self::earliest([
+            $base()->where('published_at', '>', $now)->min('published_at'),
+            $base()->where('unpublished_at', '>', $now)->min('unpublished_at'),
+        ]);
+    }
+
+    /**
+     * The next instant a listing window or a live automatic promotion starts or ends: what
+     * cached storefront pages showing products must not outlive.
+     */
+    public function nextScheduledChange(): ?CarbonImmutable
+    {
+        return self::earliest([$this->nextListingChange(), $this->promotions->nextChangeAt()]);
+    }
+
+    /**
+     * Live products for the sitemap (E12), by slug: slug, last change (listing or product) and
+     * the first image path. A product needs an active variant to be live, as on the storefront.
+     *
+     * @return list<array{slug: string, name: string, updated_at: ?CarbonImmutable, image_url: ?string}>
+     */
+    public function sitemapProducts(): array
+    {
+        $org = $this->organizationId();
+        $now = now();
+        $rows = DB::table('product_listings as pl')
+            ->join('products as p', 'p.id', '=', 'pl.product_id')
+            ->where('pl.organization_id', $org)
+            ->where('p.organization_id', $org)
+            ->whereNull('p.deleted_at')
+            ->where('p.is_active', true)
+            ->where('pl.is_published', true)
+            ->where(fn (QueryBuilder $q) => $q->whereNull('pl.published_at')->orWhere('pl.published_at', '<=', $now))
+            ->where(fn (QueryBuilder $q) => $q->whereNull('pl.unpublished_at')->orWhere('pl.unpublished_at', '>', $now))
+            ->whereExists(fn (QueryBuilder $s) => $s->from('product_variants as v')
+                ->whereColumn('v.product_id', 'p.id')->where('v.organization_id', $org)->whereNull('v.deleted_at')->where('v.is_active', true))
+            ->orderBy('pl.slug')
+            ->get(['pl.product_id', 'pl.slug', 'pl.updated_at', 'p.updated_at as product_updated_at', 'p.name']);
+
+        $images = $this->images($rows->pluck('product_id')->all());
+
+        return $rows->map(fn ($row) => [
+            'slug' => (string) $row->slug,
+            'name' => (string) $row->name,
+            'updated_at' => self::earliest([$row->updated_at, $row->product_updated_at], latest: true),
+            'image_url' => $images[$row->product_id][0]['url'] ?? null,
+        ])->all();
+    }
+
+    /**
+     * The earliest (or latest) of some instants; nulls are ignored.
+     *
+     * @param  list<mixed>  $times  date strings, DateTimeInterface or null
+     */
+    public static function earliest(array $times, bool $latest = false): ?CarbonImmutable
+    {
+        $stamps = [];
+        foreach ($times as $time) {
+            if ($time instanceof \DateTimeInterface) {
+                $stamps[] = $time->getTimestamp();
+            } elseif (is_string($time) && $time !== '') {
+                $stamps[] = CarbonImmutable::parse($time)->getTimestamp();
+            }
+        }
+        if ($stamps === []) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestamp($latest ? max($stamps) : min($stamps));
+    }
+
+    /**
+     * @param  array{ids?: list<string>, slug?: string, slugs?: list<string>, q?: ?string, category_ids?: list<string>, live?: bool, include_inactive_variants?: bool}  $options
+     * @return list<ProductRecord>
+     */
+    private function loadProducts(array $options): array
     {
         $org = $this->organizationId();
         $live = $options['live'] ?? true;

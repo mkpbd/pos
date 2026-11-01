@@ -73,7 +73,7 @@ class ResolveStorefront
      * Lower-case host without port. Local development hosts map to the configured
      * storefront host so `localhost` can serve one organization's store.
      */
-    private function host(Request $request): string
+    public function host(Request $request): string
     {
         $host = mb_strtolower($request->getHost());
         $default = config('storefront.default_host');

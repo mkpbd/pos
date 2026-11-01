@@ -4,12 +4,13 @@ import { SlidersHorizontalIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import { useStorefront } from '../api'
 import { isNotFound, useBrandQuery, useCategoryQuery, useProductListingQuery } from '../catalog/api'
 import { Breadcrumbs } from '../catalog/breadcrumbs'
 import { FilterPanel } from '../catalog/filter-panel'
 import {
   clearFilters,
+  DEFAULT_PER_PAGE,
+  DEFAULT_SORT,
   hasActiveFilters,
   parseListingState,
   serializeListingState,
@@ -26,7 +27,20 @@ import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
 import { usePriceFormat } from '../money'
 import type { Breadcrumb, ListingFacets, ProductListing, StoreBrand, StoreCategory } from '../types'
+import { useDocumentMeta } from '../use-document-meta'
 import { NotFoundPage } from './not-found-page'
+
+/** Filters, a sort, page size or view other than the defaults: a variant of the listing, not a page of its own. */
+function isRearranged(state: ListingState): boolean {
+  return Boolean(state.q) || hasActiveFilters(state) || state.sort !== DEFAULT_SORT || state.perPage !== DEFAULT_PER_PAGE || state.view !== 'grid'
+}
+
+/** The first 160 characters of an HTML description as plain text. */
+function plainText(html: string | null | undefined): string | null {
+  if (!html) return null
+  const text = (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').replace(/\s+/g, ' ').trim()
+  return text ? (text.length > 160 ? `${text.slice(0, 157).trimEnd()}…` : text) : null
+}
 
 export function ShopPage() {
   return <ListingPage scope={{ kind: 'shop' }} />
@@ -61,7 +75,6 @@ function Spinner({ label }: { label: string }) {
  * Every filter, the sort, page size, page and view live in the URL.
  */
 function ListingPage({ scope }: { scope: ListingScope }) {
-  const { store } = useStorefront()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
   const state = useMemo(() => parseListingState(params), [params])
@@ -83,10 +96,24 @@ function ListingPage({ scope }: { scope: ListingScope }) {
           ? (category.data?.name ?? '')
           : (brand.data?.name ?? '')
   const seoTitle = scope.kind === 'category' ? category.data?.seo.title : scope.kind === 'brand' ? brand.data?.seo.title : null
+  const notFound = (scope.kind === 'category' && (isNotFound(category.error) || isNotFound(listing.error))) || (scope.kind === 'brand' && (isNotFound(brand.error) || isNotFound(listing.error)))
 
-  useEffect(() => {
-    if (heading) document.title = `${seoTitle || heading} | ${store.name}`
-  }, [heading, seoTitle, store.name])
+  // Canonical: the unfiltered listing (plus ?page=N); filtered, sorted or re-arranged views and search results are noindex.
+  useDocumentMeta(
+    heading && !notFound
+      ? {
+          title: seoTitle || heading,
+          description:
+            scope.kind === 'category'
+              ? (category.data?.seo.description ?? plainText(category.data?.description_html))
+              : scope.kind === 'brand'
+                ? (brand.data?.seo.description ?? brand.data?.description)
+                : null,
+          image: scope.kind === 'category' ? (category.data?.banner ?? category.data?.image)?.url : scope.kind === 'brand' ? brand.data?.logo?.url : null,
+          noindex: scope.kind === 'search' || isRearranged(state),
+        }
+      : null,
+  )
 
   // A new page of results starts at the top of the results.
   const resultsRef = useRef<HTMLDivElement>(null)
@@ -110,12 +137,7 @@ function ListingPage({ scope }: { scope: ListingScope }) {
     return `/category/${encodeURIComponent(slug)}${search ? `?${search}` : ''}`
   }
 
-  if (
-    (scope.kind === 'category' && (isNotFound(category.error) || isNotFound(listing.error))) ||
-    (scope.kind === 'brand' && (isNotFound(brand.error) || isNotFound(listing.error)))
-  ) {
-    return <NotFoundPage />
-  }
+  if (notFound) return <NotFoundPage />
 
   if ((scope.kind === 'category' && category.isPending) || (scope.kind === 'brand' && brand.isPending)) return <Spinner label="Loading" />
 
@@ -203,7 +225,7 @@ function ListingHeader({ heading, breadcrumbs, category, brand }: { heading: str
   return (
     <header className="bg-sf-surface">
       {category?.banner && (
-        <MediaImage media={category.banner} alt="" sizes="100vw" loading="eager" className="h-40 w-full object-cover md:h-56" />
+        <MediaImage media={category.banner} alt="" sizes="100vw" priority className="h-40 w-full object-cover md:h-56" />
       )}
       <div className="mx-auto flex max-w-sf flex-col gap-3 px-4 py-8">
         <Breadcrumbs items={breadcrumbs} />

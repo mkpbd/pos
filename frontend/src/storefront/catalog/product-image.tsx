@@ -5,12 +5,14 @@ import type { CatalogImage } from '../types'
 
 /**
  * A catalog image in a fixed-ratio box (product images carry no intrinsic size, so the box
- * reserves the space and nothing shifts while they load). Lazy unless `eager`.
+ * reserves the space and nothing shifts while they load). Lazy unless `eager` (above the fold) or
+ * `priority` (the page's LCP image: eager and fetched at high priority).
  */
 export function ProductImage({
   image,
   alt,
   eager = false,
+  priority = false,
   fit = 'contain',
   className,
   imgClassName,
@@ -20,6 +22,7 @@ export function ProductImage({
   /** Used when the image has no alt text of its own. */
   alt: string
   eager?: boolean
+  priority?: boolean
   fit?: 'contain' | 'cover'
   className?: string
   imgClassName?: string
@@ -31,7 +34,8 @@ export function ProductImage({
         <img
           src={image.url}
           alt={image.alt || alt}
-          loading={eager ? 'eager' : 'lazy'}
+          loading={eager || priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
           decoding="async"
           width={600}
           height={600}

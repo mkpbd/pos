@@ -12,12 +12,15 @@ use Illuminate\Support\Facades\Route;
 
 // Public storefront content: organization from the host name, no authentication.
 Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group(function () {
-    Route::get('pages/{slug}', [StoreContentController::class, 'page'])->where('slug', '[A-Za-z0-9-]{1,100}');
-    Route::get('faq', [StoreContentController::class, 'faq']);
-    // E11: the blog.
-    Route::get('blog', [StoreBlogController::class, 'index']);
-    Route::get('blog/categories', [StoreBlogController::class, 'categories']);
-    Route::get('blog/{slug}', [StoreBlogController::class, 'show'])->where('slug', '[A-Za-z0-9-]{1,100}');
+    // Reads: ETag + public HTTP caching (E12).
+    Route::middleware('storefront.cache')->group(function () {
+        Route::get('pages/{slug}', [StoreContentController::class, 'page'])->where('slug', '[A-Za-z0-9-]{1,100}');
+        Route::get('faq', [StoreContentController::class, 'faq']);
+        // E11: the blog.
+        Route::get('blog', [StoreBlogController::class, 'index']);
+        Route::get('blog/categories', [StoreBlogController::class, 'categories']);
+        Route::get('blog/{slug}', [StoreBlogController::class, 'show'])->where('slug', '[A-Za-z0-9-]{1,100}');
+    });
     Route::post('contact', [StoreContentController::class, 'contact'])->middleware('throttle:contact');
     Route::post('newsletter', [StoreContentController::class, 'subscribe'])->middleware('throttle:newsletter');
     Route::post('newsletter/confirm', [StoreContentController::class, 'confirm']);

@@ -30,8 +30,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 
 | Method & path | Auth | Phase | Notes |
 |---------------|------|-------|-------|
-| GET `/store/bootstrap` | P | E4 | Settings, theme tokens, menus, announcement, locales; `ETag` |
-| GET `/store/homepage` | P | E5 | Enabled, in-window sections resolved with items; `ETag` |
+| GET `/store/bootstrap` | P | E4 | Settings, theme tokens, menus, announcement, locales; `ETag` (*E12a: weak ETag from the `storefront.cache` middleware, `private, no-cache`; `store.allow_indexing`; cached server-side per content version*) |
+| GET `/store/homepage` | P | E5 | Enabled, in-window sections resolved with items; `ETag` (*E12a: weak ETag, `public, max-age=60, stale-while-revalidate=300` for anonymous visitors; the other public catalog, review, page, FAQ and blog reads too; cached server-side*) |
 | GET `/store/banners?placement=` | P | E5 | Active, scheduled banners |
 | GET `/store/pages/{slug}` | P | E5 | Published CMS page |
 | GET `/store/faq` | P | E5 | |
@@ -65,13 +65,14 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | POST `/store/account/orders/{number}/cancel` | C, I | E9 | Only `pending_payment`/`confirmed` (*E9 ✅: and unpaid, else `422 ORDER_NOT_CANCELLABLE` (`details.status`, `payment_status`); `{reason?}` ≤ 200; `idempotent:shopper`; reuses the E8a restock path, history actor `customer`, staff notification + e-mail*) |
 | POST `/store/account/orders/{number}/returns` | C, I | E10 | Within the return window (*E10b ✅: `{reason_code, note?, lines [{order_line_id, quantity}]}`; delivered and paid orders within `return_window_days` (default 7) of delivery; `RETURN_NOT_ALLOWED` (`details.reason`), `QUANTITY_EXCEEDS_RETURNABLE`; also GET `/store/account/returns`, POST `/store/account/returns/{number}/cancel` (I, `RETURN_NOT_CANCELLABLE`); the order detail adds `returnable`, `return_deadline`, `return_unavailable_reason`, `returns`, line `id` and `returnable_quantity`*) |
 | POST `/store/account/reviews` | C | E9 | Verified purchase sets `order_line_id` (*E9 ✅: verified purchases only — a delivered line is required (`REVIEW_NOT_ALLOWED`), one per product (`REVIEW_EXISTS`, instead of the planned `REVIEW_ALREADY_EXISTS`); `throttle:reviews` (`POS_REVIEW_RATE_LIMIT`, 5/hour); also GET `/store/account/reviews`, PATCH/DELETE `/store/account/reviews/{id}` (edit → pending)*) |
-| GET `/sitemap.xml` · `/sitemaps/{type}-{n}.xml` · `/robots.txt` | P (web routes) | E12 | Per host |
+| GET `/sitemap.xml` · `/sitemaps/{type}-{n}.xml` | P (web routes) | E12 | Per host (*E12a ✅: index + `/sitemaps/pages.xml`, `products-{n}.xml` (5000 per file, `image:image`), `categories.xml`, `brands.xml`, `blog.xml`; live records only, primary domain, W3C `lastmod`; `public, max-age=600`, `X-Robots-Tag: noindex`; 404 unless open, `allow_indexing` and primary domain; no session*) |
+| GET `/robots.txt` | P (web route) | E12 | Per host (*E12a ✅: every host; open + `allow_indexing` + primary domain → disallow `/cart`, `/checkout`, `/account`, `/order/`, `/search`, `/admin`, `/api/` + `Sitemap:`; otherwise `Disallow: /`; `public, max-age=3600`; `backend/public/robots.txt` removed*) |
 
 ## 3. Staff endpoints
 
 | Resource | Endpoints | Permission | Phase |
 |----------|-----------|------------|-------|
-| Storefront settings | GET/PATCH `/storefront/settings` | storefront.view / .manage | E4 |
+| Storefront settings | GET/PATCH `/storefront/settings` (*E12a: `allow_indexing`*) | storefront.view / .manage | E4 |
 | Domains | GET/POST `/storefront/domains`, PATCH (make primary)/DELETE `/{id}` | storefront.manage | E4 |
 | Theme | GET/PUT `/storefront/theme`, PUT `/storefront/theme/custom-css` | storefront.manage / .custom_css | E4 |
 | Menus | GET/POST `/storefront/menus`, GET/PATCH/DELETE `/{id}`, PUT `/storefront/menus/{id}/items` (whole tree, ordered) (*E11: item types `blog`, `blog_category`, `blog_post`; link targets gain `blog_categories`, `blog_posts`*) | storefront.manage | E4 |

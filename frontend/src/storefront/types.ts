@@ -77,6 +77,8 @@ export type StorefrontBootstrap = {
     prices_include_tax: boolean
     /** ISO 4217 code of the organization's base currency (e.g. "BDT"); amounts are shown without a symbol when absent. */
     currency?: string | null
+    /** False when the owner asked search engines not to index the store (E12a); absent = true. */
+    allow_indexing?: boolean
   }
   preview: boolean
   theme: StorefrontTheme

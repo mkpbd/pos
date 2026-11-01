@@ -26,6 +26,7 @@ final class StorefrontPresenter
             'fulfilment_store_id' => $s->fulfilment_store_id,
             'guest_checkout_enabled' => $s->guest_checkout_enabled,
             'return_window_days' => $s->return_window_days,
+            'allow_indexing' => $s->allow_indexing,
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

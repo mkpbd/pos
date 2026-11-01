@@ -5,6 +5,8 @@ namespace App\Modules\Storefront\Application\Queries;
 use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
@@ -24,12 +26,33 @@ class StorefrontHomepage
         private readonly MediaLibrary $media,
         private readonly StorefrontCatalog $catalog,
         private readonly BlogDirectory $blog,
+        private readonly StorefrontContentVersion $version,
+        private readonly TenantContext $tenant,
+        private readonly ContentSchedule $schedule,
     ) {}
 
     /**
      * @return array{sections: list<array<string, mixed>>}
      */
     public function build(bool $preview = false): array
+    {
+        if ($preview) {
+            return $this->compute(true);
+        }
+
+        // E12: the public homepage is cached per content version until the next scheduled change.
+        return $this->version->remember(
+            $this->tenant->requireOrganization(),
+            'homepage',
+            fn () => $this->compute(false),
+            fn () => $this->schedule->nextChange(),
+        );
+    }
+
+    /**
+     * @return array{sections: list<array<string, mixed>>}
+     */
+    private function compute(bool $preview): array
     {
         $sections = HomepageSection::query()->with('items')->orderBy('sort_order')->get();
         if (! $preview) {
