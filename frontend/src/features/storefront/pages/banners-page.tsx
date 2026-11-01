@@ -18,6 +18,9 @@ import { MediaField, MediaThumb } from '@/features/media/components/media-picker
 import {
   BANNER_PLACEMENT_LABELS,
   BANNER_PLACEMENTS,
+  POPUP_DELAY,
+  POPUP_FREQUENCIES,
+  POPUP_FREQUENCY_LABELS,
   useBannersQuery,
   useDeleteBannerMutation,
   useReorderBannersMutation,
@@ -25,6 +28,7 @@ import {
   type Banner,
   type BannerInput,
   type BannerPlacement,
+  type PopupFrequency,
   type TextPosition,
 } from '@/features/storefront/api'
 import { ColorField } from '@/features/storefront/components/color-field'
@@ -34,11 +38,19 @@ import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap } from '@/lib/forms'
 
-type Draft = Omit<BannerInput, 'starts_at' | 'ends_at' | 'desktop_media_id'> & { desktop_media_id: string | null; starts_at: string; ends_at: string }
+type Draft = Omit<BannerInput, 'starts_at' | 'ends_at' | 'desktop_media_id' | 'popup_delay_seconds' | 'popup_frequency'> & {
+  desktop_media_id: string | null
+  starts_at: string
+  ends_at: string
+  /** Popup only: seconds as typed. */
+  popup_delay: string
+  popup_frequency: PopupFrequency
+}
 
 const PLACEMENT_HINTS: Record<BannerPlacement, string> = {
   hero_slider: 'Wide slides (about 1600×600) for hero slider sections.',
   home_promo: 'Tiles (about 800×600) for banner grid sections.',
+  popup: 'A window over the store (about 800×800), not on the cart, checkout or account pages. Only the first live popup is shown.',
 }
 
 const toDraft = (placement: BannerPlacement, b?: Banner): Draft => ({
@@ -58,7 +70,16 @@ const toDraft = (placement: BannerPlacement, b?: Banner): Draft => ({
   starts_at: toLocalInput(b?.starts_at ?? null),
   ends_at: toLocalInput(b?.ends_at ?? null),
   is_active: b?.is_active ?? true,
+  popup_delay: String(b?.popup_delay_seconds ?? POPUP_DELAY.default),
+  popup_frequency: b?.popup_frequency ?? 'once_per_day',
 })
+
+/** "After 5 s · once a day" for a popup banner's row. */
+function popupSummary(b: Banner): string {
+  const delay = b.popup_delay_seconds ?? POPUP_DELAY.default
+  const frequency = POPUP_FREQUENCY_LABELS[b.popup_frequency ?? 'once_per_day'].toLowerCase()
+  return `${delay === 0 ? 'Opens right away' : `After ${delay} s`} · ${frequency}`
+}
 
 const text = (value: string | null) => value ?? ''
 const nullable = (value: string) => (value.trim() === '' ? null : value.trim())
@@ -73,6 +94,10 @@ function validateBanner(d: Draft): Record<string, string> {
   if (d.secondary_link_url && !isSafeLink(d.secondary_link_url)) errors.secondary_link_url = 'Use a site path such as /sale or an http(s) URL.'
   if (!!d.secondary_button_label !== !!d.secondary_link_url) errors.secondary_link_url = 'The second button needs both a label and a link.'
   if (d.starts_at && d.ends_at && d.ends_at <= d.starts_at) errors.ends_at = 'The end must be after the start.'
+  if (d.placement === 'popup') {
+    const delay = d.popup_delay.trim()
+    if (!/^\d{1,2}$/.test(delay) || Number(delay) > POPUP_DELAY.max) errors.popup_delay_seconds = `Whole seconds from ${POPUP_DELAY.min} to ${POPUP_DELAY.max}.`
+  }
   return errors
 }
 
@@ -86,11 +111,13 @@ function BannerForm({ banner, placement, onDone }: { banner?: Banner; placement:
     e.preventDefault()
     const local = validateBanner(draft)
     if (Object.keys(local).length > 0) return setErrors(local)
+    const { popup_delay, popup_frequency, ...rest } = draft
     const input: Partial<BannerInput> = {
-      ...draft,
+      ...rest,
       desktop_media_id: draft.desktop_media_id ?? undefined,
       starts_at: fromLocalInput(draft.starts_at),
       ends_at: fromLocalInput(draft.ends_at),
+      ...(draft.placement === 'popup' ? { popup_delay_seconds: Number(popup_delay.trim()), popup_frequency } : {}),
     }
     if (banner) delete input.placement
     save.mutate(
@@ -165,6 +192,25 @@ function BannerForm({ banner, placement, onDone }: { banner?: Banner; placement:
         )}
       </div>
 
+      {draft.placement === 'popup' && (
+        <fieldset className="grid gap-4 rounded-md border p-3 sm:grid-cols-2">
+          <legend className="px-1 text-sm font-medium">Popup</legend>
+          <FormField label="Delay (seconds)" error={errors.popup_delay_seconds} hint={`How long after a page opens (${POPUP_DELAY.min}–${POPUP_DELAY.max}).`}>
+            <Input type="number" inputMode="numeric" min={POPUP_DELAY.min} max={POPUP_DELAY.max} step={1} className="w-28" value={draft.popup_delay} onChange={(e) => set({ popup_delay: e.target.value })} />
+          </FormField>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="popup-frequency">Show to each visitor</Label>
+            <Select value={draft.popup_frequency} onValueChange={(v) => set({ popup_frequency: v as PopupFrequency })}>
+              <SelectTrigger id="popup-frequency" aria-describedby="popup-frequency-hint" aria-invalid={errors.popup_frequency ? true : undefined}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {POPUP_FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{POPUP_FREQUENCY_LABELS[f]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p id="popup-frequency-hint" className={errors.popup_frequency ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>{errors.popup_frequency ?? 'Visitors can always close it.'}</p>
+          </div>
+        </fieldset>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <ColorField label="Text colour" value={draft.text_color} onChange={(v) => set({ text_color: v })} error={errors.text_color} />
         <FormField label="Text position">
@@ -221,6 +267,8 @@ function PlacementCard({ placement, banners, canManage, onEdit, onAdd, onDelete 
 }) {
   const reorder = useReorderBannersMutation()
   const { byId } = useMediaLookup(banners.map((b) => b.desktop_media_id))
+  // The storefront shows a single popup: the first live one in this order.
+  const shownPopupId = placement === 'popup' ? banners.find((b) => b.is_live)?.id : undefined
 
   const move = (index: number, direction: -1 | 1) => {
     const ids = banners.map((b) => b.id)
@@ -249,7 +297,9 @@ function PlacementCard({ placement, banners, canManage, onEdit, onAdd, onDelete 
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{b.name}</p>
                   <p className="truncate text-sm text-muted-foreground">{b.title ?? 'No headline'}</p>
+                  {placement === 'popup' && <p className="text-sm text-muted-foreground">{popupSummary(b)}</p>}
                 </div>
+                {placement === 'popup' && b.is_live && b.id !== shownPopupId && <Badge variant="outline">Not shown (another popup comes first)</Badge>}
                 <BannerStatus banner={b} />
                 {canManage && (
                   <div className="flex items-center">

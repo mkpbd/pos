@@ -1,4 +1,4 @@
-import type { Cart, CartLine, DisplayPromotion, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, OrderView, ShippingMethod, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap } from './types'
+import type { BlogPostDetail, BlogPostRow, Cart, CartLine, DisplayPromotion, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, OrderView, ShippingMethod, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap, StorePopup } from './types'
 
 let nextId = 0
 
@@ -354,6 +354,56 @@ export function promotionFixture(overrides: Partial<DisplayPromotion> = {}): Dis
     ends_at: new Date(Date.now() + 2 * 86_400_000 + 3_600_000).toISOString(),
     show_countdown: true,
     price: '108.00',
+    ...overrides,
+  }
+}
+
+const blogCover = { id: 'cover-1', url: '/storage/media/o/cover.jpg', srcset: '/storage/media/o/cover-640.webp 640w, /storage/media/o/cover.jpg 1600w', width: 1600, height: 900, alt: null }
+
+/** A blog list row as GET /store/blog returns it (E11). */
+export function blogPostRow(slug: string, overrides: Partial<BlogPostRow> = {}): BlogPostRow {
+  const title = slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  return {
+    slug,
+    title,
+    excerpt: `About ${title.toLowerCase()}.`,
+    cover: blogCover,
+    category: { name: 'Recipes', slug: 'recipes' },
+    author: 'Rina',
+    published_at: '2026-10-12T18:00:00+06:00',
+    reading_minutes: 4,
+    ...overrides,
+  }
+}
+
+/** A full post as GET /store/blog/{slug} returns it (E11). */
+export function blogPostDetail(slug: string, overrides: Partial<BlogPostDetail> = {}): BlogPostDetail {
+  return {
+    ...blogPostRow(slug),
+    body_html: '<p>Start with ripe mangoes. See <a href="/pages/about">our story</a>.</p>',
+    seo_title: null,
+    seo_description: null,
+    updated_at: '2026-10-12T09:00:00+06:00',
+    prev: null,
+    next: null,
+    related: [],
+    ...overrides,
+  }
+}
+
+/** The live popup banner in the bootstrap (E11). */
+export function popupFixture(overrides: Partial<StorePopup> = {}): StorePopup {
+  return {
+    id: 'pop-1',
+    title: 'Free delivery over ৳3000',
+    subtitle: 'This week only, anywhere in Dhaka.',
+    image: { id: 'pimg', url: '/storage/media/o/popup.jpg', srcset: '/storage/media/o/popup.jpg 800w', width: 800, height: 500, alt: null },
+    mobile_image: null,
+    link_url: '/shop',
+    button_label: 'Shop now',
+    delay_seconds: 0,
+    frequency: 'once_per_day',
+    updated_at: '2026-10-30T10:00:00+06:00',
     ...overrides,
   }
 }

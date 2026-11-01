@@ -180,3 +180,177 @@ export function useSubscribersQuery(params: SubscriberListParams) {
     placeholderData: (previous) => previous,
   })
 }
+
+// ── Blog (E11) ───────────────────────────────────────────────────────────────
+
+/** `scheduled` = published with a future `published_at`. */
+export type BlogPostState = 'draft' | 'scheduled' | 'published'
+export const BLOG_POST_STATES: BlogPostState[] = ['published', 'scheduled', 'draft']
+
+export type BlogCategory = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  sort_order: number
+  /** Posts in the category (all states) and the published ones among them. */
+  post_count?: number
+  published_post_count?: number
+  updated_at?: string | null
+}
+export type BlogCategoryInput = { name: string; slug: string; description: string | null }
+
+/** A media reference as the API sends it for covers. */
+export type BlogCover = { id: string; url: string; srcset?: string | null; alt?: string | null }
+
+export type BlogPostSummary = {
+  id: string
+  slug: string
+  title: string
+  excerpt: string | null
+  status: PageStatus
+  state: BlogPostState
+  published_at: string | null
+  category: { id: string; name: string; slug: string } | null
+  /** The author's display name; older shapes send `author`. */
+  author_name?: string | null
+  author?: { id: string; name: string | null } | null
+  cover_media_id: string | null
+  cover?: BlogCover | null
+  reading_minutes?: number
+  updated_at: string | null
+}
+
+export type BlogPost = BlogPostSummary & {
+  category_id: string | null
+  body_html: string | null
+  seo_title: string | null
+  seo_description: string | null
+}
+
+export type BlogPostInput = {
+  title: string
+  slug: string
+  category_id: string | null
+  excerpt: string | null
+  body_html: string | null
+  cover_media_id: string | null
+  status: PageStatus
+  published_at: string | null
+  seo_title: string | null
+  seo_description: string | null
+}
+
+/** `category_id: 'none'` lists uncategorised posts. */
+export type BlogPostListParams = { page: number; search?: string; status?: BlogPostState; category_id?: string }
+/** `meta.status_counts`: per state for the current search and category, ignoring `status`. */
+export type BlogStatusCounts = Partial<Record<BlogPostState | 'all', number>>
+
+export const blogKeys = {
+  all: ['cms', 'blog'] as const,
+  categories: ['cms', 'blog', 'categories'] as const,
+  posts: ['cms', 'blog', 'posts'] as const,
+  postList: (params: BlogPostListParams) => ['cms', 'blog', 'posts', 'list', params] as const,
+  post: (id: string) => ['cms', 'blog', 'posts', id] as const,
+}
+
+/** Menus and the homepage blog section offer blog categories and posts as targets. */
+const LINK_TARGETS = ['storefront', 'link-targets'] as const
+
+export function useBlogCategoriesQuery() {
+  return useQuery({
+    queryKey: blogKeys.categories,
+    queryFn: ({ signal }) => api.get<BlogCategory[]>('/cms/blog-categories', { signal }).then((r) => r.data),
+  })
+}
+
+export function useSaveBlogCategoryMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: Partial<BlogCategoryInput> }) =>
+      (id ? api.patch<BlogCategory>(`/cms/blog-categories/${id}`, input) : api.post<BlogCategory>('/cms/blog-categories', input)).then((r) => r.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: LINK_TARGETS })
+      // Post rows carry the category name.
+      void queryClient.invalidateQueries({ queryKey: blogKeys.posts })
+      return queryClient.invalidateQueries({ queryKey: blogKeys.categories })
+    },
+  })
+}
+
+export function useDeleteBlogCategoryMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/cms/blog-categories/${id}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: LINK_TARGETS })
+      // Its posts become uncategorised.
+      void queryClient.invalidateQueries({ queryKey: blogKeys.posts })
+      return queryClient.invalidateQueries({ queryKey: blogKeys.categories })
+    },
+  })
+}
+
+export function useReorderBlogCategoriesMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (ids: string[]) => api.put<BlogCategory[]>('/cms/blog-categories/order', { ids }).then((r) => r.data),
+    onSuccess: (items) => {
+      queryClient.setQueryData(blogKeys.categories, items)
+      void queryClient.invalidateQueries({ queryKey: LINK_TARGETS })
+    },
+  })
+}
+
+export function useBlogPostsQuery(params: BlogPostListParams) {
+  return useQuery({
+    queryKey: blogKeys.postList(params),
+    queryFn: ({ signal }) =>
+      api.get<BlogPostSummary[]>('/cms/blog-posts', { signal, query: params }).then(
+        (r): Paginated<BlogPostSummary> & { counts: BlogStatusCounts | null } => ({
+          ...toPaginated(r),
+          counts: (r.meta as ApiMeta & { status_counts?: BlogStatusCounts }).status_counts ?? null,
+        }),
+      ),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useBlogPostQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: blogKeys.post(id ?? ''),
+    queryFn: ({ signal }) => api.get<BlogPost>(`/cms/blog-posts/${id}`, { signal }).then((r) => r.data),
+    enabled: id !== undefined,
+  })
+}
+
+export function useSaveBlogPostMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: Partial<BlogPostInput> }) =>
+      (id ? api.patch<BlogPost>(`/cms/blog-posts/${id}`, input) : api.post<BlogPost>('/cms/blog-posts', input)).then((r) => r.data),
+    onSuccess: (post) => {
+      queryClient.setQueryData(blogKeys.post(post.id), post)
+      void queryClient.invalidateQueries({ queryKey: LINK_TARGETS })
+      void queryClient.invalidateQueries({ queryKey: blogKeys.categories })
+      return queryClient.invalidateQueries({ queryKey: [...blogKeys.posts, 'list'] })
+    },
+  })
+}
+
+export function useDeleteBlogPostMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/cms/blog-posts/${id}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: LINK_TARGETS })
+      void queryClient.invalidateQueries({ queryKey: blogKeys.categories })
+      return queryClient.invalidateQueries({ queryKey: blogKeys.posts })
+    },
+  })
+}

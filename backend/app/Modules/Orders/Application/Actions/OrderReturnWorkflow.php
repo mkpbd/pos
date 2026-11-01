@@ -8,6 +8,7 @@ use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Orders\Application\Events\OrderReturnRequested;
 use App\Modules\Orders\Application\Events\OrderReturnUpdated;
+use App\Modules\Orders\Application\Services\RefundPayout;
 use App\Modules\Orders\Application\Services\ReturnPolicy;
 use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\RefundMethod;
@@ -20,9 +21,6 @@ use App\Modules\Orders\Infrastructure\Models\OrderReturn;
 use App\Modules\Orders\Infrastructure\Models\OrderReturnHistory;
 use App\Modules\Orders\Infrastructure\Models\OrderReturnLine;
 use App\Modules\Orders\Infrastructure\Models\OrderReturnLineStock;
-use App\Modules\Payments\Application\Contracts\PaymentLedger;
-use App\Modules\Payments\Domain\LedgerEntry;
-use App\Modules\Payments\Domain\PaymentDirection;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Sales\Domain\ReturnShare;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
@@ -66,7 +64,7 @@ class OrderReturnWorkflow
     public function __construct(
         private readonly ReturnPolicy $policy,
         private readonly StockLedger $stock,
-        private readonly PaymentLedger $payments,
+        private readonly RefundPayout $payout,
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
     ) {}
@@ -384,15 +382,7 @@ class OrderReturnWorkflow
                 ]);
             }
 
-            if ($amount->isPositive()) {
-                $entry = new LedgerEntry(PaymentDirection::Out, $method->ledgerMethod(), $amount->amount(), $order->customer_id, $reference, "Refund {$r->number} of web order {$order->number}");
-                $source = new PaymentSource(PaymentSource::ONLINE_ORDER_REFUND, $r->id, $r->number);
-                if ($method === RefundMethod::Cash) {
-                    $this->payments->record($actor, $order->branch_id, [$entry], $source);
-                } else {
-                    $this->payments->recordSystem($order->branch_id, [$entry], $source, $actorId);
-                }
-            }
+            $this->payout->payOut($order, $amount, $method, $reference, $actor, new PaymentSource(PaymentSource::ONLINE_ORDER_REFUND, $r->id, $r->number), "Refund {$r->number} of web order {$order->number}");
 
             $r->update([
                 'status' => ReturnStatus::Refunded,

@@ -207,3 +207,98 @@ test('a hot deals section counts down and hides itself when the sale ends', asyn
   // The section asked for a fresh homepage when it ended.
   await expect.poll(() => readsAfterEnd).toBeGreaterThanOrEqual(1)
 })
+
+const cover = { id: 'c-1', url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 900, alt: null }
+const postRow = (slug: string, title: string, extra: Record<string, unknown> = {}) => ({
+  slug, title, excerpt: `About ${title.toLowerCase()}.`, cover, category: { name: 'Recipes', slug: 'recipes' }, author: 'Rina',
+  published_at: '2026-10-12T18:00:00+06:00', reading_minutes: 4, ...extra,
+})
+
+test('the blog lists posts by category and opens a post from the homepage teaser', async ({ page }) => {
+  await serveStore(page, bootstrap(), [
+    { id: 'bp-1', type: 'blog_posts', title: 'From our kitchen', subtitle: null, config: { category_id: null, limit: 3 }, posts: [postRow('mango-lassi', 'Mango lassi')] },
+  ])
+  const listQueries: string[] = []
+  await page.route('**/api/v1/store/blog/categories', (route) =>
+    route.fulfill({ json: envelope([{ slug: 'recipes', name: 'Recipes', description: 'Cooking with our produce.', post_count: 10 }, { slug: 'store-news', name: 'Store news', description: null, post_count: 1 }]) }),
+  )
+  await page.route(/\/api\/v1\/store\/blog(\?.*)?$/, (route) => {
+    const url = new URL(route.request().url())
+    listQueries.push(url.search)
+    const pageNo = Number(url.searchParams.get('page') ?? 1)
+    const rows = pageNo === 1 ? [postRow('mango-lassi', 'Mango lassi'), postRow('lychee-cooler', 'Lychee cooler')] : [postRow('tea-time', 'Tea time')]
+    return route.fulfill({ json: { success: true, data: rows, meta: { request_id: 'e2e', current_page: pageNo, per_page: 9, total: 11, last_page: 2 } } })
+  })
+  await page.route('**/api/v1/store/blog/mango-lassi*', (route) =>
+    route.fulfill({
+      json: envelope({
+        ...postRow('mango-lassi', 'Mango lassi'),
+        body_html: '<h2>You need</h2><p>Ripe mangoes and yoghurt. Read <a href="/blog/lychee-cooler">the lychee cooler</a> too.</p>',
+        seo_title: 'Mango lassi recipe', seo_description: null, updated_at: null,
+        prev: null, next: { slug: 'lychee-cooler', title: 'Lychee cooler' },
+        related: [postRow('lychee-cooler', 'Lychee cooler')],
+      }),
+    }),
+  )
+  await page.route('**/api/v1/store/blog/lychee-cooler*', (route) =>
+    route.fulfill({ status: 404, json: { success: false, error: { code: 'NOT_FOUND', message: 'Not found.', details: {} }, meta: { request_id: 'e2e' } } }),
+  )
+  await page.goto('/')
+
+  const teaser = page.getByRole('region', { name: 'From our kitchen' })
+  await teaser.getByRole('link', { name: 'View all posts' }).click()
+  await expect(page).toHaveURL(/\/blog$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Blog' })).toBeVisible()
+  await expect(page.getByTestId('blog-card')).toHaveCount(2)
+  await expect(page).toHaveTitle('Blog | Berry Kids')
+
+  await page.getByRole('navigation', { name: 'Pagination' }).getByRole('link', { name: 'Page 2' }).click()
+  await expect(page).toHaveURL(/\/blog\?page=2$/)
+  await expect(page.getByRole('heading', { name: 'Tea time' })).toBeVisible()
+
+  await page.getByRole('navigation', { name: 'Blog categories' }).getByRole('link', { name: 'Recipes (10)' }).click()
+  await expect(page).toHaveURL(/\/blog\/category\/recipes$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Recipes' })).toBeVisible()
+  await expect.poll(() => listQueries.at(-1)).toBe('?page=1&category=recipes')
+
+  await page.getByRole('heading', { name: 'Mango lassi' }).getByRole('link').click()
+  await expect(page).toHaveURL(/\/blog\/mango-lassi$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Mango lassi' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'You need' })).toBeVisible()
+  await expect(page).toHaveTitle('Mango lassi recipe | Berry Kids')
+  await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Recipes' })).toHaveAttribute('href', '/blog/category/recipes')
+  await expect(page.getByRole('region', { name: 'Related posts' }).getByTestId('blog-card')).toHaveCount(1)
+
+  // A body link navigates in the app; an unpublished post is not found.
+  await page.getByRole('link', { name: 'the lychee cooler' }).click()
+  await expect(page).toHaveURL(/\/blog\/lychee-cooler$/)
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
+})
+
+test('the popup banner opens after its delay, closes with Escape and stays closed on reload', async ({ page }) => {
+  await serveStore(
+    page,
+    bootstrap({
+      popup: {
+        id: 'pop-1', title: 'Free delivery over ৳3000', subtitle: 'This week only.', image, mobile_image: null, link_url: '/shop', button_label: 'Shop now',
+        delay_seconds: 1, frequency: 'once_per_day', updated_at: '2026-10-30T10:00:00+06:00',
+      },
+    }),
+  )
+  await page.goto('/cart')
+  await expect(page.getByRole('heading', { level: 1, name: 'Your cart' })).toBeVisible()
+  await page.waitForTimeout(1_500)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await page.goto('/')
+  const dialog = page.getByRole('dialog', { name: 'Free delivery over ৳3000' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('link', { name: 'Shop now' })).toHaveAttribute('href', '/shop')
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1, name: 'Berry Kids' })).toBeVisible()
+  await page.waitForTimeout(1_500)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})

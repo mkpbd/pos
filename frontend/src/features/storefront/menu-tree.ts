@@ -47,7 +47,7 @@ export function toApi(nodes: EditorNode[]): MenuItemNode[] {
     type: n.type,
     label: n.label.trim(),
     url: n.type === 'custom' ? n.url.trim() : null,
-    target_id: n.type === 'custom' ? null : n.target_id,
+    target_id: hasTarget(n.type) ? n.target_id : null,
     open_in_new_tab: n.open_in_new_tab,
     is_visible: n.is_visible,
     is_mega: n.is_mega,
@@ -133,9 +133,9 @@ export function validateTree(nodes: EditorNode[], allowsMega: boolean): Record<s
       const key = errorKey(path)
       if (!n.label.trim()) errors[`${key}.label`] = 'Enter a label.'
       else if (n.label.trim().length > 80) errors[`${key}.label`] = 'At most 80 characters.'
-      if (n.type !== 'custom') {
-        if (!n.target_id) errors[`${key}.target_id`] = `Choose a ${n.type}.`
-      } else if (!isSafeLink(n.url)) errors[`${key}.url`] = 'Use a site path such as /sale or an http(s) URL.'
+      if (hasTarget(n.type)) {
+        if (!n.target_id) errors[`${key}.target_id`] = `Choose a ${TARGET_NAMES[n.type]}.`
+      } else if (n.type === 'custom' && !isSafeLink(n.url)) errors[`${key}.url`] = 'Use a site path such as /sale or an http(s) URL.'
       if (n.is_mega && (path.length > 1 || !allowsMega)) errors[`${key}.is_mega`] = 'Only top-level items of the main navigation can open a mega menu.'
       walk(n.children, path)
     })
@@ -143,8 +143,25 @@ export function validateTree(nodes: EditorNode[], allowsMega: boolean): Record<s
   return errors
 }
 
-const TARGET_TYPES = ['page', 'category', 'brand'] as const
+const TARGET_TYPES = ['page', 'category', 'brand', 'blog_category', 'blog_post'] as const
 export type TargetType = (typeof TARGET_TYPES)[number]
+
+/** How a missing target is named in "Choose a …". */
+export const TARGET_NAMES: Record<TargetType, string> = {
+  page: 'page',
+  category: 'category',
+  brand: 'brand',
+  blog_category: 'blog category',
+  blog_post: 'blog post',
+}
+
+/** Link-type select value of the blog index item, which links no record. */
+export const BLOG_INDEX = 'blog'
+
+/** Whether items of this type link one record (`target_id`); custom links and the blog index do not. */
+export function hasTarget(type: MenuItemType): type is TargetType {
+  return (TARGET_TYPES as readonly string[]).includes(type)
+}
 
 /** Link-type select values encode the target kind with its id: "category:<uuid>". */
 export function encodeTarget(type: TargetType, id: string): string {

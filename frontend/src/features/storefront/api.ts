@@ -72,7 +72,8 @@ export const MENU_LOCATION_LABELS: Record<MenuLocation, string> = {
 
 export type MenuSummary = { id: string; name: string; location: MenuLocation; location_label: string; is_active: boolean; updated_at: string | null }
 
-export type MenuItemType = 'custom' | 'page' | 'category' | 'brand'
+/** `blog` is the blog index (no target); `blog_category` and `blog_post` link one record (E11). */
+export type MenuItemType = 'custom' | 'page' | 'category' | 'brand' | 'blog' | 'blog_category' | 'blog_post'
 
 export type MenuItemNode = {
   id?: string
@@ -95,14 +96,34 @@ export type MenuDetail = MenuSummary & { items: MenuItemNode[] }
 export type LinkTargetPage = { id: string; slug: string; title: string; status: 'draft' | 'published' }
 /** A category or brand a menu item can link to; `url` is null while it has no visible web listing. */
 export type LinkTargetTerm = { id: string; name: string; url: string | null }
-export type LinkTargets = { pages: LinkTargetPage[]; categories?: LinkTargetTerm[]; brands?: LinkTargetTerm[] }
+/** A blog category a menu item can link to (E11). */
+export type LinkTargetBlogCategory = { id: string; name: string; slug: string }
+/** A blog post a menu item can link to; drafts and scheduled posts are listed but flagged (E11). */
+export type LinkTargetBlogPost = { id: string; title: string; slug: string; status: 'draft' | 'published'; state?: 'draft' | 'scheduled' | 'published' }
+export type LinkTargets = {
+  pages: LinkTargetPage[]
+  categories?: LinkTargetTerm[]
+  brands?: LinkTargetTerm[]
+  blog_categories?: LinkTargetBlogCategory[]
+  blog_posts?: LinkTargetBlogPost[]
+}
 
-export const BANNER_PLACEMENTS = ['hero_slider', 'home_promo'] as const
+export const BANNER_PLACEMENTS = ['hero_slider', 'home_promo', 'popup'] as const
 export type BannerPlacement = (typeof BANNER_PLACEMENTS)[number]
 export const BANNER_PLACEMENT_LABELS: Record<BannerPlacement, string> = {
   hero_slider: 'Hero slider',
   home_promo: 'Homepage promo tiles',
+  popup: 'Popup',
 }
+/** How often a visitor sees the popup banner (E11). */
+export const POPUP_FREQUENCIES = ['once_per_session', 'once_per_day', 'once_per_week'] as const
+export type PopupFrequency = (typeof POPUP_FREQUENCIES)[number]
+export const POPUP_FREQUENCY_LABELS: Record<PopupFrequency, string> = {
+  once_per_session: 'Once per visit',
+  once_per_day: 'Once a day',
+  once_per_week: 'Once a week',
+}
+export const POPUP_DELAY = { min: 0, max: 60, default: 5 } as const
 export type TextPosition = 'left' | 'center' | 'right'
 
 export type Banner = {
@@ -123,6 +144,9 @@ export type Banner = {
   starts_at: string | null
   ends_at: string | null
   is_active: boolean
+  /** Popup placement only (E11): seconds before it opens (0–60) and how often a visitor sees it; null elsewhere. */
+  popup_delay_seconds?: number | null
+  popup_frequency?: PopupFrequency | null
   /** Active and inside its schedule right now. */
   is_live: boolean
   state: 'live' | 'inactive' | 'scheduled' | 'ended'
@@ -134,7 +158,7 @@ export type BannerInput = Omit<Banner, 'id' | 'is_live' | 'state' | 'sort_order'
 
 export const SECTION_TYPES = [
   'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
-  'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'hot_deals',
+  'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'hot_deals', 'blog_posts',
 ] as const
 export type SectionType = (typeof SECTION_TYPES)[number]
 export type SectionState = 'live' | 'disabled' | 'scheduled' | 'expired'
@@ -167,6 +191,8 @@ export type SectionConfigs = {
   brand_strip: { source: 'manual' | 'all'; limit: number }
   /** Flash-sale products (E8b): one countdown promotion, or every live one when `promotion_id` is null. */
   hot_deals: { promotion_id: string | null; limit: number; view_all_url: string | null }
+  /** Latest blog posts (E11): one category or all (`category_id` null); 3–12 posts. */
+  blog_posts: { category_id: string | null; limit: number; view_all_url: string | null }
 }
 export type AnySectionConfig = SectionConfigs[SectionType]
 

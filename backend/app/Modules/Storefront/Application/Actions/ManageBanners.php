@@ -45,6 +45,14 @@ class ManageBanners
             $before = $creating ? [] : $this->snapshot($banner);
 
             $banner->fill($attributes);
+            // Popup settings (E11) belong to popups only; popups get the defaults for what is unset.
+            if ($banner->placement === BannerPlacement::Popup) {
+                $banner->popup_delay_seconds ??= BannerPlacement::POPUP_DEFAULTS['popup_delay_seconds'];
+                $banner->popup_frequency ??= BannerPlacement::POPUP_DEFAULTS['popup_frequency'];
+            } else {
+                $banner->popup_delay_seconds = null;
+                $banner->popup_frequency = null;
+            }
             ScheduleWindow::assertValid($banner->starts_at, $banner->ends_at);
             if (($banner->button_label !== null && $banner->link_url === null)
                 || (($banner->secondary_button_label === null) !== ($banner->secondary_link_url === null))) {
@@ -138,6 +146,8 @@ class ManageBanners
             'mobile_media_id' => $banner->mobile_media_id,
             'text_color' => $banner->text_color,
             'text_position' => $banner->text_position,
+            'popup_delay_seconds' => $banner->popup_delay_seconds,
+            'popup_frequency' => $banner->popup_frequency,
             'starts_at' => $banner->starts_at?->toIso8601String(),
             'ends_at' => $banner->ends_at?->toIso8601String(),
             'is_active' => $banner->is_active,

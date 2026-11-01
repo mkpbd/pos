@@ -12,16 +12,16 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | `storefront.manage` | Change the above, domains, announcement bar |
 | `storefront.custom_css` | Edit custom CSS (Org Admin only by default) |
 | `media.manage` | Upload, edit alt text, delete unused media |
-| `cms.manage` | Pages, FAQ, blog, contact messages, newsletter export |
+| `cms.manage` | Pages, FAQ, blog, contact messages, newsletter export(*E11 ✅: blog categories and posts, staff preview of unpublished posts*) |
 | `online_catalog.view` | Read web listings in the admin (added in E6) |
 | `online_catalog.manage` | Product/category/brand web listings, publish schedule, featured, related |
 | `attributes.manage` | Attribute dictionary and values |
 | `promotions.view` / `promotions.manage` | Promotions, coupons, usage |
 | `shipping.manage` | Zones, methods, rates, couriers, geography areas |
 | `web_orders.view` | Online orders list/detail |
-| `web_orders.manage` | Status transitions, shipments, COD remittance, cancellation (*E10a: shipments, tracking updates, bulk processing; courier COD remittances moved to `web_orders.remit`*) |
+| `web_orders.manage` | Status transitions, shipments, COD remittance, cancellation (*E10a: shipments, tracking updates, bulk processing; courier COD remittances moved to `web_orders.remit`; E11: cancelling a **paid** order needs `web_orders.refund` instead*) |
 | `web_orders.remit` | Record and view couriers' COD remittances (*added in E10a; Organization Admin via `*`, Online Store Manager via `web_orders.*`, Accountant together with `web_orders.view`*) |
-| `web_orders.refund` | Online returns approval and refunds (*E10b ✅: create (staff), approve, reject, receive, refund; Organization Admin via `*`, Online Store Manager via `web_orders.*`, Accountant explicitly; reading returns needs `web_orders.view`*) |
+| `web_orders.refund` | Online returns approval and refunds (*E10b ✅: create (staff), approve, reject, receive, refund; Organization Admin via `*`, Online Store Manager via `web_orders.*`, Accountant explicitly; reading returns needs `web_orders.view`; E11 ✅: also cancelling a paid, undelivered order with a full refund*) |
 | `payment_gateways.manage` | Gateway enablement and credentials (Org Admin only by default) |
 | `reviews.view` / `reviews.moderate` | Read the review queue / approve, reject, delete reviews (*`reviews.view` added in E9*) |
 | `ai.use` | Request AI generations (declared by the AI module, POS Phase 8 / E13) |
@@ -35,6 +35,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | GET `/store/banners?placement=` | P | E5 | Active, scheduled banners |
 | GET `/store/pages/{slug}` | P | E5 | Published CMS page |
 | GET `/store/faq` | P | E5 | |
+| GET `/store/blog` · `/store/blog/categories` · `/store/blog/{slug}` | P | E11 | *Added in E11 ✅:* readable posts (published, `published_at ≤ now`), newest first, 9 per page, `?category=<slug>` (unknown → 404); categories with readable posts and `post_count`; post detail with sanitized body, SEO, prev/next, ≤ 3 related; drafts/scheduled → 404 except `?preview=1` for staff with `cms.manage`. Bootstrap gains `popup` (no separate `/store/popup`) |
 | POST `/store/contact` | P | E5 | `throttle:contact`, honeypot field |
 | POST `/store/newsletter` · GET `/store/newsletter/unsubscribe/{token}` | P | E5 | Double opt-in by e-mail |
 | GET `/store/categories` · `/store/categories/{slug}` | P | E6 | Tree (published listings only) |
@@ -73,13 +74,14 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | Storefront settings | GET/PATCH `/storefront/settings` | storefront.view / .manage | E4 |
 | Domains | GET/POST `/storefront/domains`, PATCH (make primary)/DELETE `/{id}` | storefront.manage | E4 |
 | Theme | GET/PUT `/storefront/theme`, PUT `/storefront/theme/custom-css` | storefront.manage / .custom_css | E4 |
-| Menus | GET/POST `/storefront/menus`, GET/PATCH/DELETE `/{id}`, PUT `/storefront/menus/{id}/items` (whole tree, ordered) | storefront.manage | E4 |
+| Menus | GET/POST `/storefront/menus`, GET/PATCH/DELETE `/{id}`, PUT `/storefront/menus/{id}/items` (whole tree, ordered) (*E11: item types `blog`, `blog_category`, `blog_post`; link targets gain `blog_categories`, `blog_posts`*) | storefront.manage | E4 |
 | Media | GET/POST `/media`, PATCH/DELETE `/media/{id}` | media.manage | E4 |
-| Banners | CRUD `/storefront/banners`, PUT `/storefront/banners/order` | storefront.manage | E5 |
-| Homepage | CRUD `/storefront/homepage-sections`, POST `/{id}/duplicate`, PUT `/order`, GET `/storefront/homepage-sections/types` (schemas) | storefront.manage | E5 |
+| Banners | CRUD `/storefront/banners`, PUT `/storefront/banners/order` (*E11: placement `popup` with `popup_delay_seconds`, `popup_frequency`*) | storefront.manage | E5 |
+| Homepage | CRUD `/storefront/homepage-sections`, POST `/{id}/duplicate`, PUT `/order`, GET `/storefront/homepage-sections/types` (schemas) (*E11: section type `blog_posts`*) | storefront.manage | E5 |
 | CMS pages, FAQ | CRUD `/cms/pages`, `/cms/faq` | cms.manage | E5 |
 | Contact messages | GET `/cms/contact-messages`, PATCH `/{id}` (handled) | cms.manage | E5 |
 | Newsletter | GET `/cms/newsletter-subscribers` (+ CSV export) | cms.manage | E5 |
+| Blog | GET/POST `/cms/blog-categories`, PATCH/DELETE `/{id}`, PUT `/cms/blog-categories/order`; GET/POST `/cms/blog-posts`, GET/PATCH/DELETE `/{id}` (*added in E11 ✅: posts filter `status` (derived state), `category_id` (`none` = uncategorised), `search`, `sort`; `meta.status_counts`; deleting a linked category or post → `IN_USE`*) | cms.manage | E11 |
 | Product listings | GET/PUT `/online-catalog/products/{productId}` (incl. variant listings), PUT `/related` | online_catalog.manage (GET: online_catalog.view) | E6 |
 | Category/brand listings | GET/PUT `/online-catalog/categories/{id}`, `/online-catalog/brands/{id}` (+ GET lists) | online_catalog.manage (GET: online_catalog.view) | E6 |
 | Attributes | CRUD `/attributes`, `/attributes/{id}/values` (*E6: values are replaced with the attribute — no separate `/values` route; GET also with `products.view`*) | attributes.manage | E6 |
@@ -90,7 +92,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | Customer online accounts | `online_account` in GET `/customers/{id}`; PATCH `/customer-accounts/{customerId}` `{status}` (*added in E7*) | customers.view / customers.manage | E7 |
 | Customer web activity | GET `/customers/{id}/web-activity` (*added in E10b ✅: account, orders summary, returns, reviews, wishlist, cart, 5 recent orders*) | customers.view | E10b |
 | Promotion report | GET `/promotions/{id}/report?date_from=&date_to=` (*added in E10b ✅: redemptions, orders, discount, order revenue, per-day in the organization's timezone*) | promotions.view | E10b |
-| Web orders | GET `/web-orders`, `/web-orders/{id}`; POST `/{id}/confirm`, `/process`, `/ship` (shipment), `/deliver`, `/cancel` (I), `/confirm-payment` (bank transfer, I), `/cod-remittance` (I) | web_orders.view / .manage | E8/E10 (*E8a ✅: `/confirm-payment`, `/process`, `/ship` (courier name + tracking text), `/deliver`, `/record-cod-payment` (instead of `/cod-remittance`), `/cancel` — **all** with I; no `/confirm` (COD orders start confirmed)*) (*E10a ✅: `/ship` takes `{courier_id, tracking_number?, note?}` and creates a shipment (`courier_name` no longer accepted); POST `/{id}/shipment/events` (I; `in_transit\|delivered\|returned`); `/cancel` also for a returned unpaid parcel; GET `/web-orders` board filters `courier_id`, `payment_method`, `district_id`, `date_from`/`date_to`, `cod_unremitted` + `meta.status_counts`; POST `/web-orders/bulk/process` (I, per-order results); GET `/web-orders/print?ids[]=&kind=packing_slip\|invoice`. The planned per-order `/cod-remittance` became the courier-level resource `/cod-remittances` (below); `/record-cod-payment` stays for own riders*) |
+| Web orders | GET `/web-orders`, `/web-orders/{id}`; POST `/{id}/confirm`, `/process`, `/ship` (shipment), `/deliver`, `/cancel` (I), `/confirm-payment` (bank transfer, I), `/cod-remittance` (I) | web_orders.view / .manage | E8/E10 (*E8a ✅: `/confirm-payment`, `/process`, `/ship` (courier name + tracking text), `/deliver`, `/record-cod-payment` (instead of `/cod-remittance`), `/cancel` — **all** with I; no `/confirm` (COD orders start confirmed)*) (*E10a ✅: `/ship` takes `{courier_id, tracking_number?, note?}` and creates a shipment (`courier_name` no longer accepted); POST `/{id}/shipment/events` (I; `in_transit\|delivered\|returned`); `/cancel` also for a returned unpaid parcel; GET `/web-orders` board filters `courier_id`, `payment_method`, `district_id`, `date_from`/`date_to`, `cod_unremitted` + `meta.status_counts`; POST `/web-orders/bulk/process` (I, per-order results); GET `/web-orders/print?ids[]=&kind=packing_slip\|invoice`. The planned per-order `/cod-remittance` became the courier-level resource `/cod-remittances` (below); `/record-cod-payment` stays for own riders; E11 ✅: `/cancel` `{reason, refund?: {method, reference?}}` also cancels a paid `confirmed`/`processing` order (or a shipped one with a returned parcel) with a full refund through the payments ledger — `web_orders.refund`, `REFUND_REQUIRED` without a method; unpaid orders still `web_orders.manage`*) |
 | COD remittances | GET/POST `/cod-remittances`, GET `/cod-remittances/{id}` | web_orders.remit | E10a ✅ (*POST with I; all or nothing (`REMITTANCE_INVALID`); each order paid through the shared COD payment path; courier fee booked as an expense in "Courier fees"; no edit or delete*) |
 | Online returns | GET `/web-orders/returns`, POST `/web-orders/{id}/returns` (I), POST `/web-orders/returns/{id}/approve` (I) / `/reject` | web_orders.refund | E10 (*E10b ✅ under `/web-order-returns` instead: GET `/web-order-returns`, `/web-order-returns/{id}` (`web_orders.view`); POST `/web-orders/{id}/returns` (staff, `override_window` + note after the window), POST `/web-order-returns/{id}/approve`, `/reject`, `/receive` (restock per line), `/refund` (`cash\|bank_transfer\|mobile_banking`) — all I and `web_orders.refund`*) |
 | Reviews | GET `/reviews`, POST `/reviews/{id}/approve` / `/reject` | reviews.moderate | E9/E10 (*E9 ✅ moderation: GET `/reviews` with `reviews.view` (new; `status`, `rating`, `search`, pending first, `meta.pending_count`), approve / reject `{reason?}` (idempotent by state) and DELETE `/reviews/{id}` with `reviews.moderate`; review media and the rest E10*) |
@@ -111,6 +113,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 *Added in E10a:* `SHIPMENT_NOT_FOUND` (`details.status`; a tracking update for an order without a courier shipment), `REMITTANCE_INVALID` (`details.orders [{id, number, reason}]`, reasons `not_found`, `not_cod`, `already_paid`, `not_delivered`, `other_courier`); reused `IN_USE` (couriers), `INVALID_STATUS_TRANSITION` (parcel transitions, bulk results), `NOT_FOUND` (bulk results).
 
 *Added in E10b:* `RETURN_NOT_ALLOWED` (`details.reason` `not_delivered`, `not_paid`, `returns_disabled`, `window_closed` — instead of the planned `RETURN_WINDOW_CLOSED`), `QUANTITY_EXCEEDS_RETURNABLE` (`details.lines`), `RETURN_NOT_CANCELLABLE` (`details.status`), `REFUND_EXCEEDS_PAID` (`details.paid_total`, `refunded_total`, `amount`); reused `INVALID_STATUS_TRANSITION`, `CASH_SESSION_REQUIRED`, `INSUFFICIENT_CASH`.
+
+*Added in E11:* `REFUND_REQUIRED` (`details.refund_amount`; paid cancel without a refund method), `BLOG_CATEGORY_NOT_FOUND` (menu items `details.blog_category_ids`; homepage section `details.category_id`), `BLOG_POST_NOT_FOUND` (`details.blog_post_ids`); reused `CATEGORY_NOT_FOUND` (a blog post's category), `MEDIA_NOT_FOUND` (cover), `IN_USE`, `ORDER_MISMATCH`, `LIMIT_REACHED`, `NOT_FOUND` (public blog).
 
 *Added in E7:* `VARIANT_NOT_PURCHASABLE` (instead of the planned `PRODUCT_NOT_AVAILABLE`), `OUT_OF_STOCK`, `CART_FULL`, `WISHLIST_FULL`, `ADDRESS_LIMIT_REACHED`; reused `INSUFFICIENT_STOCK` (`details.max_quantity`, `in_cart`), `INVALID_CREDENTIALS`, `TOKEN_INVALID`, `SESSION_UNAVAILABLE`. A wrong reset token, a wrong current password and a non-live wishlist product are field errors (`VALIDATION_FAILED`).
 

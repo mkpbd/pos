@@ -162,7 +162,7 @@ function MenuEditor({ menu, canManage, onDeleted }: { menu: MenuDetail; canManag
           </div>
         )}
 
-        <MenuTreeEditor nodes={nodes} onChange={change} allowsMega={allowsMega} errors={errors} readOnly={!canManage} pages={linkTargets.data?.pages ?? []} categories={linkTargets.data?.categories} brands={linkTargets.data?.brands} />
+        <MenuTreeEditor nodes={nodes} onChange={change} allowsMega={allowsMega} errors={errors} readOnly={!canManage} pages={linkTargets.data?.pages ?? []} categories={linkTargets.data?.categories} brands={linkTargets.data?.brands} blogCategories={linkTargets.data?.blog_categories} blogPosts={linkTargets.data?.blog_posts} />
 
         {canManage && (
           <div className="flex items-center justify-end gap-3 border-t pt-4">

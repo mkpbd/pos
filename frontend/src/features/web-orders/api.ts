@@ -138,6 +138,8 @@ export type WebOrder = {
   return_window_open?: boolean
   paid_total?: string
   refunded_total?: string
+  /** What cancelling would refund (E11): set for paid orders that can still be cancelled, else null. */
+  cancel_refund_amount?: string | null
   delivered_at?: string | null
   /** The order's shipment (E10a); null before shipping and for orders shipped before couriers existed (legacy text fields). */
   shipment?: Shipment | null
@@ -236,7 +238,8 @@ export const ACTION_PATHS: Record<WebOrderAction, string> = {
 export type WebOrderActionInput = {
   id: string
   action: WebOrderAction
-  body?: Record<string, string | null | undefined>
+  /** Cancel of a paid order (E11) nests `refund: {method, reference?}`. */
+  body?: Record<string, unknown>
   idempotencyKey: string
 }
 

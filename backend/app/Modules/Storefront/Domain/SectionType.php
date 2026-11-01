@@ -25,6 +25,7 @@ enum SectionType: string
     case CategoryStrip = 'category_strip';
     case BrandStrip = 'brand_strip';
     case HotDeals = 'hot_deals';
+    case BlogPosts = 'blog_posts';
 
     public const BANNER_GRID_LAYOUTS = ['2-col', '3-col', '3-col-split', '4-col'];
 
@@ -50,6 +51,7 @@ enum SectionType: string
         'category_strip' => [4, 16],
         'brand_strip' => [4, 24],
         'hot_deals' => [4, 12],
+        'blog_posts' => [3, 12],
     ];
 
     public const TABS = ['min' => 2, 'max' => 5];
@@ -69,6 +71,7 @@ enum SectionType: string
             self::CategoryStrip => 'Category strip',
             self::BrandStrip => 'Brand strip',
             self::HotDeals => 'Hot deals',
+            self::BlogPosts => 'Blog posts',
         };
     }
 
@@ -87,6 +90,7 @@ enum SectionType: string
             self::CategoryStrip => 'Category tiles with image and product count: hand-picked or the top level.',
             self::BrandStrip => 'A row of brand logos: hand-picked or every brand.',
             self::HotDeals => 'A countdown to the end of a flash sale with its products: one promotion or every running flash sale. Hidden when none is running.',
+            self::BlogPosts => 'The newest blog posts, from every category or one. Hidden while there are none.',
         };
     }
 
@@ -176,6 +180,8 @@ enum SectionType: string
             self::BrandStrip => ['source' => 'all', 'limit' => 12],
             // promotion_id null = every live countdown promotion ("flash sale").
             self::HotDeals => ['promotion_id' => null, 'limit' => 8, 'view_all_url' => null],
+            // category_id null = every category.
+            self::BlogPosts => ['category_id' => null, 'limit' => 3, 'view_all_url' => '/blog'],
         };
     }
 

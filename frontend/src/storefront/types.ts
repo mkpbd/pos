@@ -81,6 +81,8 @@ export type StorefrontBootstrap = {
   preview: boolean
   theme: StorefrontTheme
   menus: Partial<Record<MenuLocation, StorefrontMenu>>
+  /** The live popup banner (E11); absent from older payloads. */
+  popup?: StorePopup | null
 }
 
 /** GET /api/v1/store/homepage — see backend Storefront\Application\Queries\StorefrontHomepage. */
@@ -134,6 +136,7 @@ export type StoreSection =
       ends_at: string | null
       products: ProductCard[]
     })
+  | (SectionBase & { type: 'blog_posts'; config: { category_id: string | null; limit: number; view_all_url?: string | null }; posts: BlogPostRow[] })
 
 export type ProductSource = 'manual' | 'featured' | 'new_arrivals' | 'best_sellers' | 'on_sale' | 'category'
 
@@ -708,3 +711,56 @@ export type ReviewSort = 'newest' | 'highest' | 'lowest'
 
 /** GET /store/products/{slug}/reviews, normalised (see reviews/api.ts). */
 export type ProductReviews = { reviews: PublicReview[]; summary: RatingSummary; pagination: ListingPagination }
+
+/* ---------------------------------------------------------------------------------------
+ * Blog and popup (E11) — GET /api/v1/store/blog, /store/blog/categories, /store/blog/{slug}
+ * ------------------------------------------------------------------------------------- */
+
+/** A published post as the blog list (and the homepage teaser) returns it. */
+export type BlogPostRow = {
+  slug: string
+  title: string
+  excerpt: string | null
+  cover: MediaRef | null
+  category: { name: string; slug: string } | null
+  /** The author's first name. */
+  author: string | null
+  published_at: string
+  reading_minutes: number
+}
+
+/** GET /store/blog/categories — only categories with published posts. */
+export type BlogCategory = { slug: string; name: string; description: string | null; post_count: number }
+
+export type BlogPostLink = { slug: string; title: string }
+
+/** GET /store/blog/{slug} — body_html is sanitized on save (ADR-009). */
+export type BlogPostDetail = BlogPostRow & {
+  body_html: string
+  seo_title: string | null
+  seo_description: string | null
+  updated_at?: string | null
+  prev: BlogPostLink | null
+  next: BlogPostLink | null
+  related: BlogPostRow[]
+}
+
+/** `category`: the filtered category (`meta.category`), also when it has no published posts yet. */
+export type BlogListing = { posts: BlogPostRow[]; pagination: ListingPagination; category: Pick<BlogCategory, 'slug' | 'name' | 'description'> | null }
+
+export type PopupFrequency = 'once_per_session' | 'once_per_day' | 'once_per_week'
+
+/** The live popup banner (bootstrap `popup`), or null. */
+export type StorePopup = {
+  id: string
+  title: string | null
+  subtitle: string | null
+  image: MediaRef | null
+  mobile_image: MediaRef | null
+  link_url: string | null
+  button_label: string | null
+  delay_seconds: number
+  frequency: PopupFrequency
+  /** Part of the "already seen" key, so an edited popup is shown again. */
+  updated_at?: string | null
+}

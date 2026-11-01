@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { MediaField } from '@/features/media/components/media-picker'
-import type { LinkTargetPage, LinkTargetTerm } from '@/features/storefront/api'
-import { addNode, decodeTarget, encodeTarget, errorKey, MAX_MENU_DEPTH, moveNode, removeNode, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
+import type { LinkTargetBlogCategory, LinkTargetBlogPost, LinkTargetPage, LinkTargetTerm } from '@/features/storefront/api'
+import { addNode, BLOG_INDEX, decodeTarget, encodeTarget, errorKey, hasTarget, MAX_MENU_DEPTH, moveNode, removeNode, TARGET_NAMES, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -23,15 +23,28 @@ type Props = {
   /** Categories and brands an item can link to. */
   categories?: LinkTargetTerm[]
   brands?: LinkTargetTerm[]
+  /** Blog categories and posts an item can link to (E11); the blog index needs no target. */
+  blogCategories?: LinkTargetBlogCategory[]
+  blogPosts?: LinkTargetBlogPost[]
 }
 
 const CUSTOM = 'custom'
 const offStore = (t: LinkTargetTerm) => (t.url ? '' : ' (not on the store)')
+const postFlag = (p: LinkTargetBlogPost) => {
+  const state = p.state ?? p.status
+  return state === 'published' ? '' : ` (${state})`
+}
+
+function selectValue(node: EditorNode): string {
+  if (node.type === 'custom') return CUSTOM
+  if (node.type === 'blog') return BLOG_INDEX
+  return hasTarget(node.type) && node.target_id ? encodeTarget(node.type, node.target_id) : ''
+}
 
 const itemName = (path: NodePath) => `Item ${path.map((i) => i + 1).join('.')}`
 
 function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNode; path: NodePath; siblings: number }) {
-  const { nodes, onChange, allowsMega, errors, readOnly, pages, categories = [], brands = [] } = props
+  const { nodes, onChange, allowsMega, errors, readOnly, pages, categories = [], brands = [], blogCategories = [], blogPosts = [] } = props
   const linkError = errors[`${errorKey(path)}.url`] ?? errors[`${errorKey(path)}.target_id`]
   const name = itemName(path)
   const key = errorKey(path)
@@ -50,15 +63,16 @@ function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNo
           <div className="flex flex-col gap-1">
             <div className="flex gap-2">
               <Select
-                value={node.type === 'custom' ? CUSTOM : node.target_id ? encodeTarget(node.type, node.target_id) : ''}
+                value={selectValue(node)}
                 onValueChange={(v) => {
+                  if (v === BLOG_INDEX) return patch({ type: 'blog', target_id: null })
                   const target = decodeTarget(v)
                   patch(target ? { type: target.type, target_id: target.id } : { type: 'custom' })
                 }}
                 disabled={readOnly}
               >
                 <SelectTrigger aria-label={`${name} link type`} className={cn(node.type !== 'custom' ? 'w-full' : 'w-36 shrink-0')}>
-                  <SelectValue placeholder={`Choose a ${node.type}`} />
+                  <SelectValue placeholder={hasTarget(node.type) ? `Choose a ${TARGET_NAMES[node.type]}` : 'Choose a link'} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={CUSTOM}>Custom link</SelectItem>
@@ -84,6 +98,12 @@ function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNo
                       {brands.map((b) => <SelectItem key={b.id} value={encodeTarget('brand', b.id)}>Brand: {b.name}{offStore(b)}</SelectItem>)}
                     </SelectGroup>
                   )}
+                  <SelectGroup>
+                    <SelectLabel>Blog</SelectLabel>
+                    <SelectItem value={BLOG_INDEX}>Blog (all posts)</SelectItem>
+                    {blogCategories.map((c) => <SelectItem key={c.id} value={encodeTarget('blog_category', c.id)}>Blog category: {c.name}</SelectItem>)}
+                    {blogPosts.map((p) => <SelectItem key={p.id} value={encodeTarget('blog_post', p.id)}>Blog post: {p.title}{postFlag(p)}</SelectItem>)}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               {node.type === 'custom' && (

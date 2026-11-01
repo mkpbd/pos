@@ -359,7 +359,7 @@ describe('web order page', () => {
   })
 
   it.each([
-    ['ORDER_PAID', 'A paid order cannot be cancelled here; it needs a refund.'],
+    ['ORDER_PAID', 'A paid order can only be cancelled together with a refund, by someone allowed to refund web orders.'],
     ['ORDER_ALREADY_PAID', 'This order is already paid.'],
   ])('shows %s as a plain message', async (code, message) => {
     const user = userEvent.setup()

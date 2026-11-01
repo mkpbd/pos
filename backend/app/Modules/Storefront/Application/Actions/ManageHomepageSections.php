@@ -2,6 +2,8 @@
 
 namespace App\Modules\Storefront\Application\Actions;
 
+use App\Modules\Cms\Application\Contracts\BlogDirectory;
+use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
@@ -35,6 +37,7 @@ class ManageHomepageSections
         private readonly StorefrontCatalog $catalog,
         private readonly AuditTrail $audit,
         private readonly CatalogPromotions $promotions,
+        private readonly BlogDirectory $blog,
     ) {}
 
     /**
@@ -187,6 +190,11 @@ class ManageHomepageSections
         // Hot deals: one countdown promotion, or null for every running flash sale.
         if ($type === SectionType::HotDeals && is_string($config['promotion_id']) && ! $this->promotions->isCountdownPromotion($config['promotion_id'])) {
             throw new BusinessRuleViolation('PROMOTION_NOT_FOUND', 'Choose an automatic promotion with a countdown (a flash sale).', ['promotion_id' => $config['promotion_id']]);
+        }
+
+        // Blog teaser (E11): one blog category, or null for every category.
+        if ($type === SectionType::BlogPosts && is_string($config['category_id']) && $this->blog->existing(BlogReferences::CATEGORY, [$config['category_id']]) === []) {
+            throw new BusinessRuleViolation('BLOG_CATEGORY_NOT_FOUND', 'The selected blog category no longer exists.', ['category_id' => $config['category_id']]);
         }
 
         return $config;

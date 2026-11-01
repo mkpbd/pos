@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { Loader2Icon } from 'lucide-react'
+import { AlertTriangleIcon, Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
 import { LoadingState } from '@/components/common/state-views'
@@ -15,14 +15,16 @@ import { isRetryable, useIdempotencyKey } from '@/features/returns/api'
 import { useCouriersQuery } from '@/features/shipping/api'
 import { sortCouriers } from '@/features/shipping/shipping'
 import { useWebOrderActionMutation, type WebOrder, type WebOrderAction } from '@/features/web-orders/api'
-import { actionErrorMessage, isStaleOrderError } from '@/features/web-orders/orders'
+import { actionErrorMessage, cancelRefundDue, isStaleOrderError, refundBlocker } from '@/features/web-orders/orders'
+import { WEB_REFUND_METHODS, type WebRefundMethod } from '@/features/web-returns/api'
+import { REFUND_METHOD_LABELS } from '@/features/web-returns/returns'
 import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap } from '@/lib/forms'
 import { formatMoney } from '@/lib/money'
 
 type Copy = { title: string; description: string; submit: string; success: string }
 
-function copyFor(action: WebOrderAction, order: WebOrder): Copy {
+function copyFor(action: WebOrderAction, order: WebOrder, refundDue: string | null): Copy {
   const total = formatMoney(order.total, order.currency)
   switch (action) {
     case 'confirm_payment':
@@ -63,23 +65,24 @@ function copyFor(action: WebOrderAction, order: WebOrder): Copy {
         submit: 'Record payment',
         success: `Payment for ${order.number} recorded.`,
       }
-    case 'cancel':
+    case 'cancel': {
+      const stock = order.shipment?.status === 'returned' ? 'The parcel came back to you. Its items go back into stock exactly as they were taken.' : 'Its items go back into stock.'
       return {
         title: `Cancel ${order.number}?`,
-        description:
-          order.shipment?.status === 'returned'
-            ? 'The parcel came back to you. Its items go back into stock exactly as they were taken. This cannot be undone.'
-            : 'Its items go back into stock. This cannot be undone.',
-        submit: 'Cancel order',
-        success: `${order.number} cancelled.`,
+        description: refundDue
+          ? `${stock} The customer paid, so ${formatMoney(refundDue, order.currency)} is refunded in full. This cannot be undone.`
+          : `${stock} This cannot be undone.`,
+        submit: refundDue ? 'Cancel and refund' : 'Cancel order',
+        success: refundDue ? `${order.number} cancelled and refunded.` : `${order.number} cancelled.`,
       }
+    }
   }
 }
 
-type Fields = { reference: string; courier_id: string; tracking_number: string; note: string; reason: string }
-const EMPTY: Fields = { reference: '', courier_id: '', tracking_number: '', note: '', reason: '' }
+type Fields = { reference: string; courier_id: string; tracking_number: string; note: string; reason: string; refund_method: WebRefundMethod | ''; refund_reference: string }
+const EMPTY: Fields = { reference: '', courier_id: '', tracking_number: '', note: '', reason: '', refund_method: '', refund_reference: '' }
 
-function bodyFor(action: WebOrderAction, f: Fields): Record<string, string | null> | undefined {
+function bodyFor(action: WebOrderAction, f: Fields, refundDue: string | null): Record<string, unknown> | undefined {
   switch (action) {
     case 'confirm_payment':
       return { reference: f.reference.trim() }
@@ -88,16 +91,20 @@ function bodyFor(action: WebOrderAction, f: Fields): Record<string, string | nul
     case 'ship':
       return { courier_id: f.courier_id, tracking_number: f.tracking_number.trim() || null, note: f.note.trim() || null }
     case 'cancel':
-      return { reason: f.reason.trim() }
+      if (!refundDue) return { reason: f.reason.trim() }
+      return {
+        reason: f.reason.trim(),
+        refund: f.refund_reference.trim() ? { method: f.refund_method, reference: f.refund_reference.trim() } : { method: f.refund_method },
+      }
     default:
       return undefined
   }
 }
 
-function missingRequired(action: WebOrderAction, f: Fields): boolean {
+function missingRequired(action: WebOrderAction, f: Fields, refundDue: string | null, canRefund: boolean): boolean {
   if (action === 'confirm_payment') return !f.reference.trim()
   if (action === 'ship') return !f.courier_id
-  if (action === 'cancel') return !f.reason.trim()
+  if (action === 'cancel') return !f.reason.trim() || (refundDue !== null && (!canRefund || !f.refund_method))
   return false
 }
 
@@ -142,14 +149,21 @@ export function OrderActionDialog({ order, action, onClose }: Props) {
   const idempotency = useIdempotencyKey()
   const [fields, setFields] = useState<Fields>(EMPTY)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const copy = copyFor(action, order)
+  const [blocker, setBlocker] = useState<{ code: string; message: string } | null>(null)
+  const can = useCan()
+  const canRefund = can('web_orders.refund')
+  // Cancelling a paid order refunds it in full (E11); unpaid orders cancel as before.
+  const refundDue = action === 'cancel' ? cancelRefundDue(order) : null
+  const copy = copyFor(action, order, refundDue)
   const set = (patch: Partial<Fields>) => setFields((f) => ({ ...f, ...patch }))
+  const missing = missingRequired(action, fields, refundDue, canRefund)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (missingRequired(action, fields) || mutation.isPending) return
-    const body = bodyFor(action, fields)
+    if (missing || mutation.isPending) return
+    const body = bodyFor(action, fields, refundDue)
     setErrors({})
+    setBlocker(null)
     mutation.mutate(
       { id: order.id, action, body, idempotencyKey: idempotency.keyFor({ id: order.id, action, body }) },
       {
@@ -162,6 +176,11 @@ export function OrderActionDialog({ order, action, onClose }: Props) {
           idempotency.settle(error)
           if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
             setErrors(fieldErrorMap(error))
+            return
+          }
+          const refundProblem = refundBlocker(error)
+          if (refundProblem) {
+            setBlocker(refundProblem)
             return
           }
           toast.error(actionErrorMessage(error))
@@ -214,11 +233,63 @@ export function OrderActionDialog({ order, action, onClose }: Props) {
               />
             </FormField>
           )}
+          {action === 'cancel' && refundDue && (
+            canRefund ? (
+              <fieldset className="flex flex-col gap-4 rounded-md border p-3">
+                <legend className="px-1 text-sm font-medium">Refund</legend>
+                <p className="text-sm">
+                  Amount to refund <span className="font-mono font-semibold" data-testid="cancel-refund-due">{formatMoney(refundDue, order.currency)}</span>
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="cancel-refund-method">Paid back by</Label>
+                  <Select value={fields.refund_method} onValueChange={(v) => set({ refund_method: v as WebRefundMethod })}>
+                    <SelectTrigger
+                      id="cancel-refund-method"
+                      className="w-full"
+                      aria-invalid={errors['refund.method'] ? true : undefined}
+                      aria-describedby={errors['refund.method'] ? 'cancel-refund-method-error' : undefined}
+                    >
+                      <SelectValue placeholder="Choose a method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEB_REFUND_METHODS.map((m) => <SelectItem key={m} value={m}>{REFUND_METHOD_LABELS[m]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {errors['refund.method'] && <p id="cancel-refund-method-error" className="text-sm text-destructive">{errors['refund.method']}</p>}
+                </div>
+                <FormField
+                  label="Refund reference (optional)"
+                  error={errors['refund.reference']}
+                  hint={fields.refund_method === 'cash' ? 'Cash is paid out of your open register session.' : 'e.g. the bank or bKash transaction ID.'}
+                >
+                  <Input maxLength={80} value={fields.refund_reference} onChange={(e) => set({ refund_reference: e.target.value })} />
+                </FormField>
+              </fieldset>
+            ) : (
+              <p role="note" className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
+                This order is paid ({formatMoney(refundDue, order.currency)}). Cancelling it refunds the customer, which needs the permission to refund web orders. Ask a manager to cancel it.
+              </p>
+            )
+          )}
+          {blocker && (
+            <div role="alert" className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+              <div className="flex flex-col gap-1">
+                <span>{blocker.message}</span>
+                {blocker.code === 'CASH_SESSION_REQUIRED' && (
+                  <span className="text-muted-foreground">
+                    Open a register session at the <Link to="/pos" className="underline">POS terminal</Link> or on <Link to="/cash-registers" className="underline">Cash registers</Link>, or refund by bank transfer or mobile banking.
+                  </span>
+                )}
+                {blocker.code === 'INSUFFICIENT_CASH' && <span className="text-muted-foreground">Refund by bank transfer or mobile banking instead.</span>}
+              </div>
+            </div>
+          )}
           {errors.form && <p role="alert" className="text-sm text-destructive">{errors.form}</p>}
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>{destructive ? 'Keep order' : 'Back'}</Button>
-          <Button type="submit" form="order-action-form" variant={destructive ? 'destructive' : 'default'} disabled={mutation.isPending || missingRequired(action, fields)}>
+          <Button type="submit" form="order-action-form" variant={destructive ? 'destructive' : 'default'} disabled={mutation.isPending || missing}>
             {mutation.isPending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
             {copy.submit}
           </Button>

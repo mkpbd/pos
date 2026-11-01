@@ -32,6 +32,8 @@ import {
 import { CatalogSectionFields } from '@/features/storefront/components/catalog-section-fields'
 import { ColorField } from '@/features/storefront/components/color-field'
 import { HotDealsFields } from '@/features/storefront/components/hot-deals-fields'
+import { BlogPostsFields } from '@/features/storefront/components/blog-posts-fields'
+import { normalizeBlogPosts, validateBlogPosts } from '@/features/storefront/blog-posts-section'
 import { normalizeHotDeals, validateHotDeals } from '@/features/storefront/hot-deals'
 import { isCatalogSection, normalizeCatalogConfig, SECTION_ITEM_KIND, usesManualItems, validateCatalogSection } from '@/features/storefront/catalog-sections'
 import type { PickedItem } from '@/features/online-catalog/move'
@@ -293,6 +295,8 @@ function ConfigFields({ info, config, onChange, errors }: { info: SectionTypeInf
     }
     case 'hot_deals':
       return <HotDealsFields config={config as SectionConfigs['hot_deals']} onChange={onChange} errors={errors} />
+    case 'blog_posts':
+      return <BlogPostsFields config={config as SectionConfigs['blog_posts']} onChange={onChange} errors={errors} />
     case 'newsletter': {
       const c = config as SectionConfigs['newsletter']
       return (
@@ -334,6 +338,7 @@ function validate(info: SectionTypeInfo, d: Draft): Errors {
     if (d.bannerIds.length < min || d.bannerIds.length > max) errors.banner_ids = min === max ? `Choose exactly ${min} banners.` : `Choose ${min} to ${max} banners.`
   }
   if (info.type === 'hot_deals') Object.assign(errors, validateHotDeals(d.config as SectionConfigs['hot_deals']))
+  if (info.type === 'blog_posts') Object.assign(errors, validateBlogPosts(d.config as SectionConfigs['blog_posts']))
   if (info.type === 'rich_text' && !(d.config as SectionConfigs['rich_text']).body_html) errors['config.body_html'] = 'Write some text.'
   if (info.type === 'features_strip' || info.type === 'testimonials') {
     const items = (d.config as SectionConfigs['features_strip'] | SectionConfigs['testimonials']).items
@@ -378,7 +383,9 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
         ? normalizeCatalogConfig(info.type, draft.config)
         : info.type === 'hot_deals'
           ? normalizeHotDeals(draft.config as SectionConfigs['hot_deals'])
-          : draft.config,
+          : info.type === 'blog_posts'
+            ? normalizeBlogPosts(draft.config as SectionConfigs['blog_posts'])
+            : draft.config,
       is_enabled: draft.isEnabled,
       starts_at: fromLocalInput(draft.startsAt),
       ends_at: fromLocalInput(draft.endsAt),

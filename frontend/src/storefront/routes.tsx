@@ -3,6 +3,7 @@ import { AccountPage, ProfilePage, VerifyEmailPage } from './account/account-pag
 import { AddressesPage } from './account/addresses-page'
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from './account/auth-pages'
 import { GuestOnly, RequireCustomer } from './account/guards'
+import { BlogIndexPage, BlogPostPage } from './blog/blog-pages'
 import { CartPage } from './cart/cart-page'
 import { CheckoutPage } from './checkout/checkout-page'
 import { StorefrontLayout } from './components/storefront-layout'
@@ -21,7 +22,7 @@ import { WishlistPage } from './wishlist/wishlist-page'
 
 /**
  * Storefront pages. Paths must match the server's list of known paths
- * (StorefrontShellController::KNOWN_PATHS; content pages, categories, brands and products are looked up) so unknown URLs are 404s for crawlers too.
+ * (StorefrontShellController::KNOWN_PATHS; content pages, blog posts and categories, product categories, brands and products are looked up) so unknown URLs are 404s for crawlers too.
  * Checkout is open to guests unless the store requires an account (the page says so); an
  * order page needs the guest's access token or the signed-in owner.
  * Account pages need a signed-in customer (else /account/login?next=…); sign-in, registration
@@ -38,6 +39,9 @@ export const storefrontRoutes: RouteObject[] = [
       { path: 'brand/:slug', element: <BrandPage /> },
       { path: 'product/:slug', element: <ProductPage /> },
       { path: 'pages/:slug', element: <ContentPage /> },
+      { path: 'blog', element: <BlogIndexPage /> },
+      { path: 'blog/category/:slug', element: <BlogIndexPage /> },
+      { path: 'blog/:slug', element: <BlogPostPage /> },
       { path: 'newsletter/confirm', element: <NewsletterConfirmPage /> },
       { path: 'newsletter/unsubscribe', element: <NewsletterUnsubscribePage /> },
       { path: 'cart', element: <CartPage /> },

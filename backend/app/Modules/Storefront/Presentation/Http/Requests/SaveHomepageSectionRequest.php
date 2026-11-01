@@ -127,6 +127,11 @@ class SaveHomepageSectionRequest extends FormRequest
                 'config.source' => ['sometimes', Rule::in(SectionType::BRAND_STRIP_SOURCES)],
                 'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS['brand_strip'])],
             ],
+            SectionType::BlogPosts => [
+                'config.category_id' => ['sometimes', 'nullable', 'uuid'],
+                'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS['blog_posts'])],
+                'config.view_all_url' => ['sometimes', 'nullable', new SafeLink],
+            ],
             SectionType::HotDeals => [
                 'config.promotion_id' => ['sometimes', 'nullable', 'uuid'],
                 'config.limit' => ['sometimes', 'integer', 'between:'.implode(',', SectionType::LIMITS['hot_deals'])],

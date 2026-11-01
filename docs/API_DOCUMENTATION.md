@@ -112,7 +112,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 409 | `TOTAL_CHANGED` | The server total differs from the `expected_total` the shopper confirmed (`details.expected_total`, `total`, `preview` — the fresh preview). Nothing was placed. |
 | 422 | `INSUFFICIENT_STOCK` | Also: order placement — stock at the fulfilment store went below the order quantity (names the first failing variant; web orders never use the branch's negative-stock allowance). The whole placement rolls back. |
 | 422 | `INVALID_STATUS_TRANSITION` | Web order step not allowed from the current status (`details.from`, `to`, `allowed`); also confirming payment of a COD order and recording a COD payment for a bank-transfer order or one not shipped/delivered (`details.status`, `payment_method`). |
-| 422 | `ORDER_PAID`, `ORDER_ALREADY_PAID` | Cancelling a paid (or partly or fully refunded) web order — not supported; once delivered, goods come back through an online return (E10b); confirming or recording a payment twice. |
+| 422 | `ORDER_PAID`, `ORDER_ALREADY_PAID` | Cancelling a paid (or partly or fully refunded) web order without a refund (the expiry job, or an order that was paid meanwhile; since E11 staff cancel paid orders with a refund — `REFUND_REQUIRED`); once delivered, goods come back through an online return (E10b); confirming or recording a payment twice. |
 | 422 | `DISTRICT_IN_OTHER_ZONE` | Delivery zone with a district another zone covers (`details.district_ids`, `districts: [{id, name, zone_id, zone_name}]`). |
 | 422 | `COUPON_INVALID` | Applying a coupon code that cannot be used now (`details.reason` `not_found` \| `not_started` \| `expired` \| `usage_limit_reached` \| `customer_limit_reached` \| `min_subtotal` \| `not_applicable`, `details.code`, `details.min_subtotal` for `min_subtotal`). The cart keeps its previous coupon. |
 | 422 | `NOT_A_COUPON_PROMOTION`, `CODES_EXHAUSTED` | Adding codes to an automatic promotion; no free random codes left for the prefix after several attempts (try another prefix). |
@@ -128,6 +128,9 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `RETURN_NOT_CANCELLABLE` | A customer cancelling an online return that is no longer `requested` (`details.status`). |
 | 422 | `REFUND_EXCEEDS_PAID` | An online return refund that would take the order's refunds above its paid total (`details.paid_total`, `refunded_total`, `amount`). |
 | 422 | `INVALID_STATUS_TRANSITION` | Also: an online return step not allowed from the return's status (`details.from`, `to`, `allowed`). |
+| 422 | `REFUND_REQUIRED` | Staff cancelling a paid web order without `refund.method` (`details.refund_amount`) (E11). |
+| 422 | `CATEGORY_NOT_FOUND` | Also: a blog post naming a blog category that is not (any more) in the organization (`details.category_id`) (E11). |
+| 422 | `BLOG_CATEGORY_NOT_FOUND`, `BLOG_POST_NOT_FOUND` | A menu item or homepage `blog_posts` section naming a blog category or post that does not exist (`details.blog_category_ids` / `blog_post_ids`; section: `details.category_id`) (E11). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -1115,6 +1118,95 @@ Asking for both juices again while this return is active:
 ```json
 { "success": false, "error": { "code": "QUANTITY_EXCEEDS_RETURNABLE", "message": "Only 1 of Pran Mango Juice 250ml can still be returned.",
   "details": { "lines": [ { "order_line_id": "0193…", "product_name": "Pran Mango Juice 250ml", "requested": "2", "returnable": "1" } ] } }, "meta": { "request_id": "0193…" } }
+```
+
+### E-commerce track — blog, popup banner, cancelling paid orders with a refund (E11)
+
+Steps marked **I** need `Idempotency-Key`. Blog slugs follow the page slug rules (lower-case letters, digits and hyphens, ≤ 100) and are unique per organization among rows that are not deleted. A post is **readable** when `status = published` and `published_at ≤ now`; `state` is derived: `draft`, `scheduled` (published, `published_at` in the future) or `published`. Bodies are sanitized on save (ADR-009); `reading_minutes` = words of the body text / 200, rounded up, at least 1.
+
+Cancelling a paid web order (staff; `auth:sanctum` + `tenant`):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| POST `/web-orders/{id}/cancel` | `web_orders.manage` (unpaid) / `web_orders.refund` (paid) · I | `{reason (≤ 200), refund?: {method: cash\|bank_transfer\|mobile_banking, reference? (≤ 80)}}`. Neither permission → 403. **Unpaid** orders: as before (`web_orders.manage`; `refund` ignored). **Paid** orders (`paid`, `partially_refunded`) that are `confirmed` or `processing`, or `shipped` with the parcel returned to the sender: `web_orders.refund` (else 403) and `refund.method` (else `422 REFUND_REQUIRED`, `details.refund_amount`). In one transaction with the order row locked: `paid_total − refunded_total` out through the payments ledger (source `online_order_refund`; bank transfer and mobile banking without a drawer, cash from the caller's open register session in the order's branch — `CASH_SESSION_REQUIRED`, `INSUFFICIENT_CASH`, nothing changes), stock back to the exact `order_line_stock` batches (`online_order_cancel`), order `cancelled`, `payment_status: refunded`, `refunded_total = paid_total`, status history, audits `web_order.cancelled` and `web_order.refunded`. Then a queued e-mail to the order's contact address. Delivered, failed or already cancelled → `INVALID_STATUS_TRANSITION`. → the staff web order. Promotion redemptions are not reversed. |
+| GET `/web-orders/{id}` | `web_orders.view` | Adds `cancel_refund_amount` (string; what cancelling would refund — paid orders that can still be cancelled — else `null`); `allowed_actions` lists `cancel` for such orders when the user has `web_orders.refund`; the refund is in `payments` (direction `out`). |
+
+Customer self-cancel (`POST /store/account/orders/{number}/cancel`, E9) is unchanged: paid orders → `ORDER_NOT_CANCELLABLE`.
+
+Blog administration (`auth:sanctum` + `tenant` + `cms.manage`):
+
+| Method & path | Notes |
+|---------------|-------|
+| GET `/cms/blog-categories` | Every category in display order: `{id, name, slug, description, sort_order, post_count (not deleted), published_post_count (readable now), updated_at}`. |
+| POST `/cms/blog-categories` | `{name (≤ 80), slug? (from the name when left out), description? (≤ 300), sort_order?}` → 201; new categories go last; at most 100 (`LIMIT_REACHED`). |
+| PUT `/cms/blog-categories/order` | `{ids}` — every category id exactly once (`ORDER_MISMATCH`). |
+| PATCH `/cms/blog-categories/{id}` | Same fields, all optional. |
+| DELETE `/cms/blog-categories/{id}` | Soft delete; its posts become uncategorised. `IN_USE` while a menu item or a homepage `blog_posts` section links to it. |
+| GET `/cms/blog-posts` | `?status=draft\|scheduled\|published` (derived state), `?category_id=<uuid>\|none`, `?search=` (title, slug), `?sort=` (`title`, `published_at`, `updated_at`, `created_at`; default `-updated_at`), `?page=`, `?per_page=`. Rows (no body): `{id, slug, title, excerpt, category_id, category {id, name, slug}\|null, author {id, name}\|null, status, state, is_visible, published_at, cover_media_id, cover, reading_minutes, preview_url (/blog/{slug}?preview=1), created_at, updated_at}`. `meta.status_counts`: `{all, draft, scheduled, published}` for the search and category, without `status`. |
+| GET `/cms/blog-posts/{id}` | The row plus `body_html`, `seo_title`, `seo_description`. |
+| POST `/cms/blog-posts` | `{title (≤ 160), slug (not `categories`), category_id?, excerpt? (≤ 300), body_html? (≤ 200 000, sanitized), cover_media_id?, status? draft\|published, published_at? (ISO 8601 with offset; future = scheduled), seo_title? (≤ 70), seo_description? (≤ 160)}` → 201. Publishing without `published_at` publishes now. The author is the signed-in user. `CATEGORY_NOT_FOUND`, `MEDIA_NOT_FOUND`. |
+| PATCH `/cms/blog-posts/{id}` | Same fields, all optional; reading time recomputed. |
+| DELETE `/cms/blog-posts/{id}` | Soft delete. `IN_USE` while a menu item links to it. |
+
+A media item used as the cover of a post that is not deleted (drafts included) cannot be deleted (`IN_USE` from the media library); images inside bodies are not tracked, as with pages.
+
+Storefront (public, organization from the host; `throttle:storefront`):
+
+| Method & path | Notes |
+|---------------|-------|
+| GET `/store/blog` | `?category=<slug>&page=`. Readable posts, newest first, 9 per page (`meta.pagination`). Cards `{slug, title, excerpt, cover (media ref)\|null, category {name, slug}\|null, author (first name)\|null, published_at, reading_minutes}`. `meta.category`: `{name, slug, description}` or `null`; unknown category slug → 404 `NOT_FOUND`. |
+| GET `/store/blog/categories` | Categories with at least one readable post, display order: `[{name, slug, description, post_count}]`. |
+| GET `/store/blog/{slug}` | The card plus `body_html`, `seo_title`, `seo_description`, `prev` (older) / `next` (newer) `{slug, title}\|null`, `related` (≤ 3 newest readable cards of the same category), `preview`. Drafts, scheduled and deleted posts → 404 `NOT_FOUND`, except `?preview=1` for a signed-in staff user of this store with `cms.manage` (adds `state`; `Cache-Control: no-store, private`). |
+| GET `/store/bootstrap` | Adds `popup`: the first live `popup` banner by sort order `{id, title, subtitle, image, mobile_image, link_url, button_label, delay_seconds, frequency, updated_at}`, or `null` (also when its desktop image is gone). Menu items of type `blog`, `blog_category` and `blog_post` resolve to `/blog`, `/blog/category/{slug}` and `/blog/{slug}`; deleted targets and posts that are not readable yet are left out. |
+| GET `/store/homepage` | `blog_posts` sections carry `payload.posts` (cards as above); hidden while empty (preview state `empty`). |
+| Shell `/blog`, `/blog/category/{slug}`, `/blog/{slug}` | Known paths; meta written by the server: `Blog \| {store}`, `{category} \| Blog \| {store}`, post `{seo_title ?? title} \| {store}` with description, absolute `og:image` (cover) and `og:type: article`. Unknown slugs → 404 shell. Post preview (`?preview=1`, staff): `noindex`, `Cache-Control: no-store`. |
+
+Storefront configuration (`auth:sanctum` + `tenant`):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| PUT `/storefront/menus/{id}/items` | `storefront.manage` | New item types: `{type: "blog", label}` (the blog index; no `target_id`, no `url`), `{type: "blog_category" \| "blog_post", label, target_id}`. Unknown or deleted targets → `BLOG_CATEGORY_NOT_FOUND` / `BLOG_POST_NOT_FOUND` (`details.blog_category_ids` / `blog_post_ids`). Drafts and scheduled posts may be linked; menus show them once readable. |
+| GET `/storefront/link-targets` | `storefront.view` | Adds `blog_categories: [{id, name, slug}]` (display order) and `blog_posts: [{id, slug, title, status, state, is_visible}]`. |
+| POST/PATCH `/storefront/homepage-sections[/{id}]` | `storefront.manage` | New type `blog_posts`: config `{category_id: uuid\|null (null = every category), limit (3–12, default 3), view_all_url (SafeLink; default `/blog`; explicit `null` = no link)}`. Unknown category → `BLOG_CATEGORY_NOT_FOUND`. |
+| GET/POST/PATCH `/storefront/banners[/{id}]` | `storefront.view` / `storefront.manage` | Placement `popup` (`?placement=popup`). Popups also take `popup_delay_seconds` (0–60, default 5) and `popup_frequency` (`once_per_session` \| `once_per_day` \| `once_per_week`, default `once_per_day`); other placements store `null` (ignored when sent). Rows return both fields. |
+
+New error codes:
+
+| HTTP | Code | When |
+|------|------|------|
+| 422 | `REFUND_REQUIRED` | Cancelling a paid web order without `refund.method` (`details.refund_amount` — what would be refunded). |
+| 422 | `CATEGORY_NOT_FOUND` | Also: a blog post naming a blog category that is not (any more) in the organization (`details.category_id`). |
+| 422 | `BLOG_CATEGORY_NOT_FOUND`, `BLOG_POST_NOT_FOUND` | A menu item or homepage `blog_posts` section naming a blog category or post that does not exist or was deleted (`details.blog_category_ids`, `details.blog_post_ids`; the section: `details.category_id`). |
+
+Permissions are unchanged: the blog uses `cms.manage`; `web_orders.refund` now also covers cancelling paid orders. Audited `web_order.cancelled` (with `refund {amount, method, reference}` for paid orders) and `web_order.refunded` (`cancellation: true`); blog writes audit `blog_category.created|updated|deleted`, `blog_categories.reordered`, `blog_post.created|updated|deleted` (body changes recorded as changed, not copied).
+
+Example — the blog index of the seeded Demo Mart, one category (dates illustrative):
+
+```http
+GET /api/v1/store/blog?category=recipes
+```
+```json
+{
+  "success": true,
+  "data": [
+    { "slug": "weeknight-khichuri", "title": "…", "excerpt": "…",
+      "cover": { "id": "0193…", "url": "/storage/media/…/blog-weeknight-khichuri.jpg", "srcset": "…", "width": 1200, "height": 630, "alt": null },
+      "category": { "name": "Recipes", "slug": "recipes" }, "author": "…",
+      "published_at": "2026-10-18T09:00:00+00:00", "reading_minutes": 2 },
+    { "slug": "mango-lassi", "title": "…", "excerpt": "…", "cover": { "id": "0193…", "url": "…" },
+      "category": { "name": "Recipes", "slug": "recipes" }, "author": "…",
+      "published_at": "2026-10-04T09:00:00+00:00", "reading_minutes": 1 }
+  ],
+  "meta": { "request_id": "0193…", "category": { "name": "Recipes", "slug": "recipes", "description": "Simple dishes from the ingredients on our shelves." },
+            "pagination": { "current_page": 1, "per_page": 9, "total": 2, "last_page": 1 } }
+}
+```
+
+Cancelling a paid order without choosing a refund method:
+
+```json
+{ "success": false, "error": { "code": "REFUND_REQUIRED", "message": "WEB-000004 is paid; choose how the money is refunded to cancel it.",
+  "details": { "refund_amount": "1250.00" } }, "meta": { "request_id": "0193…" } }
 ```
 
 ### Planned (by phase)

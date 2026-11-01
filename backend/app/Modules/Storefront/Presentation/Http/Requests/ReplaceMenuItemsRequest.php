@@ -9,7 +9,8 @@ use Illuminate\Validation\Rule;
 
 /**
  * The full, ordered item tree of a menu: up to three levels. Custom items carry a `url`;
- * page, category and brand items a `target_id` (the record).
+ * page, category, brand, blog-category and blog-post items a `target_id` (the record); a
+ * `blog` item (the blog index) neither.
  */
 class ReplaceMenuItemsRequest extends FormRequest
 {
@@ -20,12 +21,13 @@ class ReplaceMenuItemsRequest extends FormRequest
         $rules = ['items' => ['present', 'array']];
 
         $prefix = 'items.*';
+        $targeted = implode(',', MenuItemType::TARGETED);
         for ($level = 1; $level <= self::MAX_DEPTH; $level++) {
             $rules[$prefix] = ['array'];
             $rules["{$prefix}.type"] = ['sometimes', Rule::enum(MenuItemType::class)];
             $rules["{$prefix}.label"] = ['required', 'string', 'max:80'];
-            $rules["{$prefix}.url"] = ["required_unless:{$prefix}.type,page,category,brand", 'nullable', new SafeLink];
-            $rules["{$prefix}.target_id"] = ["required_if:{$prefix}.type,page,category,brand", 'nullable', 'uuid'];
+            $rules["{$prefix}.url"] = ["required_unless:{$prefix}.type,blog,{$targeted}", 'nullable', new SafeLink];
+            $rules["{$prefix}.target_id"] = ["required_if:{$prefix}.type,{$targeted}", 'nullable', 'uuid'];
             $rules["{$prefix}.open_in_new_tab"] = ['sometimes', 'boolean'];
             $rules["{$prefix}.is_visible"] = ['sometimes', 'boolean'];
             $rules["{$prefix}.is_mega"] = ['sometimes', 'boolean'];

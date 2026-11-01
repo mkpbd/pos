@@ -77,7 +77,7 @@ class HomepageBuilderTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('link_url', 'error.details');
         $this->postJson('/api/v1/storefront/banners', ['placement' => 'hero_slider', 'name' => 'No link', 'desktop_media_id' => $image, 'button_label' => 'Go'])
             ->assertUnprocessable()->assertJsonPath('error.code', 'BUTTON_LINK_REQUIRED');
-        $this->postJson('/api/v1/storefront/banners', ['placement' => 'popup', 'name' => 'Later', 'desktop_media_id' => $image])
+        $this->postJson('/api/v1/storefront/banners', ['placement' => 'category_top', 'name' => 'Later', 'desktop_media_id' => $image])
             ->assertUnprocessable()->assertJsonValidationErrors('placement', 'error.details');
         $this->postJson('/api/v1/storefront/banners', ['placement' => 'hero_slider', 'name' => 'Ghost', 'desktop_media_id' => '01900000-0000-7000-8000-000000000000'])
             ->assertUnprocessable()->assertJsonPath('error.code', 'MEDIA_NOT_FOUND');
@@ -111,7 +111,7 @@ class HomepageBuilderTest extends TestCase
         $types = $this->getJson('/api/v1/storefront/homepage-sections/types')->assertOk()->json('data');
         $this->assertSame([
             'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
-            'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'hot_deals',
+            'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'hot_deals', 'blog_posts',
         ], array_column($types, 'type'));
 
         $this->postJson('/api/v1/storefront/homepage-sections', ['type' => 'deal_countdown'])->assertUnprocessable()->assertJsonValidationErrors('type', 'error.details');

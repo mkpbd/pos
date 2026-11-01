@@ -109,6 +109,16 @@ Online returns and refunds, customer web activity, promotion report, ratings on 
 - No new scheduler job, environment variable or rate limiter (return writes use the shopper write limit). No cache: card ratings come from one grouped query per listing.
 - The new PostgreSQL CHECKs and triggers have not run yet (the local PostgreSQL run is still pending) — run the full suite on PostgreSQL before production.
 
+Blog, popup banner and refunds for paid cancellations (E11):
+- No new permission. `pos:permissions:sync` only refreshes descriptions. **Cancelling a paid web order needs `web_orders.refund`** (Organization Admin, Online Store Manager, Accountant); `web_orders.manage` alone still cancels unpaid orders only — users without `web_orders.refund` get a 403 on paid orders and see no *Cancel* action for them. The blog uses `cms.manage`.
+- Migrations: new tables `blog_categories`, `blog_posts` (Cms); `banners.popup_delay_seconds`, `banners.popup_frequency` (Storefront) — additive, no backfill. On PostgreSQL they add the blog CHECKs, rebuild `banners_placement_check` (adds `popup`) and `menu_items_target_check` (adds the targetless `blog` type) and add `banners_popup_settings_check`. Existing banners and menu items satisfy the new checks unchanged. The down migration of the Storefront part fails on PostgreSQL while `popup` banners or `blog` menu items exist — delete them first.
+- **Mail and a queue worker:** a paid cancellation sends a queued e-mail (`OrderCancelledWithRefundEmail`) to the order's contact address after commit, linking to the account order page on the primary storefront domain for orders of a customer. Without a worker the cancel and refund still complete; the e-mail waits in the queue.
+- **Cash refunds** of paid cancellations come out of the cancelling user's open register session in the order's branch (`CASH_SESSION_REQUIRED`, `INSUFFICIENT_CASH`), as return refunds (E10b).
+- **Media:** blog covers come from the media library (`php artisan storage:link` as for other images); a cover used by a post cannot be deleted. The shell's `og:image` is made absolute from the request's scheme and host, so set up the storefront domain (and trusted proxies behind TLS termination) for correct share previews.
+- The popup is off until a banner with placement *Popup* is active; at most one shows (the first live by sort order). Visitors' "already seen" state lives in their browser (`localStorage` / `sessionStorage`) — editing the banner shows it again.
+- No new scheduler job, environment variable, rate limiter or cache. Scheduled posts appear by time (`published_at ≤ now` at read time) — no job needed.
+- The new PostgreSQL CHECKs have not run yet (the local PostgreSQL run is still pending) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash

@@ -22,6 +22,7 @@ import {
   type SectionTypeInfo,
 } from '@/features/storefront/api'
 import { HotDealsSummary } from '@/features/storefront/components/hot-deals-fields'
+import { BlogPostsSummary } from '@/features/storefront/components/blog-posts-fields'
 import { SectionEditor } from '@/features/storefront/components/section-editor'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 
@@ -78,6 +79,7 @@ function SectionRow({ section, index, count, canManage, onMove, onEdit, onDelete
           {section.banner_ids.length > 0 && ` · ${section.banner_ids.length} banner${section.banner_ids.length === 1 ? '' : 's'}`}
           {itemCount > 0 && ` · ${itemCount} hand-picked`}
           {section.type === 'hot_deals' && <HotDealsSummary config={section.config as SectionConfigs['hot_deals']} />}
+          {section.type === 'blog_posts' && <BlogPostsSummary config={section.config as SectionConfigs['blog_posts']} />}
         </p>
       </div>
       <Badge variant={state.variant}>{state.label}</Badge>
@@ -149,7 +151,7 @@ export function HomepagePage() {
           ) : sections.error ? (
             <ErrorState error={sections.error} onRetry={() => sections.refetch()} />
           ) : sections.data.length === 0 ? (
-            <EmptyState title="The homepage has no sections yet" description="Add a hero slider, banners, products, flash-sale deals, categories, brands, text, features, testimonials or a newsletter sign-up." />
+            <EmptyState title="The homepage has no sections yet" description="Add a hero slider, banners, products, flash-sale deals, categories, brands, blog posts, text, features, testimonials or a newsletter sign-up." />
           ) : (
             <ol className="flex flex-col divide-y" aria-label="Homepage sections">
               {sections.data.map((s, i) => (

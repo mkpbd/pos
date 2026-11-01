@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/api/client'
 import { BootstrapContext, useBootstrapQuery } from '../api'
 import { CartDrawerProvider } from '../cart/mini-cart'
 import { QuickViewProvider } from '../catalog/quick-view'
+import { PopupBanner } from '../popup/popup-banner'
 import { applyCssVars, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
 import { AnnouncementBar, PreviewRibbon } from './announcement-bar'
@@ -39,6 +40,7 @@ export function StorefrontLayout() {
               </main>
               <SiteFooter />
             </div>
+            <PopupBanner />
           </CartDrawerProvider>
         </NoticeProvider>
       </BootstrapContext>

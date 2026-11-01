@@ -33,6 +33,8 @@ final class ContentPresenter
             'mobile_media_id' => $b->mobile_media_id,
             'text_color' => $b->text_color,
             'text_position' => $b->text_position,
+            'popup_delay_seconds' => $b->popup_delay_seconds,
+            'popup_frequency' => $b->popup_frequency,
             'starts_at' => $b->starts_at?->toIso8601String(),
             'ends_at' => $b->ends_at?->toIso8601String(),
             'is_active' => $b->is_active,

@@ -148,8 +148,8 @@ class WebOrderWorkflowTest extends TestCase
         $this->act($id, 'confirm-payment', ['reference' => 'TXN-43'])->assertStatus(422)->assertJsonPath('error.code', 'ORDER_ALREADY_PAID');
         $this->assertSame(1, Payment::query()->withoutGlobalScopes()->where('source_type', 'online_order')->count());
 
-        // Paid orders are refunded, not cancelled (E10).
-        $this->act($id, 'cancel', ['reason' => 'Changed mind'])->assertStatus(422)->assertJsonPath('error.code', 'ORDER_PAID');
+        // Paid orders are cancelled only with a refund (E11).
+        $this->act($id, 'cancel', ['reason' => 'Changed mind'])->assertStatus(422)->assertJsonPath('error.code', 'REFUND_REQUIRED');
     }
 
     public function test_cancel_restocks_the_exact_batches_once(): void

@@ -2,8 +2,10 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
+use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use Illuminate\Http\Request;
@@ -20,7 +22,7 @@ use Illuminate\Http\Response;
 class StorefrontShellController
 {
     /** Storefront routes that exist in this phase (exact paths); content pages are looked up. */
-    private const KNOWN_PATHS = ['/', '/shop', '/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
+    private const KNOWN_PATHS = ['/', '/shop', '/search', '/blog', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
 
     /** Shopper pages (E7, E8a, E9, E10b returns): account, cart, wishlist and checkout. Personal, never indexed. */
     private const ACCOUNT_PATHS = [
@@ -32,7 +34,7 @@ class StorefrontShellController
     /** Utility pages that search engines should not index. */
     private const NOINDEX_PATHS = ['/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog): Response
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
@@ -50,6 +52,30 @@ class StorefrontShellController
                 'title' => ($page['seo_title'] ?? $page['title']).' | '.$data['store']['name'],
                 'description' => $page['seo_description'] ?? $data['store']['description'],
             ];
+        }
+        // The blog (E11): index, category pages and posts (staff may preview unpublished posts).
+        if ($path === '/blog') {
+            $meta['title'] = 'Blog | '.$data['store']['name'];
+        }
+        $blogPreview = false;
+        if (preg_match('#^/blog/category/([A-Za-z0-9-]{1,100})$#', $path, $m) === 1 && ($category = $blog->categoryMeta($m[1])) !== null) {
+            $status = 200;
+            $meta = [
+                'title' => $category['name'].' | Blog | '.$data['store']['name'],
+                'description' => $category['description'] ?? $data['store']['description'],
+            ];
+        } elseif (preg_match('#^/blog/([A-Za-z0-9-]{1,100})$#', $path, $m) === 1) {
+            $blogPreview = $request->boolean('preview') && $this->canManageContent($request);
+            $post = $blog->postMeta($m[1], $blogPreview);
+            if ($post !== null) {
+                $status = 200;
+                $meta = [
+                    'title' => ($post['seo_title'] ?? $post['title']).' | '.$data['store']['name'],
+                    'description' => $post['description'] ?? $data['store']['description'],
+                    'image' => $post['image_url'] === null ? null : (str_starts_with($post['image_url'], '/') ? $request->getSchemeAndHttpHost().$post['image_url'] : $post['image_url']),
+                    'type' => 'article',
+                ];
+            }
         }
         if ($path === '/shop') {
             $meta['title'] = 'Shop | '.$data['store']['name'];
@@ -81,14 +107,27 @@ class StorefrontShellController
                 'type' => $m[1] === 'product' ? 'product' : 'website',
             ];
         }
-        $noindex = $data['preview'] || $status === 404 || $orderPage || in_array($path, self::NOINDEX_PATHS, true);
+        $noindex = $data['preview'] || $blogPreview || $status === 404 || $orderPage || in_array($path, self::NOINDEX_PATHS, true);
 
         $html = $this->inject((string) file_get_contents($shell), $data, $meta, $request->url(), $noindex);
 
         return response($html, $status, ['Content-Type' => 'text/html; charset=UTF-8'])
             // Previews of a closed store must never be cached or indexed.
-            ->header('Cache-Control', $data['preview'] ? 'no-store' : 'no-cache')
+            ->header('Cache-Control', $data['preview'] || $blogPreview ? 'no-store' : 'no-cache')
             ->header('X-Robots-Tag', $noindex ? 'noindex' : 'all');
+    }
+
+    /**
+     * A signed-in staff member of this store who may manage content (blog previews).
+     */
+    private function canManageContent(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user instanceof TenantUser
+            && $user->isActive()
+            && $user->organizationId() === $request->attributes->get(ResolveStorefront::ATTRIBUTE)['organization_id']
+            && $user->can('cms.manage');
     }
 
     /**

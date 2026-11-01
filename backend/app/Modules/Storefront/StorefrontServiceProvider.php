@@ -2,10 +2,13 @@
 
 namespace App\Modules\Storefront;
 
+use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Contracts\PageReferences;
 use App\Modules\Media\Application\Contracts\MediaReferences;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
+use App\Modules\Storefront\Infrastructure\SectionBlogReferences;
 use App\Modules\Storefront\Infrastructure\SectionMediaReferences;
 use App\Modules\Storefront\Infrastructure\ThemeMediaReferences;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -24,6 +27,7 @@ class StorefrontServiceProvider extends ModuleServiceProvider
     {
         $this->app->tag([ThemeMediaReferences::class, SectionMediaReferences::class], MediaReferences::TAG);
         $this->app->tag([MenuPageReferences::class], PageReferences::TAG);
+        $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class], BlogReferences::TAG);
     }
 
     public function boot(): void

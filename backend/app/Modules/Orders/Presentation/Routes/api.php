@@ -53,8 +53,10 @@ Route::prefix('web-orders')->middleware(['auth:sanctum', 'tenant'])->group(funct
         Route::post('{webOrder}/shipment/events', [WebOrderController::class, 'shipmentEvent'])->whereUuid('webOrder');
         Route::post('{webOrder}/deliver', [WebOrderController::class, 'deliver'])->whereUuid('webOrder');
         Route::post('{webOrder}/record-cod-payment', [WebOrderController::class, 'recordCodPayment'])->whereUuid('webOrder');
-        Route::post('{webOrder}/cancel', [WebOrderController::class, 'cancel'])->whereUuid('webOrder');
     });
+
+    // Unpaid orders: web_orders.manage; paid orders with a refund (E11): web_orders.refund (checked by the controller).
+    Route::post('{webOrder}/cancel', [WebOrderController::class, 'cancel'])->whereUuid('webOrder')->middleware('idempotent');
 
     // E10b: staff-created returns.
     Route::post('{webOrder}/returns', [WebOrderReturnController::class, 'store'])->whereUuid('webOrder')->middleware(['can:web_orders.refund', 'idempotent']);

@@ -714,3 +714,101 @@ test('a shopper returns a delivered item; staff approve, receive it back into st
   await expect(page.getByText('RTN-WEB-000001').first()).toBeVisible()
   await expect(page.getByText(/Refunded: .*25\.8/).first()).toBeVisible()
 })
+
+test('a blog post written in the admin shows on the blog, its category, the homepage teaser and through the menu', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin editor flow runs on desktop')
+  const title = `Eid sweets guide ${Date.now()}`
+  const slug = `eid-sweets-guide-${Date.now()}`
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.goto('/admin/content/blog/new')
+  await page.getByLabel('Title', { exact: true }).fill(title)
+  await page.getByLabel('Address', { exact: true }).fill(slug)
+  await page.getByLabel('Excerpt', { exact: true }).fill('Five sweets to make for Eid this year.')
+  await page.getByRole('textbox', { name: 'Post text' }).fill('Start with shemai, then try firni and rasmalai.')
+  await page.getByLabel('Category', { exact: true }).click()
+  await page.getByRole('option', { name: 'Recipes' }).click()
+  await page.getByLabel('Publish now').check()
+  await page.getByRole('button', { name: 'Publish post' }).click()
+  await expect(page.getByRole('link', { name: 'View in store' })).toBeVisible()
+
+  // Newest first: the blog, its category, the homepage teaser.
+  await page.goto('/blog')
+  await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+  await page.goto('/blog/category/recipes')
+  await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+  await page.goto('/')
+  await expect(page.locator('[data-section-type="blog_posts"]').getByRole('link', { name: title }).first()).toBeVisible()
+
+  // The seeded main-menu "Blog" link leads to the index; the post page renders the sanitized body.
+  await page.getByRole('navigation').getByRole('link', { name: 'Blog', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/blog$/)
+  await page.getByRole('link', { name: title }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+  await expect(page.getByText('Start with shemai, then try firni and rasmalai.')).toBeVisible()
+  await expect.poll(async () => (await page.title()).startsWith(`${title} | `)).toBe(true)
+})
+
+test('a paid order whose parcel came back is cancelled with a refund and its stock restored', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin fulfilment flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // The guest's cash-on-delivery order from the checkout test: processed, shipped, paid by hand, then returned.
+  await page.getByRole('link', { name: 'Web orders' }).first().click()
+  const row = page.getByRole('row').filter({ hasText: 'Rahim Uddin' })
+  await row.getByRole('link').first().click()
+  const actions = page.getByRole('group', { name: 'Order actions' })
+  const dialog = page.getByRole('dialog')
+
+  await actions.getByRole('button', { name: 'Start processing' }).click()
+  await dialog.getByRole('button', { name: 'Start processing' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await actions.getByRole('button', { name: 'Ship' }).click()
+  // A Radix select clicked during the dialog's opening animation may not open: retry until the option shows.
+  await expect(async () => {
+    await dialog.getByLabel('Courier').click()
+    await expect(page.getByRole('option', { name: 'Pathao' })).toBeVisible({ timeout: 1000 })
+  }).toPass()
+  await page.getByRole('option', { name: 'Pathao' }).click()
+  await dialog.getByLabel('Tracking number (optional)').fill('PT-RET-1')
+  await dialog.getByRole('button', { name: 'Mark as shipped' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await actions.getByRole('button', { name: 'Record COD payment' }).click()
+  await dialog.getByRole('button', { name: 'Record payment' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Add tracking update' }).click()
+  await dialog.getByRole('radio', { name: /^Returned to sender/ }).click()
+  await dialog.getByRole('button', { name: 'Record update' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await actions.getByRole('button', { name: 'Cancel order' }).click()
+  await dialog.getByLabel('Reason').fill('Customer refused; paid in advance by mistake')
+  await expect(async () => {
+    await dialog.getByLabel('Paid back by').click()
+    await expect(page.getByRole('option', { name: 'Bank transfer' })).toBeVisible({ timeout: 1000 })
+  }).toPass()
+  await page.getByRole('option', { name: 'Bank transfer' }).click()
+  await dialog.getByLabel('Refund reference (optional)').fill('BANK-CXL-1')
+  await dialog.getByRole('button', { name: 'Cancel and refund' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByText('Cancelled').first()).toBeVisible()
+  await expect(page.getByText('Refunded').first()).toBeVisible()
+
+  // Both litchi drinks are back in stock (4 seeded, 2 ordered, 2 returned).
+  await page.getByRole('link', { name: 'Inventory' }).first().click()
+  const litchi = page.getByRole('row').filter({ hasText: 'Pran Litchi Drink 250ml' })
+  await expect(litchi.getByRole('cell').nth(2)).toHaveText(/^4(\s|$)/)
+})

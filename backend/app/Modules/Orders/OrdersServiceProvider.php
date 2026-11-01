@@ -8,6 +8,7 @@ use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Contracts\PurchaseVerifier;
 use App\Modules\Orders\Application\Events\OrderCancelledByCustomer;
+use App\Modules\Orders\Application\Events\OrderCancelledWithRefund;
 use App\Modules\Orders\Application\Events\OrderPlaced;
 use App\Modules\Orders\Application\Events\OrderReturnRequested;
 use App\Modules\Orders\Application\Events\OrderReturnUpdated;
@@ -16,6 +17,7 @@ use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
 use App\Modules\Orders\Infrastructure\EloquentCustomerWebOrders;
 use App\Modules\Orders\Infrastructure\EloquentPurchaseVerifier;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledNotifications;
+use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledWithRefundNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderPlacedNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderReturnNotifications;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
@@ -54,6 +56,7 @@ class OrdersServiceProvider extends ModuleServiceProvider
 
         Event::listen(OrderPlaced::class, SendOrderPlacedNotifications::class);
         Event::listen(OrderCancelledByCustomer::class, SendOrderCancelledNotifications::class);
+        Event::listen(OrderCancelledWithRefund::class, SendOrderCancelledWithRefundNotifications::class);
         Event::listen(OrderReturnRequested::class, [SendOrderReturnNotifications::class, 'requested']);
         Event::listen(OrderReturnUpdated::class, [SendOrderReturnNotifications::class, 'updated']);
 
@@ -77,7 +80,7 @@ class OrdersServiceProvider extends ModuleServiceProvider
             'web_orders.view' => 'View online store orders',
             'web_orders.manage' => 'Process online store orders: confirm payments, ship, deliver, record cash on delivery, cancel',
             'web_orders.remit' => 'Record and view couriers\' cash-on-delivery remittances',
-            'web_orders.refund' => 'Handle online returns of web orders: create, approve, reject, receive and refund',
+            'web_orders.refund' => 'Handle online returns of web orders (create, approve, reject, receive, refund) and cancel paid orders with a refund',
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Application\Actions;
 
+use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
@@ -25,6 +26,7 @@ class ReplaceMenuItems
         private readonly PageDirectory $pages,
         private readonly StorefrontCatalog $catalog,
         private readonly AuditTrail $audit,
+        private readonly BlogDirectory $blog,
     ) {}
 
     /**
@@ -69,6 +71,18 @@ class ReplaceMenuItems
             }
         }
 
+        // Blog links (E11): categories and posts that are not deleted (drafts may be linked; menus show them once readable).
+        foreach ([MenuItemType::BlogCategory, MenuItemType::BlogPost] as $type) {
+            $ids = array_values(array_unique(array_filter(array_map(
+                fn (array $pair) => ($pair[0]['type'] ?? null) === $type->value ? ($pair[0]['target_id'] ?? null) : null,
+                $flat,
+            ))));
+            $missing = array_values(array_diff($ids, $this->blog->existing($type->value, $ids)));
+            if ($missing !== []) {
+                throw new BusinessRuleViolation(strtoupper($type->value).'_NOT_FOUND', $type === MenuItemType::BlogPost ? 'Some linked blog posts no longer exist.' : 'Some linked blog categories no longer exist.', [$type->value.'_ids' => $missing]);
+            }
+        }
+
         return DB::transaction(function () use ($menu, $items, $flat) {
             Menu::query()->whereKey($menu->id)->lockForUpdate()->first();
             $previous = $menu->items()->count();
@@ -96,7 +110,7 @@ class ReplaceMenuItems
                 'type' => $type,
                 'label' => trim((string) $item['label']),
                 'url' => $type === MenuItemType::Custom ? $item['url'] : null,
-                'target_id' => $type === MenuItemType::Custom ? null : $item['target_id'],
+                'target_id' => $type->hasTarget() ? $item['target_id'] : null,
                 'open_in_new_tab' => (bool) ($item['open_in_new_tab'] ?? false),
                 'is_visible' => (bool) ($item['is_visible'] ?? true),
                 'is_mega' => $isMega,

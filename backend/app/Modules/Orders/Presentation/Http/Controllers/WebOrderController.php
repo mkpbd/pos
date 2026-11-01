@@ -9,17 +9,20 @@ use App\Modules\Orders\Application\Actions\ProcessOrdersInBulk;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
+use App\Modules\Orders\Domain\RefundMethod;
 use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -288,15 +291,53 @@ class WebOrderController
     /**
      * Cancel
      *
-     * Unpaid orders that are not shipped yet, or shipped orders whose parcel was returned to
-     * the sender (E10a); the stock goes back to the exact batches it came from. `ORDER_PAID`
-     * for paid orders, `INVALID_STATUS_TRANSITION` otherwise.
+     * `{reason (≤ 200), refund?: {method: cash|bank_transfer|mobile_banking, reference? (≤ 80)}}`.
+     * Orders that are not shipped yet, or shipped orders whose parcel was returned to the
+     * sender (E10a); the stock goes back to the exact batches it came from. Unpaid orders need
+     * `web_orders.manage` (`refund` is ignored). Paid orders (E11) need `web_orders.refund`
+     * (else 403) and `refund` (else 422 `REFUND_REQUIRED`): everything paid and not yet
+     * refunded (`cancel_refund_amount`) goes out through the payments ledger
+     * (`online_order_refund`; cash from the user's open register session in the order's
+     * branch: `CASH_SESSION_REQUIRED`, `INSUFFICIENT_CASH`), the order becomes cancelled and
+     * `refunded`, and the customer is e-mailed. `INVALID_STATUS_TRANSITION` otherwise.
      */
     public function cancel(Request $request, Order $webOrder, CancelOrder $cancel): JsonResponse
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:200']]);
+        $user = $request->user();
+        if (! $user->can('web_orders.manage') && ! $user->can('web_orders.refund')) {
+            throw new AuthorizationException;
+        }
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:200'],
+            'refund' => ['sometimes', 'nullable', 'array'],
+            'refund.method' => ['required_with:refund', Rule::enum(RefundMethod::class)],
+            'refund.reference' => ['sometimes', 'nullable', 'string', 'max:80'],
+        ]);
 
-        return $this->document($request, $cancel($webOrder, trim($data['reason']), $this->actor($request)));
+        if (! $webOrder->payment_status->isPaid()) {
+            if (! $user->can('web_orders.manage')) {
+                throw new AuthorizationException;
+            }
+
+            return $this->document($request, $cancel($webOrder, trim($data['reason']), $this->actor($request)));
+        }
+
+        if (! $user->can('web_orders.refund')) {
+            throw new AuthorizationException;
+        }
+        if (empty($data['refund']['method'])) {
+            throw new BusinessRuleViolation('REFUND_REQUIRED', "{$webOrder->number} is paid; choose how the money is refunded to cancel it.", [
+                'refund_amount' => Decimal::round(Decimal::sub((string) $webOrder->paid_total, (string) $webOrder->refunded_total, 2), 2),
+            ]);
+        }
+
+        return $this->document($request, $cancel->cancelWithRefund(
+            $webOrder,
+            trim($data['reason']),
+            RefundMethod::from($data['refund']['method']),
+            filled($data['refund']['reference'] ?? null) ? trim((string) $data['refund']['reference']) : null,
+            $user,
+        ));
     }
 
     private function document(Request $request, Order $webOrder): JsonResponse

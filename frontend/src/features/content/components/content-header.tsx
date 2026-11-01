@@ -5,6 +5,7 @@ import type { SectionTab } from '@/features/inventory/sections'
 
 const CONTENT_TABS: SectionTab[] = [
   { to: '/content/pages', label: 'Pages' },
+  { to: '/content/blog', label: 'Blog' },
   { to: '/content/faq', label: 'FAQ' },
   { to: '/content/messages', label: 'Messages' },
   { to: '/content/newsletter', label: 'Newsletter' },
@@ -13,7 +14,7 @@ const CONTENT_TABS: SectionTab[] = [
 export function ContentHeader({ actions }: { actions?: ReactNode }) {
   return (
     <>
-      <PageHeader title="Content" description="Pages, FAQ, contact messages and newsletter sign-ups of your online store." actions={actions} />
+      <PageHeader title="Content" description="Pages, blog, FAQ, contact messages and newsletter sign-ups of your online store." actions={actions} />
       <SectionTabs tabs={CONTENT_TABS} label="Content sections" />
     </>
   )

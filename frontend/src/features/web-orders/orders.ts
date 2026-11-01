@@ -1,5 +1,6 @@
 import { BULK_MAX, type BulkResult, type PrintKind, type Shipment, type ShipmentEvent, type ShipmentEventInput, type ShipmentStatus, type StatusCounts, type WebOrder, type WebOrderAction, type WebOrderActorKind, type WebOrderPromotionKind, type WebOrderHistoryEntry, type WebOrderPayment, type WebOrdersListParams, type WebOrderStatus, type WebPaymentMethod, type WebPaymentStatus } from '@/features/web-orders/api'
 import { ApiError } from '@/lib/api/client'
+import { compareDecimal, subtractDecimal } from '@/lib/money'
 
 /** Button label on the order page for each action. */
 export const ACTION_LABELS: Record<WebOrderAction, string> = {
@@ -275,7 +276,7 @@ export function etaLabel(min: number | null, max: number | null): string | null 
 
 const ACTION_ERRORS: Record<string, string> = {
   INVALID_STATUS_TRANSITION: 'The order has moved on since you opened it; it was refreshed. Check its status and try again.',
-  ORDER_PAID: 'A paid order cannot be cancelled here; it needs a refund.',
+  ORDER_PAID: 'A paid order can only be cancelled together with a refund, by someone allowed to refund web orders.',
   ORDER_ALREADY_PAID: 'This order is already paid.',
   SHIPMENT_NOT_FOUND: 'This order has no courier shipment to update; it was refreshed.',
 }
@@ -299,4 +300,29 @@ export const PROMOTION_KIND_LABELS: Record<WebOrderPromotionKind, string> = {
 
 export function promotionKindLabel(kind: string): string {
   return PROMOTION_KIND_LABELS[kind as WebOrderPromotionKind] ?? kind
+}
+
+/**
+ * What cancelling a paid order refunds (E11): everything paid that has not been refunded yet,
+ * as a 2-decimal string; null for unpaid orders or when nothing is left to refund.
+ */
+export function cancelRefundDue(order: Pick<WebOrder, 'payment_status' | 'total' | 'paid_total' | 'refunded_total' | 'cancel_refund_amount'>): string | null {
+  const positive = (amount: string) => (amount.startsWith('-') || compareDecimal(amount, '0') === 0 ? null : amount)
+  // The server's figure wins; older payloads fall back to paid − refunded.
+  if (order.cancel_refund_amount !== undefined) return order.cancel_refund_amount === null ? null : positive(order.cancel_refund_amount)
+  if (order.payment_status !== 'paid' && order.payment_status !== 'partially_refunded') return null
+  return positive(subtractDecimal(order.paid_total ?? order.total, order.refunded_total ?? '0', 2))
+}
+
+const REFUND_BLOCKERS: Record<string, string> = {
+  REFUND_REQUIRED: 'This order is paid. Choose how the money goes back to the customer before cancelling.',
+  CASH_SESSION_REQUIRED: 'A cash refund is paid out of your open register session, and you have none.',
+  INSUFFICIENT_CASH: 'Your register session does not hold enough cash for this refund.',
+}
+
+/** A refused paid-order cancel the user can fix inside the dialog (choose a method, open a session…). */
+export function refundBlocker(error: unknown): { code: string; message: string } | null {
+  if (!(error instanceof ApiError)) return null
+  const message = REFUND_BLOCKERS[error.code]
+  return message ? { code: error.code, message } : null
 }

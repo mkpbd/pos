@@ -18,7 +18,7 @@ class BannerController
     /**
      * List banners
      *
-     * All banners in display order, optionally of one `?placement=hero_slider|home_promo`.
+     * All banners in display order, optionally of one `?placement=hero_slider|home_promo|popup`.
      * `is_live` tells whether a banner is active and inside its schedule now.
      */
     public function index(Request $request): JsonResponse
@@ -40,7 +40,9 @@ class BannerController
      * Create a banner
      *
      * Links are site paths (`/sale`) or http(s) URLs. A button label needs its link; a link
-     * without a label makes the whole banner clickable.
+     * without a label makes the whole banner clickable. Popups (E11) also take
+     * `popup_delay_seconds` (0–60, default 5) and `popup_frequency` (once_per_session |
+     * once_per_day | once_per_week, default once_per_day); other placements store null.
      */
     public function store(Request $request, ManageBanners $banners): JsonResponse
     {
@@ -102,6 +104,9 @@ class BannerController
             'mobile_media_id' => ['sometimes', 'nullable', 'uuid'],
             'text_color' => ['sometimes', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'text_position' => ['sometimes', Rule::in(['left', 'center', 'right'])],
+            // Popups only (E11); ignored for other placements.
+            'popup_delay_seconds' => ['sometimes', 'nullable', 'integer', 'between:0,60'],
+            'popup_frequency' => ['sometimes', 'nullable', Rule::in(BannerPlacement::POPUP_FREQUENCIES)],
             'starts_at' => ['sometimes', 'nullable', 'date'],
             'ends_at' => ['sometimes', 'nullable', 'date'],
             'is_active' => ['sometimes', 'boolean'],

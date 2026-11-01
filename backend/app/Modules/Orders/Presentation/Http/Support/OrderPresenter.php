@@ -4,6 +4,7 @@ namespace App\Modules\Orders\Presentation\Http\Support;
 
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
+use App\Modules\Orders\Application\Actions\CancelOrder;
 use App\Modules\Orders\Application\Actions\CancelOwnOrder;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Services\ReturnPolicy;
@@ -23,6 +24,7 @@ use App\Modules\Payments\Application\Contracts\PaymentLedger;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Sales\Domain\TaxMode;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Domain\ValueObjects\Money;
 use App\Modules\Shipping\Application\Contracts\CourierDirectory;
 use App\Modules\Users\Application\Contracts\UserDirectory;
 
@@ -212,6 +214,8 @@ class OrderPresenter
         foreach ($returns as $return) {
             array_push($payments, ...$this->payments->entriesOf(PaymentSource::ONLINE_ORDER_REFUND, $return->id));
         }
+        // E11: the refund of a paid order that was cancelled.
+        array_push($payments, ...$this->payments->entriesOf(PaymentSource::ONLINE_ORDER_REFUND, $order->id));
         $returnable = $this->returnPolicy->returnable($order);
         foreach ($view['lines'] as $i => $line) {
             $source = $order->lines->values()[$i];
@@ -291,8 +295,14 @@ class OrderPresenter
                 ])->values()->all(),
             ],
             'cod_remittance' => $this->remittanceOf($order),
+            // E11: what cancelling would refund (paid orders that can still be cancelled), else null.
+            'cancel_refund_amount' => CancelOrder::cancellableWithRefund($order)
+                ? Money::of((string) $order->paid_total, $order->currency)->minus(Money::of((string) $order->refunded_total, $order->currency))->amount()
+                : null,
             'allowed_actions' => [
-                ...($canManage ? self::allowedActions($order) : []),
+                ...($canManage ? self::allowedActions($order, $canRefund) : []),
+                // E11: cancelling a paid order with a refund needs web_orders.refund only.
+                ...(! $canManage && $canRefund && CancelOrder::cancellableWithRefund($order) ? ['cancel'] : []),
                 // E10b: a return can be created (after the window only with override_window).
                 ...($canRefund && $this->returnPolicy->blocker($order, ignoreWindow: true) === null && $this->returnPolicy->anythingLeft($order) ? ['create_return'] : []),
             ],
@@ -426,7 +436,7 @@ class OrderPresenter
     /**
      * @return list<string>
      */
-    public static function allowedActions(Order $order): array
+    public static function allowedActions(Order $order, bool $canRefund = false): array
     {
         $unpaid = $order->payment_status === PaymentStatus::Unpaid;
         $cod = $order->payment_method === OrderPaymentMethod::CashOnDelivery;
@@ -444,7 +454,9 @@ class OrderPresenter
             'add_shipment_event' => $shipped && $shipment !== null && ! $shipment->status->isFinal(),
             'record_cod_payment' => $unpaid && $cod && ! $returned && in_array($order->status, [OrderStatus::Shipped, OrderStatus::Delivered], true),
             // E10a: a parcel returned to the sender lets the unpaid shipped order be cancelled.
-            'cancel' => $unpaid && ($order->status->canBecome(OrderStatus::Cancelled) || $returned),
+            'cancel' => ($unpaid && ($order->status->canBecome(OrderStatus::Cancelled) || $returned))
+                // E11: paid orders that are not delivered are cancelled with a refund (web_orders.refund).
+                || ($canRefund && CancelOrder::cancellableWithRefund($order)),
         ]));
     }
 

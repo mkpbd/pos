@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Application\Queries;
 
+use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Storefront\Domain\SectionType;
@@ -22,6 +23,7 @@ class StorefrontHomepage
     public function __construct(
         private readonly MediaLibrary $media,
         private readonly StorefrontCatalog $catalog,
+        private readonly BlogDirectory $blog,
     ) {}
 
     /**
@@ -95,8 +97,8 @@ class StorefrontHomepage
     }
 
     /**
-     * Products, categories or brands of a catalog section, from the online catalog; null for
-     * other section types. Records that are not (or no longer) live or visible drop out.
+     * Products, categories or brands of a catalog section, from the online catalog, or the
+     * posts of a blog section; null for other section types. Records that are not (or no longer) live or visible drop out.
      *
      * @param  array<string, mixed>  $config  normalized
      * @return array<string, mixed>|null
@@ -117,6 +119,8 @@ class StorefrontHomepage
             SectionType::CategoryStrip => ['categories' => $this->catalog->categoryStrip($config['source'] === 'manual' ? $picked() : null, $config['limit'])],
             SectionType::BrandStrip => ['brands' => $this->catalog->brandStrip($config['source'] === 'manual' ? $picked() : null, $config['limit'])],
             SectionType::HotDeals => $this->hotDeals($config),
+            // E11: the newest readable blog posts (public list rows).
+            SectionType::BlogPosts => ['posts' => $this->blog->postCards(is_string($config['category_id']) ? $config['category_id'] : null, (int) $config['limit'])],
             default => null,
         };
     }

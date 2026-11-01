@@ -8,8 +8,12 @@ use App\Modules\Catalog\Application\Actions\SaveAttribute;
 use App\Modules\Catalog\Infrastructure\Models\Brand;
 use App\Modules\Catalog\Infrastructure\Models\Category;
 use App\Modules\Catalog\Infrastructure\Models\Unit;
+use App\Modules\Cms\Application\Actions\ManageBlogCategories;
 use App\Modules\Cms\Application\Actions\ManageFaq;
+use App\Modules\Cms\Application\Actions\SaveBlogPost;
 use App\Modules\Cms\Application\Actions\SavePage;
+use App\Modules\Cms\Infrastructure\Models\BlogCategory;
+use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
 use App\Modules\CustomerAccounts\Application\Actions\CreateCustomerAccount;
@@ -68,10 +72,12 @@ class DemoStorefrontSeeder extends Seeder
         UploadMedia $upload,
         ManageBanners $banners,
         ManageHomepageSections $sections,
+        ManageBlogCategories $blogCategories,
+        SaveBlogPost $blogPosts,
     ): void {
         $host = (string) (config('storefront.default_host') ?: 'shop.localhost');
 
-        $tenant->runAs($organizationId, function () use ($host, $adminId, $saveDomain, $saveSettings, $saveMenu, $replaceItems, $pages, $faq, $upload, $banners, $sections) {
+        $tenant->runAs($organizationId, function () use ($host, $adminId, $saveDomain, $saveSettings, $saveMenu, $replaceItems, $pages, $faq, $upload, $banners, $sections, $blogCategories, $blogPosts) {
             $saveDomain(new StorefrontDomain, ['host' => $host]);
             $saveSettings([
                 'is_enabled' => true,
@@ -144,6 +150,19 @@ class DemoStorefrontSeeder extends Seeder
                 ])->id;
             }
 
+            // E11: the blog (two categories, four published posts with cover artwork, one scheduled
+            // for next week) and a popup banner that stays inactive until switched on.
+            $this->blog($adminId, $image, $blogCategories, $blogPosts);
+            $banners->save(new Banner, [
+                'placement' => 'popup', 'name' => 'Free delivery popup',
+                'title' => 'Free delivery over ৳3000', 'subtitle' => 'Inside Dhaka, on every order above ৳3000.',
+                'button_label' => 'Shop now', 'link_url' => '/shop',
+                'desktop_media_id' => $image('popup-delivery.jpg', [194, 65, 12], [124, 45, 18], 800, 600),
+                'popup_delay_seconds' => 5, 'popup_frequency' => 'once_per_day',
+                // Inactive by default so browsing (and full-stack tests) are not interrupted.
+                'is_active' => false,
+            ]);
+
             $sections->save(new HomepageSection, ['type' => 'hero_slider', 'banner_ids' => [$hero1->id, $hero2->id]]);
             // E8b: every running flash sale (DemoPromotionsSeeder adds "Juice week"); hidden while none runs.
             $sections->save(new HomepageSection, ['type' => 'hot_deals', 'title' => 'Hot deals', 'subtitle' => 'Ends soon — grab them while the clock runs',
@@ -171,6 +190,8 @@ class DemoStorefrontSeeder extends Seeder
                 ['quote' => 'My weekly groceries arrive before lunch. I have not queued at a counter for months.', 'name' => 'Nusrat J.', 'role' => 'Dhanmondi', 'rating' => 5],
                 ['quote' => 'Friendly staff and honest prices, online too.', 'name' => 'Arif H.', 'role' => 'Lalmatia', 'rating' => 5],
             ]]]);
+            $sections->save(new HomepageSection, ['type' => 'blog_posts', 'title' => 'From our blog', 'subtitle' => 'Recipes and news from Demo Mart',
+                'config' => ['category_id' => null, 'limit' => 3, 'view_all_url' => '/blog']]);
             $sections->save(new HomepageSection, ['type' => 'newsletter', 'title' => 'Weekly offers in your inbox', 'config' => ['text' => 'One e-mail a week. Unsubscribe any time.']]);
 
             $main = $saveMenu->save(new Menu, ['name' => 'Main navigation', 'location' => 'main']);
@@ -182,6 +203,7 @@ class DemoStorefrontSeeder extends Seeder
                     ['type' => 'category', 'label' => 'Rice & Grains', 'target_id' => $catalog['rice']],
                 ]],
                 ['type' => 'category', 'label' => 'Apparel', 'target_id' => $catalog['apparel']],
+                ['type' => 'blog', 'label' => 'Blog'],
                 ['type' => 'page', 'label' => 'About us', 'target_id' => $about->id],
                 ['type' => 'page', 'label' => 'FAQ', 'target_id' => $faqPage->id],
                 ['type' => 'page', 'label' => 'Contact', 'target_id' => $contact->id],
@@ -201,6 +223,52 @@ class DemoStorefrontSeeder extends Seeder
 
             $this->shopper();
         });
+    }
+
+    /**
+     * The demo blog (E11): "Recipes" and "Store news", four published posts with generated
+     * covers (a week apart) and one post scheduled for next week.
+     *
+     * @param  callable(string, array{int, int, int}, array{int, int, int}, int, int): string  $image
+     */
+    private function blog(?string $adminId, callable $image, ManageBlogCategories $categories, SaveBlogPost $posts): void
+    {
+        $recipes = $categories->save(new BlogCategory, ['name' => 'Recipes', 'slug' => 'recipes', 'description' => 'Simple dishes from the ingredients on our shelves.']);
+        $news = $categories->save(new BlogCategory, ['name' => 'Store news', 'slug' => 'store-news', 'description' => 'Opening hours, new products and what is happening at Demo Mart.']);
+
+        $paragraphs = fn (string ...$texts) => implode('', array_map(fn (string $t) => "<p>{$t}</p>", $texts));
+        foreach ([
+            [$recipes, 'mango-lassi', 'A cool mango lassi in five minutes', 'Ripe mangoes, yogurt and a pinch of cardamom: the drink of the season.', [250, 176, 5], [194, 65, 12], 28,
+                '<h2>You need</h2><ul><li>2 ripe mangoes</li><li>2 cups of yogurt</li><li>Sugar and cardamom to taste</li></ul><h2>Method</h2>'.$paragraphs('Peel and chop the mangoes, blend them with the yogurt until smooth and add sugar to taste.', 'Serve cold with a pinch of cardamom on top.')],
+            [$news, 'same-day-delivery-now-in-mirpur', 'Same-day delivery now reaches Mirpur', 'Order before 4 pm and we deliver to Mirpur the same day.', [3, 105, 161], [8, 60, 100], 21,
+                $paragraphs('Good news for our neighbours in Mirpur: from this week our same-day delivery covers your area too.', 'Order before 4 pm and your groceries arrive the same evening, at the usual delivery fee.')],
+            [$recipes, 'weeknight-khichuri', 'Weeknight khichuri', 'Rice, lentils and vegetables in one pot: comfort food for rainy evenings.', [47, 133, 90], [16, 74, 50], 14,
+                '<h2>You need</h2><ul><li>1 cup rice</li><li>Half a cup of moong dal</li><li>Onion, ginger, turmeric and seasonal vegetables</li></ul>'.$paragraphs('Roast the dal lightly, wash it with the rice and cook everything with the spices and four cups of water until soft.', 'Finish with a spoon of ghee and serve with fried eggplant.')],
+            [$news, 'our-new-opening-hours', 'Our new opening hours', 'From next month the store opens at 8 am every day.', [111, 85, 194], [52, 36, 110], 7,
+                $paragraphs('Many of you asked for an earlier start. From next month the store opens at 8 am and closes at 10 pm, seven days a week.', 'Online orders are taken around the clock as before.')],
+        ] as [$category, $slug, $title, $excerpt, $from, $to, $daysAgo, $body]) {
+            $posts->save(new BlogPost, [
+                'category_id' => $category->id,
+                'slug' => $slug,
+                'title' => $title,
+                'excerpt' => $excerpt,
+                'body_html' => $body,
+                'cover_media_id' => $image("blog-{$slug}.jpg", $from, $to, 1200, 630),
+                'status' => 'published',
+                'published_at' => now()->subDays($daysAgo)->setTime(9, 0)->toIso8601String(),
+                'seo_description' => $excerpt,
+            ], $adminId);
+        }
+
+        $posts->save(new BlogPost, [
+            'category_id' => $recipes->id,
+            'slug' => 'pitha-for-winter',
+            'title' => 'Three pitha for winter mornings',
+            'excerpt' => 'Bhapa, chitoi and patishapta: the classics, step by step.',
+            'body_html' => $paragraphs('Coming soon: our favourite winter pitha with rice flour, date molasses and coconut.'),
+            'status' => 'published',
+            'published_at' => now()->addDays(7)->setTime(9, 0)->toIso8601String(),
+        ], $adminId);
     }
 
     /**

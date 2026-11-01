@@ -1,5 +1,6 @@
 import type { SectionPreviewState, StoreSection } from '../types'
 import { BannerGrid } from './banner-grid'
+import { BlogPostsSection } from './blog-posts-section'
 import { FeaturesStrip, RichTextSection, Testimonials } from './content-sections'
 import { HeroSlider } from './hero-slider'
 import { HotDealsSection } from './hot-deals-section'
@@ -24,6 +25,8 @@ function emptyLabel(section: StoreSection): string {
       return 'No visible brands — visitors do not see this section'
     case 'hot_deals':
       return 'No live flash sales — visitors do not see this section'
+    case 'blog_posts':
+      return 'No published posts — visitors do not see this section'
     default:
       return 'No products to show — visitors do not see this section'
   }
@@ -45,6 +48,8 @@ function isEmpty(section: StoreSection): boolean {
       return section.categories.length === 0
     case 'brand_strip':
       return section.brands.length === 0
+    case 'blog_posts':
+      return section.posts.length === 0
     default:
       return false
   }
@@ -76,6 +81,8 @@ function Section({ section }: { section: StoreSection }) {
       return <BrandStrip section={section} />
     case 'hot_deals':
       return <HotDealsSection section={section} />
+    case 'blog_posts':
+      return <BlogPostsSection section={section} />
     default:
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null

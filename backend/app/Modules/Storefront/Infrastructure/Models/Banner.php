@@ -27,13 +27,15 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $mobile_media_id
  * @property string $text_color
  * @property string $text_position
+ * @property ?int $popup_delay_seconds
+ * @property ?string $popup_frequency
  * @property ?CarbonImmutable $starts_at
  * @property ?CarbonImmutable $ends_at
  * @property bool $is_active
  * @property int $sort_order
  * @property ?CarbonImmutable $updated_at
  */
-#[Fillable(['organization_id', 'placement', 'name', 'kicker', 'title', 'subtitle', 'link_url', 'button_label', 'secondary_link_url', 'secondary_button_label', 'desktop_media_id', 'mobile_media_id', 'text_color', 'text_position', 'starts_at', 'ends_at', 'is_active', 'sort_order'])]
+#[Fillable(['organization_id', 'placement', 'name', 'kicker', 'title', 'subtitle', 'link_url', 'button_label', 'secondary_link_url', 'secondary_button_label', 'desktop_media_id', 'mobile_media_id', 'text_color', 'text_position', 'popup_delay_seconds', 'popup_frequency', 'starts_at', 'ends_at', 'is_active', 'sort_order'])]
 class Banner extends Model
 {
     use BelongsToOrganization, HasUuids, TracksAuthor;
@@ -54,6 +56,7 @@ class Banner extends Model
             'updated_at' => 'immutable_datetime',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'popup_delay_seconds' => 'integer',
         ];
     }
 
