@@ -618,3 +618,43 @@ test('a shopper cancels an order, buys again and reviews a delivered product; th
   await page.getByTestId('rating-summary').click()
   await expect(page.getByTestId('product-reviews')).toContainText('Great with ice')
 })
+
+test('a COD parcel is delivered and paid through a courier remittance in the admin', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin fulfilment flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // The seeded WEB-000003 is on its way with Steadfast; the courier reports it delivered.
+  await page.getByRole('link', { name: 'Web orders' }).first().click()
+  await page.getByRole('row').filter({ hasText: 'WEB-000003' }).getByRole('link', { name: 'WEB-000003' }).click()
+  await expect(page.getByRole('heading', { name: 'WEB-000003' })).toBeVisible()
+  await expect(page.getByText('DEMO-SF-0002').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Add tracking update' }).click()
+  const update = page.getByRole('dialog')
+  await update.getByRole('radio', { name: /^Delivered/ }).click()
+  await update.getByRole('button', { name: 'Record update' }).click()
+  await expect(update).toHaveCount(0)
+  await expect(page.getByRole('list', { name: 'Tracking updates' })).toContainText('Delivered')
+
+  // Steadfast pays the collected cash minus its fee: one remittance marks the order paid.
+  await page.getByRole('link', { name: 'COD remittances' }).first().click()
+  await page.getByRole('link', { name: 'New remittance' }).click()
+  await page.getByLabel('Courier that paid').click()
+  await page.getByRole('option', { name: 'Steadfast' }).click()
+  await page.getByRole('checkbox', { name: 'Select WEB-000003' }).click()
+  await page.getByLabel(/^Courier fee/).fill('20')
+  await page.getByLabel("Courier's statement no. (optional)").fill('SF-STMT-77')
+  await page.getByRole('button', { name: 'Record remittance' }).click()
+
+  await expect(page.getByRole('heading', { name: /REM-000001/ })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Orders in this remittance' })).toContainText('WEB-000003')
+  await expect(page.getByLabel('Remittance amounts')).toContainText('112.00')
+
+  await page.getByRole('link', { name: 'Web orders' }).first().click()
+  await page.getByRole('row').filter({ hasText: 'WEB-000003' }).getByRole('link', { name: 'WEB-000003' }).click()
+  await expect(page.getByTestId('order-remittance')).toContainText('REM-000001')
+})

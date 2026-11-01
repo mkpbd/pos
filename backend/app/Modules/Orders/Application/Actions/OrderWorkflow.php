@@ -5,8 +5,11 @@ namespace App\Modules\Orders\Application\Actions;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
+use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
+use App\Modules\Orders\Infrastructure\Models\Shipment;
+use App\Modules\Orders\Infrastructure\Models\ShipmentEvent;
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
 use App\Modules\Payments\Domain\LedgerEntry;
 use App\Modules\Payments\Domain\PaymentDirection;
@@ -14,8 +17,12 @@ use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Shipping\Application\Contracts\CourierDirectory;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Staff steps of a web order. Every step locks the order row, checks the transition
@@ -24,12 +31,17 @@ use Illuminate\Support\Facades\DB;
  * Money (ADR-006): confirming a bank transfer records `bank_transfer` and recording the
  * courier's cash-on-delivery remittance records `cash_on_delivery`, both for the order total
  * through PaymentLedger::recordSystem (no drawer). A second payment is ORDER_ALREADY_PAID.
+ * COD remittances (E10a) share recordCodPaymentLocked().
+ *
+ * Shipping (E10a) creates the order's shipment with a courier; courier updates
+ * (shipmentEvent) append shipment events, `delivered` delivers the order.
  */
 class OrderWorkflow
 {
     public function __construct(
         private readonly PaymentLedger $payments,
         private readonly AuditTrail $audit,
+        private readonly CourierDirectory $couriers,
     ) {}
 
     /**
@@ -65,18 +77,89 @@ class OrderWorkflow
         return $this->locked($order, fn (Order $o) => $this->move($o, OrderStatus::Processing, [], null, $actorId, 'web_order.processing'));
     }
 
-    public function ship(Order $order, string $courierName, ?string $trackingNumber, string $actorId): Order
+    /**
+     * processing → shipped (E10a): the parcel goes to an active courier — a shipment with the
+     * amount the courier collects (the total of an unpaid COD order, else 0) and its first
+     * event `handed_over`. The order keeps the courier name and tracking number too.
+     *
+     * @throws ValidationException courier_id (unknown or inactive courier)
+     */
+    public function ship(Order $order, string $courierId, ?string $trackingNumber, ?string $note, string $actorId): Order
     {
-        return $this->locked($order, fn (Order $o) => $this->move($o, OrderStatus::Shipped, [
-            'courier_name' => $courierName,
-            'tracking_number' => $trackingNumber,
-            'shipped_at' => now(),
-        ], trim($courierName.' '.($trackingNumber ?? '')), $actorId, 'web_order.shipped'));
+        $courier = $this->couriers->find($courierId);
+        if ($courier === null || ! $courier['is_active']) {
+            throw ValidationException::withMessages(['courier_id' => ['The selected courier is not an active courier.']]);
+        }
+
+        return $this->locked($order, function (Order $o) use ($courier, $trackingNumber, $note, $actorId) {
+            $now = CarbonImmutable::now();
+            $this->move($o, OrderStatus::Shipped, [
+                'courier_name' => $courier['name'],
+                'tracking_number' => $trackingNumber,
+                'shipped_at' => $now,
+            ], trim($courier['name'].' '.($trackingNumber ?? '')), $actorId, 'web_order.shipped');
+
+            $cod = $o->payment_method === OrderPaymentMethod::CashOnDelivery && $o->payment_status === PaymentStatus::Unpaid;
+            $shipment = Shipment::query()->create([
+                'organization_id' => $o->organization_id,
+                'order_id' => $o->id,
+                'courier_id' => $courier['id'],
+                'courier_name' => $courier['name'],
+                'tracking_number' => $trackingNumber,
+                'status' => ShipmentStatus::HandedOver,
+                'cod_amount' => $cod ? (string) $o->total : '0.00',
+                'shipped_at' => $now,
+                'created_by' => $actorId,
+            ]);
+            $this->event($shipment, ShipmentStatus::HandedOver, $note, $now, $actorId);
+        });
     }
 
+    /**
+     * shipped → delivered. With a shipment (E10a) the parcel becomes delivered too and gets a
+     * `delivered` event; a parcel returned to the sender cannot be delivered.
+     */
     public function deliver(Order $order, string $actorId): Order
     {
-        return $this->locked($order, fn (Order $o) => $this->move($o, OrderStatus::Delivered, ['delivered_at' => now()], null, $actorId, 'web_order.delivered'));
+        return $this->locked($order, fn (Order $o) => $this->deliverLocked($o, null, null, $actorId));
+    }
+
+    /**
+     * A courier update on the order's shipment (E10a): `in_transit`, `delivered` (the order is
+     * delivered, as with deliver()) or `returned` (refused / undeliverable: the parcel comes back;
+     * the unpaid order may then be cancelled with restock). Orders shipped before E10a have no
+     * shipment: SHIPMENT_NOT_FOUND.
+     */
+    public function shipmentEvent(Order $order, ShipmentStatus $status, ?string $note, ?CarbonImmutable $occurredAt, string $actorId): Order
+    {
+        return $this->locked($order, function (Order $o) use ($status, $note, $occurredAt, $actorId) {
+            $shipment = $this->lockedShipment($o);
+            $at = $occurredAt ?? CarbonImmutable::now();
+            if ($at->lessThan($shipment->shipped_at)) {
+                throw ValidationException::withMessages(['occurred_at' => ['The update cannot be earlier than the hand-over to the courier.']]);
+            }
+
+            if ($status === ShipmentStatus::Delivered) {
+                if ($o->status !== OrderStatus::Shipped) {
+                    $shipment->status->assertCanBecome($status, $o->number);
+                }
+                $this->deliverLocked($o, $note, $at, $actorId);
+
+                return;
+            }
+            $from = $shipment->status;
+            $from->assertCanBecome($status, $o->number);
+            if ($o->status !== OrderStatus::Shipped) {
+                throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "{$o->number} is {$o->status->label()}; its parcel cannot change any more.", [
+                    'from' => $from->value, 'to' => $status->value, 'allowed' => [],
+                ]);
+            }
+            $shipment->update(['status' => $status] + ($status === ShipmentStatus::Returned ? ['returned_at' => $at] : []));
+            $this->event($shipment, $status, $note, $at, $actorId);
+            $this->audit->record($status === ShipmentStatus::Returned ? 'web_order.shipment_returned' : 'web_order.shipment_updated', $o, ['shipment_status' => $from->value], [
+                'shipment_status' => $status->value, 'number' => $o->number, 'note' => $note, 'occurred_at' => $at->format(DATE_ATOM),
+            ]);
+        });
     }
 
     /**
@@ -84,21 +167,72 @@ class OrderWorkflow
      */
     public function recordCodPayment(Order $order, ?string $reference, string $actorId): Order
     {
-        return $this->locked($order, function (Order $o) use ($reference, $actorId) {
-            $this->assertUnpaid($o);
-            if ($o->payment_method !== OrderPaymentMethod::CashOnDelivery || ! in_array($o->status, [OrderStatus::Shipped, OrderStatus::Delivered], true)) {
-                throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "A cash-on-delivery payment can only be recorded for a shipped or delivered cash-on-delivery order; {$o->number} is {$o->status->label()}.", [
-                    'status' => $o->status->value,
-                    'payment_method' => $o->payment_method->value,
-                ]);
-            }
+        return $this->locked($order, fn (Order $o) => $this->recordCodPaymentLocked($o, $reference, $actorId));
+    }
 
-            $this->recordPayment($o, LedgerMethod::CashOnDelivery, $reference, $actorId);
-            $o->update(['payment_status' => PaymentStatus::Paid, 'paid_total' => $o->total]);
-            $this->audit->record('web_order.cod_payment_recorded', $o, ['payment_status' => PaymentStatus::Unpaid->value], [
-                'payment_status' => PaymentStatus::Paid->value, 'amount' => $o->total, 'reference' => $reference,
+    /**
+     * The cash-on-delivery payment of an order the caller already locked inside its
+     * transaction: the single path shared by "Record COD payment" and courier COD
+     * remittances (E10a) — `cash_on_delivery` in the ledger for the order total, order paid.
+     */
+    public function recordCodPaymentLocked(Order $o, ?string $reference, string $actorId): void
+    {
+        $this->assertUnpaid($o);
+        if ($o->payment_method !== OrderPaymentMethod::CashOnDelivery || ! in_array($o->status, [OrderStatus::Shipped, OrderStatus::Delivered], true)) {
+            throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "A cash-on-delivery payment can only be recorded for a shipped or delivered cash-on-delivery order; {$o->number} is {$o->status->label()}.", [
+                'status' => $o->status->value,
+                'payment_method' => $o->payment_method->value,
             ]);
-        });
+        }
+        // A parcel returned to the sender collected no cash: it is cancelled and restocked instead.
+        if (Shipment::query()->where('order_id', $o->id)->where('status', ShipmentStatus::Returned)->exists()) {
+            throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "{$o->number} came back to the sender, so no cash on delivery was collected; cancel it to restock instead.", [
+                'status' => $o->status->value,
+                'shipment_status' => ShipmentStatus::Returned->value,
+            ]);
+        }
+
+        $this->recordPayment($o, LedgerMethod::CashOnDelivery, $reference, $actorId);
+        $o->update(['payment_status' => PaymentStatus::Paid, 'paid_total' => $o->total]);
+        $this->audit->record('web_order.cod_payment_recorded', $o, ['payment_status' => PaymentStatus::Unpaid->value], [
+            'payment_status' => PaymentStatus::Paid->value, 'amount' => $o->total, 'reference' => $reference,
+        ]);
+    }
+
+    private function deliverLocked(Order $o, ?string $note, ?CarbonImmutable $at, string $actorId): void
+    {
+        $at ??= CarbonImmutable::now();
+        $shipment = Shipment::query()->where('order_id', $o->id)->lockForUpdate()->first();
+        if ($shipment !== null && $o->status === OrderStatus::Shipped) {
+            $shipment->status->assertCanBecome(ShipmentStatus::Delivered, $o->number);
+        }
+        $this->move($o, OrderStatus::Delivered, ['delivered_at' => $at], $note, $actorId, 'web_order.delivered');
+        if ($shipment !== null) {
+            $shipment->update(['status' => ShipmentStatus::Delivered, 'delivered_at' => $at]);
+            $this->event($shipment, ShipmentStatus::Delivered, $note, $at, $actorId);
+        }
+    }
+
+    /**
+     * @throws BusinessRuleViolation SHIPMENT_NOT_FOUND
+     */
+    private function lockedShipment(Order $o): Shipment
+    {
+        return Shipment::query()->where('order_id', $o->id)->lockForUpdate()->first()
+            ?? throw new BusinessRuleViolation('SHIPMENT_NOT_FOUND', "{$o->number} has no courier shipment to update.", ['status' => $o->status->value]);
+    }
+
+    private function event(Shipment $shipment, ShipmentStatus $status, ?string $note, CarbonInterface $at, ?string $actorId): void
+    {
+        ShipmentEvent::query()->create([
+            'organization_id' => $shipment->organization_id,
+            'shipment_id' => $shipment->id,
+            'status' => $status,
+            'note' => $note === null || $note === '' ? null : mb_substr($note, 0, 200),
+            'occurred_at' => $at,
+            'created_by' => $actorId,
+            'created_at' => now(),
+        ]);
     }
 
     /**

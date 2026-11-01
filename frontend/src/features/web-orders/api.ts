@@ -21,6 +21,11 @@ export type WebOrderRow = {
   total: string
   currency: string
   item_count: number
+  /** Courier of the order's shipment (E10a), when shipped. */
+  courier_name?: string | null
+  tracking_number?: string | null
+  district?: string | null
+  shipment_status?: ShipmentStatus | null
 }
 
 export type WebOrderLine = {
@@ -117,6 +122,41 @@ export type WebOrder = {
   cancel_reason: string | null
   payments: WebOrderPayment[]
   allowed_actions: WebOrderAction[]
+  /** The order's shipment (E10a); null before shipping and for orders shipped before couriers existed (legacy text fields). */
+  shipment?: Shipment | null
+  /** The courier remittance that paid this COD order (E10a), if any. */
+  cod_remittance?: { id: string; number: string; received_at: string } | null
+}
+
+export type ShipmentStatus = 'handed_over' | 'in_transit' | 'delivered' | 'returned'
+
+export type ShipmentEvent = {
+  id?: string
+  status: ShipmentStatus
+  status_label?: string
+  note: string | null
+  occurred_at: string
+  recorded_at?: string
+  /** Staff who recorded it (`recorded_by`; `created_by` accepted too). */
+  recorded_by?: { id: string; name: string | null } | string | null
+  created_by?: { id: string; name: string | null } | string | null
+}
+
+export type Shipment = {
+  id: string
+  courier_id: string | null
+  courier_name: string
+  tracking_number: string | null
+  /** The courier's tracking page for this parcel; null without a template or tracking number. */
+  tracking_url: string | null
+  status: ShipmentStatus
+  status_label?: string
+  /** What the courier collects on delivery (order total for unpaid COD, else 0). */
+  cod_amount: string
+  shipped_at: string
+  delivered_at: string | null
+  returned_at: string | null
+  events: ShipmentEvent[]
 }
 
 export type WebOrdersListParams = {
@@ -124,10 +164,20 @@ export type WebOrdersListParams = {
   per_page?: number
   status?: WebOrderStatus
   payment_status?: WebPaymentStatus
+  payment_method?: WebPaymentMethod
+  courier_id?: string
+  district_id?: number
+  /** Delivered COD orders whose cash the courier still owes (E10a). */
+  cod_unremitted?: 1
   search?: string
-  from?: string
-  to?: string
+  date_from?: string
+  date_to?: string
 }
+
+/** Orders per status for the list's other filters (E10a `meta.status_counts`). */
+export type StatusCounts = Partial<Record<WebOrderStatus | 'all' | 'cod_unremitted', number>>
+
+export type WebOrdersPage = Paginated<WebOrderRow> & { statusCounts: StatusCounts | null }
 
 export const webOrderKeys = {
   all: ['web-orders'] as const,
@@ -135,10 +185,15 @@ export const webOrderKeys = {
   detail: (id: string) => ['web-orders', 'detail', id] as const,
 }
 
-export function useWebOrdersQuery(params: WebOrdersListParams) {
-  return useQuery<Paginated<WebOrderRow>>({
+export function useWebOrdersQuery(params: WebOrdersListParams, options: { enabled?: boolean } = {}) {
+  return useQuery<WebOrdersPage>({
+    enabled: options.enabled ?? true,
     queryKey: webOrderKeys.list(params),
-    queryFn: ({ signal }) => api.get<WebOrderRow[]>('/web-orders', { signal, query: params }).then(toPaginated),
+    queryFn: ({ signal }) =>
+      api.get<WebOrderRow[]>('/web-orders', { signal, query: params }).then((r) => {
+        const counts = (r.meta as { status_counts?: unknown }).status_counts
+        return { ...toPaginated(r), statusCounts: counts && typeof counts === 'object' ? (counts as StatusCounts) : null }
+      }),
     placeholderData: (previous) => previous,
   })
 }
@@ -164,7 +219,7 @@ export const ACTION_PATHS: Record<WebOrderAction, string> = {
 export type WebOrderActionInput = {
   id: string
   action: WebOrderAction
-  body?: Record<string, string | null>
+  body?: Record<string, string | null | undefined>
   idempotencyKey: string
 }
 
@@ -189,5 +244,124 @@ export function useWebOrderActionMutation() {
     },
     // A refused action (e.g. INVALID_STATUS_TRANSITION) means our copy is stale.
     onError: refreshRelated,
+  })
+}
+
+function useRefreshOrders() {
+  const queryClient = useQueryClient()
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: webOrderKeys.all })
+    void queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    void queryClient.invalidateQueries({ queryKey: ['payments'] })
+  }
+}
+
+export type ShipmentEventInput = { status: Exclude<ShipmentStatus, 'handed_over'>; note: string | null }
+
+/** Records a courier update; `delivered` also delivers the order. Answers with the full order. */
+export function useShipmentEventMutation() {
+  const queryClient = useQueryClient()
+  const refresh = useRefreshOrders()
+  return useMutation({
+    mutationFn: ({ id, input, idempotencyKey }: { id: string; input: ShipmentEventInput; idempotencyKey: string }) =>
+      api.post<WebOrder | null>(`/web-orders/${id}/shipment/events`, input, { idempotencyKey }).then((r) => r.data),
+    onSuccess: (order) => {
+      if (order && typeof order === 'object' && 'allowed_actions' in order) queryClient.setQueryData(webOrderKeys.detail(order.id), order)
+      refresh()
+    },
+    onError: refresh,
+  })
+}
+
+/** One order's outcome in a bulk action; a refused order carries the server's error code. */
+export type BulkResult = { id: string; number: string | null; ok: boolean; error_code?: string | null; message?: string | null }
+
+export const BULK_MAX = 100
+
+/** Confirmed → processing for up to 100 orders; never all-or-nothing, so each order reports back. */
+export function useBulkProcessMutation() {
+  const refresh = useRefreshOrders()
+  return useMutation({
+    mutationFn: ({ orderIds, idempotencyKey }: { orderIds: string[]; idempotencyKey: string }) =>
+      api
+        .post<BulkResult[] | { results: BulkResult[] }>('/web-orders/bulk/process', { order_ids: orderIds }, { idempotencyKey })
+        .then((r) => (Array.isArray(r.data) ? r.data : (r.data?.results ?? []))),
+    onSettled: refresh,
+  })
+}
+
+// ── Printing ─────────────────────────────────────────────────────────────────
+
+export type PrintKind = 'packing_slip' | 'invoice'
+
+export type PrintOrganization = {
+  name: string
+  address: string | null
+  phone: string | null
+  email?: string | null
+  tax_number: string | null
+  logo_url: string | null
+}
+
+export type PrintLine = {
+  product_name: string
+  variant_name: string | null
+  sku: string | null
+  quantity: string
+  /** Invoice only. */
+  unit_price?: string
+  discount_amount?: string
+  tax_amount?: string
+  line_total?: string
+}
+
+export type PrintOrder = {
+  id: string
+  number: string
+  placed_at: string
+  contact: { name: string; email: string | null; phone: string | null }
+  shipping_address: WebOrderAddress | null
+  shipping_method_name?: string | null
+  payment_method: WebPaymentMethod
+  payment_method_label?: string
+  payment_status: WebPaymentStatus
+  courier_name: string | null
+  tracking_number: string | null
+  lines: PrintLine[]
+  notes: string | null
+  /** Invoice only. */
+  currency?: string
+  /** Invoice only. */
+  subtotal?: string
+  discount_total?: string
+  promotions?: WebOrderPromotion[]
+  coupon_code?: string | null
+  tax_total?: string
+  prices_include_tax?: boolean
+  shipping_total?: string
+  shipping_discount?: string
+  cod_fee?: string
+  total?: string
+}
+
+export type PrintDocument = { kind: PrintKind; organization: PrintOrganization | null; orders: PrintOrder[] }
+
+/** GET /web-orders/print?ids[]=…&kind=… — read-only, records nothing. */
+export function usePrintQuery(ids: string[], kind: PrintKind) {
+  return useQuery({
+    queryKey: ['web-orders', 'print', kind, ids] as const,
+    queryFn: ({ signal }) => {
+      const qs = new URLSearchParams(ids.map((id) => ['ids[]', id]))
+      qs.set('kind', kind)
+      return api.get<PrintDocument | PrintOrder[]>(`/web-orders/print?${qs.toString()}`, { signal }).then((r): PrintDocument => {
+        if (Array.isArray(r.data)) {
+          const organization = (r.meta as { organization?: PrintOrganization }).organization ?? null
+          return { kind, organization, orders: r.data }
+        }
+        return { kind, organization: r.data.organization ?? null, orders: r.data.orders ?? [] }
+      })
+    },
+    enabled: ids.length > 0,
+    staleTime: 0,
   })
 }

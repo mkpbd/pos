@@ -87,6 +87,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 *As built (E8a):* `shipping_zones` adds sort_order; `shipping_zone_districts` has its own id and organization_id and a **database** unique `(organization_id, district_id)` besides the app check (`DISTRICT_IN_OTHER_ZONE`). `shipping_methods` is flat-rate only — no `code`, `rate_type` or `per_kg_fee` (`fee` instead of `base_fee`) — and adds a description; CHECKs on amounts and ETA (≤ 30 days, min ≤ max) on PostgreSQL. `couriers`, `shipments` and `shipment_events` wait for E10; until then the order stores `courier_name` and `tracking_number`.
 
+*As built (E10a):* `couriers` (Shipping) adds phone, sort_order and a case-insensitive unique name; the template must be an http(s) URL containing `{tracking}`. `shipments` and `shipment_events` live in the **Orders** module (not Shipping): one shipment per order (unique `order_id`), statuses `handed_over|in_transit|delivered|returned` (no `pending` or `failed`), courier name snapshot, `returned_at`, no `notes` (the hand-over note is the first event's). New `cod_remittances` + `cod_remittance_lines` (Orders; append-only, an order remitted once). The order keeps `courier_name` and `tracking_number`. Details: [DATABASE_DESIGN.md](../DATABASE_DESIGN.md) (E10a).
+
 ### Cart
 - `carts` — customer_id NULL, token_hash (guest cookie, unique), currency, coupon_code NULL, expires_at, converted_order_id NULL. Partial unique: one active cart per customer `WHERE converted_order_id IS NULL AND customer_id IS NOT NULL`.
 - `cart_items` — cart_id, variant_id, quantity NUMERIC(18,3) CHECK > 0. Unique `(cart_id, variant_id)`. **No price columns** — always repriced.

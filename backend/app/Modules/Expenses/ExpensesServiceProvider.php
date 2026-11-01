@@ -2,6 +2,8 @@
 
 namespace App\Modules\Expenses;
 
+use App\Modules\Expenses\Application\Actions\RecordSystemExpense;
+use App\Modules\Expenses\Application\Contracts\ExpenseRecorder;
 use App\Modules\Expenses\Infrastructure\Models\Expense;
 use App\Modules\Expenses\Infrastructure\Models\ExpenseCategory;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
@@ -9,10 +11,16 @@ use Illuminate\Support\Facades\Route;
 
 /**
  * Expenses and other income with their categories. Every entry moves money through the
- * payments ledger (Payments module); voiding books the opposite payment.
+ * payments ledger (Payments module); voiding books the opposite payment. Other modules record
+ * the expenses their documents cause through `ExpenseRecorder` (E10a: courier fees).
  */
 class ExpensesServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(ExpenseRecorder::class, RecordSystemExpense::class);
+    }
+
     public function boot(): void
     {
         Route::model('expense', Expense::class);

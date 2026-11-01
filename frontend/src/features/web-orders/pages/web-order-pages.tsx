@@ -1,163 +1,33 @@
 import { useState, type ReactNode } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
-import { ArrowLeftIcon, BanIcon, CheckIcon, HandCoinsIcon, PackageCheckIcon, PackageIcon, TruckIcon, XIcon, type LucideIcon } from 'lucide-react'
-import { PageHeader } from '@/components/common/page-header'
-import { PaginationBar } from '@/components/common/pagination-bar'
-import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
+import { Link, useParams } from 'react-router'
+import { ArrowLeftIcon, BanIcon, CheckIcon, HandCoinsIcon, PackageCheckIcon, PackageIcon, PrinterIcon, TruckIcon, type LucideIcon } from 'lucide-react'
+import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
-import { useWebOrderQuery, useWebOrdersQuery, WEB_ORDER_ACTIONS, type WebOrder, type WebOrderAction, type WebOrderStatus, type WebPaymentStatus } from '@/features/web-orders/api'
+import { useWebOrderQuery, WEB_ORDER_ACTIONS, type WebOrder, type WebOrderAction } from '@/features/web-orders/api'
 import { OrderActionDialog } from '@/features/web-orders/components/order-action-dialog'
+import { ShipmentCard } from '@/features/web-orders/components/shipment-card'
 import {
   ACTION_LABELS,
   customerCancellation,
   etaLabel,
-  FILTER_STATUSES,
-  filtersFromSearchParams,
-  filtersToSearchParams,
   formatDateTime,
   historyActor,
   historyLabel,
   isCustomerCancellation,
-  ORDER_STATUS,
   PAYMENT_METHOD_LABELS,
-  PAYMENT_STATUS,
   paymentBadge,
   paymentRecorder,
+  printPath,
   promotionKindLabel,
   statusBadge,
-  toListParams,
-  type WebOrderFilters,
 } from '@/features/web-orders/orders'
 import { addDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
-import { useDebouncedValue } from '@/lib/use-debounced-value'
 
-const ALL = 'all'
-
-// ── List ─────────────────────────────────────────────────────────────────────
-
-export function WebOrdersPage() {
-  const me = useAuth()
-  const timeZone = me.organization?.timezone
-  const [searchParams, setSearchParams] = useSearchParams()
-  const filters = filtersFromSearchParams(searchParams)
-  // The box is local so typing stays smooth; the URL follows the debounced term.
-  const [search, setSearch] = useState(filters.search)
-  const term = useDebouncedValue(search.trim())
-  const { data, error, isPending, refetch } = useWebOrdersQuery(toListParams(filters, term))
-
-  const update = (patch: Partial<WebOrderFilters>) =>
-    setSearchParams(filtersToSearchParams({ ...filters, search: search.trim(), page: 1, ...patch }), { replace: true })
-  const filtered = !!(filters.status || filters.paymentStatus || filters.from || filters.to || term)
-
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title="Web orders" description="Orders placed on your online store. Confirm payments, ship and track them here." />
-      <div className="flex flex-wrap items-end gap-3">
-        <Input
-          aria-label="Search web orders"
-          placeholder="Order no., name, phone or e-mail"
-          className="w-full sm:max-w-xs"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            if (filters.page !== 1) update({ search: e.target.value.trim() })
-          }}
-        />
-        <Select value={filters.status ?? ALL} onValueChange={(v) => update({ status: v === ALL ? null : (v as WebOrderStatus) })}>
-          <SelectTrigger className="w-44" aria-label="Filter by status"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All statuses</SelectItem>
-            {FILTER_STATUSES.map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS[s].label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filters.paymentStatus ?? ALL} onValueChange={(v) => update({ paymentStatus: v === ALL ? null : (v as WebPaymentStatus) })}>
-          <SelectTrigger className="w-40" aria-label="Filter by payment"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Paid and unpaid</SelectItem>
-            {(Object.keys(PAYMENT_STATUS) as WebPaymentStatus[]).map((s) => <SelectItem key={s} value={s}>{PAYMENT_STATUS[s].label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="orders-from">Placed from</Label>
-          <Input id="orders-from" type="date" className="w-40" value={filters.from} max={filters.to || undefined} onChange={(e) => update({ from: e.target.value })} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="orders-to">To</Label>
-          <Input id="orders-to" type="date" className="w-40" value={filters.to} min={filters.from || undefined} onChange={(e) => update({ to: e.target.value })} />
-        </div>
-        {filtered && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setSearch('')
-              setSearchParams(new URLSearchParams(), { replace: true })
-            }}
-          >
-            <XIcon data-icon="inline-start" /> Clear filters
-          </Button>
-        )}
-      </div>
-
-      {isPending ? (
-        <LoadingState rows={6} label="Loading web orders" />
-      ) : error ? (
-        <ErrorState error={error} onRetry={() => refetch()} />
-      ) : data.items.length === 0 ? (
-        <EmptyState title={filtered ? 'No orders match these filters' : 'No web orders yet'} description={filtered ? undefined : 'Orders placed on the online store appear here.'} />
-      ) : (
-        <>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order</TableHead>
-                  <TableHead className="hidden md:table-cell">Placed</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Payment</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.map((o) => {
-                  const status = statusBadge(o.status)
-                  const payment = paymentBadge(o.payment_status)
-                  return (
-                    <TableRow key={o.id}>
-                      <TableCell>
-                        <Link to={`/web-orders/${o.id}`} className="font-mono text-sm underline-offset-4 hover:underline">{o.number}</Link>
-                        <div className="text-xs text-muted-foreground">{o.item_count} {o.item_count === 1 ? 'item' : 'items'}</div>
-                      </TableCell>
-                      <TableCell className="hidden text-sm whitespace-nowrap md:table-cell">{formatDateTime(o.placed_at, timeZone)}</TableCell>
-                      <TableCell className="text-sm">
-                        {o.contact_name}
-                        {o.contact_phone && <div className="text-xs text-muted-foreground">{o.contact_phone}</div>}
-                      </TableCell>
-                      <TableCell className="hidden text-sm lg:table-cell">
-                        {PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}
-                        <div><Badge variant={payment.variant}>{payment.label}</Badge></div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono whitespace-nowrap">{formatMoney(o.total, o.currency)}</TableCell>
-                      <TableCell><Badge variant={status.variant}>{status.label}</Badge></TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <PaginationBar pagination={data.pagination} onPageChange={(page) => update({ page })} />
-        </>
-      )}
-    </div>
-  )
-}
+export { WebOrdersPage } from '@/features/web-orders/pages/web-orders-board'
 
 // ── Detail ───────────────────────────────────────────────────────────────────
 
@@ -193,6 +63,7 @@ function DiscountRow({ label, detail, amount }: { label: string; detail?: string
 }
 
 function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | undefined }) {
+  const canRemit = useCan()('web_orders.remit')
   const payment = paymentBadge(order.payment_status)
   const awaitingTransfer = order.payment_method === 'bank_transfer' && order.status === 'pending_payment'
 
@@ -215,6 +86,16 @@ function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | 
             <summary className="cursor-pointer text-muted-foreground">Instructions the customer received</summary>
             <p className="mt-1 whitespace-pre-line">{order.payment_instructions}</p>
           </details>
+        )}
+        {order.cod_remittance && (
+          <p data-testid="order-remittance">
+            Paid through courier remittance{' '}
+            {canRemit ? (
+              <Link to={`/cod-remittances/${order.cod_remittance.id}`} className="font-mono font-medium underline-offset-4 hover:underline">{order.cod_remittance.number}</Link>
+            ) : (
+              <span className="font-mono font-medium">{order.cod_remittance.number}</span>
+            )}
+          </p>
         )}
         {order.payments.length === 0 ? (
           <p className="text-muted-foreground">No payment recorded yet.</p>
@@ -268,18 +149,24 @@ export function WebOrderPage() {
           <h1 className="font-mono text-2xl font-semibold tracking-tight">{order.number}</h1>
           <Badge variant={status.variant}>{order.status_label || status.label}</Badge>
         </div>
-        {actions.length > 0 && (
-          <div className="flex flex-wrap gap-2" aria-label="Order actions" role="group">
-            {actions.map((a) => {
-              const Icon = ACTION_ICONS[a]
-              return (
-                <Button key={a} variant={a === 'cancel' ? 'outline' : 'default'} onClick={() => setAction(a)}>
-                  <Icon data-icon="inline-start" /> {ACTION_LABELS[a]}
-                </Button>
-              )
-            })}
+        <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" aria-label="Print" role="group">
+            <Button asChild variant="outline"><Link to={printPath([order.id], 'packing_slip')}><PrinterIcon data-icon="inline-start" /> Packing slip</Link></Button>
+            <Button asChild variant="outline"><Link to={printPath([order.id], 'invoice')}><PrinterIcon data-icon="inline-start" /> Invoice</Link></Button>
           </div>
-        )}
+          {actions.length > 0 && (
+            <div className="flex flex-wrap gap-2" aria-label="Order actions" role="group">
+              {actions.map((a) => {
+                const Icon = ACTION_ICONS[a]
+                return (
+                  <Button key={a} variant={a === 'cancel' ? 'outline' : 'default'} onClick={() => setAction(a)}>
+                    <Icon data-icon="inline-start" /> {ACTION_LABELS[a]}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <p className="-mt-4 text-sm text-muted-foreground">Placed {formatDateTime(order.placed_at, timeZone)}</p>
@@ -330,7 +217,7 @@ export function WebOrderPage() {
                 <Field label="Address">—</Field>
               )}
               <Field label="Method">{order.shipping_method_name ?? '—'}{eta && <span className="font-normal text-muted-foreground"> · {eta}</span>}</Field>
-              {(order.courier_name || order.tracking_number) && (
+              {!order.shipment && (order.courier_name || order.tracking_number) && (
                 <Field label="Courier">
                   {order.courier_name ?? '—'}
                   {order.tracking_number && <span className="block font-mono text-xs">Tracking {order.tracking_number}</span>}
@@ -341,6 +228,8 @@ export function WebOrderPage() {
         </Card>
         <PaymentCard order={order} timeZone={timeZone} />
       </div>
+
+      {order.shipment && <ShipmentCard order={order} shipment={order.shipment} timeZone={timeZone} canManage={can('web_orders.manage')} />}
 
       <div className="overflow-x-auto rounded-md border">
         <Table>

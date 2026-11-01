@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Orders\Presentation\Http\Controllers\AccountOrderController;
+use App\Modules\Orders\Presentation\Http\Controllers\CodRemittanceController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderController;
@@ -29,15 +30,25 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'a
 Route::prefix('web-orders')->middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::middleware('can:web_orders.view')->group(function () {
         Route::get('/', [WebOrderController::class, 'index']);
+        Route::get('print', [WebOrderController::class, 'print']);
         Route::get('{webOrder}', [WebOrderController::class, 'show'])->whereUuid('webOrder');
     });
 
     Route::middleware(['can:web_orders.manage', 'idempotent'])->group(function () {
         Route::post('{webOrder}/confirm-payment', [WebOrderController::class, 'confirmPayment'])->whereUuid('webOrder');
         Route::post('{webOrder}/process', [WebOrderController::class, 'process'])->whereUuid('webOrder');
+        Route::post('bulk/process', [WebOrderController::class, 'bulkProcess']);
         Route::post('{webOrder}/ship', [WebOrderController::class, 'ship'])->whereUuid('webOrder');
+        Route::post('{webOrder}/shipment/events', [WebOrderController::class, 'shipmentEvent'])->whereUuid('webOrder');
         Route::post('{webOrder}/deliver', [WebOrderController::class, 'deliver'])->whereUuid('webOrder');
         Route::post('{webOrder}/record-cod-payment', [WebOrderController::class, 'recordCodPayment'])->whereUuid('webOrder');
         Route::post('{webOrder}/cancel', [WebOrderController::class, 'cancel'])->whereUuid('webOrder');
     });
+});
+
+// Staff: couriers' cash-on-delivery remittances (E10a).
+Route::prefix('cod-remittances')->middleware(['auth:sanctum', 'tenant', 'can:web_orders.remit'])->group(function () {
+    Route::get('/', [CodRemittanceController::class, 'index']);
+    Route::get('{codRemittance}', [CodRemittanceController::class, 'show'])->whereUuid('codRemittance');
+    Route::post('/', [CodRemittanceController::class, 'store'])->middleware('idempotent');
 });

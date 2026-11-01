@@ -1,4 +1,5 @@
-import type { WebOrder, WebOrderRow } from '@/features/web-orders/api'
+import type { Courier } from '@/features/shipping/api'
+import type { Shipment, WebOrder, WebOrderRow } from '@/features/web-orders/api'
 import { makeCurrentUser } from '@/test/fixtures'
 
 export const orderManager = () => makeCurrentUser({ permissions: ['web_orders.view', 'web_orders.manage', 'shipping.manage', 'payment_gateways.manage', 'storefront.view'] })
@@ -61,3 +62,25 @@ export const webOrder = (overrides: Partial<WebOrder> = {}): WebOrder => ({
   allowed_actions: ['confirm_payment', 'cancel'],
   ...overrides,
 })
+
+export const couriers = (): Courier[] => [
+  { id: 'c-1', name: 'Pathao', phone: '09610003030', tracking_url_template: 'https://merchant.pathao.com/tracking?consignment_id={tracking}', is_active: true, sort_order: 0 },
+  { id: 'c-2', name: 'Steadfast', phone: null, tracking_url_template: null, is_active: true, sort_order: 1 },
+  { id: 'c-3', name: 'RedX', phone: null, tracking_url_template: null, is_active: false, sort_order: 2 },
+]
+
+export const shipment = (overrides: Partial<Shipment> = {}): Shipment => ({
+  id: 'sh-1',
+  courier_id: 'c-1',
+  courier_name: 'Pathao',
+  tracking_number: 'PT 123',
+  tracking_url: 'https://merchant.pathao.com/tracking?consignment_id=PT%20123',
+  status: 'handed_over',
+  cod_amount: '1560.00',
+  shipped_at: '2026-10-31T08:00:00Z',
+  delivered_at: null,
+  returned_at: null,
+  events: [{ id: 'ev-1', status: 'handed_over', note: null, occurred_at: '2026-10-31T08:00:00Z', recorded_by: { id: 'u-1', name: 'Rahim Uddin' } }],
+  ...overrides,
+})
+export const remitter = () => makeCurrentUser({ permissions: ['web_orders.view', 'web_orders.remit'] })

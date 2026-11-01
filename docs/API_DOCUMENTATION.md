@@ -120,6 +120,9 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `PROMOTION_NOT_FOUND` | A `hot_deals` homepage section naming a promotion that is not an automatic countdown promotion (flash sale) of the organization (`details.promotion_id`). |
 | 422 | `ORDER_NOT_CANCELLABLE` | A customer cancelling their own web order that is not awaiting payment or confirmed, or is already paid (`details.status`, `details.payment_status`). |
 | 422 | `REVIEW_NOT_ALLOWED`, `REVIEW_EXISTS` | Reviewing a product without a delivered web order line of it; a second review of the same product (`details.review_id` — edit that one instead). |
+| 422 | `SHIPMENT_NOT_FOUND` | A tracking update for a web order without a courier shipment — not shipped yet, or shipped before E10a (`details.status`). |
+| 422 | `REMITTANCE_INVALID` | A COD remittance names orders that cannot be settled by it (`details.orders: [{id, number, reason}]`, `reason` `not_found` \| `not_cod` \| `already_paid` \| `not_delivered` \| `other_courier`). Nothing is recorded. |
+| 422 | `IN_USE` | Also: deleting a courier that carried a shipment or sent a COD remittance (deactivate it instead). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -715,14 +718,14 @@ Staff endpoints (`auth:sanctum` + `tenant`; web order steps also `Idempotency-Ke
 | GET `/payment-gateways` | `payment_gateways.manage` | Both offline methods `[{code, display_name, is_enabled, instructions, settings, sort_order}]`, rows created with defaults on first read (COD on with "Pay in cash when your order is delivered.", bank transfer off). |
 | PUT `/payment-gateways/{code}` | `payment_gateways.manage` | `code` `cod` \| `bank_transfer` (else 404). `{is_enabled?, display_name? (≤ 60), instructions? (≤ 2000, null clears), sort_order?, settings?}` — `bank_transfer`: `{hold_hours: 1–168}`; `cod`: `{max_order_total: amount \| null}` (null = no limit). Settings are merged over the stored ones; unknown keys are dropped. Audited `payment_gateway.updated`. → the method. |
 | PATCH `/storefront/settings` | `storefront.manage` | Also accepts `guest_checkout_enabled` (boolean, default `true`); GET returns it. |
-| GET `/web-orders` | `web_orders.view` | Filters `status`, `payment_status`, `from`/`to` (`Y-m-d`, calendar days in the organization's timezone), `search` (number, contact name, phone, e-mail), `sort` (`placed_at`, `number`, `total`; default `-placed_at`), paging. Rows `{id, number, placed_at, status, status_label, payment_status, payment_method, contact_name, contact_phone, total, currency, item_count}` (`item_count` = sum of line quantities). |
+| GET `/web-orders` | `web_orders.view` | Filters `status`, `payment_status`, `from`/`to` (`Y-m-d`, calendar days in the organization's timezone), `search` (number, contact name, phone, e-mail), `sort` (`placed_at`, `number`, `total`; default `-placed_at`), paging. Rows `{id, number, placed_at, status, status_label, payment_status, payment_method, contact_name, contact_phone, total, currency, item_count}` (`item_count` = sum of line quantities). *E10a adds board filters, columns and `meta.status_counts` — see E10a.* |
 | GET `/web-orders/{id}` | `web_orders.view` | The order view plus `id`, `payment_status_label`, `paid_total`, `customer` (`{id, name, code}`, `null` for guests — guest orders have no customer record), `customer_account_id`, `ip`, `user_agent`, `notes`, `cancelled_at`, `cancelled_by` (`{id, name}`), `cancel_reason`, `confirmed_at`, `shipped_at`, `delivered_at`, `history` with `from_status`, `note` and `actor` (`{id, name}`, `null` = shopper or system), `payments` (`[{method, method_label, direction, amount, reference, recorded_at, recorded_by}]` from the payments ledger) and `allowed_actions` (subset of `confirm_payment`, `process`, `ship`, `deliver`, `record_cod_payment`, `cancel`; empty without `web_orders.manage`). No cost figures. |
 | POST `/web-orders/{id}/confirm-payment` | `web_orders.manage` · I | `{reference (≤ 80)}`. Bank-transfer order `pending_payment` → `confirmed`, `paid`; records the order total as `bank_transfer` in the payments ledger (source `online_order`, no drawer). COD order → `INVALID_STATUS_TRANSITION`; already paid → `ORDER_ALREADY_PAID`. Works until the expiry job has cancelled the order. |
 | POST `/web-orders/{id}/process` | `web_orders.manage` · I | `confirmed` → `processing`. |
-| POST `/web-orders/{id}/ship` | `web_orders.manage` · I | `{courier_name (≤ 100), tracking_number? (≤ 100)}`; `processing` → `shipped`, stored on the order (couriers and shipments are E10). |
+| POST `/web-orders/{id}/ship` | `web_orders.manage` · I | `{courier_name (≤ 100), tracking_number? (≤ 100)}`; `processing` → `shipped`, stored on the order. *Since E10a: `{courier_id, tracking_number? (≤ 60), note?}` with a shipment — see E10a.* |
 | POST `/web-orders/{id}/deliver` | `web_orders.manage` · I | `shipped` → `delivered`. |
-| POST `/web-orders/{id}/record-cod-payment` | `web_orders.manage` · I | `{reference? (≤ 80)}`. COD orders that are `shipped` or `delivered`: the courier's remittance arrived — records the total as `cash_on_delivery` (no drawer) and marks the order paid; the status does not change. Other states or methods → `INVALID_STATUS_TRANSITION`; `ORDER_ALREADY_PAID` when repeated. |
-| POST `/web-orders/{id}/cancel` | `web_orders.manage` · I | `{reason (≤ 200)}`. Unpaid orders in `pending_payment`, `confirmed` or `processing`; the stock goes back to the exact batches at the cost it left with (`online_order_cancel`). Paid → `ORDER_PAID` (refunds are E10); cancelled/shipped/delivered → `INVALID_STATUS_TRANSITION`. |
+| POST `/web-orders/{id}/record-cod-payment` | `web_orders.manage` · I | `{reference? (≤ 80)}`. COD orders that are `shipped` or `delivered`: the courier's remittance arrived — records the total as `cash_on_delivery` (no drawer) and marks the order paid; the status does not change. Other states or methods → `INVALID_STATUS_TRANSITION`; `ORDER_ALREADY_PAID` when repeated. *Since E10a:* refused with `INVALID_STATUS_TRANSITION` (`details.shipment_status: "returned"`) when the parcel came back to the sender. |
+| POST `/web-orders/{id}/cancel` | `web_orders.manage` · I | `{reason (≤ 200)}`. Unpaid orders in `pending_payment`, `confirmed` or `processing`; the stock goes back to the exact batches at the cost it left with (`online_order_cancel`). Paid → `ORDER_PAID` (refunds are E10); cancelled/shipped/delivered → `INVALID_STATUS_TRANSITION` (*since E10a a shipped order whose parcel was returned can be cancelled — see E10a*). |
 
 Every step locks the order row, appends `order_status_history`, is audited (`web_order.payment_confirmed`, `.processing`, `.shipped`, `.delivered`, `.cod_payment_recorded`, `.cancelled`) and returns the full staff order. Organization Admin and Online Store Manager hold `web_orders.*` and `shipping.manage`; `payment_gateways.manage` is Organization Admin only (ADR-016).
 
@@ -953,6 +956,77 @@ Cancelling a delivered order:
 
 ```json
 { "success": false, "error": { "code": "ORDER_NOT_CANCELLABLE", "message": "WEB-000001 is Delivered and can no longer be cancelled.", "details": { "status": "delivered", "payment_status": "paid" } }, "meta": { "request_id": "0193…" } }
+```
+
+### E-commerce track — fulfilment: couriers, shipments, printing and COD remittances (E10a)
+
+Staff endpoints (`auth:sanctum` + `tenant`; ids of another organization → 404; steps marked **I** need `Idempotency-Key`). Couriers belong to the Shipping module, shipments and remittances to Orders.
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/shipping/couriers` | `shipping.manage` or `web_orders.view` | `?active=1` for active ones only. By `sort_order`, then name: `[{id, name, phone, tracking_url_template, is_active, sort_order}]`. |
+| POST `/shipping/couriers` · PATCH/DELETE `/shipping/couriers/{id}` | `shipping.manage` | `{name (≤ 80, not blank, unique per organization regardless of case), phone? (≤ 20), tracking_url_template? (≤ 500; an absolute http(s) URL containing {tracking}), is_active?, sort_order? (0–9999)}`; PATCH any subset. DELETE (204) only for a courier that never carried a shipment nor sent a remittance, else `422 IN_USE` (deactivate it; inactive couriers cannot take new shipments). Audited `courier.created`, `.updated`, `.deleted`. |
+| GET `/web-orders` (orders board) | `web_orders.view` | E8a filters plus `payment_method` (`cod`\|`bank_transfer`), `courier_id` (the shipment's courier), `district_id` (shipping address), `date_from`/`date_to` (`Y-m-d`; aliases of `from`/`to`: calendar days of `placed_at` in the organization's timezone) and `cod_unremitted=1` (cash on delivery, `delivered`, `unpaid` — the courier owes the money). 25 per page by default. Rows add `district`, `courier_name`, `tracking_number`, `shipment_status` (null without a shipment), `delivered_at`. `meta.status_counts`: `{all, pending_payment, confirmed, processing, shipped, delivered, cancelled, cod_unremitted}` for the current filters **except** `status` (the `cod_unremitted` count also ignores `cod_unremitted`). |
+| GET `/web-orders/{id}` | `web_orders.view` | Adds `tracking_url`, `shipment` (`null` before shipping and for orders shipped before E10a; else `{id, courier: {id, name}, courier_name, tracking_number, tracking_url, status, status_label, cod_amount, shipped_at, delivered_at, returned_at, events: [{id, status, status_label, note, occurred_at, recorded_at, recorded_by: {id, name}}]}`), `cod_remittance` (`{id, number, received_at}` or `null`) and the allowed action `add_shipment_event` (shipped, with a shipment that is not delivered or returned). For a returned parcel `deliver` and `record_cod_payment` are not offered and `cancel` is (when unpaid). |
+| POST `/web-orders/{id}/ship` | `web_orders.manage` · I | **Changed:** `{courier_id, tracking_number? (≤ 60), note? (≤ 200)}` — `courier_name` is no longer accepted. `processing` → `shipped` with an active courier of the organization (unknown or inactive → field error on `courier_id`). Creates the shipment (`cod_amount` = order total for an unpaid COD order, else `0.00`) and its first event `handed_over` (with the note). The order keeps `courier_name` and `tracking_number`. |
+| POST `/web-orders/{id}/shipment/events` | `web_orders.manage` · I | `{status: in_transit\|delivered\|returned, note? (≤ 200), occurred_at? (date-time; default now; at most 5 minutes ahead, not before the hand-over — field errors)}`. Transitions: `handed_over`/`in_transit` → `in_transit` (repeatable), `delivered`, `returned`; `delivered` and `returned` are final. `delivered` delivers the order (as `/deliver`, `delivered_at` = `occurred_at`); `returned` sets the shipment `returned_at` (order stays `shipped`). No shipment (not shipped, or shipped before E10a) → `422 SHIPMENT_NOT_FOUND` (`details.status`); final parcel → `INVALID_STATUS_TRANSITION` (`details.from`, `to`, `allowed`). Audited `web_order.shipment_updated` / `.shipment_returned` (delivery: `web_order.delivered`). → the staff order. |
+| POST `/web-orders/{id}/deliver` | `web_orders.manage` · I | As E8a; with a shipment it also adds a `delivered` event. A returned parcel → `INVALID_STATUS_TRANSITION`. |
+| POST `/web-orders/{id}/cancel` | `web_orders.manage` · I | As E8a, and also a `shipped` order whose shipment is `returned` and which is unpaid: the stock goes back to the exact batches (`online_order_cancel`), once — a repeat finds it cancelled (`INVALID_STATUS_TRANSITION`). |
+| POST `/web-orders/bulk/process` | `web_orders.manage` · I | `{order_ids: [uuid] (1–100)}`. Each order `confirmed` → `processing` in its own transaction; **never all-or-nothing**. → `{results: [{id, number, ok, error_code?, message?}], succeeded, failed}` in the requested order; `error_code` `NOT_FOUND` (not an order of the organization; `number: null`) or `INVALID_STATUS_TRANSITION`. |
+| GET `/web-orders/print` | `web_orders.view` | `?ids[]=…` (1–100 uuids) `&kind=packing_slip\|invoice`. Read-only; records nothing. → `{kind, organization: {name, legal_name, address, phone, email, tax_number, logo_url (storefront theme logo or null)}, orders: […]}` in the requested order. Per order: `id, number, placed_at, status, status_label, contact {name, email, phone}, shipping_address, payment_method, payment_method_label, payment_status, payment_status_label, shipping_method_name, courier_name, tracking_number, tracking_url, notes, item_count, lines: [{product_name, variant_name, sku, quantity}]`. `invoice` adds per line `unit_price, line_subtotal, discount_amount, tax_rate, tax_amount, line_total` and per order `currency, prices_include_tax, subtotal, discount_total, tax_total, shipping_total, shipping_discount, cod_fee, promotions, coupon_code, total, paid_total, balance_due`; a packing slip has no price keys. Any id that is not an order of the organization → `404` (no partial sheet). |
+| GET `/cod-remittances` | `web_orders.remit` | Filters `courier_id`, `date_from`/`date_to` (`Y-m-d`, received date), `search` (number, reference); `sort` (`received_at`, `number`, `created_at`, `gross_amount`; default `-number`), 25 per page. Rows `{id, number, courier: {id, name}, reference, received_at (Y-m-d), method, method_label, currency, gross_amount, fee_amount, net_amount, order_count, created_at, created_by: {id, name}}`. |
+| GET `/cod-remittances/{id}` | `web_orders.remit` | The row plus `note`, `expense` (`{id, number}` of the courier fee expense, `null` without a fee) and `lines: [{order_id, number, placed_at, delivered_at, contact_name, amount}]` by order number. |
+| POST `/cod-remittances` | `web_orders.remit` · I | `{courier_id, reference? (≤ 60, the courier's statement number), received_at (Y-m-d, not after today in the organization's timezone), method: bank_transfer\|cash\|mobile_banking, fee_amount (≥ 0, 2 decimals, ≤ the gross — field error), order_ids: [uuid] (1–500, distinct), note? (≤ 500)}`. **All or nothing:** every order must be the organization's, cash on delivery, unpaid, `delivered` and shipped with this courier, else `422 REMITTANCE_INVALID` with `details.orders: [{id, number, reason}]`, `reason` checked in this order: `not_found`, `not_cod`, `already_paid`, `not_delivered`, `other_courier`. One transaction, orders locked `FOR UPDATE` in id order: number `REM-…`; per order a line (amount = order total) and the shared COD payment (ledger `cash_on_delivery` in, source `online_order`, reference = the REM number, order `paid`); a fee above zero is booked as an expense `EXP-…` in the category "Courier fees" (created when missing; party = courier, dated `received_at`, reference = the REM number; ledger `cash_on_delivery` out, no drawer). Gross = sum of the order totals, net = gross − fee. Unknown courier → field error on `courier_id` (an inactive courier is accepted). Audited `cod_remittance.recorded`. → `201` with the remittance as `GET` shows it. Remittances cannot be edited or deleted. |
+
+`web_orders.remit` is new: Organization Admin (`*`), Online Store Manager (`web_orders.*`) and the built-in Accountant (with `web_orders.view`). Existing databases: `php artisan pos:permissions:sync`. The manual `POST /web-orders/{id}/record-cod-payment` (own riders) is unchanged and uses the same payment path.
+
+Storefront: `GET /store/orders/{number}` and `GET /store/account/orders/{number}` add `tracking_url` — the courier's template with the url-encoded tracking number, `null` without a courier shipment, template or tracking number.
+
+Example — Steadfast pays for the demo order `WEB-000003` (132.00, delivered) minus a 20.00 fee:
+
+```http
+POST /api/v1/cod-remittances
+Content-Type: application/json
+Idempotency-Key: 2b7e4c1a-9d3f-4a62-8e15-7c0b9f6d2a11
+X-XSRF-TOKEN: …
+
+{
+  "courier_id": "0193…",
+  "reference": "SF-STMT-77",
+  "received_at": "2026-11-01",
+  "method": "bank_transfer",
+  "fee_amount": "20.00",
+  "order_ids": ["0193…"],
+  "note": null
+}
+```
+```json
+{
+  "success": true,
+  "data": {
+    "id": "0193…", "number": "REM-000001",
+    "courier": { "id": "0193…", "name": "Steadfast" },
+    "reference": "SF-STMT-77", "received_at": "2026-11-01",
+    "method": "bank_transfer", "method_label": "Bank transfer", "currency": "BDT",
+    "gross_amount": "132.00", "fee_amount": "20.00", "net_amount": "112.00", "order_count": 1,
+    "created_at": "2026-11-01T08:40:12+00:00", "created_by": { "id": "0193…", "name": "Demo Owner" },
+    "note": null,
+    "expense": { "id": "0193…", "number": "EXP-…" },
+    "lines": [
+      { "order_id": "0193…", "number": "WEB-000003", "placed_at": "2026-11-01T04:12:09+00:00",
+        "delivered_at": "2026-11-01T08:35:40+00:00", "contact_name": "Demo Shopper", "amount": "132.00" }
+    ]
+  },
+  "meta": { "request_id": "0193…" }
+}
+```
+
+The same body with an order of another courier and one already paid:
+
+```json
+{ "success": false, "error": { "code": "REMITTANCE_INVALID", "message": "2 orders cannot be part of this remittance.",
+  "details": { "orders": [ { "id": "0193…", "number": "WEB-000001", "reason": "already_paid" },
+                           { "id": "0193…", "number": "WEB-000007", "reason": "other_courier" } ] } }, "meta": { "request_id": "0193…" } }
 ```
 
 ### Planned (by phase)

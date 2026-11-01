@@ -26,7 +26,9 @@ use Illuminate\Support\Facades\RateLimiter;
  * orders list and workflow (confirm payment, process, ship, deliver, record COD payment,
  * cancel with restock), the confirmation e-mail and staff notification, and the scheduled
  * expiry of unpaid bank-transfer orders (`orders:expire-pending`); the customer's own orders
- * (E9: history, detail, cancel, re-order) and the `PurchaseVerifier` the Reviews module asks.
+ * (E9: history, detail, cancel, re-order) and the `PurchaseVerifier` the Reviews module asks;
+ * fulfilment (E10a): shipments with courier events, the orders board (filters, counts, bulk
+ * processing), print data and couriers' COD remittances.
  */
 class OrdersServiceProvider extends ModuleServiceProvider
 {
@@ -63,6 +65,7 @@ class OrdersServiceProvider extends ModuleServiceProvider
         return [
             'web_orders.view' => 'View online store orders',
             'web_orders.manage' => 'Process online store orders: confirm payments, ship, deliver, record cash on delivery, cancel',
+            'web_orders.remit' => 'Record and view couriers\' cash-on-delivery remittances',
         ];
     }
 }

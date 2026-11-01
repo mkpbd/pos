@@ -62,6 +62,7 @@ use LogicException;
  * @property ?string $cancel_reason
  * @property ?string $ip
  * @property ?string $user_agent
+ * @property-read ?Shipment $shipment
  */
 #[Fillable([
     'id', 'organization_id', 'number', 'customer_id', 'customer_account_id', 'branch_id', 'store_id', 'status',
@@ -142,6 +143,16 @@ class Order extends Model
     public function promotions(): HasMany
     {
         return $this->hasMany(OrderPromotion::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /**
+     * The parcel handed to a courier (E10a; orders shipped before E10a have none).
+     *
+     * @return HasOne<Shipment, $this>
+     */
+    public function shipment(): HasOne
+    {
+        return $this->hasOne(Shipment::class);
     }
 
     /**

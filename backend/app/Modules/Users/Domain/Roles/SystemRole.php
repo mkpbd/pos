@@ -66,6 +66,8 @@ enum SystemRole: string
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
                 'sales.view', 'purchases.view', 'purchases.pay', 'customers.view', 'suppliers.view',
                 'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'audit.view',
+                // E10a: couriers' COD remittances (and the web orders they settle).
+                'web_orders.view', 'web_orders.remit',
             ],
             // Custom CSS and payment gateway credentials stay with the Organization Admin (ADR-016).
             self::OnlineStoreManager => [

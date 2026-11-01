@@ -98,3 +98,47 @@ export function useDeleteMethodMutation() {
   const invalidate = useInvalidateZones()
   return useMutation({ mutationFn: (id: string) => api.delete(`/shipping/methods/${id}`), onSuccess: invalidate })
 }
+
+// ── Couriers (E10a) ──────────────────────────────────────────────────────────
+
+export type Courier = {
+  id: string
+  name: string
+  phone: string | null
+  /** Link to the courier's tracking page; contains `{tracking}`. */
+  tracking_url_template: string | null
+  is_active: boolean
+  sort_order: number
+}
+
+export type CourierInput = Omit<Courier, 'id'>
+
+export const courierKeys = {
+  all: ['shipping', 'couriers'] as const,
+}
+
+/** Every courier of the organization, active or not (staff with shipping.manage or web_orders.view). */
+export function useCouriersQuery(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: courierKeys.all,
+    queryFn: ({ signal }) => api.get<Courier[]>('/shipping/couriers', { signal }).then((r) => r.data),
+    enabled: options.enabled ?? true,
+  })
+}
+
+export function useSaveCourierMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: Partial<CourierInput> }) =>
+      (id ? api.patch<Courier>(`/shipping/couriers/${id}`, input) : api.post<Courier>('/shipping/couriers', input)).then((r) => r.data),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: courierKeys.all }),
+  })
+}
+
+export function useDeleteCourierMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/shipping/couriers/${id}`),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: courierKeys.all }),
+  })
+}

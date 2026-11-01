@@ -8,8 +8,10 @@ use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
+use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
+use App\Modules\Orders\Infrastructure\Models\Shipment;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,8 @@ use Illuminate\Support\Facades\DB;
  * to the exact batches it left from, at the cost it left with (`online_order_cancel`), in the
  * same transaction as the status change. The order row is locked first, so a second cancel
  * (or a cancel racing the expiry job) finds it cancelled — INVALID_STATUS_TRANSITION, never a
- * second restock. Paid orders need a refund (E10): ORDER_PAID.
+ * second restock. Paid orders need a refund (E10): ORDER_PAID. A shipped order can be
+ * cancelled only when its parcel was returned to the sender (E10a).
  */
 class CancelOrder
 {
@@ -46,7 +49,9 @@ class CancelOrder
     {
         $actorType ??= $actorId === null ? 'system' : 'staff';
         $from = $locked->status;
-        $from->assertCanBecome(OrderStatus::Cancelled, $locked->number);
+        if (! self::returnedToSender($locked)) {
+            $from->assertCanBecome(OrderStatus::Cancelled, $locked->number);
+        }
         if ($locked->payment_status === PaymentStatus::Paid) {
             throw new BusinessRuleViolation('ORDER_PAID', "{$locked->number} is paid; refund it instead of cancelling.");
         }
@@ -85,5 +90,15 @@ class CancelOrder
         ]);
 
         return $locked;
+    }
+
+    /**
+     * A shipped order whose parcel came back to the sender (E10a): it may be cancelled — with
+     * the same exact restock — when it is unpaid (checked by the caller).
+     */
+    public static function returnedToSender(Order $order): bool
+    {
+        return $order->status === OrderStatus::Shipped
+            && Shipment::query()->where('order_id', $order->id)->where('status', ShipmentStatus::Returned)->exists();
     }
 }

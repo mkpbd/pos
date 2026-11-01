@@ -80,7 +80,7 @@ class WebOrderWorkflowTest extends TestCase
         $this->staff();
 
         $list = $this->getJson('/api/v1/web-orders')->assertOk();
-        $this->assertSame(['id', 'number', 'placed_at', 'status', 'status_label', 'payment_status', 'payment_method', 'contact_name', 'contact_phone', 'total', 'currency', 'item_count'], array_keys($list->json('data.0')));
+        $this->assertSame(['id', 'number', 'placed_at', 'status', 'status_label', 'payment_status', 'payment_method', 'contact_name', 'contact_phone', 'total', 'currency', 'item_count', 'district', 'courier_name', 'tracking_number', 'shipment_status', 'delivered_at'], array_keys($list->json('data.0')));
         $this->assertSame(['WEB-000001', '510.00', '1'], [$list->json('data.0.number'), $list->json('data.0.total'), $list->json('data.0.item_count')]);
         $this->getJson('/api/v1/web-orders?status=pending_payment')->assertJsonPath('meta.pagination.total', 0);
         $this->getJson('/api/v1/web-orders?search=01712345678')->assertJsonPath('meta.pagination.total', 1);
@@ -99,9 +99,12 @@ class WebOrderWorkflowTest extends TestCase
 
         $this->act($id, 'process')->assertOk()->assertJsonPath('data.status', 'processing')->assertJsonPath('data.allowed_actions', ['ship', 'cancel']);
         $this->act($id, 'ship', ['tracking_number' => 'T1'])->assertStatus(422)->assertJsonPath('error.code', 'VALIDATION_FAILED');
-        $this->act($id, 'ship', ['courier_name' => 'Pathao', 'tracking_number' => 'PTH-1'])->assertOk()
+        // E10a: a courier id, not free text.
+        $this->act($id, 'ship', ['courier_name' => 'Pathao', 'tracking_number' => 'PTH-1'])->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['courier_id']]]);
+        $courier = $this->postJson('/api/v1/shipping/couriers', ['name' => 'Pathao'])->assertCreated()->json('data.id');
+        $this->act($id, 'ship', ['courier_id' => $courier, 'tracking_number' => 'PTH-1'])->assertOk()
             ->assertJsonPath('data.status', 'shipped')->assertJsonPath('data.courier_name', 'Pathao')->assertJsonPath('data.tracking_number', 'PTH-1')
-            ->assertJsonPath('data.allowed_actions', ['deliver', 'record_cod_payment']);
+            ->assertJsonPath('data.allowed_actions', ['deliver', 'add_shipment_event', 'record_cod_payment']);
         $this->act($id, 'cancel', ['reason' => 'Too late'])->assertStatus(422)->assertJsonPath('error.code', 'INVALID_STATUS_TRANSITION');
 
         $paid = $this->act($id, 'record-cod-payment', ['reference' => 'Pathao remit 7'])->assertOk()->json('data');
@@ -221,7 +224,7 @@ class WebOrderWorkflowTest extends TestCase
         $this->getJson('/api/v1/payment-gateways')->assertForbidden();
 
         // Staff actions need an Idempotency-Key.
-        $this->postJson("/api/v1/web-orders/{$id}/ship", ['courier_name' => 'X'])->assertStatus(428);
+        $this->postJson("/api/v1/web-orders/{$id}/ship", ['courier_id' => (string) Str::uuid()])->assertStatus(428);
     }
 
     public function test_orders_and_shipping_are_isolated_between_organizations(): void

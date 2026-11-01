@@ -3,6 +3,14 @@ import { notificationTarget } from '@/features/notifications/target'
 import { MOVEMENT_LABELS } from '@/features/inventory/api'
 import {
   actionErrorMessage,
+  boardTabCount,
+  boardTabLabel,
+  bulkErrorLabel,
+  bulkSummary,
+  nextShipmentEvents,
+  printParams,
+  printPath,
+  safeHttpUrl,
   etaLabel,
   filtersFromSearchParams,
   filtersToSearchParams,
@@ -18,23 +26,69 @@ import {
 import { ApiError } from '@/lib/api/client'
 
 describe('web order filters', () => {
-  it('round-trips filters through the address', () => {
-    const filters = filtersFromSearchParams(new URLSearchParams('status=shipped&payment_status=paid&search=0171&from=2026-10-01&to=2026-10-31&page=3'))
-    expect(filters).toEqual({ page: 3, status: 'shipped', paymentStatus: 'paid', search: '0171', from: '2026-10-01', to: '2026-10-31' })
-    expect(filtersToSearchParams(filters).toString()).toBe('status=shipped&payment_status=paid&search=0171&from=2026-10-01&to=2026-10-31&page=3')
+  it('round-trips the tab and filters through the address', () => {
+    const filters = filtersFromSearchParams(new URLSearchParams('status=shipped&courier_id=c-1&payment_method=cod&district_id=26&search=0171&from=2026-10-01&to=2026-10-31&page=3'))
+    expect(filters).toEqual({ page: 3, tab: 'shipped', courierId: 'c-1', paymentMethod: 'cod', districtId: 26, search: '0171', from: '2026-10-01', to: '2026-10-31' })
+    expect(filtersToSearchParams(filters).toString()).toBe('status=shipped&courier_id=c-1&payment_method=cod&district_id=26&search=0171&from=2026-10-01&to=2026-10-31&page=3')
+  })
+
+  it('reads the COD-to-collect tab', () => {
+    const filters = filtersFromSearchParams(new URLSearchParams('cod_unremitted=1&status=shipped'))
+    expect(filters.tab).toBe('cod_unremitted')
+    expect(filtersToSearchParams(filters).toString()).toBe('cod_unremitted=1')
+    expect(toListParams(filters, '')).toEqual({ page: 1, per_page: 25, cod_unremitted: 1 })
   })
 
   it('drops unknown or malformed values', () => {
-    expect(filtersFromSearchParams(new URLSearchParams('status=lost&payment_status=refunded&from=yesterday&page=-1'))).toEqual({
-      page: 1, status: null, paymentStatus: null, search: '', from: '', to: '',
-    })
-    expect(filtersToSearchParams({ page: 1, status: null, paymentStatus: null, search: '', from: '', to: '' }).toString()).toBe('')
+    const empty = { page: 1, tab: 'all', courierId: null, paymentMethod: null, districtId: null, search: '', from: '', to: '' }
+    expect(filtersFromSearchParams(new URLSearchParams('status=lost&payment_method=cheque&district_id=x&from=yesterday&page=-1'))).toEqual(empty)
+    expect(filtersToSearchParams(empty as never).toString()).toBe('')
   })
 
-  it('builds the list query with the debounced search term', () => {
+  it('builds the list query with the debounced search term and spec date names', () => {
     const filters = filtersFromSearchParams(new URLSearchParams('status=confirmed&to=2026-10-31'))
-    expect(toListParams(filters, '')).toEqual({ page: 1, status: 'confirmed', to: '2026-10-31' })
-    expect(toListParams(filters, 'WEB-0001')).toEqual({ page: 1, status: 'confirmed', to: '2026-10-31', search: 'WEB-0001' })
+    expect(toListParams(filters, '')).toEqual({ page: 1, per_page: 25, status: 'confirmed', date_to: '2026-10-31' })
+    expect(toListParams(filters, 'WEB-0001')).toEqual({ page: 1, per_page: 25, status: 'confirmed', date_to: '2026-10-31', search: 'WEB-0001' })
+  })
+
+  it('counts tabs from the status counts', () => {
+    const counts = { pending_payment: 2, confirmed: 3, shipped: 1, cod_unremitted: 4 }
+    expect(boardTabCount('all', counts)).toBe(6)
+    expect(boardTabCount('confirmed', counts)).toBe(3)
+    expect(boardTabCount('delivered', counts)).toBe(0)
+    expect(boardTabCount('cod_unremitted', counts)).toBe(4)
+    expect(boardTabCount('cod_unremitted', { confirmed: 1 })).toBeNull()
+    expect(boardTabCount('all', null)).toBeNull()
+    expect(boardTabLabel('cod_unremitted')).toBe('COD to collect')
+  })
+})
+
+describe('fulfilment helpers', () => {
+  it('summarises a bulk action per order', () => {
+    expect(bulkSummary([{ id: 'a', number: 'W1', ok: true }, { id: 'b', number: 'W2', ok: false, error_code: 'INVALID_STATUS_TRANSITION' }])).toBe('1 order moved to Processing; 1 not changed.')
+    expect(bulkSummary([{ id: 'a', number: 'W1', ok: true }, { id: 'b', number: 'W2', ok: true }])).toBe('2 orders moved to Processing.')
+    expect(bulkErrorLabel('INVALID_STATUS_TRANSITION')).toMatch(/not confirmed/)
+    expect(bulkErrorLabel('SOMETHING', 'Locked')).toBe('Locked')
+  })
+
+  it('offers shipment updates until the parcel is delivered or returned', () => {
+    expect(nextShipmentEvents({ status: 'handed_over' })).toEqual(['in_transit', 'delivered', 'returned'])
+    expect(nextShipmentEvents({ status: 'in_transit' })).toEqual(['in_transit', 'delivered', 'returned'])
+    expect(nextShipmentEvents({ status: 'delivered' })).toEqual([])
+    expect(nextShipmentEvents({ status: 'returned' })).toEqual([])
+  })
+
+  it('only links http(s) tracking pages', () => {
+    expect(safeHttpUrl('https://merchant.pathao.com/tracking?consignment_id=A%201')).toBe('https://merchant.pathao.com/tracking?consignment_id=A%201')
+    expect(safeHttpUrl('javascript:alert(1)')).toBeNull()
+    expect(safeHttpUrl(null)).toBeNull()
+  })
+
+  it('builds and reads print addresses', () => {
+    const path = printPath(['wo-1', 'wo-2'], 'invoice')
+    expect(path).toBe('/web-orders/print?ids=wo-1%2Cwo-2&kind=invoice')
+    expect(printParams(new URLSearchParams(path.split('?')[1]))).toEqual({ ids: ['wo-1', 'wo-2'], kind: 'invoice' })
+    expect(printParams(new URLSearchParams('ids=a,,a,b&kind=weird'))).toEqual({ ids: ['a', 'b'], kind: 'packing_slip' })
   })
 })
 

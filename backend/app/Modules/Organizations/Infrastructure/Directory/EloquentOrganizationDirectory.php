@@ -27,6 +27,11 @@ class EloquentOrganizationDirectory implements OrganizationDirectory
             'invoice_prefix' => $organization->settings['invoice_prefix'] ?? null,
             'receipt_header' => $organization->settings['receipt_header'] ?? null,
             'receipt_footer' => $organization->settings['receipt_footer'] ?? null,
+            'legal_name' => $organization->getAttribute('legal_name'),
+            'tax_number' => $organization->getAttribute('tax_number'),
+            'email' => $organization->getAttribute('email'),
+            'phone' => $organization->getAttribute('phone'),
+            'address' => $organization->getAttribute('address'),
         ];
     }
 }

@@ -1,12 +1,14 @@
 <?php
 
+use App\Modules\Shipping\Presentation\Http\Controllers\CourierController;
 use App\Modules\Shipping\Presentation\Http\Controllers\ShippingZoneController;
 use App\Modules\Shipping\Presentation\Http\Controllers\StoreShippingController;
 use Illuminate\Support\Facades\Route;
 
-// Staff: delivery zones and methods (reading also with web_orders.view, checked in the controller).
+// Staff: delivery zones, methods and couriers (reading also with web_orders.view, checked in the controller).
 Route::prefix('shipping')->middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('zones', [ShippingZoneController::class, 'index']);
+    Route::get('couriers', [CourierController::class, 'index']);
 
     Route::middleware('can:shipping.manage')->group(function () {
         Route::post('zones', [ShippingZoneController::class, 'store']);
@@ -15,6 +17,9 @@ Route::prefix('shipping')->middleware(['auth:sanctum', 'tenant'])->group(functio
         Route::post('zones/{zone}/methods', [ShippingZoneController::class, 'storeMethod'])->whereUuid('zone');
         Route::patch('methods/{method}', [ShippingZoneController::class, 'updateMethod'])->whereUuid('method');
         Route::delete('methods/{method}', [ShippingZoneController::class, 'destroyMethod'])->whereUuid('method');
+        Route::post('couriers', [CourierController::class, 'store']);
+        Route::patch('couriers/{courier}', [CourierController::class, 'update'])->whereUuid('courier');
+        Route::delete('couriers/{courier}', [CourierController::class, 'destroy'])->whereUuid('courier');
     });
 });
 

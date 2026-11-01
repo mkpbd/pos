@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { routes } from '@/app/routes'
 import type { WebOrder } from '@/features/web-orders/api'
-import { orderManager, orderRow, orderViewer, webOrder } from '@/features/web-orders/test-data'
+import { couriers, orderManager, orderViewer, shipment, webOrder } from '@/features/web-orders/test-data'
+import { makeCurrentUser } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 
 const toastSuccess = vi.hoisted(() => vi.fn())
@@ -18,68 +19,6 @@ const paged = (items: unknown[]) => ok(items, { pagination: { current_page: 1, p
 beforeEach(() => {
   toastSuccess.mockReset()
   toastError.mockReset()
-})
-
-describe('web orders list', () => {
-  it('lists orders and sends the filters as query parameters', async () => {
-    const user = userEvent.setup()
-    const queries: URLSearchParams[] = []
-    mockApi({
-      'GET /auth/me': ok(orderManager()),
-      'GET /web-orders': (_init, url) => {
-        queries.push(url.searchParams)
-        return paged([orderRow(), orderRow({ id: 'wo-2', number: 'WEB-000002', status: 'confirmed', payment_method: 'cod', item_count: 1 })])
-      },
-    })
-    const { router } = renderRoutes(routes, '/web-orders')
-
-    expect(await screen.findByRole('link', { name: 'WEB-000001' })).toHaveAttribute('href', '/web-orders/wo-1')
-    expect(screen.getByRole('link', { name: 'WEB-000002' })).toBeInTheDocument()
-    expect(screen.getAllByText('Awaiting payment')[0]).toBeInTheDocument()
-    expect(screen.getByText('Cash on delivery')).toBeInTheDocument()
-    expect(queries[0]?.toString()).toBe('page=1')
-
-    await user.click(screen.getByRole('combobox', { name: 'Filter by status' }))
-    await user.click(await screen.findByRole('option', { name: 'Confirmed' }))
-    await waitFor(() => expect(queries.at(-1)?.get('status')).toBe('confirmed'))
-    expect(router.state.location.search).toBe('?status=confirmed')
-
-    await user.click(screen.getByRole('combobox', { name: 'Filter by payment' }))
-    await user.click(await screen.findByRole('option', { name: 'Unpaid' }))
-    await waitFor(() => expect(queries.at(-1)?.get('payment_status')).toBe('unpaid'))
-
-    await user.type(screen.getByLabelText('Search web orders'), ' 01711 ')
-    await waitFor(() => expect(queries.at(-1)?.get('search')).toBe('01711'))
-
-    const from = screen.getByLabelText('Placed from')
-    await user.type(from, '2026-10-01')
-    await waitFor(() => expect(queries.at(-1)?.get('from')).toBe('2026-10-01'))
-    expect(queries.at(-1)?.get('status')).toBe('confirmed')
-
-    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
-    await waitFor(() => expect(queries.at(-1)?.toString()).toBe('page=1'))
-  })
-
-  it('reads its filters from the address', async () => {
-    let query: URLSearchParams | undefined
-    mockApi({
-      'GET /auth/me': ok(orderViewer()),
-      'GET /web-orders': (_init, url) => {
-        query = url.searchParams
-        return paged([])
-      },
-    })
-    renderRoutes(routes, '/web-orders?status=shipped&payment_status=paid&from=2026-10-01&to=2026-10-31&page=2')
-
-    expect(await screen.findByText('No orders match these filters')).toBeInTheDocument()
-    expect(Object.fromEntries(query ?? [])).toEqual({ page: '2', status: 'shipped', payment_status: 'paid', from: '2026-10-01', to: '2026-10-31' })
-  })
-
-  it('is listed in the sidebar for order staff only', async () => {
-    mockApi({ 'GET /auth/me': ok(orderViewer()), 'GET /web-orders': paged([]), 'GET /notifications/unread-count': ok({ count: 0 }) })
-    renderRoutes(routes, '/web-orders')
-    expect(await screen.findByRole('link', { name: 'Web orders' })).toHaveAttribute('href', '/web-orders')
-  })
 })
 
 describe('web order page', () => {
@@ -258,28 +197,140 @@ describe('web order page', () => {
     expect(within(screen.getByRole('list', { name: 'Status history' })).getByText(/Rahim Uddin/)).toBeInTheDocument()
   })
 
-  it('records a shipment with courier and tracking number', async () => {
+  it('ships with an active courier, tracking number and note, then shows the shipment', async () => {
     const user = userEvent.setup()
     let body: unknown
     let key: string | null = null
+    let current: WebOrder = webOrder({ status: 'processing', status_label: 'Processing', payment_method: 'cod', payment_method_label: 'Cash on delivery', allowed_actions: ['ship', 'cancel'] })
     mockApi({
       'GET /auth/me': ok(orderManager()),
-      'GET /web-orders/wo-1': ok(webOrder({ status: 'processing', status_label: 'Processing', payment_method: 'cod', allowed_actions: ['ship', 'cancel'] })),
+      'GET /web-orders/wo-1': () => ok(current),
+      'GET /shipping/couriers': ok(couriers()),
       'POST /web-orders/wo-1/ship': (init) => {
         body = JSON.parse(String(init.body))
         key = new Headers(init.headers).get('Idempotency-Key')
-        return ok(webOrder({ status: 'shipped', status_label: 'Shipped', courier_name: 'Pathao', tracking_number: null, allowed_actions: ['deliver', 'record_cod_payment'] }))
+        current = webOrder({ status: 'shipped', status_label: 'Shipped', payment_method: 'cod', courier_name: 'Pathao', tracking_number: 'PT 123', shipment: shipment(), allowed_actions: ['deliver', 'record_cod_payment'] })
+        return ok(current)
       },
     })
     renderRoutes(routes, '/web-orders/wo-1')
 
     await user.click(await screen.findByRole('button', { name: 'Ship' }))
     const dialog = await screen.findByRole('dialog', { name: 'Ship WEB-000001' })
-    await user.type(within(dialog).getByLabelText('Courier'), 'Pathao')
-    await user.click(within(dialog).getByRole('button', { name: 'Mark as shipped' }))
+    expect(within(dialog).getByText(/collects BDT 1,560.00 on delivery/)).toBeInTheDocument()
+    const submit = within(dialog).getByRole('button', { name: 'Mark as shipped' })
+    expect(submit).toBeDisabled()
+    await user.click(await within(dialog).findByLabelText('Courier'))
+    expect(screen.queryByRole('option', { name: 'RedX' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('option', { name: 'Pathao' }))
+    await user.type(within(dialog).getByLabelText('Tracking number (optional)'), ' PT 123 ')
+    await user.type(within(dialog).getByLabelText('Note (optional)'), '2 parcels')
+    await user.click(submit)
 
-    await waitFor(() => expect(body).toEqual({ courier_name: 'Pathao', tracking_number: null }))
-    expect(key).toBeTruthy()
+    await waitFor(() => expect(body).toEqual({ courier_id: 'c-1', tracking_number: 'PT 123', note: '2 parcels' }))
+    expect(key).toMatch(/^[0-9a-f-]{36}$/)
+    const card = await screen.findByTestId('shipment-card')
+    expect(within(card).getByRole('link', { name: /Track parcel/ })).toHaveAttribute('href', 'https://merchant.pathao.com/tracking?consignment_id=PT%20123')
+    expect(within(card).getByRole('link', { name: /Track parcel/ })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(within(card).getByTestId('shipment-cod')).toHaveTextContent('BDT 1,560.00')
+    expect(within(within(card).getByRole('list', { name: 'Tracking updates' })).getByText('Handed to courier')).toBeInTheDocument()
+  })
+
+  it('points to the couriers settings when no courier is active', async () => {
+    const user = userEvent.setup()
+    mockApi({
+      'GET /auth/me': ok(orderManager()),
+      'GET /web-orders/wo-1': ok(webOrder({ status: 'processing', allowed_actions: ['ship'] })),
+      'GET /shipping/couriers': ok([{ ...couriers()[2] }]),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    await user.click(await screen.findByRole('button', { name: 'Ship' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Ship WEB-000001' })
+    expect(await within(dialog).findByRole('link', { name: 'Add a courier' })).toHaveAttribute('href', '/storefront/shipping/couriers')
+    expect(within(dialog).getByRole('button', { name: 'Mark as shipped' })).toBeDisabled()
+  })
+
+  it('records a tracking update with a note and an idempotency key', async () => {
+    const user = userEvent.setup()
+    let body: unknown
+    let key: string | null = null
+    let current: WebOrder = webOrder({ status: 'shipped', payment_method: 'cod', shipment: shipment(), allowed_actions: ['deliver', 'add_shipment_event'] as WebOrder['allowed_actions'] })
+    mockApi({
+      'GET /auth/me': ok(orderManager()),
+      'GET /web-orders/wo-1': () => ok(current),
+      'POST /web-orders/wo-1/shipment/events': (init) => {
+        body = JSON.parse(String(init.body))
+        key = new Headers(init.headers).get('Idempotency-Key')
+        current = webOrder({
+          status: 'shipped', payment_method: 'cod', allowed_actions: ['cancel'],
+          shipment: shipment({ status: 'returned', returned_at: '2026-11-01T08:00:00Z', events: [...shipment().events, { id: 'ev-2', status: 'returned', note: 'Customer refused', occurred_at: '2026-11-01T08:00:00Z', created_by: 'Rahim Uddin' }] }),
+        })
+        return ok(current)
+      },
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    await user.click(await screen.findByRole('button', { name: 'Add tracking update' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Tracking update for WEB-000001' })
+    const submit = within(dialog).getByRole('button', { name: 'Record update' })
+    expect(submit).toBeDisabled()
+    await user.click(within(dialog).getByRole('radio', { name: /Returned to sender/ }))
+    await user.type(within(dialog).getByLabelText('Note (optional)'), 'Customer refused')
+    await user.click(submit)
+
+    await waitFor(() => expect(body).toEqual({ status: 'returned', note: 'Customer refused' }))
+    expect(key).toMatch(/^[0-9a-f-]{36}$/)
+    expect(toastSuccess).toHaveBeenCalledWith('WEB-000001: returned to sender recorded.')
+    const card = await screen.findByTestId('shipment-card')
+    await waitFor(() => expect(within(card).getByRole('note')).toHaveTextContent('Cancel the order to put its items back into stock.'))
+    expect(within(card).getByText('Customer refused')).toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: 'Add tracking update' })).not.toBeInTheDocument()
+
+    // Cancel is offered for the returned parcel and explains the exact restock.
+    await user.click(within(screen.getByRole('group', { name: 'Order actions' })).getByRole('button', { name: 'Cancel order' }))
+    expect(await screen.findByRole('dialog', { name: 'Cancel WEB-000001?' })).toHaveTextContent('The parcel came back to you.')
+  })
+
+  it('hides tracking updates from viewers and keeps legacy courier text for orders without a shipment', async () => {
+    mockApi({
+      'GET /auth/me': ok(orderViewer()),
+      'GET /web-orders/wo-1': ok(webOrder({ status: 'shipped', shipment: shipment(), allowed_actions: [] })),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+    expect(await screen.findByTestId('shipment-card')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add tracking update' })).not.toBeInTheDocument()
+  })
+
+  it('shows the legacy courier line of an order shipped before couriers existed', async () => {
+    mockApi({
+      'GET /auth/me': ok(orderViewer()),
+      'GET /web-orders/wo-1': ok(webOrder({ status: 'delivered', courier_name: 'Pathao', tracking_number: 'DEMO-TRK-0001', shipment: null, allowed_actions: [] })),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+    expect(await screen.findByText('Tracking DEMO-TRK-0001')).toBeInTheDocument()
+    expect(screen.queryByTestId('shipment-card')).not.toBeInTheDocument()
+  })
+
+  it('links the courier remittance that paid the order for staff who may see remittances', async () => {
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['web_orders.view', 'web_orders.remit'] })),
+      'GET /web-orders/wo-1': ok(webOrder({
+        status: 'delivered', payment_status: 'paid', payment_method: 'cod', allowed_actions: [],
+        shipment: shipment({ status: 'delivered' }), cod_remittance: { id: 'rem-1', number: 'REM-000001', received_at: '2026-11-01' },
+      })),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+    expect(await screen.findByRole('link', { name: 'REM-000001' })).toHaveAttribute('href', '/cod-remittances/rem-1')
+    expect(within(screen.getByRole('list', { name: 'Tracking updates' })).getByText(/Rahim Uddin/)).toBeInTheDocument()
+  })
+
+  it('links to the packing slip and invoice of the order', async () => {
+    mockApi({ 'GET /auth/me': ok(orderViewer()), 'GET /web-orders/wo-1': ok(webOrder()) })
+    renderRoutes(routes, '/web-orders/wo-1')
+    const print = await screen.findByRole('group', { name: 'Print' })
+    expect(within(print).getByRole('link', { name: /Packing slip/ })).toHaveAttribute('href', '/web-orders/print?ids=wo-1&kind=packing_slip')
+    expect(within(print).getByRole('link', { name: /Invoice/ })).toHaveAttribute('href', '/web-orders/print?ids=wo-1&kind=invoice')
   })
 
   it('needs a reason to cancel and explains a stale order', async () => {

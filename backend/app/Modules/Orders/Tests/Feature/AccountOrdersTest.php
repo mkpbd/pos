@@ -107,7 +107,7 @@ class AccountOrdersTest extends TestCase
         $this->assertSame($number, $view['number']);
         $this->assertTrue($view['can_cancel']);
         $this->assertNull($view['cancel_reason']);
-        foreach (['subtotal', 'discount_total', 'tax_total', 'shipping_total', 'promotions', 'coupon_code', 'shipping_address', 'history', 'courier_name', 'tracking_number', 'payment_instructions'] as $key) {
+        foreach (['subtotal', 'discount_total', 'tax_total', 'shipping_total', 'promotions', 'coupon_code', 'shipping_address', 'history', 'courier_name', 'tracking_number', 'tracking_url', 'payment_instructions'] as $key) {
             $this->assertArrayHasKey($key, $view);
         }
         $line = $view['lines'][0];
@@ -122,6 +122,7 @@ class AccountOrdersTest extends TestCase
         $this->advance($number, 'shipped');
         $view = $this->browse('GET', $this->storeUrl("account/orders/{$number}"))->json('data');
         $this->assertSame(['shipped', 'Pathao', 'TRK-1', false], [$view['status'], $view['courier_name'], $view['tracking_number'], $view['can_cancel']]);
+        $this->assertSame('https://track.example.test/p?id=TRK-1', $view['tracking_url']);
         $admin = (string) $this->tenant['admin']->id;
         $this->inTenant($this->tenant['organization'], fn () => app(OrderWorkflow::class)->deliver($this->orderModel($number), $admin));
         $view = $this->browse('GET', $this->storeUrl("account/orders/{$number}"))->json('data');

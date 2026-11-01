@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { District, Division, MethodInput, ShippingMethod, ShippingZone } from '@/features/shipping/api'
+import type { Courier, CourierInput, District, Division, MethodInput, ShippingMethod, ShippingZone } from '@/features/shipping/api'
 import { ApiError } from '@/lib/api/client'
 import { formatMoney, MONEY_PATTERN } from '@/lib/money'
 
@@ -98,4 +98,62 @@ export function toMethodInput(v: MethodValues): MethodInput {
     is_active: v.is_active,
     sort_order: v.sort_order,
   }
+}
+
+// ── Couriers (E10a) ──────────────────────────────────────────────────────────
+
+export const TRACKING_PLACEHOLDER = '{tracking}'
+
+const trackingTemplate = z
+  .string()
+  .trim()
+  .max(500, 'At most 500 characters.')
+  .refine((v) => v === '' || /^https?:\/\/[^\s]+$/i.test(v), 'A web address starting with http:// or https://.')
+  .refine((v) => v === '' || v.includes(TRACKING_PLACEHOLDER), `Must contain ${TRACKING_PLACEHOLDER} where the tracking number goes.`)
+
+export const courierSchema = z.object({
+  name: z.string().trim().min(1, 'Required.').max(80, 'At most 80 characters.'),
+  phone: z.string().trim().max(20, 'At most 20 characters.'),
+  tracking_url_template: trackingTemplate,
+  is_active: z.boolean(),
+  sort_order: z.number({ error: 'A whole number.' }).int('A whole number.').min(0, 'A whole number.'),
+})
+
+export type CourierValues = z.infer<typeof courierSchema>
+export const COURIER_FIELDS = ['name', 'phone', 'tracking_url_template', 'is_active', 'sort_order'] as const
+
+export function toCourierValues(courier: Courier | null, nextSortOrder = 0): CourierValues {
+  return {
+    name: courier?.name ?? '',
+    phone: courier?.phone ?? '',
+    tracking_url_template: courier?.tracking_url_template ?? '',
+    is_active: courier?.is_active ?? true,
+    sort_order: courier?.sort_order ?? nextSortOrder,
+  }
+}
+
+export function toCourierInput(v: CourierValues): CourierInput {
+  return {
+    name: v.name,
+    phone: v.phone || null,
+    tracking_url_template: v.tracking_url_template || null,
+    is_active: v.is_active,
+    sort_order: v.sort_order,
+  }
+}
+
+/** The tracking page for a parcel, as the server builds it: the template with the url-encoded number. */
+export function trackingUrl(template: string | null | undefined, trackingNumber: string | null | undefined): string | null {
+  if (!template || !trackingNumber || !template.includes(TRACKING_PLACEHOLDER)) return null
+  return template.replaceAll(TRACKING_PLACEHOLDER, encodeURIComponent(trackingNumber))
+}
+
+export function sortCouriers(couriers: Courier[]): Courier[] {
+  return [...couriers].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+}
+
+/** Explains a refused delete: a courier with shipments stays for the record and can only be deactivated. */
+export function courierDeleteError(error: unknown, name: string): string {
+  if (error instanceof ApiError && error.code === 'IN_USE') return `${name} has shipments, so it cannot be deleted. Switch it off instead to hide it from the ship dialog.`
+  return error instanceof Error ? error.message : 'Something went wrong.'
 }

@@ -4,6 +4,7 @@ namespace App\Modules\Orders\Tests\Concerns;
 
 use App\Modules\Orders\Application\Actions\OrderWorkflow;
 use App\Modules\Orders\Infrastructure\Models\Order;
+use App\Modules\Shipping\Infrastructure\Models\Courier;
 
 /**
  * Orders of the signed-in shopper (E9) on the BuildsCheckout shop: places them through the
@@ -47,7 +48,8 @@ trait BuildsCustomerOrders
             if ($to === 'processing') {
                 return;
             }
-            $order = $workflow->ship($order->fresh(), 'Pathao', 'TRK-1', $admin);
+            $courier = Courier::query()->firstOrCreate(['name' => 'Pathao'], ['tracking_url_template' => 'https://track.example.test/p?id={tracking}']);
+            $order = $workflow->ship($order->fresh(), $courier->id, 'TRK-1', null, $admin);
             if ($to === 'delivered') {
                 $workflow->deliver($order->fresh(), $admin);
             }

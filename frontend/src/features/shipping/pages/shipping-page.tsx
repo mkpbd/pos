@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAuth } from '@/features/auth/use-auth'
 import { useDeleteMethodMutation, useDeleteZoneMutation, useShippingZonesQuery, type ShippingMethod, type ShippingZone } from '@/features/shipping/api'
 import { MethodDialog } from '@/features/shipping/components/method-dialog'
+import { ShippingTabs } from '@/features/shipping/components/shipping-tabs'
 import { ZoneDialog } from '@/features/shipping/components/zone-dialog'
 import { feeSummary } from '@/features/shipping/shipping'
 import { etaLabel } from '@/features/web-orders/orders'
@@ -122,6 +123,7 @@ export function ShippingPage() {
   return (
     <div className="flex flex-col gap-6">
       <StorefrontHeader />
+      <ShippingTabs />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-sm text-muted-foreground">
           Group districts into zones and give each zone its delivery methods. Customers in a district without an active zone and method cannot check out.

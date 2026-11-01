@@ -9,14 +9,20 @@ use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
+use App\Modules\Orders\Domain\ShipmentStatus;
+use App\Modules\Orders\Infrastructure\Models\CodRemittance;
+use App\Modules\Orders\Infrastructure\Models\CodRemittanceLine;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderLine;
 use App\Modules\Orders\Infrastructure\Models\OrderPromotion;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
+use App\Modules\Orders\Infrastructure\Models\Shipment;
+use App\Modules\Orders\Infrastructure\Models\ShipmentEvent;
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Sales\Domain\TaxMode;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shipping\Application\Contracts\CourierDirectory;
 use App\Modules\Users\Application\Contracts\UserDirectory;
 
 /**
@@ -30,6 +36,7 @@ class OrderPresenter
         private readonly UserDirectory $users,
         private readonly CustomerDirectory $customers,
         private readonly OrderLineReviews $reviews,
+        private readonly CourierDirectory $couriers,
     ) {}
 
     /**
@@ -39,7 +46,7 @@ class OrderPresenter
      */
     public function storefront(Order $order): array
     {
-        $order->loadMissing(['lines', 'shippingAddress', 'history', 'promotions']);
+        $order->loadMissing(['lines', 'shippingAddress', 'history', 'promotions', 'shipment']);
         $address = $order->shippingAddress;
 
         return [
@@ -95,6 +102,8 @@ class OrderPresenter
             'prices_include_tax' => $order->tax_mode === TaxMode::Inclusive,
             'courier_name' => $order->courier_name,
             'tracking_number' => $order->tracking_number,
+            // E10a: the courier's parcel tracking link (null without a courier template or number).
+            'tracking_url' => $this->trackingUrl($order),
             'history' => $order->history->map(fn (OrderStatusChange $h) => [
                 'status' => $h->to_status->value,
                 'label' => $h->to_status->label(),
@@ -177,10 +186,13 @@ class OrderPresenter
     {
         $view = $this->storefront($order);
         $payments = $this->payments->entriesOf(PaymentSource::ONLINE_ORDER, $order->id);
+        $shipment = $order->shipment;
+        $shipment?->loadMissing('events');
         $actorIds = array_values(array_filter([
             ...$order->history->pluck('actor_user_id')->all(),
             ...array_column($payments, 'created_by'),
             $order->cancelled_by,
+            ...($shipment?->events->pluck('created_by')->all() ?? []),
         ]));
         $names = $this->users->names($order->organization_id, $actorIds);
         $customer = $order->customer_id === null ? null : ($this->customers->summaries($order->organization_id, [$order->customer_id])[$order->customer_id] ?? null);
@@ -218,8 +230,129 @@ class OrderPresenter
                 'recorded_at' => $p['created_at'],
                 'recorded_by' => $p['created_by'] === null ? null : ['id' => $p['created_by'], 'name' => $names[$p['created_by']] ?? null],
             ], $payments),
+            // E10a: the courier parcel (null before shipping and for orders shipped before E10a).
+            'shipment' => $shipment === null ? null : [
+                'id' => $shipment->id,
+                'courier' => $shipment->courier_id === null ? null : ['id' => $shipment->courier_id, 'name' => $shipment->courier_name],
+                'courier_name' => $shipment->courier_name,
+                'tracking_number' => $shipment->tracking_number,
+                'tracking_url' => $view['tracking_url'],
+                'status' => $shipment->status->value,
+                'status_label' => $shipment->status->label(),
+                'cod_amount' => (string) $shipment->cod_amount,
+                'shipped_at' => $shipment->shipped_at->toIso8601String(),
+                'delivered_at' => $shipment->delivered_at?->toIso8601String(),
+                'returned_at' => $shipment->returned_at?->toIso8601String(),
+                'events' => $shipment->events->map(fn (ShipmentEvent $e) => [
+                    'id' => $e->id,
+                    'status' => $e->status->value,
+                    'status_label' => $e->status->label(),
+                    'note' => $e->note,
+                    'occurred_at' => $e->occurred_at->toIso8601String(),
+                    'recorded_at' => $e->created_at->toIso8601String(),
+                    'recorded_by' => $e->created_by === null ? null : ['id' => $e->created_by, 'name' => $names[$e->created_by] ?? null],
+                ])->values()->all(),
+            ],
+            'cod_remittance' => $this->remittanceOf($order),
             'allowed_actions' => $canManage ? self::allowedActions($order) : [],
         ];
+    }
+
+    /**
+     * An order as printed (E10a): `packing_slip` (no prices) or `invoice` (prices, discounts,
+     * tax, totals). Read-only.
+     *
+     * @return array<string, mixed>
+     */
+    public function printable(Order $order, string $kind): array
+    {
+        $view = $this->storefront($order);
+        $invoice = $kind === 'invoice';
+        $lines = $order->lines->values();
+
+        $printed = [
+            'id' => $order->id,
+            'number' => $order->number,
+            'placed_at' => $view['placed_at'],
+            'status' => $view['status'],
+            'status_label' => $view['status_label'],
+            'contact' => $view['contact'],
+            'shipping_address' => $view['shipping_address'],
+            'payment_method' => $view['payment_method'],
+            'payment_method_label' => $view['payment_method_label'],
+            'payment_status' => $view['payment_status'],
+            'payment_status_label' => $order->payment_status->label(),
+            'shipping_method_name' => $view['shipping_method_name'],
+            'courier_name' => $view['courier_name'],
+            'tracking_number' => $view['tracking_number'],
+            'tracking_url' => $view['tracking_url'],
+            'notes' => $order->notes,
+            'item_count' => self::quantity((string) $lines->reduce(fn (string $sum, OrderLine $l) => Decimal::add($sum, (string) $l->quantity, 3), '0')),
+            'lines' => $lines->map(function (OrderLine $l) use ($invoice) {
+                $line = [
+                    'product_name' => $l->product_name,
+                    'variant_name' => $l->variant_name,
+                    'sku' => $l->sku,
+                    'quantity' => self::quantity((string) $l->quantity),
+                ];
+
+                return $invoice ? $line + [
+                    'unit_price' => (string) $l->unit_price,
+                    'line_subtotal' => (string) $l->line_subtotal,
+                    'discount_amount' => (string) $l->discount_amount,
+                    'tax_rate' => Decimal::round((string) $l->tax_rate, 2),
+                    'tax_amount' => (string) $l->tax_amount,
+                    'line_total' => (string) $l->line_total,
+                ] : $line;
+            })->all(),
+        ];
+
+        if (! $invoice) {
+            return $printed;
+        }
+
+        return $printed + [
+            'currency' => $view['currency'],
+            'prices_include_tax' => $view['prices_include_tax'],
+            'subtotal' => $view['subtotal'],
+            'discount_total' => $view['discount_total'],
+            'tax_total' => $view['tax_total'],
+            'shipping_total' => $view['shipping_total'],
+            'shipping_discount' => $view['shipping_discount'],
+            'cod_fee' => $view['cod_fee'],
+            'promotions' => $view['promotions'],
+            'coupon_code' => $view['coupon_code'],
+            'total' => $view['total'],
+            'paid_total' => (string) $order->paid_total,
+            'balance_due' => Decimal::sub((string) $order->total, (string) $order->paid_total, 2),
+        ];
+    }
+
+    /**
+     * The tracking link of the order's shipment: the courier's template with the url-encoded
+     * tracking number; null without a shipment, template or number.
+     */
+    public function trackingUrl(Order $order): ?string
+    {
+        $shipment = $order->shipment;
+        if ($shipment === null || $shipment->courier_id === null || $shipment->tracking_number === null) {
+            return null;
+        }
+        $courier = $this->couriers->find($shipment->courier_id);
+
+        return $this->couriers->trackingUrl($courier['tracking_url_template'] ?? null, $shipment->tracking_number);
+    }
+
+    /**
+     * @return array{id: string, number: string, received_at: string}|null
+     */
+    private function remittanceOf(Order $order): ?array
+    {
+        $remittanceId = CodRemittanceLine::query()->where('order_id', $order->id)->value('remittance_id');
+        /** @var CodRemittance|null $remittance */
+        $remittance = $remittanceId === null ? null : CodRemittance::query()->find($remittanceId);
+
+        return $remittance === null ? null : ['id' => $remittance->id, 'number' => $remittance->number, 'received_at' => $remittance->received_at->toDateString()];
     }
 
     /**
@@ -240,6 +373,12 @@ class OrderPresenter
             'total' => (string) $order->total,
             'currency' => $order->currency,
             'item_count' => self::quantity($itemCount),
+            // E10a board columns (expects `shippingAddress` and `shipment` loaded).
+            'district' => $order->shippingAddress?->district_name,
+            'courier_name' => $order->courier_name,
+            'tracking_number' => $order->tracking_number,
+            'shipment_status' => $order->shipment?->status->value,
+            'delivered_at' => $order->delivered_at?->toIso8601String(),
         ];
     }
 
@@ -250,14 +389,21 @@ class OrderPresenter
     {
         $unpaid = $order->payment_status === PaymentStatus::Unpaid;
         $cod = $order->payment_method === OrderPaymentMethod::CashOnDelivery;
+        $shipped = $order->status === OrderStatus::Shipped;
+        /** @var Shipment|null $shipment */
+        $shipment = $order->shipment;
+        $returned = $shipped && $shipment?->status === ShipmentStatus::Returned;
 
         return array_keys(array_filter([
             'confirm_payment' => $unpaid && ! $cod && $order->status === OrderStatus::PendingPayment,
             'process' => $order->status === OrderStatus::Confirmed,
             'ship' => $order->status === OrderStatus::Processing,
-            'deliver' => $order->status === OrderStatus::Shipped,
-            'record_cod_payment' => $unpaid && $cod && in_array($order->status, [OrderStatus::Shipped, OrderStatus::Delivered], true),
-            'cancel' => $unpaid && $order->status->canBecome(OrderStatus::Cancelled),
+            'deliver' => $shipped && ! $returned,
+            // E10a: courier updates (in transit, delivered, returned) on the order's shipment.
+            'add_shipment_event' => $shipped && $shipment !== null && ! $shipment->status->isFinal(),
+            'record_cod_payment' => $unpaid && $cod && ! $returned && in_array($order->status, [OrderStatus::Shipped, OrderStatus::Delivered], true),
+            // E10a: a parcel returned to the sender lets the unpaid shipped order be cancelled.
+            'cancel' => $unpaid && ($order->status->canBecome(OrderStatus::Cancelled) || $returned),
         ]));
     }
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { BanknoteIcon } from 'lucide-react'
+import { BanknoteIcon, ExternalLinkIcon } from 'lucide-react'
 import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { displayQuantity } from '../cart/quantity'
@@ -113,12 +113,43 @@ export function OrderAddressCard({ address }: { address: OrderView['shipping_add
   )
 }
 
+/** E10a: the courier's tracking page for the parcel, when the courier has one (null otherwise). */
+type Tracking = { tracking_url?: string | null }
+
+function safeTrackingUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : null
+  } catch {
+    return null
+  }
+}
+
+/** "Track parcel" — opens the courier's tracking page in a new tab. */
+export function TrackParcelLink({ url }: { url: string | null | undefined }) {
+  const href = safeTrackingUrl(url)
+  if (!href) return null
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 font-semibold text-sf-accent underline-offset-4 hover:underline"
+      data-testid="track-parcel"
+    >
+      Track parcel <ExternalLinkIcon aria-hidden className="size-3.5" />
+      <span className="sr-only">(opens in a new tab)</span>
+    </a>
+  )
+}
+
 function paymentStateLabel(order: Pick<OrderView, 'payment_status' | 'payment_method'>): string {
   return order.payment_status === 'paid' ? 'Paid' : order.payment_method === 'cod' ? 'Pay on delivery' : 'Awaiting payment'
 }
 
 /** `showCourier: false` when the timeline shows the courier and tracking number instead. */
-export function OrderDeliveryCard({ order, showCourier = true }: { order: OrderView | Omit<OrderView, 'lines'>; showCourier?: boolean }) {
+export function OrderDeliveryCard({ order, showCourier = true }: { order: (OrderView | Omit<OrderView, 'lines'>) & Tracking; showCourier?: boolean }) {
   const eta = etaLabel(order.eta_min_days, order.eta_max_days)
   return (
     <section aria-labelledby="order-delivery" className={orderCardClass}>
@@ -141,6 +172,12 @@ export function OrderDeliveryCard({ order, showCourier = true }: { order: OrderV
             <dd data-testid="order-courier">
               {order.courier_name}
               {order.tracking_number ? `, tracking number ${order.tracking_number}` : ''}
+              {order.tracking_url && (
+                <>
+                  {' '}
+                  <TrackParcelLink url={order.tracking_url} />
+                </>
+              )}
             </dd>
           </div>
         )}
@@ -176,7 +213,7 @@ export function OrderTotalsCard({ order }: { order: OrderView | Omit<OrderView, 
  * The status history, oldest first, the current status highlighted; `withTracking` adds the
  * courier and tracking number under it once the order is shipped.
  */
-export function OrderTimeline({ order, withTracking = false }: { order: Pick<OrderView, 'history' | 'courier_name' | 'tracking_number'>; withTracking?: boolean }) {
+export function OrderTimeline({ order, withTracking = false }: { order: Pick<OrderView, 'history' | 'courier_name' | 'tracking_number'> & Tracking; withTracking?: boolean }) {
   if (order.history.length === 0) return null
   return (
     <section aria-labelledby="order-history" className={orderCardClass}>
@@ -206,6 +243,12 @@ export function OrderTimeline({ order, withTracking = false }: { order: Pick<Ord
               — tracking number <strong className="text-sf-heading">{order.tracking_number}</strong>
             </>
           ) : null}
+          {order.tracking_url && (
+            <>
+              {' '}
+              <TrackParcelLink url={order.tracking_url} />
+            </>
+          )}
         </p>
       )}
     </section>

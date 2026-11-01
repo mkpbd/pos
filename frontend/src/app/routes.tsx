@@ -87,10 +87,15 @@ const pages = {
   loyalty: page(() => import('@/features/loyalty/pages/loyalty-page'), 'LoyaltyPage'),
   webOrders: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrdersPage'),
   webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
+  webOrdersPrint: page(() => import('@/features/web-orders/pages/print-page'), 'WebOrdersPrintPage'),
+  codRemittances: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'CodRemittancesPage'),
+  newCodRemittance: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'NewCodRemittancePage'),
+  codRemittance: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'CodRemittancePage'),
   promotions: page(() => import('@/features/promotions/pages/promotions-page'), 'PromotionsPage'),
   promotion: page(() => import('@/features/promotions/pages/promotion-editor-page'), 'PromotionEditorPage'),
   reviews: page(() => import('@/features/reviews/pages/reviews-page'), 'ReviewsPage'),
   storefrontShipping: page(() => import('@/features/shipping/pages/shipping-page'), 'ShippingPage'),
+  storefrontCouriers: page(() => import('@/features/shipping/pages/couriers-page'), 'CouriersPage'),
   storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
 }
 
@@ -118,6 +123,8 @@ export const routes: RouteObject[] = [
       {
         element: <RequireAuth />,
         children: [
+          // Print sheets: own minimal layout, no admin chrome (E10a).
+          guarded('web_orders.view', 'web-orders/print', pages.webOrdersPrint),
           {
             element: <AppLayout />,
             children: [
@@ -132,6 +139,9 @@ export const routes: RouteObject[] = [
               },
               guarded('web_orders.view', 'web-orders', pages.webOrders),
               guarded('web_orders.view', 'web-orders/:orderId', pages.webOrder),
+              guarded('web_orders.remit', 'cod-remittances', pages.codRemittances),
+              guarded('web_orders.remit', 'cod-remittances/new', pages.newCodRemittance),
+              guarded('web_orders.remit', 'cod-remittances/:remittanceId', pages.codRemittance),
               guarded('promotions.view', 'promotions', pages.promotions),
               guarded('promotions.manage', 'promotions/new', pages.promotion),
               // Viewers see the same page read-only; write actions need promotions.manage.
@@ -182,6 +192,7 @@ export const routes: RouteObject[] = [
               guarded('storefront.view', 'storefront/homepage', pages.storefrontHomepage),
               guarded('storefront.view', 'storefront/banners', pages.storefrontBanners),
               guarded('shipping.manage', 'storefront/shipping', pages.storefrontShipping),
+              guarded('shipping.manage', 'storefront/shipping/couriers', pages.storefrontCouriers),
               guarded('payment_gateways.manage', 'storefront/payments', pages.storefrontPayments),
               guarded('online_catalog.view', 'storefront/categories', pages.webCategories),
               guarded('online_catalog.view', 'storefront/brands', pages.webBrands),

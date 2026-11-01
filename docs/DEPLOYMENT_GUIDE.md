@@ -92,6 +92,15 @@ Customer account area and reviews (E9):
 - No scheduler job and no cache: the rating summary is computed from approved reviews per request.
 - The new PostgreSQL CHECKs have not run yet (the local PostgreSQL run is still blocked) — run the full suite on PostgreSQL before production.
 
+Fulfilment: couriers, shipments, printing and COD remittances (E10a):
+- Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive the new `web_orders.remit` (Organization Admin through `*`, Online Store Manager through `web_orders.*`) and the **Accountant** role its two new permissions `web_orders.view` and `web_orders.remit` — accountants then see *Web orders* and *COD remittances* in the admin. Until then existing databases show no *COD remittances* entry in the admin.
+- **Before shipping the first order after the upgrade:** create the couriers under *Online store → Shipping → Couriers* (optionally with a tracking link template, `https://…{tracking}…`). `POST /web-orders/{id}/ship` now requires `courier_id`; with no active courier the admin's *Ship* dialog only links to the settings. Orders already shipped keep their courier text and can still be marked delivered, but get no tracking updates.
+- Migrations: new tables `couriers` (Shipping), `shipments`, `shipment_events`, `cod_remittances`, `cod_remittance_lines` (Orders) — additive, no backfill. On PostgreSQL they add CHECK constraints and the append-only triggers on `shipment_events`, `cod_remittances` and `cod_remittance_lines` (reusing `prevent_order_detail_mutation()` from the E8a orders migration, so the migrations must run in order).
+- Remittances book the courier fee in the expense category "Courier fees", created on the first remittance with a fee. Remittances cannot be edited or deleted (a reversal may come with E10b), so check the order list before recording one.
+- Printing is done by the browser (print-ready HTML, "Save as PDF" in the print dialog) — no PDF tool to install. The organization's legal name, address, phone, e-mail and tax/BIN number and the storefront logo appear on packing slips and invoices, so fill them in.
+- No new scheduler job, queue job, environment variable or rate limiter.
+- The new PostgreSQL CHECKs and triggers have not run yet (the local PostgreSQL run is still blocked) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash
