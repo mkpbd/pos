@@ -22,7 +22,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | `web_orders.manage` | Status transitions, shipments, COD remittance, cancellation |
 | `web_orders.refund` | Online returns approval and refunds |
 | `payment_gateways.manage` | Gateway enablement and credentials (Org Admin only by default) |
-| `reviews.moderate` | Approve/reject reviews |
+| `reviews.view` / `reviews.moderate` | Read the review queue / approve, reject, delete reviews (*`reviews.view` added in E9*) |
 | `ai.use` | Request AI generations (declared by the AI module, POS Phase 8 / E13) |
 
 ## 2. Public and customer endpoints (`/store`)
@@ -41,7 +41,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | GET `/store/products` | P | E6 | `q, category, brand, price_min, price_max, attr[<slug>][]=, in_stock, on_sale, sort=(popularity\|rating\|latest\|price_asc\|price_desc), page, per_page≤48`; returns items + `facets` (counts). *As built (E6):* sorts `featured` (default), `popularity`, `latest`, `price_asc`, `price_desc`, `name` — no `rating` until E10; `per_page` 12/24/36/48; extra `slugs=` mode for recently viewed; response adds `context` |
 | GET `/store/products/{slug}` | P | E6 | Variants, prices, availability, gallery, specs, SEO, rating summary (*E6: no rating summary until E10; staff `?preview=1`*) |
 | GET `/store/products/{slug}/related` | P | E6 | Related + frequently bought together |
-| GET `/store/products/{slug}/reviews` | P | E9 | Approved only, paginated |
+| GET `/store/products/{slug}/reviews` | P | E9 | Approved only, paginated (*E9 ✅: `sort=newest\|highest\|lowest`, `rating=`, 10 per page; author first name + last initial; top-level `summary {average, count, distribution}` over all approved reviews; product detail gains `rating {average, count} \| null`, cards none until E10*) |
 | GET `/store/search/suggest?q=` | P | E6 | ≤ 8 products + categories, `pg_trgm` (*E6: ≤ 6 products + ≤ 4 categories, substring match; trigram index only speeds it up, no similarity ranking*) |
 | GET `/store/geo/divisions` · `/districts?division=` · `/areas?district=` | P | E7 | Global reference data, long cache (*E7: divisions and districts only, `max-age=86400`; `/areas` waits for an upazila/thana dataset — addresses carry a free-text `area`*) |
 | POST `/store/account/register` · `login` · `logout` · `forgot-password` · `reset-password` · `verify-email` | P/C | E7 | `throttle:customer-auth` (*E7: plus GET `/store/account/me` (null for guests) and POST `/store/account/verification-notification`; `logout` unthrottled beyond `storefront`, `verify-email` on `storefront-write`; register/login/reset return `{customer, merge}`; reset uses an own token table, not a broker*) |
@@ -59,10 +59,10 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | GET `/store/payments/{gateway}/return` | P | E8 | Browser return → server verify → redirect to order page (*E8c*) |
 | POST `/store/payments/{gateway}/webhook` | P | E8 | IPN/webhook; signature + verify API; idempotent (*E8c*) |
 | GET `/store/orders/{number}?token=` | P | E8 | Guest order view (signed token, expires) (*E8a ✅: random token stored as sha-256, does not expire; the signed-in owner needs no token*) |
-| GET `/store/account/orders` · `/store/account/orders/{number}` | C | E9 | Own orders only |
-| POST `/store/account/orders/{number}/cancel` | C, I | E9 | Only `pending_payment`/`confirmed` |
+| GET `/store/account/orders` · `/store/account/orders/{number}` | C | E9 | Own orders only (*E9 ✅: by `orders.customer_id`, guest orders with the same e-mail not attached; `status=open\|delivered\|cancelled`, 10 per page; detail = storefront order view + `can_cancel`, `cancelled_at`, `cancel_reason`, line `product_id`, `variant_id`, `review`, `reviewable`; also POST `/store/account/orders/{number}/reorder` → `{cart, added, skipped}`*) |
+| POST `/store/account/orders/{number}/cancel` | C, I | E9 | Only `pending_payment`/`confirmed` (*E9 ✅: and unpaid, else `422 ORDER_NOT_CANCELLABLE` (`details.status`, `payment_status`); `{reason?}` ≤ 200; `idempotent:shopper`; reuses the E8a restock path, history actor `customer`, staff notification + e-mail*) |
 | POST `/store/account/orders/{number}/returns` | C, I | E10 | Within the return window |
-| POST `/store/account/reviews` | C | E9 | Verified purchase sets `order_line_id` |
+| POST `/store/account/reviews` | C | E9 | Verified purchase sets `order_line_id` (*E9 ✅: verified purchases only — a delivered line is required (`REVIEW_NOT_ALLOWED`), one per product (`REVIEW_EXISTS`, instead of the planned `REVIEW_ALREADY_EXISTS`); `throttle:reviews` (`POS_REVIEW_RATE_LIMIT`, 5/hour); also GET `/store/account/reviews`, PATCH/DELETE `/store/account/reviews/{id}` (edit → pending)*) |
 | GET `/sitemap.xml` · `/sitemaps/{type}-{n}.xml` · `/robots.txt` | P (web routes) | E12 | Per host |
 
 ## 3. Staff endpoints
@@ -89,7 +89,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | Customer online accounts | `online_account` in GET `/customers/{id}`; PATCH `/customer-accounts/{customerId}` `{status}` (*added in E7*) | customers.view / customers.manage | E7 |
 | Web orders | GET `/web-orders`, `/web-orders/{id}`; POST `/{id}/confirm`, `/process`, `/ship` (shipment), `/deliver`, `/cancel` (I), `/confirm-payment` (bank transfer, I), `/cod-remittance` (I) | web_orders.view / .manage | E8/E10 (*E8a ✅: `/confirm-payment`, `/process`, `/ship` (courier name + tracking text), `/deliver`, `/record-cod-payment` (instead of `/cod-remittance`), `/cancel` — **all** with I; no `/confirm` (COD orders start confirmed)*) |
 | Online returns | GET `/web-orders/returns`, POST `/web-orders/{id}/returns` (I), POST `/web-orders/returns/{id}/approve` (I) / `/reject` | web_orders.refund | E10 |
-| Reviews | GET `/reviews`, POST `/reviews/{id}/approve` / `/reject` | reviews.moderate | E9/E10 |
+| Reviews | GET `/reviews`, POST `/reviews/{id}/approve` / `/reject` | reviews.moderate | E9/E10 (*E9 ✅ moderation: GET `/reviews` with `reviews.view` (new; `status`, `rating`, `search`, pending first, `meta.pending_count`), approve / reject `{reason?}` (idempotent by state) and DELETE `/reviews/{id}` with `reviews.moderate`; review media and the rest E10*) |
 | AI generations | POST `/ai/generations` (description, seo, category suggestion), POST `/{id}/approve` / `/reject` | online_catalog.manage + ai.use | E13 |
 
 ## 4. New error codes
@@ -101,6 +101,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 *Added in E8a:* `CART_HAS_ISSUES` (instead of `CART_CHANGED`; `details.cart`), `TOTAL_CHANGED` (409, `details.preview`), `CHECKOUT_UNAVAILABLE`, `GUEST_CHECKOUT_DISABLED`, `SHIPPING_UNAVAILABLE` (instead of `SHIPPING_NOT_AVAILABLE`), `PAYMENT_METHOD_UNAVAILABLE` (instead of `PAYMENT_METHOD_NOT_AVAILABLE`), `INVALID_STATUS_TRANSITION` (instead of `ORDER_TRANSITION_NOT_ALLOWED`), `ORDER_PAID`, `ORDER_ALREADY_PAID`, `DISTRICT_IN_OTHER_ZONE`; reused `CART_EMPTY`, `INSUFFICIENT_STOCK`, `IDEMPOTENCY_KEY_REQUIRED` / `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_REQUEST_IN_PROGRESS`, `CASH_SESSION_REQUIRED` (cash refused by `recordSystem`). `ORDER_NOT_PAYABLE` and `PAYMENT_VERIFICATION_FAILED` wait for E8c.
 
 *Added in E8b:* `COUPON_INVALID` with `details.reason` (`not_found`, `not_started`, `expired`, `usage_limit_reached`, `customer_limit_reached`, `min_subtotal`, `not_applicable`) — replaces the planned `COUPON_NOT_APPLICABLE` and `COUPON_LIMIT_REACHED`; `NOT_A_COUPON_PROMOTION`, `CODES_EXHAUSTED`, `PROMOTION_NOT_FOUND` (hot-deals section); reused `IN_USE`, `TOTAL_CHANGED` (a usage limit reached during placement). Promotion rule violations are field errors (`VALIDATION_FAILED`).
+
+*Added in E9:* `ORDER_NOT_CANCELLABLE` (`details.status`, `payment_status`), `REVIEW_NOT_ALLOWED`, `REVIEW_EXISTS` (instead of `REVIEW_ALREADY_EXISTS`; `details.review_id`); reused `IDEMPOTENCY_KEY_REQUIRED` and the idempotency codes on the customer cancel.
 
 *Added in E7:* `VARIANT_NOT_PURCHASABLE` (instead of the planned `PRODUCT_NOT_AVAILABLE`), `OUT_OF_STOCK`, `CART_FULL`, `WISHLIST_FULL`, `ADDRESS_LIMIT_REACHED`; reused `INSUFFICIENT_STOCK` (`details.max_quantity`, `in_cart`), `INVALID_CREDENTIALS`, `TOKEN_INVALID`, `SESSION_UNAVAILABLE`. A wrong reset token, a wrong current password and a non-live wishlist product are field errors (`VALIDATION_FAILED`).
 

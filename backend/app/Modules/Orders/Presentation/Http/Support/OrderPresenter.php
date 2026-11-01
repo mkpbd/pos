@@ -4,6 +4,8 @@ namespace App\Modules\Orders\Presentation\Http\Support;
 
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
+use App\Modules\Orders\Application\Actions\CancelOwnOrder;
+use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -27,6 +29,7 @@ class OrderPresenter
         private readonly PaymentLedger $payments,
         private readonly UserDirectory $users,
         private readonly CustomerDirectory $customers,
+        private readonly OrderLineReviews $reviews,
     ) {}
 
     /**
@@ -101,6 +104,70 @@ class OrderPresenter
     }
 
     /**
+     * The customer's own order in the account area (E9): the storefront view plus
+     * `can_cancel`, the cancellation reason, and per line `product_id`, `variant_id`, the
+     * customer's `review` of the product (`{id, rating, status}` or null) and `reviewable`
+     * (delivered and not reviewed yet).
+     *
+     * @return array<string, mixed>
+     */
+    public function account(Order $order, string $customerId): array
+    {
+        $view = $this->storefront($order);
+        $lines = $order->lines->values();
+        $reviews = $this->reviews->ofCustomer($customerId, array_values(array_unique($lines->pluck('product_id')->all())));
+        $delivered = $order->status === OrderStatus::Delivered;
+
+        foreach ($view['lines'] as $i => $line) {
+            /** @var OrderLine $source */
+            $source = $lines[$i];
+            $review = $reviews[$source->product_id] ?? null;
+            $view['lines'][$i] = ['product_id' => $source->product_id, 'variant_id' => $source->variant_id] + $line + [
+                'review' => $review,
+                'reviewable' => $delivered && $review === null,
+            ];
+        }
+
+        return $view + [
+            'can_cancel' => CancelOwnOrder::allowed($order),
+            'cancelled_at' => $order->cancelled_at?->toIso8601String(),
+            'cancel_reason' => $order->cancel_reason,
+        ];
+    }
+
+    /**
+     * A row of the customer's order history (E9). Expects `lines` and `lines_sum_quantity`.
+     *
+     * @return array<string, mixed>
+     */
+    public function accountRow(Order $order): array
+    {
+        /** @var OrderLine|null $first */
+        $first = $order->lines->sortBy('position')->first();
+
+        return [
+            'number' => $order->number,
+            'placed_at' => $order->placed_at->toIso8601String(),
+            'status' => $order->status->value,
+            'status_label' => $order->status->label(),
+            'payment_status' => $order->payment_status->value,
+            'payment_method_label' => $this->methodLabel($order->payment_method),
+            'item_count' => self::quantity(Decimal::round((string) ($order->getAttribute('lines_sum_quantity') ?? '0'), 3)),
+            'total' => (string) $order->total,
+            'currency' => $order->currency,
+            'first_item' => $first === null ? null : ['name' => $first->product_name, 'image_url' => $first->image_url],
+        ];
+    }
+
+    /**
+     * customer | staff | system (rows from before E9 without the column: derived).
+     */
+    private static function actorType(OrderStatusChange $h): string
+    {
+        return $h->actor_type ?? ($h->actor_user_id !== null ? 'staff' : ($h->from_status === null ? 'customer' : 'system'));
+    }
+
+    /**
      * The full order for staff: everything the shopper sees plus customer, client details,
      * notes, cancellation, history with actors, ledger payments and the allowed actions.
      *
@@ -124,6 +191,7 @@ class OrderPresenter
             'label' => $h->to_status->label(),
             'note' => $h->note,
             'at' => $h->created_at->toIso8601String(),
+            'actor_type' => self::actorType($h),
             'actor' => $h->actor_user_id === null ? null : ['id' => $h->actor_user_id, 'name' => $names[$h->actor_user_id] ?? null],
         ])->values()->all();
 

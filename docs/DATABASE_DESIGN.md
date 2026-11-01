@@ -234,6 +234,16 @@ Cart module:
 
 Promotions keep no price or discount projection on products: card and product prices are computed per request from the live promotions (listing filters and sorting use the base price; E12 may index promotional prices).
 
+### E-commerce E9 — Customer account area and reviews (implemented)
+
+Reviews module:
+- `reviews` — organization_id (`RESTRICT`), product_id → products (`RESTRICT`), customer_id → customers (`RESTRICT`), order_line_id → order_lines (`RESTRICT`; the delivered web order line that verifies the purchase — every review is a verified purchase), rating smallint, title varchar(120) NULL, body text (plain text, trimmed), status varchar(10) (`pending|approved|rejected`, default `pending`), rejection_reason varchar(200) NULL, moderated_by → users NULL (set null), moderated_at timestamptz NULL, timestamps. **Unique `(customer_id, product_id)`** (one review per customer and product; the action answers `REVIEW_EXISTS` first, the index catches parallel submits). Indexes `(organization_id, product_id, status, created_at)` (product page list and summary) and `(organization_id, status, created_at)` (moderation queue). PostgreSQL CHECK `reviews_rules_check`: `rating BETWEEN 1 AND 5`, the status enum, `char_length(body) BETWEEN 10 AND 2000`, title NULL or 1–120 characters, `rejection_reason` only when `rejected`, and `(status = 'pending') = (moderated_at IS NULL)` — an author's edit sets the review back to pending and clears the moderation columns.
+- The rating summary (average with one decimal, count, distribution 1–5) is an aggregate query over approved rows per request; there is no rating projection on products in E9.
+
+Orders module:
+- `order_status_history.actor_type` varchar(10) NULL (`customer|staff|system`; PostgreSQL CHECK `order_status_history_actor_type_check`): `customer` for placement and a cancellation from the account area, `staff` for workflow steps (`actor_user_id` set), `system` for expiry. The table is append-only, so rows from before E9 stay NULL and the presenter derives the type (actor user → staff, first row → customer, otherwise system).
+- No other order columns: a customer cancellation uses `cancelled_at` and `cancel_reason` (E8a) with `cancelled_by` NULL. The account order list uses the existing index `(organization_id, customer_id, placed_at)`; orders are the customer's by `orders.customer_id` only (guest orders keep it NULL and are not attached by e-mail).
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.

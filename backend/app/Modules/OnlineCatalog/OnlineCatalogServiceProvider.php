@@ -3,7 +3,9 @@
 namespace App\Modules\OnlineCatalog;
 
 use App\Modules\Media\Application\Contracts\MediaReferences;
+use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\OnlineCatalog\Application\Services\NoProductRatings;
 use App\Modules\OnlineCatalog\Infrastructure\Console\RefreshProductStatsCommand;
 use App\Modules\OnlineCatalog\Infrastructure\ListingMediaReferences;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModelStorefrontCatalog;
@@ -21,6 +23,8 @@ class OnlineCatalogServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(StorefrontCatalog::class, ReadModelStorefrontCatalog::class);
         $this->app->tag([ListingMediaReferences::class], MediaReferences::TAG);
+        // Replaced by the Reviews module when it is installed.
+        $this->app->bindIf(ProductRatings::class, NoProductRatings::class);
     }
 
     public function boot(): void

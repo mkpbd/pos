@@ -76,10 +76,10 @@ test('receiving a purchase order moves stock and the supplier balance', async ({
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  // Opening stock 60 from the demo seed, minus the 4 of the demo sale.
+  // Opening stock 60 from the demo seed, minus the 4 of the demo sale and the 2 of the demo web order.
   await page.getByRole('link', { name: 'Inventory' }).first().click()
   const juice = page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })
-  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^56(\s|$)/)
+  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^54(\s|$)/)
 
   // Receive the seeded order for 96 in full.
   await page.getByRole('link', { name: 'Purchasing' }).first().click()
@@ -95,7 +95,7 @@ test('receiving a purchase order moves stock and the supplier balance', async ({
   await expect(page.getByText('BDT 1,987.20')).toBeVisible()
 
   await page.getByRole('link', { name: 'Inventory' }).first().click()
-  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^152(\s|$)/)
+  await expect(juice.getByRole('cell').nth(2)).toHaveText(/^150(\s|$)/)
 
   await page.getByRole('link', { name: 'Suppliers' }).first().click()
   const pran = page.getByRole('row').filter({ hasText: 'Pran Distribution Ltd' })
@@ -133,8 +133,8 @@ test('cashier scans, takes cash and the sale reaches stock and history', async (
   await expect(done.getByTestId('receipt')).toContainText('Pran Mango Juice 250ml')
   await done.getByRole('button', { name: 'New sale' }).click()
 
-  // 152 after the receipt test, minus 2.
-  await expect(page.getByRole('button', { name: /Pran Mango Juice 250ml/ })).toContainText('150 pcs')
+  // 150 after the receipt test, minus 2.
+  await expect(page.getByRole('button', { name: /Pran Mango Juice 250ml/ })).toContainText('148 pcs')
 
   await page.getByRole('link', { name: 'Sales' }).first().click()
   await expect(page.getByRole('row').filter({ hasText: 'BDT 57.50' })).toBeVisible()
@@ -553,4 +553,68 @@ test('a flash sale and the WELCOME50 coupon lower the price from card to placed 
   await page.getByRole('link', { name: 'Welcome 50' }).click()
   await page.getByRole('tab', { name: /Redemptions/ }).click()
   await expect(page.getByRole('row').filter({ hasText: number })).toContainText('50.00')
+})
+
+test('a shopper cancels an order, buys again and reviews a delivered product; the admin publishes the review', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin moderation flow runs on desktop')
+
+  await page.goto('/account/login?next=/account/orders')
+  const form = page.getByRole('form', { name: 'Sign in' })
+  await form.getByLabel('E-mail').fill('shopper@demo.test')
+  await form.getByLabel('Password').fill('password')
+  await form.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page).toHaveURL(/\/account\/orders$/)
+
+  // The seeded orders: WEB-000001 delivered (reviewed), WEB-000002 confirmed and unpaid (cancellable).
+  await expect(page.getByRole('link', { name: /WEB-000001/ }).first()).toBeVisible()
+  await page.getByRole('link', { name: /WEB-000002/ }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name: /WEB-000002/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel order' }).click()
+  const cancel = page.getByRole('form', { name: 'Cancel order' })
+  await cancel.getByLabel(/Reason/).fill('Ordered by mistake')
+  await cancel.getByRole('button', { name: 'Cancel order' }).click()
+  await expect(page.getByText('Cancelled').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel order' })).toHaveCount(0)
+
+  // Buy again puts the delivered order's juice into the cart.
+  await page.goto('/account/orders/WEB-000001')
+  await expect(page.getByText('DEMO-TRK-0001')).toBeVisible()
+  await page.getByRole('button', { name: 'Buy again' }).click()
+  await expect(page.getByTestId('mini-cart').getByTestId('cart-line').filter({ hasText: 'Pran Mango Juice 250ml' })).toHaveCount(1)
+  await page.keyboard.press('Escape')
+
+  // Editing the published review sends it back to moderation: the product page has no published review meanwhile.
+  await page.getByTestId('line-review').getByRole('button', { name: /^Edit your review of Pran Mango Juice/ }).click()
+  const review = page.getByRole('form', { name: 'Edit your review' })
+  await review.locator('label').filter({ has: page.getByRole('radio', { name: '4 stars' }) }).click()
+  await expect(review.getByRole('radio', { name: '4 stars' })).toBeChecked()
+  await review.getByLabel('Title (optional)').fill('Great with ice')
+  await review.getByLabel('Your review').fill('Still tastes like real mangoes, best served cold.')
+  await review.getByRole('button', { name: 'Save review' }).click()
+  await expect(page.getByText(/We will publish it once it has been checked/)).toBeVisible()
+
+  await page.goto('/product/pran-mango-juice-250ml')
+  await expect(page.getByText('Great with ice')).toHaveCount(0)
+
+  // The admin publishes it, and sees the customer's cancellation on the web order.
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.getByRole('link', { name: 'Reviews' }).first().click()
+  const card = page.getByRole('listitem', { name: /Review of Pran Mango Juice 250ml/ }).filter({ hasText: 'Great with ice' })
+  await card.getByRole('button', { name: 'Approve' }).click()
+  await expect(card).toHaveCount(0)
+
+  await page.getByRole('link', { name: 'Web orders' }).first().click()
+  await page.getByRole('row').filter({ hasText: 'WEB-000002' }).getByRole('link', { name: 'WEB-000002' }).click()
+  await expect(page.getByText('Cancelled by customer').first()).toBeVisible()
+  await expect(page.getByText(/Ordered by mistake/).first()).toBeVisible()
+
+  await page.goto('/product/pran-mango-juice-250ml')
+  await expect(page.getByTestId('rating-summary')).toContainText('1 review')
+  await page.getByTestId('rating-summary').click()
+  await expect(page.getByTestId('product-reviews')).toContainText('Great with ice')
 })

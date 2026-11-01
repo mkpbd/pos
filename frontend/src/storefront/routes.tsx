@@ -10,9 +10,12 @@ import { ContentPage } from './pages/content-page'
 import { HomePage } from './pages/home-page'
 import { BrandPage, CategoryPage, SearchPage, ShopPage } from './pages/listing-page'
 import { NewsletterConfirmPage, NewsletterUnsubscribePage } from './pages/newsletter-pages'
+import { AccountOrderPage } from './orders/account-order-page'
+import { AccountOrdersPage } from './orders/account-orders-page'
 import { OrderPage } from './orders/order-page'
 import { NotFoundPage } from './pages/not-found-page'
 import { ProductPage } from './pages/product-page'
+import { MyReviewsPage } from './reviews/my-reviews-page'
 import { WishlistPage } from './wishlist/wishlist-page'
 
 /**
@@ -56,6 +59,9 @@ export const storefrontRoutes: RouteObject[] = [
           { path: 'account', element: <AccountPage /> },
           { path: 'account/profile', element: <ProfilePage /> },
           { path: 'account/addresses', element: <AddressesPage /> },
+          { path: 'account/orders', element: <AccountOrdersPage /> },
+          { path: 'account/orders/:number', element: <AccountOrderPage /> },
+          { path: 'account/reviews', element: <MyReviewsPage /> },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

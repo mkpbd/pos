@@ -1,4 +1,4 @@
-import type { WebOrderAction, WebOrderPromotionKind, WebOrderHistoryEntry, WebOrderPayment, WebOrdersListParams, WebOrderStatus, WebPaymentMethod, WebPaymentStatus } from '@/features/web-orders/api'
+import type { WebOrder, WebOrderAction, WebOrderActorKind, WebOrderPromotionKind, WebOrderHistoryEntry, WebOrderPayment, WebOrdersListParams, WebOrderStatus, WebPaymentMethod, WebPaymentStatus } from '@/features/web-orders/api'
 import { ApiError } from '@/lib/api/client'
 
 /** Button label on the order page for each action. */
@@ -107,8 +107,44 @@ export function formatDateTime(iso: string | null | undefined, timeZone: string 
   }
 }
 
+const ACTOR_KINDS: readonly string[] = ['staff', 'customer', 'system'] satisfies WebOrderActorKind[]
+
+/** The kind of actor, or null when an older server does not say (system or customer). */
+export function historyActorKind(entry: WebOrderHistoryEntry): WebOrderActorKind | null {
+  if (typeof entry.actor === 'string' && ACTOR_KINDS.includes(entry.actor)) return entry.actor
+  if (entry.actor_type && ACTOR_KINDS.includes(entry.actor_type)) return entry.actor_type
+  return entry.actor && typeof entry.actor === 'object' ? 'staff' : null
+}
+
 export function historyActor(entry: WebOrderHistoryEntry): string {
-  return entry.actor_name ?? entry.actor?.name ?? 'System or customer'
+  const staffName = entry.actor_name ?? (entry.actor && typeof entry.actor === 'object' ? entry.actor.name : null)
+  switch (historyActorKind(entry)) {
+    case 'customer':
+      return 'Customer'
+    case 'system':
+      return 'System'
+    case 'staff':
+      return staffName ?? 'Staff'
+    default:
+      return staffName ?? 'System or customer'
+  }
+}
+
+/** Whether the customer cancelled the order themselves from their account (E9). */
+export function isCustomerCancellation(entry: WebOrderHistoryEntry): boolean {
+  return entry.status === 'cancelled' && historyActorKind(entry) === 'customer'
+}
+
+/** Heading of a history entry; a self-service cancellation says so. */
+export function historyLabel(entry: WebOrderHistoryEntry): string {
+  if (isCustomerCancellation(entry)) return 'Cancelled by customer'
+  return entry.label || statusBadge(entry.status).label
+}
+
+/** The cancellation entry made by the customer, if the order was cancelled from their account. */
+export function customerCancellation(order: Pick<WebOrder, 'status' | 'history'>): WebOrderHistoryEntry | null {
+  if (order.status !== 'cancelled') return null
+  return order.history.findLast(isCustomerCancellation) ?? null
 }
 
 export function paymentRecorder(payment: WebOrderPayment): string {

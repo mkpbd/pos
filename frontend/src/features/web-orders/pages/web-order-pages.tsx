@@ -16,12 +16,15 @@ import { useWebOrderQuery, useWebOrdersQuery, WEB_ORDER_ACTIONS, type WebOrder, 
 import { OrderActionDialog } from '@/features/web-orders/components/order-action-dialog'
 import {
   ACTION_LABELS,
+  customerCancellation,
   etaLabel,
   FILTER_STATUSES,
   filtersFromSearchParams,
   filtersToSearchParams,
   formatDateTime,
   historyActor,
+  historyLabel,
+  isCustomerCancellation,
   ORDER_STATUS,
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS,
@@ -254,6 +257,8 @@ export function WebOrderPage() {
   const discountLines = (order.promotions ?? []).filter((p) => p.kind !== 'shipping')
   const shippingPromotion = (order.promotions ?? []).find((p) => p.kind === 'shipping')
   const shippingWaived = !isZeroDecimal(order.shipping_discount)
+  const cancelledByCustomer = customerCancellation(order)
+  const customerReason = cancelledByCustomer ? order.cancel_reason || cancelledByCustomer.note || null : null
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -279,10 +284,18 @@ export function WebOrderPage() {
 
       <p className="-mt-4 text-sm text-muted-foreground">Placed {formatDateTime(order.placed_at, timeZone)}</p>
 
-      {order.status === 'cancelled' && order.cancel_reason && (
+      {cancelledByCustomer ? (
         <p role="note" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-          <span className="font-medium">Cancelled:</span> {order.cancel_reason}
+          <span className="font-medium">Cancelled by customer</span>
+          {customerReason ? <>: {customerReason}</> : ' (no reason given)'}
         </p>
+      ) : (
+        order.status === 'cancelled' &&
+        order.cancel_reason && (
+          <p role="note" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <span className="font-medium">Cancelled:</span> {order.cancel_reason}
+          </p>
+        )
       )}
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -406,9 +419,9 @@ export function WebOrderPage() {
               {order.history.map((h, i) => (
                 <li key={i} className="relative">
                   <span className="absolute top-1.5 -left-[1.3rem] size-2 rounded-full bg-primary" aria-hidden />
-                  <div className="font-medium">{h.label || statusBadge(h.status).label}</div>
+                  <div className="font-medium">{historyLabel(h)}</div>
                   <div className="text-xs text-muted-foreground">{formatDateTime(h.at, timeZone)} · {historyActor(h)}</div>
-                  {h.note && <div className="text-xs">{h.note}</div>}
+                  {h.note && <div className="text-xs">{isCustomerCancellation(h) ? `Reason: ${h.note}` : h.note}</div>}
                 </li>
               ))}
             </ol>

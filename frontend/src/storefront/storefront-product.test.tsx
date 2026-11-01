@@ -124,12 +124,16 @@ describe('product page', () => {
       'GET /store/bootstrap': ok(bootstrapFixture()),
       'GET /store/products/plain': ok(productDetail({ slug: 'plain', description_html: null, specifications: [], options: [], variants: [productDetail().variants[0]!] })),
       'GET /store/products/plain/related': ok({ related: [], frequently_bought: [] }),
+      'GET /store/products/plain/reviews': ok([], { summary: { average: '0.0', count: 0, distribution: {} } }),
       'GET /store/products/gone': fail(404, 'NOT_FOUND'),
     })
     const { unmount } = renderRoutes(storefrontRoutes, '/product/plain')
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Kids Tee' })).toBeInTheDocument()
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    // Without a description or specifications only the Reviews tab is left (E9).
+    expect(within(screen.getByRole('tablist')).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Reviews'])
+    expect(await screen.findByText('No reviews yet')).toBeInTheDocument()
+    expect(screen.queryByTestId('rating-summary')).not.toBeInTheDocument()
     expect(screen.queryByTestId('variant-selector')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Related products' })).not.toBeInTheDocument()
     unmount()

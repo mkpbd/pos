@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * One step of an order's status history. Append-only; actor NULL = shopper or system.
+ * One step of an order's status history. Append-only; `actor_type` says who (customer,
+ * staff — actor_user_id — or system).
  *
  * @property string $id
  * @property string $order_id
@@ -20,10 +21,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property OrderStatus $to_status
  * @property ?string $note
  * @property ?string $actor_user_id
+ * @property ?string $actor_type customer | staff | system (E9)
  * @property CarbonImmutable $created_at
  */
 #[Table('order_status_history', timestamps: false)]
-#[Fillable(['organization_id', 'order_id', 'from_status', 'to_status', 'note', 'actor_user_id', 'created_at'])]
+#[Fillable(['organization_id', 'order_id', 'from_status', 'to_status', 'note', 'actor_user_id', 'actor_type', 'created_at'])]
 class OrderStatusChange extends Model
 {
     use AppendOnly, BelongsToOrganization, HasUuids;

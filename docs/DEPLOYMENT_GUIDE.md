@@ -84,6 +84,14 @@ Promotions and coupons (E8b):
 - No scheduler job: promotions start and end by their timestamps at request time; flash-sale prices revert on the storefront when `ends_at` passes. Cancelling or expiring an order does **not** give a coupon use back.
 - The PostgreSQL-only `PromotionConcurrencyTest` (two placements racing for a single-use coupon), the CHECK constraints and the triggers have not run yet — run the full suite on PostgreSQL before production.
 
+Customer account area and reviews (E9):
+- Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive `reviews.view` and `reviews.moderate` (Organization Admin through `*`; Online Store Manager already lists `reviews.*`, ADR-016). Until then existing databases show no *Reviews* entry in the admin, and nobody can approve reviews — new reviews stay pending and invisible on the storefront.
+- Rate limit: `POS_REVIEW_RATE_LIMIT` (default 5) new reviews per hour per signed-in customer (`config('pos.review_rate_limit')`); refused attempts count. Edits and deletes use the normal shopper write limit.
+- **Mail and a queue worker:** a customer's cancellation sends a queued confirmation e-mail (link to `/account/orders/{number}` with the request's scheme and host — `TRUSTED_PROXIES` matters as for E8a); staff with `web_orders.view` get an inbox notification.
+- Migrations: new table `reviews` (foreign keys to organizations, products, customers, order lines and users; on PostgreSQL the CHECK `reviews_rules_check`) and the nullable column `order_status_history.actor_type` (PostgreSQL CHECK; existing history rows stay NULL and are derived when shown — no backfill, the table is append-only). Both are additive; `migrate --force` before switching traffic as usual.
+- No scheduler job and no cache: the rating summary is computed from approved reviews per request.
+- The new PostgreSQL CHECKs have not run yet (the local PostgreSQL run is still blocked) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash

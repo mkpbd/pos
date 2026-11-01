@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Orders\Presentation\Http\Controllers\AccountOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderController;
@@ -11,6 +12,17 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'c
     Route::post('checkout/preview', [StoreCheckoutController::class, 'preview'])->middleware('throttle:checkout')->name('store.checkout.preview');
     Route::post('checkout', [StoreCheckoutController::class, 'place'])->middleware(['throttle:checkout', 'idempotent:shopper'])->name('store.checkout');
     Route::get('orders/{number}', [StoreOrderController::class, 'show'])->where('number', '[A-Za-z0-9-]{1,40}')->name('store.orders.show');
+});
+
+// The signed-in customer's own orders (E9).
+Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'auth:customer', 'customer.active'])->prefix('store/account/orders')->group(function () {
+    Route::get('/', [AccountOrderController::class, 'index'])->name('store.account.orders');
+    Route::get('{number}', [AccountOrderController::class, 'show'])->where('number', '[A-Za-z0-9-]{1,40}')->name('store.account.orders.show');
+
+    Route::middleware('throttle:storefront-write')->group(function () {
+        Route::post('{number}/cancel', [AccountOrderController::class, 'cancel'])->where('number', '[A-Za-z0-9-]{1,40}')->middleware('idempotent:shopper');
+        Route::post('{number}/reorder', [AccountOrderController::class, 'reorder'])->where('number', '[A-Za-z0-9-]{1,40}');
+    });
 });
 
 // Staff: web orders.

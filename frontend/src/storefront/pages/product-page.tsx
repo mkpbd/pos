@@ -15,6 +15,8 @@ import { imageIndexOf, useVariantSelection } from '../catalog/use-variant-select
 import { initialVariant } from '../catalog/variant-selection'
 import { usePromotionPricing } from '../promotions/display'
 import { RichText } from '../components/rich-text'
+import { REVIEWS_SECTION_ID, REVIEWS_TAB_ID, reviewsTabLabel } from '../reviews/display'
+import { ProductReviews, RatingSummaryLink } from '../reviews/product-reviews'
 import type { ProductCard as Card, ProductDetail } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { NotFoundPage } from './not-found-page'
@@ -85,6 +87,12 @@ function ProductView({ product }: { product: ProductDetail }) {
     if (i >= 0) setImageIndex(i)
   })
   const promo = usePromotionPricing(product, variant)
+  const [tab, setTab] = useState<string | undefined>(undefined)
+
+  const openReviews = () => {
+    setTab(REVIEWS_TAB_ID)
+    document.getElementById(REVIEWS_SECTION_ID)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }
 
   const tabs: TabItem[] = []
   if (product.description_html) tabs.push({ id: 'description', label: 'Description', content: <RichText html={product.description_html} className="max-w-3xl" /> })
@@ -106,6 +114,8 @@ function ProductView({ product }: { product: ProductDetail }) {
       ),
     })
   }
+
+  if (!product.preview_state) tabs.push({ id: REVIEWS_TAB_ID, label: reviewsTabLabel(product.rating), content: <ProductReviews slug={product.slug} /> })
 
   const notice = product.preview_state ? PREVIEW_STATES[product.preview_state] : undefined
 
@@ -136,7 +146,10 @@ function ProductView({ product }: { product: ProductDetail }) {
             />
           </div>
           <div className="flex flex-col gap-5">
-            <h1 className="text-3xl leading-tight font-extrabold lg:text-4xl">{product.name}</h1>
+            <div className="flex flex-col gap-2">
+              <h1 className="text-3xl leading-tight font-extrabold lg:text-4xl">{product.name}</h1>
+              <RatingSummaryLink rating={product.rating} onOpen={openReviews} />
+            </div>
             <ProductSummary product={product} variant={variant} selection={selection} onChoose={choose} />
             <div className="flex flex-col gap-3 border-t pt-5">
               <AddToCartForm key={variant?.id ?? 'none'} product={product} variant={variant} />
@@ -154,8 +167,8 @@ function ProductView({ product }: { product: ProductDetail }) {
         </div>
 
         {tabs.length > 0 && (
-          <section aria-label="Product information" className="mt-8 rounded-sf-card bg-sf-surface p-4 md:p-8">
-            <Tabs tabs={tabs} label="Product information" />
+          <section id={REVIEWS_SECTION_ID} aria-label="Product information" className="mt-8 scroll-mt-24 rounded-sf-card bg-sf-surface p-4 md:p-8">
+            <Tabs tabs={tabs} label="Product information" selectedId={tab} onSelect={setTab} />
           </section>
         )}
 

@@ -112,6 +112,21 @@ interface StorefrontCatalog
     public function variantsForCart(array $variantIds): array;
 
     /**
+     * The id of the live product at a storefront address (case-insensitive slug), or null.
+     */
+    public function liveProductId(string $slug): ?string;
+
+    /**
+     * Display data of products (archived ones included, other organizations' left out) keyed
+     * by id: name, first image and the storefront slug while the product is live (else null).
+     * Used for review lists (E9).
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array{id: string, name: string, slug: ?string, image_url: ?string}>
+     */
+    public function productSummaries(array $productIds): array;
+
+    /**
      * Search metadata for the HTML shell, or null when the page does not exist.
      *
      * @param  'category'|'brand'|'product'  $type

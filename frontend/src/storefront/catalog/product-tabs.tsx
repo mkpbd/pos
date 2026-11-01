@@ -5,13 +5,34 @@ export type TabItem = { id: string; label: string; content: ReactNode }
 
 /**
  * Tabs (WAI-ARIA tabs pattern, automatic activation): Arrow keys, Home and End move between
- * tabs; only the selected tab is in the tab order.
+ * tabs; only the selected tab is in the tab order. Pass `selectedId` + `onSelect` to control
+ * the selection from outside (e.g. a link that opens the Reviews tab).
  */
-export function Tabs({ tabs, label, className, tabListClassName }: { tabs: TabItem[]; label: string; className?: string; tabListClassName?: string }) {
+export function Tabs({
+  tabs,
+  label,
+  className,
+  tabListClassName,
+  selectedId,
+  onSelect,
+}: {
+  tabs: TabItem[]
+  label: string
+  className?: string
+  tabListClassName?: string
+  selectedId?: string
+  onSelect?: (id: string) => void
+}) {
   const baseId = useId()
-  const [selected, setSelected] = useState(0)
+  const [own, setOwn] = useState(0)
   const refs = useRef<(HTMLButtonElement | null)[]>([])
-  const current = Math.min(selected, tabs.length - 1)
+  const controlled = selectedId !== undefined ? tabs.findIndex((t) => t.id === selectedId) : -1
+  const current = Math.min(controlled >= 0 ? controlled : own, tabs.length - 1)
+  const setSelected = (i: number) => {
+    setOwn(i)
+    const tab = tabs[i]
+    if (tab) onSelect?.(tab.id)
+  }
 
   if (tabs.length === 0) return null
 

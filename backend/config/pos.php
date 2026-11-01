@@ -35,4 +35,7 @@ return [
     // Coupon codes tried per minute per cart / customer (E8b, ADR-015).
     'coupon_rate_limit' => (int) env('POS_COUPON_RATE_LIMIT', 10),
 
+    // New product reviews per hour per customer (E9).
+    'review_rate_limit' => (int) env('POS_REVIEW_RATE_LIMIT', 5),
+
 ];

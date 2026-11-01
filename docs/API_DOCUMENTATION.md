@@ -118,6 +118,8 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `NOT_A_COUPON_PROMOTION`, `CODES_EXHAUSTED` | Adding codes to an automatic promotion; no free random codes left for the prefix after several attempts (try another prefix). |
 | 422 | `IN_USE` | Also: deleting a promotion or a coupon code that an order used (deactivate it instead). |
 | 422 | `PROMOTION_NOT_FOUND` | A `hot_deals` homepage section naming a promotion that is not an automatic countdown promotion (flash sale) of the organization (`details.promotion_id`). |
+| 422 | `ORDER_NOT_CANCELLABLE` | A customer cancelling their own web order that is not awaiting payment or confirmed, or is already paid (`details.status`, `details.payment_status`). |
+| 422 | `REVIEW_NOT_ALLOWED`, `REVIEW_EXISTS` | Reviewing a product without a delivered web order line of it; a second review of the same product (`details.review_id` — edit that one instead). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -897,6 +899,61 @@ Cookie: cart_token=…; XSRF-TOKEN=…; …session cookie…
 ```
 
 The coupon's `min_subtotal` (500) is compared with the subtotal before discounts (500.00), and its 50 off applies after the product discount (450.00 → 400.00); 15 % VAT on 400.00 makes the goods total 460.00 (with a 60.00 home delivery, the placed order's `total` is 520.00). With 19 juices the answer would be `422` with `error.code` `COUPON_INVALID`, `details: {reason: "min_subtotal", code: "WELCOME50", min_subtotal: "500.00"}`. Placing the order gives `discount_total: "100.00"`, `coupon_code: "WELCOME50"` and `promotions: [{name: "Juice week", kind: "product", amount: "50.00"}, {name: "Welcome 50", kind: "order", amount: "50.00"}]`.
+
+### E-commerce track — customer account area: orders and reviews (E9)
+
+Account routes run like the E7 account routes: storefront host → organization, `storefront.session` (cookie session, CSRF on writes), `throttle:storefront`, `auth:customer` and `customer.active` (*C*; guests and disabled shoppers → `401`). Everything is scoped to the signed-in customer **and** the host's organization: another customer's order or review, another store's, and unknown numbers/ids are `404`. An order is the customer's own when `orders.customer_id` is theirs — orders placed as a guest with the same e-mail are **not** attached (owning the address is not proven).
+
+| Method & path | Auth · limiter | Notes |
+|---------------|----------------|-------|
+| GET `/store/account/orders` | C | `status` (`open` = `pending_payment`\|`confirmed`\|`processing`\|`shipped`; `delivered`; `cancelled`; anything else → `VALIDATION_FAILED`), `page`. Newest first, 10 per page (`meta.pagination`), `Cache-Control: no-store`. Rows `{number, placed_at, status, status_label, payment_status, payment_method_label, item_count, total, currency, first_item: {name, image_url} \| null}`. |
+| GET `/store/account/orders/{number}` | C | The storefront order view of E8a/E8b (lines with `discount_amount`, totals, `promotions`, `coupon_code`, address, `history`, `courier_name`, `tracking_number`, `payment_instructions`) plus `can_cancel`, `cancelled_at`, `cancel_reason` and per line `product_id`, `variant_id`, `review` (`{id, rating, status}` of the customer's review of that product, or `null`) and `reviewable` (order delivered and no review yet). `no-store`. |
+| POST `/store/account/orders/{number}/cancel` | C, I · `storefront-write` | `{reason?}` (≤ 200). Needs `Idempotency-Key` (`428 IDEMPOTENCY_KEY_REQUIRED`), stored under the scope `customer:{account id}`; a retry with the same key and body replays the first answer (`Idempotent-Replayed: true`), a different body → `409 IDEMPOTENCY_KEY_REUSED`. Allowed only while `pending_payment` or `confirmed` **and** `payment_status` `unpaid` (paid orders need a refund, E10); otherwise `422 ORDER_NOT_CANCELLABLE` with `details.status`, `details.payment_status`. Runs the E8a cancel path in one transaction with the order locked: stock back to the exact batches, history row `to_status: cancelled` with actor type `customer` and the reason as note. After commit the shopper gets a cancellation e-mail (queued) and staff with `web_orders.view` an inbox notification. → the order as `GET` shows it (`can_cancel: false`). |
+| POST `/store/account/orders/{number}/reorder` | C · `storefront-write` | No body. Adds every line's variant with the ordered quantity to the customer's cart (merged with an existing line of the variant; capped at the fulfilment store's stock and 999; at most 50 lines; a unit that no longer allows decimals gets whole units). → `{cart (the repriced cart), added: [{variant_id, name, quantity}], skipped: [{name, reason}]}` — `reason` `unavailable` (not purchasable any more), `out_of_stock`, `limit` (cart full, or nothing more can be added). Prices are today's. Never fails as a whole. |
+| GET `/store/account/reviews` | C | `page`; newest first, 20 per page, `no-store`. `[{id, product: {id, name, slug (null while not live), image_url}, rating, title, body, status (pending\|approved\|rejected), status_label, rejection_reason, verified: true, created_at, updated_at}]`. |
+| POST `/store/account/reviews` | C · `storefront-write`, `reviews` | `{product_id, rating (1–5), title? (≤ 120), body (10–2000)}` — plain text, trimmed. → `201` with the review as above, `status: "pending"`. A second review of the product → `422 REVIEW_EXISTS` (`details.review_id`); no **delivered** web order line of the product for this customer → `422 REVIEW_NOT_ALLOWED`. The delivered line is stored as `order_line_id`, so every review is a verified purchase. `reviews` limiter: `POS_REVIEW_RATE_LIMIT` (default 5) per hour per signed-in customer; refused attempts count too → `429`. |
+| PATCH `/store/account/reviews/{id}` | C · `storefront-write` | Any subset of `rating`, `title` (empty → `null`), `body`; allowed in any status. The review goes back to `pending` and loses `rejection_reason`, moderator and `moderated_at`. → the review. |
+| DELETE `/store/account/reviews/{id}` | C · `storefront-write` | `204`. The customer may then write a new one. |
+| GET `/store/products/{slug}/reviews` | P · `storefront` | `sort` `newest` (default) \| `highest` \| `lowest`, `rating` 1–5, `page`. **Approved reviews only**, 10 per page: `data: [{id, rating, title, body, author, created_at, verified: true}]` — `author` is the first name and the initial of the last name (`"Rina A."`; a single name as is; none → `"Customer"`), nothing else of the customer. Next to `data` and `meta`: `summary {average (one decimal as a string, null without reviews), count, distribution {"1": n … "5": n}}` over **all** approved reviews (the `rating` filter does not narrow it). Unknown or not-live product → `404`. |
+| GET `/store/products/{slug}` | P | Adds `rating: {average, count} \| null` (approved reviews). Cards carry no rating in E9 (E10, with the rating sort). |
+
+The guest-facing `GET /store/orders/{number}` is unchanged; the storefront links a signed-in customer's confirmation to `/account/orders/{number}`. The HTML shell answers `/account/orders`, `/account/orders/{number}` and `/account/reviews` with `noindex`.
+
+Staff endpoints (`auth:sanctum` + `tenant`; ids of another organization → 404):
+
+| Method & path | Permission | Notes |
+|---------------|------------|-------|
+| GET `/reviews` | `reviews.view` | Filters `status` (`pending`\|`approved`\|`rejected`), `rating` (1–5), `search` (≤ 100: title, body, product name, customer name or e-mail); `page`, `per_page` (default 25, ≤ 100). Pending first, then newest. Rows `{id, product: {id, name}, customer: {id, name, email}, rating, title, body, status, created_at, moderated_at, moderated_by_name, rejection_reason}`; `meta.pending_count` = all pending reviews of the organization. |
+| POST `/reviews/{id}/approve` | `reviews.moderate` | → the row; shown on the product page from now on. Approving an approved review changes nothing. Audited `review.approved`. |
+| POST `/reviews/{id}/reject` | `reviews.moderate` | `{reason?}` (≤ 200, shown to the author) → the row. Rejecting a rejected review changes nothing (the first reason stays). Audited `review.rejected`. |
+| DELETE `/reviews/{id}` | `reviews.moderate` | `204`. Audited `review.deleted`. |
+| GET `/web-orders/{id}` | `web_orders.view` | `history[]` adds `actor_type` (`customer` \| `staff` \| `system`) next to `actor`; a customer cancellation has `actor_type: "customer"`, `actor: null` and the reason as `note`. |
+
+Organization Admin holds `reviews.*` through `*`; Online Store Manager already listed `reviews.*` (ADR-016). Existing databases: `php artisan pos:permissions:sync`. Moderation takes no `Idempotency-Key` (approve and reject are idempotent by state).
+
+Example — the seeded mango juice with the demo shopper's approved review (customer "Demo Shopper"):
+
+```http
+GET /api/v1/store/products/pran-mango-juice-250ml/reviews?sort=newest
+Host: shop.example.com
+```
+```json
+{
+  "success": true,
+  "data": [
+    { "id": "0193…", "rating": 5, "title": "Tastes like real mangoes", "body": "Cold from the fridge it is perfect. Delivery was quick and the bottles were well packed.",
+      "author": "Demo S.", "created_at": "2026-11-01T04:12:09+00:00", "verified": true }
+  ],
+  "meta": { "request_id": "0193…", "pagination": { "current_page": 1, "per_page": 10, "total": 1, "last_page": 1 } },
+  "summary": { "average": "5.0", "count": 1, "distribution": { "1": 0, "2": 0, "3": 0, "4": 0, "5": 1 } }
+}
+```
+
+Cancelling a delivered order:
+
+```json
+{ "success": false, "error": { "code": "ORDER_NOT_CANCELLABLE", "message": "WEB-000001 is Delivered and can no longer be cancelled.", "details": { "status": "delivered", "payment_status": "paid" } }, "meta": { "request_id": "0193…" } }
+```
 
 ### Planned (by phase)
 

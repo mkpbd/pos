@@ -153,6 +153,7 @@ class OrderWorkflow
             'to_status' => $to,
             'note' => $note === null ? null : mb_substr($note, 0, 255),
             'actor_user_id' => $actorId,
+            'actor_type' => 'staff',
             'created_at' => now(),
         ]);
     }

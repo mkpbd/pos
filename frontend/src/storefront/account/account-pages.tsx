@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { HeartIcon, LogOutIcon, MapPinIcon, ShoppingBagIcon, UserIcon } from 'lucide-react'
+import { HeartIcon, LogOutIcon, MapPinIcon, PackageIcon, ShoppingBagIcon, StarIcon, UserIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { applyServerErrors, storeFormError } from '../form-errors'
 import type { Customer } from '../types'
 import { useDocumentTitle } from '../use-document-title'
+import { RecentOrders } from '../orders/recent-orders'
 import {
   useChangePasswordMutation,
   useCustomer,
@@ -21,6 +22,8 @@ import { normalizeBdPhone, passwordSchema, profileSchema, type PasswordValues, t
 
 const NAV = [
   { to: '/account', label: 'Overview', end: true },
+  { to: '/account/orders', label: 'Orders' },
+  { to: '/account/reviews', label: 'Reviews' },
   { to: '/account/profile', label: 'Profile' },
   { to: '/account/addresses', label: 'Addresses' },
   { to: '/wishlist', label: 'Wishlist' },
@@ -89,6 +92,8 @@ function VerificationBanner({ customer }: { customer: Customer }) {
 }
 
 const TILES = [
+  { to: '/account/orders', label: 'Orders', text: 'Track, cancel or buy again.', icon: PackageIcon },
+  { to: '/account/reviews', label: 'Reviews', text: 'What you said about your purchases.', icon: StarIcon },
   { to: '/account/profile', label: 'Profile', text: 'Your name, mobile number and password.', icon: UserIcon },
   { to: '/account/addresses', label: 'Addresses', text: 'Where we deliver your orders.', icon: MapPinIcon },
   { to: '/wishlist', label: 'Wishlist', text: 'Products you saved for later.', icon: HeartIcon },
@@ -107,6 +112,7 @@ export function AccountPage() {
         Hello, <strong className="text-sf-heading">{customer.name}</strong>!
       </p>
       <p className="mt-1 text-sm">Signed in as {customer.email}</p>
+      <RecentOrders />
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">
         {TILES.map(({ to, label, text, icon: Icon }) => (
           <li key={to}>

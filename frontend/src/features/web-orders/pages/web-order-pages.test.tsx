@@ -139,6 +139,64 @@ describe('web order page', () => {
     expect(screen.getByTestId('order-total')).toHaveTextContent('BDT 3,130.00')
   })
 
+  it('shows a cancellation by the customer with their reason', async () => {
+    mockApi({
+      'GET /auth/me': ok(orderViewer()),
+      'GET /web-orders/wo-1': ok(
+        webOrder({
+          status: 'cancelled', status_label: 'Cancelled', payment_method: 'cod', payment_method_label: 'Cash on delivery', allowed_actions: [], cancel_reason: 'Ordered by mistake',
+          history: [
+            // The E9 backend shape: `actor` stays the staff user (null here), `actor_type` says who.
+            { status: 'pending_payment', label: 'Awaiting payment', at: '2026-10-31T04:30:00Z', actor: null, actor_type: 'customer', note: null },
+            { status: 'confirmed', label: 'Confirmed', at: '2026-10-31T04:30:01Z', actor: null, actor_type: 'system', note: null },
+            { status: 'cancelled', label: 'Cancelled', at: '2026-10-31T05:00:00Z', actor: null, actor_type: 'customer', note: 'Ordered by mistake' },
+          ],
+        }),
+      ),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    expect(await screen.findByRole('heading', { name: 'WEB-000001' })).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('Cancelled by customer: Ordered by mistake')
+    const items = within(screen.getByRole('list', { name: 'Status history' })).getAllByRole('listitem')
+    expect(items[1]).toHaveTextContent(/System$/)
+    expect(items[2]).toHaveTextContent('Cancelled by customer')
+    expect(items[2]).toHaveTextContent(/· Customer/)
+    expect(items[2]).toHaveTextContent('Reason: Ordered by mistake')
+  })
+
+  it('shows a customer cancellation without a reason', async () => {
+    mockApi({
+      'GET /auth/me': ok(orderViewer()),
+      'GET /web-orders/wo-1': ok(
+        webOrder({
+          status: 'cancelled', status_label: 'Cancelled', allowed_actions: [], cancel_reason: null,
+          history: [{ status: 'cancelled', label: 'Cancelled', at: '2026-10-31T05:00:00Z', actor: 'customer' }],
+        }),
+      ),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    expect(await screen.findByRole('note')).toHaveTextContent('Cancelled by customer (no reason given)')
+    expect(within(screen.getByRole('list', { name: 'Status history' })).getByText('Cancelled by customer')).toBeInTheDocument()
+  })
+
+  it('keeps the staff wording for a cancellation by staff', async () => {
+    mockApi({
+      'GET /auth/me': ok(orderViewer()),
+      'GET /web-orders/wo-1': ok(
+        webOrder({
+          status: 'cancelled', status_label: 'Cancelled', allowed_actions: [], cancel_reason: 'Out of stock',
+          history: [{ status: 'cancelled', label: 'Cancelled', at: '2026-10-31T05:00:00Z', actor: { id: 'u-1', name: 'Rahim Uddin' }, note: 'Out of stock' }],
+        }),
+      ),
+    })
+    renderRoutes(routes, '/web-orders/wo-1')
+
+    expect(await screen.findByRole('note')).toHaveTextContent('Cancelled: Out of stock')
+    expect(screen.queryByText('Cancelled by customer')).not.toBeInTheDocument()
+  })
+
   it('shows no discount column for orders without discounts', async () => {
     mockApi({ 'GET /auth/me': ok(orderViewer()), 'GET /web-orders/wo-1': ok(webOrder()) })
     renderRoutes(routes, '/web-orders/wo-1')

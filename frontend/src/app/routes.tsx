@@ -89,6 +89,7 @@ const pages = {
   webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
   promotions: page(() => import('@/features/promotions/pages/promotions-page'), 'PromotionsPage'),
   promotion: page(() => import('@/features/promotions/pages/promotion-editor-page'), 'PromotionEditorPage'),
+  reviews: page(() => import('@/features/reviews/pages/reviews-page'), 'ReviewsPage'),
   storefrontShipping: page(() => import('@/features/shipping/pages/shipping-page'), 'ShippingPage'),
   storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
 }
@@ -135,6 +136,8 @@ export const routes: RouteObject[] = [
               guarded('promotions.manage', 'promotions/new', pages.promotion),
               // Viewers see the same page read-only; write actions need promotions.manage.
               guarded('promotions.view', 'promotions/:promotionId', pages.promotion),
+              // Moderators and viewers share the page; approve / reject / delete need reviews.moderate.
+              guarded('reviews.view', 'reviews', pages.reviews),
               guarded('returns.view', 'returns', pages.returns),
               guarded('returns.view', 'returns/:returnId', pages.saleReturn),
               guarded(REGISTER_PERMISSIONS, 'cash-registers', pages.cashRegisters),

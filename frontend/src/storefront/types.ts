@@ -315,6 +315,8 @@ export type ProductDetail = {
   /** Sold in fractions (e.g. by weight). Not part of the E6 contract: integer quantities when absent. */
   allow_decimal?: boolean
   seo: Seo & { image_url: string | null }
+  /** Approved reviews (E9): average as a one-decimal string ("4.5"); null without reviews. */
+  rating?: { average: string; count: number } | null
   /** Staff preview only (?preview=1). */
   preview_state?: 'draft' | 'scheduled' | 'live' | 'expired'
 }
@@ -573,3 +575,78 @@ export type OrderView = {
 
 /** 201 of POST /store/checkout; the access token is only for guests (null for customers). */
 export type PlacedOrder = { order: OrderView; access_token: string | null }
+
+/* ---------------------------------------------------------------------------------------
+ * Customer account area (E9) — /api/v1/store/account/orders*, /store/account/reviews*, /store/products/{slug}/reviews
+ * ------------------------------------------------------------------------------------- */
+
+/** The order-history tabs: `open` = pending payment, confirmed, processing or shipped. */
+export type AccountOrderFilter = 'open' | 'delivered' | 'cancelled'
+
+/** A row of GET /store/account/orders (newest first, 10 per page). */
+export type AccountOrderRow = {
+  number: string
+  placed_at: string
+  status: OrderStatus
+  status_label: string
+  payment_status: 'unpaid' | 'paid' | (string & {})
+  payment_method_label: string
+  item_count: number | string
+  total: string
+  currency: string | null
+  first_item: { name: string; image_url: string | null } | null
+}
+
+export type ReviewStatus = 'pending' | 'approved' | 'rejected' | (string & {})
+
+/** The customer's review of an order line's product, as the order detail carries it. */
+export type LineReview = { id: string; rating: number; status: ReviewStatus }
+
+export type AccountOrderLine = OrderView['lines'][number] & {
+  /** The product to review (POST /store/account/reviews takes it). */
+  product_id?: string | null
+  review: LineReview | null
+  /** A delivered line whose product the customer has not reviewed yet. */
+  reviewable: boolean
+}
+
+/** GET /store/account/orders/{number}: the order view plus what the customer may do with it. */
+export type AccountOrder = Omit<OrderView, 'lines'> & {
+  lines: AccountOrderLine[]
+  can_cancel: boolean
+}
+
+export type ReorderSkipReason = 'unavailable' | 'out_of_stock' | 'limit' | (string & {})
+
+/** POST /store/account/orders/{number}/reorder — today's prices. */
+export type ReorderResult = {
+  cart: Cart
+  added: { variant_id: string; name: string; quantity: string | number }[]
+  skipped: { name: string; reason: ReorderSkipReason }[]
+}
+
+/** A review of GET /store/account/reviews (any status) and of the create/update answers. */
+export type MyReview = {
+  id: string
+  product_id?: string
+  product: { id: string; name: string; slug: string | null; image_url?: string | null; image?: CatalogImage | null } | null
+  rating: number
+  title: string | null
+  body: string
+  status: ReviewStatus
+  rejection_reason: string | null
+  created_at: string
+  updated_at?: string | null
+}
+
+export type ReviewInput = { product_id: string; rating: number; title: string | null; body: string }
+
+/** An approved review on the product page; the author is "first name + last initial". */
+export type PublicReview = { id: string; rating: number; title: string | null; body: string; author: string; created_at: string; verified: boolean }
+
+export type RatingSummary = { average: string; count: number; distribution: Partial<Record<'1' | '2' | '3' | '4' | '5', number>> }
+
+export type ReviewSort = 'newest' | 'highest' | 'lowest'
+
+/** GET /store/products/{slug}/reviews, normalised (see reviews/api.ts). */
+export type ProductReviews = { reviews: PublicReview[]; summary: RatingSummary; pagination: ListingPagination }

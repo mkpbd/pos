@@ -71,5 +71,6 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoStorefrontSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
         $this->callWith(DemoCheckoutSeeder::class, ['organizationId' => $result['organization']->id]);
         $this->callWith(DemoPromotionsSeeder::class, ['organizationId' => $result['organization']->id]);
+        $this->callWith(DemoAccountSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
     }
 }

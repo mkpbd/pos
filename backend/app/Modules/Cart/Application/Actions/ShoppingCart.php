@@ -226,6 +226,80 @@ class ShoppingCart
     }
 
     /**
+     * Adds several lines at once (re-order, E9), never failing as a whole: each line is added
+     * to the line of the same variant (quantities summed, capped at what the fulfilment store
+     * has and at 999) or skipped — `unavailable` (not purchasable any more), `out_of_stock`,
+     * `limit` (cart full, or the line already holds all that can be added). The cart is only
+     * created when something is added.
+     *
+     * @param  list<array{variant_id: string, quantity: string, name: string}>  $lines
+     * @return array{cart: ?Cart, added: list<array{variant_id: string, name: string, quantity: string}>, skipped: list<array{name: string, reason: string}>}
+     */
+    public function addLines(CartOwner $owner, array $lines): array
+    {
+        $variants = $this->catalog->variantsForCart(array_values(array_unique(array_column($lines, 'variant_id'))));
+
+        return DB::transaction(function () use ($owner, $lines, $variants) {
+            $cart = $this->query($owner)?->lockForUpdate()->first();
+            $existing = $cart === null ? collect() : $cart->items()->get()->keyBy('variant_id');
+            $added = [];
+            $skipped = [];
+
+            foreach ($lines as $line) {
+                $variant = $variants[$line['variant_id']] ?? null;
+                if ($variant === null || ! $variant['purchasable']) {
+                    $skipped[] = ['name' => $line['name'], 'reason' => 'unavailable'];
+
+                    continue;
+                }
+                if (! $variant['in_stock'] || ($variant['max_quantity'] !== null && Decimal::compare($variant['max_quantity'], '0') <= 0)) {
+                    $skipped[] = ['name' => $line['name'], 'reason' => 'out_of_stock'];
+
+                    continue;
+                }
+                /** @var CartItem|null $item */
+                $item = $existing->get($line['variant_id']);
+                if ($item === null && $existing->count() >= CartRules::MAX_LINES) {
+                    $skipped[] = ['name' => $line['name'], 'reason' => 'limit'];
+
+                    continue;
+                }
+
+                $before = $item === null ? '0' : Decimal::round((string) $item->quantity, 3);
+                $requested = Decimal::round($line['quantity'], 3);
+                if (! $variant['allow_decimal'] && ! Decimal::isWhole($requested)) {
+                    // The unit stopped allowing decimals since: whole units only, at least one.
+                    $whole = explode('.', $requested)[0];
+                    $requested = Decimal::round(Decimal::compare($whole, '1') < 0 ? '1' : $whole, 3);
+                }
+                [$quantity] = CartRules::merged($before, $requested, $variant['max_quantity']);
+                $delta = Decimal::sub($quantity, $before, 3);
+                if (Decimal::compare($delta, '0') <= 0) {
+                    $skipped[] = ['name' => $line['name'], 'reason' => 'limit'];
+
+                    continue;
+                }
+
+                if ($cart === null) {
+                    [$cart] = $this->lockOrCreate($owner);
+                }
+                if ($item === null) {
+                    $existing->put($line['variant_id'], $cart->items()->create(['variant_id' => $line['variant_id'], 'quantity' => $quantity]));
+                } else {
+                    $item->update(['quantity' => $quantity]);
+                }
+                $added[] = ['variant_id' => $line['variant_id'], 'name' => $line['name'], 'quantity' => CartRules::display($delta)];
+            }
+
+            if ($cart !== null && $added !== []) {
+                $this->touch($cart);
+            }
+
+            return ['cart' => $cart, 'added' => $added, 'skipped' => $skipped];
+        });
+    }
+
+    /**
      * @param  array<string, mixed>|null  $variant  catalog data of the line's variant
      */
     private function assertQuantity(?array $variant, string $quantity, string $alreadyInCart): void

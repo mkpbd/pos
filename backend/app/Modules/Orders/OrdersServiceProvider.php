@@ -4,8 +4,14 @@ namespace App\Modules\Orders;
 
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
+use App\Modules\Orders\Application\Contracts\OrderLineReviews;
+use App\Modules\Orders\Application\Contracts\PurchaseVerifier;
+use App\Modules\Orders\Application\Events\OrderCancelledByCustomer;
 use App\Modules\Orders\Application\Events\OrderPlaced;
+use App\Modules\Orders\Application\Services\NoOrderLineReviews;
 use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
+use App\Modules\Orders\Infrastructure\EloquentPurchaseVerifier;
+use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderPlacedNotifications;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -19,15 +25,24 @@ use Illuminate\Support\Facades\RateLimiter;
  * fulfilment store, COD and bank transfer), the guest/customer order page, the staff web
  * orders list and workflow (confirm payment, process, ship, deliver, record COD payment,
  * cancel with restock), the confirmation e-mail and staff notification, and the scheduled
- * expiry of unpaid bank-transfer orders (`orders:expire-pending`).
+ * expiry of unpaid bank-transfer orders (`orders:expire-pending`); the customer's own orders
+ * (E9: history, detail, cancel, re-order) and the `PurchaseVerifier` the Reviews module asks.
  */
 class OrdersServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(PurchaseVerifier::class, EloquentPurchaseVerifier::class);
+        // Replaced by the Reviews module when it is installed.
+        $this->app->bindIf(OrderLineReviews::class, NoOrderLineReviews::class);
+    }
+
     public function boot(): void
     {
         parent::boot();
 
         Event::listen(OrderPlaced::class, SendOrderPlacedNotifications::class);
+        Event::listen(OrderCancelledByCustomer::class, SendOrderCancelledNotifications::class);
 
         // Checkout preview and placement: per IP and cart (ADR-015).
         RateLimiter::for('checkout', function (Request $request) {

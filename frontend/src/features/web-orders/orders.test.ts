@@ -7,7 +7,9 @@ import {
   filtersFromSearchParams,
   filtersToSearchParams,
   formatDateTime,
+  customerCancellation,
   historyActor,
+  historyLabel,
   isStaleOrderError,
   paymentRecorder,
   statusBadge,
@@ -50,6 +52,24 @@ describe('web order display helpers', () => {
     expect(historyActor({ status: 'cancelled', label: 'Cancelled', at: '', actor: null })).toBe('System or customer')
     expect(paymentRecorder({ method: 'bank_transfer', amount: '1.00', reference: null, recorded_at: '', recorded_by: { id: 'u', name: 'Nadia' } })).toBe('Nadia')
     expect(paymentRecorder({ method: 'bank_transfer', amount: '1.00', reference: null, recorded_at: '', recorded_by: 'Nadia' })).toBe('Nadia')
+  })
+
+  it('tells customer, staff and system changes apart (E9 actor kinds)', () => {
+    const cancelled = { status: 'cancelled' as const, label: 'Cancelled', at: '2026-11-01T05:00:00Z', note: 'Ordered by mistake' }
+    expect(historyActor({ ...cancelled, actor: 'customer' })).toBe('Customer')
+    expect(historyLabel({ ...cancelled, actor: 'customer' })).toBe('Cancelled by customer')
+    expect(historyLabel({ ...cancelled, actor_type: 'customer', actor: null })).toBe('Cancelled by customer')
+    expect(historyActor({ ...cancelled, actor: 'system' })).toBe('System')
+    expect(historyLabel({ ...cancelled, actor: 'system' })).toBe('Cancelled')
+    expect(historyActor({ ...cancelled, actor: 'staff', actor_name: 'Nadia' })).toBe('Nadia')
+    expect(historyActor({ ...cancelled, actor: 'staff' })).toBe('Staff')
+    expect(historyActor({ ...cancelled, actor_type: 'staff', actor: { id: 'u-1', name: 'Rahim' } })).toBe('Rahim')
+    expect(historyLabel({ status: 'confirmed', label: '', at: '' })).toBe('Confirmed')
+
+    const history = [{ status: 'pending_payment' as const, label: 'Awaiting payment', at: '' }, { ...cancelled, actor: 'customer' as const }]
+    expect(customerCancellation({ status: 'cancelled', history })?.note).toBe('Ordered by mistake')
+    expect(customerCancellation({ status: 'confirmed', history })).toBeNull()
+    expect(customerCancellation({ status: 'cancelled', history: [{ ...cancelled, actor: { id: 'u-1', name: 'Rahim' } }] })).toBeNull()
   })
 
   it('labels delivery times and unknown statuses', () => {

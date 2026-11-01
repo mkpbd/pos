@@ -50,14 +50,21 @@ export type WebOrderAddress = {
   postcode: string | null
 }
 
-/** One status change. `actor` null = the system or the customer. */
+/** Who made a status change (E9): staff, the signed-in customer (self-service cancel) or the system. */
+export type WebOrderActorKind = 'staff' | 'customer' | 'system'
+
+/**
+ * One status change. `actor` is the staff user, or — from E9 — may be the kind of actor;
+ * `actor_type` carries the kind next to a staff object. Neither = the system or the customer (E8a).
+ */
 export type WebOrderHistoryEntry = {
   status: WebOrderStatus
   label: string
   at: string
   from?: WebOrderStatus | null
   note?: string | null
-  actor?: { id: string; name: string | null } | null
+  actor?: { id: string; name: string | null } | WebOrderActorKind | null
+  actor_type?: WebOrderActorKind | null
   actor_name?: string | null
 }
 

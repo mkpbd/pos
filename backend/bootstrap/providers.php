@@ -23,6 +23,7 @@ use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
+use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Shipping\ShippingServiceProvider;
 use App\Modules\Storefront\StorefrontServiceProvider;
@@ -63,6 +64,7 @@ return [
     ShippingServiceProvider::class,
     OnlinePaymentsServiceProvider::class,
     OrdersServiceProvider::class,
+    ReviewsServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

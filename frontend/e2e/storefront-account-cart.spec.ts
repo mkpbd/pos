@@ -173,6 +173,8 @@ async function serveStore(page: Page) {
           return route.fulfill({ json: envelope({ items: state.wishlist }) })
         case 'GET /store/account/addresses':
           return route.fulfill({ json: envelope(state.addresses) })
+        case 'GET /store/account/orders':
+          return route.fulfill({ json: { success: true, data: [], meta: { request_id: 'e2e', pagination: { current_page: 1, per_page: 10, total: 0, last_page: 1 } } } })
         case 'POST /store/account/addresses': {
           const address = {
             id: `a-${state.addresses.length + 1}`, label: body?.label ?? null, recipient_name: body?.recipient_name, phone: body?.phone,

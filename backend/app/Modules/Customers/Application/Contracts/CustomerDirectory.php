@@ -19,7 +19,7 @@ interface CustomerDirectory
 
     /**
      * @param  list<string>  $customerIds
-     * @return array<string, array{id: string, code: string, name: string, phone: ?string}>
+     * @return array<string, array{id: string, code: string, name: string, phone: ?string, email: ?string}>
      */
     public function summaries(string $organizationId, array $customerIds): array;
 

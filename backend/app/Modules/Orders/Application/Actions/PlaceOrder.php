@@ -260,6 +260,7 @@ class PlaceOrder
                 'to_status' => $status,
                 'note' => 'Order placed',
                 'actor_user_id' => null,
+                'actor_type' => 'customer',
                 'created_at' => $now,
             ]);
 

@@ -216,6 +216,36 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         return null;
     }
 
+    public function liveProductId(string $slug): ?string
+    {
+        return $this->catalog->products(['slug' => $slug])[0]['id'] ?? null;
+    }
+
+    public function productSummaries(array $productIds): array
+    {
+        $productIds = array_values(array_unique($productIds));
+        if ($productIds === []) {
+            return [];
+        }
+
+        $slugs = [];
+        foreach ($this->catalog->products(['ids' => $productIds]) as $record) {
+            $slugs[$record['id']] = $record['listing']->slug;
+        }
+        $images = $this->catalog->images($productIds);
+
+        return DB::table('products')
+            ->where('organization_id', $this->catalog->organizationId())
+            ->whereIn('id', $productIds)
+            ->get(['id', 'name'])
+            ->mapWithKeys(fn ($p) => [$p->id => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'slug' => $slugs[$p->id] ?? null,
+                'image_url' => $images[$p->id][0]['url'] ?? null,
+            ]])->all();
+    }
+
     public function pageMeta(string $type, string $slug): ?array
     {
         return $this->navigation->meta($type, $slug);

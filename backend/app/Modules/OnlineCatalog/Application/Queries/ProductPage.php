@@ -3,6 +3,7 @@
 namespace App\Modules\OnlineCatalog\Application\Queries;
 
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
+use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\OnlineCatalog\Domain\CatalogItem;
 use App\Modules\OnlineCatalog\Domain\CatalogSort;
 use App\Modules\OnlineCatalog\Domain\Pricing;
@@ -23,6 +24,7 @@ class ProductPage
         private readonly CatalogReadModel $catalog,
         private readonly CatalogDirectory $directory,
         private readonly BrowseCatalog $browse,
+        private readonly ProductRatings $ratings,
     ) {}
 
     /**
@@ -91,6 +93,8 @@ class ProductPage
             'unit' => $unit,
             // Quantities may have up to 3 decimals (kg, litre) instead of whole units.
             'allow_decimal' => (bool) ($unitInfo['allow_decimal'] ?? false),
+            // Approved reviews (E9): {average: "4.5", count: 12}, null without any.
+            'rating' => $this->ratings->summary($record['id']),
             'seo' => [
                 'title' => $listing->seo_title ?? $record['name'],
                 'description' => $listing->seo_description ?? $listing->short_description,

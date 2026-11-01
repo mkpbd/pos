@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
 import { useNotice } from '../notices'
-import { customerKeys } from '../store-keys'
+import { accountKeys, customerKeys } from '../store-keys'
 import type { AddressInput, Customer, CustomerAddress, GeoDistrict, GeoDivision, SignInResult } from '../types'
 import { clearLocalWishlist, readLocalWishlist } from '../wishlist/local-wishlist'
 
@@ -45,6 +45,8 @@ function refreshCustomerData(queryClient: QueryClient, customer: Customer | null
   else void queryClient.invalidateQueries({ queryKey: customerKeys.me })
   queryClient.removeQueries({ queryKey: customerKeys.profile })
   queryClient.removeQueries({ queryKey: customerKeys.addresses })
+  queryClient.removeQueries({ queryKey: accountKeys.orders })
+  queryClient.removeQueries({ queryKey: accountKeys.reviews })
   void queryClient.invalidateQueries({ queryKey: customerKeys.wishlist })
   void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
 }
@@ -94,6 +96,8 @@ export function useLogoutMutation() {
       queryClient.removeQueries({ queryKey: customerKeys.profile })
       queryClient.removeQueries({ queryKey: customerKeys.addresses })
       queryClient.removeQueries({ queryKey: customerKeys.wishlist })
+      queryClient.removeQueries({ queryKey: accountKeys.orders })
+      queryClient.removeQueries({ queryKey: accountKeys.reviews })
       void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
     },
   })

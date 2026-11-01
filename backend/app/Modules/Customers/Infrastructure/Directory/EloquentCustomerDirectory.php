@@ -36,8 +36,8 @@ class EloquentCustomerDirectory implements CustomerDirectory
         return Customer::query()->withoutGlobalScope('organization')->withTrashed()
             ->where('organization_id', $organizationId)
             ->whereKey(array_values(array_unique($customerIds)))
-            ->get(['id', 'code', 'name', 'phone'])
-            ->mapWithKeys(fn (Customer $c) => [$c->id => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name, 'phone' => $c->phone]])
+            ->get(['id', 'code', 'name', 'phone', 'email'])
+            ->mapWithKeys(fn (Customer $c) => [$c->id => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name, 'phone' => $c->phone, 'email' => $c->email]])
             ->all();
     }
 
