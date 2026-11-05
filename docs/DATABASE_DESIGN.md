@@ -300,6 +300,30 @@ Created with `CREATE INDEX IF NOT EXISTS`; `StorefrontIndexesTest` (PostgreSQL o
 
 No table for the server cache: entries and the per-organization content version live in the configured cache store (`cache` table with the `database` store).
 
+### E-commerce E12b — Bangla storefront and content translations (implemented)
+
+Content translations (ADR-011): a nullable `translations` **jsonb** column `{"bn": {field: value}}` next to the base (English) columns, added by `Shared\Infrastructure\Persistence\TranslationsColumn::add()`. On PostgreSQL each gets `{table}_translations_check`: `translations IS NULL OR jsonb_typeof(translations) = 'object'`. Shape, allowed fields and lengths are enforced by the application (`TranslationInput`); the stored document has sorted keys, no empty locales, and is `NULL` when nothing is translated. No index on it: public reads fetch the column with the row, and the storefront search's Bangla-name match is an unindexed `lower(translations->'bn'->>'name') LIKE …` (Laravel JSON path; `json_extract` on SQLite) beside the trigram-indexed base-name match.
+
+| Migration (2026_11_05_…) | Module | Tables gaining `translations` | Translatable fields |
+|--------------------------|--------|-------------------------------|---------------------|
+| `100000_add_translations_to_listings` | OnlineCatalog | `product_listings`, `category_listings`, `brand_listings` | product: `name` (base = `products.name`), `short_description`, `description_html`, `seo_title`, `seo_description`; category: `name` (base = `categories.name`), `description_html`, SEO; brand: `name` (base = `brands.name`), `description`, SEO |
+| `100100_add_translations_to_content` | Cms | `cms_pages`, `faq_items`, `blog_categories`, `blog_posts` | page `title`, `body_html`, SEO; FAQ `question`, `answer_html`; blog category `name`, `description`; post `title`, `excerpt`, `body_html`, SEO |
+| `100200_add_languages_to_storefront` | Storefront | `menu_items`, `banners`, `homepage_sections` | `label`; `kicker`, `title`, `subtitle`, `button_label`, `secondary_button_label`; `title`, `subtitle` + config texts (`body_html` of `rich_text`, `text` / `button_label` of `newsletter`) as flat keys |
+| `100300_add_translations_to_shipping_methods` | Shipping | `shipping_methods` | `name`, `description` |
+| `100400_add_translations_to_payment_gateways` | OnlinePayments | `payment_gateways` | `display_name`, `instructions` |
+| `100500_add_translations_to_promotions` | Promotions | `promotions` | `name`, `description` |
+
+The announcement bar's translations live inside the theme document (`theme_settings.settings → announcement.translations`, `{"bn": {"text": …}}` or null; `ThemeSchema` default null) — no column.
+
+Store languages (Storefront `100200`, after `allow_indexing`):
+- `storefront_settings.bangla_enabled` boolean NOT NULL default `true`; `default_locale` varchar(2) NOT NULL default `'en'`; `bangla_digits` boolean NOT NULL default `false`. PostgreSQL `storefront_settings_default_locale_check`: `default_locale IN ('en','bn') AND (bangla_enabled OR default_locale = 'en')`. Existing stores become bilingual with English as default.
+
+Language of orders and accounts:
+- `orders.locale` varchar(2) NOT NULL default `'en'` (Orders `100600_add_locale_to_orders`; PostgreSQL `orders_locale_check`: `locale IN ('en','bn')`) — the checkout request's language; existing orders are `en`. Line, delivery, promotion and address snapshots stay English.
+- `customer_accounts.preferred_locale` varchar(2) NULL (CustomerAccounts `100700_add_preferred_locale_to_customer_accounts`; `customer_accounts_preferred_locale_check`: NULL or `en|bn`) — the language of the last sign-up / sign-in.
+
+All additive, no backfill. Geography already had `name_bn` (E7); no change. **The CHECKs and the jsonb search expression have not run on PostgreSQL yet.**
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.
@@ -310,7 +334,7 @@ No table for the server cache: entries and the per-organization content version 
 ## 3. Indexing strategy
 
 - Every tenant table: composite index starting with `(organization_id, …)`; branch tables `(organization_id, branch_id, …)`.
-- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6). Storefront live listings: partial indexes on published `product_listings` windows and live `product_variants` (E12a).
+- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6). Storefront live listings: partial indexes on published `product_listings` windows and live `product_variants` (E12a). The Bangla-name search on `translations` jsonb (E12b) has no index (a GIN / trigram expression index can follow if `EXPLAIN` asks for it).
 - Case-insensitive uniqueness uses expression indexes, e.g. `brands (organization_id, lower(name))`, and partial indexes such as `customers (organization_id, phone) WHERE deleted_at IS NULL AND phone IS NOT NULL` — valid on PostgreSQL and SQLite alike.
 - Ledgers: `stock_movements (store_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down to the source document.
 - Reports: `sales (organization_id, branch_id, created_at)` and BRIN on large append-only `created_at` columns once volumes justify it.

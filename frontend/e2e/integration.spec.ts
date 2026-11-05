@@ -51,7 +51,7 @@ test('organization admin creates a product and finds it by barcode', async ({ pa
   await expect(page.getByRole('link', { name: 'Pran Mango Juice 250ml' })).toBeVisible()
 
   await page.getByRole('link', { name: 'New product' }).click()
-  await page.getByLabel('Name').fill(`E2E Tea ${ean}`)
+  await page.getByLabel('Name', { exact: true }).fill(`E2E Tea ${ean}`)
   await page.getByRole('combobox').filter({ hasText: 'Choose a unit' }).click()
   await page.getByRole('option', { name: 'Piece (pcs)' }).click()
   await page.getByLabel('Cost price').fill('40')
@@ -268,7 +268,7 @@ test('a banner edited and a section added in the admin show on the storefront in
   await page.goto('/admin/storefront/banners')
   await page.getByRole('button', { name: 'Edit Fresh week' }).click()
   const bannerDialog = page.getByRole('dialog', { name: 'Edit banner' })
-  await bannerDialog.getByLabel('Headline').fill('Eid offers all week')
+  await bannerDialog.getByLabel('Headline', { exact: true }).fill('Eid offers all week')
   await bannerDialog.getByRole('button', { name: 'Save banner' }).click()
   await expect(page.getByText('Banner saved.')).toBeVisible()
 
@@ -281,7 +281,7 @@ test('a banner edited and a section added in the admin show on the storefront in
   await page.getByRole('button', { name: /Text block/ }).click()
   const sectionDialog = page.getByRole('dialog', { name: 'New text block' })
   await sectionDialog.getByLabel('Title', { exact: true }).fill('Store news')
-  await sectionDialog.getByRole('textbox', { name: 'Section text' }).fill('We now deliver on Fridays.')
+  await sectionDialog.getByRole('textbox', { name: 'Section text', exact: true }).fill('We now deliver on Fridays.')
   await sectionDialog.getByRole('button', { name: 'Add section' }).click()
   await expect(page.getByText('Section added at the end of the homepage.')).toBeVisible()
 
@@ -319,7 +319,7 @@ test('a product created and repriced in the admin shows its current price everyw
 
   // Brief check 7: create the product and publish it, featured, on the online store.
   await page.goto('/admin/products/new')
-  await page.getByLabel('Name').fill(name)
+  await page.getByLabel('Name', { exact: true }).fill(name)
   await page.getByRole('combobox').filter({ hasText: 'Choose a unit' }).click()
   await page.getByRole('option', { name: 'Piece (pcs)' }).click()
   await page.getByLabel('Cost price').fill('300')
@@ -730,7 +730,7 @@ test('a blog post written in the admin shows on the blog, its category, the home
   await page.getByLabel('Title', { exact: true }).fill(title)
   await page.getByLabel('Address', { exact: true }).fill(slug)
   await page.getByLabel('Excerpt', { exact: true }).fill('Five sweets to make for Eid this year.')
-  await page.getByRole('textbox', { name: 'Post text' }).fill('Start with shemai, then try firni and rasmalai.')
+  await page.getByRole('textbox', { name: 'Post text', exact: true }).fill('Start with shemai, then try firni and rasmalai.')
   await page.getByLabel('Category', { exact: true }).click()
   await page.getByRole('option', { name: 'Recipes' }).click()
   await page.getByLabel('Publish now').check()
@@ -811,4 +811,42 @@ test('a paid order whose parcel came back is cancelled with a refund and its sto
   await page.getByRole('link', { name: 'Inventory' }).first().click()
   const litchi = page.getByRole('row').filter({ hasText: 'Pran Litchi Drink 250ml' })
   await expect(litchi.getByRole('cell').nth(2)).toHaveText(/^4(\s|$)/)
+})
+
+test('a shopper switches the store to Bangla: menus, products, order status and the server-rendered page follow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The header switcher is shown from md up')
+
+  await page.goto('/')
+  await page.getByTestId('language-switcher').first().getByRole('button', { name: 'বাংলা' }).click()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'bn')
+  await expect(page).toHaveURL(/[?&]lang=bn/)
+
+  // Seeded translations: menu labels and the product name; untranslated fields fall back to English.
+  const nav = page.getByRole('navigation').first()
+  await expect(nav.getByRole('link', { name: 'মুদি পণ্য' })).toBeVisible()
+  await page.goto('/product/pran-mango-juice-250ml')
+  await expect(page.getByRole('heading', { level: 1, name: 'প্রাণ ম্যাঙ্গো জুস ২৫০ মি.লি.' })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'bn')
+
+  // The server-rendered shell (Laravel, not the Vite dev server) honours the cookie: Bangla lang,
+  // hreflang alternates, canonical with ?lang=bn.
+  const backend = process.env.VITE_BACKEND_ORIGIN ?? 'http://127.0.0.1:8010'
+  const shell = await (await page.request.get(`${backend}/product/pran-mango-juice-250ml`, { headers: { Cookie: 'lang=bn' } })).text()
+  expect(shell).toMatch(/<html[^>]* lang="bn"/)
+  expect(shell).toContain('hreflang="en"')
+  expect(shell).toContain('hreflang="x-default"')
+  expect(shell).toMatch(/rel="canonical" href="[^"]*\/product\/pran-mango-juice-250ml\?lang=bn"/)
+
+  // Signed in, the delivered demo order reads in Bangla.
+  await page.goto('/account/login?next=/account/orders/WEB-000001')
+  const form = page.getByRole('form').first()
+  await form.getByRole('textbox').first().fill('shopper@demo.test')
+  await form.locator('input[type="password"]').fill('password')
+  await form.getByRole('button').last().click()
+  await expect(page).toHaveURL(/\/account\/orders\/WEB-000001/)
+  await expect(page.getByTestId('order-status').first()).toHaveText(/ডেলিভারি হয়েছে|ফেরত/)
+
+  // Back to English.
+  await page.getByTestId('language-switcher').first().getByRole('button', { name: 'English' }).click()
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 })

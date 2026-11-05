@@ -9,6 +9,7 @@ import { useOrderQuery } from '../checkout/api'
 import { formatDateTime } from '../checkout/delivery'
 import { readOrderToken, rememberOrderToken } from '../checkout/order-token'
 import { useLocale } from '../i18n/locale'
+import { orderStatusLabel } from './returns-api'
 import { rich } from '../i18n/rich'
 import type { OrderView } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
@@ -119,7 +120,7 @@ function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; than
           <h1 className="text-3xl font-extrabold lg:text-4xl">{rich(t('orders.title'), { number: <span data-testid="order-number">{order.number}</span> })}</h1>
         )}
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-          <OrderStatusBadge label={order.status_label} />
+          <OrderStatusBadge label={orderStatusLabel(t, order.status, order.status_label)} />
           <span>{rich(t('orders.placedAt'), { date: <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time> })}</span>
         </p>
         {accountLink && (

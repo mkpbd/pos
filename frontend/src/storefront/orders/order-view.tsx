@@ -8,6 +8,7 @@ import { ProductImage } from '../catalog/product-image'
 import { etaLabel, formatDateTime } from '../checkout/delivery'
 import { SummaryTotals } from '../checkout/summary-totals'
 import { useLocale } from '../i18n/locale'
+import { orderStatusLabel } from './returns-api'
 import { rich } from '../i18n/rich'
 import type { Translate } from '../i18n/translate'
 import { formatDiscount, formatPrice } from '../money'
@@ -244,7 +245,7 @@ export function OrderTimeline({ order, withTracking = false }: { order: Pick<Ord
           return (
             <li key={`${entry.status}-${entry.at}-${index}`} className="relative text-sm" aria-current={current ? 'step' : undefined}>
               <span aria-hidden className={cn('absolute top-1.5 -left-[1.4rem] size-2.5 rounded-full', current ? 'bg-sf-accent' : 'bg-sf-border')} />
-              <span className="block font-semibold text-sf-heading">{entry.label}</span>
+              <span className="block font-semibold text-sf-heading">{orderStatusLabel(t, entry.status, entry.label)}</span>
               <time dateTime={entry.at} className="text-xs">
                 {formatDateTime(entry.at)}
               </time>

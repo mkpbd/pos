@@ -4,6 +4,7 @@ import { displayQuantity } from '../cart/quantity'
 import { ProductImage } from '../catalog/product-image'
 import { formatDateTime } from '../checkout/delivery'
 import { useLocale } from '../i18n/locale'
+import { orderStatusLabel } from './returns-api'
 import { formatPrice } from '../money'
 import type { AccountOrderRow } from '../types'
 import { OrderStatusBadge } from './order-view'
@@ -22,7 +23,7 @@ export function OrderRow({ row }: { row: AccountOrderRow }) {
       <div className="min-w-0 flex-1 text-sm">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-heading text-base font-bold text-sf-heading">{row.number}</span>
-          <OrderStatusBadge label={row.status_label} />
+          <OrderStatusBadge label={orderStatusLabel(t, row.status, row.status_label)} />
         </p>
         <p className="mt-1 truncate">
           {row.first_item?.name}

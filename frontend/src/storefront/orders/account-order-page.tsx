@@ -20,7 +20,7 @@ import type { AccountOrder, AccountOrderLine, OrderReturnSummary } from '../type
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { reorderNotice, useAccountOrderQuery, useCancelOrderMutation, useReorderMutation } from './account-api'
 import { ReturnRequestDialog } from './return-request-dialog'
-import { canRequestReturn } from './returns-api'
+import { canRequestReturn, orderStatusLabel } from './returns-api'
 import { CancelReturnDialog, OrderReturnsCard } from './returns-view'
 import { OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
 
@@ -144,7 +144,7 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
     <>
       <header className="flex flex-col gap-3">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-          <OrderStatusBadge label={order.status_label} />
+          <OrderStatusBadge label={orderStatusLabel(t, order.status, order.status_label)} />
           <span>{rich(t('orders.placedAt'), { date: <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time> })}</span>
         </p>
         <div className="flex flex-wrap gap-3">

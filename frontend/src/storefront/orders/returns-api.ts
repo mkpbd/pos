@@ -26,6 +26,29 @@ export const RETURN_REASONS: { value: ReturnReasonCode; label: MessageKey }[] = 
   { value: 'other', label: 'orders.returns.reason.other' },
 ]
 
+/**
+ * Status and reason labels from the codes, in the shopper's language; the server's (English)
+ * label is the fallback for a code this build does not know yet.
+ */
+const camel = (code: string) => code.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+
+export function orderStatusLabel(t: Translate, status: string, fallback: string): string {
+  const key = `orders.status.${camel(status)}` as MessageKey
+  const text = t(key)
+  return text === key ? fallback : text
+}
+
+export function returnStatusLabel(t: Translate, status: string, fallback: string): string {
+  const key = `orders.returnStatus.${camel(status)}` as MessageKey
+  const text = t(key)
+  return text === key ? fallback : text
+}
+
+export function returnReasonLabel(t: Translate, code: string | null | undefined, fallback: string | null | undefined): string | null {
+  const reason = RETURN_REASONS.find((r) => r.value === code)
+  return reason ? t(reason.label) : (fallback ?? null)
+}
+
 const noClientRetry = (count: number, error: unknown) => !(error instanceof ApiError && error.status < 500) && count < 1
 
 /** The id a return request names the line by. */

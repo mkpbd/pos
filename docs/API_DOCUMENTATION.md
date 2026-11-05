@@ -145,6 +145,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). Also required on unsafe storefront requests that run the `storefront.session` stack (account, cart, wishlist). |
 | `Retry-After`, `X-RateLimit-*` | response | Rate-limit information. |
+| `Content-Language` | response | Storefront requests (E12b): `en` or `bn`, the language of the answer. The public API takes the language from `?lang=` only; storefront pages also from the `lang` cookie. |
 
 ## Conventions
 
@@ -1279,6 +1280,105 @@ Example — a two-variant product on promotion with one approved review (values 
 ```
 
 (Written on one line by the server; wrapped here.) The SPA updates title, description, canonical, robots and `og:*` on in-app navigation with the same rules; JSON-LD is server-only (first load).
+
+No new error codes or permissions.
+
+### E-commerce track — Bangla storefront and content translations (E12b)
+
+Languages `en` (base: the base columns hold English) and `bn` (ADR-011). Field names and paths are unchanged; texts are localized in place.
+
+**Language of a request.**
+
+| Request | Resolved from | Notes |
+|---------|---------------|-------|
+| Public storefront API `/api/v1/store/*` | `?lang=en\|bn` only (case-insensitive) | Missing, unknown or disabled (Bangla off) → the store's `default_locale` (`en` while Bangla is off). The cookie is ignored, so the URL identifies the language and HTTP caches stay correct. Every answer carries `Content-Language: en\|bn`. |
+| HTML shell (storefront pages), sitemaps | `?lang=` > `lang` cookie > `default_locale` | Shell answers carry `Vary: Cookie`. The `lang` cookie is written by the SPA (plain text, excluded from encryption, not HttpOnly). |
+| Staff API, console, queued jobs | — | Always English (base values). |
+
+**Store languages** — `GET · PATCH /storefront/settings` (`storefront.view` · `storefront.manage`; audited):
+
+| Field | Type | Default | Rules |
+|-------|------|---------|-------|
+| `bangla_enabled` | boolean | `true` | English is always on. |
+| `default_locale` | `en` \| `bn` | `en` | Must be enabled: `bn` while `bangla_enabled` is (or becomes) false → 422 `VALIDATION_FAILED` on `default_locale` ("Switch Bangla on before making it the default language."). |
+| `bangla_digits` | boolean | `false` | Bengali digits for amounts, numbers and dates when reading in Bangla. The client formats; the server never localizes digits (amounts stay NUMERIC strings). |
+
+**Bootstrap** (`GET /store/bootstrap`, also inlined by the shell): `store.locales` (`["en"]` or `["en","bn"]`), `store.default_locale` (`en` while Bangla is off), `store.bangla_digits` (`false` while Bangla is off) and top-level `locale` (the resolved language of this payload). Menu labels, the announcement text and the popup's title / subtitle / button label are localized.
+
+**Staff payloads — `translations`.** Every editor below returns `translations` as `{"bn": {field: value}}` (`{"bn": {}}` when empty) and accepts it on create / update. Limits are those of the base field; HTML fields (*) go through the HtmlSanitizer like the base field (a value with no text left is removed).
+
+| Entity | Endpoints | Translatable fields (max length) |
+|--------|-----------|----------------------------------|
+| Product listing | GET · PUT `/online-catalog/products/{productId}` (`data.listing.translations`; top-level in the PUT body next to `slug`) | `name` 255 (base: the product name), `short_description` 500, `description_html`* 100000, `seo_title` 70, `seo_description` 160 |
+| Category listing | GET · PUT `/online-catalog/categories/{categoryId}` | `name` 100 (base: the category name), `description_html`* 50000, `seo_title` 70, `seo_description` 160 |
+| Brand listing | GET · PUT `/online-catalog/brands/{brandId}` | `name` 100 (base: the brand name), `description` 1000, `seo_title` 70, `seo_description` 160 |
+| Content page | `/cms/pages` POST · GET · PATCH `/{id}` | `title` 160, `body_html`* 200000, `seo_title` 160, `seo_description` 300 |
+| FAQ entry | `/cms/faq` GET · POST · PATCH `/{id}` | `question` 255, `answer_html`* 20000 |
+| Blog post | `/cms/blog-posts` POST · GET · PATCH `/{id}` | `title` 160, `excerpt` 300, `body_html`* 200000, `seo_title` 70, `seo_description` 160 |
+| Blog category | `/cms/blog-categories` GET · POST · PATCH `/{id}` | `name` 80, `description` 300 |
+| Menu item | GET `/storefront/menus/{id}` · PUT `/storefront/menus/{id}/items` (`items.*.translations`, children too) | `label` 80 |
+| Banner (incl. popup) | `/storefront/banners` GET · POST · PATCH `/{id}` | `kicker` 60, `title` 120, `subtitle` 255, `button_label` 40, `secondary_button_label` 40 |
+| Homepage section | `/storefront/homepage-sections` GET · POST · PATCH `/{id}` | `title` 120, `subtitle` 255; `rich_text`: + `body_html`* 50000; `newsletter`: + `text` 255, `button_label` 30 — config texts are flat keys in `translations.bn`, not under `config` |
+| Announcement | GET · PUT `/storefront/theme` (`announcement.translations`) | `text` 200 |
+| Delivery method | POST `/shipping/zones/{id}/methods` · PATCH `/shipping/methods/{id}`; returned in `GET /shipping/zones` | `name` 60, `description` 160 |
+| Payment method | GET `/payment-gateways` · PUT `/payment-gateways/{code}` | `display_name` 60, `instructions` 2000 |
+| Promotion | GET `/promotions/{id}` · POST · PATCH `/promotions/{id}` | `name` 80, `description` 200 (stored; the description is not shown to shoppers) |
+
+Semantics (`Shared\Application\Support\TranslationInput`):
+- `translations` left out → kept. `translations: null` or `{"bn": null}` → all removed.
+- Partial merge: a sent field replaces its translation; a blank one (`""`, whitespace, `null`) removes it; fields not sent are kept. Values are trimmed.
+- Exceptions: menu items (`PUT …/items` replaces the whole tree) and the announcement (`PUT /storefront/theme` replaces the whole document) store exactly what is sent — no merge. The theme returns `announcement.translations` as stored (`null` or `{"bn": {"text": …}}`).
+- Errors (422 `VALIDATION_FAILED`, in `error.details`): `translations.bn.<field>` — too long or not a string; `translations.bn` — unknown field (e.g. `slug`); `translations` — unknown locale (e.g. `fr`) or not an object. Menu items use `items.{i}.translations…` (and nested `children` paths), the announcement `announcement.translations…`.
+- Audit snapshots of listings, pages, FAQ, posts and sections record a `translations_hash` (xxh128 of the document), not the texts.
+
+**Public reads.** Each translatable field reads its Bangla value when non-blank, else the base value — per field (`Shared\Domain\Translations::pick`), so a half-translated record mixes Bangla and English. Slugs and URLs are never translated. Localized: `/store/products` cards (name, short description, category and brand names) and facets, `/store/products/{slug}` (name, texts, `seo.*`, breadcrumbs incl. "হোম"), related products, `/store/search/suggest`, `/store/categories[/{slug}]`, `/store/brands[/{slug}]`, `/store/homepage` (section title / subtitle / config texts, banners, catalog sections), `/store/bootstrap`, `/store/pages/{slug}`, `/store/faq`, `/store/blog*`, `/store/shipping-methods`, checkout preview, payment methods and cart line names, the order page's `payment_method_label` and `payment_instructions`, review product names. SEO stays per field: `seo.title` = Bangla SEO title, else base SEO title, else the localized name.
+- **Search** (`q` on `/store/products`, `/store/search/suggest`) matches base **and** Bangla names (products, brands, category suggestions) in either language (`lower(translations->'bn'->>'name') LIKE …`; not yet run on PostgreSQL).
+- **Geography:** `GET /store/geo/divisions` · `/store/geo/districts` with `?lang=bn` → `name` is the Bangla name, rows sorted by it; `name_bn` unchanged. Staff `/geography/*` stay English.
+- **Not translated:** attribute names and values, variant option names, product page tab labels, features-strip / testimonials items, FAQ group names, store name and meta description, order line snapshots.
+
+**Orders and accounts.** Checkout placement (`POST /store/checkout?lang=bn`) stores `orders.locale` = the request's language; the shopper's order (`GET /store/orders/{number}`, account order detail) returns `locale` (`en|bn`). Snapshots (product, delivery method, promotion, place names) are taken in English whatever the language. Sign-up, sign-in and password reset set `customer_accounts.preferred_locale` from `lang`; the account profile returns `preferred_locale` (`null` until the first sign-in after E12b). Both are for the e-mails of E13; e-mails are English today.
+
+**Shell and sitemaps** (Bangla on, English default):
+
+| | English (`/product/x`) | Bangla (`/product/x?lang=bn`, or cookie `lang=bn`) |
+|-|------------------------|---------------------------------------------------|
+| `<html lang>` | `en` | `bn` |
+| Title, description, `og:*` | English | Bangla (per-field fallback); fixed words from `FixedText` (`শপ \| {store}`) |
+| `og:locale` · `og:locale:alternate` | `en_US` · `bn_BD` | `bn_BD` · `en_US` |
+| Canonical | `…/product/x` | `…/product/x?lang=bn` (`lang` kept only when not the default) |
+| `<link rel="alternate" hreflang>` (indexable pages only) | `en` → `…/product/x`, `bn` → `…/product/x?lang=bn`, `x-default` → `…/product/x` | same |
+| JSON-LD | `inLanguage: "en"` on `WebSite`, `CollectionPage`, `BlogPosting` | `inLanguage: "bn"` |
+
+With `default_locale = bn` the roles swap (English URLs carry `?lang=en`; x-default = the Bangla URL). With Bangla off: no hreflang, no `og:locale:alternate`, `lang` ignored. `lang` does not make a listing noindex; other canonical rules are unchanged. Sitemaps (Bangla on): `<urlset>` declares `xmlns:xhtml` and each `<url>` lists `<xhtml:link rel="alternate" hreflang="en|bn|x-default" href="…"/>` (after any `image:image`); `<loc>` is the default language's URL.
+
+**Caching.** Server cache keys include the language — `storefront:{org}:v{version}:{locale}:{key}` — and the weak `ETag` hashes `{locale}|{body}`, so English and Bangla answers never share an entry or an ETag. HTTP caching rules are unchanged (the language is in the URL).
+
+Example — a category read in Bangla (`seo.title` falls back to the Bangla name; abridged, values illustrative):
+
+```http
+GET /api/v1/store/categories/grocery?lang=bn HTTP/1.1
+Host: shop.example.com
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Language: bn
+Cache-Control: public, max-age=60, stale-while-revalidate=300
+ETag: W/"5b0c…"
+
+{"success": true,
+ "data": {"slug": "grocery", "name": "মুদি পণ্য", "description_html": "<p>প্রতিদিনের বাজার</p>",
+          "seo": {"title": "মুদি পণ্য", "description": "প্রতিদিনের বাজার"}, "…": "…"},
+ "meta": {"request_id": "…"}}
+```
+
+The staff save that produced it (other Bangla fields kept; a blank `description_html` would remove that one):
+
+```http
+PUT /api/v1/online-catalog/categories/{categoryId}
+{"slug": "grocery", "is_visible": true, "translations": {"bn": {"name": "মুদি পণ্য", "description_html": "<p>প্রতিদিনের বাজার</p>"}}}
+→ 200 {"data": {"listing": {"slug": "grocery", "…": "…", "translations": {"bn": {"description_html": "<p>প্রতিদিনের বাজার</p>", "name": "মুদি পণ্য"}}}, "…": "…"}}
+```
 
 No new error codes or permissions.
 

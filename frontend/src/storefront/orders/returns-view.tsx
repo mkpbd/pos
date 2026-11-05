@@ -14,7 +14,7 @@ import type { Translate } from '../i18n/translate'
 import { formatPrice } from '../money'
 import { useNotice } from '../notices'
 import type { AccountOrderLine, AccountReturn, OrderReturnLine, OrderReturnSummary } from '../types'
-import { isCancellableReturn, returnErrorMessage, returnOrderNumber, useCancelReturnMutation } from './returns-api'
+import { isCancellableReturn, returnErrorMessage, returnOrderNumber, returnReasonLabel, returnStatusLabel, useCancelReturnMutation } from './returns-api'
 
 const STATUS_TONE: Record<string, string> = {
   requested: 'bg-sf-primary/20 text-sf-heading',
@@ -59,7 +59,7 @@ export function ReturnItem({
   showOrder = false,
   onCancel,
 }: {
-  ret: OrderReturnSummary & Partial<Pick<AccountReturn, 'order' | 'order_number' | 'rejection_reason' | 'reason_label' | 'refunded_at'>>
+  ret: OrderReturnSummary & Partial<Pick<AccountReturn, 'order' | 'order_number' | 'rejection_reason' | 'reason_code' | 'reason_label' | 'refunded_at'>>
   currency: string | null
   orderLines?: AccountOrderLine[]
   showOrder?: boolean
@@ -73,7 +73,7 @@ export function ReturnItem({
     <article className="flex flex-col gap-2 rounded-lg border border-sf-border p-4 text-sm" aria-label={t('orders.returns.aria', { number: ret.number })} data-testid="order-return">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-heading text-base font-bold text-sf-heading">{ret.number}</span>
-        <ReturnStatusBadge status={ret.status} label={ret.status_label} />
+        <ReturnStatusBadge status={ret.status} label={returnStatusLabel(t, ret.status, ret.status_label)} />
         <span>{rich(t('orders.returns.requestedAt'), { date: <time dateTime={ret.created_at}>{formatDateTime(ret.created_at)}</time> })}</span>
       </div>
       {orderNumber && (
@@ -96,7 +96,7 @@ export function ReturnItem({
           ))}
         </ul>
       )}
-      {ret.reason_label && <p>{t('orders.returns.reason', { reason: ret.reason_label })}</p>}
+      {returnReasonLabel(t, ret.reason_code, ret.reason_label) && <p>{t('orders.returns.reason', { reason: returnReasonLabel(t, ret.reason_code, ret.reason_label) ?? '' })}</p>}
       {refund && (
         <p className="font-semibold text-sf-heading" data-testid="return-refund">
           {refund}
