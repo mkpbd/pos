@@ -4,6 +4,7 @@ import { ArrowLeftIcon, CheckIcon, Loader2Icon, PencilIcon, PlusIcon, Trash2Icon
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -39,6 +40,7 @@ import {
   type ReturnReason,
   type ReturnStatus,
   type Settlement,
+  returnsListQuery,
 } from '@/features/returns/api'
 import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
 import { lineLabel, useSaleQuery, type SaleLine } from '@/features/sales/api'
@@ -178,11 +180,16 @@ export function ReturnsPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<ReturnStatus | 'all'>('all')
   const term = useDebouncedValue(search.trim())
-  const { data, error, isPending, refetch } = useReturnsQuery({ page, search: term || undefined, status: status === 'all' ? undefined : status })
+  const filters = { search: term || undefined, status: status === 'all' ? undefined : status }
+  const { data, error, isPending, refetch } = useReturnsQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Sales returns" description="Goods brought back against an invoice. Start a return from the invoice on the Sales page." />
+      <PageHeader
+        title="Sales returns"
+        description="Goods brought back against an invoice. Start a return from the invoice on the Sales page."
+        actions={<ExportMenu list="saleReturns" query={returnsListQuery(filters)} disabled={!data?.items.length} />}
+      />
       <Tabs defaultValue="returns">
         <TabsList>
           <TabsTrigger value="returns">Returns</TabsTrigger>

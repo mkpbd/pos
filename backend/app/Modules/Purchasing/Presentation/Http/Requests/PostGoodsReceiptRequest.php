@@ -2,6 +2,7 @@
 
 namespace App\Modules\Purchasing\Presentation\Http\Requests;
 
+use App\Modules\Organizations\Application\Support\OrganizationDate;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class PostGoodsReceiptRequest extends FormRequest
                     ->where('supplier_id', (string) $this->input('supplier_id'))
                     ->withMessage('This supplier invoice has already been recorded.'),
             ],
-            'invoice_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'invoice_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.app(OrganizationDate::class)->today()],
             'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:invoice_date'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'lines' => ['required', 'array', 'min:1', 'max:500'],
@@ -31,7 +32,7 @@ class PostGoodsReceiptRequest extends FormRequest
             'lines.*.tax_rate' => ['nullable', 'decimal:0,4', 'min:0', 'max:100'],
             'lines.*.batch_number' => ['nullable', 'string', 'max:64'],
             'lines.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
-            'lines.*.manufactured_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'lines.*.manufactured_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.app(OrganizationDate::class)->today()],
         ];
     }
 

@@ -9,13 +9,15 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "dedoc/scramble": "^0.13.52",
         "ezyang/htmlpurifier": "^4.19.1",
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
-        "predis/predis": "^3.7"
+        "openspout/openspout": "5.12.2",
+        "predis/predis": "^3.7",
+        "spatie/browsershot": "5.4.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

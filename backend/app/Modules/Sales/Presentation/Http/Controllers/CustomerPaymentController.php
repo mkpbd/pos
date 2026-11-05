@@ -8,7 +8,11 @@ use App\Modules\Sales\Application\Actions\ReceiveCustomerPayment;
 use App\Modules\Sales\Application\Queries\CustomerAccount;
 use App\Modules\Sales\Application\Services\SalesContext;
 use App\Modules\Sales\Infrastructure\Models\CustomerPayment;
+use App\Modules\Sales\Presentation\Http\Exports\CustomerPaymentsExport;
+use App\Modules\Sales\Presentation\Http\Exports\CustomerStatementExport;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Users\Application\Contracts\UserDirectory;
@@ -16,8 +20,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -36,7 +42,7 @@ class CustomerPaymentController
      *
      * Filters: `customer_id`, `branch_id`; `search` matches number or reference.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate(['customer_id' => ['sometimes', 'uuid'], 'branch_id' => ['sometimes', 'uuid']]);
         $accessible = $this->user($request)->accessibleBranchIds();
@@ -45,7 +51,11 @@ class CustomerPaymentController
             ->when($request->query('customer_id'), fn (Builder $q, string $v) => $q->where('customer_id', $v))
             ->when($request->query('branch_id'), fn (Builder $q, string $v) => $q->where('branch_id', $v));
 
-        $page = ListQuery::paginate($query, $request, sortable: ['created_at', 'amount'], searchable: ['number', 'reference']);
+        ListQuery::apply($query, $request, sortable: ['created_at', 'amount'], searchable: ['number', 'reference']);
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, CustomerPaymentsExport::class, RowSource::fromQuery($query, fn (Collection $payments) => $payments->map($this->presenter($payments))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
         $present = $this->presenter(collect($page->items()));
 
         return ApiResponse::paginated($page, fn (CustomerPayment $p) => new JsonResource($present($p)));
@@ -80,14 +90,19 @@ class CustomerPaymentController
      * balance (positive = owed by the customer). `from`/`to` limit the period. Needs
      * `sales.view` or `payments.view`.
      */
-    public function statement(Request $request, string $customerId, CustomerAccount $account): JsonResponse
+    public function statement(Request $request, string $customerId, CustomerAccount $account, ListExporter $exports, CustomerStatementExport $export): Response
     {
         if (! Gate::forUser($request->user())->any(['sales.view', 'payments.view'])) {
             throw new AccessDeniedHttpException;
         }
         $data = $request->validate(['from' => ['sometimes', 'date_format:Y-m-d'], 'to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:from']]);
 
-        return ApiResponse::success($account->statement($customerId, $data['from'] ?? null, $data['to'] ?? null));
+        $statement = $account->statement($customerId, $data['from'] ?? null, $data['to'] ?? null);
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, $export, RowSource::fromRows($export->rows($statement, $data['from'] ?? null, $data['to'] ?? null)));
+        }
+
+        return ApiResponse::success($statement);
     }
 
     /**

@@ -71,11 +71,16 @@ export const expensesKeys = {
   categories: (type?: EntryType) => ['expenses', 'categories', type ?? 'all'] as const,
 }
 
+/** Query string of GET /expenses — shared by the list and its export. */
+export function expensesListQuery(params: Omit<ExpensesParams, 'page'> & { page?: number }) {
+  return { ...params, voided: params.voided ? 'true' : undefined, sort: '-occurred_on' }
+}
+
 export function useExpensesQuery(params: ExpensesParams) {
   return useQuery<ExpensesPage>({
     queryKey: expensesKeys.list(params),
     queryFn: ({ signal }) =>
-      api.get<Expense[]>('/expenses', { signal, query: { ...params, voided: params.voided ? 'true' : undefined, sort: '-occurred_on' } }).then((res) => {
+      api.get<Expense[]>('/expenses', { signal, query: expensesListQuery(params) }).then((res) => {
         const meta = res.meta as ApiMeta & { totals?: { amount: string }; by_category?: ExpensesPage['byCategory'] }
         return { ...toPaginated(res), total: meta.totals?.amount ?? null, byCategory: meta.by_category ?? [] }
       }),

@@ -8,9 +8,12 @@ use App\Modules\Sales\Application\Queries\SalesSummary;
 use App\Modules\Sales\Application\Services\CustomerCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
 use App\Modules\Sales\Infrastructure\Models\Sale;
+use App\Modules\Sales\Presentation\Http\Exports\SalesExport;
 use App\Modules\Sales\Presentation\Http\Support\SalePresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +21,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Sales history, invoices (with receipt data), cancellation and the daily summary.
@@ -37,7 +42,7 @@ class SaleController
      * (calendar days in the organization's timezone); `search` matches the invoice number.
      * Users without `sales.view` (POS-only) see the sales they rang up.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'branch_id' => ['sometimes', 'uuid'],
@@ -61,7 +66,11 @@ class SaleController
             ->when($request->query('to'), fn (Builder $q, string $v) => $q->where('sold_at', '<', $day($v)->addDay()));
         $this->presenter->scopeVisible($query, $this->user($request));
 
-        $page = ListQuery::paginate($query, $request, sortable: ['sold_at', 'number', 'total'], searchable: ['number'], defaultSort: '-sold_at');
+        ListQuery::apply($query, $request, sortable: ['sold_at', 'number', 'total'], searchable: ['number'], defaultSort: '-sold_at');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, SalesExport::class, RowSource::fromQuery($query, fn (Collection $sales) => $sales->map($this->presenter->headers($sales))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
         $header = $this->presenter->headers(collect($page->items()));
 
         return ApiResponse::paginated($page, fn (Sale $s) => new JsonResource($header($s)));

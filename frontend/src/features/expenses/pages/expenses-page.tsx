@@ -4,6 +4,7 @@ import { AlertTriangleIcon, BanIcon, Loader2Icon, PencilIcon, PlusIcon, Trash2Ic
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -24,6 +25,7 @@ import {
   useCreateExpenseMutation,
   useDeleteExpenseCategoryMutation,
   useExpenseCategoriesQuery,
+  expensesListQuery,
   useExpensesQuery,
   useSaveExpenseCategoryMutation,
   useVoidExpenseMutation,
@@ -177,7 +179,8 @@ function EntriesTab({ type, canManage }: { type: EntryType; canManage: boolean }
   const term = useDebouncedValue(search.trim())
   const categories = useExpenseCategoriesQuery(type)
   const voidEntry = useVoidExpenseMutation()
-  const { data, error, isPending, refetch } = useExpensesQuery({ page, type, from, to, voided, expense_category_id: categoryId === ALL ? undefined : categoryId, search: term || undefined })
+  const filters = { type, from, to, voided, expense_category_id: categoryId === ALL ? undefined : categoryId, search: term || undefined }
+  const { data, error, isPending, refetch } = useExpensesQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-4">
@@ -202,7 +205,10 @@ function EntriesTab({ type, canManage }: { type: EntryType; canManage: boolean }
           <Switch id={`${type}-voided`} checked={voided} onCheckedChange={(v) => { setVoided(v); setPage(1) }} />
           <Label htmlFor={`${type}-voided`} className="font-normal">Voided</Label>
         </div>
-        {canManage && <Button className="ml-auto" onClick={() => setCreating(true)}><PlusIcon data-icon="inline-start" /> New {t.label.toLowerCase()}</Button>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ExportMenu list="expenses" query={expensesListQuery(filters)} disabled={!data?.items.length} />
+          {canManage && <Button onClick={() => setCreating(true)}><PlusIcon data-icon="inline-start" /> New {t.label.toLowerCase()}</Button>}
+        </div>
       </div>
 
       {data && data.total !== null && (

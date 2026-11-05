@@ -5,6 +5,7 @@ import { Loader2Icon, PlusIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { FormField } from '@/components/common/form-field'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -104,7 +105,12 @@ export function PaymentsPage() {
       <PageHeader
         title="Purchasing"
         description="Money paid to suppliers."
-        actions={can('purchases.pay') && <Button onClick={() => setRecording(true)}><PlusIcon data-icon="inline-start" /> Record payment</Button>}
+        actions={
+          <>
+            <ExportMenu list="supplierPayments" disabled={!data?.items.length} />
+            {can('purchases.pay') && <Button onClick={() => setRecording(true)}><PlusIcon data-icon="inline-start" /> Record payment</Button>}
+          </>
+        }
       />
       <SectionTabs tabs={PURCHASING_TABS} label="Purchasing sections" />
       {isPending ? (
@@ -178,7 +184,10 @@ export function SupplierStatementSheet({ supplierId, onOpenChange }: { supplierI
                   <div className="text-xs text-muted-foreground">Balance owed</div>
                   <div className="font-mono text-xl font-semibold">{formatMoney(data.closing_balance, currency)}</div>
                 </div>
-                {can('purchases.pay') && <Button size="sm" onClick={() => setPaying(true)}>Record payment</Button>}
+                <div className="flex flex-wrap items-center gap-2">
+                  {supplierId && <ExportMenu list="supplierStatement" pathParams={{ id: supplierId }} size="sm" />}
+                  {can('purchases.pay') && <Button size="sm" onClick={() => setPaying(true)}>Record payment</Button>}
+                </div>
               </div>
               <Table>
                 <TableHeader>

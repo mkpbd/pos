@@ -26,6 +26,26 @@ final class ListQuery
         array $searchable = [],
         string $defaultSort = '-created_at',
     ): LengthAwarePaginator {
+        return self::apply($query, $request, $sortable, $searchable, $defaultSort)->paginate(self::perPage($request));
+    }
+
+    /**
+     * Search and sort only — the query a list pages through, and its exports stream in full.
+     *
+     * @template TBuilder of Builder
+     *
+     * @param  TBuilder  $query
+     * @param  list<string>  $sortable
+     * @param  list<string>  $searchable
+     * @return TBuilder
+     */
+    public static function apply(
+        Builder $query,
+        Request $request,
+        array $sortable,
+        array $searchable = [],
+        string $defaultSort = '-created_at',
+    ): Builder {
         $search = trim((string) $request->query('search', ''));
         if ($search !== '' && $searchable !== []) {
             $query->where(function (Builder $q) use ($search, $searchable) {
@@ -42,8 +62,11 @@ final class ListQuery
         }
         $query->orderBy($column, str_starts_with($sort, '-') ? 'desc' : 'asc');
 
-        $perPage = max(1, min(self::MAX_PER_PAGE, (int) $request->query('per_page', 25)));
+        return $query;
+    }
 
-        return $query->paginate($perPage);
+    public static function perPage(Request $request): int
+    {
+        return max(1, min(self::MAX_PER_PAGE, (int) $request->query('per_page', 25)));
     }
 }

@@ -8,10 +8,14 @@ use App\Modules\Expenses\Application\Actions\VoidExpense;
 use App\Modules\Expenses\Domain\EntryType;
 use App\Modules\Expenses\Infrastructure\Models\Expense;
 use App\Modules\Expenses\Infrastructure\Models\ExpenseCategory;
+use App\Modules\Expenses\Presentation\Http\Exports\ExpensesExport;
+use App\Modules\Organizations\Application\Support\OrganizationDate;
 use App\Modules\Payments\Domain\PaymentMethod;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Users\Application\Contracts\UserDirectory;
@@ -21,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -42,7 +47,7 @@ class ExpenseController
      * number, party or reference. `meta.totals` sums the filtered entries; `meta.by_category`
      * breaks them down.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'type' => ['sometimes', Rule::enum(EntryType::class)],
@@ -68,11 +73,16 @@ class ExpenseController
             ->when($request->query('from'), fn (Builder $q, string $v) => $q->where('occurred_on', '>=', $v))
             ->when($request->query('to'), fn (Builder $q, string $v) => $q->where('occurred_on', '<=', $v));
 
+        $listed = ListQuery::apply(clone $query, $request, sortable: ['occurred_on', 'created_at', 'amount', 'number'], searchable: ['number', 'party', 'reference'], defaultSort: '-occurred_on');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, app(ExpensesExport::class)->forType($request->query('type')), RowSource::fromQuery($listed, fn (Collection $expenses) => $expenses->map($this->presenter($expenses))));
+        }
+
         $byCategory = (clone $query)->groupBy('expense_category_id')->selectRaw('expense_category_id, SUM(amount) as total, COUNT(*) as entries')->get();
         $names = ExpenseCategory::query()->whereKey($byCategory->pluck('expense_category_id'))->pluck('name', 'id');
         $total = $byCategory->reduce(fn (string $sum, $row) => Decimal::add($sum, Decimal::round((string) $row->getAttribute('total'), 2), 2), '0.00');
 
-        $page = ListQuery::paginate($query, $request, sortable: ['occurred_on', 'created_at', 'amount', 'number'], searchable: ['number', 'party', 'reference'], defaultSort: '-occurred_on');
+        $page = $listed->paginate(ListQuery::perPage($request));
         $present = $this->presenter(collect($page->items()));
 
         return ApiResponse::paginated($page, fn (Expense $e) => new JsonResource($present($e)), [
@@ -111,7 +121,7 @@ class ExpenseController
             'expense_category_id' => ['required', 'uuid'],
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:99999999'],
             'method' => ['required', Rule::enum(PaymentMethod::class)],
-            'occurred_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'occurred_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.app(OrganizationDate::class)->today()],
             'reference' => ['sometimes', 'nullable', 'string', 'max:100'],
             'party' => ['sometimes', 'nullable', 'string', 'max:150'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ArrowLeftIcon, BanIcon, BanknoteIcon, PercentIcon, PrinterIcon, ReceiptTextIcon, TrendingUpIcon, Undo2Icon, WalletIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -14,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useCan } from '@/features/auth/use-auth'
-import { lineLabel, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleStatus } from '@/features/sales/api'
+import { lineLabel, salesListQuery, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleStatus } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
 import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
@@ -70,11 +71,18 @@ export function SalesPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<SaleStatus | 'all'>('all')
   const term = useDebouncedValue(search.trim())
-  const { data, error, isPending, refetch } = useSalesQuery({ page, search: term || undefined, status: status === 'all' ? undefined : status, from: date, to: date })
+  const filters = { search: term || undefined, status: status === 'all' ? undefined : status, from: date, to: date }
+  const { data, error, isPending, refetch } = useSalesQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Sales" description="Daily summary and sales history of your branches." actions={can('pos.sell') && <Button asChild><Link to="/pos">Open POS terminal</Link></Button>} />
+      <PageHeader title="Sales" description="Daily summary and sales history of your branches." actions={
+          <>
+            <ExportMenu list="sales" query={salesListQuery(filters)} disabled={!data?.items.length} />
+            {can('pos.sell') && <Button asChild><Link to="/pos">Open POS terminal</Link></Button>}
+          </>
+        }
+      />
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="sales-date">Day</Label>

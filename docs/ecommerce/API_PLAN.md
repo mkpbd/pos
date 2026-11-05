@@ -30,7 +30,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 
 | Method & path | Auth | Phase | Notes |
 |---------------|------|-------|-------|
-| GET `/store/bootstrap` | P | E4 | Settings, theme tokens, menus, announcement, locales; `ETag` (*E12a: weak ETag from the `storefront.cache` middleware, `private, no-cache`; `store.allow_indexing`; cached server-side per content version*) |
+| GET `/store/bootstrap` | P | E4 | Settings, theme tokens, menus, announcement, locales; `ETag` (*E12a: weak ETag from the `storefront.cache` middleware, `private, no-cache`; `store.allow_indexing`; cached server-side per content version; E12b: `store.locales`, `store.default_locale`, `store.bangla_digits`, `locale`; cached per language*) |
 | GET `/store/homepage` | P | E5 | Enabled, in-window sections resolved with items; `ETag` (*E12a: weak ETag, `public, max-age=60, stale-while-revalidate=300` for anonymous visitors; the other public catalog, review, page, FAQ and blog reads too; cached server-side*) |
 | GET `/store/banners?placement=` | P | E5 | Active, scheduled banners |
 | GET `/store/pages/{slug}` | P | E5 | Published CMS page |
@@ -45,7 +45,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | GET `/store/products/{slug}/related` | P | E6 | Related + frequently bought together |
 | GET `/store/products/{slug}/reviews` | P | E9 | Approved only, paginated (*E9 ✅: `sort=newest\|highest\|lowest`, `rating=`, 10 per page; author first name + last initial; top-level `summary {average, count, distribution}` over all approved reviews; product detail gains `rating {average, count} \| null`, cards none until E10*) |
 | GET `/store/search/suggest?q=` | P | E6 | ≤ 8 products + categories, `pg_trgm` (*E6: ≤ 6 products + ≤ 4 categories, substring match; trigram index only speeds it up, no similarity ranking*) |
-| GET `/store/geo/divisions` · `/districts?division=` · `/areas?district=` | P | E7 | Global reference data, long cache (*E7: divisions and districts only, `max-age=86400`; `/areas` waits for an upazila/thana dataset — addresses carry a free-text `area`*) |
+| GET `/store/geo/divisions` · `/districts?division=` · `/areas?district=` | P | E7 | Global reference data, long cache (*E7: divisions and districts only, `max-age=86400`; `/areas` waits for an upazila/thana dataset — addresses carry a free-text `area`; E12b: `?lang=bn` → `name` in Bangla, sorted by it*) |
 | POST `/store/account/register` · `login` · `logout` · `forgot-password` · `reset-password` · `verify-email` | P/C | E7 | `throttle:customer-auth` (*E7: plus GET `/store/account/me` (null for guests) and POST `/store/account/verification-notification`; `logout` unthrottled beyond `storefront`, `verify-email` on `storefront-write`; register/login/reset return `{customer, merge}`; reset uses an own token table, not a broker*) |
 | GET/PUT `/store/account/profile` · PUT `/store/account/password` | C | E7 | |
 | GET/POST/PUT/DELETE `/store/account/addresses[/{id}]` | C | E7 | (*E7: changes use PATCH, not PUT; max 10, `ADDRESS_LIMIT_REACHED`*) |
@@ -72,7 +72,7 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 
 | Resource | Endpoints | Permission | Phase |
 |----------|-----------|------------|-------|
-| Storefront settings | GET/PATCH `/storefront/settings` (*E12a: `allow_indexing`*) | storefront.view / .manage | E4 |
+| Storefront settings | GET/PATCH `/storefront/settings` (*E12a: `allow_indexing`; E12b: `bangla_enabled`, `default_locale`, `bangla_digits`*) | storefront.view / .manage | E4 |
 | Domains | GET/POST `/storefront/domains`, PATCH (make primary)/DELETE `/{id}` | storefront.manage | E4 |
 | Theme | GET/PUT `/storefront/theme`, PUT `/storefront/theme/custom-css` | storefront.manage / .custom_css | E4 |
 | Menus | GET/POST `/storefront/menus`, GET/PATCH/DELETE `/{id}`, PUT `/storefront/menus/{id}/items` (whole tree, ordered) (*E11: item types `blog`, `blog_category`, `blog_post`; link targets gain `blog_categories`, `blog_posts`*) | storefront.manage | E4 |
@@ -98,6 +98,8 @@ Phase **E3** draft. Becomes part of `docs/API_DOCUMENTATION.md` phase by phase a
 | Online returns | GET `/web-orders/returns`, POST `/web-orders/{id}/returns` (I), POST `/web-orders/returns/{id}/approve` (I) / `/reject` | web_orders.refund | E10 (*E10b ✅ under `/web-order-returns` instead: GET `/web-order-returns`, `/web-order-returns/{id}` (`web_orders.view`); POST `/web-orders/{id}/returns` (staff, `override_window` + note after the window), POST `/web-order-returns/{id}/approve`, `/reject`, `/receive` (restock per line), `/refund` (`cash\|bank_transfer\|mobile_banking`) — all I and `web_orders.refund`*) |
 | Reviews | GET `/reviews`, POST `/reviews/{id}/approve` / `/reject` | reviews.moderate | E9/E10 (*E9 ✅ moderation: GET `/reviews` with `reviews.view` (new; `status`, `rating`, `search`, pending first, `meta.pending_count`), approve / reject `{reason?}` (idempotent by state) and DELETE `/reviews/{id}` with `reviews.moderate`; review media and the rest E10*) |
 | AI generations | POST `/ai/generations` (description, seo, category suggestion), POST `/{id}/approve` / `/reject` | online_catalog.manage + ai.use | E13 |
+
+*As built (E12b, localization — ADR-011):* no new endpoint. Every public `/store/*` read takes `?lang=en|bn` (the only source of the language for the API; the cookie is read by the HTML shell and sitemaps only) and answers with `Content-Language`; texts are localized in place with per-field fallback to English, slugs unchanged, search over base and Bangla names, geography `name` in Bangla with `lang=bn`. `GET /store/bootstrap` adds `store.locales`, `store.default_locale`, `store.bangla_digits` and `locale`; the shopper's order adds `locale`, the account profile `preferred_locale`. Staff editors of product / category / brand listings, pages, FAQ, blog posts and categories, menu items, banners, homepage sections, the theme announcement, delivery methods, payment methods and promotions return and accept `translations: {"bn": {…}}` (partial; blank removes; `null` clears; menu items and the announcement are replaced with the saved document). Validation errors under `translations`, `translations.bn`, `translations.bn.<field>` — no new error code or permission. Details: API_DOCUMENTATION.md (E12b).
 
 ## 4. New error codes
 

@@ -850,3 +850,27 @@ test('a shopper switches the store to Bangla: menus, products, order status and 
   await page.getByTestId('language-switcher').first().getByRole('button', { name: 'English' }).click()
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 })
+
+test('an admin list exports to Excel and PDF with the current filters', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin export flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  await page.getByRole('link', { name: 'Products' }).first().click()
+  await expect(page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })).toBeVisible()
+
+  for (const [item, extension] of [['Excel (.xlsx)', 'xlsx'], ['PDF', 'pdf']] as const) {
+    await page.getByRole('button', { name: 'Export' }).click()
+    const download = page.waitForEvent('download')
+    await page.getByRole('menuitem', { name: item }).click()
+    const file = await download
+    expect(file.suggestedFilename()).toMatch(new RegExp(String.raw`^products-.+-\d{8}-\d{4}\.` + extension + '$'))
+    const path = await file.path()
+    const { size } = await import('node:fs').then((fs) => fs.promises.stat(path))
+    expect(size).toBeGreaterThan(extension === 'pdf' ? 5_000 : 1_000)
+  }
+})

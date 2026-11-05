@@ -9,15 +9,20 @@ use App\Modules\Payments\Domain\PaymentDirection;
 use App\Modules\Payments\Domain\SessionStatus;
 use App\Modules\Payments\Infrastructure\Models\CashRegister;
 use App\Modules\Payments\Infrastructure\Models\RegisterSession;
+use App\Modules\Payments\Presentation\Http\Exports\RegisterSessionsExport;
 use App\Modules\Payments\Presentation\Http\Support\PaymentsPresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Register sessions (shifts): open, cash in/out, close with a cash count, and reports.
@@ -32,7 +37,7 @@ class RegisterSessionController
      * Filters: `branch_id`, `cash_register_id`, `status`, `opened_by`. With `cash_registers.view`
      * every session of the accessible branches, otherwise one's own.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'branch_id' => ['sometimes', 'uuid'],
@@ -47,7 +52,11 @@ class RegisterSessionController
             ->when($request->query('status'), fn (Builder $q, string $v) => $q->where('status', $v));
         $this->presenter->scopeVisibleSessions($query, $this->user($request));
 
-        $page = ListQuery::paginate($query, $request, sortable: ['opened_at', 'number'], searchable: ['number'], defaultSort: '-opened_at');
+        ListQuery::apply($query, $request, sortable: ['opened_at', 'number'], searchable: ['number'], defaultSort: '-opened_at');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, RegisterSessionsExport::class, RowSource::fromQuery($query, fn (Collection $sessions) => $sessions->map($this->presenter->sessionHeaders($sessions))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
         $header = $this->presenter->sessionHeaders(collect($page->items()));
 
         return ApiResponse::paginated($page, fn (RegisterSession $s) => new JsonResource($header($s)));

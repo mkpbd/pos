@@ -2,6 +2,8 @@
 
 namespace App\Modules\Users\Presentation\Http\Controllers;
 
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Users\Application\Actions\CreateUser;
@@ -9,13 +11,16 @@ use App\Modules\Users\Application\Actions\UpdateUser;
 use App\Modules\Users\Application\DTOs\UserData;
 use App\Modules\Users\Domain\Enums\UserStatus;
 use App\Modules\Users\Infrastructure\Models\User;
+use App\Modules\Users\Presentation\Http\Exports\UsersExport;
 use App\Modules\Users\Presentation\Http\Requests\StoreUserRequest;
 use App\Modules\Users\Presentation\Http\Requests\UpdateUserRequest;
 use App\Modules\Users\Presentation\Http\Resources\UserResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 class UserController
 {
@@ -24,7 +29,7 @@ class UserController
      *
      * Filters: `status`, `role_id`, `branch_id`; `search` matches name and email.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'status' => ['sometimes', Rule::enum(UserStatus::class)],
@@ -38,10 +43,12 @@ class UserController
             ->when($request->query('role_id'), fn (Builder $q, string $roleId) => $q->whereHas('roles', fn (Builder $r) => $r->whereKey($roleId)))
             ->when($request->query('branch_id'), fn (Builder $q, string $branchId) => $q->whereHas('branchMemberships', fn (Builder $b) => $b->where('branch_id', $branchId)));
 
-        return ApiResponse::paginated(
-            ListQuery::paginate($query, $request, sortable: ['name', 'email', 'created_at', 'last_login_at'], searchable: ['name', 'email'], defaultSort: 'name'),
-            UserResource::class,
-        );
+        ListQuery::apply($query, $request, sortable: ['name', 'email', 'created_at', 'last_login_at'], searchable: ['name', 'email'], defaultSort: 'name');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, UsersExport::class, RowSource::fromQuery($query, fn (Collection $users) => $users->map(fn (User $u) => new UserResource($u))));
+        }
+
+        return ApiResponse::paginated($query->paginate(ListQuery::perPage($request)), UserResource::class);
     }
 
     public function store(StoreUserRequest $request, CreateUser $createUser): JsonResponse

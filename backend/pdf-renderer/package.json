@@ -1,0 +1,12 @@
+{
+  "name": "pos-pdf-renderer",
+  "private": true,
+  "description": "Drives headless Chrome for PDF exports (spatie/browsershot). Install with PUPPETEER_SKIP_DOWNLOAD=1 npm ci: Chrome is never downloaded; config/pdf.php points at an installed Chrome/Chromium.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "puppeteer-core": "25.16.0"
+  }
+}

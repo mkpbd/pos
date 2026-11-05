@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -20,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useSupplierBalancesQuery } from '@/features/purchasing/api'
 import { SupplierStatementSheet } from '@/features/purchasing/pages/payment-pages'
-import { useArchiveSupplierMutation, useSaveSupplierMutation, useSuppliersQuery, type Supplier } from '@/features/suppliers/api'
+import { supplierListQuery, useArchiveSupplierMutation, useSaveSupplierMutation, useSuppliersQuery, type Supplier } from '@/features/suppliers/api'
 import { handleFormError } from '@/lib/forms'
 import { formatMoney } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -129,7 +130,8 @@ export function SuppliersPage() {
   const [statementFor, setStatementFor] = useState<string | null>(null)
   const debouncedSearch = useDebouncedValue(search)
   const archive = useArchiveSupplierMutation()
-  const { data, error, isPending, refetch } = useSuppliersQuery({ page, search: debouncedSearch || undefined, archived })
+  const filters = { search: debouncedSearch || undefined, archived }
+  const { data, error, isPending, refetch } = useSuppliersQuery({ page, ...filters })
   const balances = useSupplierBalancesQuery(data?.items.map((s) => s.id) ?? [], canViewAccounts)
   const currency = me.organization?.base_currency
   const showActions = canManage || canViewAccounts
@@ -139,7 +141,12 @@ export function SuppliersPage() {
       <PageHeader
         title="Suppliers"
         description="Who you buy from and what you owe them."
-        actions={canManage && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New supplier</Button>}
+        actions={
+          <>
+            <ExportMenu list="suppliers" query={supplierListQuery(filters)} disabled={!data?.items.length} />
+            {canManage && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New supplier</Button>}
+          </>
+        }
       />
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-sm">

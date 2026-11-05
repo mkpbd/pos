@@ -3,12 +3,16 @@
 namespace App\Modules\Audit\Presentation\Http\Controllers;
 
 use App\Modules\Audit\Infrastructure\Models\AuditLog;
+use App\Modules\Audit\Presentation\Http\Exports\AuditLogsExport;
 use App\Modules\Audit\Presentation\Http\Resources\AuditLogResource;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\Response;
 
 class AuditLogController
 {
@@ -18,7 +22,7 @@ class AuditLogController
      * Filters: `action` (exact or prefix with `*`, e.g. `user.*`), `user_id`, `subject_type`,
      * `subject_id`, `from`/`to` (dates, inclusive).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports, AuditLogsExport $export): Response
     {
         $request->validate([
             'action' => ['sometimes', 'string', 'max:100', 'regex:/^[a-z_.]+\*?$/'],
@@ -41,6 +45,11 @@ class AuditLogController
             ->when($request->query('from'), fn (Builder $q, string $v) => $q->where('created_at', '>=', $v))
             ->when($request->query('to'), fn (Builder $q, string $v) => $q->where('created_at', '<', now()->parse($v)->addDay()->startOfDay()));
 
-        return ApiResponse::paginated(ListQuery::paginate($query, $request, sortable: ['created_at']), AuditLogResource::class);
+        ListQuery::apply($query, $request, sortable: ['created_at']);
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, $export, RowSource::fromQuery($query, fn (Collection $logs) => $export->present($logs)));
+        }
+
+        return ApiResponse::paginated($query->paginate(ListQuery::perPage($request)), AuditLogResource::class);
     }
 }

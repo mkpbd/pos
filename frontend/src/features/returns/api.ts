@@ -130,10 +130,15 @@ export type ReturnsListParams = {
   per_page?: number
 }
 
+/** Query string of GET /returns — shared by the list and its export. */
+export function returnsListQuery(params: Omit<ReturnsListParams, 'page'> & { page?: number }) {
+  return { ...params, sort: '-requested_at' }
+}
+
 export function useReturnsQuery(params: ReturnsListParams) {
   return useQuery<Paginated<SaleReturnHeader>>({
     queryKey: returnsKeys.list(params),
-    queryFn: ({ signal }) => api.get<SaleReturnHeader[]>('/returns', { signal, query: { ...params, sort: '-requested_at' } }).then(toPaginated),
+    queryFn: ({ signal }) => api.get<SaleReturnHeader[]>('/returns', { signal, query: returnsListQuery(params) }).then(toPaginated),
     placeholderData: (previous) => previous,
   })
 }

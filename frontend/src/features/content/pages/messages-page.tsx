@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { MailIcon, SearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
@@ -62,11 +63,12 @@ export function MessagesPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const debounced = useDebouncedValue(search, 300)
-  const messages = useContactMessagesQuery({ page, search: debounced || undefined, status: filter === 'all' ? undefined : filter })
+  const filters = { search: debounced || undefined, status: filter === 'all' ? undefined : filter }
+  const messages = useContactMessagesQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
-      <ContentHeader />
+      <ContentHeader actions={<ExportMenu list="contactMessages" query={filters} disabled={!messages.data?.items.length} />} />
       <Card>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">

@@ -8,14 +8,19 @@ use App\Modules\Orders\Domain\RefundMethod;
 use App\Modules\Orders\Domain\ReturnStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderReturn;
+use App\Modules\Orders\Presentation\Http\Exports\WebOrderReturnsExport;
 use App\Modules\Orders\Presentation\Http\Support\ReturnPresenter;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Online returns for staff (E10b). Viewing needs `web_orders.view`; creating a return and
@@ -34,7 +39,7 @@ class WebOrderReturnController
      * reason_code, reason_label, requested_by, refund_amount, currency, created_at}`.
      * `meta.status_counts`: `{all, <every status>: n}` for the search without `status`.
      */
-    public function index(Request $request, CustomerDirectory $customers, TenantContext $tenant): JsonResponse
+    public function index(Request $request, CustomerDirectory $customers, TenantContext $tenant, ListExporter $exports): Response
     {
         $request->validate([
             'status' => ['sometimes', 'nullable', Rule::enum(ReturnStatus::class)],
@@ -60,12 +65,23 @@ class WebOrderReturnController
             $statusCounts[$status->value] = (int) ($counts[$status->value] ?? 0);
         }
 
-        $page = $filtered()->with('order')
+        $listed = $filtered()->with('order')
             ->when($request->query('status'), fn (Builder $q, string $v) => $q->where('status', $v))
-            ->orderByDesc('created_at')->orderByDesc('id')
-            ->paginate(max(1, min(100, (int) $request->query('per_page', 25))));
-        $customerIds = collect($page->items())->map(fn (OrderReturn $r) => $r->order->customer_id)->filter()->unique()->values()->all();
-        $names = $customerIds === [] ? [] : $customers->summaries($tenant->requireOrganization(), $customerIds);
+            ->orderByDesc('created_at')->orderByDesc('id');
+        $customerNames = function (Collection $returns) use ($customers, $tenant): array {
+            $customerIds = $returns->map(fn (OrderReturn $r) => $r->order->customer_id)->filter()->unique()->values()->all();
+
+            return $customerIds === [] ? [] : $customers->summaries($tenant->requireOrganization(), $customerIds);
+        };
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, WebOrderReturnsExport::class, RowSource::fromQuery($listed, function (Collection $returns) use ($customerNames) {
+                $names = $customerNames($returns);
+
+                return $returns->map(fn (OrderReturn $r) => ReturnPresenter::row($r, $names));
+            }));
+        }
+        $page = $listed->paginate(max(1, min(100, (int) $request->query('per_page', 25))));
+        $names = $customerNames(collect($page->items()));
 
         return ApiResponse::paginated($page, fn (OrderReturn $r) => new JsonResource(ReturnPresenter::row($r, $names)), ['status_counts' => $statusCounts]);
     }

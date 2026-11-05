@@ -52,6 +52,8 @@ No column is renamed or dropped. The only change to an existing constraint is th
 - `homepage_sections` — type (`hero_slider`, `banner_grid`, `category_strip`, `category_showcase`, `category_tabs`, `product_carousel`, `product_grid`, `product_tabs`, `hot_deals`, `brand_strip`, `testimonials`, `features_strip`, `blog_posts`, `newsletter`, `rich_text` — catalogue from UI_REFERENCE_ANALYSIS §5), title, subtitle, translations jsonb, `config jsonb` (layout key, limit, columns, source `manual|new_arrivals|best_sellers|featured|on_sale|category`, category_id, tabs, background color/media, promotion_id for countdown, inline items for testimonials/features), is_enabled, starts_at, ends_at, sort_order. Config validated per type by a PHP schema class. *As built (E11): `blog_posts` config `{category_id: uuid|null, limit 3–12 (default 3), view_all_url (default /blog, null = no link)}`.*
 - `homepage_section_items` — section_id, item_type `product|category|brand|banner`, item_id uuid, sort_order. Unique `(section_id, item_type, item_id)`.
 
+*As built (E12b, `2026_11_05_100200_add_languages_to_storefront`):* `storefront_settings.default_locale` (varchar(2), default `en`) arrived with `bangla_enabled` (default true) and `bangla_digits` (default false; digits are a store setting, not a theme one) and a PostgreSQL CHECK (`en|bn`, `bn` only with Bangla on). `menu_items.translations`, `banners.translations` and `homepage_sections.translations` (jsonb, nullable, CHECK: object) as planned; section config texts (`rich_text` `body_html`, `newsletter` `text` / `button_label`) are flat keys of `translations.bn`, not nested in `config`. The announcement's translations live in `theme_settings.settings.announcement.translations`.
+
 ### OnlineCatalog
 - `product_listings` — product_id **unique**, slug (unique per org, `lower`), is_published, published_at, unpublished_at (schedule), is_featured, is_new_until date, short_description, description_html (purified), specifications jsonb `[{label,value}]`, shipping_note, seo_title, seo_description, og_media_id, translations jsonb, sort_weight. Index `(organization_id, is_published, published_at)`.
 - `variant_listings` — variant_id **unique**, compare_at_price NUMERIC(18,2) NULL (CHECK > 0), image ids jsonb (ordered `product_images` ids).
@@ -61,6 +63,8 @@ No column is renamed or dropped. The only change to an existing constraint is th
 - `related_products` — product_id, related_product_id, kind `related|frequently_bought`, sort_order. PK `(product_id, related_product_id, kind)`.
 
 *As built in E6* (see DATABASE_DESIGN.md): `product_listings` has no `shipping_note`, `og_media_id` or `translations` yet (SEO image = first product image; translations E12) and is indexed `(organization_id, is_published)`; `variant_listings.image_id` is a single nullable FK to `product_images` instead of an ordered id list; `category_listings` uses `is_visible` instead of `show_in_menu` (menus link categories explicitly) and has no `translations`; `product_stats` has no rating columns yet (E10) and adds `organization_id`; `related_products` also carries `organization_id`.
+
+*As built (E12b, `2026_11_05_100000_add_translations_to_listings`):* `translations` jsonb (nullable, PostgreSQL CHECK: object) on `product_listings`, `category_listings` **and** `brand_listings`; the translated `name` of a listing overrides the product / category / brand name on the storefront (the base name stays in Products / Catalog). No index on the column.
 
 ### Catalog (extension)
 - `attributes` — name (unique per org, lower), slug, display `text|swatch|button`, is_filterable, sort_order.
@@ -76,6 +80,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 *As built (E7):* `customer_accounts` has no `phone_verified_at` (no phone OTP yet) and adds `email_verification_token_hash` / `email_verification_sent_at` (24-hour link); the e-mail index is a plain `(organization_id, lower(email))` unique index (e-mail is required). `customer_password_reset_tokens` is keyed `(organization_id, email)` — one live token per address — and replaces a Laravel password broker. `customer_addresses` stores a free-text `area` (≤ 100) instead of `area_id`, and references `geo_divisions` / `geo_districts` directly.
 
+*As built (E12b, `2026_11_05_100700_add_preferred_locale_to_customer_accounts`):* `customer_accounts.preferred_locale` varchar(2) NULL (CHECK `en|bn`), the language of the last sign-up / sign-in, for E13 e-mails.
+
 ### Shipping
 - `geo_divisions` (8), `geo_districts` (64), `geo_areas` (upazila/thana, admin-extendable) — **global reference tables** (no organization_id), name_en, name_bn, code. Seeded from an openly licensed dataset (source to be confirmed in E8).
 
@@ -88,6 +94,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 *As built (E8a):* `shipping_zones` adds sort_order; `shipping_zone_districts` has its own id and organization_id and a **database** unique `(organization_id, district_id)` besides the app check (`DISTRICT_IN_OTHER_ZONE`). `shipping_methods` is flat-rate only — no `code`, `rate_type` or `per_kg_fee` (`fee` instead of `base_fee`) — and adds a description; CHECKs on amounts and ETA (≤ 30 days, min ≤ max) on PostgreSQL. `couriers`, `shipments` and `shipment_events` wait for E10; until then the order stores `courier_name` and `tracking_number`.
 
 *As built (E10a):* `couriers` (Shipping) adds phone, sort_order and a case-insensitive unique name; the template must be an http(s) URL containing `{tracking}`. `shipments` and `shipment_events` live in the **Orders** module (not Shipping): one shipment per order (unique `order_id`), statuses `handed_over|in_transit|delivered|returned` (no `pending` or `failed`), courier name snapshot, `returned_at`, no `notes` (the hand-over note is the first event's). New `cod_remittances` + `cod_remittance_lines` (Orders; append-only, an order remitted once). The order keeps `courier_name` and `tracking_number`. Details: [DATABASE_DESIGN.md](../DATABASE_DESIGN.md) (E10a).
+
+*As built (E12b, `2026_11_05_100300_add_translations_to_shipping_methods`):* `shipping_methods.translations` jsonb (name, description). Geography unchanged (`name_bn` since E7).
 
 ### Cart
 - `carts` — customer_id NULL, token_hash (guest cookie, unique), currency, coupon_code NULL, expires_at, converted_order_id NULL. Partial unique: one active cart per customer `WHERE converted_order_id IS NULL AND customer_id IS NOT NULL`.
@@ -105,6 +113,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `coupons` — promotion_id, code (unique per org, lower), usage_limit, used_count (projection), is_active.
 - `promotion_redemptions` — promotion_id, coupon_id NULL, order_id, customer_id NULL, amount. Append-only; counted under a lock on the coupon row at order placement.
 
+*As built (E12b, `2026_11_05_100500_add_translations_to_promotions`):* `promotions.translations` jsonb (name, description; the description is not shown to shoppers yet).
+
 ### Orders
 - `orders` — number (`WEB-000001`, `SequenceGenerator`), customer_id, customer_account_id NULL (NULL = guest), branch_id + store_id (fulfilment), status `pending_payment|confirmed|processing|shipped|delivered|cancelled|failed|returned`, payment_status `unpaid|partially_paid|paid|refunded|partially_refunded`, payment_method_code, shipping_method_id, currency, tax_mode snapshot, subtotal, discount_total, tax_total, shipping_total, cod_fee, total, paid_total, refunded_total, cost_total, coupon_code, notes, placed_at, expires_at, cancelled_at/by/reason, ip, user_agent. Indexes `(organization_id, status, placed_at)`, `(organization_id, customer_id, placed_at)`.
 - `order_lines` — snapshot like `sale_lines` (product/variant name, SKU, option_values, image path), quantity, unit_price, compare_at_price, discount_amount, net_amount, tax_rate, tax_amount, line_total, unit_cost, cost_total. Append-only trigger.
@@ -117,6 +127,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 *As built (E10b):* `order_returns` (number `RTN-WEB-000001`, sequence key `order_return`; status `requested|approved|received|refunded|rejected|cancelled`; reason code; customer/staff notes; `requested_by customer|staff` and `requested_by_user_id`; `override_window`; `items_amount` + `shipping_refund` = `refund_amount`; refund method `cash|bank_transfer|mobile_banking` and reference; per-step times and actors), `order_return_lines` (immutable `requested_quantity`, approved `quantity`, amount/tax/cost, `restock` decided at receipt, `restocked_quantity`; guard trigger: no delete, identity columns fixed), the append-only `order_return_line_stock` (allocation, batch, unit cost, movement id per restocked piece) and the append-only `order_return_history`. **No `order_refunds` table**: the refund fields are on the return and the money is a `payments` row (`online_order_refund`, out). `orders.refunded_total` (CHECK `0 ≤ refunded_total ≤ paid_total`); `payment_status` gains `partially_refunded|refunded` (no CHECK list). `storefront_settings.return_window_days` (0–60, default 7). Refunds are manual only (no gateways yet, E8c). See DATABASE_DESIGN.md "E-commerce E10b".
 
+*As built (E12b, `2026_11_05_100600_add_locale_to_orders`):* `orders.locale` varchar(2) NOT NULL default `en` (CHECK `en|bn`), the checkout's language; snapshots stay in the base language.
+
 ### OnlinePayments
 - `payment_gateways` — code `cod|bank_transfer|sslcommerz|bkash|nagad`, display_name, is_enabled, mode `sandbox|live`, credentials **encrypted text**, settings jsonb (bank details text, COD limits), sort_order. Unique `(organization_id, code)`.
 - `payment_intents` — order_id, gateway_code, amount, currency, status `created|pending|succeeded|failed|cancelled|expired|refunded`, provider_reference (session/payment id), idempotency_key, verified_at. Unique `(gateway_code, provider_reference)` where not null.
@@ -124,6 +136,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `webhook_receipts` — gateway_code, provider_event_id unique per gateway, payload hash, processed_at — idempotent webhook processing.
 
 *As built (E8a):* `payment_gateways` holds only `cod` and `bank_transfer` (no `mode`, no credentials; `settings` json: `max_order_total` / `hold_hours`; `instructions` text for bank details), rows created with defaults on first use. `payment_intents`, `payment_transactions` and `webhook_receipts` arrive with the online gateways (E8c).
+
+*As built (E12b, `2026_11_05_100400_add_translations_to_payment_gateways`):* `payment_gateways.translations` jsonb (`display_name`, `instructions`).
 
 ### Reviews
 - `reviews` — product_id, customer_id, order_line_id NULL (verified purchase), rating smallint CHECK 1–5, title, body, status `pending|approved|rejected`, moderated_by/at. Unique `(customer_id, product_id)`.
@@ -136,6 +150,8 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 - `blog_posts` — category_id, slug unique per org, title, excerpt, body_html, cover_media_id, author_user_id, status, published_at, seo fields, translations jsonb, soft delete. *As built (E11): no `translations` (E12); category_id → blog_categories NULL on delete (soft delete of a category also nulls its posts in the action), cover_media_id → media NULL on delete (posts that are not deleted protect their cover through `MediaReferences`), author_user_id → users NULL on delete; title varchar(160), excerpt varchar(300), seo_title varchar(70), seo_description varchar(160), status `draft|published` (scheduled = published with a future `published_at`, derived), new `reading_minutes` smallint (≥ 1); unique `(organization_id, lower(slug)) WHERE deleted_at IS NULL`; indexes `(organization_id, status, published_at)`, `(organization_id, category_id)`; PostgreSQL CHECKs status, slug pattern, `reading_minutes ≥ 1`, published needs `published_at`.*
 - `contact_messages` — name, email, phone, subject, message, ip, handled_at/by.
 - `newsletter_subscribers` — email unique per org, status `subscribed|unsubscribed`, confirmed_at, unsubscribe_token.
+
+*As built (E12b, `2026_11_05_100100_add_translations_to_content`):* `translations` jsonb (nullable, CHECK: object) on `cms_pages`, `faq_items`, `blog_categories` and `blog_posts` (the E11 notes deferred it). FAQ translates `question` and `answer_html`.
 
 ### Media
 - `media` — disk, path, original_name, mime_type, size, width, height, alt, renditions jsonb `{thumb, medium, large}`, checksum (sha256, dedupe per org), uploaded_by. Referenced by FK with `ON DELETE RESTRICT` (`IN_USE` on delete, like Catalog).
@@ -152,4 +168,4 @@ Product options remain `products.options` jsonb; the editor offers dictionary va
 
 ## 5. Migration order
 
-E4 Storefront + Media → E5 Cms (pages needed by menus) → E6 OnlineCatalog + Catalog attributes → E7 CustomerAccounts/addresses + Cart → E8 Shipping + Promotions + Orders + OnlinePayments + ledger CHECK changes (*E8a: idempotency scope, guest checkout flag, Shipping, OnlinePayments, Orders, `carts.converted_order_id`; no ledger CHECK change was needed*) → E10 Reviews, returns → E13 AI. Each migration ships with its tests and runs on PostgreSQL before the phase closes.
+E4 Storefront + Media → E5 Cms (pages needed by menus) → E6 OnlineCatalog + Catalog attributes → E7 CustomerAccounts/addresses + Cart → E8 Shipping + Promotions + Orders + OnlinePayments + ledger CHECK changes (*E8a: idempotency scope, guest checkout flag, Shipping, OnlinePayments, Orders, `carts.converted_order_id`; no ledger CHECK change was needed*) → E10 Reviews, returns → E12b translations (`2026_11_05_100000`–`100700`, one migration per owning module, additive) → E13 AI. Each migration ships with its tests and runs on PostgreSQL before the phase closes.

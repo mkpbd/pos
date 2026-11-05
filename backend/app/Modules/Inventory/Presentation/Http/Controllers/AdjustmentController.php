@@ -6,23 +6,28 @@ use App\Modules\Inventory\Application\Actions\PostStockAdjustment;
 use App\Modules\Inventory\Domain\AdjustmentReason;
 use App\Modules\Inventory\Infrastructure\Models\StockAdjustment;
 use App\Modules\Inventory\Infrastructure\Models\StockAdjustmentLine;
+use App\Modules\Inventory\Presentation\Http\Exports\AdjustmentsExport;
 use App\Modules\Inventory\Presentation\Http\Requests\PostAdjustmentRequest;
 use App\Modules\Inventory\Presentation\Http\Support\InventoryPresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class AdjustmentController
 {
     public function __construct(private readonly InventoryPresenter $presenter) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate(['branch_id' => ['sometimes', 'uuid'], 'reason' => ['sometimes', Rule::enum(AdjustmentReason::class)]]);
         /** @var TenantUser $user */
@@ -32,10 +37,26 @@ class AdjustmentController
             ->when($request->query('reason'), fn (Builder $q, string $reason) => $q->where('reason', $reason));
         $this->presenter->scopeBranches($query, $user, $request->query('branch_id'));
 
-        $page = ListQuery::paginate($query, $request, sortable: ['created_at', 'number'], searchable: ['number']);
-        $stores = $this->presenter->lookups(storeIds: collect($page->items())->pluck('store_id')->all())['stores'];
+        ListQuery::apply($query, $request, sortable: ['created_at', 'number'], searchable: ['number']);
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, AdjustmentsExport::class, RowSource::fromQuery($query, fn (Collection $adjustments) => $adjustments->map($this->rows($adjustments))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
 
-        return ApiResponse::paginated($page, fn (StockAdjustment $a) => new JsonResource([
+        $row = $this->rows(collect($page->items()));
+
+        return ApiResponse::paginated($page, fn (StockAdjustment $a) => new JsonResource($row($a)));
+    }
+
+    /**
+     * @param  Collection<int, StockAdjustment>  $adjustments
+     * @return callable(StockAdjustment): array<string, mixed>
+     */
+    private function rows(Collection $adjustments): callable
+    {
+        $stores = $this->presenter->lookups(storeIds: $adjustments->pluck('store_id')->all())['stores'];
+
+        return fn (StockAdjustment $a) => [
             'id' => $a->id,
             'number' => $a->number,
             'reason' => $a->reason,
@@ -44,7 +65,7 @@ class AdjustmentController
             'note' => $a->note,
             'created_by' => $a->created_by,
             'created_at' => $a->created_at?->toIso8601String(),
-        ]));
+        ];
     }
 
     public function show(Request $request, StockAdjustment $adjustment): JsonResponse

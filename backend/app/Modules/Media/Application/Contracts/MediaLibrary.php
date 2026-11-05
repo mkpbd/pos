@@ -23,4 +23,11 @@ interface MediaLibrary
      * @return array<string, array{id: string, url: string, srcset: string, width: int, height: int, alt: ?string}>
      */
     public function refs(array $ids): array;
+
+    /**
+     * A small rendition (the narrowest at least $minWidth wide, else the original) as a
+     * `data:` URI, for documents rendered without network access (PDF letterhead, X1).
+     * Null when unknown, unreadable or larger than $maxBytes.
+     */
+    public function dataUri(string $id, int $minWidth = 240, int $maxBytes = 524288): ?string;
 }

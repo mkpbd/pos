@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
+import { ExportMenu } from '@/components/common/export-menu'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,7 +40,10 @@ function StatementTab({ customer, currency }: { customer: Customer; currency?: s
           <div className="text-xs text-muted-foreground">Balance owed</div>
           <div className="font-mono text-xl font-semibold" data-testid="statement-balance">{formatMoney(data.closing_balance, currency)}</div>
         </div>
-        {can('payments.collect') && <Button size="sm" onClick={() => setReceiving(true)}>Receive payment</Button>}
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportMenu list="customerStatement" pathParams={{ id: customer.id }} size="sm" />
+          {can('payments.collect') && <Button size="sm" onClick={() => setReceiving(true)}>Receive payment</Button>}
+        </div>
       </div>
       <Table>
         <TableHeader>

@@ -5,8 +5,11 @@ namespace App\Providers;
 use App\Modules\Shared\Application\Authorization\PermissionRegistry;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
+use App\Modules\Shared\Application\Export\PdfRenderer;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Infrastructure\Export\BrowsershotPdfRenderer;
+use App\Modules\Shared\Infrastructure\Export\ChromeLocator;
 use App\Modules\Shared\Infrastructure\Html\PurifierHtmlSanitizer;
 use App\Modules\Shared\Infrastructure\Sequences\DatabaseSequenceGenerator;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -29,6 +32,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(LocaleContext::class);
         $this->app->singleton(PermissionRegistry::class);
         $this->app->bind(SequenceGenerator::class, DatabaseSequenceGenerator::class);
+        // X1: list exports render PDFs with headless Chrome (config/pdf.php).
+        $this->app->bind(PdfRenderer::class, fn () => new BrowsershotPdfRenderer(ChromeLocator::fromConfig()));
         // Rich-text images may only come from the media disk (same-origin /storage locally, the CDN URL otherwise).
         $this->app->singleton(HtmlSanitizer::class, function () {
             $disk = (string) config('media.disk');

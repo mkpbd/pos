@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -10,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/use-auth'
-import { useCustomerPaymentsQuery } from '@/features/customers/api'
+import { customerPaymentsListQuery, useCustomerPaymentsQuery } from '@/features/customers/api'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { PAYMENTS_TABS } from '@/features/inventory/sections'
 import { PAYMENT_SOURCES, usePaymentsLedgerQuery, type PaymentDirection, type PaymentEntry } from '@/features/payments/api'
@@ -57,20 +58,24 @@ export function PaymentsPage() {
   const [source, setSource] = useState<string>(ALL)
   const [search, setSearch] = useState('')
   const term = useDebouncedValue(search.trim())
-  const { data, error, isPending, refetch } = usePaymentsLedgerQuery({
-    page,
+  const filters = {
     from,
     to,
     method: method === ALL ? undefined : method,
     direction: direction === ALL ? undefined : direction,
     source_type: source === ALL ? undefined : source,
     search: term || undefined,
-  })
+  }
+  const { data, error, isPending, refetch } = usePaymentsLedgerQuery({ page, ...filters })
   const reset = () => setPage(1)
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Payments" description="Every amount of money received or paid out, from sales, refunds, collections, expenses and cash movements." />
+      <PageHeader
+        title="Payments"
+        description="Every amount of money received or paid out, from sales, refunds, collections, expenses and cash movements."
+        actions={<ExportMenu list="payments" query={filters} disabled={!data?.items.length} />}
+      />
       <SectionTabs tabs={PAYMENTS_TABS} label="Payments sections" />
       <div className="flex flex-wrap items-end gap-3">
         <DateRange from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); reset() }} />
@@ -170,11 +175,16 @@ export function CustomerPaymentsPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const term = useDebouncedValue(search.trim())
-  const { data, error, isPending, refetch } = useCustomerPaymentsQuery({ page, search: term || undefined })
+  const filters = { search: term || undefined }
+  const { data, error, isPending, refetch } = useCustomerPaymentsQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Payments" description="Money customers paid against their balance. Record one from the customer's statement on the Customers page." />
+      <PageHeader
+        title="Payments"
+        description="Money customers paid against their balance. Record one from the customer's statement on the Customers page."
+        actions={<ExportMenu list="customerPayments" query={customerPaymentsListQuery(filters)} disabled={!data?.items.length} />}
+      />
       <SectionTabs tabs={PAYMENTS_TABS} label="Payments sections" />
       <Input aria-label="Search customer payments" placeholder="Receipt number or reference" className="max-w-xs" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
 

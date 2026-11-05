@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { PlusIcon, SearchIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -18,7 +19,7 @@ import { INVENTORY_TABS } from '@/features/inventory/sections'
 import { compareDecimal, formatMoney, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
-function Header() {
+function Header({ exportMenu }: { exportMenu: ReactNode }) {
   const can = useCan()
 
   return (
@@ -28,6 +29,7 @@ function Header() {
         description="Stock on hand per store, batches, and every movement in the ledger."
         actions={
           <>
+            {exportMenu}
             {can('inventory.transfer') && <Button asChild variant="outline"><Link to="/inventory/transfers/new">New transfer</Link></Button>}
             {can('inventory.adjust') && <Button asChild><Link to="/inventory/adjustments/new"><PlusIcon data-icon="inline-start" /> New adjustment</Link></Button>}
           </>
@@ -46,12 +48,13 @@ export function StockPage() {
   const [params] = useSearchParams()
   const [lowOnly, setLowOnly] = useState(params.get('low_stock') === '1')
   const term = useDebouncedValue(search)
-  const { data, error, isPending, refetch } = useStockQuery({ page, search: term || undefined, store_id: storeId ?? undefined, low_stock: lowOnly ? 1 : undefined })
+  const filters = { search: term || undefined, store_id: storeId ?? undefined, low_stock: lowOnly ? 1 : undefined }
+  const { data, error, isPending, refetch } = useStockQuery({ page, ...filters })
   const currency = me.organization?.base_currency
 
   return (
     <div className="flex flex-col gap-6">
-      <Header />
+      <Header exportMenu={<ExportMenu list="stock" query={filters} disabled={!data?.items.length} />} />
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-sm">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -114,11 +117,12 @@ export function StockPage() {
 
 export function BatchesPage() {
   const [days, setDays] = useState('')
-  const { data, error, isPending, refetch } = useBatchesQuery({ expiring_within_days: days === '' ? undefined : Number(days) })
+  const filters = { expiring_within_days: days === '' ? undefined : Number(days) }
+  const { data, error, isPending, refetch } = useBatchesQuery(filters)
 
   return (
     <div className="flex flex-col gap-6">
-      <Header />
+      <Header exportMenu={<ExportMenu list="batches" query={filters} disabled={!data?.length} />} />
       <div className="flex items-end gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="expiring">Expiring within (days)</Label>
@@ -171,7 +175,7 @@ export function MovementsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Header />
+      <Header exportMenu={<ExportMenu list="movements" disabled={!data?.items.length} />} />
       {isPending ? (
         <LoadingState rows={6} label="Loading movements" />
       ) : error ? (

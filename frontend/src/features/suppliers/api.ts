@@ -21,11 +21,15 @@ export type SupplierInput = Omit<Supplier, 'id' | 'archived_at' | 'code'> & { co
 
 const supplierKeys = { all: ['suppliers'] as const }
 
+/** Query string of GET /suppliers — shared by the list and its export. */
+export function supplierListQuery(params: { page?: number; search?: string; archived?: boolean }) {
+  return { ...params, archived: params.archived ? 1 : undefined }
+}
+
 export function useSuppliersQuery(params: { page: number; search?: string; archived?: boolean }) {
   return useQuery({
     queryKey: [...supplierKeys.all, params],
-    queryFn: ({ signal }) =>
-      api.get<Supplier[]>('/suppliers', { signal, query: { ...params, archived: params.archived ? 1 : undefined } }).then(toPaginated),
+    queryFn: ({ signal }) => api.get<Supplier[]>('/suppliers', { signal, query: supplierListQuery(params) }).then(toPaginated),
     placeholderData: (previous) => previous,
   })
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { PlusIcon, SearchIcon, TimerIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -36,7 +37,8 @@ export function PromotionsPage() {
   const [status, setStatus] = useState<PromotionState | typeof ALL>(ALL)
   const [trigger, setTrigger] = useState<PromotionTrigger | typeof ALL>(ALL)
   const term = useDebouncedValue(search.trim(), 300)
-  const promotions = usePromotionsQuery({ page, search: term || undefined, status: status === ALL ? undefined : status, trigger: trigger === ALL ? undefined : trigger })
+  const filters = { search: term || undefined, status: status === ALL ? undefined : status, trigger: trigger === ALL ? undefined : trigger }
+  const promotions = usePromotionsQuery({ page, ...filters })
   const filtered = !!term || status !== ALL || trigger !== ALL
 
   return (
@@ -45,11 +47,14 @@ export function PromotionsPage() {
         title="Promotions"
         description="Discounts, coupon codes, free shipping and flash sales for the online store."
         actions={
-          can('promotions.manage') && (
-            <Button asChild>
-              <Link to="/promotions/new"><PlusIcon data-icon="inline-start" /> New promotion</Link>
-            </Button>
-          )
+          <>
+            <ExportMenu list="promotions" query={filters} disabled={!promotions.data?.items.length} />
+            {can('promotions.manage') && (
+              <Button asChild>
+                <Link to="/promotions/new"><PlusIcon data-icon="inline-start" /> New promotion</Link>
+              </Button>
+            )}
+          </>
         }
       />
       <p className="-mt-3 text-sm text-muted-foreground">{APPLICATION_RULE} Promotions apply to web orders only.</p>

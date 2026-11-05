@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArchiveIcon, ArchiveRestoreIcon, FileTextIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -16,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { CatalogRecordDialog } from '@/features/catalog/components/catalog-record-dialog'
 import {
+  customerListQuery,
   useArchiveCustomerMutation,
   useCustomerGroupsQuery,
   useCustomersQuery,
@@ -129,7 +131,8 @@ export function CustomersPage() {
   const debouncedSearch = useDebouncedValue(search)
   const groups = useCustomerGroupsQuery()
   const archive = useArchiveCustomerMutation()
-  const { data, error, isPending, refetch } = useCustomersQuery({ page, search: debouncedSearch || undefined, customer_group_id: groupId === ALL ? undefined : groupId, archived })
+  const filters = { search: debouncedSearch || undefined, customer_group_id: groupId === ALL ? undefined : groupId, archived }
+  const { data, error, isPending, refetch } = useCustomersQuery({ page, ...filters })
   const canSeeBalances = can('sales.view')
   const balances = useCustomerBalancesQuery(data?.items.map((c) => c.id) ?? [], canSeeBalances)
   const loyaltyOn = useLoyaltySettingsQuery().data?.is_enabled === true
@@ -140,7 +143,12 @@ export function CustomersPage() {
       <PageHeader
         title="Customers"
         description="Registered customers. Sales without a customer are walk-in sales."
-        actions={canCreate && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New customer</Button>}
+        actions={
+          <>
+            <ExportMenu list="customers" query={customerListQuery(filters)} disabled={!data?.items.length} />
+            {canCreate && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New customer</Button>}
+          </>
+        }
       />
       <Tabs defaultValue="customers">
         <TabsList>

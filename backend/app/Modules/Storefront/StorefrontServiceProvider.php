@@ -4,15 +4,20 @@ namespace App\Modules\Storefront;
 
 use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Contracts\PageReferences;
+use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Media\Application\Contracts\MediaReferences;
+use App\Modules\Shared\Application\Contracts\DocumentLetterhead;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Caching\CacheStorefrontContentVersion;
 use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
 use App\Modules\Storefront\Infrastructure\SectionBlogReferences;
 use App\Modules\Storefront\Infrastructure\SectionMediaReferences;
+use App\Modules\Storefront\Infrastructure\ThemeLogoLetterhead;
 use App\Modules\Storefront\Infrastructure\ThemeMediaReferences;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -31,6 +36,10 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         // E12: storefront content version counters in the default cache store.
         $this->app->bind(StorefrontContentVersion::class, fn ($app) => new CacheStorefrontContentVersion($app->make('cache.store'), $app->make(LocaleContext::class)));
         $this->app->tag([ThemeMediaReferences::class, SectionMediaReferences::class], MediaReferences::TAG);
+        // X1: the theme logo heads exported PDFs.
+        $this->app->extend(DocumentLetterhead::class, fn (DocumentLetterhead $inner, $app) => new ThemeLogoLetterhead(
+            $inner, $app->make(StorefrontConfig::class), $app->make(MediaLibrary::class), $app->make(TenantContext::class),
+        ));
         $this->app->tag([MenuPageReferences::class], PageReferences::TAG);
         $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class], BlogReferences::TAG);
     }

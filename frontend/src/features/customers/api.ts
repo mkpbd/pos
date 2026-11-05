@@ -61,11 +61,17 @@ const customerKeys = {
   detail: (id: string | undefined) => ['customers', 'detail', id] as const,
 }
 
-export function useCustomersQuery(params: { page: number; search?: string; customer_group_id?: string; archived?: boolean }) {
+export type CustomerListParams = { page: number; search?: string; customer_group_id?: string; archived?: boolean }
+
+/** Query string of GET /customers — shared by the list and its export. */
+export function customerListQuery(params: Omit<CustomerListParams, 'page'> & { page?: number }) {
+  return { ...params, archived: params.archived ? 1 : undefined }
+}
+
+export function useCustomersQuery(params: CustomerListParams) {
   return useQuery({
     queryKey: [...customerKeys.all, params],
-    queryFn: ({ signal }) =>
-      api.get<Customer[]>('/customers', { signal, query: { ...params, archived: params.archived ? 1 : undefined } }).then(toPaginated),
+    queryFn: ({ signal }) => api.get<Customer[]>('/customers', { signal, query: customerListQuery(params) }).then(toPaginated),
     placeholderData: (previous) => previous,
   })
 }
@@ -202,10 +208,17 @@ export const accountKeys = {
   statement: (customerId: string | undefined, params: Record<string, unknown>) => ['customer-accounts', 'statement', customerId, params] as const,
 }
 
-export function useCustomerPaymentsQuery(params: { page: number; customer_id?: string; branch_id?: string; search?: string }) {
+export type CustomerPaymentsParams = { page: number; customer_id?: string; branch_id?: string; search?: string }
+
+/** Query string of GET /customer-payments — shared by the list and its export. */
+export function customerPaymentsListQuery(params: Omit<CustomerPaymentsParams, 'page'> & { page?: number }) {
+  return { ...params, sort: '-created_at' }
+}
+
+export function useCustomerPaymentsQuery(params: CustomerPaymentsParams) {
   return useQuery<Paginated<CustomerPayment>>({
     queryKey: accountKeys.payments(params),
-    queryFn: ({ signal }) => api.get<CustomerPayment[]>('/customer-payments', { signal, query: { ...params, sort: '-created_at' } }).then(toPaginated),
+    queryFn: ({ signal }) => api.get<CustomerPayment[]>('/customer-payments', { signal, query: customerPaymentsListQuery(params) }).then(toPaginated),
     placeholderData: (previous) => previous,
   })
 }

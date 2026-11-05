@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { BanknoteIcon, Loader2Icon, PackageIcon, PrinterIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -129,7 +130,11 @@ export function WebOrdersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Web orders" description="Orders placed on your online store. Confirm payments, pack, print, ship and track them here." />
+      <PageHeader
+        title="Web orders"
+        description="Orders placed on your online store. Confirm payments, pack, print, ship and track them here."
+        actions={<ExportMenu list="webOrders" query={params} disabled={!data?.items.length} />}
+      />
 
       <div className="overflow-x-auto">
         <Tabs value={filters.tab} onValueChange={(v) => update({ tab: v as BoardTab })}>

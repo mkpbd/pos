@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -61,16 +62,20 @@ export function AuditLogPage() {
   const [to, setTo] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const { data, error, isPending, refetch } = useAuditLogQuery({
-    page,
+  const filters = {
     action: action === 'all' ? undefined : action,
     from: from || undefined,
     to: to || undefined,
-  })
+  }
+  const { data, error, isPending, refetch } = useAuditLogQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Audit log" description="Append-only record of sensitive changes in your organization." />
+      <PageHeader
+        title="Audit log"
+        description="Append-only record of sensitive changes in your organization."
+        actions={<ExportMenu list="auditLog" query={filters} disabled={!data?.items.length} />}
+      />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">

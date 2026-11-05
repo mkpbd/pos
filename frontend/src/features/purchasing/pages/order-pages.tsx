@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
 import { emptyLine, type LineValue } from '@/components/common/line-values'
 import { LinesEditor } from '@/components/common/lines-editor'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -47,7 +48,12 @@ export function PurchaseOrdersPage() {
       <PageHeader
         title="Purchasing"
         description="Orders to suppliers, goods received, returns and payments."
-        actions={can('purchases.manage') && <Button asChild><Link to="/purchasing/orders/new"><PlusIcon data-icon="inline-start" /> New order</Link></Button>}
+        actions={
+          <>
+            <ExportMenu list="purchaseOrders" disabled={!data?.items.length} />
+            {can('purchases.manage') && <Button asChild><Link to="/purchasing/orders/new"><PlusIcon data-icon="inline-start" /> New order</Link></Button>}
+          </>
+        }
       />
       <SectionTabs tabs={PURCHASING_TABS} label="Purchasing sections" />
       {isPending ? (

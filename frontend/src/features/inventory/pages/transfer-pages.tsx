@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
 import { emptyLine } from '@/components/common/line-values'
 import { LinesEditor } from '@/components/common/lines-editor'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -38,7 +39,8 @@ export function TransfersPage() {
   const [status, setStatus] = useState<TransferStatus | 'all'>('all')
   const [confirm, setConfirm] = useState<{ transfer: Transfer; action: 'receive' | 'cancel' } | null>(null)
   const complete = useCompleteTransferMutation()
-  const { data, error, isPending, refetch } = useTransfersQuery({ page, status: status === 'all' ? undefined : status })
+  const filters = { status: status === 'all' ? undefined : status }
+  const { data, error, isPending, refetch } = useTransfersQuery({ page, ...filters })
   const canTransfer = can('inventory.transfer')
 
   return (
@@ -46,7 +48,12 @@ export function TransfersPage() {
       <PageHeader
         title="Inventory"
         description="Stock moving between stores and branches."
-        actions={canTransfer && <Button asChild><Link to="/inventory/transfers/new"><PlusIcon data-icon="inline-start" /> New transfer</Link></Button>}
+        actions={
+          <>
+            <ExportMenu list="transfers" query={filters} disabled={!data?.items.length} />
+            {canTransfer && <Button asChild><Link to="/inventory/transfers/new"><PlusIcon data-icon="inline-start" /> New transfer</Link></Button>}
+          </>
+        }
       />
       <SectionTabs tabs={INVENTORY_TABS} label="Inventory sections" />
       <Select value={status} onValueChange={(v) => { setStatus(v as TransferStatus | 'all'); setPage(1) }}>

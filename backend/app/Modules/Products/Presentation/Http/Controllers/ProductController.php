@@ -11,9 +11,12 @@ use App\Modules\Products\Application\DTOs\ProductData;
 use App\Modules\Products\Domain\ProductType;
 use App\Modules\Products\Infrastructure\Models\Product;
 use App\Modules\Products\Infrastructure\Models\ProductImage;
+use App\Modules\Products\Presentation\Http\Exports\ProductsExport;
 use App\Modules\Products\Presentation\Http\Requests\SaveProductRequest;
 use App\Modules\Products\Presentation\Http\Resources\ProductResource;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ProductController
@@ -36,7 +40,7 @@ class ProductController
      * `search` matches name, SKU and barcode. Filters: `category_id`, `brand_id`, `type`,
      * `is_active`, `archived=1` (archived products only).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'category_id' => ['sometimes', 'uuid'],
@@ -63,7 +67,11 @@ class ProductController
                         ->orWhereHas('barcodes', fn (Builder $b) => $b->where('barcode', $search))));
             });
 
-        $page = ListQuery::paginate($query, $request, sortable: ['name', 'created_at', 'updated_at'], defaultSort: 'name');
+        ListQuery::apply($query, $request, sortable: ['name', 'created_at', 'updated_at'], defaultSort: 'name');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, ProductsExport::class, RowSource::fromQuery($query, fn (Collection $products) => $products->map($this->presenter($request, $products))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
         $present = $this->presenter($request, collect($page->items()));
 
         return ApiResponse::paginated($page, $present);

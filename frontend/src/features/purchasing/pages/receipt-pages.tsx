@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { FormField } from '@/components/common/form-field'
 import { emptyLine, type LineValue } from '@/components/common/line-values'
 import { LinesEditor } from '@/components/common/lines-editor'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -50,7 +51,12 @@ export function ReceiptsPage() {
       <PageHeader
         title="Purchasing"
         description="Goods received from suppliers (their invoices)."
-        actions={can('purchases.receive') && <Button asChild><Link to="/purchasing/receipts/new"><PlusIcon data-icon="inline-start" /> Receive goods</Link></Button>}
+        actions={
+          <>
+            <ExportMenu list="goodsReceipts" query={{ search: search || undefined }} disabled={!data?.items.length} />
+            {can('purchases.receive') && <Button asChild><Link to="/purchasing/receipts/new"><PlusIcon data-icon="inline-start" /> Receive goods</Link></Button>}
+          </>
+        }
       />
       <SectionTabs tabs={PURCHASING_TABS} label="Purchasing sections" />
       <Input aria-label="Search receipts" placeholder="Receipt or supplier invoice number" className="max-w-sm" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
@@ -321,7 +327,11 @@ export function ReturnsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Purchasing" description="Goods returned to suppliers. Start a return from the receipt." />
+      <PageHeader
+        title="Purchasing"
+        description="Goods returned to suppliers. Start a return from the receipt."
+        actions={<ExportMenu list="purchaseReturns" disabled={!data?.items.length} />}
+      />
       <SectionTabs tabs={PURCHASING_TABS} label="Purchasing sections" />
       {isPending ? (
         <LoadingState rows={4} label="Loading returns" />

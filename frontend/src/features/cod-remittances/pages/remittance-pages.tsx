@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ArrowLeftIcon, Loader2Icon, PlusIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -58,7 +59,8 @@ export function CodRemittancesPage() {
   const currency = me.organization?.base_currency
   const [searchParams, setSearchParams] = useSearchParams()
   const filters = remittanceFiltersFromSearchParams(searchParams)
-  const { data, error, isPending, refetch } = useCodRemittancesQuery(toRemittanceListParams(filters))
+  const params = toRemittanceListParams(filters)
+  const { data, error, isPending, refetch } = useCodRemittancesQuery(params)
   const couriers = useCouriersQuery()
   const update = (patch: Partial<RemittanceFilters>) => setSearchParams(remittanceFiltersToSearchParams({ ...filters, page: 1, ...patch }), { replace: true })
   const filtered = !!(filters.courierId || filters.from || filters.to)
@@ -68,7 +70,12 @@ export function CodRemittancesPage() {
       <PageHeader
         title="COD remittances"
         description="Cash couriers collected on delivery and paid over to you. Recording a remittance marks its orders paid and books the courier's fee as an expense."
-        actions={<Button asChild><Link to="/cod-remittances/new"><PlusIcon data-icon="inline-start" /> New remittance</Link></Button>}
+        actions={
+          <>
+            <ExportMenu list="codRemittances" query={params} disabled={!data?.items.length} />
+            <Button asChild><Link to="/cod-remittances/new"><PlusIcon data-icon="inline-start" /> New remittance</Link></Button>
+          </>
+        }
       />
       <div className="flex flex-wrap items-end gap-3">
         <Select value={filters.courierId ?? ALL} onValueChange={(v) => update({ courierId: v === ALL ? null : v })}>

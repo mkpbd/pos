@@ -83,20 +83,19 @@ export const productKeys = {
   detail: (id: string) => ['products', 'detail', id] as const,
 }
 
+/** Query string of GET /products — shared by the list and its export. */
+export function productListQuery(params: Omit<ProductListParams, 'page'> & { page?: number }) {
+  return {
+    ...params,
+    is_active: params.is_active === undefined ? undefined : Number(params.is_active),
+    archived: params.archived ? 1 : undefined,
+  }
+}
+
 export function useProductsQuery(params: ProductListParams) {
   return useQuery({
     queryKey: productKeys.list(params),
-    queryFn: ({ signal }) =>
-      api
-        .get<Product[]>('/products', {
-          signal,
-          query: {
-            ...params,
-            is_active: params.is_active === undefined ? undefined : Number(params.is_active),
-            archived: params.archived ? 1 : undefined,
-          },
-        })
-        .then(toPaginated),
+    queryFn: ({ signal }) => api.get<Product[]>('/products', { signal, query: productListQuery(params) }).then(toPaginated),
     placeholderData: (previous) => previous,
   })
 }

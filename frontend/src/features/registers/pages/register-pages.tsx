@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { ArrowDownToLineIcon, ArrowLeftIcon, ArrowUpFromLineIcon, LockIcon, PencilIcon, PlayIcon, PlusIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -211,11 +212,16 @@ export function CashRegistersPage() {
 export function RegisterSessionsPage() {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<SessionStatus | 'all'>('all')
-  const { data, error, isPending, refetch } = useRegisterSessionsQuery({ page, status: status === 'all' ? undefined : status })
+  const filters = { status: status === 'all' ? undefined : status }
+  const { data, error, isPending, refetch } = useRegisterSessionsQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Cash registers" description="Shifts with their cash reconciliation (X report while open, Z report once closed)." />
+      <PageHeader
+        title="Cash registers"
+        description="Shifts with their cash reconciliation (X report while open, Z report once closed)."
+        actions={<ExportMenu list="registerSessions" query={filters} disabled={!data?.items.length} />}
+      />
       <SectionTabs tabs={REGISTER_TABS} label="Cash register sections" />
       <Select value={status} onValueChange={(v) => { setStatus(v as SessionStatus | 'all'); setPage(1) }}>
         <SelectTrigger className="w-40" aria-label="Filter by status"><SelectValue /></SelectTrigger>

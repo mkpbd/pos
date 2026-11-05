@@ -9,8 +9,12 @@ use App\Modules\Promotions\Domain\PromotionState;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
+use App\Modules\Promotions\Presentation\Http\Exports\PromotionReportExport;
+use App\Modules\Promotions\Presentation\Http\Exports\PromotionsExport;
 use App\Modules\Promotions\Presentation\Http\Requests\SavePromotionRequest;
 use App\Modules\Promotions\Presentation\Http\Support\PromotionPresenter;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Carbon\CarbonImmutable;
@@ -18,8 +22,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Promotions of the online store (E8b, web only). Viewing needs `promotions.view`, changes
@@ -37,7 +43,7 @@ class PromotionController
      * Rows: `{id, name, type, value, scope, trigger, starts_at, ends_at, show_countdown,
      * is_active, state, coupon_count, redemption_count, discount_total}`.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'status' => ['sometimes', Rule::enum(PromotionState::class)],
@@ -57,7 +63,11 @@ class PromotionController
                     ->where(fn (Builder $w) => $w->whereNull('ends_at')->orWhere('ends_at', '>', $now)),
             });
 
-        $page = ListQuery::paginate($query, $request, sortable: ['created_at', 'name', 'starts_at', 'ends_at'], searchable: ['name'], defaultSort: '-created_at');
+        ListQuery::apply($query, $request, sortable: ['created_at', 'name', 'starts_at', 'ends_at'], searchable: ['name'], defaultSort: '-created_at');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, PromotionsExport::class, RowSource::fromQuery($query, fn (Collection $promotions) => $promotions->map(fn (Promotion $p) => PromotionPresenter::row($p))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
 
         return ApiResponse::paginated($page, fn (Promotion $p) => new JsonResource(PromotionPresenter::row($p)));
     }
@@ -120,7 +130,7 @@ class PromotionController
      * discount}]}` — with both dates every day of the range is listed, otherwise only days
      * with redemptions. Redemptions of orders cancelled later stay counted.
      */
-    public function report(Request $request, Promotion $promotion, PromotionReport $report): JsonResponse
+    public function report(Request $request, Promotion $promotion, PromotionReport $report, ListExporter $exports, PromotionReportExport $export): Response
     {
         $data = $request->validate([
             'date_from' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
@@ -132,7 +142,12 @@ class PromotionController
             throw ValidationException::withMessages(['date_to' => ['Choose at most '.PromotionReport::MAX_DAYS.' days.']]);
         }
 
-        return ApiResponse::success($report->for($promotion, $from, $to));
+        $result = $report->for($promotion, $from, $to);
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, $export, RowSource::fromRows($export->rows($promotion->name, $result)));
+        }
+
+        return ApiResponse::success($result);
     }
 
     /**

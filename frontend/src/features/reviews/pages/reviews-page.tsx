@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { CheckIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -135,7 +136,8 @@ export function ReviewsPage() {
   // The box is local so typing stays smooth; the URL follows the debounced term.
   const [search, setSearch] = useState(filters.search)
   const term = useDebouncedValue(search.trim(), 300)
-  const reviews = useReviewsQuery(reviewListParams(filters, term))
+  const params = reviewListParams(filters, term)
+  const reviews = useReviewsQuery(params)
   const moderate = useModerateReviewMutation()
   const [rejecting, setRejecting] = useState<Review | null>(null)
   const [rejectError, setRejectError] = useState<string | undefined>()
@@ -177,7 +179,11 @@ export function ReviewsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Reviews" description="Product reviews from customers with a delivered order. Only approved reviews are shown in the store." />
+      <PageHeader
+        title="Reviews"
+        description="Product reviews from customers with a delivered order. Only approved reviews are shown in the store."
+        actions={<ExportMenu list="reviews" query={params} disabled={!reviews.data?.items.length} />}
+      />
       {!canModerate && <p className="-mt-3 text-sm text-muted-foreground" data-testid="reviews-read-only">You can read reviews; approving, rejecting and deleting them needs moderation rights.</p>}
 
       <Card>

@@ -4,6 +4,8 @@ namespace App\Modules\Organizations;
 
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Organizations\Infrastructure\Directory\EloquentOrganizationDirectory;
+use App\Modules\Organizations\Infrastructure\Directory\OrganizationLetterhead;
+use App\Modules\Shared\Application\Contracts\DocumentLetterhead;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
 /**
@@ -14,6 +16,8 @@ class OrganizationsServiceProvider extends ModuleServiceProvider
     public function register(): void
     {
         $this->app->bind(OrganizationDirectory::class, EloquentOrganizationDirectory::class);
+        // X1: letterhead of list exports (the Storefront module adds the theme logo).
+        $this->app->bind(DocumentLetterhead::class, OrganizationLetterhead::class);
     }
 
     protected function permissions(): array

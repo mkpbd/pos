@@ -6,13 +6,18 @@ use App\Modules\Reviews\Application\Actions\ModerateReview;
 use App\Modules\Reviews\Application\Queries\ReviewQueries;
 use App\Modules\Reviews\Domain\ReviewStatus;
 use App\Modules\Reviews\Infrastructure\Models\Review;
+use App\Modules\Reviews\Presentation\Http\Exports\ReviewsExport;
 use App\Modules\Reviews\Presentation\Http\Support\Pagination;
 use App\Modules\Reviews\Presentation\Http\Support\ReviewPresenter;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Staff moderation of product reviews (E9): listing needs `reviews.view`, approve / reject /
@@ -34,7 +39,7 @@ class ReviewModerationController
      * title, body, status, created_at, moderated_at, moderated_by_name, rejection_reason}`;
      * `meta.pending_count` counts all pending reviews.
      */
-    public function index(Request $request, ReviewQueries $queries): JsonResponse
+    public function index(Request $request, ReviewQueries $queries, ListExporter $exports): Response
     {
         $data = $request->validate([
             'status' => ['sometimes', 'nullable', Rule::enum(ReviewStatus::class)],
@@ -43,12 +48,16 @@ class ReviewModerationController
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1'],
         ]);
-        $perPage = max(1, min(ListQuery::MAX_PER_PAGE, (int) ($data['per_page'] ?? 25)));
-        $page = $queries->forStaff([
+        $filters = [
             'status' => $data['status'] ?? null,
             'rating' => isset($data['rating']) ? (int) $data['rating'] : null,
             'search' => $data['search'] ?? null,
-        ], (int) ($data['page'] ?? 1), $perPage);
+        ];
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, ReviewsExport::class, RowSource::fromQuery($queries->staffQuery($filters), fn (Collection $reviews) => $this->presenter->staff($reviews->all())));
+        }
+        $perPage = max(1, min(ListQuery::MAX_PER_PAGE, (int) ($data['per_page'] ?? 25)));
+        $page = $queries->forStaff($filters, (int) ($data['page'] ?? 1), $perPage);
 
         return ApiResponse::success($this->presenter->staff($page->items()), meta: [
             'pagination' => Pagination::meta($page),

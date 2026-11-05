@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ArrowLeftIcon, BanIcon, CheckIcon, HandCoinsIcon, PackageCheckIcon, type LucideIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -47,7 +48,8 @@ export function WebReturnsPage() {
   const filters = returnFiltersFromSearchParams(searchParams)
   const [search, setSearch] = useState(filters.search)
   const term = useDebouncedValue(search.trim())
-  const { data, error, isPending, refetch } = useWebReturnsQuery(toReturnListParams(filters, term))
+  const params = toReturnListParams(filters, term)
+  const { data, error, isPending, refetch } = useWebReturnsQuery(params)
   const update = (patch: Partial<ReturnFilters>) => setSearchParams(returnFiltersToSearchParams({ ...filters, search: search.trim(), page: 1, ...patch }), { replace: true })
   const narrowed = !!term || filters.tab !== 'all'
 
@@ -56,6 +58,7 @@ export function WebReturnsPage() {
       <PageHeader
         title="Web returns"
         description="Returns on online orders: approve or reject requests, receive the goods back into stock and record the refund."
+        actions={<ExportMenu list="webReturns" query={params} disabled={!data?.items.length} />}
       />
 
       <div className="overflow-x-auto">

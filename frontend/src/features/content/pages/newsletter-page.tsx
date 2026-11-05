@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DownloadIcon, SearchIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
@@ -24,17 +25,21 @@ export function NewsletterPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<SubscriberStatus | typeof ALL>(ALL)
   const debounced = useDebouncedValue(search, 300)
-  const subscribers = useSubscribersQuery({ page, search: debounced || undefined, status: status === ALL ? undefined : status })
+  const filters = { search: debounced || undefined, status: status === ALL ? undefined : status }
+  const subscribers = useSubscribersQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
       <ContentHeader
         actions={
-          <Button asChild variant="outline">
-            <a href={NEWSLETTER_EXPORT_URL} download>
-              <DownloadIcon data-icon="inline-start" /> Export subscribers (CSV)
-            </a>
-          </Button>
+          <>
+            <ExportMenu list="newsletterSubscribers" query={filters} disabled={!subscribers.data?.items.length} />
+            <Button asChild variant="outline">
+              <a href={NEWSLETTER_EXPORT_URL} download>
+                <DownloadIcon data-icon="inline-start" /> Export subscribers (CSV)
+              </a>
+            </Button>
+          </>
         }
       />
 

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { FormField } from '@/components/common/form-field'
 import { emptyLine } from '@/components/common/line-values'
 import { LinesEditor } from '@/components/common/lines-editor'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -35,7 +36,12 @@ export function AdjustmentsPage() {
       <PageHeader
         title="Inventory"
         description="Stock adjustments: opening stock, counts, damage and other corrections."
-        actions={can('inventory.adjust') && <Button asChild><Link to="/inventory/adjustments/new"><PlusIcon data-icon="inline-start" /> New adjustment</Link></Button>}
+        actions={
+          <>
+            <ExportMenu list="adjustments" disabled={!data?.items.length} />
+            {can('inventory.adjust') && <Button asChild><Link to="/inventory/adjustments/new"><PlusIcon data-icon="inline-start" /> New adjustment</Link></Button>}
+          </>
+        }
       />
       <SectionTabs tabs={INVENTORY_TABS} label="Inventory sections" />
       {isPending ? (

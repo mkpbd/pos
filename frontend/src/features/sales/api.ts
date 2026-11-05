@@ -129,10 +129,15 @@ export const salesKeys = {
 
 export type SalesListParams = { page: number; search?: string; status?: SaleStatus; from?: string; to?: string; customer_id?: string; per_page?: number }
 
+/** Query string of GET /sales — shared by the list and its export. */
+export function salesListQuery(params: Omit<SalesListParams, 'page'> & { page?: number }) {
+  return { ...params, sort: '-sold_at' }
+}
+
 export function useSalesQuery(params: SalesListParams, enabled = true) {
   return useQuery<Paginated<SaleHeader>>({
     queryKey: salesKeys.list(params),
-    queryFn: ({ signal }) => api.get<SaleHeader[]>('/sales', { signal, query: { ...params, sort: '-sold_at' } }).then(toPaginated),
+    queryFn: ({ signal }) => api.get<SaleHeader[]>('/sales', { signal, query: salesListQuery(params) }).then(toPaginated),
     placeholderData: (previous) => previous,
     enabled,
   })

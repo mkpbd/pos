@@ -8,6 +8,7 @@ use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use App\Modules\Suppliers\Infrastructure\Models\Supplier;
 use App\Modules\Users\Domain\Roles\SystemRole;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -37,6 +38,21 @@ class PurchasingWorkflowTest extends TestCase
         $this->actingAsUser($admin);
 
         return compact('admin', 'org', 'branch', 'variant', 'store', 'supplier');
+    }
+
+    public function test_business_dates_follow_the_organization_timezone_not_the_utc_clock(): void
+    {
+        ['org' => $org, 'variant' => $variant, 'store' => $store, 'supplier' => $supplier] = $this->world();
+        $org->forceFill(['timezone' => 'Asia/Dhaka'])->save();
+        // 02:30 on 6 November in Dhaka is still 5 November in UTC.
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 20:30:00', 'UTC'));
+        $receipt = fn (string $date) => $this->postJson('/api/v1/purchasing/receipts', [
+            'supplier_id' => $supplier->id, 'store_id' => $store, 'invoice_date' => $date,
+            'lines' => [['variant_id' => $variant->id, 'quantity' => '1', 'unit_cost' => '1']],
+        ]);
+
+        $receipt('2026-11-06')->assertCreated();
+        $receipt('2026-11-07')->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['invoice_date']]]);
     }
 
     public function test_purchase_order_lifecycle_with_server_side_totals(): void
@@ -204,7 +220,7 @@ class PurchasingWorkflowTest extends TestCase
             ->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['supplier_id']]]);
         $this->postJson('/api/v1/purchasing/receipts', ['supplier_id' => $inactive->id, 'store_id' => $store, 'invoice_date' => now()->toDateString(), 'lines' => $line])
             ->assertStatus(422)->assertJsonPath('error.details.supplier_id.0', 'The selected supplier is inactive.');
-        $this->postJson('/api/v1/purchasing/receipts', ['supplier_id' => $supplier->id, 'store_id' => $store, 'invoice_date' => now()->addDay()->toDateString(), 'lines' => $line])
+        $this->postJson('/api/v1/purchasing/receipts', ['supplier_id' => $supplier->id, 'store_id' => $store, 'invoice_date' => now()->addDays(2)->toDateString(), 'lines' => $line])
             ->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['invoice_date']]]);
 
         $id = $this->postJson('/api/v1/purchasing/receipts', ['supplier_id' => $supplier->id, 'store_id' => $store, 'invoice_date' => now()->toDateString(), 'lines' => $line])->json('data.id');

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -43,6 +44,14 @@ export function ReportPanel({ promotion }: { promotion: Promotion }) {
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="report-to">To</Label>
             <Input id="report-to" type="date" className="w-40" value={range.to} min={range.from || undefined} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} />
+          </div>
+          <div className="ml-auto">
+            <ExportMenu
+              list="promotionReport"
+              pathParams={{ id: promotion.id }}
+              query={{ date_from: range.from, date_to: range.to }}
+              disabled={!!invalid || !data || data.by_day.length === 0}
+            />
           </div>
         </div>
 

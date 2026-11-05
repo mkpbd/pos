@@ -12,11 +12,14 @@ use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\RefundMethod;
 use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
+use App\Modules\Orders\Presentation\Http\Exports\WebOrdersExport;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
@@ -28,7 +31,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -54,7 +59,7 @@ class WebOrderController
      * `meta.status_counts`: `{all, <every status>: n, cod_unremitted}` for the current
      * filters except `status` (and except `cod_unremitted` for its own count).
      */
-    public function index(Request $request, OrganizationDirectory $organizations, TenantContext $tenant): JsonResponse
+    public function index(Request $request, OrganizationDirectory $organizations, TenantContext $tenant, ListExporter $exports): Response
     {
         $request->validate([
             'status' => ['sometimes', Rule::enum(OrderStatus::class)],
@@ -103,7 +108,13 @@ class WebOrderController
             ->with(['shippingAddress', 'shipment'])
             ->withSum('lines', 'quantity')
             ->when($request->query('status'), fn (Builder $q, string $v) => $q->where('status', $v));
-        $page = ListQuery::paginate($query, $request, sortable: ['placed_at', 'number', 'total'], defaultSort: '-placed_at');
+        ListQuery::apply($query, $request, sortable: ['placed_at', 'number', 'total'], defaultSort: '-placed_at');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, WebOrdersExport::class, RowSource::fromQuery($query, fn (Collection $orders) => $orders->map(
+                fn (Order $o) => OrderPresenter::row($o, Decimal::round((string) ($o->getAttribute('lines_sum_quantity') ?? '0'), 3)),
+            )));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
 
         return ApiResponse::paginated(
             $page,

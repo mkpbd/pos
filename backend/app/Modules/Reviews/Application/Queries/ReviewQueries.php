@@ -109,6 +109,17 @@ class ReviewQueries
      */
     public function forStaff(array $filters, int $page, int $perPage): LengthAwarePaginator
     {
+        return $this->staffQuery($filters)->paginate($perPage, ['*'], 'page', max(1, $page));
+    }
+
+    /**
+     * The staff queue (pending first, newest first) — paged by forStaff(), exported in full.
+     *
+     * @param  array{status?: ?string, rating?: ?int, search?: ?string}  $filters
+     * @return Builder<Review>
+     */
+    public function staffQuery(array $filters): Builder
+    {
         $org = $this->tenant->requireOrganization();
         $query = Review::query()
             ->when($filters['status'] ?? null, fn (Builder $q, string $v) => $q->where('status', $v))
@@ -129,8 +140,7 @@ class ReviewQueries
 
         return $query
             ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
-            ->orderByDesc('created_at')->orderByDesc('id')
-            ->paginate($perPage, ['*'], 'page', max(1, $page));
+            ->orderByDesc('created_at')->orderByDesc('id');
     }
 
     public function pendingCount(): int

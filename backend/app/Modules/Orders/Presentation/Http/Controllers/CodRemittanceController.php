@@ -6,8 +6,11 @@ use App\Modules\Orders\Application\Actions\RecordCodRemittance;
 use App\Modules\Orders\Domain\RemittanceMethod;
 use App\Modules\Orders\Infrastructure\Models\CodRemittance;
 use App\Modules\Orders\Infrastructure\Models\CodRemittanceLine;
+use App\Modules\Orders\Presentation\Http\Exports\CodRemittancesExport;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Shipping\Application\Contracts\CourierDirectory;
@@ -17,7 +20,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Couriers' cash-on-delivery remittances (E10a), `web_orders.remit`. Recording needs an
@@ -38,7 +43,7 @@ class CodRemittanceController
      * method_label, currency, gross_amount, fee_amount, net_amount, order_count, created_at,
      * created_by: {id, name}}`.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'courier_id' => ['sometimes', 'uuid'],
@@ -51,14 +56,26 @@ class CodRemittanceController
             ->when($request->query('courier_id'), fn (Builder $q, string $v) => $q->where('courier_id', $v))
             ->when($request->query('date_from'), fn (Builder $q, string $v) => $q->where('received_at', '>=', $v))
             ->when($request->query('date_to'), fn (Builder $q, string $v) => $q->where('received_at', '<=', $v));
-        $page = ListQuery::paginate($query, $request, sortable: ['received_at', 'number', 'created_at', 'gross_amount'], searchable: ['number', 'reference'], defaultSort: '-number');
+        ListQuery::apply($query, $request, sortable: ['received_at', 'number', 'created_at', 'gross_amount'], searchable: ['number', 'reference'], defaultSort: '-number');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, CodRemittancesExport::class, RowSource::fromQuery($query, fn (Collection $items) => $items->map($this->rows($items->all()))));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
+        $row = $this->rows($page->items());
 
-        /** @var list<CodRemittance> $items */
-        $items = $page->items();
+        return ApiResponse::paginated($page, fn (CodRemittance $r) => new JsonResource($row($r)));
+    }
+
+    /**
+     * @param  list<CodRemittance>  $items
+     * @return callable(CodRemittance): array<string, mixed>
+     */
+    private function rows(array $items): callable
+    {
         $couriers = $this->couriers->summaries(array_values(array_unique(array_map(fn (CodRemittance $r) => $r->courier_id, $items))));
         $names = $items === [] ? [] : $this->users->names($items[0]->organization_id, array_values(array_filter(array_map(fn (CodRemittance $r) => $r->created_by, $items))));
 
-        return ApiResponse::paginated($page, fn (CodRemittance $r) => new JsonResource($this->row($r, $couriers, $names)));
+        return fn (CodRemittance $r) => $this->row($r, $couriers, $names);
     }
 
     /**

@@ -6,16 +6,21 @@ use App\Modules\Inventory\Application\Actions\TransferStock;
 use App\Modules\Inventory\Domain\TransferStatus;
 use App\Modules\Inventory\Infrastructure\Models\StockTransfer;
 use App\Modules\Inventory\Infrastructure\Models\StockTransferLine;
+use App\Modules\Inventory\Presentation\Http\Exports\TransfersExport;
 use App\Modules\Inventory\Presentation\Http\Requests\DispatchTransferRequest;
 use App\Modules\Inventory\Presentation\Http\Support\InventoryPresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class TransferController
@@ -27,7 +32,7 @@ class TransferController
      *
      * Transfers from or to the user's branches. Filters: `status`, `direction` (`incoming`/`outgoing`).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'status' => ['sometimes', Rule::enum(TransferStatus::class)],
@@ -51,7 +56,15 @@ class TransferController
                 });
             });
 
-        $page = ListQuery::paginate($query, $request, sortable: ['created_at', 'number'], searchable: ['number']);
+        ListQuery::apply($query, $request, sortable: ['created_at', 'number'], searchable: ['number']);
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, TransfersExport::class, RowSource::fromQuery($query, function (Collection $items) use ($user) {
+                $stores = $this->presenter->lookups(storeIds: $items->flatMap(fn (StockTransfer $t) => [$t->from_store_id, $t->to_store_id])->all())['stores'];
+
+                return $items->map(fn (StockTransfer $t) => $this->summary($t, $stores, $user));
+            }));
+        }
+        $page = $query->paginate(ListQuery::perPage($request));
         $items = collect($page->items());
         $stores = $this->presenter->lookups(storeIds: $items->flatMap(fn (StockTransfer $t) => [$t->from_store_id, $t->to_store_id])->all())['stores'];
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router'
 import { ImageIcon, PlusIcon, SearchIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -14,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { flattenCategoryTree, useCatalogList } from '@/features/catalog/api'
-import { useProductsQuery, useRestoreProductMutation } from '@/features/products/api'
+import { productListQuery, useProductsQuery, useRestoreProductMutation } from '@/features/products/api'
 import { formatRange } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -36,12 +37,8 @@ export function ProductsPage() {
   const currency = me.organization?.base_currency
   const restore = useRestoreProductMutation()
 
-  const { data, error, isPending, refetch } = useProductsQuery({
-    page,
-    search: debouncedSearch || undefined,
-    category_id: categoryId === ALL ? undefined : categoryId,
-    archived,
-  })
+  const filters = { search: debouncedSearch || undefined, category_id: categoryId === ALL ? undefined : categoryId, archived }
+  const { data, error, isPending, refetch } = useProductsQuery({ page, ...filters })
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,11 +46,14 @@ export function ProductsPage() {
         title="Products"
         description="Everything you sell: goods, variants and services."
         actions={
-          canEdit && (
-            <Button asChild>
-              <Link to="/products/new"><PlusIcon data-icon="inline-start" /> New product</Link>
-            </Button>
-          )
+          <>
+            <ExportMenu list="products" query={productListQuery(filters)} disabled={!data?.items.length} />
+            {canEdit && (
+              <Button asChild>
+                <Link to="/products/new"><PlusIcon data-icon="inline-start" /> New product</Link>
+              </Button>
+            )}
+          </>
         }
       />
 

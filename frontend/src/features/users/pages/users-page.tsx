@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PencilIcon, PlusIcon, SearchIcon } from 'lucide-react'
+import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -32,12 +33,12 @@ export function UsersPage() {
   const debouncedSearch = useDebouncedValue(search)
 
   const roles = useRolesQuery(can('roles.view'))
-  const { data, error, isPending, refetch } = useUsersQuery({
-    page,
+  const filters = {
     search: debouncedSearch || undefined,
     status: status === ALL ? undefined : status,
     role_id: roleId === ALL ? undefined : roleId,
-  })
+  }
+  const { data, error, isPending, refetch } = useUsersQuery({ page, ...filters })
   const branchNames = new Map(me.branches.map((b) => [b.id, b.name]))
 
   return (
@@ -46,11 +47,14 @@ export function UsersPage() {
         title="Users"
         description="People who can sign in to your organization."
         actions={
-          canManage && (
-            <Button onClick={() => setEditing(null)} disabled={!roles.data}>
-              <PlusIcon data-icon="inline-start" /> New user
-            </Button>
-          )
+          <>
+            <ExportMenu list="users" query={filters} disabled={!data?.items.length} />
+            {canManage && (
+              <Button onClick={() => setEditing(null)} disabled={!roles.data}>
+                <PlusIcon data-icon="inline-start" /> New user
+              </Button>
+            )}
+          </>
         }
       />
 

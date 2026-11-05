@@ -5,13 +5,18 @@ namespace App\Modules\Customers\Presentation\Http\Controllers;
 use App\Modules\Customers\Application\Actions\ArchiveCustomer;
 use App\Modules\Customers\Application\Actions\SaveCustomer;
 use App\Modules\Customers\Infrastructure\Models\Customer;
+use App\Modules\Customers\Presentation\Http\Exports\CustomersExport;
 use App\Modules\Customers\Presentation\Http\Requests\SaveCustomerRequest;
 use App\Modules\Customers\Presentation\Http\Resources\CustomerResource;
+use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
+use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\Response;
 
 class CustomerController
 {
@@ -20,7 +25,7 @@ class CustomerController
      *
      * `search` matches code, name, phone and e-mail. Filters: `customer_group_id`, `is_active`, `archived=1`.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListExporter $exports): Response
     {
         $request->validate([
             'customer_group_id' => ['sometimes', 'uuid'],
@@ -40,10 +45,12 @@ class CustomerController
             ->when($request->query('customer_group_id'), fn (Builder $q, string $id) => $q->where('customer_group_id', $id))
             ->when($request->has('is_active'), fn (Builder $q) => $q->where('is_active', $request->boolean('is_active')));
 
-        return ApiResponse::paginated(
-            ListQuery::paginate($query, $request, sortable: ['code', 'name', 'created_at'], searchable: ['code', 'name', 'phone', 'email'], defaultSort: 'name'),
-            CustomerResource::class,
-        );
+        ListQuery::apply($query, $request, sortable: ['code', 'name', 'created_at'], searchable: ['code', 'name', 'phone', 'email'], defaultSort: 'name');
+        if ($format = ListExporter::requested($request)) {
+            return $exports->download($request, $format, CustomersExport::class, RowSource::fromQuery($query, fn (Collection $customers) => $customers->map(fn (Customer $c) => new CustomerResource($c))));
+        }
+
+        return ApiResponse::paginated($query->paginate(ListQuery::perPage($request)), CustomerResource::class);
     }
 
     public function store(SaveCustomerRequest $request, SaveCustomer $save): JsonResponse
