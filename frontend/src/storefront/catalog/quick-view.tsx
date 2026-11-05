@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { ArrowRightIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AddToCartForm } from '../cart/add-to-cart'
+import { useLocale } from '../i18n/locale'
 import type { ProductDetail } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { isNotFound, useProductQuery } from './api'
@@ -50,18 +51,19 @@ export function QuickViewProvider({ children }: { children: ReactNode }) {
 
 function QuickViewBody({ slug, onNavigate }: { slug: string; onNavigate: () => void }) {
   const product = useProductQuery(slug)
+  const { t } = useLocale()
 
   if (product.data) return <QuickViewProduct key={product.data.id} product={product.data} onNavigate={onNavigate} />
 
   return (
     <div className="grid min-h-60 place-items-center text-center" role="status">
-      <DialogTitle className="sr-only">Quick view</DialogTitle>
+      <DialogTitle className="sr-only">{t('catalog.quickView.title')}</DialogTitle>
       {product.error ? (
-        <p>{isNotFound(product.error) ? 'This product is no longer available.' : 'The product could not be loaded. Please try again.'}</p>
+        <p>{isNotFound(product.error) ? t('catalog.quickView.gone') : t('catalog.quickView.failed')}</p>
       ) : (
         <>
           <span className="size-8 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
-          <span className="sr-only">Loading the product</span>
+          <span className="sr-only">{t('catalog.product.loading')}</span>
         </>
       )}
     </div>
@@ -69,6 +71,7 @@ function QuickViewBody({ slug, onNavigate }: { slug: string; onNavigate: () => v
 }
 
 function QuickViewProduct({ product, onNavigate }: { product: ProductDetail; onNavigate: () => void }) {
+  const { t } = useLocale()
   const [imageIndex, setImageIndex] = useState(() => Math.max(0, imageIndexOf(product, initialVariant(product)?.image_id)))
   const { selection, variant, choose } = useVariantSelection(product, null, (next) => {
     const i = imageIndexOf(product, next?.image_id)
@@ -89,7 +92,7 @@ function QuickViewProduct({ product, onNavigate }: { product: ProductDetail; onN
           onClick={onNavigate}
           className="mt-auto inline-flex items-center gap-2 self-start text-sm font-bold text-sf-accent underline-offset-4 hover:underline"
         >
-          View full details
+          {t('catalog.quickView.fullDetails')}
           <ArrowRightIcon aria-hidden className="size-4" />
         </Link>
       </div>

@@ -1,8 +1,9 @@
 import { HeartIcon } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 import { useNotice } from '../notices'
-import { useWishlist, type WishlistProduct } from './api'
+import { MAX_WISHLIST_ITEMS, useWishlist, type WishlistProduct } from './api'
 
 /**
  * Heart toggle (aria-pressed) for a product: saved on the account when signed in, in this
@@ -11,15 +12,22 @@ import { useWishlist, type WishlistProduct } from './api'
 export function WishlistButton({ product, name, appearance = 'icon', className }: { product: WishlistProduct; name: string; appearance?: 'icon' | 'text'; className?: string }) {
   const wishlist = useWishlist()
   const notify = useNotice()
+  const { t } = useLocale()
   const saved = wishlist.isSaved(product.id)
 
   const onClick = () => {
     wishlist.toggle(product).catch((error: unknown) => {
-      notify(error instanceof ApiError && error.status === 422 ? error.message : 'The wishlist could not be updated. Please try again.')
+      if (error instanceof ApiError && error.code === 'WISHLIST_FULL') {
+        const max = Number(error.details.max_items)
+        notify(t('wishlist.full', { max: Number.isFinite(max) && max > 0 ? max : MAX_WISHLIST_ITEMS }))
+      } else {
+        // Other refusals: the server's message (it answers in the request's language when it can).
+        notify(error instanceof ApiError && error.status === 422 ? error.message : t('wishlist.updateFailed'))
+      }
     })
   }
 
-  const label = saved ? `Remove ${name} from the wishlist` : `Add ${name} to the wishlist`
+  const label = saved ? t('wishlist.button.removeLabel', { name }) : t('wishlist.button.addLabel', { name })
 
   if (appearance === 'text') {
     return (
@@ -32,7 +40,7 @@ export function WishlistButton({ product, name, appearance = 'icon', className }
         data-testid="wishlist-toggle"
       >
         <HeartIcon aria-hidden className={cn('size-5', saved && 'fill-sf-sale text-sf-sale')} />
-        {saved ? 'Saved to wishlist' : 'Add to wishlist'}
+        {saved ? t('wishlist.button.saved') : t('wishlist.button.add')}
       </button>
     )
   }
@@ -42,7 +50,7 @@ export function WishlistButton({ product, name, appearance = 'icon', className }
       type="button"
       aria-pressed={saved}
       aria-label={label}
-      title={saved ? 'Remove from wishlist' : 'Add to wishlist'}
+      title={saved ? t('wishlist.button.removeTitle') : t('wishlist.button.add')}
       disabled={!wishlist.ready || wishlist.pending}
       onClick={onClick}
       className={cn(

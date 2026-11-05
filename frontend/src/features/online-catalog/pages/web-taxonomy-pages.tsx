@@ -33,6 +33,7 @@ import { counter, SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from '@/features/online-c
 import {
   BRAND_DESCRIPTION_MAX,
   brandListingSchema,
+  TERM_NAME_MAX,
   categoryListingSchema,
   toBrandInput,
   toBrandValues,
@@ -43,7 +44,8 @@ import {
   type CategoryListingValues,
 } from '@/features/online-catalog/taxonomy-form'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
-import { handleFormError } from '@/lib/forms'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { handleTranslatedFormError, rhfBnErrors } from '@/features/translations/translations'
 
 type Row = { id: string; name: string; is_active: boolean; listing: WebCategoryRow['listing']; depth?: number }
 
@@ -100,22 +102,23 @@ function DialogShell({ title, description, formId, pending, onClose, children }:
   )
 }
 
-const CATEGORY_FIELDS = ['is_visible', 'slug', 'image_media_id', 'banner_media_id', 'description_html', 'seo_title', 'seo_description'] as const
+const CATEGORY_FIELDS = ['is_visible', 'slug', 'image_media_id', 'banner_media_id', 'description_html', 'seo_title', 'seo_description', 'translations'] as const
 
 function CategoryForm({ data, onClose }: { data: CategoryListingResponse; onClose: () => void }) {
   const save = useSaveCategoryListingMutation()
   const form = useForm<CategoryListingValues>({ resolver: zodResolver(categoryListingSchema), defaultValues: toCategoryValues(data) })
   const { errors } = form.formState
+  const [descriptionHtml, seoTitle, seoDescription] = useWatch({ control: form.control, name: ['description_html', 'seo_title', 'seo_description'] })
 
   const submit = form.handleSubmit((values) =>
     save.mutate(
-      { id: data.category.id, input: toCategoryInput(values) },
+      { id: data.category.id, input: toCategoryInput(values, data.listing.translations) },
       {
         onSuccess: () => {
           toast.success(`${data.category.name} listing saved.`)
           onClose()
         },
-        onError: (error) => handleFormError(error, form.setError, CATEGORY_FIELDS),
+        onError: (error) => handleTranslatedFormError(error, form.setError, CATEGORY_FIELDS),
       },
     ),
   )
@@ -144,28 +147,41 @@ function CategoryForm({ data, onClose }: { data: CategoryListingResponse; onClos
             {errors.description_html?.message && <p className="text-sm text-destructive">{errors.description_html.message}</p>}
           </div>
         </CommonFields>
+        <Controller control={form.control} name="translations.bn" render={({ field }) => (
+          <BanglaTranslations
+            fields={[
+              { name: 'name', label: 'Category name', base: data.category.name, max: TERM_NAME_MAX },
+              { name: 'description_html', label: 'Description', base: descriptionHtml, kind: 'rich' },
+              { name: 'seo_title', label: 'SEO title', base: seoTitle, max: SEO_TITLE_MAX },
+              { name: 'seo_description', label: 'Meta description', base: seoDescription, kind: 'textarea', max: SEO_DESCRIPTION_MAX },
+            ]}
+            value={field.value}
+            onChange={field.onChange}
+            errors={rhfBnErrors(errors.translations)}
+          />
+        )} />
       </form>
     </DialogShell>
   )
 }
 
-const BRAND_FIELDS = ['is_visible', 'slug', 'logo_media_id', 'description', 'seo_title', 'seo_description'] as const
+const BRAND_FIELDS = ['is_visible', 'slug', 'logo_media_id', 'description', 'seo_title', 'seo_description', 'translations'] as const
 
 function BrandForm({ data, onClose }: { data: BrandListingResponse; onClose: () => void }) {
   const save = useSaveBrandListingMutation()
   const form = useForm<BrandListingValues>({ resolver: zodResolver(brandListingSchema), defaultValues: toBrandValues(data) })
   const { errors } = form.formState
-  const description = useWatch({ control: form.control, name: 'description' })
+  const [description, seoTitle, seoDescription] = useWatch({ control: form.control, name: ['description', 'seo_title', 'seo_description'] })
 
   const submit = form.handleSubmit((values) =>
     save.mutate(
-      { id: data.brand.id, input: toBrandInput(values) },
+      { id: data.brand.id, input: toBrandInput(values, data.listing.translations) },
       {
         onSuccess: () => {
           toast.success(`${data.brand.name} listing saved.`)
           onClose()
         },
-        onError: (error) => handleFormError(error, form.setError, BRAND_FIELDS),
+        onError: (error) => handleTranslatedFormError(error, form.setError, BRAND_FIELDS),
       },
     ),
   )
@@ -183,6 +199,19 @@ function BrandForm({ data, onClose }: { data: BrandListingResponse; onClose: () 
             <Textarea rows={3} maxLength={BRAND_DESCRIPTION_MAX} {...form.register('description')} />
           </FormField>
         </CommonFields>
+        <Controller control={form.control} name="translations.bn" render={({ field }) => (
+          <BanglaTranslations
+            fields={[
+              { name: 'name', label: 'Brand name', base: data.brand.name, max: TERM_NAME_MAX },
+              { name: 'description', label: 'Description', base: description, kind: 'textarea', rows: 3, max: BRAND_DESCRIPTION_MAX },
+              { name: 'seo_title', label: 'SEO title', base: seoTitle, max: SEO_TITLE_MAX },
+              { name: 'seo_description', label: 'Meta description', base: seoDescription, kind: 'textarea', max: SEO_DESCRIPTION_MAX },
+            ]}
+            value={field.value}
+            onChange={field.onChange}
+            errors={rhfBnErrors(errors.translations)}
+          />
+        )} />
       </form>
     </DialogShell>
   )

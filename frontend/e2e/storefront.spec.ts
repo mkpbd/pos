@@ -48,8 +48,8 @@ async function serveStore(page: Page, data: unknown, sections: unknown[] = []) {
   await page.route('**/api/v1/store/bootstrap', (route) => route.fulfill({ json: envelope(data) }))
   await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections, preview: false }) }))
   // A guest with an empty cart (E7 header).
-  await page.route('**/api/v1/store/account/me', (route) => route.fulfill({ json: envelope(null) }))
-  await page.route('**/api/v1/store/cart', (route) =>
+  await page.route('**/api/v1/store/account/me*', (route) => route.fulfill({ json: envelope(null) }))
+  await page.route('**/api/v1/store/cart*', (route) =>
     route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', discount_total: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: true, currency: 'BDT', issues: [], promotions: [], free_shipping: null, coupon: null }) }),
   )
 }
@@ -145,10 +145,10 @@ test('homepage sections render in order and link to content pages', async ({ pag
     { id: 's-2', type: 'features_strip', title: 'Why us', subtitle: null, config: { items: [{ icon: 'truck', title: 'Fast delivery', text: null }], background: null } },
     { id: 's-3', type: 'newsletter', title: 'Weekly offers', subtitle: null, config: { text: null, button_label: 'Subscribe', image: null, background: '#c2410c', foreground: '#ffffff' } },
   ])
-  await page.route('**/api/v1/store/pages/about', (route) =>
+  await page.route('**/api/v1/store/pages/about*', (route) =>
     route.fulfill({ json: envelope({ slug: 'about', title: 'About us', template: 'default', body_html: '<h2>Since 2020</h2><p>Clothes for little ones.</p>', published_at: null, seo_title: null, seo_description: null, updated_at: null }) }),
   )
-  await page.route('**/api/v1/store/newsletter', (route) => route.fulfill({ status: 202, json: envelope({ message: 'Almost done: check your inbox and confirm your subscription.' }) }))
+  await page.route('**/api/v1/store/newsletter*', (route) => route.fulfill({ status: 202, json: envelope({ message: 'Almost done: check your inbox and confirm your subscription.' }) }))
   await page.goto('/')
 
   await expect(page.getByTestId('homepage-section')).toHaveCount(3)
@@ -219,7 +219,7 @@ test('the blog lists posts by category and opens a post from the homepage teaser
     { id: 'bp-1', type: 'blog_posts', title: 'From our kitchen', subtitle: null, config: { category_id: null, limit: 3 }, posts: [postRow('mango-lassi', 'Mango lassi')] },
   ])
   const listQueries: string[] = []
-  await page.route('**/api/v1/store/blog/categories', (route) =>
+  await page.route('**/api/v1/store/blog/categories*', (route) =>
     route.fulfill({ json: envelope([{ slug: 'recipes', name: 'Recipes', description: 'Cooking with our produce.', post_count: 10 }, { slug: 'store-news', name: 'Store news', description: null, post_count: 1 }]) }),
   )
   await page.route(/\/api\/v1\/store\/blog(\?.*)?$/, (route) => {
@@ -259,7 +259,7 @@ test('the blog lists posts by category and opens a post from the homepage teaser
   await page.getByRole('navigation', { name: 'Blog categories' }).getByRole('link', { name: 'Recipes (10)' }).click()
   await expect(page).toHaveURL(/\/blog\/category\/recipes$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Recipes' })).toBeVisible()
-  await expect.poll(() => listQueries.at(-1)).toBe('?page=1&category=recipes')
+  await expect.poll(() => listQueries.at(-1)).toBe('?page=1&category=recipes&lang=en')
 
   await page.getByRole('heading', { name: 'Mango lassi' }).getByRole('link').click()
   await expect(page).toHaveURL(/\/blog\/mango-lassi$/)

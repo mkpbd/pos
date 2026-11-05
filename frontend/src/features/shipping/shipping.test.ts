@@ -60,6 +60,7 @@ describe('shipping method form', () => {
     expect(toMethodInput(v)).toEqual({
       name: 'Courier', description: null, fee: '120', free_over: null, cod_allowed: false, cod_fee: '0.00', eta_min_days: 1, eta_max_days: 3, is_active: true, sort_order: 2,
     })
+    expect(toMethodInput(v, { bn: { name: 'হোম' } }).translations).toEqual({ bn: { name: '', description: '' } })
   })
 
   it('summarises fees', () => {

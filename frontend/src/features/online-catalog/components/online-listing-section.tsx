@@ -22,6 +22,7 @@ import {
   counter,
   LISTING_STATE,
   listingFormSchema,
+  PRODUCT_NAME_MAX,
   MAX_RELATED,
   MAX_SPECIFICATIONS,
   SEO_DESCRIPTION_MAX,
@@ -31,6 +32,8 @@ import {
   toListingInput,
   type ListingFormValues,
 } from '@/features/online-catalog/listing-form'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { rhfBnErrors } from '@/features/translations/translations'
 import { formatMoney } from '@/lib/money'
 
 const NO_IMAGE = '__none__'
@@ -60,14 +63,17 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
   const form = useForm<ListingFormValues>({ resolver: zodResolver(listingFormSchema), defaultValues: toListingFormValues(data) })
   const { errors, isDirty } = form.formState
   const specs = useFieldArray({ control: form.control, name: 'specifications' })
-  const [slug, shortDescription, seoTitle, seoDescription, isPublished] = useWatch({ control: form.control, name: ['slug', 'short_description', 'seo_title', 'seo_description', 'is_published'] })
+  const [slug, shortDescription, seoTitle, seoDescription, isPublished, descriptionHtml] = useWatch({
+    control: form.control,
+    name: ['slug', 'short_description', 'seo_title', 'seo_description', 'is_published', 'description_html'],
+  })
   const { product, listing } = data
   const state = LISTING_STATE[listing.state]
   const variantIds = product.variants.map((v) => v.id)
   const disabled = !canManage
 
   const onSubmit = form.handleSubmit((values) =>
-    save.mutate(toListingInput(values), {
+    save.mutate(toListingInput(values, { bn: form.formState.defaultValues?.translations?.bn }), {
       onSuccess: (saved) => {
         toast.success('Online listing saved.')
         // The server's slug and state become the new baseline; related lists were saved as shown.
@@ -276,6 +282,22 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
                 <Textarea rows={2} maxLength={SEO_DESCRIPTION_MAX} {...form.register('seo_description')} />
               </FormField>
             </section>
+
+            <Controller control={form.control} name="translations.bn" render={({ field }) => (
+              <BanglaTranslations
+                fields={[
+                  { name: 'name', label: 'Product name', base: product.name, max: PRODUCT_NAME_MAX },
+                  { name: 'short_description', label: 'Short description', base: shortDescription, kind: 'textarea', max: SHORT_DESCRIPTION_MAX },
+                  { name: 'description_html', label: 'Web description', base: descriptionHtml, kind: 'rich' },
+                  { name: 'seo_title', label: 'SEO title', base: seoTitle, max: SEO_TITLE_MAX },
+                  { name: 'seo_description', label: 'Meta description', base: seoDescription, kind: 'textarea', max: SEO_DESCRIPTION_MAX },
+                ]}
+                value={field.value}
+                onChange={field.onChange}
+                errors={rhfBnErrors(errors.translations)}
+                disabled={disabled}
+              />
+            )} />
           </fieldset>
 
           {canManage && (

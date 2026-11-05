@@ -25,6 +25,7 @@ import {
   useSaveStorefrontSettingsMutation,
   useStorefrontDomainsQuery,
   useStorefrontSettingsQuery,
+  type StoreLocale,
   type StorefrontDomain,
   type StorefrontSettings,
 } from '@/features/storefront/api'
@@ -142,6 +143,91 @@ function SearchEnginesCard({ settings, canManage }: { settings: StorefrontSettin
         <p id="allow-indexing-help" className="text-sm text-muted-foreground">
           Turn this off for a staging or test store: robots.txt then disallows everything and every page is marked noindex. Pages already in search results drop out over time.
         </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+const LOCALE_LABELS: Record<StoreLocale, string> = { en: 'English', bn: 'বাংলা (Bangla)' }
+
+/** Store languages (E12b): whether shoppers may switch to Bangla, the first language, and Bengali digits. */
+function LanguagesCard({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
+  const save = useSaveStorefrontSettingsMutation()
+  const [error, setError] = useState<string | undefined>()
+  const banglaEnabled = settings.bangla_enabled ?? true
+  const defaultLocale: StoreLocale = banglaEnabled ? (settings.default_locale ?? 'en') : 'en'
+  const banglaDigits = settings.bangla_digits ?? false
+  const busy = !canManage || save.isPending
+
+  const update = (input: Parameters<typeof save.mutate>[0], done: (s: StorefrontSettings) => string) => {
+    setError(undefined)
+    save.mutate(input, {
+      onSuccess: (s) => toast.success(done(s)),
+      onError: (e) => {
+        const map = fieldErrorMap(e)
+        const message = map.default_locale ?? map.bangla_enabled ?? map.bangla_digits ?? map.form ?? e.message
+        setError(message)
+      },
+    })
+  }
+
+  const toggleBangla = (on: boolean) =>
+    // Bangla can only be the default language while it is enabled.
+    update(on ? { bangla_enabled: true } : { bangla_enabled: false, ...(defaultLocale === 'bn' ? { default_locale: 'en' as const } : {}) }, (s) =>
+      (s.bangla_enabled ?? on) ? 'Shoppers can switch the store to Bangla.' : 'The store is shown in English only.',
+    )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Languages</CardTitle>
+        <CardDescription>
+          The store is available in English and <span lang="bn">বাংলা</span>. Bangla texts come from the “বাংলা (Bangla)” section of each editor; anything not translated is shown in English.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Switch id="bangla-enabled" checked={banglaEnabled} disabled={busy} onCheckedChange={toggleBangla} aria-describedby="bangla-enabled-help" />
+            <Label htmlFor="bangla-enabled">Offer the store in Bangla</Label>
+          </div>
+          <p id="bangla-enabled-help" className="text-sm text-muted-foreground">Shows the English / বাংলা switch in the store header and lists both languages to search engines.</p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="default-locale">Default language</Label>
+          <Select
+            value={defaultLocale}
+            disabled={busy}
+            onValueChange={(v) => update({ default_locale: v as StoreLocale }, (s) => `Visitors see the store in ${LOCALE_LABELS[s.default_locale ?? (v as StoreLocale)]} first.`)}
+          >
+            <SelectTrigger id="default-locale" className="w-full sm:w-64" aria-describedby="default-locale-help" aria-invalid={error ? true : undefined}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">{LOCALE_LABELS.en}</SelectItem>
+              <SelectItem value="bn" disabled={!banglaEnabled}>{LOCALE_LABELS.bn}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p id="default-locale-help" className="text-sm text-muted-foreground">
+            {banglaEnabled ? 'For visitors who have not picked a language yet.' : 'Turn on Bangla to make it the default language.'}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="bangla-digits"
+              checked={banglaDigits}
+              disabled={busy || !banglaEnabled}
+              aria-describedby="bangla-digits-help"
+              onCheckedChange={(on) => update({ bangla_digits: on }, (s) => ((s.bangla_digits ?? on) ? 'Bangla pages show Bengali digits.' : 'Bangla pages show Latin digits.'))}
+            />
+            <Label htmlFor="bangla-digits">Bengali digits in Bangla</Label>
+          </div>
+          <p id="bangla-digits-help" className="text-sm text-muted-foreground">
+            Prices and numbers on Bangla pages as <span lang="bn">৳১,২৫০.০০</span> instead of ৳1,250.00. English pages always use 0–9.
+          </p>
+        </div>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </CardContent>
     </Card>
   )
@@ -386,6 +472,7 @@ export function StorefrontSettingsPage() {
             <StatusCard settings={settings.data} primary={domains.data.find((d) => d.is_primary)} canManage={canManage} />
             <DetailsCard settings={settings.data} canManage={canManage} />
             <SearchEnginesCard settings={settings.data} canManage={canManage} />
+            <LanguagesCard settings={settings.data} canManage={canManage} />
             <AvailabilityCard settings={settings.data} canManage={canManage} />
             <CheckoutCard settings={settings.data} canManage={canManage} />
           </div>

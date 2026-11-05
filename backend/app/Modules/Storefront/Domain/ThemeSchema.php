@@ -55,6 +55,8 @@ final class ThemeSchema
                 'foreground' => '#ffffff',
                 'starts_at' => null,
                 'ends_at' => null,
+                // E12b: {"bn": {"text": "…"}} or null.
+                'translations' => null,
             ],
             'footer' => [
                 'about' => null,

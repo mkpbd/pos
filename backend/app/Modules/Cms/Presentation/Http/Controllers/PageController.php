@@ -8,6 +8,7 @@ use App\Modules\Cms\Domain\PageStatus;
 use App\Modules\Cms\Domain\PageTemplate;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Presentation\Http\Support\CmsPresenter;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
@@ -85,6 +86,8 @@ class PageController
             'published_at' => ['sometimes', 'nullable', 'date'],
             'seo_title' => ['sometimes', 'nullable', 'string', 'max:160'],
             'seo_description' => ['sometimes', 'nullable', 'string', 'max:300'],
+            // E12b: {bn: {title, body_html, seo_title, seo_description}} (partial; blank removes).
+            ...TranslationInput::rules(SavePage::TRANSLATABLE),
         ];
     }
 }

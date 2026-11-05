@@ -2,6 +2,8 @@
 
 namespace App\Modules\Shipping\Infrastructure;
 
+use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shipping\Application\Contracts\ShippingRates;
 use App\Modules\Shipping\Infrastructure\Models\ShippingMethod;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
@@ -9,6 +11,9 @@ use App\Modules\Shipping\Infrastructure\Models\ShippingZoneDistrict;
 
 class EloquentShippingRates implements ShippingRates
 {
+    /** E12b: names and descriptions in the request's language (orders snapshot the base name). */
+    public function __construct(private readonly LocaleContext $locale) {}
+
     public function methodsForDistrict(int $districtId): array
     {
         $zoneId = ShippingZoneDistrict::query()->where('district_id', $districtId)->value('zone_id');
@@ -21,7 +26,7 @@ class EloquentShippingRates implements ShippingRates
             ->where('is_active', true)
             ->orderBy('sort_order')->orderBy('name')
             ->get()
-            ->map(fn (ShippingMethod $m) => self::option($m))
+            ->map(fn (ShippingMethod $m) => self::option($m, $this->locale->current()))
             ->values()
             ->all();
     }
@@ -40,12 +45,12 @@ class EloquentShippingRates implements ShippingRates
     /**
      * @return array{id: string, name: string, description: ?string, fee: string, free_over: ?string, cod_allowed: bool, cod_fee: string, eta_min_days: int, eta_max_days: int}
      */
-    public static function option(ShippingMethod $m): array
+    public static function option(ShippingMethod $m, string $locale = LocaleContext::BASE): array
     {
         return [
             'id' => $m->id,
-            'name' => $m->name,
-            'description' => $m->description,
+            'name' => Translations::pick($m, 'name', $locale),
+            'description' => Translations::pick($m, 'description', $locale),
             'fee' => (string) $m->fee,
             'free_over' => $m->free_over === null ? null : (string) $m->free_over,
             'cod_allowed' => $m->cod_allowed,

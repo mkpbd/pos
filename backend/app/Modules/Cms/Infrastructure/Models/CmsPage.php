@@ -26,8 +26,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ?string $seo_title
  * @property ?string $seo_description
  * @property ?CarbonImmutable $updated_at
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'slug', 'title', 'body_html', 'template', 'status', 'published_at', 'seo_title', 'seo_description'])]
+#[Fillable(['organization_id', 'slug', 'title', 'body_html', 'template', 'status', 'published_at', 'seo_title', 'seo_description', 'translations'])]
 class CmsPage extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, SoftDeletes, TracksAuthor;
@@ -44,6 +45,7 @@ class CmsPage extends Model
             'status' => PageStatus::class,
             'published_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
+            'translations' => 'array',
         ];
     }
 

@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect } from 'react'
 import { Outlet } from 'react-router'
 import { ApiError } from '@/lib/api/client'
-import { BootstrapContext, useBootstrapQuery } from '../api'
+import { BootstrapContext } from '../api'
 import { CartDrawerProvider } from '../cart/mini-cart'
 import { QuickViewProvider } from '../catalog/quick-view'
+import { LocaleContext, useLocale } from '../i18n/locale'
+import { useLocaleController } from '../i18n/use-locale-controller'
 import { PopupBanner } from '../popup/popup-banner'
 import { applyCssVars, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
@@ -14,42 +16,57 @@ import { SiteHeader } from './site-header'
 import { StoreErrorView, StoreLoadingView, StoreNotFoundView } from './state-views'
 
 /**
- * Root of every storefront page: loads the bootstrap (inline or fetched), applies the
- * theme, and frames the page with announcement, header and footer.
+ * Root of every storefront page: resolves the language and loads the bootstrap in it (inline
+ * or fetched), applies the theme, and frames the page with announcement, header and footer.
  */
 export function StorefrontLayout() {
-  const query = useBootstrapQuery()
+  const { bootstrap: query, locale } = useLocaleController()
 
-  if (query.data) {
+  if (query.data && locale) {
     return (
-      <BootstrapContext value={query.data}>
-        <ThemeEffects bootstrap={query.data} />
-        <NoticeProvider>
-          <CartDrawerProvider>
-            <div className="flex min-h-screen flex-col">
-              <a href="#main" className="sr-only z-50 bg-sf-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
-                Skip to content
-              </a>
-              {query.data.preview && <PreviewRibbon />}
-              {query.data.theme.announcement && <AnnouncementBar announcement={query.data.theme.announcement} />}
-              <SiteHeader />
-              <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-                <QuickViewProvider>
-                  <Outlet />
-                </QuickViewProvider>
-              </main>
-              <SiteFooter />
-            </div>
-            <PopupBanner />
-          </CartDrawerProvider>
-        </NoticeProvider>
-      </BootstrapContext>
+      <LocaleContext value={locale}>
+        <BootstrapContext value={query.data}>
+          <ThemeEffects bootstrap={query.data} />
+          <NoticeProvider>
+            <CartDrawerProvider>
+              <StoreFrame bootstrap={query.data} />
+              <PopupBanner />
+            </CartDrawerProvider>
+          </NoticeProvider>
+        </BootstrapContext>
+      </LocaleContext>
     )
   }
 
-  if (query.error instanceof ApiError && query.error.code === 'STOREFRONT_NOT_FOUND') return <StoreNotFoundView />
-  if (query.error) return <StoreErrorView onRetry={() => void query.refetch()} retrying={query.isFetching} />
-  return <StoreLoadingView />
+  const view =
+    query.error instanceof ApiError && query.error.code === 'STOREFRONT_NOT_FOUND' ? (
+      <StoreNotFoundView />
+    ) : query.error ? (
+      <StoreErrorView onRetry={() => void query.refetch()} retrying={query.isFetching} />
+    ) : (
+      <StoreLoadingView />
+    )
+  return locale ? <LocaleContext value={locale}>{view}</LocaleContext> : view
+}
+
+function StoreFrame({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
+  const { t } = useLocale()
+  return (
+    <div className="flex min-h-screen flex-col">
+      <a href="#main" className="sr-only z-50 bg-sf-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
+        {t('common.skipToContent')}
+      </a>
+      {bootstrap.preview && <PreviewRibbon />}
+      {bootstrap.theme.announcement && <AnnouncementBar announcement={bootstrap.theme.announcement} />}
+      <SiteHeader />
+      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
+        <QuickViewProvider>
+          <Outlet />
+        </QuickViewProvider>
+      </main>
+      <SiteFooter />
+    </div>
+  )
 }
 
 /**

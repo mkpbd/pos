@@ -12,9 +12,9 @@ use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
  */
 final class ListingMedia
 {
-    public const AUDITED_CATEGORY = ['slug', 'is_visible', 'image_media_id', 'banner_media_id', 'seo_title', 'seo_description'];
+    public const AUDITED_CATEGORY = ['slug', 'is_visible', 'image_media_id', 'banner_media_id', 'seo_title', 'seo_description', 'translations'];
 
-    public const AUDITED_BRAND = ['slug', 'is_visible', 'logo_media_id', 'description', 'seo_title', 'seo_description'];
+    public const AUDITED_BRAND = ['slug', 'is_visible', 'logo_media_id', 'description', 'seo_title', 'seo_description', 'translations'];
 
     /**
      * @param  list<?string>  $ids

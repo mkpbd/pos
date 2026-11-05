@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import type { PaymentGateway, PaymentGatewayInput } from '@/features/online-payments/api'
+import { readBn, toTranslationsInput, translationsSchema } from '@/features/translations/translations'
 import { MONEY_PATTERN } from '@/lib/money'
+
+export const DISPLAY_NAME_MAX = 60
+export const INSTRUCTIONS_MAX = 2000
+/** Translatable checkout texts (E12b). */
+const GATEWAY_TRANSLATIONS = [{ name: 'display_name', max: DISPLAY_NAME_MAX }, { name: 'instructions', max: INSTRUCTIONS_MAX }] as const
+const GATEWAY_TRANSLATION_NAMES = GATEWAY_TRANSLATIONS.map((f) => f.name)
 
 /** Methods configured in this phase, in display order (online gateways arrive later). */
 export const OFFLINE_CODES = ['cod', 'bank_transfer'] as const
@@ -26,6 +33,7 @@ export const gatewaySchema = z
     instructions: z.string().trim().max(2000),
     hold_hours: z.string().trim(),
     max_order_total: z.string().trim(),
+    translations: translationsSchema(GATEWAY_TRANSLATIONS),
   })
   .superRefine((v, ctx) => {
     if (v.code === 'bank_transfer') {
@@ -39,7 +47,7 @@ export const gatewaySchema = z
   })
 
 export type GatewayValues = z.infer<typeof gatewaySchema>
-export const GATEWAY_FIELDS = ['is_enabled', 'display_name', 'instructions', 'hold_hours', 'max_order_total'] as const
+export const GATEWAY_FIELDS = ['is_enabled', 'display_name', 'instructions', 'hold_hours', 'max_order_total', 'translations'] as const
 
 const text = (v: unknown): string => (typeof v === 'number' || typeof v === 'string' ? String(v) : '')
 
@@ -51,6 +59,7 @@ export function toGatewayValues(g: PaymentGateway): GatewayValues {
     instructions: g.instructions ?? '',
     hold_hours: text(g.settings.hold_hours) || '48',
     max_order_total: text(g.settings.max_order_total),
+    translations: { bn: readBn(g.translations, GATEWAY_TRANSLATION_NAMES) },
   }
 }
 
@@ -59,5 +68,12 @@ export function toGatewayInput(g: PaymentGateway, v: GatewayValues): PaymentGate
   const settings: Record<string, unknown> = { ...g.settings }
   if (g.code === 'bank_transfer') settings.hold_hours = Number(v.hold_hours)
   if (g.code === 'cod') settings.max_order_total = v.max_order_total || null
-  return { is_enabled: v.is_enabled, display_name: v.display_name, instructions: v.instructions || null, settings, sort_order: g.sort_order }
+  return {
+    is_enabled: v.is_enabled,
+    display_name: v.display_name,
+    instructions: v.instructions || null,
+    settings,
+    sort_order: g.sort_order,
+    translations: toTranslationsInput(v.translations.bn, GATEWAY_TRANSLATION_NAMES, g.translations),
+  }
 }

@@ -7,6 +7,7 @@ use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\Changes;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,9 @@ use Illuminate\Support\Facades\DB;
 class ManageBlogCategories
 {
     public const MAX_CATEGORIES = 100;
+
+    /** E12b: translatable texts with the limits of their base fields. */
+    public const TRANSLATABLE = ['name' => ['max:80'], 'description' => ['max:300']];
 
     public function __construct(
         private readonly AuditTrail $audit,
@@ -49,6 +53,9 @@ class ManageBlogCategories
                     throw new BusinessRuleViolation('LIMIT_REACHED', 'The blog can have at most '.self::MAX_CATEGORIES.' categories.');
                 }
                 $attributes['sort_order'] ??= (int) BlogCategory::query()->max('sort_order') + 1;
+            }
+            if (array_key_exists('translations', $attributes)) {
+                $attributes['translations'] = TranslationInput::apply($category->translations, $attributes['translations'], array_keys(self::TRANSLATABLE));
             }
             $category->fill($attributes);
             $category->save();
@@ -110,6 +117,7 @@ class ManageBlogCategories
             'slug' => $category->slug,
             'description' => $category->description,
             'sort_order' => $category->sort_order,
+            'translations' => $category->translations,
         ];
     }
 }

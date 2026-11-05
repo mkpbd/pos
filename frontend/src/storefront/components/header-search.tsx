@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { MIN_SUGGEST_LENGTH, useSearchSuggestionsQuery } from '../catalog/api'
 import { searchUrl } from '../catalog/listing-params'
 import { ProductImage } from '../catalog/product-image'
+import { useLocale } from '../i18n/locale'
 import { usePriceFormat } from '../money'
 
 type Option = { id: string; url: string; kind: 'product' | 'category' | 'search'; label: string; image?: { url: string; alt: string | null } | null; price?: string }
@@ -31,6 +32,7 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
   const listId = `${id}-list`
   const navigate = useNavigate()
   const format = usePriceFormat()
+  const { t } = useLocale()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [value, setValue] = useState(initialValue)
@@ -45,7 +47,7 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
   if (ready && suggestions.data) {
     for (const p of suggestions.data.products) options.push({ id: `${id}-p-${p.slug}`, url: p.url, kind: 'product', label: p.name, image: p.image, price: p.price })
     for (const c of suggestions.data.categories) options.push({ id: `${id}-c-${c.slug}`, url: c.url, kind: 'category', label: c.name })
-    options.push({ id: `${id}-all`, url: searchUrl(term), kind: 'search', label: `Search for “${term}”` })
+    options.push({ id: `${id}-all`, url: searchUrl(term), kind: 'search', label: t('shell.search.searchFor', { term }) })
   }
   const expanded = open && value.trim().length >= MIN_SUGGEST_LENGTH && (ready || suggestions.isFetching)
   const activeOption = expanded ? options[active] : undefined
@@ -117,8 +119,8 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
   )
 
   return (
-    <form role="search" onSubmit={submit} className={cn('relative', className)} aria-label="Products">
-      <label htmlFor={`${id}-input`} className="sr-only">Search products</label>
+    <form role="search" onSubmit={submit} className={cn('relative', className)} aria-label={t('shell.search.form')}>
+      <label htmlFor={`${id}-input`} className="sr-only">{t('shell.search.label')}</label>
       <div className="flex h-11 items-center rounded-full border-2 border-sf-border bg-sf-surface pl-5 focus-within:border-sf-accent">
         <input
           ref={inputRef}
@@ -132,7 +134,7 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
           autoComplete="off"
           enterKeyHint="search"
           maxLength={100}
-          placeholder="Search products…"
+          placeholder={t('shell.search.placeholder')}
           autoFocus={autoFocus}
           value={value}
           onChange={(e) => {
@@ -145,7 +147,7 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
           onKeyDown={onKeyDown}
           className="h-full min-w-0 flex-1 bg-transparent text-sm text-sf-heading outline-none placeholder:text-sf-text [&::-webkit-search-cancel-button]:hidden"
         />
-        <button type="submit" aria-label="Search" className="m-1 grid size-8 shrink-0 place-items-center rounded-full bg-sf-accent text-sf-accent-foreground transition hover:brightness-110">
+        <button type="submit" aria-label={t('shell.search.submit')} className="m-1 grid size-8 shrink-0 place-items-center rounded-full bg-sf-accent text-sf-accent-foreground transition hover:brightness-110">
           <SearchIcon aria-hidden className="size-4" />
         </button>
       </div>
@@ -154,26 +156,26 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
         className={cn('absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-sf-card border bg-sf-surface py-2 shadow-xl', !expanded && 'hidden')}
         data-testid="search-suggestions"
       >
-        <ul id={listId} role="listbox" aria-label="Suggestions" className="max-h-[70vh] overflow-y-auto">
+        <ul id={listId} role="listbox" aria-label={t('shell.search.suggestions')} className="max-h-[70vh] overflow-y-auto">
           {products.length > 0 && (
             <li role="presentation">
-              <p className="px-4 pt-1 pb-1 text-xs font-bold tracking-wide uppercase" id={`${id}-products`}>Products</p>
+              <p className="px-4 pt-1 pb-1 text-xs font-bold tracking-wide uppercase" id={`${id}-products`}>{t('shell.search.products')}</p>
               <ul role="group" aria-labelledby={`${id}-products`}>{products.map(renderOption)}</ul>
             </li>
           )}
           {categories.length > 0 && (
             <li role="presentation">
-              <p className="px-4 pt-2 pb-1 text-xs font-bold tracking-wide uppercase" id={`${id}-categories`}>Categories</p>
+              <p className="px-4 pt-2 pb-1 text-xs font-bold tracking-wide uppercase" id={`${id}-categories`}>{t('shell.search.categories')}</p>
               <ul role="group" aria-labelledby={`${id}-categories`}>{categories.map(renderOption)}</ul>
             </li>
           )}
           {all && renderOption(all)}
         </ul>
-        {empty && <p className="px-4 pt-1 text-sm">No matching products.</p>}
-        {!ready && <p className="px-4 py-1 text-sm">Searching…</p>}
+        {empty && <p className="px-4 pt-1 text-sm">{t('shell.search.noMatches')}</p>}
+        {!ready && <p className="px-4 py-1 text-sm">{t('shell.search.searching')}</p>}
       </div>
       <p role="status" className="sr-only">
-        {expanded && ready ? (empty ? 'No suggestions' : `${products.length + categories.length} suggestions available`) : ''}
+        {expanded && ready ? (empty ? t('shell.search.noSuggestions') : t('shell.search.available', { count: products.length + categories.length })) : ''}
       </p>
     </form>
   )

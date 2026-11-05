@@ -20,7 +20,9 @@ import { MAX_PAYMENT_LOGOS, SOCIAL_NETWORKS, THEME_COLORS, type SocialNetwork, u
 import { ColorField } from '@/features/storefront/components/color-field'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { contrastRatio, meetsAA } from '@/features/storefront/contrast'
-import { COLOR_LABELS, contrastPairs, THEME_FIELDS, themeSchema, toDocument, toFormValues, type ThemeFormValues } from '@/features/storefront/theme-form'
+import { ANNOUNCEMENT_TEXT_MAX, COLOR_LABELS, contrastPairs, THEME_FIELDS, themeSchema, toDocument, toFormValues, type ThemeFormValues } from '@/features/storefront/theme-form'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { rhfBnErrors, type TranslationsMap } from '@/features/translations/translations'
 import { handleFormError } from '@/lib/forms'
 
 const FONT_LABELS: Record<string, string> = { baloo: 'Baloo (rounded, playful)', poppins: 'Poppins (geometric)', system: 'System font' }
@@ -91,11 +93,11 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
   }, [theme.settings, form])
 
   const onSubmit = form.handleSubmit(
-    (v) => save.mutate(toDocument(v), { onSuccess: () => toast.success('Theme saved.'), onError: (e) => handleFormError(e, form.setError, THEME_FIELDS, { nested: true }) }),
+    (v) => save.mutate(toDocument(v, theme.settings.announcement.translations as TranslationsMap), { onSuccess: () => toast.success('Theme saved.'), onError: (e) => handleFormError(e, form.setError, THEME_FIELDS, { nested: true }) }),
     () => toast.error('Please correct the highlighted fields.'),
   )
 
-  const announcementEnabled = useWatch({ control, name: 'announcement.enabled' })
+  const [announcementEnabled, announcementText] = useWatch({ control, name: ['announcement.enabled', 'announcement.text'] })
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
@@ -199,8 +201,18 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
               </div>
             )} />
             <FormField label="Text" error={errors.announcement?.text?.message} className="sm:col-span-2" hint={announcementEnabled ? undefined : 'Saved but hidden while switched off.'}>
-              <Input maxLength={200} {...register('announcement.text')} />
+              <Input maxLength={ANNOUNCEMENT_TEXT_MAX} {...register('announcement.text')} />
             </FormField>
+            <Controller control={control} name="announcement.translations.bn" render={({ field }) => (
+              <BanglaTranslations
+                className="sm:col-span-2"
+                fields={[{ name: 'text', label: 'Announcement text', base: announcementText, max: ANNOUNCEMENT_TEXT_MAX }]}
+                value={field.value}
+                onChange={field.onChange}
+                errors={rhfBnErrors(errors.announcement?.translations)}
+                disabled={!canManage}
+              />
+            )} />
             <FormField label="Link (optional)" error={errors.announcement?.link?.message} hint="/sale or https://…" className="sm:col-span-2">
               <Input {...register('announcement.link')} />
             </FormField>

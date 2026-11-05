@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { LockIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { primaryButtonClass } from '../account/form-controls'
+import { useLocale } from '../i18n/locale'
 import type { Cart } from '../types'
 import { cartNeedsAttention } from './cart-helpers'
 
@@ -12,14 +13,15 @@ import { cartNeedsAttention } from './cart-helpers'
  */
 export function CheckoutButton({ cart, onNavigate, className }: { cart: Cart; onNavigate?: () => void; className?: string }) {
   const reasonId = useId()
-  const reason = cart.items.length === 0 ? 'Your cart is empty.' : cartNeedsAttention(cart) ? 'Please fix the items marked in your cart before checking out.' : null
+  const { t } = useLocale()
+  const reason = cart.items.length === 0 ? t('cart.checkoutBlocked.empty') : cartNeedsAttention(cart) ? t('cart.checkoutBlocked.fix') : null
 
   if (reason) {
     return (
       <div className={cn('flex flex-col gap-2', className)}>
         <button type="button" className={primaryButtonClass} disabled aria-describedby={reasonId}>
           <LockIcon aria-hidden className="size-4" />
-          Checkout
+          {t('cart.checkout')}
         </button>
         <p id={reasonId} className="text-sm text-sf-sale" data-testid="checkout-blocked">
           {reason}
@@ -30,7 +32,7 @@ export function CheckoutButton({ cart, onNavigate, className }: { cart: Cart; on
   return (
     <Link to="/checkout" onClick={onNavigate} className={cn(primaryButtonClass, className)}>
       <LockIcon aria-hidden className="size-4" />
-      Checkout
+      {t('cart.checkout')}
     </Link>
   )
 }

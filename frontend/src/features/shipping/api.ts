@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
 
 export type Division = { id: number; name: string; name_bn?: string }
@@ -18,6 +19,8 @@ export type ShippingMethod = {
   eta_max_days: number
   is_active: boolean
   sort_order: number
+  /** Bangla texts (E12b): name, description. */
+  translations?: TranslationsMap
 }
 
 export type ShippingZone = {
@@ -31,7 +34,7 @@ export type ShippingZone = {
 
 export type ZoneInput = { name: string; is_active: boolean; sort_order: number; district_ids: number[] }
 
-export type MethodInput = Omit<ShippingMethod, 'id' | 'zone_id'>
+export type MethodInput = Omit<ShippingMethod, 'id' | 'zone_id' | 'translations'> & { translations?: TranslationsInput }
 
 export const shippingKeys = {
   all: ['shipping'] as const,

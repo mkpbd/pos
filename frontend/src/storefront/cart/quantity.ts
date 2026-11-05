@@ -1,5 +1,7 @@
 import { ApiError } from '@/lib/api/client'
 import { addDecimal, compareDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
+import { formatNumber } from '../i18n/format'
+import type { Translate } from '../i18n/translate'
 
 /**
  * Cart quantities are decimal strings (NUMERIC(18,3) on the server): integers unless the
@@ -62,28 +64,29 @@ export function maxQuantityHint(error: unknown): string | null {
 }
 
 /** A shopper-facing message for a failed add / quantity change. */
-export function cartErrorMessage(error: unknown): string {
+export function cartErrorMessage(error: unknown, t: Translate): string {
   if (error instanceof ApiError) {
     switch (error.code) {
       case 'VARIANT_NOT_PURCHASABLE':
-        return 'This product is not available any more.'
+        return t('cart.error.notPurchasable')
       case 'OUT_OF_STOCK':
-        return 'Sorry, this item is out of stock.'
+        return t('cart.error.outOfStock')
       case 'INSUFFICIENT_STOCK': {
         const max = maxQuantityHint(error)
-        return max && max !== '0' ? `Only ${max} available.` : 'Sorry, there is not enough stock.'
+        return max && max !== '0' ? t('cart.error.onlyAvailable', { max: formatNumber(max) }) : t('cart.error.notEnoughStock')
       }
       case 'CART_FULL':
-        return 'Your cart is full. Remove an item to add another.'
+        return t('cart.error.cartFull')
       case 'VALIDATION_FAILED': {
+        // The server's field message (it answers in the request's language when it can).
         const first = Object.values(error.fieldErrors)[0]?.[0]
-        return first ?? 'Please check the quantity.'
+        return first ?? t('cart.error.checkQuantity')
       }
       case 'NOT_FOUND':
-        return 'This item is no longer in your cart.'
+        return t('cart.error.lineGone')
     }
-    if (error.status === 429) return 'Too many requests. Please wait a moment and try again.'
-    if (error.status === 419) return 'Your session expired. Please reload the page and try again.'
+    if (error.status === 429) return t('cart.error.tooManyRequests')
+    if (error.status === 419) return t('cart.error.sessionExpired')
   }
-  return 'Something went wrong. Please try again.'
+  return t('common.genericError')
 }

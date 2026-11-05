@@ -14,6 +14,7 @@ use App\Modules\Promotions\Infrastructure\Models\PromotionTarget;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Instants;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,9 @@ class SavePromotion
     ];
 
     public const MAX_TARGETS = 500;
+
+    /** E12b: texts shoppers see, translatable with the limits of their base fields. */
+    public const TRANSLATABLE = ['name' => ['max:80'], 'description' => ['max:200']];
 
     public function __construct(
         private readonly TenantContext $tenant,
@@ -139,6 +143,10 @@ class SavePromotion
             throw ValidationException::withMessages($errors);
         }
 
+        if (array_key_exists('translations', $data)) {
+            $attributes['translations'] = TranslationInput::apply($promotion->translations, $data['translations'], array_keys(self::TRANSLATABLE));
+        }
+
         return DB::transaction(function () use ($promotion, $attributes, $targetIds, $scope, $code, $creating) {
             $before = $creating ? [] : $this->snapshot($promotion);
             $promotion->fill($attributes);
@@ -228,6 +236,7 @@ class SavePromotion
             'is_active' => $promotion->is_active,
             'usage_limit' => $promotion->usage_limit,
             'usage_limit_per_customer' => $promotion->usage_limit_per_customer,
+            'translations' => $promotion->translations,
         ];
     }
 }

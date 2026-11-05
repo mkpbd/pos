@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { useStorefront } from './api'
+import { useLocale } from './i18n/locale'
+import type { Locale } from './i18n/runtime'
 
 /**
  * What a page tells search engines and link previews. The server writes the same tags on the
@@ -23,7 +25,12 @@ export type DocumentMeta = {
 
 export const ROBOTS_NOINDEX = 'noindex, follow'
 
-type Defaults = { storeName: string; description: string | null; noindex: boolean }
+/** The page's language and the store's languages: canonical and hreflang links depend on them (ADR-011). */
+export type MetaLocale = { locale: Locale; defaultLocale: Locale; locales: readonly Locale[] }
+
+type Defaults = { storeName: string; description: string | null; noindex: boolean; language?: MetaLocale }
+
+const OG_LOCALES: Record<Locale, string> = { en: 'en_US', bn: 'bn_BD' }
 
 function absolute(pathOrUrl: string): string {
   try {
@@ -33,10 +40,27 @@ function absolute(pathOrUrl: string): string {
   }
 }
 
-/** The canonical URL of a location: origin + path, plus `?page=N` when N > 1; filters, sort and the like are dropped. */
-export function canonicalFor(pathname: string, search = ''): string {
+/**
+ * The canonical URL of a location: origin + path, plus `?page=N` when N > 1; filters, sort and the
+ * like are dropped. `?lang=` stays only for a language other than the store default.
+ */
+export function canonicalFor(pathname: string, search = '', locale?: Locale, defaultLocale: Locale = 'en'): string {
   const page = Number(new URLSearchParams(search).get('page'))
-  return absolute(pathname) + (Number.isInteger(page) && page > 1 ? `?page=${page}` : '')
+  return withLang(absolute(pathname) + (Number.isInteger(page) && page > 1 ? `?page=${page}` : ''), locale, defaultLocale)
+}
+
+/** A URL in a language: `lang` set when it is not the store default, removed otherwise. */
+export function withLang(href: string, locale: Locale | undefined, defaultLocale: Locale = 'en'): string {
+  if (!locale) return href
+  let url: URL
+  try {
+    url = new URL(href, window.location.origin)
+  } catch {
+    return href
+  }
+  if (locale === defaultLocale) url.searchParams.delete('lang')
+  else url.searchParams.set('lang', locale)
+  return url.href
 }
 
 function setMeta(attribute: 'name' | 'property', key: string, content: string | null | undefined) {
@@ -53,6 +77,23 @@ function setMeta(attribute: 'name' | 'property', key: string, content: string | 
   element.setAttribute('content', content)
 }
 
+/** `<link rel="alternate" hreflang>` for each language plus x-default; none for a single-language store. */
+function setAlternates(base: string, language: MetaLocale | undefined) {
+  document.head.querySelectorAll('link[rel="alternate"][hreflang]').forEach((link) => link.remove())
+  if (!language || language.locales.length < 2) return
+  const entries: [string, string][] = [
+    ...language.locales.map((locale): [string, string] => [locale, withLang(base, locale, language.defaultLocale)]),
+    ['x-default', withLang(base, language.defaultLocale, language.defaultLocale)],
+  ]
+  for (const [hreflang, href] of entries) {
+    const link = document.createElement('link')
+    link.rel = 'alternate'
+    link.hreflang = hreflang
+    link.href = href
+    document.head.appendChild(link)
+  }
+}
+
 function setCanonical(href: string) {
   let link = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')
   if (!link) {
@@ -67,7 +108,9 @@ function setCanonical(href: string) {
 export function applyDocumentMeta(meta: DocumentMeta, defaults: Defaults, location: { pathname: string; search: string }) {
   const title = meta.title ? `${meta.title} | ${defaults.storeName}` : defaults.storeName
   const description = meta.description || defaults.description
-  const canonical = meta.canonical ? absolute(meta.canonical) : canonicalFor(location.pathname, location.search)
+  const language = defaults.language
+  const base = meta.canonical ? absolute(meta.canonical) : canonicalFor(location.pathname, location.search)
+  const canonical = withLang(base, language?.locale, language?.defaultLocale)
 
   document.title = title
   setMeta('name', 'description', description)
@@ -78,6 +121,8 @@ export function applyDocumentMeta(meta: DocumentMeta, defaults: Defaults, locati
   setMeta('property', 'og:description', description)
   setMeta('property', 'og:url', canonical)
   setMeta('property', 'og:image', meta.image ? absolute(meta.image) : null)
+  setMeta('property', 'og:locale', language && language.locales.length > 1 ? OG_LOCALES[language.locale] : null)
+  setAlternates(base, language)
 }
 
 /**
@@ -92,14 +137,17 @@ export function useDocumentMeta(meta: DocumentMeta | null) {
   const storeName = store.name
   const description = store.description
   const storeNoindex = preview || store.allow_indexing === false
+  const { locale, defaultLocale, locales } = useLocale()
+  const languages = locales.join(',')
 
   useEffect(() => {
     if (key === null) return
-    const defaults: Defaults = { storeName, description, noindex: storeNoindex }
+    const language: MetaLocale = { locale, defaultLocale, locales: languages.split(',') as Locale[] }
+    const defaults: Defaults = { storeName, description, noindex: storeNoindex, language }
     applyDocumentMeta(JSON.parse(key) as DocumentMeta, defaults, { pathname, search })
     // The next page (if any) applies its own right after this.
     return () => applyDocumentMeta({}, defaults, window.location)
-  }, [key, storeName, description, storeNoindex, pathname, search])
+  }, [key, storeName, description, storeNoindex, pathname, search, locale, defaultLocale, languages])
 }
 
 /** A page that is personal or transactional (cart, checkout, account, orders): titled, never indexed. */

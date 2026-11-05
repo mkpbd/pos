@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
-import { checkoutKeys, customerKeys } from '../store-keys'
+import { useLocale } from '../i18n/locale'
+import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { Cart } from '../types'
 
 /**
@@ -10,8 +11,9 @@ import type { Cart } from '../types'
  * cached one — nothing is computed here.
  */
 export function useCartQuery() {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.cart,
+    queryKey: localized(customerKeys.cart, locale),
     queryFn: ({ signal }) => storeApi.get<Cart>('/store/cart', { signal }).then((r) => r.data),
     staleTime: 30_000,
     retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,
@@ -20,10 +22,11 @@ export function useCartQuery() {
 
 function useCartMutation<V>(request: (variables: V) => Promise<Cart>) {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: request,
     onSuccess: (cart) => {
-      if (cart) queryClient.setQueryData(customerKeys.cart, cart)
+      if (cart) setLocalizedData(queryClient, customerKeys.cart, locale, cart)
       else void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
       // A cached checkout summary priced the old cart (lines, coupon): price it afresh next time.
       void queryClient.invalidateQueries({ queryKey: checkoutKeys.previewAll })

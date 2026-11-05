@@ -1,13 +1,18 @@
 import { createContext, useContext } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { api, ApiError } from '@/lib/api/client'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { ApiError } from '@/lib/api/client'
 import { storeApi } from './http'
+import { useLocale } from './i18n/locale'
+import { parseLocale, type Locale } from './i18n/runtime'
+import { localized } from './store-keys'
 import type { ContactInput, StorefrontBootstrap, StorefrontHomepage, StorePage } from './types'
 
 export const BOOTSTRAP_ELEMENT_ID = 'storefront-bootstrap'
 
 export const storefrontKeys = {
   bootstrap: ['store', 'bootstrap'] as const,
+  /** The bootstrap as asked for: a language, or `default` (no `lang`: the store's default language). */
+  bootstrapFor: (requested: Locale | null) => ['store', 'bootstrap', requested ?? 'default'] as const,
   homepage: (preview: boolean) => ['store', 'homepage', { preview }] as const,
   homepageAll: ['store', 'homepage'] as const,
   page: (slug: string) => ['store', 'pages', slug] as const,
@@ -27,15 +32,48 @@ export function readInlineBootstrap(doc: Document = document): StorefrontBootstr
   }
 }
 
-export async function fetchBootstrap(signal?: AbortSignal): Promise<StorefrontBootstrap> {
-  return (await api.get<StorefrontBootstrap>('/store/bootstrap', { signal })).data
+/** `requested`: the language from `?lang=` or the cookie; null asks for the store's default language. */
+export async function fetchBootstrap(requested: Locale | null, signal?: AbortSignal): Promise<StorefrontBootstrap> {
+  return (await storeApi.get<StorefrontBootstrap>('/store/bootstrap', { signal, query: { lang: requested ?? undefined } })).data
 }
 
-export function useBootstrapQuery() {
+/** The languages a bootstrap payload offers (English only for payloads from before E12b). */
+export function storeLocales(bootstrap: StorefrontBootstrap): Locale[] {
+  const locales = (bootstrap.store.locales ?? []).map(parseLocale).filter((locale): locale is Locale => locale !== null)
+  return locales.length > 0 ? locales : ['en']
+}
+
+/** The store's default language, when it is one of its languages; else English. */
+export function storeDefaultLocale(bootstrap: StorefrontBootstrap): Locale {
+  const fallback = parseLocale(bootstrap.store.default_locale)
+  return fallback && storeLocales(bootstrap).includes(fallback) ? fallback : (storeLocales(bootstrap)[0] ?? 'en')
+}
+
+/** The language to show: the requested one when the store offers it, else the payload's resolved language, else the default. */
+export function resolveLocale(bootstrap: StorefrontBootstrap, requested: Locale | null): Locale {
+  const locales = storeLocales(bootstrap)
+  if (requested && locales.includes(requested)) return requested
+  const resolved = parseLocale(bootstrap.locale)
+  return resolved && locales.includes(resolved) ? resolved : storeDefaultLocale(bootstrap)
+}
+
+/**
+ * The inline payload when it answers the request: the shell resolved it with the same rule
+ * (`?lang=` > cookie > default), so it does unless the language changed since.
+ */
+function inlineBootstrapFor(requested: Locale | null): StorefrontBootstrap | undefined {
+  const inline = readInlineBootstrap()
+  if (!inline || requested === null) return inline
+  return resolveLocale(inline, requested) === resolveLocale(inline, null) ? inline : undefined
+}
+
+export function useBootstrapQuery(requested: Locale | null = null) {
   return useQuery({
-    queryKey: storefrontKeys.bootstrap,
-    queryFn: ({ signal }) => fetchBootstrap(signal),
-    initialData: readInlineBootstrap,
+    queryKey: storefrontKeys.bootstrapFor(requested),
+    queryFn: ({ signal }) => fetchBootstrap(requested, signal),
+    initialData: () => inlineBootstrapFor(requested),
+    // Switching the language keeps the page on screen while the payload in the new language loads.
+    placeholderData: keepPreviousData,
     staleTime: 5 * 60_000,
   })
 }
@@ -51,17 +89,19 @@ export function useStorefront(): StorefrontBootstrap {
 
 /** The homepage sections. `preview` asks for hidden and scheduled sections too (staff only; ignored otherwise). */
 export function useHomepageQuery(preview: boolean) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: storefrontKeys.homepage(preview),
-    queryFn: ({ signal }) => api.get<StorefrontHomepage>('/store/homepage', { signal, query: preview ? { preview: 1 } : undefined }).then((r) => r.data),
+    queryKey: localized(storefrontKeys.homepage(preview), locale),
+    queryFn: ({ signal }) => storeApi.get<StorefrontHomepage>('/store/homepage', { signal, query: preview ? { preview: 1 } : undefined }).then((r) => r.data),
     staleTime: preview ? 0 : 60_000,
   })
 }
 
 export function useStorePageQuery(slug: string) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: storefrontKeys.page(slug),
-    queryFn: ({ signal }) => api.get<StorePage>(`/store/pages/${encodeURIComponent(slug)}`, { signal }).then((r) => r.data),
+    queryKey: localized(storefrontKeys.page(slug), locale),
+    queryFn: ({ signal }) => storeApi.get<StorePage>(`/store/pages/${encodeURIComponent(slug)}`, { signal }).then((r) => r.data),
     staleTime: 60_000,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   })

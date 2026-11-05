@@ -85,8 +85,8 @@ async function serveCatalog(page: Page) {
   await page.route('**/api/v1/store/bootstrap', (route) => route.fulfill({ json: envelope(bootstrap) }))
   await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections: [], preview: false }) }))
   // A guest with an empty cart (E7 header).
-  await page.route('**/api/v1/store/account/me', (route) => route.fulfill({ json: envelope(null) }))
-  await page.route('**/api/v1/store/cart', (route) =>
+  await page.route('**/api/v1/store/account/me*', (route) => route.fulfill({ json: envelope(null) }))
+  await page.route('**/api/v1/store/cart*', (route) =>
     route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', discount_total: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: false, currency: 'BDT', issues: [], promotions: [], free_shipping: null, coupon: null }) }),
   )
   await page.route((url) => url.pathname === '/api/v1/store/products', (route) => {
@@ -104,8 +104,8 @@ async function serveCatalog(page: Page) {
       },
     })
   })
-  await page.route('**/api/v1/store/products/kids-tee', (route) => route.fulfill({ json: envelope(tee) }))
-  await page.route('**/api/v1/store/products/kids-tee/related', (route) =>
+  await page.route('**/api/v1/store/products/kids-tee*', (route) => route.fulfill({ json: envelope(tee) }))
+  await page.route('**/api/v1/store/products/kids-tee/related*', (route) =>
     route.fulfill({ json: envelope({ related: [cards[1]], frequently_bought: [] }) }),
   )
   await page.route('**/api/v1/store/search/suggest*', (route) =>
@@ -229,7 +229,7 @@ test('search suggestions lead to a product; the quick view links to its page', a
 
 test('unknown products show the not-found page', async ({ page }) => {
   await serveCatalog(page)
-  await page.route('**/api/v1/store/products/nope', (route) =>
+  await page.route('**/api/v1/store/products/nope*', (route) =>
     route.fulfill({ status: 404, json: { success: false, error: { code: 'NOT_FOUND', message: 'Not found.', details: {} }, meta: { request_id: 'e2e' } } }),
   )
   await page.goto('/product/nope')

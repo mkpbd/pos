@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Switch } from '@/components/ui/switch'
 import { MediaField } from '@/features/media/components/media-picker'
 import type { LinkTargetBlogCategory, LinkTargetBlogPost, LinkTargetPage, LinkTargetTerm } from '@/features/storefront/api'
-import { addNode, BLOG_INDEX, decodeTarget, encodeTarget, errorKey, hasTarget, MAX_MENU_DEPTH, moveNode, removeNode, TARGET_NAMES, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
+import { addNode, BLOG_INDEX, decodeTarget, encodeTarget, errorKey, hasTarget, MAX_MENU_DEPTH, MENU_LABEL_MAX, moveNode, removeNode, TARGET_NAMES, updateNode, type EditorNode, type NodePath } from '@/features/storefront/menu-tree'
+import { BanglaInput } from '@/features/translations/components/bangla-translations'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -57,8 +58,17 @@ function NodeEditor({ node, path, siblings, ...props }: Props & { node: EditorNo
       <div className="flex flex-col gap-3 rounded-md border bg-card p-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <Input aria-label={`${name} label`} placeholder="Label" value={node.label} maxLength={80} disabled={readOnly} aria-invalid={errors[`${key}.label`] ? true : undefined} onChange={(e) => patch({ label: e.target.value })} />
+            <Input aria-label={`${name} label`} placeholder="Label" value={node.label} maxLength={MENU_LABEL_MAX} disabled={readOnly} aria-invalid={errors[`${key}.label`] ? true : undefined} onChange={(e) => patch({ label: e.target.value })} />
             {errors[`${key}.label`] && <p className="text-sm text-destructive">{errors[`${key}.label`]}</p>}
+            <BanglaInput
+              label={`${name} Bangla label`}
+              base={node.label}
+              value={node.bn_label}
+              max={MENU_LABEL_MAX}
+              disabled={readOnly}
+              error={errors[`${key}.translations.bn.label`]}
+              onChange={(bn_label) => patch({ bn_label })}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <div className="flex gap-2">

@@ -6,6 +6,8 @@ use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\ContactMessage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
 use App\Modules\Cms\Infrastructure\Models\NewsletterSubscriber;
+use App\Modules\Shared\Application\Support\TranslationInput;
+use App\Modules\Shared\Domain\Translations;
 use Illuminate\Support\Collection;
 
 /**
@@ -32,9 +34,24 @@ final class CmsPresenter
         ];
         if ($withBody) {
             $data['body_html'] = $p->body_html;
+            // E12b: {bn: {title, body_html, seo_title, seo_description}}.
+            $data['translations'] = TranslationInput::present($p->translations);
         }
 
         return $data;
+    }
+
+    /**
+     * A visible page as the storefront shows it, in `$locale` (per-field fallback, E12b).
+     *
+     * @return array<string, mixed>
+     */
+    public static function publicPage(CmsPage $p, string $locale): array
+    {
+        $data = self::page($p, true);
+        unset($data['id'], $data['status'], $data['is_visible'], $data['translations']);
+
+        return array_replace($data, Translations::pickMany($p, ['title', 'body_html', 'seo_title', 'seo_description'], $locale));
     }
 
     /**
@@ -49,22 +66,25 @@ final class CmsPresenter
             'answer_html' => $f->answer_html,
             'is_active' => $f->is_active,
             'sort_order' => $f->sort_order,
+            // E12b: {bn: {question, answer_html}}.
+            'translations' => TranslationInput::present($f->translations),
         ];
     }
 
     /**
      * Active entries grouped in their sort order; entries without a group come first.
+     * Questions and answers in `$locale` (E12b; group names are not translated).
      *
      * @param  Collection<int, FaqItem>  $items
      * @return list<array{group: ?string, items: list<array{id: string, question: string, answer_html: string}>}>
      */
-    public static function publicFaq(Collection $items): array
+    public static function publicFaq(Collection $items, string $locale = 'en'): array
     {
         $groups = [];
         foreach ($items->sortBy('sort_order') as $item) {
             $key = $item->group ?? '';
             $groups[$key] ??= ['group' => $item->group, 'items' => []];
-            $groups[$key]['items'][] = ['id' => $item->id, 'question' => $item->question, 'answer_html' => $item->answer_html];
+            $groups[$key]['items'][] = ['id' => $item->id] + Translations::pickMany($item, ['question', 'answer_html'], $locale);
         }
         if (isset($groups[''])) {
             $groups = ['' => $groups['']] + $groups;

@@ -6,6 +6,7 @@ use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -17,12 +18,18 @@ use DateTimeInterface;
  * records' updated_at; products carry their first image (image sitemap extension).
  *
  * Every document is cached per organization content version until the next scheduled change.
+ *
+ * E12b: with Bangla on, every `<url>` lists its language versions as
+ * `<xhtml:link rel="alternate" hreflang="en|bn|x-default">` — `<loc>` and x-default are the
+ * default language's URL, the other language adds `?lang=`.
  */
 class StorefrontSitemap
 {
     private const NS = 'http://www.sitemaps.org/schemas/sitemap/0.9';
 
     private const IMAGE_NS = 'http://www.google.com/schemas/sitemap-image/1.1';
+
+    private const XHTML_NS = 'http://www.w3.org/1999/xhtml';
 
     public function __construct(
         private readonly StorefrontCatalog $catalog,
@@ -31,6 +38,7 @@ class StorefrontSitemap
         private readonly StorefrontContentVersion $version,
         private readonly TenantContext $tenant,
         private readonly ContentSchedule $schedule,
+        private readonly LocaleContext $locale,
     ) {}
 
     /**
@@ -126,8 +134,9 @@ class StorefrontSitemap
      */
     private function urlset(array $entries, bool $images): string
     {
+        $languages = $this->locale->banglaEnabled() ? $this->locale->enabled() : [];
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n"
-            .'<urlset xmlns="'.self::NS.'"'.($images ? ' xmlns:image="'.self::IMAGE_NS.'"' : '').">\n";
+            .'<urlset xmlns="'.self::NS.'"'.($images ? ' xmlns:image="'.self::IMAGE_NS.'"' : '').($languages !== [] ? ' xmlns:xhtml="'.self::XHTML_NS.'"' : '').">\n";
         foreach ($entries as $entry) {
             $xml .= '  <url><loc>'.$this->e($entry['loc']).'</loc>';
             if ($entry['lastmod'] !== null) {
@@ -135,6 +144,10 @@ class StorefrontSitemap
             }
             if (! empty($entry['image'])) {
                 $xml .= '<image:image><image:loc>'.$this->e($entry['image']).'</image:loc></image:image>';
+            }
+            foreach ($languages !== [] ? [...$languages, 'x-default'] : [] as $code) {
+                $href = $code === 'x-default' || $code === $this->locale->defaultLocale() ? $entry['loc'] : $entry['loc'].'?lang='.$code;
+                $xml .= '<xhtml:link rel="alternate" hreflang="'.$code.'" href="'.$this->e($href).'"/>';
             }
             $xml .= "</url>\n";
         }

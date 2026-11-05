@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 import type { ProductDetail, ProductOption } from '../types'
 import { valueStatus, type Selection } from './variant-selection'
 
@@ -29,13 +30,14 @@ type OptionProps = { product: ProductDetail; option: ProductOption; index: numbe
 
 function OptionRadios({ product, option, index, selection, onChoose }: OptionProps) {
   const name = useId()
+  const { t } = useLocale()
   const current = selection[option.name]
   const swatch = option.display === 'swatch'
 
   return (
     <fieldset>
       <legend className="mb-2 text-sm font-semibold text-sf-heading">
-        {option.name}: <span className="font-normal text-sf-text">{current ?? 'Choose'}</span>
+        {option.name}: <span className="font-normal text-sf-text">{current ?? t('catalog.variant.choose')}</span>
       </legend>
       <div className="flex flex-wrap gap-2">
         {option.values.map((v, i) => {
@@ -55,7 +57,7 @@ function OptionRadios({ product, option, index, selection, onChoose }: OptionPro
               />
               <label
                 htmlFor={id}
-                title={status === 'sold_out' ? `${v.value} (out of stock)` : v.value}
+                title={status === 'sold_out' ? t('catalog.variant.soldOut', { value: v.value }) : v.value}
                 className={cn(
                   'relative flex cursor-pointer items-center justify-center border-2 transition peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-sf-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-35',
                   swatch
@@ -73,7 +75,7 @@ function OptionRadios({ product, option, index, selection, onChoose }: OptionPro
                   <span aria-hidden>{v.value}</span>
                 )}
                 {/* One text node, so the accessible name reads "L (out of stock)". */}
-                <span className="sr-only">{status === 'sold_out' ? `${v.value} (out of stock)` : v.value}</span>
+                <span className="sr-only">{status === 'sold_out' ? t('catalog.variant.soldOut', { value: v.value }) : v.value}</span>
               </label>
             </div>
           )
@@ -85,6 +87,7 @@ function OptionRadios({ product, option, index, selection, onChoose }: OptionPro
 
 function OptionSelect({ product, option, index, selection, onChoose }: OptionProps) {
   const id = useId()
+  const { t } = useLocale()
 
   return (
     <div className="flex flex-col gap-2">
@@ -95,13 +98,12 @@ function OptionSelect({ product, option, index, selection, onChoose }: OptionPro
         onChange={(e) => onChoose(option.name, e.target.value)}
         className="h-11 max-w-xs rounded-lg border border-sf-border bg-sf-surface px-3 text-sf-heading focus-visible:outline-2 focus-visible:outline-sf-accent"
       >
-        {selection[option.name] === undefined && <option value="" disabled>Choose {option.name.toLowerCase()}</option>}
+        {selection[option.name] === undefined && <option value="" disabled>{t('catalog.variant.chooseOption', { option: option.name.toLowerCase() })}</option>}
         {option.values.map((v) => {
           const status = valueStatus(product, selection, index, v.value)
           return (
             <option key={v.value} value={v.value} disabled={status === 'unavailable'}>
-              {v.value}
-              {status === 'sold_out' ? ' (out of stock)' : status === 'unavailable' ? ' (unavailable)' : ''}
+              {status === 'sold_out' ? t('catalog.variant.soldOut', { value: v.value }) : status === 'unavailable' ? t('catalog.variant.unavailable', { value: v.value }) : v.value}
             </option>
           )
         })}

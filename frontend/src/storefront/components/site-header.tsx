@@ -3,8 +3,10 @@ import { Link, useLocation } from 'react-router'
 import { SearchIcon, XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
+import { useLocale } from '../i18n/locale'
 import { HeaderActions } from './header-actions'
 import { HeaderSearch } from './header-search'
+import { LanguageSwitcher } from './language-switcher'
 import { MainNav } from './main-nav'
 import { MediaImage } from './media-image'
 import { MobileMenu } from './mobile-menu'
@@ -16,6 +18,7 @@ import { MobileMenu } from './mobile-menu'
  */
 export function SiteHeader() {
   const { store, theme, menus } = useStorefront()
+  const { t } = useLocale()
   const mainItems = menus.main?.items ?? []
   const mobileItems = menus.mobile?.items ?? mainItems
   const { pathname } = useLocation()
@@ -27,7 +30,7 @@ export function SiteHeader() {
   return (
     <header className={cn('z-40 bg-sf-surface shadow-sm', theme.layout.sticky_header && 'sticky top-0')} data-testid="site-header">
       <div className="mx-auto flex max-w-sf items-center justify-between gap-2 px-4 py-3 sm:gap-4 lg:gap-10 lg:py-5">
-        <Link to="/" className="flex min-w-0 items-center" aria-label={`${store.name} home`}>
+        <Link to="/" className="flex min-w-0 items-center" aria-label={t('common.storeHome', { store: store.name })}>
           {theme.logo ? (
             <MediaImage
               media={theme.logo}
@@ -42,12 +45,13 @@ export function SiteHeader() {
         </Link>
         <HeaderSearch className="hidden max-w-xl flex-1 lg:block" />
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          <LanguageSwitcher className="mr-1 hidden md:flex lg:mr-2" />
           <button
             type="button"
             className="grid size-10 place-items-center rounded-md text-sf-heading hover:bg-sf-canvas lg:hidden"
             aria-expanded={searchOpen}
             aria-controls="mobile-search"
-            aria-label={searchOpen ? 'Close search' : 'Open search'}
+            aria-label={searchOpen ? t('common.closeSearch') : t('common.openSearch')}
             onClick={() => setSearchOpen(!searchOpen)}
           >
             {searchOpen ? <XIcon aria-hidden className="size-6" /> : <SearchIcon aria-hidden className="size-6" />}

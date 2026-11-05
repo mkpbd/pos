@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { CircleAlertIcon, CircleCheckIcon, Loader2Icon, TicketPercentIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { inputClass, primaryButtonClass } from '../account/form-controls'
+import { useLocale } from '../i18n/locale'
 import type { Cart } from '../types'
 import { useApplyCouponMutation, useRemoveCouponMutation } from './api'
 import { useCartCurrency } from './cart-helpers'
@@ -19,6 +20,7 @@ type FocusTarget = 'input' | 'coupon' | 'toggle'
  */
 export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boolean }) {
   const currency = useCartCurrency(cart)
+  const { t } = useLocale()
   const apply = useApplyCouponMutation()
   const remove = useRemoveCouponMutation()
   const [code, setCode] = useState('')
@@ -49,12 +51,12 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
     const normalized = normalizeCouponCode(code)
     setAnnouncement('')
     if (normalized === '') {
-      setError('Enter a coupon code.')
+      setError(t('cart.coupon.enterCode'))
       inputRef.current?.focus()
       return
     }
     if (!COUPON_CODE.test(normalized)) {
-      setError('This coupon code is not valid.')
+      setError(t('cart.coupon.notFound'))
       inputRef.current?.focus()
       return
     }
@@ -63,12 +65,12 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
       onSuccess: (next) => {
         setCode('')
         setRemoveError(null)
-        const note = next.coupon ? couponNote(next.coupon) : null
-        setAnnouncement(note ? `Coupon ${normalized} added. ${note}` : `Coupon ${normalized} applied.`)
+        const note = next.coupon ? couponNote(next.coupon, t) : null
+        setAnnouncement(note ? t('cart.coupon.addedWithNote', { code: normalized, note }) : t('cart.coupon.applied', { code: normalized }))
         focusNext.current = 'coupon'
       },
       onError: (e) => {
-        setError(couponErrorMessage(e, currency))
+        setError(couponErrorMessage(e, t, currency))
         inputRef.current?.focus()
       },
     })
@@ -80,26 +82,26 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
     setAnnouncement('')
     remove.mutate(undefined, {
       onSuccess: () => {
-        setAnnouncement(`Coupon ${coupon.code} removed.`)
+        setAnnouncement(t('cart.coupon.removed', { code: coupon.code }))
         focusNext.current = compact ? 'toggle' : 'input'
         if (compact) setOpen(false)
       },
-      onError: (e) => setRemoveError(cartErrorMessage(e)),
+      onError: (e) => setRemoveError(cartErrorMessage(e, t)),
     })
   }
 
   const errorId = `${id}-error`
-  const note = coupon ? couponNote(coupon) : null
+  const note = coupon ? couponNote(coupon, t) : null
 
   return (
     <div className={cn('flex flex-col gap-2 text-sm', !compact && 'border-b pb-4')} data-testid="coupon-box">
       {coupon ? (
-        <div ref={couponRef} tabIndex={-1} role="group" aria-label={`Coupon ${coupon.code}`} className="flex flex-col gap-1.5 rounded-lg border border-dashed border-sf-border px-3 py-2.5 outline-none focus-visible:outline-2 focus-visible:outline-sf-accent" data-testid="cart-coupon">
+        <div ref={couponRef} tabIndex={-1} role="group" aria-label={t('cart.coupon.groupLabel', { code: coupon.code })} className="flex flex-col gap-1.5 rounded-lg border border-dashed border-sf-border px-3 py-2.5 outline-none focus-visible:outline-2 focus-visible:outline-sf-accent" data-testid="cart-coupon">
           <div className="flex items-center justify-between gap-3">
             <p className="inline-flex min-w-0 items-center gap-2">
               <TicketPercentIcon aria-hidden className="size-4 shrink-0 text-sf-accent" />
               <span className="min-w-0">
-                <span className="sr-only">Coupon </span>
+                <span className="sr-only">{t('cart.coupon.srPrefix')} </span>
                 <strong className="font-bold tracking-wide text-sf-heading" data-testid="coupon-code">{coupon.code}</strong>
                 {coupon.promotion_name && <span className="block text-xs">{coupon.promotion_name}</span>}
               </span>
@@ -108,10 +110,10 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
               type="button"
               onClick={removeCoupon}
               disabled={remove.isPending}
-              aria-label={`Remove coupon ${coupon.code}`}
+              aria-label={t('cart.coupon.removeLabel', { code: coupon.code })}
               className="shrink-0 font-semibold text-sf-accent underline underline-offset-4 hover:no-underline disabled:opacity-50"
             >
-              Remove
+              {t('cart.coupon.remove')}
             </button>
           </div>
           {note ? (
@@ -122,7 +124,7 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
           ) : (
             <p className="flex items-center gap-1.5 text-xs font-semibold text-sf-highlight" data-testid="coupon-applied">
               <CircleCheckIcon aria-hidden className="size-3.5 shrink-0" />
-              Coupon applied
+              {t('cart.coupon.appliedBadge')}
             </p>
           )}
           {removeError && (
@@ -143,12 +145,12 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
           className="inline-flex items-center gap-2 self-start font-semibold text-sf-accent underline-offset-4 hover:underline"
         >
           <TicketPercentIcon aria-hidden className="size-4" />
-          Have a coupon code?
+          {t('cart.coupon.haveCode')}
         </button>
       ) : (
-        <form onSubmit={submit} noValidate className="flex flex-col gap-1.5" aria-label="Coupon">
+        <form onSubmit={submit} noValidate className="flex flex-col gap-1.5" aria-label={t('cart.coupon.formLabel')}>
           <label htmlFor={`${id}-code`} className="font-medium text-sf-heading">
-            Coupon code
+            {t('cart.coupon.codeLabel')}
           </label>
           <div className="flex gap-2">
             <input
@@ -167,11 +169,11 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? errorId : undefined}
               className={cn(inputClass, 'min-w-0 flex-1 py-2 uppercase placeholder:normal-case')}
-              placeholder="Enter your code"
+              placeholder={t('cart.coupon.placeholder')}
             />
             <button type="submit" disabled={apply.isPending} className={cn(primaryButtonClass, 'shrink-0 px-5 py-2')}>
               {apply.isPending && <Loader2Icon aria-hidden className="size-4 animate-spin" />}
-              {apply.isPending ? 'Applying…' : 'Apply'}
+              {apply.isPending ? t('cart.coupon.applying') : t('cart.coupon.apply')}
             </button>
           </div>
           {error && (

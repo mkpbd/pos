@@ -4,6 +4,7 @@ namespace App\Modules\Cms\Presentation\Http\Support;
 
 use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
+use App\Modules\Shared\Application\Support\TranslationInput;
 
 /**
  * Admin output shapes of the blog. Public shapes come from BlogPostCards.
@@ -24,6 +25,8 @@ final class BlogPresenter
             'sort_order' => $c->sort_order,
             'post_count' => $counts['posts'] ?? 0,
             'published_post_count' => $counts['published'] ?? 0,
+            // E12b: {bn: {name, description}}.
+            'translations' => TranslationInput::present($c->translations),
             'updated_at' => $c->updated_at?->toIso8601String(),
         ];
     }
@@ -59,6 +62,8 @@ final class BlogPresenter
                 'body_html' => $p->body_html,
                 'seo_title' => $p->seo_title,
                 'seo_description' => $p->seo_description,
+                // E12b: {bn: {title, excerpt, body_html, seo_title, seo_description}}.
+                'translations' => TranslationInput::present($p->translations),
             ];
         }
 

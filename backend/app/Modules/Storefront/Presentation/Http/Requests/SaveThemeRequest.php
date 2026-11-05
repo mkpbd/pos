@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Requests;
 
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Domain\ThemeSchema;
 use App\Modules\Storefront\Presentation\Http\Rules\SafeLink;
 use Illuminate\Foundation\Http\FormRequest;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Rule;
  */
 class SaveThemeRequest extends FormRequest
 {
+    public const ANNOUNCEMENT_TRANSLATIONS = ['text' => ['max:200']];
+
     public function rules(): array
     {
         $hex = ['string', 'regex:/^#[0-9a-fA-F]{6}$/'];
@@ -37,6 +40,8 @@ class SaveThemeRequest extends FormRequest
             'announcement.foreground' => ['sometimes', ...$hex],
             'announcement.starts_at' => ['sometimes', 'nullable', 'date'],
             'announcement.ends_at' => ['sometimes', 'nullable', 'date', 'after:announcement.starts_at'],
+            // E12b: {bn: {text}} (same limit as the text).
+            ...TranslationInput::rules(self::ANNOUNCEMENT_TRANSLATIONS, 'announcement.translations'),
             'footer' => ['sometimes', 'array'],
             'footer.about' => ['sometimes', 'nullable', 'string', 'max:500'],
             'footer.copyright' => ['sometimes', 'nullable', 'string', 'max:200'],

@@ -4,7 +4,9 @@ namespace App\Modules\Cms\Application\Queries;
 
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Users\Application\Contracts\UserDirectory;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -13,6 +15,7 @@ use Illuminate\Support\Collection;
  * Public rows of blog posts (the blog index, category pages, related posts and the homepage
  * teaser): `{slug, title, excerpt, cover, category: {name, slug} | null, author (first
  * name), published_at, reading_minutes}`. Expects `category` loaded or loads it.
+ * E12b: titles, excerpts and category names in the request's language.
  */
 class BlogPostCards
 {
@@ -20,7 +23,13 @@ class BlogPostCards
         private readonly MediaLibrary $media,
         private readonly UserDirectory $users,
         private readonly TenantContext $tenant,
+        private readonly LocaleContext $locale,
     ) {}
+
+    public function locale(): string
+    {
+        return $this->locale->current();
+    }
 
     /**
      * @param  Collection<int, BlogPost>  $posts
@@ -59,12 +68,14 @@ class BlogPostCards
      */
     public function card(BlogPost $p, array $refs, array $names): array
     {
+        $locale = $this->locale->current();
+
         return [
             'slug' => $p->slug,
-            'title' => $p->title,
-            'excerpt' => $p->excerpt,
+            'title' => Translations::pick($p, 'title', $locale),
+            'excerpt' => Translations::pick($p, 'excerpt', $locale),
             'cover' => $p->cover_media_id === null ? null : ($refs[$p->cover_media_id] ?? null),
-            'category' => $p->category === null ? null : ['name' => $p->category->name, 'slug' => $p->category->slug],
+            'category' => $p->category === null ? null : ['name' => Translations::pick($p->category, 'name', $locale), 'slug' => $p->category->slug],
             'author' => $p->author_user_id === null ? null : ($names[$p->author_user_id] ?? null),
             'published_at' => $p->published_at?->toIso8601String(),
             'reading_minutes' => $p->reading_minutes,

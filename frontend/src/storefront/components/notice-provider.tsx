@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { InfoIcon, XIcon } from 'lucide-react'
+import { useLocale } from '../i18n/locale'
 import { NoticeContext } from '../notices'
 
 type Notice = { id: number; message: string }
@@ -31,6 +32,7 @@ export function NoticeProvider({ children }: { children: ReactNode }) {
 }
 
 function NoticeItem({ notice, onDismiss }: { notice: Notice; onDismiss: (id: number) => void }) {
+  const { t } = useLocale()
   useEffect(() => {
     const timer = window.setTimeout(() => onDismiss(notice.id), DISMISS_AFTER_MS)
     return () => window.clearTimeout(timer)
@@ -40,7 +42,7 @@ function NoticeItem({ notice, onDismiss }: { notice: Notice; onDismiss: (id: num
     <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-sf-card bg-sf-heading px-4 py-3 text-sm text-white shadow-lg">
       <InfoIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
       <p className="flex-1">{notice.message}</p>
-      <button type="button" className="grid size-6 place-items-center rounded-full hover:bg-white/20" aria-label="Dismiss" onClick={() => onDismiss(notice.id)}>
+      <button type="button" className="grid size-6 place-items-center rounded-full hover:bg-white/20" aria-label={t('common.dismiss')} onClick={() => onDismiss(notice.id)}>
         <XIcon aria-hidden className="size-4" />
       </button>
     </div>

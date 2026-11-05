@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { ChevronDownIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 import type { MenuNode } from '../types'
 import { MediaImage } from './media-image'
 import { MenuLink } from './menu-link'
@@ -20,6 +21,7 @@ const MEGA_GRID: Record<number, string> = {
 export function MainNav({ items }: { items: MenuNode[] }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const navRef = useRef<HTMLElement>(null)
+  const { t } = useLocale()
 
   // Navigating (route change or a click on a link) closes any open panel.
   useEffect(() => {
@@ -34,7 +36,7 @@ export function MainNav({ items }: { items: MenuNode[] }) {
   if (items.length === 0) return null
 
   return (
-    <nav ref={navRef} aria-label="Main" className="relative hidden bg-sf-accent text-sf-accent-foreground lg:block">
+    <nav ref={navRef} aria-label={t('shell.nav.main')} className="relative hidden bg-sf-accent text-sf-accent-foreground lg:block">
       <ul className="mx-auto flex max-w-sf flex-wrap items-stretch px-4">
         {items.map((item) => (
           <NavItem
@@ -52,6 +54,7 @@ export function MainNav({ items }: { items: MenuNode[] }) {
 function NavItem({ item, open, onOpenChange }: { item: MenuNode; open: boolean; onOpenChange: (open: boolean) => void }) {
   const panelId = useId()
   const toggleRef = useRef<HTMLButtonElement>(null)
+  const { t } = useLocale()
   const hasPanel = item.children.length > 0 || (item.is_mega && item.image !== null)
 
   const linkClass = 'flex items-center px-4 py-4 text-sm font-semibold tracking-wide uppercase transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none'
@@ -94,7 +97,7 @@ function NavItem({ item, open, onOpenChange }: { item: MenuNode; open: boolean; 
         className="flex items-center pr-3 pl-1 transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={`${item.label} submenu`}
+        aria-label={t('common.submenu', { label: item.label })}
         // A pointer has already opened the panel by hovering, so a click keeps it open;
         // keyboard activation (detail 0) toggles.
         onClick={(event) => onOpenChange(event.detail === 0 ? !open : true)}

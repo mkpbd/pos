@@ -6,6 +6,7 @@ use App\Modules\OnlinePayments\Domain\GatewayCode;
 use App\Modules\OnlinePayments\Infrastructure\Models\PaymentGatewaySetting;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\Changes;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -14,7 +15,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ConfigurePaymentMethod
 {
-    private const AUDITED = ['is_enabled', 'display_name', 'instructions', 'settings', 'sort_order'];
+    private const AUDITED = ['is_enabled', 'display_name', 'instructions', 'settings', 'sort_order', 'translations'];
+
+    /** E12b: translatable texts with the limits of their base fields (plain text). */
+    public const TRANSLATABLE = ['display_name' => ['max:60'], 'instructions' => ['max:2000']];
 
     public function __construct(private readonly AuditTrail $audit) {}
 
@@ -40,6 +44,9 @@ class ConfigurePaymentMethod
 
             if (array_key_exists('settings', $data)) {
                 $data['settings'] = array_intersect_key($data['settings'] + ($row->settings ?? []), $code->defaults()['settings']);
+            }
+            if (array_key_exists('translations', $data)) {
+                $data['translations'] = TranslationInput::apply($row->translations, $data['translations'], array_keys(self::TRANSLATABLE));
             }
             $row->fill(array_intersect_key($data, array_flip(self::AUDITED)))->save();
 

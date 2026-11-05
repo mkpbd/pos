@@ -1,4 +1,5 @@
 import { ApiError, request, type ApiSuccess, type RequestOptions } from '@/lib/api/client'
+import { getLocaleRuntime } from './i18n/runtime'
 
 /**
  * The storefront's API client. It builds on the shared envelope client, which already sends
@@ -9,13 +10,32 @@ import { ApiError, request, type ApiSuccess, type RequestOptions } from '@/lib/a
  * When an unsafe request is rejected with 419 (no or a stale token — first visit, expired
  * session), the cookie is refreshed by fetching /store/account/me once and the request is
  * retried exactly once.
+ *
+ * Every /store/* request carries the shopper's language as `?lang=` (ADR-011): the public API
+ * resolves the language only from the URL, so HTTP caches keep one entry per language. An
+ * explicit `lang` in the query wins (the first bootstrap asks for the requested language).
  */
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export const CSRF_REFRESH_PATH = '/store/account/me'
 
-export async function storeRequest<T>(method: Method, path: string, options: RequestOptions = {}): Promise<ApiSuccess<T>> {
+function withLang(path: string, options: RequestOptions): [string, RequestOptions] {
+  const { lang } = getLocaleRuntime()
+  if (!lang || !path.startsWith('/store/') || (options.query && 'lang' in options.query)) return [path, options]
+  // A path that already has its query string (repeatable filters) gets the parameter appended.
+  const [base = path, search = ''] = path.split('?', 2)
+  if (path.includes('?')) {
+    const params = new URLSearchParams(search)
+    if (params.has('lang')) return [path, options]
+    params.set('lang', lang)
+    return [`${base}?${params.toString()}`, options]
+  }
+  return [path, { ...options, query: { ...options.query, lang } }]
+}
+
+export async function storeRequest<T>(method: Method, requestPath: string, requestOptions: RequestOptions = {}): Promise<ApiSuccess<T>> {
+  const [path, options] = withLang(requestPath, requestOptions)
   try {
     return await request<T>(method, path, options)
   } catch (error) {

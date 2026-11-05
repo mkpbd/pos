@@ -1,25 +1,13 @@
 import { compareDecimal, formatMoney, trimDecimal } from '@/lib/money'
 import type { PromotionType } from './types'
 import { useStorefront } from './api'
+import { formatCurrency, localizeDigits } from './i18n/format'
+import { useLocale } from './i18n/locale'
 
-const formatters = new Map<string, Intl.NumberFormat | null>()
-
-/** `whole`: no fraction digits (for amounts that have none, e.g. "৳20" in a badge). */
-function formatterFor(currency: string, whole = false): Intl.NumberFormat | null {
-  const key = whole ? `${currency}|whole` : currency
-  if (!formatters.has(key)) {
-    try {
-      formatters.set(
-        key,
-        new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol', ...(whole ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}) }),
-      )
-    } catch {
-      // Not an ISO 4217 code this browser knows: fall back to plain grouping.
-      formatters.set(key, null)
-    }
-  }
-  return formatters.get(key) ?? null
-}
+/*
+ * Amounts follow the storefront's language (ADR-011): "৳1,234.50" in English, the same with
+ * Bangla grouping in Bangla, and Bengali digits only when the store turned them on.
+ */
 
 const DECIMAL = /^-?\d+(\.\d+)?$/
 
@@ -30,8 +18,8 @@ const DECIMAL = /^-?\d+(\.\d+)?$/
 export function formatPrice(amount: string, currency?: string | null): string {
   const value = amount.trim()
   if (!DECIMAL.test(value)) return amount
-  const formatter = currency ? formatterFor(currency) : null
-  return formatter ? formatter.format(value as Intl.StringNumericLiteral) : formatMoney(value)
+  // Not an ISO 4217 code this browser knows (or none): plain grouping.
+  return (currency ? formatCurrency(value, currency) : null) ?? localizeDigits(formatMoney(value))
 }
 
 /** "৳120.00" for equal amounts, "৳120.00 – ৳150.00" when the variants' prices differ. */
@@ -46,8 +34,7 @@ export function formatShortPrice(amount: string, currency?: string | null): stri
   const value = trimDecimal(amount.trim())
   if (!DECIMAL.test(value)) return amount
   if (value.includes('.')) return formatPrice(value, currency)
-  const formatter = currency ? formatterFor(currency, true) : null
-  return formatter ? formatter.format(value as Intl.StringNumericLiteral) : formatMoney(value, undefined, 0)
+  return (currency ? formatCurrency(value, currency, true) : null) ?? localizeDigits(formatMoney(value, undefined, 0))
 }
 
 /**
@@ -55,7 +42,7 @@ export function formatShortPrice(amount: string, currency?: string | null): stri
  * each unit; null for promotions without a product price effect (free shipping).
  */
 export function promotionBadge(promotion: { type: PromotionType; value: string }, currency?: string | null): string | null {
-  if (promotion.type === 'percent') return `−${trimDecimal(promotion.value)} %`
+  if (promotion.type === 'percent') return `−${localizeDigits(trimDecimal(promotion.value))} %`
   if (promotion.type === 'fixed') return `−${formatShortPrice(promotion.value, currency)}`
   return null
 }
@@ -68,6 +55,8 @@ export function formatDiscount(amount: string, currency?: string | null): string
 /** Price formatters bound to the store currency from the bootstrap. */
 export function usePriceFormat() {
   const { currency } = useStorefront().store
+  // Re-render on a language switch (the formatters read the published locale).
+  useLocale()
   return {
     price: (amount: string) => formatPrice(amount, currency),
     range: (min: string, max: string) => formatPriceRange(min, max, currency),

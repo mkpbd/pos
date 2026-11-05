@@ -4,6 +4,7 @@ import { EyeIcon } from 'lucide-react'
 import { compareDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { CardCartAction } from '../cart/add-to-cart'
+import { useLocale } from '../i18n/locale'
 import { usePriceFormat } from '../money'
 import { Countdown } from '../promotions/countdown-timer'
 import { isReduced, useLivePromotion } from '../promotions/display'
@@ -33,22 +34,23 @@ export function ProductBadges({
   promotionLabel?: string | null
   className?: string
 }) {
+  const { t } = useLocale()
   if (!promotionLabel && !onSale && !isNew && inStock) return null
 
   return (
-    <ul className={cn('pointer-events-none flex flex-col items-start gap-1.5', className)} aria-label="Product labels">
+    <ul className={cn('pointer-events-none flex flex-col items-start gap-1.5', className)} aria-label={t('catalog.badges.label')}>
       {promotionLabel ? (
         <li className="rounded-full bg-sf-sale px-2.5 py-0.5 text-xs font-bold text-white" data-testid="promotion-badge">
-          <span className="sr-only">Offer: </span>
+          <span className="sr-only">{t('catalog.badges.offer')}</span>
           {promotionLabel}
         </li>
       ) : onSale && (
         <li className="rounded-full bg-sf-sale px-2.5 py-0.5 text-xs font-bold text-white">
-          {discountPercent ? `Sale −${discountPercent} %` : 'Sale'}
+          {discountPercent ? t('catalog.badges.saleWithPercent', { percent: discountPercent }) : t('catalog.badges.sale')}
         </li>
       )}
-      {isNew && <li className="rounded-full bg-sf-highlight px-2.5 py-0.5 text-xs font-bold text-white">New</li>}
-      {!inStock && <li className="rounded-full bg-sf-heading px-2.5 py-0.5 text-xs font-bold text-white">Out of stock</li>}
+      {isNew && <li className="rounded-full bg-sf-highlight px-2.5 py-0.5 text-xs font-bold text-white">{t('catalog.badges.new')}</li>}
+      {!inStock && <li className="rounded-full bg-sf-heading px-2.5 py-0.5 text-xs font-bold text-white">{t('catalog.stock.out')}</li>}
     </ul>
   )
 }
@@ -58,12 +60,13 @@ export function ProductBadges({
  * 12 reviews". Nothing for a product without reviews.
  */
 export function CardRating({ rating }: { rating: Card['rating'] }) {
+  const { t, formatNumber } = useLocale()
   if (!rating || rating.count <= 0) return null
-  const reviews = `${rating.count} ${rating.count === 1 ? 'review' : 'reviews'}`
+  const reviews = t('reviews.count', { count: rating.count })
   return (
     <p className="flex items-center gap-1.5 text-xs" data-testid="card-rating">
       <Stars rating={rating.average} size="size-3.5" />
-      <span aria-hidden>({rating.count})</span>
+      <span aria-hidden>({formatNumber(rating.count)})</span>
       <span className="sr-only">{reviews}</span>
     </p>
   )
@@ -91,6 +94,7 @@ export function ProductCard({
 }) {
   const quickView = useQuickView()
   const format = usePriceFormat()
+  const { t } = useLocale()
   const promotion = useLivePromotion(product.promotion)
   const range = compareDecimal(product.price, product.price_max) !== 0
   const priceMax = range ? product.price_max : undefined
@@ -132,7 +136,7 @@ export function ProductCard({
             <button
               type="button"
               onClick={() => quickView.open(product.slug)}
-              aria-label={`Quick view: ${product.name}`}
+              aria-label={t('catalog.card.quickView', { name: product.name })}
               className="grid size-10 place-items-center rounded-full bg-sf-surface text-sf-heading shadow-md transition hover:bg-sf-accent hover:text-sf-accent-foreground focus-visible:bg-sf-accent focus-visible:text-sf-accent-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
             >
               <EyeIcon aria-hidden className="size-5" />

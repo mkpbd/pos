@@ -3,7 +3,10 @@ import { ApiError } from '@/lib/api/client'
 import { compareDecimal, trimDecimal } from '@/lib/money'
 import { storeFormError } from '../form-errors'
 import { storeApi } from '../http'
-import { accountKeys } from '../store-keys'
+import type { MessageKey } from '../i18n/en'
+import { useLocale } from '../i18n/locale'
+import type { Translate } from '../i18n/translate'
+import { accountKeys, localized } from '../store-keys'
 import type { AccountOrder, AccountOrderLine, AccountReturn, OrderReturnSummary, ReturnReasonCode, ReturnRequestInput } from '../types'
 import { toPage, type Page } from './account-api'
 
@@ -15,12 +18,12 @@ import { toPage, type Page } from './account-api'
 
 export const RETURN_NOTE_MAX = 500
 
-export const RETURN_REASONS: { value: ReturnReasonCode; label: string }[] = [
-  { value: 'damaged', label: 'Arrived damaged' },
-  { value: 'wrong_item', label: 'Wrong item sent' },
-  { value: 'not_as_described', label: 'Not as described' },
-  { value: 'changed_mind', label: 'Changed my mind' },
-  { value: 'other', label: 'Other reason' },
+export const RETURN_REASONS: { value: ReturnReasonCode; label: MessageKey }[] = [
+  { value: 'damaged', label: 'orders.returns.reason.damaged' },
+  { value: 'wrong_item', label: 'orders.returns.reason.wrongItem' },
+  { value: 'not_as_described', label: 'orders.returns.reason.notAsDescribed' },
+  { value: 'changed_mind', label: 'orders.returns.reason.changedMind' },
+  { value: 'other', label: 'orders.returns.reason.other' },
 ]
 
 const noClientRetry = (count: number, error: unknown) => !(error instanceof ApiError && error.status < 500) && count < 1
@@ -50,32 +53,33 @@ export const isCancellableReturn = (ret: Pick<OrderReturnSummary, 'status'>) => 
 /** The order a return belongs to, from either shape of the list row. */
 export const returnOrderNumber = (ret: AccountReturn): string | null => ret.order?.number ?? ret.order_number ?? null
 
-const NOT_ALLOWED: Record<string, string> = {
-  window_closed: 'The return window for this order has closed.',
-  not_delivered: 'Items can be returned once the order has been delivered.',
-  not_paid: 'This order can be returned once its payment is complete.',
-  returns_disabled: 'This store does not accept returns online. Please contact us for help.',
+const NOT_ALLOWED: Record<string, MessageKey> = {
+  window_closed: 'orders.returns.error.windowClosed',
+  not_delivered: 'orders.returns.error.notDelivered',
+  not_paid: 'orders.returns.error.notPaid',
+  returns_disabled: 'orders.returns.error.disabled',
 }
 
 /** A shopper-facing message for a failed return request or cancellation. */
-export function returnErrorMessage(error: unknown): string {
+export function returnErrorMessage(error: unknown, t: Translate): string {
   if (error instanceof ApiError) {
     switch (error.code) {
       case 'RETURN_NOT_ALLOWED': {
         const reason = error.details.reason
-        return (typeof reason === 'string' && NOT_ALLOWED[reason]) || 'This order cannot be returned online. Please contact us for help.'
+        return t((typeof reason === 'string' && NOT_ALLOWED[reason]) || 'orders.returns.error.notAllowed')
       }
       case 'QUANTITY_EXCEEDS_RETURNABLE':
-        return 'Some of these items have already been returned. The quantities you can return were updated — please check them and try again.'
+        return t('orders.returns.error.quantityExceeds')
       case 'RETURN_NOT_CANCELLABLE':
-        return 'This return can no longer be cancelled — the store has already handled it.'
+        return t('orders.returns.error.notCancellable')
       case 'VALIDATION_FAILED': {
+        // The server's field message (it answers in the request's language when it can).
         const first = Object.values(error.fieldErrors)[0]?.[0]
-        return first ?? 'Please check your return request.'
+        return first ?? t('orders.returns.error.checkRequest')
       }
     }
   }
-  return storeFormError(error)
+  return storeFormError(error, t)
 }
 
 /**
@@ -102,8 +106,9 @@ export function useCreateReturnMutation(number: string) {
 
 /** GET /store/account/returns — the customer's own returns, newest first. */
 export function useAccountReturnsQuery(page: number) {
-  return useQuery<Page<AccountReturn>, Error, Page<AccountReturn>, ReturnType<typeof accountKeys.returnList>>({
-    queryKey: accountKeys.returnList(page),
+  const { locale } = useLocale()
+  return useQuery<Page<AccountReturn>, Error, Page<AccountReturn>, readonly unknown[]>({
+    queryKey: localized(accountKeys.returnList(page), locale),
     queryFn: ({ signal }) =>
       storeApi.get<AccountReturn[]>('/store/account/returns', { signal, query: { page: page > 1 ? page : undefined } }).then((r): Page<AccountReturn> => toPage(r)),
     placeholderData: keepPreviousData,

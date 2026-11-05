@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api/client'
-import { addressFixture, customerFixture, previewFixture, shippingMethodFixture } from '../test-fixtures'
+import { isMessageKey } from '../i18n/translate'
+import { addressFixture, customerFixture, previewFixture, shippingMethodFixture, tEn } from '../test-fixtures'
 import { etaLabel, goodsTotal, methodFee } from './delivery'
 import { isOpenOutcome, PlacementAttempts, stableStringify } from './placement-attempt'
 import { changedPreview, placementProblem, RETRY_MESSAGE } from './placement-errors'
@@ -85,7 +86,8 @@ function values(overrides: Partial<CheckoutValues> = {}): CheckoutValues {
 function errorsOf(input: CheckoutValues): Record<string, string> {
   const result = checkoutSchema.safeParse(input)
   if (result.success) return {}
-  return Object.fromEntries(result.error.issues.map((issue) => [issue.path.join('.'), issue.message]))
+  // The schema's messages are dictionary keys; the page shows them translated (here: English).
+  return Object.fromEntries(result.error.issues.map((issue) => [issue.path.join('.'), isMessageKey(issue.message) ? tEn(issue.message) : issue.message]))
 }
 
 describe('checkout form schema', () => {
@@ -168,7 +170,7 @@ describe('checkout form schema', () => {
 
 describe('placement problems', () => {
   it('has a message (and where to fix it) for every checkout error', () => {
-    const problem = (status: number, code: string) => placementProblem(new ApiError(status, code, code))
+    const problem = (status: number, code: string) => placementProblem(new ApiError(status, code, code), tEn)
     expect(problem(422, 'CART_HAS_ISSUES')).toMatchObject({ link: { to: '/cart' } })
     expect(problem(422, 'INSUFFICIENT_STOCK')).toMatchObject({ message: expect.stringContaining('sold out'), link: { to: '/cart' } })
     expect(problem(422, 'SHIPPING_UNAVAILABLE')).toMatchObject({ field: 'shipping_method_id' })
@@ -177,8 +179,8 @@ describe('placement problems', () => {
     expect(problem(422, 'GUEST_CHECKOUT_DISABLED')).toMatchObject({ link: { to: '/account/login?next=%2Fcheckout' } })
     expect(problem(422, 'CART_EMPTY')).toMatchObject({ link: { to: '/shop' } })
     expect(problem(429, 'TOO_MANY_REQUESTS').message).toMatch(/Too many attempts/)
-    expect(problem(0, 'NETWORK_ERROR').message).toBe(RETRY_MESSAGE)
-    expect(problem(503, 'SERVER_ERROR').message).toBe(RETRY_MESSAGE)
+    expect(problem(0, 'NETWORK_ERROR').message).toBe(tEn(RETRY_MESSAGE))
+    expect(problem(503, 'SERVER_ERROR').message).toBe(tEn(RETRY_MESSAGE))
   })
 
   it('reads the fresh preview of TOTAL_CHANGED', () => {
@@ -191,11 +193,11 @@ describe('placement problems', () => {
 
 describe('delivery display', () => {
   it('labels delivery times and fees', () => {
-    expect(etaLabel(1, 2)).toBe('1–2 days')
-    expect(etaLabel(3, 3)).toBe('3 days')
-    expect(etaLabel(1, 1)).toBe('1 day')
-    expect(etaLabel(0, 0)).toBe('Same day')
-    expect(etaLabel(null, 2)).toBeNull()
+    expect(etaLabel(1, 2, tEn)).toBe('1–2 days')
+    expect(etaLabel(3, 3, tEn)).toBe('3 days')
+    expect(etaLabel(1, 1, tEn)).toBe('1 day')
+    expect(etaLabel(0, 0, tEn)).toBe('Same day')
+    expect(etaLabel(null, 2, tEn)).toBeNull()
     const method = shippingMethodFixture('sm-1')
     expect(goodsTotal({ total: '2080.00', shipping_total: '60.00', cod_fee: '20.00' })).toBe('2000.00')
     expect(methodFee(method, '1999.99')).toBe('60.00')

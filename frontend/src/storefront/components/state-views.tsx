@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { useLocale } from '../i18n/locale'
 
 function FullPageMessage({ title, children }: { title: string; children?: ReactNode }) {
   return (
@@ -13,39 +14,43 @@ function FullPageMessage({ title, children }: { title: string; children?: ReactN
 }
 
 export function StoreNotFoundView() {
+  const { t } = useLocale()
   return (
-    <FullPageMessage title="There is no open store at this address">
-      <p>Check the address, or come back later.</p>
+    <FullPageMessage title={t('common.store.notFoundTitle')}>
+      <p>{t('common.store.notFoundText')}</p>
     </FullPageMessage>
   )
 }
 
 export function StoreErrorView({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
+  const { t } = useLocale()
   return (
-    <FullPageMessage title="The store could not be loaded">
-      <p>Check your connection and try again.</p>
+    <FullPageMessage title={t('common.store.errorTitle')}>
+      <p>{t('common.store.errorText')}</p>
       <Button onClick={onRetry} disabled={retrying} className="rounded-sf-button">
-        {retrying ? 'Retrying…' : 'Try again'}
+        {retrying ? t('common.retrying') : t('common.tryAgain')}
       </Button>
     </FullPageMessage>
   )
 }
 
 export function StoreLoadingView() {
+  const { t } = useLocale()
   return (
     <div role="status" aria-live="polite" className="grid min-h-screen place-items-center bg-sf-canvas">
       <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
-      <span className="sr-only">Loading the store</span>
+      <span className="sr-only">{t('common.store.loading')}</span>
     </div>
   )
 }
 
 /** While a page's code is fetched (lazy routes): announced politely, sized like a page body. */
 export function PageLoadingView() {
+  const { t } = useLocale()
   return (
     <div role="status" aria-live="polite" className="grid min-h-[50vh] place-items-center" data-testid="page-loading">
       <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent motion-reduce:animate-none" aria-hidden />
-      <span className="sr-only">Loading the page</span>
+      <span className="sr-only">{t('common.page.loading')}</span>
     </div>
   )
 }

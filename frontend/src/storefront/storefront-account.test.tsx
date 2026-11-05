@@ -2,11 +2,13 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
-import { CAPPED_NOTICE } from './account/api'
 import { storefrontRoutes } from './routes'
 import { addressFixture, bootstrapFixture, cartFixture, cartLine, customerFixture } from './test-fixtures'
 import type { Customer, CustomerAddress } from './types'
 import { LOCAL_WISHLIST_KEY } from './wishlist/local-wishlist'
+
+// The sign-in notice when the merged guest cart was capped to the stock (account.notice.capped).
+const CAPPED_NOTICE = 'Some items from your earlier cart were reduced to the quantity in stock. Please check your cart.'
 
 afterEach(() => localStorage.clear())
 

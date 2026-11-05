@@ -27,10 +27,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $is_active
  * @property int $sort_order
  * @property-read ShippingZone $zone
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
 #[Fillable([
     'organization_id', 'zone_id', 'name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee',
-    'eta_min_days', 'eta_max_days', 'is_active', 'sort_order',
+    'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'translations',
 ])]
 class ShippingMethod extends Model
 {
@@ -54,6 +55,7 @@ class ShippingMethod extends Model
             'eta_max_days' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'translations' => 'array',
         ];
     }
 

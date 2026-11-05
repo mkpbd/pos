@@ -5,18 +5,23 @@ namespace App\Modules\Cms\Infrastructure;
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\Cms\Domain\PageStatus;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
+use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Domain\Translations;
 use Carbon\CarbonImmutable;
 
 class EloquentPageDirectory implements PageDirectory
 {
+    /** E12b: titles and SEO texts in the request's language. */
+    public function __construct(private readonly LocaleContext $locale) {}
+
     public function visible(array $ids): array
     {
         if ($ids === []) {
             return [];
         }
 
-        return CmsPage::query()->visible()->whereIn('id', array_values(array_unique($ids)))->get(['id', 'slug', 'title'])
-            ->mapWithKeys(fn (CmsPage $p) => [$p->id => ['id' => $p->id, 'slug' => $p->slug, 'title' => $p->title]])
+        return CmsPage::query()->visible()->whereIn('id', array_values(array_unique($ids)))->get(['id', 'slug', 'title', 'translations'])
+            ->mapWithKeys(fn (CmsPage $p) => [$p->id => ['id' => $p->id, 'slug' => $p->slug, 'title' => Translations::pick($p, 'title', $this->locale->current())]])
             ->all();
     }
 
@@ -27,10 +32,7 @@ class EloquentPageDirectory implements PageDirectory
         return $page === null ? null : [
             'id' => $page->id,
             'slug' => $page->slug,
-            'title' => $page->title,
-            'seo_title' => $page->seo_title,
-            'seo_description' => $page->seo_description,
-        ];
+        ] + Translations::pickMany($page, ['title', 'seo_title', 'seo_description'], $this->locale->current());
     }
 
     public function all(): array

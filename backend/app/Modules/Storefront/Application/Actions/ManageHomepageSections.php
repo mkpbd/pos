@@ -12,6 +12,7 @@ use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\ScheduleWindow;
@@ -55,6 +56,10 @@ class ManageHomepageSections
         $bannerIds = array_key_exists('banner_ids', $attributes) ? array_values($attributes['banner_ids'] ?? []) : null;
         $itemIds = array_key_exists('item_ids', $attributes) ? array_values($attributes['item_ids'] ?? []) : null;
         unset($attributes['banner_ids'], $attributes['item_ids']);
+
+        if (array_key_exists('translations', $attributes)) {
+            $attributes['translations'] = TranslationInput::apply($section->translations, $attributes['translations'], array_keys($type->translatable()), ['body_html'], $this->sanitizer);
+        }
 
         $configSent = array_key_exists('config', $attributes);
         if ($configSent || $creating) {
@@ -290,6 +295,7 @@ class ManageHomepageSections
             'is_enabled' => $section->is_enabled,
             'starts_at' => $section->starts_at?->toIso8601String(),
             'ends_at' => $section->ends_at?->toIso8601String(),
+            'translations_hash' => $section->translations === null ? null : hash('xxh128', (string) json_encode($section->translations)),
         ];
     }
 }

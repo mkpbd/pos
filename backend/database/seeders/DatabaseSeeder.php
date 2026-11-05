@@ -72,5 +72,7 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoCheckoutSeeder::class, ['organizationId' => $result['organization']->id]);
         $this->callWith(DemoPromotionsSeeder::class, ['organizationId' => $result['organization']->id]);
         $this->callWith(DemoAccountSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
+        // E12b: Bangla translations of the demo content (translations columns only).
+        $this->callWith(DemoTranslationsSeeder::class, ['organizationId' => $result['organization']->id]);
     }
 }

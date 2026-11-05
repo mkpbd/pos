@@ -19,8 +19,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $description_html
  * @property ?string $seo_title
  * @property ?string $seo_description
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'category_id', 'slug', 'is_visible', 'image_media_id', 'banner_media_id', 'description_html', 'seo_title', 'seo_description'])]
+#[Fillable(['organization_id', 'category_id', 'slug', 'is_visible', 'image_media_id', 'banner_media_id', 'description_html', 'seo_title', 'seo_description', 'translations'])]
 class CategoryListing extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -29,6 +30,6 @@ class CategoryListing extends Model
 
     protected function casts(): array
     {
-        return ['is_visible' => 'boolean'];
+        return ['is_visible' => 'boolean', 'translations' => 'array'];
     }
 }

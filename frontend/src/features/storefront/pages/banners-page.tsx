@@ -36,6 +36,8 @@ import { StorefrontHeader } from '@/features/storefront/components/storefront-he
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { ApiError } from '@/lib/api/client'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors, readBn, toTranslationsInput, validateBn, type BnValues, type TranslationField } from '@/features/translations/translations'
 import { fieldErrorMap } from '@/lib/forms'
 
 type Draft = Omit<BannerInput, 'starts_at' | 'ends_at' | 'desktop_media_id' | 'popup_delay_seconds' | 'popup_frequency'> & {
@@ -81,6 +83,17 @@ function popupSummary(b: Banner): string {
   return `${delay === 0 ? 'Opens right away' : `After ${delay} s`} · ${frequency}`
 }
 
+/** Translatable banner texts (E12b) with the base fields' limits; the second button is hero-only. */
+const BANNER_TRANSLATIONS = [
+  { name: 'kicker', max: 60 },
+  { name: 'title', max: 120 },
+  { name: 'subtitle', max: 255 },
+  { name: 'button_label', max: 40 },
+  { name: 'secondary_button_label', max: 40 },
+] as const
+const ALL_BANNER_TRANSLATION_NAMES = BANNER_TRANSLATIONS.map((f) => f.name)
+const bannerTranslations = (placement: BannerPlacement) => BANNER_TRANSLATIONS.filter((f) => placement === 'hero_slider' || f.name !== 'secondary_button_label')
+
 const text = (value: string | null) => value ?? ''
 const nullable = (value: string) => (value.trim() === '' ? null : value.trim())
 
@@ -104,12 +117,22 @@ function validateBanner(d: Draft): Record<string, string> {
 function BannerForm({ banner, placement, onDone }: { banner?: Banner; placement: BannerPlacement; onDone: () => void }) {
   const save = useSaveBannerMutation()
   const [draft, setDraft] = useState<Draft>(() => toDraft(placement, banner))
+  const [bn, setBn] = useState<BnValues>(() => readBn(banner?.translations, ALL_BANNER_TRANSLATION_NAMES))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }))
+  const translatable = bannerTranslations(draft.placement)
+  const labels: Record<(typeof BANNER_TRANSLATIONS)[number]['name'], string> = {
+    kicker: 'Small heading',
+    title: 'Headline',
+    subtitle: 'Text',
+    button_label: 'Button label',
+    secondary_button_label: 'Second button label',
+  }
+  const bnFields: TranslationField[] = translatable.map((f) => ({ ...f, label: labels[f.name], base: draft[f.name] }))
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    const local = validateBanner(draft)
+    const local = { ...validateBanner(draft), ...validateBn(bn, translatable) }
     if (Object.keys(local).length > 0) return setErrors(local)
     const { popup_delay, popup_frequency, ...rest } = draft
     const input: Partial<BannerInput> = {
@@ -118,6 +141,7 @@ function BannerForm({ banner, placement, onDone }: { banner?: Banner; placement:
       starts_at: fromLocalInput(draft.starts_at),
       ends_at: fromLocalInput(draft.ends_at),
       ...(draft.placement === 'popup' ? { popup_delay_seconds: Number(popup_delay.trim()), popup_frequency } : {}),
+      translations: toTranslationsInput(bn, translatable.map((f) => f.name), banner?.translations),
     }
     if (banner) delete input.placement
     save.mutate(
@@ -233,6 +257,8 @@ function BannerForm({ banner, placement, onDone }: { banner?: Banner; placement:
           <Input type="datetime-local" value={draft.ends_at} onChange={(e) => set({ ends_at: e.target.value })} />
         </FormField>
       </div>
+
+      <BanglaTranslations fields={bnFields} value={bn} onChange={setBn} errors={bnErrors(errors)} />
 
       {errors.form && <p role="alert" className="text-sm text-destructive">{errors.form}</p>}
       <DialogFooter>

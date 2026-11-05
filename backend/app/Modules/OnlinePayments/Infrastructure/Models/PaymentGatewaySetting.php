@@ -22,13 +22,13 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $sort_order
  */
 #[Table('payment_gateways')]
-#[Fillable(['organization_id', 'code', 'is_enabled', 'display_name', 'instructions', 'settings', 'sort_order'])]
+#[Fillable(['organization_id', 'code', 'is_enabled', 'display_name', 'instructions', 'settings', 'sort_order', 'translations'])]
 class PaymentGatewaySetting extends Model
 {
     use BelongsToOrganization, HasUuids, TracksAuthor;
 
     protected function casts(): array
     {
-        return ['is_enabled' => 'boolean', 'settings' => 'array', 'sort_order' => 'integer'];
+        return ['is_enabled' => 'boolean', 'settings' => 'array', 'sort_order' => 'integer', 'translations' => 'array'];
     }
 }

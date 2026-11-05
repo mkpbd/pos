@@ -57,7 +57,7 @@ describe('storefront blog index', () => {
     expect(await screen.findByRole('heading', { name: 'Older Post' })).toBeInTheDocument()
     expect(router.state.location.search).toBe('?page=2')
     expect(screen.getByText('1 min read')).toBeInTheDocument()
-    expect(queries).toEqual(['?page=1', '?page=2'])
+    expect(queries).toEqual(['?page=1&lang=en', '?page=2&lang=en'])
   })
 
   it('filters by category on its own page', async () => {
@@ -78,7 +78,7 @@ describe('storefront blog index', () => {
     expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Blog' })).toHaveAttribute('href', '/blog')
     expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument()
     await waitFor(() => expect(document.title).toBe('Recipes | Berry Kids'))
-    expect(queries).toEqual(['?page=1&category=recipes'])
+    expect(queries).toEqual(['?page=1&category=recipes&lang=en'])
   })
 
   it('shows a category a menu links to before it has published posts, and not found for an unknown one', async () => {

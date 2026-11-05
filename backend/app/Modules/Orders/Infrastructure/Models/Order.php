@@ -71,7 +71,7 @@ use LogicException;
     'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'paid_total', 'refunded_total', 'cost_total',
     'contact_name', 'contact_email', 'contact_phone', 'notes', 'access_token_hash', 'courier_name', 'tracking_number',
     'placed_at', 'expires_at', 'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by',
-    'cancel_reason', 'ip', 'user_agent',
+    'cancel_reason', 'ip', 'user_agent', 'locale',
 ])]
 class Order extends Model
 {

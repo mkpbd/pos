@@ -1,12 +1,12 @@
 import { compareDecimal, isZeroDecimal, subtractDecimal } from '@/lib/money'
+import type { Translate } from '../i18n/translate'
 import type { CheckoutPreview, ShippingMethod } from '../types'
 
 /** "Same day", "1 day", "3–5 days"; null when unknown. */
-export function etaLabel(min: number | null | undefined, max: number | null | undefined): string | null {
+export function etaLabel(min: number | null | undefined, max: number | null | undefined, t: Translate): string | null {
   if (min === null || min === undefined || max === null || max === undefined) return null
-  const days = (n: number) => (n === 1 ? '1 day' : `${n} days`)
-  if (min === max) return min === 0 ? 'Same day' : days(min)
-  return `${min}–${days(max)}`
+  if (min === max) return min === 0 ? t('checkout.eta.sameDay') : t('checkout.eta.days', { count: min })
+  return t('checkout.eta.range', { min, count: max })
 }
 
 /** The goods total the free-delivery threshold is compared with: the preview total without delivery and COD fees. */
@@ -29,11 +29,5 @@ export function isFree(amount: string): boolean {
   return isZeroDecimal(amount)
 }
 
-const dateTimeFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' })
-
-/** "Oct 31, 2026, 3:15 PM" in the shopper's time zone; the raw string when it is not a date. */
-export function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? iso : dateTimeFormat.format(date)
-}
+/** "Oct 31, 2026, 3:15 PM" in the shopper's time zone and language; the raw string when it is not a date. */
+export { formatDateTime } from '../i18n/format'

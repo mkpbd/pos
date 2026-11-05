@@ -4,7 +4,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createTestQueryClient, fail, mockApi, ok } from '@/test/utils'
 import { useAddToCartMutation, useCartQuery, useUpdateCartItemMutation } from './cart/api'
-import { customerKeys } from './store-keys'
+import { customerKeys, localized } from './store-keys'
 import { cartFixture, cartLine, customerFixture, productCard } from './test-fixtures'
 import { useWishlist } from './wishlist/api'
 import { LOCAL_WISHLIST_KEY } from './wishlist/local-wishlist'
@@ -34,7 +34,7 @@ describe('cart hooks', () => {
     await act(() => result.current.add.mutateAsync({ variant_id: 'v-l-1', quantity: '2' }))
     await waitFor(() => expect(result.current.cart.data?.item_count).toBe('2'))
     await act(() => result.current.update.mutateAsync({ id: 'l-1', quantity: '3' }))
-    expect(queryClient.getQueryData(customerKeys.cart)).toEqual(repriced)
+    expect(queryClient.getQueryData(localized(customerKeys.cart, 'en'))).toEqual(repriced)
   })
 
   it('refetch the cart when a line is gone (404)', async () => {

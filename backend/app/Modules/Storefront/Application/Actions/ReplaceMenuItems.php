@@ -8,6 +8,7 @@ use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\MenuItemType;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
@@ -119,6 +120,8 @@ class ReplaceMenuItems
                 'mega_columns' => $isMega ? (int) ($item['mega_columns'] ?? 4) : null,
                 'image_media_id' => $isMega ? ($item['image_media_id'] ?? null) : null,
                 'sort_order' => $position,
+                // E12b: the tree is replaced, so are the labels' translations.
+                'translations' => TranslationInput::apply(null, $item['translations'] ?? null, ['label']),
             ]);
 
             $this->insert($menu, $item['children'] ?? [], $created->id);

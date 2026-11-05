@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Application\Actions;
 
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
@@ -11,10 +12,11 @@ use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontSettings;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SaveStorefrontSettings
 {
-    private const AUDITED = ['is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing'];
+    private const AUDITED = ['is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing', 'bangla_enabled', 'default_locale', 'bangla_digits'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
@@ -24,7 +26,7 @@ class SaveStorefrontSettings
     ) {}
 
     /**
-     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool}  $attributes
+     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {
@@ -41,6 +43,10 @@ class SaveStorefrontSettings
             $before = $settings->exists ? $settings->only(self::AUDITED) : [];
 
             $settings->fill($attributes);
+            // E12b: the default language must be one shoppers can use.
+            if (! $settings->bangla_enabled && $settings->default_locale !== LocaleContext::BASE) {
+                throw ValidationException::withMessages(['default_locale' => ['Switch Bangla on before making it the default language.']]);
+            }
             if ($settings->is_enabled && ! StorefrontDomain::query()->exists()) {
                 throw new BusinessRuleViolation('STOREFRONT_DOMAIN_REQUIRED', 'Add a domain before opening the storefront.');
             }

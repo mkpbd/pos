@@ -10,12 +10,17 @@ use App\Modules\OnlineCatalog\Domain\Pricing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\RelatedProduct;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
+use App\Modules\Shared\Application\Localization\FixedText;
 use App\Modules\Shared\Domain\PlainText;
+use App\Modules\Shared\Domain\Translations;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * The product page and its recommendations. Shoppers only see live products; staff
  * previews (`$preview`) also open drafts, scheduled and ended listings.
+ *
+ * E12b: name, descriptions, SEO texts and breadcrumbs in the request's language (each
+ * field falls back to its base text).
  */
 class ProductPage
 {
@@ -54,19 +59,20 @@ class ProductPage
         $unitInfo = $record['unit_id'] === null ? null
             : ($this->directory->describe($this->catalog->organizationId(), ['units' => [$record['unit_id']]])['units'][$record['unit_id']] ?? null);
         $unit = $unitInfo['code'] ?? null;
+        $text = $this->texts($listing);
 
         $data = [
             'id' => $record['id'],
             'slug' => $listing->slug,
             'name' => $record['name'],
             'url' => '/product/'.$listing->slug,
-            'short_description' => $listing->short_description,
-            'description_html' => $listing->description_html,
+            'short_description' => $text['short_description'],
+            'description_html' => $text['description_html'],
             'specifications' => array_values($listing->specifications ?? []),
             'brand' => $this->catalog->brandLink($record['brand_id']),
             'category' => $this->catalog->categoryLink($record['category_id']),
             'breadcrumbs' => [
-                ['name' => 'Home', 'url' => '/'],
+                ['name' => FixedText::get('Home', $this->catalog->locale()), 'url' => '/'],
                 ...$this->categoryCrumbs($record['category_id']),
                 ['name' => $record['name'], 'url' => null],
             ],
@@ -100,8 +106,8 @@ class ProductPage
             // Approved reviews (E9): {average: "4.5", count: 12}, null without any.
             'rating' => $this->ratings->summary($record['id']),
             'seo' => [
-                'title' => $listing->seo_title ?? $record['name'],
-                'description' => $listing->seo_description ?? $listing->short_description,
+                'title' => $text['seo_title'] ?? $record['name'],
+                'description' => $text['seo_description'] ?? $text['short_description'],
                 'image_url' => $record['images'][0]['url'] ?? null,
             ],
         ];
@@ -131,16 +137,17 @@ class ProductPage
         $listing = $record['listing'];
         $variants = $this->catalog->activeVariants($record);
         $url = '/product/'.$listing->slug;
+        $text = $this->texts($listing);
 
         return [
             'name' => $record['name'],
             'url' => $url,
-            'description' => PlainText::excerpt($listing->description_html ?? $listing->short_description, self::STRUCTURED_DESCRIPTION_LENGTH),
+            'description' => PlainText::excerpt($text['description_html'] ?? $text['short_description'], self::STRUCTURED_DESCRIPTION_LENGTH),
             'sku' => count($variants) === 1 ? $variants[0]['sku'] : null,
             'images' => array_column($record['images'], 'url'),
             'brand' => $this->catalog->brandLink($record['brand_id'])['name'] ?? null,
             'breadcrumbs' => [
-                ['name' => 'Home', 'url' => '/'],
+                ['name' => FixedText::get('Home', $this->catalog->locale()), 'url' => '/'],
                 ...$this->categoryCrumbs($record['category_id']),
                 ['name' => $record['name'], 'url' => $url],
             ],
@@ -198,6 +205,17 @@ class ProductPage
             'related' => $related,
             'frequently_bought' => $this->browse->cards(($picks['frequently_bought'] ?? collect())->pluck('related_product_id')->all()),
         ];
+    }
+
+    /**
+     * The listing's texts in the request's language (E12b).
+     *
+     * @return array{short_description: ?string, description_html: ?string, seo_title: ?string, seo_description: ?string}
+     */
+    private function texts(ProductListing $listing): array
+    {
+        /** @var array{short_description: ?string, description_html: ?string, seo_title: ?string, seo_description: ?string} */
+        return Translations::pickMany($listing, ['short_description', 'description_html', 'seo_title', 'seo_description'], $this->catalog->locale());
     }
 
     /**

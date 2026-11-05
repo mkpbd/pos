@@ -5,18 +5,20 @@ import { ApiError } from '@/lib/api/client'
 import { useStorefront, useStorePageQuery } from '../api'
 import { ContactForm } from '../components/contact-form'
 import { RichText } from '../components/rich-text'
+import { useLocale } from '../i18n/locale'
 import type { FaqGroup } from '../types'
 import { useDocumentMeta } from '../use-document-meta'
 import { NotFoundPage } from './not-found-page'
 
 function PageTitle({ title }: { title: string }) {
+  const { t } = useLocale()
   return (
     <div className="bg-sf-surface">
       <div className="mx-auto max-w-sf px-4 py-10 text-center">
         <h1 className="text-3xl font-extrabold lg:text-4xl">{title}</h1>
-        <nav aria-label="Breadcrumb" className="mt-2 text-sm">
+        <nav aria-label={t('content.page.breadcrumb')} className="mt-2 text-sm">
           <ol className="flex justify-center gap-2">
-            <li><Link to="/" className="hover:underline">Home</Link></li>
+            <li><Link to="/" className="hover:underline">{t('content.page.home')}</Link></li>
             <li aria-hidden>/</li>
             <li aria-current="page">{title}</li>
           </ol>
@@ -27,12 +29,13 @@ function PageTitle({ title }: { title: string }) {
 }
 
 function Faq({ groups }: { groups: FaqGroup[] }) {
+  const { t } = useLocale()
   if (groups.length === 0) return null
 
   return (
     <div className="mt-10 flex flex-col gap-8">
       {groups.map((g) => (
-        <section key={g.group ?? ''} aria-label={g.group ?? 'Questions'}>
+        <section key={g.group ?? ''} aria-label={g.group ?? t('content.page.questions')}>
           {g.group && <h2 className="mb-3 text-2xl font-bold">{g.group}</h2>}
           <div className="divide-y rounded-sf-card bg-sf-surface">
             {g.items.map((item) => (
@@ -68,13 +71,14 @@ function ContactDetails() {
 export function ContentPage() {
   const { slug = '' } = useParams()
   const page = useStorePageQuery(slug)
+  const { t } = useLocale()
   useDocumentMeta(page.data ? { title: page.data.seo_title ?? page.data.title, description: page.data.seo_description, canonical: `/pages/${page.data.slug}` } : null)
 
   if (page.isPending) {
     return (
       <div role="status" className="grid min-h-[50vh] place-items-center">
         <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
-        <span className="sr-only">Loading</span>
+        <span className="sr-only">{t('content.loading')}</span>
       </div>
     )
   }
@@ -82,8 +86,8 @@ export function ContentPage() {
   if (page.error) {
     return (
       <section className="mx-auto max-w-sf px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">This page could not be loaded</h1>
-        <Button className="mt-4 rounded-sf-button" onClick={() => void page.refetch()}>Try again</Button>
+        <h1 className="text-2xl font-bold">{t('content.loadError')}</h1>
+        <Button className="mt-4 rounded-sf-button" onClick={() => void page.refetch()}>{t('common.tryAgain')}</Button>
       </section>
     )
   }

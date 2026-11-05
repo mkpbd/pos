@@ -6,6 +6,7 @@ use App\Modules\Cms\Infrastructure\Models\FaqItem;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Support\Changes;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\DB;
 class ManageFaq
 {
     public const MAX_ITEMS = 300;
+
+    /** E12b: translatable texts with the limits of their base fields. */
+    public const TRANSLATABLE = ['question' => ['max:255'], 'answer_html' => ['max:20000']];
 
     public function __construct(
         private readonly HtmlSanitizer $sanitizer,
@@ -40,6 +44,9 @@ class ManageFaq
             $creating = ! $item->exists;
             $before = $creating ? [] : $this->snapshot($item);
 
+            if (array_key_exists('translations', $attributes)) {
+                $attributes['translations'] = TranslationInput::apply($item->translations, $attributes['translations'], array_keys(self::TRANSLATABLE), ['answer_html'], $this->sanitizer);
+            }
             $item->fill($attributes);
             if ($creating) {
                 if (FaqItem::query()->count() >= self::MAX_ITEMS) {
@@ -94,6 +101,7 @@ class ManageFaq
             'question' => $item->question,
             'answer_hash' => hash('xxh128', $item->answer_html ?? ''),
             'is_active' => $item->is_active,
+            'translations_hash' => $item->translations === null ? null : hash('xxh128', (string) json_encode($item->translations)),
         ];
     }
 }

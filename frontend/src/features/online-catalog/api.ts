@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated } from '@/lib/api/client'
 import type { ProductOption } from '@/features/products/api'
+import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 
 /** Web state of a listing, computed by the server from the publish switch and schedule. */
 export type ListingState = 'draft' | 'scheduled' | 'live' | 'expired'
@@ -34,6 +35,8 @@ export type ProductListing = {
   seo_description: string | null
   sort_weight: number
   state: ListingState
+  /** Bangla texts (E12b): name, short_description, description_html, seo_title, seo_description. */
+  translations?: TranslationsMap
 }
 
 export type VariantListing = { variant_id: string; compare_at_price: string | null; image_id: string | null }
@@ -63,6 +66,7 @@ export type ProductListingInput = {
   seo_description: string | null
   sort_weight: number
   variants: VariantListing[]
+  translations?: TranslationsInput
 }
 
 export type RelatedInput = { related: string[]; frequently_bought: string[] }
@@ -86,6 +90,8 @@ export type CategoryListing = {
   description_html: string | null
   seo_title: string | null
   seo_description: string | null
+  /** Bangla texts (E12b): name, description_html, seo_title, seo_description. */
+  translations?: TranslationsMap
 }
 
 export type CategoryListingResponse = {
@@ -94,7 +100,7 @@ export type CategoryListingResponse = {
   url: string
 }
 
-export type CategoryListingInput = Omit<CategoryListing, 'exists' | 'slug'> & { slug?: string }
+export type CategoryListingInput = Omit<CategoryListing, 'exists' | 'slug' | 'translations'> & { slug?: string; translations?: TranslationsInput }
 
 export type WebBrandRow = { id: string; name: string; is_active: boolean; listing: null | { slug: string; is_visible: boolean } }
 
@@ -106,6 +112,8 @@ export type BrandListing = {
   description: string | null
   seo_title: string | null
   seo_description: string | null
+  /** Bangla texts (E12b): name, description, seo_title, seo_description. */
+  translations?: TranslationsMap
 }
 
 export type BrandListingResponse = {
@@ -114,7 +122,7 @@ export type BrandListingResponse = {
   url: string
 }
 
-export type BrandListingInput = Omit<BrandListing, 'exists' | 'slug'> & { slug?: string }
+export type BrandListingInput = Omit<BrandListing, 'exists' | 'slug' | 'translations'> & { slug?: string; translations?: TranslationsInput }
 
 /** A product as found by the admin product search (GET /products?search=). */
 export type ProductSearchHit = { id: string; name: string; variants: { sku: string }[]; images: { url: string }[]; is_active: boolean }

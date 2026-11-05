@@ -5,7 +5,7 @@ import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 import { normalizeReviews } from './reviews/api'
 import { reorderNotice, toPage } from './orders/account-api'
 import { storefrontRoutes } from './routes'
-import { bootstrapFixture, cartFixture, cartLine, customerFixture, orderFixture, productDetail } from './test-fixtures'
+import { bootstrapFixture, cartFixture, cartLine, customerFixture, orderFixture, productDetail, tEn } from './test-fixtures'
 import type { AccountOrder, AccountOrderRow, Customer, MyReview } from './types'
 
 type Routes = Parameters<typeof mockApi>[0]
@@ -118,7 +118,8 @@ describe('order history', () => {
     expect(await screen.findByText('You have no cancelled orders.')).toBeInTheDocument()
     expect(within(tabs).getByRole('link', { name: 'Cancelled' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Start shopping' })).toHaveAttribute('href', '/shop')
-    expect(requests).toEqual(['', '?page=2', '?status=cancelled'])
+    // Every store request carries the language (ADR-011).
+    expect(requests).toEqual(['?lang=en', '?page=2&lang=en', '?status=cancelled&lang=en'])
   })
 
   it('shows the last three orders on the account overview', async () => {
@@ -403,8 +404,8 @@ describe('product reviews', () => {
 
     await user.selectOptions(within(panel).getByLabelText('Sort by'), 'lowest')
     await user.selectOptions(within(panel).getByLabelText('Rating'), '4')
-    await waitFor(() => expect(queries).toContain('?sort=lowest&rating=4'))
-    expect(queries.slice(0, 3)).toEqual(['?sort=newest', '?sort=newest&page=2', '?sort=lowest'])
+    await waitFor(() => expect(queries).toContain('?sort=lowest&rating=4&lang=en'))
+    expect(queries.slice(0, 3)).toEqual(['?sort=newest&lang=en', '?sort=newest&page=2&lang=en', '?sort=lowest&lang=en'])
   })
 
   it('shows "No reviews yet" without a hint for guests', async () => {
@@ -452,7 +453,7 @@ describe('helpers', () => {
   })
 
   it('words the buy-again notice', () => {
-    expect(reorderNotice({ added: [{ variant_id: 'v', name: 'A', quantity: '1' }, { variant_id: 'w', name: 'B', quantity: '1' }], skipped: [] })).toBe('2 items were added to your cart.')
-    expect(reorderNotice({ added: [], skipped: [{ name: 'A', reason: 'limit' }] })).toBe('None of the items could be added to your cart: A (cart limit reached).')
+    expect(reorderNotice({ added: [{ variant_id: 'v', name: 'A', quantity: '1' }, { variant_id: 'w', name: 'B', quantity: '1' }], skipped: [] }, tEn)).toBe('2 items were added to your cart.')
+    expect(reorderNotice({ added: [], skipped: [{ name: 'A', reason: 'limit' }] }, tEn)).toBe('None of the items could be added to your cart: A (cart limit reached).')
   })
 })

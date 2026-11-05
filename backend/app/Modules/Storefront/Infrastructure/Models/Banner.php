@@ -35,8 +35,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $is_active
  * @property int $sort_order
  * @property ?CarbonImmutable $updated_at
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'placement', 'name', 'kicker', 'title', 'subtitle', 'link_url', 'button_label', 'secondary_link_url', 'secondary_button_label', 'desktop_media_id', 'mobile_media_id', 'text_color', 'text_position', 'popup_delay_seconds', 'popup_frequency', 'starts_at', 'ends_at', 'is_active', 'sort_order'])]
+#[Fillable(['organization_id', 'placement', 'name', 'kicker', 'title', 'subtitle', 'link_url', 'button_label', 'secondary_link_url', 'secondary_button_label', 'desktop_media_id', 'mobile_media_id', 'text_color', 'text_position', 'popup_delay_seconds', 'popup_frequency', 'starts_at', 'ends_at', 'is_active', 'sort_order', 'translations'])]
 class Banner extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -58,6 +59,7 @@ class Banner extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'popup_delay_seconds' => 'integer',
+            'translations' => 'array',
         ];
     }
 

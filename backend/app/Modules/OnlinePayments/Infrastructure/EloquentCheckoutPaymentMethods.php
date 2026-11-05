@@ -9,15 +9,21 @@ use App\Modules\OnlinePayments\Domain\PaymentGateway;
 use App\Modules\OnlinePayments\Infrastructure\Gateways\BankTransferGateway;
 use App\Modules\OnlinePayments\Infrastructure\Gateways\CashOnDeliveryGateway;
 use App\Modules\OnlinePayments\Infrastructure\Models\PaymentGatewaySetting;
+use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 
 class EloquentCheckoutPaymentMethods implements CheckoutPaymentMethods
 {
+    /** E12b: display names and instructions in the request's language. */
+    public function __construct(private readonly LocaleContext $locale) {}
+
     public function all(): array
     {
         $saved = PaymentGatewaySetting::query()->get()->keyBy('code');
-        $methods = array_map(fn (GatewayCode $code) => self::config($code, $saved->get($code->value)), GatewayCode::cases());
+        $methods = array_map(fn (GatewayCode $code) => self::config($code, $saved->get($code->value), $this->locale->current()), GatewayCode::cases());
         usort($methods, fn (array $a, array $b) => [$a['sort_order'], $a['code']] <=> [$b['sort_order'], $b['code']]);
 
         return $methods;
@@ -67,19 +73,23 @@ class EloquentCheckoutPaymentMethods implements CheckoutPaymentMethods
     }
 
     /**
-     * @return array{code: string, display_name: string, is_enabled: bool, instructions: ?string, settings: array<string, mixed>, sort_order: int}
+     * `display_name` and `instructions` in `$locale` (per-field fallback, E12b); `translations`
+     * is the stored document ({bn: {display_name, instructions}}) for the admin.
+     *
+     * @return array{code: string, display_name: string, is_enabled: bool, instructions: ?string, settings: array<string, mixed>, sort_order: int, translations: array<string, mixed>}
      */
-    public static function config(GatewayCode $code, ?PaymentGatewaySetting $row): array
+    public static function config(GatewayCode $code, ?PaymentGatewaySetting $row, string $locale = LocaleContext::BASE): array
     {
         $defaults = $code->defaults();
 
         return [
             'code' => $code->value,
-            'display_name' => $row->display_name ?? $defaults['display_name'],
+            'display_name' => Translations::value($row?->translations, 'display_name', $locale, $row->display_name ?? $defaults['display_name']),
             'is_enabled' => $row?->is_enabled ?? $defaults['is_enabled'],
-            'instructions' => $row === null ? $defaults['instructions'] : $row->instructions,
+            'instructions' => Translations::value($row?->translations, 'instructions', $locale, $row === null ? $defaults['instructions'] : $row->instructions),
             'settings' => ($row?->settings ?? []) + $defaults['settings'],
             'sort_order' => $row->sort_order ?? $defaults['sort_order'],
+            'translations' => TranslationInput::present($row?->translations),
         ];
     }
 }

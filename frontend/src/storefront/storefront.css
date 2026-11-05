@@ -6,6 +6,13 @@
 @import "@fontsource/poppins/500.css";
 @import "@fontsource/poppins/600.css";
 @import "@fontsource/poppins/700.css";
+/* Bangla (ADR-011): only the Bengali subsets, so Latin text keeps Poppins / Baloo 2 and the
+   files are fetched only when Bengali text is on the page. */
+@import "@fontsource/hind-siliguri/bengali-400.css";
+@import "@fontsource/hind-siliguri/bengali-500.css";
+@import "@fontsource/hind-siliguri/bengali-600.css";
+@import "@fontsource/hind-siliguri/bengali-700.css";
+@import "@fontsource-variable/baloo-da-2/wght.css";
 
 /*
  * Storefront tokens. Values come from the store's theme (themeToCssVars sets the --sf-*
@@ -108,4 +115,22 @@
   & table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
   & th, & td { border: 1px solid var(--sf-border); padding: 0.5em 0.75em; text-align: left; }
   & figcaption { font-size: 0.875rem; text-align: center; margin-top: 0.5em; }
+}
+
+/*
+ * Bangla pages (`<html lang="bn">`): Hind Siliguri for text, Baloo Da 2 for headings, in front of
+ * the theme's fonts. Unlayered, so it wins over the font utilities. Hind Siliguri is loaded for
+ * Bengali characters only (Latin stays in the theme font); Baloo Da 2 is Baloo 2's Bengali sibling.
+ */
+html:lang(bn) {
+  font-family: 'Hind Siliguri', var(--sf-font-body);
+}
+
+:lang(bn):is(h1, h2, h3, h4, h5, h6, .font-heading) {
+  font-family: 'Baloo Da 2 Variable', var(--sf-font-heading);
+}
+
+/* Bengali script sits taller than Latin: a little more line height keeps the vowel signs clear. */
+html:lang(bn) body {
+  line-height: 1.6;
 }

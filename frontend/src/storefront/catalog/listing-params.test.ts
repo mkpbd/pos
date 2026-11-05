@@ -11,6 +11,7 @@ import {
   toApiQuery,
   toggleAttribute,
 } from './listing-params'
+import { tEn } from '../test-fixtures'
 
 const parse = (qs: string) => parseListingState(new URLSearchParams(qs))
 
@@ -95,10 +96,10 @@ describe('pagination and summary', () => {
   })
 
   it('summarises the result count', () => {
-    expect(resultSummary({ current_page: 2, per_page: 24, total: 57, last_page: 3 })).toBe('Showing 25–48 of 57 products')
-    expect(resultSummary({ current_page: 1, per_page: 24, total: 7, last_page: 1 })).toBe('Showing all 7 products')
-    expect(resultSummary({ current_page: 1, per_page: 24, total: 1, last_page: 1 })).toBe('Showing 1 product')
-    expect(resultSummary({ current_page: 1, per_page: 24, total: 0, last_page: 1 })).toBe('No products found')
+    expect(resultSummary({ current_page: 2, per_page: 24, total: 57, last_page: 3 }, tEn)).toBe('Showing 25–48 of 57 products')
+    expect(resultSummary({ current_page: 1, per_page: 24, total: 7, last_page: 1 }, tEn)).toBe('Showing all 7 products')
+    expect(resultSummary({ current_page: 1, per_page: 24, total: 1, last_page: 1 }, tEn)).toBe('Showing 1 product')
+    expect(resultSummary({ current_page: 1, per_page: 24, total: 0, last_page: 1 }, tEn)).toBe('No products found')
   })
 
   it('builds the search URL', () => {

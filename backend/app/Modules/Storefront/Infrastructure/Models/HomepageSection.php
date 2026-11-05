@@ -24,8 +24,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?CarbonImmutable $ends_at
  * @property int $sort_order
  * @property ?CarbonImmutable $updated_at
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'type', 'title', 'subtitle', 'config', 'is_enabled', 'starts_at', 'ends_at', 'sort_order'])]
+#[Fillable(['organization_id', 'type', 'title', 'subtitle', 'config', 'is_enabled', 'starts_at', 'ends_at', 'sort_order', 'translations'])]
 class HomepageSection extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -46,6 +47,7 @@ class HomepageSection extends Model
             'ends_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
             'sort_order' => 'integer',
+            'translations' => 'array',
         ];
     }
 

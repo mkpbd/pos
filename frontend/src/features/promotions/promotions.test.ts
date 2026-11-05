@@ -51,6 +51,9 @@ describe('promotion draft', () => {
       name: 'Sale', description: null, type: 'free_shipping', value: null, scope: 'order', target_ids: [], min_subtotal: '3000', max_discount: null,
       trigger: 'automatic', starts_at: null, ends_at: '2026-11-08T00:00:00+06:00', show_countdown: false, is_active: true, usage_limit: null, usage_limit_per_customer: null,
     })
+    // Bangla texts: left out while there are none; clearing saved ones sends "" to remove them.
+    expect(toInput(draft({ bn: { name: 'জুস', description: '' } }), TZ).translations).toEqual({ bn: { name: 'জুস', description: '' } })
+    expect(toInput(draft(), TZ, { bn: { name: 'জুস' } }).translations).toEqual({ bn: { name: '', description: '' } })
     expect(toInput(toDraft(promotion(), TZ), TZ)).toMatchObject({ value: '10', scope: 'brands', target_ids: ['br-1'], ends_at: '2026-11-08T00:00:00+06:00', show_countdown: true })
   })
 
@@ -58,6 +61,8 @@ describe('promotion draft', () => {
     expect(promotionErrorMap(new ApiError(422, 'VALIDATION_FAILED', 'Invalid', { 'target_ids.0': ['Unknown brand.'], ends_at: ['Too early.'] }))).toEqual({ target_ids: 'Unknown brand.', ends_at: 'Too early.' })
     expect(promotionErrorMap(new ApiError(422, 'PROMOTION_INVALID', 'Invalid', { show_countdown: 'Needs an end.' }))).toEqual({ show_countdown: 'Needs an end.' })
     expect(promotionErrorMap(new ApiError(500, 'SERVER_ERROR', 'Boom'))).toEqual({ form: 'Boom' })
+    // Bangla texts keep their key so the Bangla section can show them.
+    expect(promotionErrorMap(new ApiError(422, 'VALIDATION_FAILED', 'Invalid', { 'translations.bn.name': ['Too long.'] }))).toEqual({ 'translations.bn.name': 'Too long.' })
   })
 
   it('labels offers', () => {

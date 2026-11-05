@@ -14,7 +14,9 @@ import { useCartQuery } from '../cart/api'
 import { cartNeedsAttention } from '../cart/cart-helpers'
 import { couponNote } from '../cart/coupon-messages'
 import { formatPrice } from '../money'
-import { checkoutKeys, customerKeys } from '../store-keys'
+import type { MessageKey } from '../i18n/en'
+import { useLocale } from '../i18n/locale'
+import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { Cart, CartCoupon, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
@@ -36,19 +38,26 @@ const REGISTER_PATH = `/account/register?next=${encodeURIComponent('/checkout')}
  * choice that affects the price changes. Guests check out without an account unless the
  * store requires one.
  */
+/** A field error to show: a client-side message key translated, a server message as it is. */
+function useErrorText() {
+  const { translateMessage, digits } = useLocale()
+  return (message: string | undefined) => (message ? digits(translateMessage(message)) : undefined)
+}
+
 export function CheckoutPage() {
-  useDocumentMeta(privatePage('Checkout'))
+  const { t } = useLocale()
+  useDocumentMeta(privatePage(t('checkout.page.title')))
   const me = useMeQuery()
   const options = useCheckoutOptionsQuery()
   const cart = useCartQuery()
   const customer = me.data ?? null
   const addresses = useAddressesQuery(customer !== null)
 
-  if (me.isPending || options.isPending || (!cart.data && cart.isPending)) return <Spinner label="Loading the checkout" />
+  if (me.isPending || options.isPending || (!cart.data && cart.isPending)) return <Spinner label={t('checkout.page.loading')} />
   if (options.error || !options.data || (cart.error && !cart.data)) {
     return (
-      <CheckoutMessage title="The checkout could not be loaded">
-        <p>Check your connection and try again.</p>
+      <CheckoutMessage title={t('checkout.page.loadFailedTitle')}>
+        <p>{t('checkout.page.loadFailedText')}</p>
         <button
           type="button"
           className={`${primaryButtonClass} mt-4`}
@@ -58,55 +67,56 @@ export function CheckoutPage() {
             void cart.refetch()
           }}
         >
-          Try again
+          {t('common.tryAgain')}
         </button>
       </CheckoutMessage>
     )
   }
   if (cart.data?.items.length === 0 || options.data.reason === 'cart_empty') {
     return (
-      <CheckoutMessage title="Your cart is empty" icon>
-        <p>Add something to your cart to check out.</p>
+      <CheckoutMessage title={t('checkout.page.emptyTitle')} icon>
+        <p>{t('checkout.page.emptyText')}</p>
         <Link to="/shop" className={`${primaryButtonClass} mt-4`}>
-          Start shopping
+          {t('checkout.page.startShopping')}
         </Link>
       </CheckoutMessage>
     )
   }
   if (!options.data.available) {
     return (
-      <CheckoutMessage title="Checkout is not available">
-        <p>Online ordering is not available right now. Please try again later.</p>
+      <CheckoutMessage title={t('checkout.page.unavailableTitle')}>
+        <p>{t('checkout.page.unavailableText')}</p>
         <Link to="/cart" className={`${secondaryButtonClass} mt-4`}>
-          Back to your cart
+          {t('checkout.page.backToCart')}
         </Link>
       </CheckoutMessage>
     )
   }
   if (!customer && !options.data.guest_checkout) {
     return (
-      <CheckoutMessage title="Sign in to check out">
-        <p>Please sign in or create an account to place your order. Your cart is kept.</p>
+      <CheckoutMessage title={t('checkout.page.signInTitle')}>
+        <p>{t('checkout.page.signInText')}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">
           <Link to={loginPathFor('/checkout')} className={primaryButtonClass}>
-            Sign in
+            {t('checkout.page.signIn')}
           </Link>
           <Link to={REGISTER_PATH} className={secondaryButtonClass}>
-            Create an account
+            {t('checkout.page.createAccount')}
           </Link>
         </div>
       </CheckoutMessage>
     )
   }
-  if (customer && addresses.isPending) return <Spinner label="Loading your addresses" />
+  if (customer && addresses.isPending) return <Spinner label={t('checkout.page.loadingAddresses')} />
 
   return <CheckoutForm key={customer?.id ?? 'guest'} customer={customer} addresses={customer ? (addresses.data ?? []) : []} options={options.data} cart={cart.data} />
 }
 
 function CheckoutMessage({ title, icon = false, children }: { title: string; icon?: boolean; children: ReactNode }) {
+  const { t } = useLocale()
   return (
     <section className="mx-auto max-w-sf px-4 py-8 lg:py-12" data-testid="checkout-page">
-      <h1 className="text-3xl font-extrabold lg:text-4xl">Checkout</h1>
+      <h1 className="text-3xl font-extrabold lg:text-4xl">{t('checkout.page.title')}</h1>
       <div className="mt-6 flex flex-col items-center rounded-sf-card bg-sf-surface p-8 text-center sm:p-10">
         {icon && <ShoppingBagIcon aria-hidden className="mb-4 size-14 text-sf-border" />}
         <h2 className="text-xl font-bold">{title}</h2>
@@ -121,6 +131,7 @@ type Form = UseFormReturn<CheckoutValues>
 function CheckoutForm({ customer, addresses, options, cart }: { customer: Customer | null; addresses: CustomerAddress[]; options: CheckoutOptions; cart: Cart | undefined }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { locale, t } = useLocale()
   const place = usePlaceOrderMutation()
   const [attempts] = useState(() => new PlacementAttempts())
   const [problem, setProblem] = useState<PlacementProblem | null>(null)
@@ -218,17 +229,17 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
 
   /** Applies what a failed placement tells us (fresh totals, fresh cart, field errors) and returns the message. */
   function handlePlacementError(error: unknown, expectedTotal: string): PlacementProblem {
-    const result = placementProblem(error)
+    const result = placementProblem(error, t)
     if (!(error instanceof ApiError)) return result
     switch (error.code) {
       case 'TOTAL_CHANGED': {
         const fresh = changedPreview(error)
         if (fresh) {
-          queryClient.setQueryData<CheckoutPreview>(checkoutKeys.preview(settledInput), fresh)
+          queryClient.setQueryData<CheckoutPreview>(localized(checkoutKeys.preview(settledInput), locale), fresh)
           const currency = fresh.currency ?? cart?.currency ?? null
           return {
             ...result,
-            message: `The total of your order changed from ${formatPrice(expectedTotal, currency)} to ${formatPrice(fresh.total, currency)} — prices, stock or delivery fees were updated. Please check the order summary and confirm the new total.`,
+            message: t('checkout.problem.totalChangedFrom', { from: formatPrice(expectedTotal, currency), to: formatPrice(fresh.total, currency) }),
           }
         }
         void queryClient.invalidateQueries({ queryKey: checkoutKeys.previewAll })
@@ -236,7 +247,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       }
       case 'CART_HAS_ISSUES': {
         const fresh = error.details.cart
-        if (fresh && typeof fresh === 'object' && 'items' in fresh) queryClient.setQueryData(customerKeys.cart, fresh)
+        if (fresh && typeof fresh === 'object' && 'items' in fresh) setLocalizedData(queryClient, customerKeys.cart, locale, fresh)
         else void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
         void queryClient.invalidateQueries({ queryKey: checkoutKeys.previewAll })
         return result
@@ -272,26 +283,26 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
 
   const placeId = useId()
   const blocked = place.isPending || !current || updating || needsAttention
-  const blockedReason = place.isPending ? null : needsAttention ? 'Please fix your cart before placing the order.' : updating || !current ? 'Updating the total…' : null
+  const blockedReason = place.isPending ? null : needsAttention ? t('checkout.page.blockedFix') : updating || !current ? t('checkout.page.updatingTotal') : null
   const confirming = problem?.code === 'TOTAL_CHANGED'
 
   return (
     <section className="mx-auto max-w-sf px-4 py-8 lg:py-12" data-testid="checkout-page">
-      <h1 className="text-3xl font-extrabold lg:text-4xl">Checkout</h1>
+      <h1 className="text-3xl font-extrabold lg:text-4xl">{t('checkout.page.title')}</h1>
       {!customer && (
         <p className="mt-2 text-sm">
-          Have an account?{' '}
+          {t('checkout.page.haveAccount')}{' '}
           <Link to={loginPathFor('/checkout')} className="font-semibold text-sf-accent underline underline-offset-4 hover:no-underline">
-            Sign in for faster checkout
+            {t('checkout.page.signInFaster')}
           </Link>
         </p>
       )}
       {needsAttention && (
         <p role="status" className="mt-4 flex flex-wrap items-start gap-2 rounded-sf-card bg-sf-sale/10 px-4 py-3 text-sm font-medium text-sf-sale" data-testid="checkout-cart-issues">
           <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
-          <span className="flex-1">Some items in your cart are not available in the quantity you chose.</span>
+          <span className="flex-1">{t('checkout.page.cartIssues')}</span>
           <Link to="/cart" className="font-bold underline underline-offset-4 hover:no-underline">
-            Review your cart
+            {t('checkout.page.reviewCart')}
           </Link>
         </p>
       )}
@@ -307,7 +318,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
           onRetry={() => void preview.refetch()}
         />
 
-        <form ref={formRef} noValidate onSubmit={onSubmit} aria-label="Checkout" className="flex min-w-0 flex-col gap-6 lg:order-first">
+        <form ref={formRef} noValidate onSubmit={onSubmit} aria-label={t('checkout.page.formLabel')} className="flex min-w-0 flex-col gap-6 lg:order-first">
           <ContactSection form={form} />
           <AddressSection form={form} customer={customer} addresses={addresses} divisions={divisions} districts={districts} />
           <DeliverySection
@@ -336,13 +347,13 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
             )}
             {shown && (
               <p className="flex justify-between gap-4 text-base lg:hidden">
-                <span className="font-bold text-sf-heading">Total</span>
+                <span className="font-bold text-sf-heading">{t('checkout.page.total')}</span>
                 <span className="font-heading text-xl font-extrabold text-sf-heading">{formatPrice(shown.total, shown.currency)}</span>
               </p>
             )}
             <button type="submit" disabled={blocked} aria-describedby={blockedReason ? `${placeId}-reason` : undefined} className={cn(primaryButtonClass, 'w-full')}>
               {place.isPending ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <LockIcon aria-hidden className="size-4" />}
-              {place.isPending ? 'Placing your order…' : confirming ? 'Confirm new total and place order' : 'Place order'}
+              {place.isPending ? t('checkout.page.placing') : confirming ? t('checkout.page.confirmNewTotal') : t('checkout.page.placeOrder')}
             </button>
             {blockedReason && (
               <p id={`${placeId}-reason`} className={cn('text-center text-sm', needsAttention && 'text-sf-sale')}>
@@ -363,15 +374,25 @@ const headingClass = 'font-heading text-xl font-bold text-sf-heading'
 
 function ContactSection({ form }: { form: Form }) {
   const { errors } = form.formState
+  const { t } = useLocale()
+  const errorText = useErrorText()
   return (
     <section aria-labelledby="checkout-contact" className={sectionClass}>
       <h2 id="checkout-contact" className={headingClass}>
-        Contact
+        {t('checkout.contact.heading')}
       </h2>
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField label="Full name" autoComplete="name" maxLength={120} error={errors.name?.message} className="sm:col-span-2" {...form.register('name')} />
-        <TextField label="E-mail" type="email" autoComplete="email" maxLength={255} error={errors.email?.message} hint="We send the order confirmation here." {...form.register('email')} />
-        <TextField label="Mobile number" type="tel" autoComplete="tel" placeholder="01XXXXXXXXX" maxLength={20} error={errors.phone?.message} {...form.register('phone')} />
+        <TextField label={t('checkout.contact.fullName')} autoComplete="name" maxLength={120} error={errorText(errors.name?.message)} className="sm:col-span-2" {...form.register('name')} />
+        <TextField
+          label={t('checkout.contact.email')}
+          type="email"
+          autoComplete="email"
+          maxLength={255}
+          error={errorText(errors.email?.message)}
+          hint={t('checkout.contact.emailHint')}
+          {...form.register('email')}
+        />
+        <TextField label={t('checkout.contact.mobile')} type="tel" autoComplete="tel" placeholder={t('checkout.phonePlaceholder')} maxLength={20} error={errorText(errors.phone?.message)} {...form.register('phone')} />
       </div>
     </section>
   )
@@ -383,13 +404,15 @@ function AddressSection({ form, customer, addresses, divisions, districts }: { f
   const choice = useWatch({ control: form.control, name: 'address_choice' })
   const errors = form.formState.errors
   const errorId = useId()
+  const { t } = useLocale()
+  const errorText = useErrorText()
   const showBook = customer !== null && addresses.length > 0
 
   if (!showBook) {
     return (
       <section aria-labelledby="checkout-address" className={sectionClass}>
         <h2 id="checkout-address" className={headingClass}>
-          Delivery address
+          {t('checkout.address.heading')}
         </h2>
         <NewAddressFields form={form} divisions={divisions} districts={districts} canSave={customer !== null} bookFull={false} />
       </section>
@@ -400,14 +423,14 @@ function AddressSection({ form, customer, addresses, divisions, districts }: { f
   return (
     <fieldset className={sectionClass} aria-describedby={errors.address_choice ? errorId : undefined}>
       <legend className="float-left w-full">
-        <h2 className={headingClass}>Delivery address</h2>
+        <h2 className={headingClass}>{t('checkout.address.heading')}</h2>
       </legend>
       <div className="flex flex-col gap-3">
         {addresses.map((address) => (
           <RadioCard key={address.id} value={address.id} registered={form.register('address_choice')} invalid={invalid} testId="address-option">
             <span className="flex flex-wrap items-center gap-2 font-semibold text-sf-heading">
               {address.label || address.recipient_name}
-              {address.is_default_shipping && <span className="rounded-full bg-sf-accent px-2 py-0.5 text-xs font-bold text-sf-accent-foreground">Default</span>}
+              {address.is_default_shipping && <span className="rounded-full bg-sf-accent px-2 py-0.5 text-xs font-bold text-sf-accent-foreground">{t('checkout.address.default')}</span>}
             </span>
             <span className="block text-sm">
               {address.recipient_name}, {address.address_line}, {address.area}, {address.district.name}
@@ -416,12 +439,12 @@ function AddressSection({ form, customer, addresses, divisions, districts }: { f
           </RadioCard>
         ))}
         <RadioCard value={NEW_ADDRESS} registered={form.register('address_choice')} invalid={invalid} testId="address-option">
-          <span className="font-semibold text-sf-heading">Use a new address</span>
+          <span className="font-semibold text-sf-heading">{t('checkout.address.useNew')}</span>
         </RadioCard>
       </div>
       {errors.address_choice && (
         <p id={errorId} className="text-sm text-sf-sale">
-          {errors.address_choice.message}
+          {errorText(errors.address_choice.message)}
         </p>
       )}
       {choice === NEW_ADDRESS && <NewAddressFields form={form} divisions={divisions} districts={districts} canSave bookFull={addresses.length >= MAX_ADDRESSES} />}
@@ -433,6 +456,8 @@ const selectClass = cn(inputClass, 'appearance-auto')
 
 function NewAddressFields({ form, divisions, districts, canSave, bookFull }: { form: Form; divisions: GeoQuery; districts: GeoQuery; canSave: boolean; bookFull: boolean }) {
   const { errors } = form.formState
+  const { t } = useLocale()
+  const errorText = useErrorText()
   const divisionId = useWatch({ control: form.control, name: 'division_id' })
   const districtId = useWatch({ control: form.control, name: 'district_id' })
   const divisionField = form.register('division_id', { onChange: () => form.setValue('district_id', '') })
@@ -455,13 +480,14 @@ function NewAddressFields({ form, divisions, districts, canSave, bookFull }: { f
         {options?.map((option) => (
           <option key={String(option.id)} value={String(option.id)}>
             {option.name}
-            {option.name_bn ? ` (${option.name_bn})` : ''}
+            {/* In Bangla the API's name already is the Bangla one. */}
+            {option.name_bn && option.name_bn !== option.name ? ` (${option.name_bn})` : ''}
           </option>
         ))}
       </select>
       {errors[name] && (
         <p id={`checkout-${name}-error`} className="text-sm text-sf-sale">
-          {errors[name]?.message}
+          {errorText(errors[name]?.message)}
         </p>
       )}
     </div>
@@ -469,23 +495,62 @@ function NewAddressFields({ form, divisions, districts, canSave, bookFull }: { f
 
   return (
     <div className="flex flex-col gap-4" data-testid="new-address">
-      {divisions.isError && <FormAlert message="The list of divisions could not be loaded. Please reload the page." />}
+      {divisions.isError && <FormAlert message={t('checkout.address.divisionsFailed')} />}
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField label="Recipient name" autoComplete="shipping name" maxLength={120} error={errors.recipient_name?.message} {...form.register('recipient_name')} />
-        <TextField label="Recipient mobile number" type="tel" autoComplete="shipping tel" placeholder="01XXXXXXXXX" maxLength={20} error={errors.address_phone?.message} {...form.register('address_phone')} />
-        {select('division_id', 'Division', divisionId, divisions.data, divisions.isPending ? 'Loading…' : 'Choose a division', divisionField, !divisions.data)}
-        {select('district_id', 'District', districtId, divisionId ? districts.data : [], divisionId ? (districts.isPending ? 'Loading…' : 'Choose a district') : 'Choose a division first', form.register('district_id'), !divisionId || !districts.data)}
-        <TextField label="Area / thana" maxLength={100} error={errors.area?.message} {...form.register('area')} />
-        <TextField label="Postcode (optional)" inputMode="numeric" autoComplete="shipping postal-code" maxLength={4} error={errors.postcode?.message} {...form.register('postcode')} />
-        <TextField label="Street address" autoComplete="shipping street-address" maxLength={255} placeholder="House, road, block" error={errors.address_line?.message} className="sm:col-span-2" {...form.register('address_line')} />
+        <TextField label={t('checkout.address.recipientName')} autoComplete="shipping name" maxLength={120} error={errorText(errors.recipient_name?.message)} {...form.register('recipient_name')} />
+        <TextField
+          label={t('checkout.address.recipientMobile')}
+          type="tel"
+          autoComplete="shipping tel"
+          placeholder={t('checkout.phonePlaceholder')}
+          maxLength={20}
+          error={errorText(errors.address_phone?.message)}
+          {...form.register('address_phone')}
+        />
+        {select(
+          'division_id',
+          t('checkout.address.division'),
+          divisionId,
+          divisions.data,
+          divisions.isPending ? t('checkout.address.loading') : t('checkout.address.chooseDivision'),
+          divisionField,
+          !divisions.data,
+        )}
+        {select(
+          'district_id',
+          t('checkout.address.district'),
+          districtId,
+          divisionId ? districts.data : [],
+          divisionId ? (districts.isPending ? t('checkout.address.loading') : t('checkout.address.chooseDistrict')) : t('checkout.address.chooseDivisionFirst'),
+          form.register('district_id'),
+          !divisionId || !districts.data,
+        )}
+        <TextField label={t('checkout.address.area')} maxLength={100} error={errorText(errors.area?.message)} {...form.register('area')} />
+        <TextField
+          label={t('checkout.address.postcode')}
+          inputMode="numeric"
+          autoComplete="shipping postal-code"
+          maxLength={4}
+          error={errorText(errors.postcode?.message)}
+          {...form.register('postcode')}
+        />
+        <TextField
+          label={t('checkout.address.street')}
+          autoComplete="shipping street-address"
+          maxLength={255}
+          placeholder={t('checkout.address.streetPlaceholder')}
+          error={errorText(errors.address_line?.message)}
+          className="sm:col-span-2"
+          {...form.register('address_line')}
+        />
       </div>
       {canSave &&
         (bookFull ? (
-          <p className="text-sm">Your address book is full ({MAX_ADDRESSES} addresses), so this address is used for this order only.</p>
+          <p className="text-sm">{t('checkout.address.bookFull', { max: MAX_ADDRESSES })}</p>
         ) : (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="size-4 accent-sf-accent" {...form.register('save_address')} />
-            Save this address to my account
+            {t('checkout.address.save')}
           </label>
         ))}
     </div>
@@ -514,38 +579,40 @@ function DeliverySection({
 }) {
   const errors = form.formState.errors
   const errorId = useId()
+  const { t } = useLocale()
+  const errorText = useErrorText()
   const price = (amount: string) => formatPrice(amount, currency)
   const goods = preview ? goodsTotal(preview) : '0'
   const unavailable = error instanceof ApiError && error.code === 'SHIPPING_UNAVAILABLE'
   const invalid = errors.shipping_method_id ? true : undefined
 
   let body: ReactNode
-  if (deliveryPending) body = <p className="text-sm">Choose a delivery address to see the delivery options.</p>
+  if (deliveryPending) body = <p className="text-sm">{t('checkout.delivery.chooseAddress')}</p>
   else if (unavailable || (!loading && preview && methods.length === 0)) {
     body = (
       <p className="flex items-start gap-2 text-sm font-medium text-sf-sale" data-testid="shipping-unavailable">
         <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
-        Sorry, we do not deliver to this district yet. Please choose another address.
+        {t('checkout.delivery.notDelivered')}
       </p>
     )
-  } else if (methods.length === 0) body = <p className="text-sm">Loading the delivery options…</p>
+  } else if (methods.length === 0) body = <p className="text-sm">{t('checkout.delivery.loading')}</p>
   else {
     body = (
       <div className="flex flex-col gap-3">
         {methods.map((method) => {
           const fee = methodFee(method, goods, freeShipping)
-          const eta = etaLabel(method.eta_min_days, method.eta_max_days)
+          const eta = etaLabel(method.eta_min_days, method.eta_max_days, t)
           return (
             <RadioCard key={method.id} value={method.id} registered={form.register('shipping_method_id')} invalid={invalid} testId="shipping-option">
               <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="font-semibold text-sf-heading">{method.name}</span>
-                <span className="font-semibold text-sf-heading">{isZeroDecimal(fee) ? 'Free' : price(fee)}</span>
+                <span className="font-semibold text-sf-heading">{isZeroDecimal(fee) ? t('checkout.delivery.free') : price(fee)}</span>
               </span>
               {method.description && <span className="block text-sm">{method.description}</span>}
               <span className="block text-xs">
-                {eta && <>Delivery in {eta}</>}
+                {eta && t('checkout.delivery.eta', { eta })}
                 {eta && method.free_over && !isZeroDecimal(fee) ? ' · ' : ''}
-                {method.free_over && !isZeroDecimal(fee) && <>Free on orders of {price(method.free_over)} or more</>}
+                {method.free_over && !isZeroDecimal(fee) && t('checkout.delivery.freeOver', { amount: price(method.free_over) })}
               </span>
             </RadioCard>
           )
@@ -559,36 +626,38 @@ function DeliverySection({
       <legend className="float-left w-full">
         <h2 className={cn(headingClass, 'flex items-center gap-2')}>
           <TruckIcon aria-hidden className="size-5" />
-          Delivery method
+          {t('checkout.delivery.heading')}
         </h2>
       </legend>
       {body}
       {errors.shipping_method_id && (
         <p id={errorId} className="text-sm text-sf-sale">
-          {errors.shipping_method_id.message}
+          {errorText(errors.shipping_method_id.message)}
         </p>
       )}
     </fieldset>
   )
 }
 
-const PAYMENT_DESCRIPTIONS: Record<string, string> = {
-  cod: 'Pay in cash when your order is delivered.',
-  bank_transfer: 'Transfer the total to our bank account. You get the account details after placing the order, and we keep your order for you until the payment arrives.',
+const PAYMENT_DESCRIPTIONS: Record<string, MessageKey> = {
+  cod: 'checkout.payment.cod',
+  bank_transfer: 'checkout.payment.bankTransfer',
 }
 
 function PaymentSection({ form, options, selectedMethod, currency }: { form: Form; options: CheckoutOptions; selectedMethod: ShippingMethod | null; currency: string | null }) {
   const errors = form.formState.errors
   const errorId = useId()
+  const { t } = useLocale()
+  const errorText = useErrorText()
   const invalid = errors.payment_method ? true : undefined
 
   return (
     <fieldset className={sectionClass} aria-describedby={errors.payment_method ? errorId : undefined}>
       <legend className="float-left w-full">
-        <h2 className={headingClass}>Payment method</h2>
+        <h2 className={headingClass}>{t('checkout.payment.heading')}</h2>
       </legend>
       {options.payment_methods.length === 0 ? (
-        <p className="text-sm">No payment method is available right now. Please try again later.</p>
+        <p className="text-sm">{t('checkout.payment.none')}</p>
       ) : (
         <div className="flex flex-col gap-3">
           {options.payment_methods.map((method) => {
@@ -597,9 +666,9 @@ function PaymentSection({ form, options, selectedMethod, currency }: { form: For
             return (
               <RadioCard key={method.code} value={method.code} registered={form.register('payment_method')} invalid={invalid} disabled={codBlocked} testId="payment-option">
                 <span className="block font-semibold text-sf-heading">{method.display_name}</span>
-                <span className="block text-sm">{PAYMENT_DESCRIPTIONS[method.code] ?? ''}</span>
-                {codBlocked && <span className="block text-sm font-medium text-sf-sale">Not available with {selectedMethod.name}.</span>}
-                {codFee && <span className="block text-xs">A cash on delivery fee of {formatPrice(codFee, currency)} applies.</span>}
+                <span className="block text-sm">{method.code in PAYMENT_DESCRIPTIONS ? t(PAYMENT_DESCRIPTIONS[method.code]!) : ''}</span>
+                {codBlocked && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>}
+                {codFee && <span className="block text-xs">{t('checkout.payment.codFee', { amount: formatPrice(codFee, currency) })}</span>}
               </RadioCard>
             )
           })}
@@ -607,7 +676,7 @@ function PaymentSection({ form, options, selectedMethod, currency }: { form: For
       )}
       {errors.payment_method && (
         <p id={errorId} className="text-sm text-sf-sale">
-          {errors.payment_method.message}
+          {errorText(errors.payment_method.message)}
         </p>
       )}
     </fieldset>
@@ -616,15 +685,16 @@ function PaymentSection({ form, options, selectedMethod, currency }: { form: For
 
 function NotesSection({ form }: { form: Form }) {
   const id = useId()
-  const error = form.formState.errors.notes?.message
+  const { t } = useLocale()
+  const error = useErrorText()(form.formState.errors.notes?.message)
   return (
     <section aria-labelledby={`${id}-heading`} className={sectionClass}>
       <h2 id={`${id}-heading`} className={headingClass}>
-        Order notes
+        {t('checkout.notes.heading')}
       </h2>
       <div className="flex flex-col gap-1.5">
         <label htmlFor={id} className="text-sm font-medium text-sf-heading">
-          Notes for the delivery (optional)
+          {t('checkout.notes.label')}
         </label>
         <textarea
           id={id}
@@ -633,11 +703,11 @@ function NotesSection({ form }: { form: Form }) {
           className={inputClass}
           aria-invalid={error ? true : undefined}
           aria-describedby={`${id}-message`}
-          placeholder="A landmark, or the best time to deliver"
+          placeholder={t('checkout.notes.placeholder')}
           {...form.register('notes')}
         />
         <p id={`${id}-message`} className={cn('text-sm', error && 'text-sf-sale')}>
-          {error ?? 'Up to 500 characters.'}
+          {error ?? t('checkout.notes.hint', { max: 500 })}
         </p>
       </div>
     </section>
@@ -695,14 +765,15 @@ function OrderSummaryPanel({
 }) {
   const [open, setOpen] = useState(false)
   const contentId = useId()
+  const { t } = useLocale()
   const total = preview ? formatPrice(preview.total, currency) : null
-  const problem = useMemo(() => (error && !preview ? placementProblem(error) : null), [error, preview])
+  const problem = useMemo(() => (error && !preview ? placementProblem(error, t) : null), [error, preview, t])
 
   return (
     <aside aria-labelledby="checkout-summary-heading" className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-5 md:p-6 lg:sticky lg:top-40" data-testid="order-summary" aria-busy={updating || undefined}>
       <div className="flex items-center justify-between gap-3">
         <h2 id="checkout-summary-heading" className={headingClass}>
-          Order summary
+          {t('checkout.summary.heading')}
         </h2>
         <button
           type="button"
@@ -711,14 +782,14 @@ function OrderSummaryPanel({
           aria-controls={contentId}
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? 'Hide' : 'Show'}
+          {open ? t('checkout.summary.hide') : t('checkout.summary.show')}
           {total && <span className="text-sf-heading">{total}</span>}
           <ChevronDownIcon aria-hidden className={cn('size-4 transition', open && 'rotate-180')} />
         </button>
       </div>
       {/* Announces the new total after every recomputation. */}
       <p className="sr-only" aria-live="polite" data-testid="summary-announcement">
-        {total ? `Order total ${total}` : ''}
+        {total ? t('checkout.summary.announcement', { total }) : ''}
       </p>
       <div id={contentId} className={cn('flex-col gap-4', open ? 'flex' : 'hidden lg:flex', updating && 'opacity-70 transition-opacity')}>
         {preview ? (
@@ -729,9 +800,9 @@ function OrderSummaryPanel({
               <p className="flex items-start gap-2 rounded-lg bg-sf-sale/10 px-3 py-2 text-xs font-medium text-sf-sale" data-testid="summary-coupon-note">
                 <CircleAlertIcon aria-hidden className="mt-px size-3.5 shrink-0" />
                 <span>
-                  Coupon {coupon.code} is not applied: {couponNote(coupon)}{' '}
+                  {t('checkout.summary.couponNotApplied', { code: coupon.code, note: couponNote(coupon, t) ?? '' })}{' '}
                   <Link to="/cart" className="font-bold underline underline-offset-4 hover:no-underline">
-                    Change it in your cart
+                    {t('checkout.summary.changeInCart')}
                   </Link>
                 </span>
               </p>
@@ -739,15 +810,15 @@ function OrderSummaryPanel({
           </>
         ) : problem ? (
           <div className="text-sm">
-            <p role="alert">{problem.code === 'RETRY' ? 'The order summary could not be loaded.' : problem.message}</p>
+            <p role="alert">{problem.code === 'RETRY' ? t('checkout.summary.loadFailed') : problem.message}</p>
             <button type="button" className={`${secondaryButtonClass} mt-3`} onClick={onRetry}>
-              Try again
+              {t('common.tryAgain')}
             </button>
           </div>
         ) : (
           <div role="status" className="grid place-items-center py-8">
             <span className="size-8 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
-            <span className="sr-only">Loading the order summary</span>
+            <span className="sr-only">{t('checkout.summary.loading')}</span>
           </div>
         )}
       </div>

@@ -15,7 +15,9 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,8 +38,13 @@ use Illuminate\Support\Facades\DB;
  * Instances cache reference data (categories, brands, attributes, fulfilment store) for
  * their lifetime, so resolve a fresh instance per request.
  *
+ * E12b: names are in the request's language (LocaleContext): a product's `name` is its
+ * listing's translated name, else the product's name; category and brand names come from
+ * their listings' translations the same way. Listing texts are read with
+ * Translations::pick(). Search matches base and Bangla names.
+ *
  * @phpstan-type VariantRecord array{id: string, sku: string, name: ?string, option_values: array<string, string>, price: string, compare_at_price: ?string, raw_compare_at_price: ?string, image_id: ?string, is_active: bool, tracked: bool, in_stock: bool, low_stock: bool}
- * @phpstan-type ProductRecord array{id: string, name: string, category_id: ?string, brand_id: ?string, unit_id: ?string, options: list<array{name: string, values: list<string>}>, is_active: bool, listing: ProductListing, variants: list<VariantRecord>, images: list<array{id: string, url: string}>, units_sold_30d: string, units_sold_total: string, rating?: array{average: string, count: int}|null}
+ * @phpstan-type ProductRecord array{id: string, name: string, base_name?: string, category_id: ?string, brand_id: ?string, unit_id: ?string, options: list<array{name: string, values: list<string>}>, is_active: bool, listing: ProductListing, variants: list<VariantRecord>, images: list<array{id: string, url: string}>, units_sold_30d: string, units_sold_total: string, rating?: array{average: string, count: int}|null}
  */
 class CatalogReadModel
 {
@@ -72,7 +79,13 @@ class CatalogReadModel
         private readonly CatalogPromotions $promotions,
         private readonly ProductRatings $ratings,
         private readonly StorefrontContentVersion $version,
+        private readonly LocaleContext $locale,
     ) {}
+
+    public function locale(): string
+    {
+        return $this->locale->current();
+    }
 
     public function organizationId(): string
     {
@@ -107,10 +120,28 @@ class CatalogReadModel
                 fn () => $this->nextListingChange(),
             );
 
-            return array_map(fn (array $record) => ['listing' => (new ProductListing)->newFromBuilder($record['listing'])] + $record, $cached);
+            return $this->localize(array_map(fn (array $record) => ['listing' => (new ProductListing)->newFromBuilder($record['listing'])] + $record, $cached));
         }
 
-        return $this->loadProducts($options);
+        return $this->localize($this->loadProducts($options));
+    }
+
+    /**
+     * Product names in the request's language (E12b); `base_name` keeps the product's own.
+     *
+     * @param  list<ProductRecord>  $records
+     * @return list<ProductRecord>
+     */
+    private function localize(array $records): array
+    {
+        $locale = $this->locale->current();
+
+        return array_map(function (array $record) use ($locale) {
+            $record['base_name'] = $record['name'];
+            $record['name'] = (string) Translations::value($record['listing']->translations, 'name', $locale, $record['name']);
+
+            return $record;
+        }, $records);
     }
 
     /**
@@ -335,7 +366,7 @@ class CatalogReadModel
             'variant_count' => count($variants),
             // Lets a card add a single-variant product to the cart; null when options must be chosen.
             'default_variant_id' => count($variants) === 1 ? $variants[0]['id'] : null,
-            'short_description' => $listing->short_description,
+            'short_description' => Translations::pick($listing, 'short_description', $this->locale->current()),
             // Live automatic promotion of the variant giving `price` (E8b): {id, name, type, value, ends_at, show_countdown, price}.
             'promotion' => $variants === [] ? null : $this->promotion($record, $pricing['price']),
             // E10b: {average (one decimal), count} of the approved reviews, null when unrated.
@@ -520,7 +551,14 @@ class CatalogReadModel
     public function categoryTree(): CategoryTree
     {
         if ($this->tree === null) {
-            $categories = $this->catalog->categories($this->organizationId());
+            $locale = $this->locale->current();
+            $listings = $this->categoryListings();
+            $categories = array_map(function (array $c) use ($listings, $locale) {
+                $c['base_name'] = $c['name'];
+                $c['name'] = (string) Translations::value(($listings[$c['id']] ?? null)?->translations, 'name', $locale, $c['name']);
+
+                return $c;
+            }, $this->catalog->categories($this->organizationId()));
             $active = array_column(array_filter($categories, fn (array $c) => $c['is_active']), 'id', 'id');
             $visible = [];
             foreach ($this->categoryListings() as $categoryId => $listing) {
@@ -561,7 +599,18 @@ class CatalogReadModel
      */
     public function brands(): array
     {
-        return $this->brands ??= array_column($this->catalog->brands($this->organizationId()), null, 'id');
+        if ($this->brands === null) {
+            $locale = $this->locale->current();
+            $listings = $this->brandListings();
+            $this->brands = [];
+            foreach ($this->catalog->brands($this->organizationId()) as $brand) {
+                $brand['base_name'] = $brand['name'];
+                $brand['name'] = (string) Translations::value(($listings[$brand['id']] ?? null)?->translations, 'name', $locale, $brand['name']);
+                $this->brands[$brand['id']] = $brand;
+            }
+        }
+
+        return $this->brands;
     }
 
     /**
@@ -639,16 +688,23 @@ class CatalogReadModel
     }
 
     /**
-     * Case-insensitive substring match on product name, any live SKU or the brand name.
+     * Case-insensitive substring match on product name, any live SKU or the brand name —
+     * base and Bangla names (the listings' translations, E12b) in every language.
      *
      * @param  Builder<ProductListing>  $query
      */
     private function applySearch(Builder $query, string $q): void
     {
         $like = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower(trim($q))).'%';
+        $grammar = $query->getQuery()->getGrammar();
+        $translated = fn (string $column) => 'lower('.$grammar->wrap($column.'->'.LocaleContext::BN.'->name').')';
 
         $query->where(fn (Builder $w) => $w
             ->whereRaw("lower(p.name) like ? escape '!'", [$like])
+            ->orWhereRaw($translated('product_listings.translations')." like ? escape '!'", [$like])
+            ->orWhereExists(fn (QueryBuilder $s) => $s->from('brand_listings as sbl')
+                ->whereColumn('sbl.brand_id', 'p.brand_id')
+                ->whereRaw($translated('sbl.translations')." like ? escape '!'", [$like]))
             ->orWhereExists(fn (QueryBuilder $s) => $s->from('product_variants as sv')
                 ->whereColumn('sv.product_id', 'p.id')->whereNull('sv.deleted_at')->where('sv.is_active', true)
                 ->whereRaw("lower(sv.sku) like ? escape '!'", [$like]))

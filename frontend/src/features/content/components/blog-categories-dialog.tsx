@@ -15,8 +15,10 @@ import {
   useSaveBlogCategoryMutation,
   type BlogCategory,
 } from '@/features/content/api'
-import { BLOG_LIMITS, blogDeleteError } from '@/features/content/blog'
+import { BLOG_CATEGORY_TRANSLATION_NAMES, BLOG_CATEGORY_TRANSLATIONS, BLOG_LIMITS, blogDeleteError } from '@/features/content/blog'
 import { slugify, SLUG_PATTERN } from '@/features/content/slug'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors, readBn, toTranslationsInput, validateBn, type BnValues } from '@/features/translations/translations'
 import { fieldErrorMap } from '@/lib/forms'
 
 /** Add or edit one category; the address follows the name until it is edited by hand. */
@@ -26,6 +28,7 @@ function CategoryForm({ category, onDone }: { category: BlogCategory | null; onD
   const [slug, setSlug] = useState(category?.slug ?? '')
   const [slugTouched, setSlugTouched] = useState(category !== null)
   const [description, setDescription] = useState(category?.description ?? '')
+  const [bn, setBn] = useState<BnValues>(() => readBn(category?.translations, BLOG_CATEGORY_TRANSLATION_NAMES))
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const submit = (e: React.FormEvent) => {
@@ -34,11 +37,12 @@ function CategoryForm({ category, onDone }: { category: BlogCategory | null; onD
     const local: Record<string, string> = {}
     if (!name.trim()) local.name = 'Enter a name.'
     if (!SLUG_PATTERN.test(slug)) local.slug = 'Lower-case letters, digits and single hyphens, e.g. store-news.'
+    Object.assign(local, validateBn(bn, BLOG_CATEGORY_TRANSLATIONS))
     if (Object.keys(local).length > 0) return setErrors(local)
     setErrors({})
 
     save.mutate(
-      { id: category?.id, input: { name: name.trim(), slug, description: description.trim() || null } },
+      { id: category?.id, input: { name: name.trim(), slug, description: description.trim() || null, translations: toTranslationsInput(bn, BLOG_CATEGORY_TRANSLATION_NAMES, category?.translations) } },
       {
         onSuccess: () => {
           toast.success(category ? 'Category saved.' : 'Category added.')
@@ -78,6 +82,16 @@ function CategoryForm({ category, onDone }: { category: BlogCategory | null; onD
       <FormField label="Description (optional)" error={errors.description} hint={`${description.length}/${BLOG_LIMITS.categoryDescription}`}>
         <Textarea rows={2} maxLength={BLOG_LIMITS.categoryDescription} value={description} onChange={(e) => setDescription(e.target.value)} />
       </FormField>
+      <BanglaTranslations
+        className="bg-background"
+        fields={[
+          { name: 'name', label: 'Category name', base: name, max: BLOG_LIMITS.categoryName },
+          { name: 'description', label: 'Description', base: description, kind: 'textarea', max: BLOG_LIMITS.categoryDescription },
+        ]}
+        value={bn}
+        onChange={setBn}
+        errors={bnErrors(errors)}
+      />
       {errors.form && <p role="alert" className="text-sm text-destructive">{errors.form}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone}>Cancel</Button>

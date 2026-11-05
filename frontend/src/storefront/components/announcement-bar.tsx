@@ -1,3 +1,4 @@
+import { useLocale } from '../i18n/locale'
 import type { Announcement } from '../types'
 import { MenuLink } from './menu-link'
 
@@ -18,9 +19,10 @@ export function AnnouncementBar({ announcement }: { announcement: Announcement }
 }
 
 export function PreviewRibbon() {
+  const { t } = useLocale()
   return (
     <div role="status" className="bg-neutral-900 px-4 py-1.5 text-center text-xs font-semibold text-white">
-      Preview — this store is not open to customers yet.
+      {t('shell.preview.ribbon')}
     </div>
   )
 }

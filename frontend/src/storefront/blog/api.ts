@@ -1,5 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { api, ApiError, type ApiSuccess } from '@/lib/api/client'
+import { ApiError, type ApiSuccess } from '@/lib/api/client'
+import { storeApi } from '../http'
+import { useLocale } from '../i18n/locale'
+import { localized } from '../store-keys'
 import type { BlogCategory, BlogListing, BlogPostDetail, BlogPostRow, ListingPagination } from '../types'
 
 export const blogKeys = {
@@ -30,12 +33,13 @@ export function normalizeBlogListing(response: ListEnvelope): BlogListing {
 
 /** A page of published posts, newest first, optionally of one category. The previous page stays visible while the next loads. */
 export function useBlogListQuery(category: string | null, page: number) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: blogKeys.list(category, page),
+    queryKey: localized(blogKeys.list(category, page), locale),
     queryFn: async ({ signal }) => {
       const query: Record<string, string | number> = { page }
       if (category) query.category = category
-      return normalizeBlogListing((await api.get<BlogPostRow[]>('/store/blog', { signal, query })) as ListEnvelope)
+      return normalizeBlogListing((await storeApi.get<BlogPostRow[]>('/store/blog', { signal, query })) as ListEnvelope)
     },
     placeholderData: keepPreviousData,
     staleTime: 60_000,
@@ -44,9 +48,10 @@ export function useBlogListQuery(category: string | null, page: number) {
 }
 
 export function useBlogCategoriesQuery() {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: blogKeys.categories,
-    queryFn: ({ signal }) => api.get<BlogCategory[]>('/store/blog/categories', { signal }).then((r) => r.data),
+    queryKey: localized(blogKeys.categories, locale),
+    queryFn: ({ signal }) => storeApi.get<BlogCategory[]>('/store/blog/categories', { signal }).then((r) => r.data),
     staleTime: 5 * 60_000,
     retry: retryUnlessNotFound,
   })
@@ -54,9 +59,10 @@ export function useBlogCategoriesQuery() {
 
 /** One post. `preview` lets staff see a draft or scheduled post (ignored for visitors). */
 export function useBlogPostQuery(slug: string, preview: boolean) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: blogKeys.post(slug, preview),
-    queryFn: ({ signal }) => api.get<BlogPostDetail>(`/store/blog/${encodeURIComponent(slug)}`, { signal, query: preview ? { preview: 1 } : undefined }).then((r) => r.data),
+    queryKey: localized(blogKeys.post(slug, preview), locale),
+    queryFn: ({ signal }) => storeApi.get<BlogPostDetail>(`/store/blog/${encodeURIComponent(slug)}`, { signal, query: preview ? { preview: 1 } : undefined }).then((r) => r.data),
     staleTime: preview ? 0 : 60_000,
     retry: retryUnlessNotFound,
   })

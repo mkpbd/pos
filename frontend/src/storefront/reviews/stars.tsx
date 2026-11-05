@@ -1,15 +1,17 @@
 import { useId, useState } from 'react'
 import { StarIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 
 const STARS = [1, 2, 3, 4, 5] as const
 
-const starLabel = (n: number) => `${n} ${n === 1 ? 'star' : 'stars'}`
 
 /** A rating shown as five stars (partly filled for averages) with a text alternative: "Rated 4.5 out of 5". */
 export function Stars({ rating, className, size = 'size-4' }: { rating: number | string; className?: string; size?: string }) {
+  const { t, digits, formatNumber } = useLocale()
   const value = Math.max(0, Math.min(5, Number(rating) || 0))
-  const label = `Rated ${typeof rating === 'string' ? rating : String(value)} out of 5`
+  // A decimal string from the server is read as it is ("4.5"), only its digits localized.
+  const label = t('reviews.stars.rated', { rating: typeof rating === 'string' ? digits(rating) : formatNumber(value), max: 5 })
   return (
     <span role="img" aria-label={label} className={cn('relative inline-flex shrink-0', className)} data-testid="stars">
       <span aria-hidden className="flex text-sf-border">
@@ -32,17 +34,18 @@ export function Stars({ rating, className, size = 'size-4' }: { rating: number |
  */
 export function StarRatingInput({ value, onChange, error, disabled }: { value: number | null; onChange: (rating: number) => void; error?: string; disabled?: boolean }) {
   const id = useId()
+  const { t } = useLocale()
   const [hover, setHover] = useState<number | null>(null)
   const shown = hover ?? value ?? 0
 
   return (
     <fieldset role="radiogroup" className="flex flex-col gap-1.5" aria-describedby={error ? `${id}-error` : undefined} disabled={disabled}>
-      <legend className="mb-1.5 text-sm font-medium text-sf-heading">Your rating</legend>
+      <legend className="mb-1.5 text-sm font-medium text-sf-heading">{t('reviews.stars.yourRating')}</legend>
       <div className="flex gap-1" onMouseLeave={() => setHover(null)}>
         {STARS.map((n) => (
           <label key={n} className="cursor-pointer rounded-md p-0.5 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-sf-accent" onMouseEnter={() => setHover(n)}>
             <input type="radio" name={`${id}-rating`} value={n} checked={value === n} onChange={() => onChange(n)} className="sr-only" />
-            <span className="sr-only">{starLabel(n)}</span>
+            <span className="sr-only">{t('reviews.stars.count', { count: n })}</span>
             <StarIcon aria-hidden className={cn('size-8 transition', n <= shown ? 'fill-current text-sf-primary' : 'text-sf-border')} />
           </label>
         ))}

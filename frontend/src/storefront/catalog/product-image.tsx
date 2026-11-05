@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 import type { CatalogImage } from '../types'
 
 /**
@@ -28,6 +29,7 @@ export function ProductImage({
   imgClassName?: string
   imgStyle?: CSSProperties
 }) {
+  const { t } = useLocale()
   return (
     <div className={cn('relative aspect-square overflow-hidden bg-sf-surface', className)}>
       {image ? (
@@ -43,7 +45,7 @@ export function ProductImage({
           className={cn('absolute inset-0 size-full', fit === 'contain' ? 'object-contain' : 'object-cover', imgClassName)}
         />
       ) : (
-        <div className="absolute inset-0 grid place-items-center bg-sf-canvas text-sf-border" role="img" aria-label={`${alt} (no image)`}>
+        <div className="absolute inset-0 grid place-items-center bg-sf-canvas text-sf-border" role="img" aria-label={t('catalog.image.missing', { name: alt })}>
           <ImageIcon aria-hidden className="size-1/4" />
         </div>
       )}

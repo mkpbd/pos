@@ -19,13 +19,14 @@ import { ProductReviews, RatingSummaryLink } from '../reviews/product-reviews'
 import type { ProductCard as Card, ProductDetail } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { useDocumentMeta } from '../use-document-meta'
+import { useLocale } from '../i18n/locale'
 import { NotFoundPage } from './not-found-page'
 
-const PREVIEW_STATES: Record<string, string> = {
-  draft: 'Preview — this product is not published.',
-  scheduled: 'Preview — this product is scheduled and not visible yet.',
-  expired: 'Preview — this product is no longer published.',
-}
+const PREVIEW_STATES = {
+  draft: 'catalog.preview.draft',
+  scheduled: 'catalog.preview.scheduled',
+  expired: 'catalog.preview.expired',
+} as const
 
 export function ProductPage() {
   const { slug = '' } = useParams()
@@ -37,6 +38,7 @@ function ProductPageContent({ slug }: { slug: string }) {
   const preview = params.get('preview') === '1'
   const product = useProductQuery(slug, preview)
   const data = product.data
+  const { t } = useLocale()
 
   // Canonical without ?variant= (one URL per product); previews are never indexed.
   useDocumentMeta(
@@ -60,8 +62,8 @@ function ProductPageContent({ slug }: { slug: string }) {
   if (product.error) {
     return (
       <section className="mx-auto max-w-sf px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold">This product could not be loaded</h1>
-        <Button className="mt-4 rounded-sf-button" onClick={() => void product.refetch()}>Try again</Button>
+        <h1 className="text-2xl font-bold">{t('catalog.product.loadFailed')}</h1>
+        <Button className="mt-4 rounded-sf-button" onClick={() => void product.refetch()}>{t('common.tryAgain')}</Button>
       </section>
     )
   }
@@ -69,7 +71,7 @@ function ProductPageContent({ slug }: { slug: string }) {
     return (
       <div role="status" className="grid min-h-[50vh] place-items-center">
         <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
-        <span className="sr-only">Loading the product</span>
+        <span className="sr-only">{t('catalog.product.loading')}</span>
       </div>
     )
   }
@@ -98,6 +100,7 @@ function ProductView({ product }: { product: ProductDetail }) {
   })
   const promo = usePromotionPricing(product, variant)
   const [tab, setTab] = useState<string | undefined>(undefined)
+  const { t } = useLocale()
 
   const openReviews = () => {
     setTab(REVIEWS_TAB_ID)
@@ -105,11 +108,11 @@ function ProductView({ product }: { product: ProductDetail }) {
   }
 
   const tabs: TabItem[] = []
-  if (product.description_html) tabs.push({ id: 'description', label: 'Description', content: <RichText html={product.description_html} className="max-w-3xl" /> })
+  if (product.description_html) tabs.push({ id: 'description', label: t('catalog.product.description'), content: <RichText html={product.description_html} className="max-w-3xl" /> })
   if (product.specifications.length > 0) {
     tabs.push({
       id: 'specifications',
-      label: 'Specifications',
+      label: t('catalog.product.specifications'),
       content: (
         <table className="w-full max-w-2xl text-sm">
           <tbody>
@@ -125,9 +128,10 @@ function ProductView({ product }: { product: ProductDetail }) {
     })
   }
 
-  if (!product.preview_state) tabs.push({ id: REVIEWS_TAB_ID, label: reviewsTabLabel(product.rating), content: <ProductReviews slug={product.slug} /> })
+  if (!product.preview_state) tabs.push({ id: REVIEWS_TAB_ID, label: reviewsTabLabel(product.rating, t), content: <ProductReviews slug={product.slug} /> })
 
-  const notice = product.preview_state ? PREVIEW_STATES[product.preview_state] : undefined
+  const previewKey = product.preview_state ? PREVIEW_STATES[product.preview_state as keyof typeof PREVIEW_STATES] : undefined
+  const notice = previewKey ? t(previewKey) : undefined
 
   return (
     <article data-testid="product-page">
@@ -167,7 +171,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             </div>
             {product.category?.slug && (
               <p className="border-t pt-4 text-sm">
-                Category:{' '}
+                {t('catalog.product.category')}{' '}
                 <Link to={`/category/${product.category.slug}`} className="font-semibold text-sf-accent hover:underline">
                   {product.category.name}
                 </Link>
@@ -177,8 +181,8 @@ function ProductView({ product }: { product: ProductDetail }) {
         </div>
 
         {tabs.length > 0 && (
-          <section id={REVIEWS_SECTION_ID} aria-label="Product information" className="mt-8 scroll-mt-24 rounded-sf-card bg-sf-surface p-4 md:p-8">
-            <Tabs tabs={tabs} label="Product information" selectedId={tab} onSelect={setTab} />
+          <section id={REVIEWS_SECTION_ID} aria-label={t('catalog.product.information')} className="mt-8 scroll-mt-24 rounded-sf-card bg-sf-surface p-4 md:p-8">
+            <Tabs tabs={tabs} label={t('catalog.product.information')} selectedId={tab} onSelect={setTab} />
           </section>
         )}
 
@@ -206,12 +210,13 @@ function ProductRow({ title, products }: { title: string; products: Card[] }) {
 
 function RelatedSections({ slug }: { slug: string }) {
   const related = useRelatedProductsQuery(slug)
+  const { t } = useLocale()
   if (!related.data) return null
 
   return (
     <>
-      <ProductRow title="Frequently bought together" products={related.data.frequently_bought} />
-      <ProductRow title="Related products" products={related.data.related} />
+      <ProductRow title={t('catalog.product.frequentlyBought')} products={related.data.frequently_bought} />
+      <ProductRow title={t('catalog.product.related')} products={related.data.related} />
     </>
   )
 }
@@ -220,6 +225,7 @@ function RelatedSections({ slug }: { slug: string }) {
 function RecentlyViewed({ currentSlug }: { currentSlug: string }) {
   const [slugs] = useState(() => readRecentlyViewed().filter((s) => s !== currentSlug).slice(0, 8))
   const products = useProductsBySlugsQuery(slugs)
+  const { t } = useLocale()
 
-  return <ProductRow title="Recently viewed" products={products.data ?? []} />
+  return <ProductRow title={t('catalog.product.recentlyViewed')} products={products.data ?? []} />
 }

@@ -9,6 +9,7 @@ use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Infrastructure\Models\Coupon;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 
 /**
@@ -81,6 +82,8 @@ class PromotionPresenter
 
         return self::row($p) + [
             'description' => $p->description,
+            // E12b: {bn: {name, description}}.
+            'translations' => TranslationInput::present($p->translations),
             'min_subtotal' => $p->min_subtotal === null ? null : (string) $p->min_subtotal,
             'max_discount' => $p->max_discount === null ? null : (string) $p->max_discount,
             'usage_limit' => $p->usage_limit,

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { isExcluded } from '../cart/cart-helpers'
 import { displayQuantity } from '../cart/quantity'
 import { ProductImage } from '../catalog/product-image'
+import { useLocale } from '../i18n/locale'
 import { formatDiscount, formatPrice } from '../money'
 import type { AppliedPromotion, CartLine } from '../types'
 
@@ -47,6 +48,7 @@ function PromotionList({ promotions, currency, label }: { promotions: AppliedPro
  * (checkout preview and order page). `deliveryPending`: no address chosen yet, so delivery is unknown.
  */
 export function SummaryTotals({ amounts, currency, deliveryPending = false }: { amounts: SummaryAmounts; currency: string | null; deliveryPending?: boolean }) {
+  const { t } = useLocale()
   const price = (amount: string) => formatPrice(amount, currency)
   const hasTax = !isZeroDecimal(amounts.tax_total)
   const discount = amounts.discount_total ?? '0'
@@ -65,59 +67,59 @@ export function SummaryTotals({ amounts, currency, deliveryPending = false }: { 
 
   return (
     <dl className="flex flex-col gap-2 text-sm" data-testid="summary-totals">
-      {row('Subtotal', price(amounts.subtotal), 'summary-subtotal')}
+      {row(t('checkout.summary.subtotal'), price(amounts.subtotal), 'summary-subtotal')}
       {!isZeroDecimal(discount) && (
         <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
-          <dt>Discounts</dt>
+          <dt>{t('checkout.summary.discounts')}</dt>
           <dd className="text-right font-semibold text-sf-sale" data-testid="summary-discount">
             {formatDiscount(discount, currency)}
           </dd>
-          <PromotionList promotions={goodsPromotions} currency={currency} label="Promotions applied" />
+          <PromotionList promotions={goodsPromotions} currency={currency} label={t('checkout.summary.promotionsApplied')} />
         </div>
       )}
       {amounts.coupon_code && (
         <div className="flex justify-between gap-4">
           <dt className="inline-flex items-center gap-1.5">
             <TicketPercentIcon aria-hidden className="size-4" />
-            Coupon
+            {t('checkout.summary.coupon')}
           </dt>
           <dd className="font-semibold tracking-wide text-sf-heading" data-testid="summary-coupon">
             {amounts.coupon_code}
           </dd>
         </div>
       )}
-      {hasTax && !amounts.prices_include_tax && row('VAT', price(amounts.tax_total), 'summary-tax')}
+      {hasTax && !amounts.prices_include_tax && row(t('checkout.summary.vat'), price(amounts.tax_total), 'summary-tax')}
       {deliveryPending ? (
-        row('Delivery', 'Choose an address', 'summary-shipping', true)
+        row(t('checkout.summary.delivery'), t('checkout.summary.chooseAddress'), 'summary-shipping', true)
       ) : !isZeroDecimal(shippingDiscount) ? (
         <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
-          <dt>Delivery</dt>
+          <dt>{t('checkout.summary.delivery')}</dt>
           <dd className="text-right font-semibold text-sf-heading" data-testid="summary-shipping">
             {!isZeroDecimal(amounts.shipping_total) ? (
               price(amounts.shipping_total)
             ) : (
               <>
                 <s className="mr-1.5 font-normal text-sf-text" data-testid="summary-shipping-waived">
-                  <span className="sr-only">Was </span>
+                  <span className="sr-only">{t('checkout.summary.was')} </span>
                   {price(shippingDiscount)}
                 </s>
-                Free
+                {t('checkout.summary.free')}
               </>
             )}
           </dd>
-          <PromotionList promotions={shippingPromotions} currency={currency} label="Delivery offers" />
+          <PromotionList promotions={shippingPromotions} currency={currency} label={t('checkout.summary.deliveryOffers')} />
         </div>
       ) : (
-        row('Delivery', isZeroDecimal(amounts.shipping_total) ? 'Free' : price(amounts.shipping_total), 'summary-shipping')
+        row(t('checkout.summary.delivery'), isZeroDecimal(amounts.shipping_total) ? t('checkout.summary.free') : price(amounts.shipping_total), 'summary-shipping')
       )}
-      {!isZeroDecimal(amounts.cod_fee) && row('Cash on delivery fee', price(amounts.cod_fee), 'summary-cod-fee')}
+      {!isZeroDecimal(amounts.cod_fee) && row(t('checkout.summary.codFee'), price(amounts.cod_fee), 'summary-cod-fee')}
       <div className="flex justify-between gap-4 border-t pt-3 text-base">
-        <dt className="font-bold text-sf-heading">Total</dt>
+        <dt className="font-bold text-sf-heading">{t('checkout.summary.total')}</dt>
         <dd className="font-heading text-xl font-extrabold text-sf-heading" data-testid="summary-total">
           {price(amounts.total)}
         </dd>
       </div>
-      {amounts.prices_include_tax && hasTax && <p className="text-xs">Prices include VAT ({price(amounts.tax_total)}).</p>}
+      {amounts.prices_include_tax && hasTax && <p className="text-xs">{t('checkout.summary.pricesIncludeVat', { amount: price(amounts.tax_total) })}</p>}
     </dl>
   )
 }
@@ -130,8 +132,9 @@ function lineDetails(line: CartLine): string | null {
 
 /** The cart lines of the checkout summary, read-only (changes happen in the cart). */
 export function SummaryLines({ lines, currency }: { lines: CartLine[]; currency: string | null }) {
+  const { t, formatNumber } = useLocale()
   return (
-    <ul className="flex flex-col divide-y" aria-label="Items in your order">
+    <ul className="flex flex-col divide-y" aria-label={t('checkout.summary.linesLabel')}>
       {lines.map((line) => {
         const excluded = isExcluded(line)
         const details = lineDetails(line)
@@ -140,7 +143,7 @@ export function SummaryLines({ lines, currency }: { lines: CartLine[]; currency:
             <div className="relative w-14 shrink-0">
               <ProductImage image={line.product.image} alt={line.product.name} className={cn('rounded-lg border', excluded && 'opacity-50')} />
               <span className="absolute -top-2 -right-2 grid min-w-5 place-items-center rounded-full bg-sf-heading px-1 text-xs font-bold text-sf-surface" aria-hidden>
-                {displayQuantity(line.quantity)}
+                {formatNumber(displayQuantity(line.quantity))}
               </span>
             </div>
             <div className="min-w-0 flex-1 text-sm">
@@ -149,19 +152,21 @@ export function SummaryLines({ lines, currency }: { lines: CartLine[]; currency:
               </Link>
               {details && <p className="text-xs">{details}</p>}
               <p className="text-xs">
-                <span className="sr-only">Quantity: </span>
-                <span aria-hidden>Qty </span>
-                {displayQuantity(line.quantity)} × {formatPrice(line.unit_price, currency)}
+                <span className="sr-only">{t('checkout.summary.quantity')} </span>
+                <span aria-hidden>{t('checkout.summary.qty')} </span>
+                {formatNumber(displayQuantity(line.quantity))} × {formatPrice(line.unit_price, currency)}
               </p>
               {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
                 <p className="text-xs font-semibold text-sf-sale" data-testid="summary-line-discount">
-                  Discount{line.promotion ? ` (${line.promotion.name})` : ''}: {formatDiscount(line.discount_amount, currency)}
+                  {line.promotion
+                    ? t('checkout.summary.lineDiscountPromotion', { promotion: line.promotion.name, amount: formatDiscount(line.discount_amount, currency) })
+                    : t('checkout.summary.lineDiscount', { amount: formatDiscount(line.discount_amount, currency) })}
                 </p>
               )}
               {excluded ? (
-                <p className="text-xs font-semibold text-sf-sale">Not available — not included</p>
+                <p className="text-xs font-semibold text-sf-sale">{t('checkout.summary.notAvailable')}</p>
               ) : line.exceeds_stock ? (
-                <p className="text-xs font-semibold text-sf-sale">Not enough in stock</p>
+                <p className="text-xs font-semibold text-sf-sale">{t('checkout.summary.notEnoughStock')}</p>
               ) : null}
             </div>
             <span className="shrink-0 text-sm font-semibold text-sf-heading">{excluded ? '—' : formatPrice(line.line_total, currency)}</span>

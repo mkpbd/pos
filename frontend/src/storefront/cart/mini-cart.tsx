@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { ShoppingBagIcon } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { primaryButtonClass, secondaryButtonClass } from '../account/form-controls'
+import { useLocale } from '../i18n/locale'
 import { useCartQuery } from './api'
 import { CartDrawerContext } from './cart-drawer-context'
 import { CartLines, CartTotals } from './cart-lines'
@@ -51,13 +52,16 @@ export function CartDrawerProvider({ children }: { children: ReactNode }) {
 function MiniCartBody({ onClose }: { onClose: () => void }) {
   const cart = useCartQuery()
   const data = cart.data
+  const { t } = useLocale()
   const count = data ? displayQuantity(data.item_count) : null
 
   return (
     <>
       <SheetHeader className="border-b px-5 py-4">
-        <SheetTitle className="font-heading text-xl font-extrabold text-sf-heading">Your cart{count && count !== '0' ? ` (${count})` : ''}</SheetTitle>
-        <SheetDescription className="sr-only">Items in your cart, with quantities and the subtotal.</SheetDescription>
+        <SheetTitle className="font-heading text-xl font-extrabold text-sf-heading">
+          {count && count !== '0' ? t('cart.drawer.titleWithCount', { count: Number(count) }) : t('cart.drawer.title')}
+        </SheetTitle>
+        <SheetDescription className="sr-only">{t('cart.drawer.description')}</SheetDescription>
       </SheetHeader>
 
       <div className="flex-1 overflow-y-auto px-5" data-testid="mini-cart">
@@ -65,9 +69,9 @@ function MiniCartBody({ onClose }: { onClose: () => void }) {
           data.items.length === 0 ? (
             <div className="flex flex-col items-center gap-4 py-16 text-center">
               <ShoppingBagIcon aria-hidden className="size-12 text-sf-border" />
-              <p className="font-semibold text-sf-heading">Your cart is empty.</p>
+              <p className="font-semibold text-sf-heading">{t('cart.page.empty')}</p>
               <button type="button" className={primaryButtonClass} onClick={onClose}>
-                Continue shopping
+                {t('cart.page.continueShopping')}
               </button>
             </div>
           ) : (
@@ -75,15 +79,15 @@ function MiniCartBody({ onClose }: { onClose: () => void }) {
           )
         ) : cart.error ? (
           <div className="py-16 text-center">
-            <p role="alert">Your cart could not be loaded.</p>
+            <p role="alert">{t('cart.drawer.loadFailed')}</p>
             <button type="button" className={`${secondaryButtonClass} mt-3`} onClick={() => void cart.refetch()}>
-              Try again
+              {t('common.tryAgain')}
             </button>
           </div>
         ) : (
           <div role="status" className="grid place-items-center py-16">
             <span className="size-8 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent" aria-hidden />
-            <span className="sr-only">Loading your cart</span>
+            <span className="sr-only">{t('cart.page.loading')}</span>
           </div>
         )}
       </div>
@@ -94,10 +98,10 @@ function MiniCartBody({ onClose }: { onClose: () => void }) {
           <CartTotals cart={data} compact />
           <CheckoutButton cart={data} onNavigate={onClose} />
           <Link to="/cart" onClick={onClose} className={secondaryButtonClass}>
-            View cart
+            {t('cart.drawer.viewCart')}
           </Link>
           <button type="button" className={secondaryButtonClass} onClick={onClose}>
-            Continue shopping
+            {t('cart.page.continueShopping')}
           </button>
         </div>
       )}

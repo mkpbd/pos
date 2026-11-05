@@ -28,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum SPA cookie authentication for first-party frontends (SANCTUM_STATEFUL_DOMAINS).
         $middleware->statefulApi();
         $middleware->throttleApi();
+        // E12b: the storefront's language switcher writes `lang` in the browser (plain text).
+        $middleware->encryptCookies(except: ['lang']);
 
         $middleware->alias([
             'tenant' => ResolveTenant::class,

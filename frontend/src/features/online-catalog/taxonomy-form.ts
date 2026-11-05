@@ -1,8 +1,27 @@
 import { z } from 'zod'
 import type { BrandListingInput, BrandListingResponse, CategoryListingInput, CategoryListingResponse, WebBrandRow, WebCategoryRow } from '@/features/online-catalog/api'
 import { optionalSlug, SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from '@/features/online-catalog/listing-form'
+import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
 
 export const BRAND_DESCRIPTION_MAX = 1000
+/** Catalog limits of category and brand names. */
+export const TERM_NAME_MAX = 100
+
+/** Translatable fields (E12b) with the base fields' limits. */
+export const CATEGORY_TRANSLATIONS = [
+  { name: 'name', max: TERM_NAME_MAX },
+  { name: 'description_html' },
+  { name: 'seo_title', max: SEO_TITLE_MAX },
+  { name: 'seo_description', max: SEO_DESCRIPTION_MAX },
+] as const
+export const BRAND_TRANSLATIONS = [
+  { name: 'name', max: TERM_NAME_MAX },
+  { name: 'description', max: BRAND_DESCRIPTION_MAX },
+  { name: 'seo_title', max: SEO_TITLE_MAX },
+  { name: 'seo_description', max: SEO_DESCRIPTION_MAX },
+] as const
+const CATEGORY_NAMES = CATEGORY_TRANSLATIONS.map((f) => f.name)
+const BRAND_NAMES = BRAND_TRANSLATIONS.map((f) => f.name)
 
 const seo = {
   seo_title: z.string().max(SEO_TITLE_MAX, `At most ${SEO_TITLE_MAX} characters.`),
@@ -16,6 +35,7 @@ export const categoryListingSchema = z.object({
   banner_media_id: z.string().nullable(),
   description_html: z.string(),
   ...seo,
+  translations: translationsSchema(CATEGORY_TRANSLATIONS),
 })
 export type CategoryListingValues = z.infer<typeof categoryListingSchema>
 
@@ -25,6 +45,7 @@ export const brandListingSchema = z.object({
   logo_media_id: z.string().nullable(),
   description: z.string().max(BRAND_DESCRIPTION_MAX, `At most ${BRAND_DESCRIPTION_MAX} characters.`),
   ...seo,
+  translations: translationsSchema(BRAND_TRANSLATIONS),
 })
 export type BrandListingValues = z.infer<typeof brandListingSchema>
 
@@ -37,10 +58,11 @@ export function toCategoryValues({ listing }: CategoryListingResponse): Category
     description_html: listing.description_html ?? '',
     seo_title: listing.seo_title ?? '',
     seo_description: listing.seo_description ?? '',
+    translations: { bn: readBn(listing.translations, CATEGORY_NAMES) },
   }
 }
 
-export function toCategoryInput(v: CategoryListingValues): CategoryListingInput {
+export function toCategoryInput(v: CategoryListingValues, before?: TranslationsMap): CategoryListingInput {
   return {
     ...(v.slug ? { slug: v.slug } : {}),
     is_visible: v.is_visible,
@@ -49,6 +71,7 @@ export function toCategoryInput(v: CategoryListingValues): CategoryListingInput 
     description_html: v.description_html || null,
     seo_title: v.seo_title.trim() || null,
     seo_description: v.seo_description.trim() || null,
+    translations: toTranslationsInput(v.translations.bn, CATEGORY_NAMES, before),
   }
 }
 
@@ -60,10 +83,11 @@ export function toBrandValues({ listing }: BrandListingResponse): BrandListingVa
     description: listing.description ?? '',
     seo_title: listing.seo_title ?? '',
     seo_description: listing.seo_description ?? '',
+    translations: { bn: readBn(listing.translations, BRAND_NAMES) },
   }
 }
 
-export function toBrandInput(v: BrandListingValues): BrandListingInput {
+export function toBrandInput(v: BrandListingValues, before?: TranslationsMap): BrandListingInput {
   return {
     ...(v.slug ? { slug: v.slug } : {}),
     is_visible: v.is_visible,
@@ -71,6 +95,7 @@ export function toBrandInput(v: BrandListingValues): BrandListingInput {
     description: v.description.trim() || null,
     seo_title: v.seo_title.trim() || null,
     seo_description: v.seo_description.trim() || null,
+    translations: toTranslationsInput(v.translations.bn, BRAND_NAMES, before),
   }
 }
 

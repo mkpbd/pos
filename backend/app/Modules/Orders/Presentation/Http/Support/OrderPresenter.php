@@ -62,6 +62,8 @@ class OrderPresenter
             'payment_method' => $order->payment_method->value,
             'payment_method_label' => $this->methodLabel($order->payment_method),
             'payment_instructions' => $this->instructions($order),
+            // E12b: the language the order was placed in (en | bn).
+            'locale' => $order->locale ?? 'en',
             'placed_at' => $order->placed_at->toIso8601String(),
             'expires_at' => $order->expires_at?->toIso8601String(),
             'contact' => ['name' => $order->contact_name, 'email' => $order->contact_email, 'phone' => $order->contact_phone],

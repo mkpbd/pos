@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Requests;
 
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
 use App\Modules\Storefront\Presentation\Http\Rules\SafeLink;
@@ -47,6 +48,9 @@ class SaveHomepageSectionRequest extends FormRequest
         } else {
             $rules['item_ids'] = ['prohibited'];
         }
+
+        // E12b: {bn: {title, subtitle, …the type's config texts}}.
+        $rules += TranslationInput::rules($type->translatable());
 
         $needsConfig = in_array($type, [SectionType::RichText, SectionType::FeaturesStrip, SectionType::Testimonials, SectionType::BannerGrid, SectionType::ProductTabs], true);
         $rules['config'] = [$creating && $needsConfig ? 'required' : 'sometimes', 'array'];

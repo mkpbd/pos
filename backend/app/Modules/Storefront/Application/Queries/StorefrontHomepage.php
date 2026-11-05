@@ -6,7 +6,9 @@ use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
@@ -19,6 +21,9 @@ use App\Modules\Storefront\Infrastructure\Models\HomepageSectionItem;
  *
  * The preview (staff only) includes every section with its state, so the admin can see
  * disabled and scheduled sections in place before publishing them.
+ *
+ * E12b: section titles and subtitles, the text block, newsletter texts and banner texts in
+ * the request's language (per-field fallback to the base text); cached per language.
  */
 class StorefrontHomepage
 {
@@ -29,6 +34,7 @@ class StorefrontHomepage
         private readonly StorefrontContentVersion $version,
         private readonly TenantContext $tenant,
         private readonly ContentSchedule $schedule,
+        private readonly LocaleContext $locale,
     ) {}
 
     /**
@@ -102,9 +108,9 @@ class StorefrontHomepage
             $data = [
                 'id' => $section->id,
                 'type' => $type->value,
-                'title' => $section->title,
-                'subtitle' => $section->subtitle,
-                'config' => $this->publicConfig($type, $config, $ref),
+                'title' => Translations::pick($section, 'title', $this->locale->current()),
+                'subtitle' => Translations::pick($section, 'subtitle', $this->locale->current()),
+                'config' => $this->publicConfig($type, $this->localizeConfig($section, $type, $config), $ref),
             ];
             if ($type->bannerPlacement() !== null) {
                 $data['banners'] = $sectionBanners;
@@ -177,20 +183,37 @@ class StorefrontHomepage
      */
     private function banner(Banner $b, callable $ref): array
     {
+        $text = Translations::pickMany($b, ['kicker', 'title', 'subtitle', 'button_label', 'secondary_button_label'], $this->locale->current());
+
         return [
             'id' => $b->id,
-            'kicker' => $b->kicker,
-            'title' => $b->title,
-            'subtitle' => $b->subtitle,
+            'kicker' => $text['kicker'],
+            'title' => $text['title'],
+            'subtitle' => $text['subtitle'],
             'link_url' => $b->link_url,
-            'button_label' => $b->button_label,
+            'button_label' => $text['button_label'],
             'secondary_link_url' => $b->secondary_link_url,
-            'secondary_button_label' => $b->secondary_button_label,
+            'secondary_button_label' => $text['secondary_button_label'],
             'image' => $ref($b->desktop_media_id),
             'mobile_image' => $ref($b->mobile_media_id),
             'text_color' => $b->text_color,
             'text_position' => $b->text_position,
         ];
+    }
+
+    /**
+     * The config's translatable texts (text block, newsletter) in the request's language.
+     *
+     * @param  array<string, mixed>  $config  normalized
+     * @return array<string, mixed>
+     */
+    private function localizeConfig(HomepageSection $section, SectionType $type, array $config): array
+    {
+        foreach ($type->translatableConfigFields() as $field) {
+            $config[$field] = Translations::value($section->translations, $field, $this->locale->current(), $config[$field] ?? null);
+        }
+
+        return $config;
     }
 
     /**

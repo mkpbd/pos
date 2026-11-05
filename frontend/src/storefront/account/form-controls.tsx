@@ -1,6 +1,7 @@
 import { useId, type InputHTMLAttributes, type ReactNode, type Ref } from 'react'
 import { Loader2Icon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 
 export const inputClass =
   'w-full rounded-lg border border-sf-border bg-sf-surface px-4 py-2.5 text-sf-heading focus-visible:outline-2 focus-visible:outline-sf-accent aria-[invalid=true]:border-sf-sale disabled:opacity-60'
@@ -18,8 +19,12 @@ type TextFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   ref?: Ref<HTMLInputElement>
 }
 
-/** A labelled input with its error (or hint) wired up through aria-describedby. */
+/**
+ * A labelled input with its error (or hint) wired up through aria-describedby. A client-side
+ * error is a message key (translated, `{max}` = maxLength); a server message shows as it is.
+ */
 export function TextField({ label, error, hint, className, ref, ...props }: TextFieldProps) {
+  const { translateMessage } = useLocale()
   const id = useId()
   const messageId = `${id}-message`
   return (
@@ -37,7 +42,7 @@ export function TextField({ label, error, hint, className, ref, ...props }: Text
       />
       {error ? (
         <p id={messageId} className="text-sm text-sf-sale">
-          {error}
+          {translateMessage(error, props.maxLength === undefined ? undefined : { max: props.maxLength })}
         </p>
       ) : hint ? (
         <p id={messageId} className="text-sm">
@@ -58,10 +63,11 @@ export function SubmitButton({ pending, children, pendingLabel, className }: { p
 }
 
 export function FormAlert({ message }: { message: string | null | undefined }) {
+  const { translateMessage } = useLocale()
   if (!message) return null
   return (
     <p role="alert" className="rounded-lg bg-sf-sale/10 px-4 py-3 text-sm font-medium text-sf-sale">
-      {message}
+      {translateMessage(message)}
     </p>
   )
 }

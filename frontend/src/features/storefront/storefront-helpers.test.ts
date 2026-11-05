@@ -92,7 +92,7 @@ describe('theme form', () => {
     layout: { container_width: 1170, sticky_header: true },
     logo_media_id: 'm-1',
     favicon_media_id: null,
-    announcement: { enabled: false, text: null, link: null, background: '#6f55c2', foreground: '#ffffff', starts_at: null, ends_at: null },
+    announcement: { enabled: false, text: 'Eid sale', link: null, background: '#6f55c2', foreground: '#ffffff', starts_at: null, ends_at: null, translations: { bn: { text: 'ঈদ সেল' } } },
     footer: { about: null, copyright: null, contact: { email: null, phone: null, address: null }, social: { facebook: 'https://facebook.com/x', instagram: null, youtube: null, tiktok: null, x: null, linkedin: null }, payment_logo_media_ids: ['m-2'] },
   }
 
@@ -103,6 +103,7 @@ describe('theme form', () => {
   it('requires announcement text when enabled and https social links', () => {
     const values = toFormValues(doc)
     values.announcement.enabled = true
+    values.announcement.text = ''
     values.footer.social.instagram = 'http://instagram.com/x'
     const result = themeSchema.safeParse(values)
     expect(result.success).toBe(false)

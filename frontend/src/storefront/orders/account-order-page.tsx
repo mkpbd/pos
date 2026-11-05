@@ -10,6 +10,8 @@ import { useCartDrawer } from '../cart/cart-drawer-context'
 import { PlacementAttempts } from '../checkout/placement-attempt'
 import { formatDateTime } from '../checkout/delivery'
 import { storeFormError } from '../form-errors'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
 import { useNotice } from '../notices'
 import { reviewStatusLabel, useMyReviewsQuery } from '../reviews/api'
 import { ReviewDialog, type ReviewTarget } from '../reviews/review-dialog'
@@ -28,19 +30,20 @@ const REASON_MAX = 200
 export function AccountOrderPage() {
   const { number = '' } = useParams()
   const order = useAccountOrderQuery(number)
+  const { t } = useLocale()
   const notFound = order.error instanceof ApiError && order.error.status === 404
-  useDocumentMeta(privatePage(order.data ? `Order ${order.data.number}` : notFound ? 'Order not found' : null))
+  useDocumentMeta(privatePage(order.data ? t('orders.title', { number: order.data.number }) : notFound ? t('orders.notFoundTitle') : null))
 
   const back = (
     <Link to="/account/orders" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-sf-accent hover:underline">
       <ArrowLeftIcon aria-hidden className="size-4" />
-      All orders
+      {t('orders.detail.allOrders')}
     </Link>
   )
 
   if (order.data) {
     return (
-      <AccountShell title={`Order ${order.data.number}`}>
+      <AccountShell title={t('orders.title', { number: order.data.number })}>
         {back}
         <AccountOrderDetails order={order.data} />
       </AccountShell>
@@ -48,22 +51,22 @@ export function AccountOrderPage() {
   }
 
   return (
-    <AccountShell title={notFound ? 'Order not found' : 'Order'}>
+    <AccountShell title={notFound ? t('orders.notFoundTitle') : t('orders.titleShort')}>
       {back}
       {notFound ? (
         <div className="rounded-sf-card bg-sf-surface p-8 text-center">
-          <p className="font-semibold text-sf-heading">We could not find this order in your account.</p>
-          <p className="mt-1 text-sm">Orders placed as a guest are not shown here — use the link in the confirmation e-mail.</p>
+          <p className="font-semibold text-sf-heading">{t('orders.detail.notFound')}</p>
+          <p className="mt-1 text-sm">{t('orders.detail.guestNote')}</p>
         </div>
       ) : order.error ? (
         <div className="rounded-sf-card bg-sf-surface p-6">
-          <p role="alert">{storeFormError(order.error)}</p>
+          <p role="alert">{storeFormError(order.error, t)}</p>
           <button type="button" className={`${primaryButtonClass} mt-3`} disabled={order.isFetching} onClick={() => void order.refetch()}>
-            Try again
+            {t('common.tryAgain')}
           </button>
         </div>
       ) : (
-        <Spinner label="Loading your order" />
+        <Spinner label={t('orders.loading')} />
       )}
     </AccountShell>
   )
@@ -78,6 +81,7 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
   const reorder = useReorderMutation()
   const drawer = useCartDrawer()
   const notify = useNotice()
+  const { t } = useLocale()
   const hasReviews = order.lines.some((line) => line.review)
   const myReviews = useMyReviewsQuery(hasReviews)
   const buyAgainRef = useRef<HTMLButtonElement>(null)
@@ -85,10 +89,10 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
   const buyAgain = () =>
     reorder.mutate(order.number, {
       onSuccess: (result) => {
-        notify(reorderNotice(result))
+        notify(reorderNotice(result, t))
         if (result.added.length > 0) drawer?.open(buyAgainRef.current)
       },
-      onError: (error) => notify(error instanceof ApiError && error.status === 429 ? 'Too many attempts. Please try again later.' : `Buy again failed: ${storeFormError(error)}`),
+      onError: (error) => notify(error instanceof ApiError && error.status === 429 ? t('common.form.tooManyAttempts') : t('orders.detail.buyAgainFailed', { error: storeFormError(error, t) })),
     })
 
   const editReview = (line: AccountOrderLine) => {
@@ -102,13 +106,19 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
       return (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="line-review">
           <span className="inline-flex items-center gap-1.5 text-xs">
-            Your review: <Stars rating={line.review.rating} size="size-3.5" />
-            <span className="font-semibold text-sf-heading">{reviewStatusLabel(line.review.status)}</span>
+            {t('orders.detail.yourReview')} <Stars rating={line.review.rating} size="size-3.5" />
+            <span className="font-semibold text-sf-heading">{reviewStatusLabel(line.review.status, t)}</span>
           </span>
-          {line.review.status === 'rejected' && full?.rejection_reason && <span className="text-xs text-sf-sale">Reason: {full.rejection_reason}</span>}
-          <button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-sf-accent hover:underline disabled:opacity-60" disabled={!full} onClick={() => editReview(line)} aria-label={`Edit your review of ${line.product_name}`}>
+          {line.review.status === 'rejected' && full?.rejection_reason && <span className="text-xs text-sf-sale">{t('orders.detail.reviewReason', { reason: full.rejection_reason })}</span>}
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-sf-accent hover:underline disabled:opacity-60"
+            disabled={!full}
+            onClick={() => editReview(line)}
+            aria-label={t('orders.detail.editReviewAria', { product: line.product_name })}
+          >
             <PencilIcon aria-hidden className="size-3.5" />
-            Edit review
+            {t('orders.detail.editReview')}
           </button>
         </div>
       )
@@ -120,10 +130,10 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
           type="button"
           className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-sf-accent hover:underline"
           onClick={() => setReviewing({ mode: 'create', productId, productName: line.product_name })}
-          aria-label={`Write a review of ${line.product_name}`}
+          aria-label={t('orders.detail.writeReviewAria', { product: line.product_name })}
         >
           <StarIcon aria-hidden className="size-3.5" />
-          Write a review
+          {t('orders.detail.writeReview')}
         </button>
       )
     }
@@ -135,31 +145,35 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
       <header className="flex flex-col gap-3">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <OrderStatusBadge label={order.status_label} />
-          <span>
-            Placed <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time>
-          </span>
+          <span>{rich(t('orders.placedAt'), { date: <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time> })}</span>
         </p>
         <div className="flex flex-wrap gap-3">
           <button ref={buyAgainRef} type="button" className={primaryButtonClass} disabled={reorder.isPending} onClick={buyAgain}>
             <RotateCcwIcon aria-hidden className="size-4" />
-            {reorder.isPending ? 'Adding to cart…' : 'Buy again'}
+            {reorder.isPending ? t('orders.detail.addingToCart') : t('orders.detail.buyAgain')}
           </button>
           {returnable && (
             <button type="button" className={secondaryButtonClass} onClick={() => setReturning(true)}>
               <PackageOpenIcon aria-hidden className="size-4" />
-              Return items
+              {t('orders.detail.returnItems')}
             </button>
           )}
           {order.can_cancel && (
             <button type="button" className={cn(secondaryButtonClass, 'hover:border-sf-sale hover:text-sf-sale')} onClick={() => setCancelling(true)}>
               <XCircleIcon aria-hidden className="size-4" />
-              Cancel order
+              {t('orders.detail.cancelOrder')}
             </button>
           )}
         </div>
         {returnable && order.return_deadline && (
           <p className="text-sm" data-testid="return-deadline">
-            Returns accepted until <time dateTime={order.return_deadline} className="font-semibold text-sf-heading">{formatDateTime(order.return_deadline)}</time>
+            {rich(t('orders.detail.returnsUntil'), {
+              date: (
+                <time dateTime={order.return_deadline} className="font-semibold text-sf-heading">
+                  {formatDateTime(order.return_deadline)}
+                </time>
+              ),
+            })}
           </p>
         )}
       </header>
@@ -199,6 +213,7 @@ function CancelOrderDialog({ order, open, onClose }: { order: AccountOrder; open
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const notify = useNotice()
+  const { t } = useLocale()
   const reasonId = useId()
 
   const close = () => {
@@ -218,13 +233,13 @@ function CancelOrderDialog({ order, open, onClose }: { order: AccountOrder; open
         onSuccess: () => {
           attempts.current.settle()
           setReason('')
-          notify(`Order ${order.number} was cancelled.`)
+          notify(t('orders.cancel.done', { number: order.number }))
           onClose()
         },
         onError: (failure) => {
           attempts.current.settle(failure)
-          if (failure instanceof ApiError && failure.code === 'ORDER_NOT_CANCELLABLE') setError('This order can no longer be cancelled. Its status may have changed — please contact us if you need help.')
-          else setError(storeFormError(failure))
+          if (failure instanceof ApiError && failure.code === 'ORDER_NOT_CANCELLABLE') setError(t('orders.cancel.notCancellable'))
+          else setError(storeFormError(failure, t))
         },
       },
     )
@@ -233,22 +248,22 @@ function CancelOrderDialog({ order, open, onClose }: { order: AccountOrder; open
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent className="bg-sf-surface p-5 sm:max-w-md md:p-6">
-        <form noValidate onSubmit={submit} className="flex flex-col gap-4" aria-label="Cancel order">
-          <DialogTitle className="pr-8 font-heading text-2xl font-extrabold text-sf-heading">Cancel order {order.number}?</DialogTitle>
-          <DialogDescription>The items go back on sale and you will not be charged. This cannot be undone.</DialogDescription>
+        <form noValidate onSubmit={submit} className="flex flex-col gap-4" aria-label={t('orders.detail.cancelOrder')}>
+          <DialogTitle className="pr-8 font-heading text-2xl font-extrabold text-sf-heading">{t('orders.cancel.title', { number: order.number })}</DialogTitle>
+          <DialogDescription>{t('orders.cancel.description')}</DialogDescription>
           <FormAlert message={error} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor={reasonId} className="text-sm font-medium text-sf-heading">
-              Reason (optional)
+              {t('orders.cancel.reason')}
             </label>
             <textarea id={reasonId} rows={3} maxLength={REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} className={cn(inputClass, 'resize-y')} disabled={cancel.isPending} />
           </div>
           <div className="flex flex-wrap gap-3">
             <button type="submit" className={cn(primaryButtonClass, 'bg-sf-sale text-white')} disabled={cancel.isPending}>
-              {cancel.isPending ? 'Cancelling…' : 'Cancel order'}
+              {cancel.isPending ? t('orders.cancelling') : t('orders.detail.cancelOrder')}
             </button>
             <button type="button" className={secondaryButtonClass} disabled={cancel.isPending} onClick={close}>
-              Keep order
+              {t('orders.cancel.keep')}
             </button>
           </div>
         </form>

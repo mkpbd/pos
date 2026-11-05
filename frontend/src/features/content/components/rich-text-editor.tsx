@@ -36,6 +36,8 @@ type Props = {
   invalid?: boolean
   disabled?: boolean
   className?: string
+  /** Language of the text (e.g. "bn" for Bangla translations), for fonts, spelling and screen readers. */
+  lang?: string
 }
 
 /** Mirrors the server whitelist (ADR-009): site paths, http(s) and mailto links. */
@@ -195,7 +197,7 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
  * links, images from the media library). The server sanitizes again on save; this editor
  * only offers what survives. Emits "" for an empty document.
  */
-export function RichTextEditor({ value, onChange, label, id, invalid, disabled = false, className }: Props) {
+export function RichTextEditor({ value, onChange, label, id, invalid, disabled = false, className, lang }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -215,6 +217,7 @@ export function RichTextEditor({ value, onChange, label, id, invalid, disabled =
         'aria-label': label,
         ...(id ? { id } : {}),
         ...(invalid ? { 'aria-invalid': 'true' } : {}),
+        ...(lang ? { lang } : {}),
         class: 'rich-text min-h-48 px-3 py-2 outline-none',
       },
     },

@@ -5,8 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { MailCheckIcon } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
 import { applyServerErrors, storeFormError } from '../form-errors'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
-import { FORGOT_PASSWORD_SENT, useForgotPasswordMutation, useLoginMutation, useRegisterMutation, useResetPasswordMutation } from './api'
+import { useForgotPasswordMutation, useLoginMutation, useRegisterMutation, useResetPasswordMutation } from './api'
 import { AuthCard, FormAlert, SubmitButton, TextField } from './form-controls'
 import { safeNextPath } from './safe-next'
 import { forgotSchema, loginSchema, normalizeBdPhone, registerSchema, resetSchema, type ForgotValues, type LoginValues, type RegisterValues, type ResetValues } from './schemas'
@@ -22,8 +24,12 @@ const linkClass = 'font-semibold text-sf-accent underline-offset-4 hover:underli
  * Sign-in. On success the guard of this page moves on to `?next=` (same-origin paths only) or
  * the account; the guest cart and wishlist are merged into the account on the way.
  */
+/** The minimum length of a new password (the schemas check it). */
+const PASSWORD_MIN = 8
+
 export function LoginPage() {
-  useDocumentMeta(privatePage('Sign in'))
+  const { t } = useLocale()
+  useDocumentMeta(privatePage(t('account.login.title')))
   const [params] = useSearchParams()
   const next = safeNextPath(params.get('next'))
   const login = useLoginMutation()
@@ -35,7 +41,7 @@ export function LoginPage() {
     setFormError(null)
     login.mutate(values, {
       onError: (error) => {
-        if (!applyServerErrors(error, form.setError, ['email', 'password'])) setFormError(storeFormError(error))
+        if (!applyServerErrors(error, form.setError, ['email', 'password'])) setFormError(storeFormError(error, t))
         form.setValue('password', '')
       },
     })
@@ -43,33 +49,40 @@ export function LoginPage() {
 
   return (
     <AuthCard
-      title="Sign in"
-      intro="Welcome back! Sign in to see your account, cart and wishlist."
+      title={t('account.login.title')}
+      intro={t('account.login.intro')}
       footer={
         <p>
-          New here? <Link to={withNext('/account/register', next)} className={linkClass}>Create an account</Link>
+          {rich(t('account.login.newHere'), {
+            link: (
+              <Link to={withNext('/account/register', next)} className={linkClass}>
+                {t('account.login.createAccount')}
+              </Link>
+            ),
+          })}
         </p>
       }
     >
-      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Sign in">
+      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label={t('account.login.title')}>
         <FormAlert message={formError} />
-        <TextField label="E-mail" type="email" autoComplete="email" error={errors.email?.message} {...form.register('email')} />
-        <TextField label="Password" type="password" autoComplete="current-password" error={errors.password?.message} {...form.register('password')} />
+        <TextField label={t('account.field.email')} type="email" autoComplete="email" error={errors.email?.message} {...form.register('email')} />
+        <TextField label={t('account.field.password')} type="password" autoComplete="current-password" error={errors.password?.message} {...form.register('password')} />
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" className="size-4 accent-sf-accent" {...form.register('remember')} />
-            Keep me signed in
+            {t('account.login.keepSignedIn')}
           </label>
-          <Link to="/account/forgot-password" className={linkClass}>Forgot your password?</Link>
+          <Link to="/account/forgot-password" className={linkClass}>{t('account.login.forgot')}</Link>
         </div>
-        <SubmitButton pending={login.isPending} pendingLabel="Signing in…">Sign in</SubmitButton>
+        <SubmitButton pending={login.isPending} pendingLabel={t('account.login.pending')}>{t('account.login.submit')}</SubmitButton>
       </form>
     </AuthCard>
   )
 }
 
 export function RegisterPage() {
-  useDocumentMeta(privatePage('Create an account'))
+  const { t } = useLocale()
+  useDocumentMeta(privatePage(t('account.register.title')))
   const [params] = useSearchParams()
   const next = safeNextPath(params.get('next'))
   const register = useRegisterMutation()
@@ -87,7 +100,7 @@ export function RegisterPage() {
       { name: values.name.trim(), email: values.email.trim(), password: values.password, password_confirmation: values.password_confirmation, ...(phone ? { phone: normalizeBdPhone(phone) } : {}) },
       {
         onError: (error) => {
-          if (!applyServerErrors(error, form.setError, ['name', 'email', 'phone', 'password', 'password_confirmation'])) setFormError(storeFormError(error))
+          if (!applyServerErrors(error, form.setError, ['name', 'email', 'phone', 'password', 'password_confirmation'])) setFormError(storeFormError(error, t))
         },
       },
     )
@@ -95,29 +108,36 @@ export function RegisterPage() {
 
   return (
     <AuthCard
-      title="Create an account"
-      intro="Save your addresses and wishlist, and keep your cart on every device."
+      title={t('account.register.title')}
+      intro={t('account.register.intro')}
       footer={
         <p>
-          Already have an account? <Link to={withNext('/account/login', next)} className={linkClass}>Sign in</Link>
+          {rich(t('account.register.haveAccount'), {
+            link: (
+              <Link to={withNext('/account/login', next)} className={linkClass}>
+                {t('account.register.signIn')}
+              </Link>
+            ),
+          })}
         </p>
       }
     >
-      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Create an account">
+      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label={t('account.register.title')}>
         <FormAlert message={formError} />
-        <TextField label="Full name" autoComplete="name" maxLength={120} error={errors.name?.message} {...form.register('name')} />
-        <TextField label="E-mail" type="email" autoComplete="email" maxLength={254} error={errors.email?.message} {...form.register('email')} />
-        <TextField label="Mobile number (optional)" type="tel" autoComplete="tel" maxLength={20} placeholder="01XXXXXXXXX" error={errors.phone?.message} {...form.register('phone')} />
-        <TextField label="Password" type="password" autoComplete="new-password" hint="At least 8 characters." error={errors.password?.message} {...form.register('password')} />
-        <TextField label="Confirm password" type="password" autoComplete="new-password" error={errors.password_confirmation?.message} {...form.register('password_confirmation')} />
-        <SubmitButton pending={register.isPending} pendingLabel="Creating your account…">Create account</SubmitButton>
+        <TextField label={t('account.field.fullName')} autoComplete="name" maxLength={120} error={errors.name?.message} {...form.register('name')} />
+        <TextField label={t('account.field.email')} type="email" autoComplete="email" maxLength={254} error={errors.email?.message} {...form.register('email')} />
+        <TextField label={t('account.field.mobileOptional')} type="tel" autoComplete="tel" maxLength={20} placeholder="01XXXXXXXXX" error={errors.phone?.message} {...form.register('phone')} />
+        <TextField label={t('account.field.password')} type="password" autoComplete="new-password" hint={t('account.field.passwordHint', { min: PASSWORD_MIN })} error={errors.password?.message} {...form.register('password')} />
+        <TextField label={t('account.field.confirmPassword')} type="password" autoComplete="new-password" error={errors.password_confirmation?.message} {...form.register('password_confirmation')} />
+        <SubmitButton pending={register.isPending} pendingLabel={t('account.register.pending')}>{t('account.register.submit')}</SubmitButton>
       </form>
     </AuthCard>
   )
 }
 
 export function ForgotPasswordPage() {
-  useDocumentMeta(privatePage('Forgot your password?'))
+  const { t } = useLocale()
+  useDocumentMeta(privatePage(t('account.forgot.title')))
   const forgot = useForgotPasswordMutation()
   const [formError, setFormError] = useState<string | null>(null)
   const form = useForm<ForgotValues>({ resolver: zodResolver(forgotSchema), defaultValues: { email: '' } })
@@ -126,27 +146,27 @@ export function ForgotPasswordPage() {
     setFormError(null)
     forgot.mutate(values.email.trim(), {
       onError: (error) => {
-        if (!applyServerErrors(error, form.setError, ['email'])) setFormError(storeFormError(error))
+        if (!applyServerErrors(error, form.setError, ['email'])) setFormError(storeFormError(error, t))
       },
     })
   })
 
   return (
     <AuthCard
-      title="Forgot your password?"
-      intro="Enter the e-mail address of your account and we will send you a link to choose a new password."
-      footer={<Link to="/account/login" className={linkClass}>Back to sign in</Link>}
+      title={t('account.forgot.title')}
+      intro={t('account.forgot.intro')}
+      footer={<Link to="/account/login" className={linkClass}>{t('account.forgot.back')}</Link>}
     >
       {forgot.isSuccess ? (
         <div role="status" className="flex flex-col items-center gap-3 text-center">
           <MailCheckIcon aria-hidden className="size-10 text-sf-highlight" />
-          <p>{FORGOT_PASSWORD_SENT}</p>
+          <p>{t('account.forgot.sent')}</p>
         </div>
       ) : (
-        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Reset password request">
+        <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label={t('account.forgot.formLabel')}>
           <FormAlert message={formError} />
-          <TextField label="E-mail" type="email" autoComplete="email" error={form.formState.errors.email?.message} {...form.register('email')} />
-          <SubmitButton pending={forgot.isPending} pendingLabel="Sending…">Send reset link</SubmitButton>
+          <TextField label={t('account.field.email')} type="email" autoComplete="email" error={form.formState.errors.email?.message} {...form.register('email')} />
+          <SubmitButton pending={forgot.isPending} pendingLabel={t('account.sending')}>{t('account.forgot.submit')}</SubmitButton>
         </form>
       )}
     </AuthCard>
@@ -155,7 +175,8 @@ export function ForgotPasswordPage() {
 
 /** Target of the reset e-mail (`?token&email`). A successful reset signs the customer in. */
 export function ResetPasswordPage() {
-  useDocumentMeta(privatePage('Choose a new password'))
+  const { t } = useLocale()
+  useDocumentMeta(privatePage(t('account.reset.title')))
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const reset = useResetPasswordMutation()
@@ -165,8 +186,8 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <AuthCard title="Choose a new password" footer={<Link to="/account/forgot-password" className={linkClass}>Request a new link</Link>}>
-        <p className="text-center">This link is incomplete. Please use the link from the e-mail, or request a new one.</p>
+      <AuthCard title={t('account.reset.title')} footer={<Link to="/account/forgot-password" className={linkClass}>{t('account.reset.newLink')}</Link>}>
+        <p className="text-center">{t('account.reset.incomplete')}</p>
       </AuthCard>
     )
   }
@@ -178,7 +199,7 @@ export function ResetPasswordPage() {
       {
         onError: (error) => {
           // An invalid or expired token comes back as a field error on email/token.
-          if (!applyServerErrors(error, form.setError, ['email', 'password', 'password_confirmation'])) setFormError(storeFormError(error))
+          if (!applyServerErrors(error, form.setError, ['email', 'password', 'password_confirmation'])) setFormError(storeFormError(error, t))
           const tokenError = error instanceof ApiError ? error.fieldErrors.token?.[0] : undefined
           if (tokenError) setFormError(tokenError)
         },
@@ -187,13 +208,13 @@ export function ResetPasswordPage() {
   })
 
   return (
-    <AuthCard title="Choose a new password" footer={<Link to="/account/forgot-password" className={linkClass}>Request a new link</Link>}>
-      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label="Choose a new password">
+    <AuthCard title={t('account.reset.title')} footer={<Link to="/account/forgot-password" className={linkClass}>{t('account.reset.newLink')}</Link>}>
+      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-label={t('account.reset.title')}>
         <FormAlert message={formError} />
-        <TextField label="E-mail" type="email" autoComplete="email" error={errors.email?.message} {...form.register('email')} />
-        <TextField label="New password" type="password" autoComplete="new-password" hint="At least 8 characters." error={errors.password?.message} {...form.register('password')} />
-        <TextField label="Confirm new password" type="password" autoComplete="new-password" error={errors.password_confirmation?.message} {...form.register('password_confirmation')} />
-        <SubmitButton pending={reset.isPending} pendingLabel="Saving…">Save password and sign in</SubmitButton>
+        <TextField label={t('account.field.email')} type="email" autoComplete="email" error={errors.email?.message} {...form.register('email')} />
+        <TextField label={t('account.field.newPassword')} type="password" autoComplete="new-password" hint={t('account.field.passwordHint', { min: PASSWORD_MIN })} error={errors.password?.message} {...form.register('password')} />
+        <TextField label={t('account.field.confirmNewPassword')} type="password" autoComplete="new-password" error={errors.password_confirmation?.message} {...form.register('password_confirmation')} />
+        <SubmitButton pending={reset.isPending} pendingLabel={t('account.saving')}>{t('account.reset.submit')}</SubmitButton>
       </form>
     </AuthCard>
   )

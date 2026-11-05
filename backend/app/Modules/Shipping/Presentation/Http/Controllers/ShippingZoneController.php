@@ -2,6 +2,7 @@
 
 namespace App\Modules\Shipping\Presentation\Http\Controllers;
 
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Shipping\Application\Actions\ManageShippingMethods;
 use App\Modules\Shipping\Application\Actions\ManageShippingZones;
@@ -139,6 +140,8 @@ class ShippingZoneController
             'eta_max_days' => [$required, 'integer', 'min:0', 'max:30'],
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:9999'],
+            // E12b: {bn: {name, description}} (partial; blank removes).
+            ...TranslationInput::rules(ManageShippingMethods::TRANSLATABLE),
         ]);
         foreach (['cod_allowed', 'is_active'] as $flag) {
             if (array_key_exists($flag, $data)) {

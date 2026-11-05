@@ -1,3 +1,5 @@
+import { useLocale } from '../i18n/locale'
+import type { MessageKey } from '../i18n/en'
 import type { SectionPreviewState, StoreSection } from '../types'
 import { BannerGrid } from './banner-grid'
 import { BlogPostsSection } from './blog-posts-section'
@@ -7,28 +9,28 @@ import { HotDealsSection } from './hot-deals-section'
 import { NewsletterStrip } from './newsletter-strip'
 import { BrandStrip, CategoryStrip, ProductCarouselSection, ProductGridSection, ProductTabsSection } from './product-sections'
 
-const PREVIEW_LABELS: Record<Exclude<SectionPreviewState, 'live' | 'empty'>, string> = {
-  disabled: 'Hidden — visitors do not see this section',
-  scheduled: 'Scheduled — not shown yet',
-  expired: 'Ended — no longer shown',
+const PREVIEW_LABELS: Record<Exclude<SectionPreviewState, 'live' | 'empty'>, MessageKey> = {
+  disabled: 'content.preview.disabled',
+  scheduled: 'content.preview.scheduled',
+  expired: 'content.preview.expired',
 }
 
 /** Why an empty section is not shown, by what it would list. */
-function emptyLabel(section: StoreSection): string {
+function emptyLabel(section: StoreSection): MessageKey {
   switch (section.type) {
     case 'hero_slider':
     case 'banner_grid':
-      return 'No live banners — visitors do not see this section'
+      return 'content.preview.noBanners'
     case 'category_strip':
-      return 'No visible categories — visitors do not see this section'
+      return 'content.preview.noCategories'
     case 'brand_strip':
-      return 'No visible brands — visitors do not see this section'
+      return 'content.preview.noBrands'
     case 'hot_deals':
-      return 'No live flash sales — visitors do not see this section'
+      return 'content.preview.noDeals'
     case 'blog_posts':
-      return 'No published posts — visitors do not see this section'
+      return 'content.preview.noPosts'
     default:
-      return 'No products to show — visitors do not see this section'
+      return 'content.preview.noProducts'
   }
 }
 
@@ -91,6 +93,7 @@ function Section({ section }: { section: StoreSection }) {
 
 /** The homepage sections in order. In a preview, sections visitors do not see are marked. */
 export function SectionList({ sections }: { sections: StoreSection[] }) {
+  const { t } = useLocale()
   return (
     <>
       {sections.map((section) => {
@@ -102,7 +105,7 @@ export function SectionList({ sections }: { sections: StoreSection[] }) {
         return (
           <div key={section.id} data-section-type={section.type} data-testid="homepage-section" className={state ? 'relative opacity-60 outline-2 outline-offset-[-2px] outline-dashed outline-sf-sale' : undefined}>
             {state && (
-              <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{state === 'empty' ? emptyLabel(section) : PREVIEW_LABELS[state]}</p>
+              <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{t(state === 'empty' ? emptyLabel(section) : PREVIEW_LABELS[state])}</p>
             )}
             {empty ? <div className="h-24" aria-hidden /> : <Section section={section} />}
           </div>

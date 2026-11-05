@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, PauseIcon, PlayIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MenuLink } from '../components/menu-link'
+import { useLocale } from '../i18n/locale'
 import type { StoreSection } from '../types'
 import { BannerPicture, BannerText } from './banner-content'
 
@@ -19,6 +20,7 @@ function prefersReducedMotion(): boolean {
  */
 export function HeroSlider({ section }: Props) {
   const { banners, config } = section
+  const { t } = useLocale()
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(() => config.autoplay_seconds > 0 && banners.length > 1 && !prefersReducedMotion())
   const [hovered, setHovered] = useState(false)
@@ -36,7 +38,7 @@ export function HeroSlider({ section }: Props) {
   return (
     <section
       aria-roledescription="carousel"
-      aria-label={section.title ?? 'Featured'}
+      aria-label={section.title ?? t('content.section.featured')}
       className="relative overflow-hidden bg-sf-heading"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -62,13 +64,13 @@ export function HeroSlider({ section }: Props) {
               key={banner.id}
               role="group"
               aria-roledescription="slide"
-              aria-label={`${i + 1} of ${count}${banner.title ? `: ${banner.title}` : ''}`}
+              aria-label={banner.title ? t('content.section.slideTitled', { index: i + 1, count, title: banner.title }) : t('content.section.slide', { index: i + 1, count })}
               aria-hidden={i !== current}
               inert={i !== current}
               className={cn('absolute inset-0 transition-opacity duration-700 motion-reduce:transition-none', i === current ? 'opacity-100' : 'pointer-events-none opacity-0')}
             >
               {linkWhole ? (
-                <MenuLink url={banner.link_url!} aria-label={banner.title ?? banner.image.alt ?? 'Open offer'} className="block size-full">
+                <MenuLink url={banner.link_url!} aria-label={banner.title ?? banner.image.alt ?? t('content.section.openOffer')} className="block size-full">
                   {content}
                 </MenuLink>
               ) : (
@@ -81,7 +83,7 @@ export function HeroSlider({ section }: Props) {
 
       {count > 1 && (
         <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3">
-          <button type="button" aria-label="Previous slide" onClick={() => go(current - 1)} className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white">
+          <button type="button" aria-label={t('content.section.previousSlide')} onClick={() => go(current - 1)} className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white">
             <ChevronLeftIcon className="size-5" />
           </button>
           <div className="flex gap-2">
@@ -89,20 +91,20 @@ export function HeroSlider({ section }: Props) {
               <button
                 key={b.id}
                 type="button"
-                aria-label={`Go to slide ${i + 1}`}
+                aria-label={t('content.section.goToSlide', { index: i + 1 })}
                 aria-current={i === current ? 'true' : undefined}
                 onClick={() => go(i)}
                 className={cn('size-3 rounded-full border-2 border-white', i === current ? 'bg-white' : 'bg-white/30')}
               />
             ))}
           </div>
-          <button type="button" aria-label="Next slide" onClick={() => go(current + 1)} className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white">
+          <button type="button" aria-label={t('content.section.nextSlide')} onClick={() => go(current + 1)} className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white">
             <ChevronRightIcon className="size-5" />
           </button>
           {config.autoplay_seconds > 0 && (
             <button
               type="button"
-              aria-label={playing ? 'Stop automatic slides' : 'Start automatic slides'}
+              aria-label={playing ? t('content.section.stopSlides') : t('content.section.startSlides')}
               onClick={() => setPlaying((p) => !p)}
               className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white"
             >

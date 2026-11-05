@@ -3,6 +3,7 @@
 namespace App\Modules\Shipping\Application\Actions;
 
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Shipping\Infrastructure\Models\ShippingMethod;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
@@ -17,6 +18,9 @@ class ManageShippingMethods
 {
     private const FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order'];
 
+    /** E12b: translatable texts with the limits of their base fields. */
+    public const TRANSLATABLE = ['name' => ['max:60'], 'description' => ['max:160']];
+
     public function __construct(private readonly AuditTrail $audit) {}
 
     /**
@@ -27,7 +31,7 @@ class ManageShippingMethods
         $this->assertEta((int) $data['eta_min_days'], (int) $data['eta_max_days']);
 
         return DB::transaction(function () use ($zone, $data) {
-            $method = ShippingMethod::query()->create(['zone_id' => $zone->id] + $this->attributes($data));
+            $method = ShippingMethod::query()->create(['zone_id' => $zone->id] + $this->attributes($data) + $this->translations(null, $data));
             $this->audit->record('shipping.method_created', $method, new: $this->attributes($data));
 
             return $method;
@@ -42,7 +46,7 @@ class ManageShippingMethods
         $this->assertEta((int) ($data['eta_min_days'] ?? $method->eta_min_days), (int) ($data['eta_max_days'] ?? $method->eta_max_days));
 
         return DB::transaction(function () use ($method, $data) {
-            $method->fill($this->attributes($data))->save();
+            $method->fill($this->attributes($data) + $this->translations($method, $data))->save();
             $this->audit->record('shipping.method_updated', $method, new: $this->attributes($data));
 
             return $method;
@@ -77,6 +81,17 @@ class ManageShippingMethods
         }
 
         return $attributes;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{translations?: ?array<string, array<string, string>>}
+     */
+    private function translations(?ShippingMethod $method, array $data): array
+    {
+        return array_key_exists('translations', $data)
+            ? ['translations' => TranslationInput::apply($method?->translations, $data['translations'], array_keys(self::TRANSLATABLE))]
+            : [];
     }
 
     private function assertEta(int $min, int $max): void

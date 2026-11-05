@@ -262,7 +262,7 @@ class WebOrderWorkflowTest extends TestCase
         $zones = $this->getJson('/api/v1/shipping/zones')->assertOk()->json('data');
         $this->assertSame(['Inside Dhaka', 'Outside Dhaka'], array_column($zones, 'name'));
         $this->assertSame([['id' => self::DHAKA, 'name' => 'Dhaka']], $zones[0]['districts']);
-        $this->assertSame(['id', 'zone_id', 'name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order'], array_keys($zones[0]['methods'][0]));
+        $this->assertSame(['id', 'zone_id', 'name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'translations'], array_keys($zones[0]['methods'][0]));
         $this->assertSame(['60.00', '2000.00', '0.00'], [$zones[0]['methods'][0]['fee'], $zones[0]['methods'][0]['free_over'], $zones[0]['methods'][0]['cod_fee']]);
 
         // One zone per district.
@@ -315,7 +315,7 @@ class WebOrderWorkflowTest extends TestCase
         $this->staff();
         $methods = $this->getJson('/api/v1/payment-gateways')->assertOk()->json('data');
         $this->assertSame(['cod', 'bank_transfer'], array_column($methods, 'code'));
-        $this->assertSame(['code', 'display_name', 'is_enabled', 'instructions', 'settings', 'sort_order'], array_keys($methods[0]));
+        $this->assertSame(['code', 'display_name', 'is_enabled', 'instructions', 'settings', 'sort_order', 'translations'], array_keys($methods[0]));
         $this->assertSame(['max_order_total' => null], $methods[0]['settings']);
         $this->assertSame(['hold_hours' => 48], $methods[1]['settings']);
 

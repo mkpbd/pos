@@ -3,7 +3,9 @@ import { ChevronDownIcon, MenuIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 import type { MenuNode } from '../types'
+import { LanguageSwitcher } from './language-switcher'
 import { MenuLink } from './menu-link'
 
 /**
@@ -12,24 +14,29 @@ import { MenuLink } from './menu-link'
  */
 export function MobileMenu({ storeName, items }: { storeName: string; items: MenuNode[] }) {
   const [open, setOpen] = useState(false)
+  const { t, locales } = useLocale()
 
-  if (items.length === 0) return null
+  // The drawer also carries the language switcher, so a bilingual store keeps it without menu items.
+  if (items.length === 0 && locales.length < 2) return null
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
+        <Button variant="ghost" size="icon" className="lg:hidden" aria-label={t('common.openMenu')}>
           <MenuIcon aria-hidden className="size-6" />
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-80 max-w-[85vw] gap-0 p-0">
         <SheetHeader className="border-b">
           <SheetTitle className="font-heading text-lg text-sf-heading">{storeName}</SheetTitle>
-          <SheetDescription className="sr-only">Site navigation</SheetDescription>
+          <SheetDescription className="sr-only">{t('common.siteNavigation')}</SheetDescription>
         </SheetHeader>
-        <nav aria-label="Mobile" className="overflow-y-auto">
-          <MobileTree items={items} depth={0} onNavigate={() => setOpen(false)} />
-        </nav>
+        {items.length > 0 && (
+          <nav aria-label={t('common.mobileNav')} className="overflow-y-auto">
+            <MobileTree items={items} depth={0} onNavigate={() => setOpen(false)} />
+          </nav>
+        )}
+        <LanguageSwitcher className="border-t px-4 py-3" />
       </SheetContent>
     </Sheet>
   )
@@ -47,6 +54,7 @@ function MobileTree({ items, depth, onNavigate }: { items: MenuNode[]; depth: nu
 
 function MobileItem({ item, depth, onNavigate }: { item: MenuNode; depth: number; onNavigate: () => void }) {
   const [expanded, setExpanded] = useState(false)
+  const { t } = useLocale()
   const childrenId = useId()
   const hasChildren = item.children.length > 0
 
@@ -68,7 +76,7 @@ function MobileItem({ item, depth, onNavigate }: { item: MenuNode; depth: number
             className="flex size-11 items-center justify-center text-sf-text"
             aria-expanded={expanded}
             aria-controls={childrenId}
-            aria-label={`${item.label} submenu`}
+            aria-label={t('common.submenu', { label: item.label })}
             onClick={() => setExpanded((value) => !value)}
           >
             <ChevronDownIcon aria-hidden className={cn('size-4 transition-transform', expanded && 'rotate-180')} />

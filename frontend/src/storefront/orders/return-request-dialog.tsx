@@ -7,6 +7,8 @@ import { QuantityStepper } from '../cart/quantity-stepper'
 import { displayQuantity } from '../cart/quantity'
 import { PlacementAttempts } from '../checkout/placement-attempt'
 import { formatDateTime } from '../checkout/delivery'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
 import { useNotice } from '../notices'
 import type { AccountOrder, AccountOrderLine, ReturnReasonCode, ReturnRequestInput } from '../types'
 import { RETURN_NOTE_MAX, RETURN_REASONS, lineIdOf, returnErrorMessage, returnableLines, returnableQuantity, useCreateReturnMutation } from './returns-api'
@@ -33,6 +35,7 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
   const create = useCreateReturnMutation(order.number)
   const attempts = useRef(new PlacementAttempts())
   const notify = useNotice()
+  const { t, formatNumber } = useLocale()
   const id = useId()
   const [picks, setPicks] = useState<Record<string, LineChoice>>({})
   const [reason, setReason] = useState<ReturnReasonCode | ''>('')
@@ -79,8 +82,8 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
       return pick.selected && lineId ? [{ order_line_id: lineId, quantity: pick.quantity }] : []
     })
     const nextErrors = {
-      lines: chosen.length === 0 ? 'Please choose at least one item to return.' : undefined,
-      reason: reason === '' ? 'Please choose a reason.' : undefined,
+      lines: chosen.length === 0 ? t('orders.returnForm.chooseItemError') : undefined,
+      reason: reason === '' ? t('orders.returnForm.chooseReasonError') : undefined,
     }
     setErrors(nextErrors)
     if (nextErrors.lines || nextErrors.reason || reason === '') return
@@ -93,13 +96,13 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
       {
         onSuccess: (created) => {
           attempts.current.settle()
-          notify(created?.number ? `Return ${created.number} was requested. We will e-mail you once the store has reviewed it.` : 'Your return was requested.')
+          notify(created?.number ? t('orders.returnForm.requested', { number: created.number }) : t('orders.returnForm.requestedGeneric'))
           reset()
           onClose()
         },
         onError: (failure) => {
           attempts.current.settle(failure)
-          setFormError(returnErrorMessage(failure))
+          setFormError(returnErrorMessage(failure, t))
         },
       },
     )
@@ -112,28 +115,30 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto bg-sf-surface p-5 sm:max-w-lg md:p-6">
-        <form noValidate onSubmit={submit} className="flex flex-col gap-4" aria-label="Return items">
-          <DialogTitle className="pr-8 font-heading text-2xl font-extrabold text-sf-heading">Return items</DialogTitle>
+        <form noValidate onSubmit={submit} className="flex flex-col gap-4" aria-label={t('orders.returnForm.title')}>
+          <DialogTitle className="pr-8 font-heading text-2xl font-extrabold text-sf-heading">{t('orders.returnForm.title')}</DialogTitle>
           <DialogDescription>
-            Choose what you are sending back from order {order.number}.
+            {t('orders.returnForm.intro', { number: order.number })}
             {order.return_deadline && (
               <>
                 {' '}
-                Returns are accepted until{' '}
-                <time dateTime={order.return_deadline} className="font-semibold text-sf-heading">
-                  {formatDateTime(order.return_deadline)}
-                </time>
-                .
+                {rich(t('orders.returnForm.until'), {
+                  date: (
+                    <time dateTime={order.return_deadline} className="font-semibold text-sf-heading">
+                      {formatDateTime(order.return_deadline)}
+                    </time>
+                  ),
+                })}
               </>
             )}{' '}
-            Delivery and cash-on-delivery fees are not refunded.
+            {t('orders.returnForm.fees')}
           </DialogDescription>
           <FormAlert message={formError} />
 
           <fieldset className="flex flex-col gap-3" aria-describedby={errors.lines ? linesErrorId : undefined} disabled={create.isPending}>
-            <legend className="mb-1.5 text-sm font-medium text-sf-heading">Items to return</legend>
+            <legend className="mb-1.5 text-sm font-medium text-sf-heading">{t('orders.returnForm.itemsLegend')}</legend>
             {lines.length === 0 ? (
-              <p className="text-sm">There is nothing left to return from this order.</p>
+              <p className="text-sm">{t('orders.returnForm.nothingLeft')}</p>
             ) : (
               <ul className="flex flex-col divide-y rounded-lg border border-sf-border">
                 {lines.map((line) => {
@@ -146,8 +151,8 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
                       <div className="flex min-w-0 items-start gap-2">
                         <input id={checkboxId} type="checkbox" className="mt-1 size-4 accent-sf-accent" checked={pick.selected} onChange={(e) => update(line, { selected: e.target.checked })} />
                         <label htmlFor={checkboxId} className="text-sm">
-                          <span className="block font-semibold text-sf-heading">Return {name}</span>
-                          <span className="text-xs">You can return up to {displayQuantity(max)}.</span>
+                          <span className="block font-semibold text-sf-heading">{t('orders.returnForm.returnLine', { name })}</span>
+                          <span className="text-xs">{t('orders.returnForm.upTo', { max: formatNumber(displayQuantity(max)) })}</span>
                         </label>
                       </div>
                       {pick.selected && (
@@ -156,7 +161,7 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
                           value={pick.quantity}
                           max={max}
                           allowDecimal={allowsDecimal(line)}
-                          label={`Quantity of ${name} to return`}
+                          label={t('orders.returnForm.quantityLabel', { name })}
                           onChange={(quantity) => update(line, { quantity: clamp(quantity, max) })}
                         />
                       )}
@@ -174,7 +179,7 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${id}-reason`} className="text-sm font-medium text-sf-heading">
-              Reason
+              {t('orders.returnForm.reason')}
             </label>
             <select
               id={`${id}-reason`}
@@ -189,10 +194,10 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
                 setErrors((current) => ({ ...current, reason: undefined }))
               }}
             >
-              <option value="">Choose a reason</option>
+              <option value="">{t('orders.returnForm.chooseReason')}</option>
               {RETURN_REASONS.map((r) => (
                 <option key={r.value} value={r.value}>
-                  {r.label}
+                  {t(r.label)}
                 </option>
               ))}
             </select>
@@ -205,7 +210,7 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${id}-note`} className="text-sm font-medium text-sf-heading">
-              Comments (optional)
+              {t('orders.returnForm.comments')}
             </label>
             <textarea
               id={`${id}-note`}
@@ -218,16 +223,16 @@ export function ReturnRequestDialog({ order, open, onClose }: { order: AccountOr
               disabled={create.isPending}
             />
             <p id={noteHintId} className="text-xs">
-              {note.length}/{RETURN_NOTE_MAX} characters
+              {t('orders.returnForm.characters', { count: note.length, max: RETURN_NOTE_MAX })}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <button type="submit" className={primaryButtonClass} disabled={create.isPending || lines.length === 0}>
-              {create.isPending ? 'Sending request…' : 'Request return'}
+              {create.isPending ? t('orders.returnForm.sending') : t('orders.returnForm.submit')}
             </button>
             <button type="button" className={secondaryButtonClass} disabled={create.isPending} onClick={close}>
-              Close
+              {t('common.close')}
             </button>
           </div>
         </form>

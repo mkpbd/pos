@@ -32,8 +32,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ?CarbonImmutable $created_at
  * @property ?CarbonImmutable $updated_at
  * @property ?BlogCategory $category
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'category_id', 'slug', 'title', 'excerpt', 'body_html', 'cover_media_id', 'author_user_id', 'status', 'published_at', 'seo_title', 'seo_description', 'reading_minutes'])]
+#[Fillable(['organization_id', 'category_id', 'slug', 'title', 'excerpt', 'body_html', 'cover_media_id', 'author_user_id', 'status', 'published_at', 'seo_title', 'seo_description', 'reading_minutes', 'translations'])]
 class BlogPost extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, SoftDeletes, TracksAuthor;
@@ -51,6 +52,7 @@ class BlogPost extends Model
             'reading_minutes' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
+            'translations' => 'array',
         ];
     }
 

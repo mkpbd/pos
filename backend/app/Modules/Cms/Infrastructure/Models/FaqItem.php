@@ -16,8 +16,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $answer_html
  * @property bool $is_active
  * @property int $sort_order
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'group', 'question', 'answer_html', 'is_active', 'sort_order'])]
+#[Fillable(['organization_id', 'group', 'question', 'answer_html', 'is_active', 'sort_order', 'translations'])]
 class FaqItem extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -32,6 +33,7 @@ class FaqItem extends Model
         return [
             'is_active' => 'boolean',
             'sort_order' => 'integer',
+            'translations' => 'array',
         ];
     }
 }

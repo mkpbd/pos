@@ -7,13 +7,17 @@ use App\Modules\Shared\Domain\ValueObjects\Decimal;
 /**
  * schema.org JSON-LD documents the HTML shell writes (E12, ADR-008). Every URL is made
  * absolute against the request's scheme and host; documents are encoded so they can never
- * end their `<script>` element early.
+ * end their `<script>` element early. E12b: creative works (WebSite, CollectionPage,
+ * BlogPosting) carry the page's `inLanguage`.
  */
 final class StructuredData
 {
     private const CONTEXT = 'https://schema.org';
 
-    public function __construct(private readonly string $base) {}
+    /**
+     * @param  ?string  $language  BCP 47 language of the page (`en`, `bn`; E12b) for `inLanguage`
+     */
+    public function __construct(private readonly string $base, private readonly ?string $language = null) {}
 
     /**
      * `<script type="application/ld+json">` elements for the documents.
@@ -72,6 +76,7 @@ final class StructuredData
             '@type' => 'WebSite',
             'name' => $name,
             'url' => $this->base.'/',
+            ...($this->language === null ? [] : ['inLanguage' => $this->language]),
             'potentialAction' => [
                 '@type' => 'SearchAction',
                 'target' => ['@type' => 'EntryPoint', 'urlTemplate' => $this->base.'/search?q={search_term_string}'],
@@ -109,6 +114,7 @@ final class StructuredData
             'name' => $name,
             'description' => $description,
             'url' => $this->absolute($url),
+            'inLanguage' => $this->language,
         ], fn ($v) => $v !== null);
     }
 
@@ -194,6 +200,7 @@ final class StructuredData
             'author' => $post['author'] === null ? null : ['@type' => 'Person', 'name' => $post['author']],
             'publisher' => $publisher,
             'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => $url],
+            'inLanguage' => $this->language,
         ], fn ($v) => $v !== null);
     }
 }

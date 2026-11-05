@@ -5,6 +5,7 @@ namespace App\Modules\CustomerAccounts\Application\Actions;
 use App\Modules\CustomerAccounts\Application\Contracts\GuestCartMerger;
 use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\Customers\Application\Actions\OnlineCustomerProfiles;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,6 +29,7 @@ class CustomerSession
         private readonly Request $request,
         private readonly GuestCartMerger $carts,
         private readonly OnlineCustomerProfiles $customers,
+        private readonly LocaleContext $locale,
     ) {}
 
     /**
@@ -65,7 +67,8 @@ class CustomerSession
 
         Auth::guard('customer')->login($account, $remember);
         $this->request->session()->regenerate();
-        $account->forceFill(['last_login_at' => now()])->save();
+        // E12b: the storefront language of this sign-up / sign-in (`lang`), for e-mails (E13).
+        $account->forceFill(['last_login_at' => now(), 'preferred_locale' => $this->locale->current()])->save();
 
         return $this->carts->mergeGuestCart($account->customer_id);
     }

@@ -4,6 +4,7 @@ import { CircleAlertIcon, TagIcon, Trash2Icon, TruckIcon } from 'lucide-react'
 import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { ProductImage } from '../catalog/product-image'
+import { useLocale } from '../i18n/locale'
 import { formatDiscount, formatPrice } from '../money'
 import type { Cart, CartLine } from '../types'
 import { useRemoveCartItemMutation, useUpdateCartItemMutation } from './api'
@@ -19,8 +20,9 @@ function lineDetails(line: CartLine): string | null {
 
 export function CartLines({ cart, compact = false, onNavigate }: { cart: Cart; compact?: boolean; onNavigate?: () => void }) {
   const currency = useCartCurrency(cart)
+  const { t } = useLocale()
   return (
-    <ul className={cn('flex flex-col', compact ? 'divide-y' : 'gap-4')} aria-label="Cart items">
+    <ul className={cn('flex flex-col', compact ? 'divide-y' : 'gap-4')} aria-label={t('cart.lines.label')}>
       {cart.items.map((line) => (
         <CartLineRow key={line.id} line={line} currency={currency} compact={compact} onNavigate={onNavigate} />
       ))}
@@ -32,6 +34,8 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
   const update = useUpdateCartItemMutation()
   const remove = useRemoveCartItemMutation()
   const [error, setError] = useState<string | null>(null)
+  const { t, formatNumber } = useLocale()
+  const item = `${line.product.name}${line.variant_name ? ` (${line.variant_name})` : ''}`
   const excluded = isExcluded(line)
   const details = lineDetails(line)
   const busy = update.isPending || remove.isPending
@@ -40,7 +44,7 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
 
   const setQuantity = (quantity: string) => {
     setError(null)
-    update.mutate({ id: line.id, quantity }, { onError: (e) => setError(cartErrorMessage(e)) })
+    update.mutate({ id: line.id, quantity }, { onError: (e) => setError(cartErrorMessage(e, t)) })
   }
 
   return (
@@ -60,16 +64,16 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
               {line.product.name}
             </Link>
             {details && <p className="text-sm">{details}</p>}
-            {!compact && <p className="text-xs">SKU: {line.sku}</p>}
+            {!compact && <p className="text-xs">{t('cart.line.sku', { sku: line.sku })}</p>}
           </div>
           <button
             type="button"
             className="grid size-9 shrink-0 place-items-center rounded-full text-sf-text transition hover:bg-sf-canvas hover:text-sf-sale disabled:opacity-50"
-            aria-label={`Remove ${line.product.name}${line.variant_name ? ` (${line.variant_name})` : ''} from the cart`}
+            aria-label={t('cart.line.remove', { item })}
             disabled={busy}
             onClick={() => {
               setError(null)
-              remove.mutate(line.id, { onError: (e) => setError(cartErrorMessage(e)) })
+              remove.mutate(line.id, { onError: (e) => setError(cartErrorMessage(e, t)) })
             }}
           >
             <Trash2Icon aria-hidden className="size-4" />
@@ -80,18 +84,18 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
           <span className="font-semibold text-sf-heading">{price(line.unit_price)}</span>
           {line.compare_at_price && (
             <s>
-              <span className="sr-only">Original price: </span>
+              <span className="sr-only">{t('cart.line.originalPrice')} </span>
               {price(line.compare_at_price)}
             </s>
           )}
-          {!compact && <span className="text-xs">each</span>}
+          {!compact && <span className="text-xs">{t('cart.line.each')}</span>}
         </p>
 
         {/* The line's product discount plus its share of an order discount; the product promotion is named. */}
         {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
           <p className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-sf-sale" data-testid="line-discount">
             <TagIcon aria-hidden className="size-3.5 shrink-0" />
-            <span>Discount{line.promotion ? ` (${line.promotion.name})` : ''}:</span>
+            <span>{line.promotion ? t('cart.line.discountPromotion', { promotion: line.promotion.name }) : t('cart.line.discount')}</span>
             <span>{formatDiscount(line.discount_amount, currency)}</span>
           </p>
         )}
@@ -106,14 +110,14 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
               allowDecimal={line.allow_decimal}
               max={line.max_quantity}
               disabled={busy || !line.in_stock}
-              label={`Quantity of ${line.product.name}${line.variant_name ? ` (${line.variant_name})` : ''}`}
+              label={t('cart.line.quantityOf', { item })}
               size="sm"
             />
           ) : (
-            <span className="text-sm">Quantity: {displayQuantity(line.quantity)}</span>
+            <span className="text-sm">{t('cart.line.quantity', { quantity: formatNumber(displayQuantity(line.quantity)) })}</span>
           )}
           <span className={cn('text-sm font-bold', excluded ? 'text-sf-text' : 'text-sf-heading')} data-testid="line-total">
-            {excluded ? 'Not included' : price(line.line_total)}
+            {excluded ? t('cart.line.notIncluded') : price(line.line_total)}
           </span>
         </div>
         {error && (
@@ -127,10 +131,11 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
 }
 
 function LineFlags({ line, max, busy, onFix }: { line: CartLine; max: string | null; busy: boolean; onFix: (quantity: string) => void }) {
+  const { t, formatNumber } = useLocale()
   let message: string | null = null
-  if (!line.purchasable) message = 'No longer available — not included in the total. Please remove it.'
-  else if (!line.in_stock) message = 'Out of stock — not included in the total.'
-  else if (line.exceeds_stock && max) message = `Only ${max} left in stock.`
+  if (!line.purchasable) message = t('cart.line.unavailable')
+  else if (!line.in_stock) message = t('cart.line.outOfStock')
+  else if (line.exceeds_stock && max) message = t('cart.line.onlyLeft', { max: formatNumber(max) })
   if (!message) return null
 
   return (
@@ -141,7 +146,7 @@ function LineFlags({ line, max, busy, onFix }: { line: CartLine; max: string | n
       </span>
       {line.purchasable && line.in_stock && line.exceeds_stock && max && (
         <button type="button" disabled={busy} onClick={() => onFix(max)} className="text-sf-accent underline underline-offset-4 hover:no-underline disabled:opacity-50">
-          Change quantity to {max}
+          {t('cart.line.changeQuantity', { max: formatNumber(max) })}
         </button>
       )}
     </div>
@@ -155,6 +160,7 @@ function LineFlags({ line, max, busy, onFix }: { line: CartLine; max: string | n
  */
 export function CartTotals({ cart, compact = false }: { cart: Cart; compact?: boolean }) {
   const currency = useCartCurrency(cart)
+  const { t } = useLocale()
   const price = (amount: string) => formatPrice(amount, currency)
   const hasTax = !isZeroDecimal(cart.tax_total)
   const discount = cart.discount_total ?? '0'
@@ -164,16 +170,16 @@ export function CartTotals({ cart, compact = false }: { cart: Cart; compact?: bo
   return (
     <dl className="flex flex-col gap-2 text-sm" data-testid="cart-totals">
       <div className="flex justify-between gap-4">
-        <dt>Subtotal</dt>
+        <dt>{t('cart.totals.subtotal')}</dt>
         <dd className="font-semibold text-sf-heading" data-testid="cart-subtotal">{price(cart.subtotal)}</dd>
       </div>
       {!isZeroDecimal(discount) && (
         <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
-          <dt>Discounts</dt>
+          <dt>{t('cart.totals.discounts')}</dt>
           <dd className="text-right font-semibold text-sf-sale" data-testid="cart-discount">{formatDiscount(discount, currency)}</dd>
           {promotions.length > 0 && (
             <dd className="col-span-2">
-              <ul className="flex flex-col gap-0.5 pl-3 text-xs" aria-label="Promotions applied">
+              <ul className="flex flex-col gap-0.5 pl-3 text-xs" aria-label={t('cart.totals.promotionsApplied')}>
                 {promotions.map((promotion) => (
                   <li key={`${promotion.kind}-${promotion.id}`} className="flex justify-between gap-4" data-testid="cart-promotion">
                     <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -190,28 +196,28 @@ export function CartTotals({ cart, compact = false }: { cart: Cart; compact?: bo
       )}
       {!compact && hasTax && !cart.prices_include_tax && (
         <div className="flex justify-between gap-4">
-          <dt>VAT</dt>
+          <dt>{t('cart.totals.vat')}</dt>
           <dd className="font-semibold text-sf-heading" data-testid="cart-tax">{price(cart.tax_total)}</dd>
         </div>
       )}
       {!compact && (
         <div className="flex justify-between gap-4 border-t pt-3 text-base">
-          <dt className="font-bold text-sf-heading">Total</dt>
+          <dt className="font-bold text-sf-heading">{t('cart.totals.total')}</dt>
           <dd className="font-heading text-xl font-extrabold text-sf-heading" data-testid="cart-total">{price(cart.total)}</dd>
         </div>
       )}
       {freeShipping && (
         <p className="flex items-start gap-1.5 text-xs font-semibold text-sf-highlight" data-testid="free-shipping-note">
           <TruckIcon aria-hidden className="mt-px size-3.5 shrink-0" />
-          Free delivery with {freeShipping.name} — applied at checkout.
+          {t('cart.totals.freeDelivery', { name: freeShipping.name })}
         </p>
       )}
       {cart.prices_include_tax ? (
         <p className="text-xs" data-testid="vat-note">
-          Prices include VAT{hasTax && !compact ? ` (${price(cart.tax_total)})` : ''}.
+          {hasTax && !compact ? t('cart.totals.pricesIncludeVatAmount', { amount: price(cart.tax_total) }) : t('cart.totals.pricesIncludeVat')}
         </p>
       ) : compact ? (
-        <p className="text-xs">Subtotal excludes VAT.</p>
+        <p className="text-xs">{t('cart.totals.subtotalExcludesVat')}</p>
       ) : null}
     </dl>
   )

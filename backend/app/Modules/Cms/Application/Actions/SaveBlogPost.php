@@ -13,6 +13,7 @@ use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
 use App\Modules\Shared\Application\Support\StaffActor;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,15 @@ use Illuminate\Support\Facades\DB;
  */
 class SaveBlogPost
 {
+    /** E12b: translatable texts with the limits of their base fields. */
+    public const TRANSLATABLE = [
+        'title' => ['max:160'],
+        'excerpt' => ['max:300'],
+        'body_html' => ['max:200000'],
+        'seo_title' => ['max:70'],
+        'seo_description' => ['max:160'],
+    ];
+
     public function __construct(
         private readonly HtmlSanitizer $sanitizer,
         private readonly MediaLibrary $media,
@@ -65,6 +75,9 @@ class SaveBlogPost
                 }
             }
 
+            if (array_key_exists('translations', $attributes)) {
+                $attributes['translations'] = TranslationInput::apply($post->translations, $attributes['translations'], array_keys(self::TRANSLATABLE), ['body_html'], $this->sanitizer);
+            }
             $post->fill($attributes);
             if ($creating) {
                 $post->author_user_id = $authorId ?? StaffActor::id();
@@ -124,6 +137,7 @@ class SaveBlogPost
             'seo_description' => $post->seo_description,
             // The body itself is too large for the audit log; record that it changed.
             'body_hash' => $post->body_html === null ? null : hash('xxh128', $post->body_html),
+            'translations_hash' => $post->translations === null ? null : hash('xxh128', (string) json_encode($post->translations)),
         ];
     }
 }

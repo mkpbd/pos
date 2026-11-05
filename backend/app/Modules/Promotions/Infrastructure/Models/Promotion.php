@@ -34,10 +34,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?int $usage_limit_per_customer
  * @property ?CarbonImmutable $created_at
  * @property ?CarbonImmutable $updated_at
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
 #[Fillable([
     'name', 'description', 'type', 'value', 'scope', 'min_subtotal', 'max_discount', 'trigger', 'starts_at', 'ends_at',
-    'show_countdown', 'is_active', 'usage_limit', 'usage_limit_per_customer',
+    'show_countdown', 'is_active', 'usage_limit', 'usage_limit_per_customer', 'translations',
 ])]
 class Promotion extends Model
 {
@@ -66,6 +67,7 @@ class Promotion extends Model
             'usage_limit_per_customer' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
+            'translations' => 'array',
         ];
     }
 

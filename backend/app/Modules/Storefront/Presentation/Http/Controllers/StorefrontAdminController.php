@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontDomain;
@@ -35,6 +36,9 @@ class StorefrontAdminController
      * decides online availability (null: stock-tracked products show as out of stock).
      * `return_window_days` (0–60, default 7; 0 = no online returns): days after delivery a
      * customer may ask to return goods of a web order (E10b).
+     * E12b languages: `bangla_enabled` (default true), `default_locale` `en|bn` (must be
+     * enabled: Bangla off + default `bn` -> 422 on `default_locale`), `bangla_digits` (default
+     * false: Bengali digits for amounts and numbers when reading in Bangla).
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save): JsonResponse
     {
@@ -46,6 +50,9 @@ class StorefrontAdminController
             'guest_checkout_enabled' => ['sometimes', 'boolean'],
             'return_window_days' => ['sometimes', 'integer', 'min:0', 'max:60'],
             'allow_indexing' => ['sometimes', 'boolean'],
+            'bangla_enabled' => ['sometimes', 'boolean'],
+            'default_locale' => ['sometimes', Rule::in(LocaleContext::SUPPORTED)],
+            'bangla_digits' => ['sometimes', 'boolean'],
         ]);
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)));

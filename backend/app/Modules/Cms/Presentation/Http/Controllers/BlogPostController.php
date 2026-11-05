@@ -8,6 +8,7 @@ use App\Modules\Cms\Domain\PageSlug;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Cms\Presentation\Http\Support\BlogPresenter;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
@@ -164,6 +165,8 @@ class BlogPostController
             'published_at' => ['sometimes', 'nullable', 'date'],
             'seo_title' => ['sometimes', 'nullable', 'string', 'max:70'],
             'seo_description' => ['sometimes', 'nullable', 'string', 'max:160'],
+            // E12b: {bn: {title, excerpt, body_html, seo_title, seo_description}} (partial; blank removes).
+            ...TranslationInput::rules(SaveBlogPost::TRANSLATABLE),
         ];
     }
 }

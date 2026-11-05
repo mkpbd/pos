@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMeQuery } from '../account/api'
 import { storeApi } from '../http'
-import { customerKeys } from '../store-keys'
+import { useLocale } from '../i18n/locale'
+import { customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { Wishlist } from '../types'
 import { removeLocalWishlistItem, toggleLocalWishlistItem, useLocalWishlist } from './local-wishlist'
 
@@ -9,8 +10,9 @@ export const MAX_WISHLIST_ITEMS = 200
 
 /** The signed-in customer's wishlist (guests keep theirs in this browser, see local-wishlist). */
 export function useWishlistQuery(enabled: boolean) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.wishlist,
+    queryKey: localized(customerKeys.wishlist, locale),
     queryFn: ({ signal }) => storeApi.get<Wishlist>('/store/wishlist', { signal }).then((r) => r.data),
     enabled,
   })
@@ -18,10 +20,11 @@ export function useWishlistQuery(enabled: boolean) {
 
 function useWishlistMutation<V>(request: (variables: V) => Promise<Wishlist>) {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: request,
     onSuccess: (list) => {
-      if (list) queryClient.setQueryData(customerKeys.wishlist, list)
+      if (list) setLocalizedData(queryClient, customerKeys.wishlist, locale, list)
       else void queryClient.invalidateQueries({ queryKey: customerKeys.wishlist })
     },
   })

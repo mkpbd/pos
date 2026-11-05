@@ -8,7 +8,9 @@ use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use App\Modules\Storefront\Domain\MenuItemType;
 use App\Modules\Storefront\Domain\MenuLocation;
@@ -23,6 +25,11 @@ use Illuminate\Support\Collection;
  * Everything the storefront needs before it can draw a page: store identity, theme
  * (media ids resolved to URLs), the announcement if it is live now, the active menus
  * with their visible items as trees, and the live popup banner (E11) or null.
+ *
+ * E12b: texts in the request's language (menu labels, announcement, popup; per-field
+ * fallback to the base text) and the store's languages: `store.locales` (`["en"]` or
+ * `["en","bn"]`), `store.default_locale`, `store.bangla_digits` and the resolved `locale`.
+ * Cached per language.
  */
 class StorefrontBootstrap
 {
@@ -36,6 +43,7 @@ class StorefrontBootstrap
         private readonly BlogDirectory $blog,
         private readonly StorefrontContentVersion $version,
         private readonly ContentSchedule $schedule,
+        private readonly LocaleContext $locale,
     ) {}
 
     /**
@@ -61,6 +69,7 @@ class StorefrontBootstrap
         $settings = $this->config->settings();
         $theme = $this->config->theme();
         $t = $theme->settings;
+        $locale = $this->locale->current();
 
         $menus = Menu::query()->where('is_active', true)->with(['items' => fn ($q) => $q->where('is_visible', true)])->get();
 
@@ -109,7 +118,13 @@ class StorefrontBootstrap
                 'prices_include_tax' => ($organization['tax_mode'] ?? 'exclusive') === 'inclusive',
                 // E12: false (staging) = every page is noindex; the SPA keeps that on navigation.
                 'allow_indexing' => $settings->allow_indexing,
+                // E12b: the languages shoppers can switch between, the default and digits.
+                'locales' => $settings->bangla_enabled ? LocaleContext::SUPPORTED : [LocaleContext::EN],
+                'default_locale' => $settings->bangla_enabled ? $settings->default_locale : LocaleContext::EN,
+                'bangla_digits' => $settings->bangla_enabled && $settings->bangla_digits,
             ],
+            // E12b: the language of this payload (and of the page the shell serves).
+            'locale' => $locale,
             'theme' => [
                 'colors' => $t['colors'],
                 'typography' => $t['typography'],
@@ -117,7 +132,7 @@ class StorefrontBootstrap
                 'layout' => $t['layout'],
                 'logo' => $ref($t['logo_media_id']),
                 'favicon' => $ref($t['favicon_media_id']),
-                'announcement' => $this->liveAnnouncement($t['announcement']),
+                'announcement' => $this->liveAnnouncement($t['announcement'], $locale),
                 'footer' => [
                     'about' => $t['footer']['about'],
                     'copyright' => $t['footer']['copyright'],
@@ -130,18 +145,18 @@ class StorefrontBootstrap
             'menus' => $menus
                 ->mapWithKeys(fn (Menu $menu) => [$menu->location->value => [
                     'name' => $menu->name,
-                    'items' => $this->tree($menu->items, null, $ref, $links),
+                    'items' => $this->tree($menu->items, null, $ref, $links, $locale),
                 ]])
                 ->sortKeysUsing(fn (string $a, string $b) => array_search(MenuLocation::from($a), MenuLocation::cases(), true) <=> array_search(MenuLocation::from($b), MenuLocation::cases(), true))
                 ->all(),
             'popup' => $popup === null || $ref($popup->desktop_media_id) === null ? null : [
                 'id' => $popup->id,
-                'title' => $popup->title,
-                'subtitle' => $popup->subtitle,
+                'title' => Translations::pick($popup, 'title', $locale),
+                'subtitle' => Translations::pick($popup, 'subtitle', $locale),
                 'image' => $ref($popup->desktop_media_id),
                 'mobile_image' => $ref($popup->mobile_media_id),
                 'link_url' => $popup->link_url,
-                'button_label' => $popup->button_label,
+                'button_label' => Translations::pick($popup, 'button_label', $locale),
                 'delay_seconds' => $popup->popup_delay_seconds ?? BannerPlacement::POPUP_DEFAULTS['popup_delay_seconds'],
                 'frequency' => $popup->popup_frequency ?? BannerPlacement::POPUP_DEFAULTS['popup_frequency'],
                 'updated_at' => $popup->updated_at?->toIso8601String(),
@@ -150,10 +165,10 @@ class StorefrontBootstrap
     }
 
     /**
-     * @param  array<string, mixed>  $announcement
+     * @param  array<string, mixed>  $announcement  `translations` {bn: {text}} since E12b
      * @return array{text: string, link: ?string, background: string, foreground: string}|null
      */
-    private function liveAnnouncement(array $announcement): ?array
+    private function liveAnnouncement(array $announcement, string $locale): ?array
     {
         if (! $announcement['enabled'] || ! is_string($announcement['text']) || $announcement['text'] === '') {
             return null;
@@ -166,7 +181,7 @@ class StorefrontBootstrap
         }
 
         return [
-            'text' => $announcement['text'],
+            'text' => Translations::value($announcement['translations'] ?? null, 'text', $locale, $announcement['text']),
             'link' => $announcement['link'],
             'background' => $announcement['background'],
             'foreground' => $announcement['foreground'],
@@ -182,7 +197,7 @@ class StorefrontBootstrap
      * @param  array<string, array<string, string>>  $links  item type => target id => storefront path
      * @return list<array<string, mixed>>
      */
-    private function tree(Collection $items, ?string $parentId, callable $ref, array $links): array
+    private function tree(Collection $items, ?string $parentId, callable $ref, array $links, string $locale): array
     {
         return $items
             ->where('parent_id', $parentId)
@@ -190,13 +205,13 @@ class StorefrontBootstrap
             ->filter(fn (MenuItem $item) => $item->type === MenuItemType::Custom || isset($links[$item->type->value][$item->target_id ?? '']))
             ->map(fn (MenuItem $item) => [
                 'id' => $item->id,
-                'label' => $item->label,
+                'label' => Translations::pick($item, 'label', $locale),
                 'url' => $item->type === MenuItemType::Custom ? $item->url : $links[$item->type->value][$item->target_id ?? ''],
                 'open_in_new_tab' => $item->open_in_new_tab,
                 'is_mega' => $item->is_mega,
                 'mega_columns' => $item->mega_columns,
                 'image' => $ref($item->image_media_id),
-                'children' => $this->tree($items, $item->id, $ref, $links),
+                'children' => $this->tree($items, $item->id, $ref, $links, $locale),
             ])
             ->values()
             ->all();

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -14,9 +14,10 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/use-auth'
 import { usePaymentGatewaysQuery, useSavePaymentGatewayMutation, type PaymentGateway } from '@/features/online-payments/api'
-import { GATEWAY_COPY, GATEWAY_FIELDS, gatewaySchema, OFFLINE_CODES, toGatewayInput, toGatewayValues, type GatewayValues } from '@/features/online-payments/gateway-form'
+import { DISPLAY_NAME_MAX, GATEWAY_COPY, GATEWAY_FIELDS, gatewaySchema, INSTRUCTIONS_MAX, OFFLINE_CODES, toGatewayInput, toGatewayValues, type GatewayValues } from '@/features/online-payments/gateway-form'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
-import { handleFormError } from '@/lib/forms'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { handleTranslatedFormError, rhfBnErrors } from '@/features/translations/translations'
 
 function GatewayCard({ gateway, currency }: { gateway: PaymentGateway; currency: string | undefined }) {
   const save = useSavePaymentGatewayMutation()
@@ -24,7 +25,7 @@ function GatewayCard({ gateway, currency }: { gateway: PaymentGateway; currency:
   const copy = GATEWAY_COPY[code]
   const form = useForm<GatewayValues>({ resolver: zodResolver(gatewaySchema), defaultValues: toGatewayValues(gateway) })
   const { errors, isDirty } = form.formState
-  const enabled = useWatch({ control: form.control, name: 'is_enabled' })
+  const [enabled, displayName, instructions] = useWatch({ control: form.control, name: ['is_enabled', 'display_name', 'instructions'] })
   const switchId = `gateway-${code}-enabled`
 
   useEffect(() => {
@@ -36,7 +37,7 @@ function GatewayCard({ gateway, currency }: { gateway: PaymentGateway; currency:
       { code: gateway.code, input: toGatewayInput(gateway, values) },
       {
         onSuccess: (saved) => toast.success(`${copy.title} ${saved.is_enabled ? 'saved and offered at checkout' : 'saved (not offered at checkout)'}.`),
-        onError: (error) => handleFormError(error, form.setError, GATEWAY_FIELDS),
+        onError: (error) => handleTranslatedFormError(error, form.setError, GATEWAY_FIELDS),
       },
     ),
   )
@@ -57,10 +58,10 @@ function GatewayCard({ gateway, currency }: { gateway: PaymentGateway; currency:
             <Label htmlFor={switchId}>Offer {copy.title.toLowerCase()} at checkout</Label>
           </div>
           <FormField label="Name at checkout" error={errors.display_name?.message}>
-            <Input maxLength={60} {...form.register('display_name')} />
+            <Input maxLength={DISPLAY_NAME_MAX} {...form.register('display_name')} />
           </FormField>
           <FormField label="Instructions" error={errors.instructions?.message} hint={copy.instructionsHint}>
-            <Textarea rows={code === 'bank_transfer' ? 5 : 3} maxLength={2000} {...form.register('instructions')} />
+            <Textarea rows={code === 'bank_transfer' ? 5 : 3} maxLength={INSTRUCTIONS_MAX} {...form.register('instructions')} />
           </FormField>
           {code === 'bank_transfer' && (
             <FormField label="Hold unpaid orders for (hours)" error={errors.hold_hours?.message} hint="1–168 hours. The stock stays reserved meanwhile.">
@@ -72,6 +73,17 @@ function GatewayCard({ gateway, currency }: { gateway: PaymentGateway; currency:
               <Input inputMode="decimal" className="w-40 font-mono" {...form.register('max_order_total')} />
             </FormField>
           )}
+          <Controller control={form.control} name="translations.bn" render={({ field }) => (
+            <BanglaTranslations
+              fields={[
+                { name: 'display_name', label: 'Name at checkout', base: displayName, max: DISPLAY_NAME_MAX },
+                { name: 'instructions', label: 'Instructions', base: instructions, kind: 'textarea', rows: code === 'bank_transfer' ? 5 : 3, max: INSTRUCTIONS_MAX },
+              ]}
+              value={field.value}
+              onChange={field.onChange}
+              errors={rhfBnErrors(errors.translations)}
+            />
+          )} />
           <Button type="submit" className="self-start" disabled={save.isPending || !isDirty}>
             {save.isPending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
             Save {copy.title.toLowerCase()}

@@ -28,10 +28,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $seo_description
  * @property int $sort_weight
  * @property ?CarbonImmutable $created_at
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
 #[Fillable([
     'organization_id', 'product_id', 'slug', 'is_published', 'published_at', 'unpublished_at', 'is_featured',
-    'is_new_until', 'short_description', 'description_html', 'specifications', 'seo_title', 'seo_description', 'sort_weight',
+    'is_new_until', 'short_description', 'description_html', 'specifications', 'seo_title', 'seo_description', 'sort_weight', 'translations',
 ])]
 class ProductListing extends Model
 {
@@ -55,6 +56,7 @@ class ProductListing extends Model
             'specifications' => 'array',
             'sort_weight' => 'integer',
             'created_at' => 'immutable_datetime',
+            'translations' => 'array',
         ];
     }
 

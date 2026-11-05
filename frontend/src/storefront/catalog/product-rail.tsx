@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 
 /**
  * A horizontally scrolling row (product and category carousels) inside a labelled section.
@@ -9,6 +10,7 @@ import { cn } from '@/lib/utils'
  * visible width and are disabled at either end.
  */
 export function Rail({ label, children, itemClassName, count }: { label: string; children: ReactNode[]; itemClassName?: string; count: number }) {
+  const { t } = useLocale()
   const trackRef = useRef<HTMLUListElement>(null)
   const [edges, setEdges] = useState({ start: true, end: count <= 1 })
 
@@ -43,17 +45,17 @@ export function Rail({ label, children, itemClassName, count }: { label: string;
         className="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-1 pb-3 [scrollbar-width:thin] motion-reduce:scroll-auto"
       >
         {children.map((child, i) => (
-          <li key={i} className={cn('shrink-0 snap-start', itemClassName)} aria-roledescription="slide" aria-label={`${i + 1} of ${count}`}>
+          <li key={i} className={cn('shrink-0 snap-start', itemClassName)} aria-roledescription="slide" aria-label={t('catalog.rail.slide', { index: i + 1, count })}>
             {child}
           </li>
         ))}
       </ul>
       {!(edges.start && edges.end) && (
         <div className="mt-3 flex justify-end gap-2">
-          <button type="button" className={arrow} onClick={() => page(-1)} disabled={edges.start} aria-label={`Previous: ${label}`}>
+          <button type="button" className={arrow} onClick={() => page(-1)} disabled={edges.start} aria-label={t('catalog.rail.previous', { label })}>
             <ChevronLeftIcon aria-hidden className="size-5" />
           </button>
-          <button type="button" className={arrow} onClick={() => page(1)} disabled={edges.end} aria-label={`Next: ${label}`}>
+          <button type="button" className={arrow} onClick={() => page(1)} disabled={edges.end} aria-label={t('catalog.rail.next', { label })}>
             <ChevronRightIcon aria-hidden className="size-5" />
           </button>
         </div>

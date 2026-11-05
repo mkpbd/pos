@@ -27,6 +27,7 @@ use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
@@ -58,6 +59,10 @@ use Throwable;
  * its discounts and promotion snapshot, and one redemption per promotion is appended
  * (the coupon's use counted). An idempotent replay returns the stored answer, so nothing
  * is redeemed twice.
+ *
+ * E12b: the order keeps the shopper's language (`locale`, from the request's `lang`) for the
+ * e-mails of E13, while every snapshot (product, delivery method, promotion and place
+ * names) is taken in the base language — the order is placed in a base-language context.
  */
 class PlaceOrder
 {
@@ -74,6 +79,7 @@ class PlaceOrder
         private readonly StockLedger $stock,
         private readonly SequenceGenerator $sequences,
         private readonly PromotionRedemptions $redemptions,
+        private readonly LocaleContext $locale,
     ) {}
 
     /**
@@ -86,6 +92,19 @@ class PlaceOrder
      */
     public function __invoke(CartOwner $owner, ?array $customer, array $data, array $client): array
     {
+        $locale = $this->locale->current();
+
+        return $this->locale->runAs(LocaleContext::BASE, fn () => $this->place($owner, $customer, $data, $client, $locale));
+    }
+
+    /**
+     * @param  array{customer_id: string, account_id: string}|null  $customer
+     * @param  array<string, mixed>  $data
+     * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
+     * @return array{order: Order, access_token: ?string}
+     */
+    private function place(CartOwner $owner, ?array $customer, array $data, array $client, string $locale): array
+    {
         $organizationId = $this->tenant->requireOrganization();
         $settings = $this->storefront->settings();
         if ($customer === null && ! $settings->guest_checkout_enabled) {
@@ -93,7 +112,7 @@ class PlaceOrder
         }
         $store = $this->fulfilmentStore($organizationId, $settings->fulfilment_store_id);
 
-        [$order, $token] = DB::transaction(function () use ($owner, $customer, $data, $client, $organizationId, $store) {
+        [$order, $token] = DB::transaction(function () use ($owner, $customer, $data, $client, $organizationId, $store, $locale) {
             $cart = $this->carts->lockForCheckout($owner);
             if ($cart === null || ! $cart->items()->exists()) {
                 throw new BusinessRuleViolation('CART_EMPTY', 'Your cart is empty.');
@@ -191,6 +210,7 @@ class PlaceOrder
                 'confirmed_at' => $status === OrderStatus::Confirmed ? $now : null,
                 'ip' => $client['ip'],
                 'user_agent' => $client['user_agent'] === null ? null : mb_substr($client['user_agent'], 0, 255),
+                'locale' => $locale,
             ]);
 
             foreach ($quote['lines'] as $i => $line) {

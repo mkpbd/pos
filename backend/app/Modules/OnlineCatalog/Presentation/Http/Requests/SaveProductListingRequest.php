@@ -2,7 +2,9 @@
 
 namespace App\Modules\OnlineCatalog\Presentation\Http\Requests;
 
+use App\Modules\OnlineCatalog\Application\Actions\SaveProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Slug;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
 use Illuminate\Foundation\Http\FormRequest;
@@ -48,6 +50,8 @@ class SaveProductListingRequest extends FormRequest
             'variants.*.variant_id' => ['required', 'uuid', 'distinct'],
             'variants.*.compare_at_price' => ['sometimes', 'nullable', 'regex:/^\d{1,16}(\.\d{1,2})?$/'],
             'variants.*.image_id' => ['sometimes', 'nullable', 'uuid'],
+            // E12b: {bn: {name, short_description, description_html, seo_title, seo_description}}.
+            ...TranslationInput::rules(SaveProductListing::TRANSLATABLE),
         ];
     }
 

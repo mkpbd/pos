@@ -8,6 +8,8 @@ import { loginPathFor } from '../account/safe-next'
 import { useOrderQuery } from '../checkout/api'
 import { formatDateTime } from '../checkout/delivery'
 import { readOrderToken, rememberOrderToken } from '../checkout/order-token'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
 import type { OrderView } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
@@ -31,6 +33,7 @@ export function OrderPage() {
   const token = urlToken || readOrderToken(number)
   const order = useOrderQuery(number, token)
   const customer = useCustomer()
+  const { t } = useLocale()
 
   useEffect(() => {
     if (urlToken) rememberOrderToken(number, urlToken)
@@ -43,22 +46,22 @@ export function OrderPage() {
   }, [urlToken, placedState, number, location.pathname, location.search, location.hash, navigate])
 
   const notFound = order.error instanceof ApiError && order.error.status === 404
-  useDocumentMeta(privatePage(order.data ? (thankYou ? 'Thank you for your order' : `Order ${order.data.number}`) : notFound ? 'Order not found' : null))
+  useDocumentMeta(privatePage(order.data ? (thankYou ? t('orders.page.thankYouTitle') : t('orders.title', { number: order.data.number })) : notFound ? t('orders.notFoundTitle') : null))
 
   // A signed-in customer's own order (opened without a guest token) is also in the account area.
   if (order.data) return <OrderDetails order={order.data} thankYou={thankYou} accountLink={customer !== null && !token} />
   if (notFound) {
     return (
-      <OrderMessage title="We could not find this order">
-        <p>Check the order number, or open the link in your order confirmation e-mail.</p>
+      <OrderMessage title={t('orders.page.notFoundHeading')}>
+        <p>{t('orders.page.notFoundText')}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">
           {!customer && (
             <Link to={loginPathFor(location.pathname)} className={primaryButtonClass}>
-              Sign in
+              {t('common.account.signIn')}
             </Link>
           )}
           <Link to="/shop" className={secondaryButtonClass}>
-            Continue shopping
+            {t('orders.continueShopping')}
           </Link>
         </div>
       </OrderMessage>
@@ -66,15 +69,15 @@ export function OrderPage() {
   }
   if (order.error) {
     return (
-      <OrderMessage title="This order could not be loaded">
-        <p>Check your connection and try again.</p>
+      <OrderMessage title={t('orders.page.failedHeading')}>
+        <p>{t('orders.checkConnection')}</p>
         <button type="button" className={`${primaryButtonClass} mt-4`} disabled={order.isFetching} onClick={() => void order.refetch()}>
-          Try again
+          {t('common.tryAgain')}
         </button>
       </OrderMessage>
     )
   }
-  return <Spinner label="Loading your order" />
+  return <Spinner label={t('orders.loading')} />
 }
 
 function OrderMessage({ title, children }: { title: string; children: ReactNode }) {
@@ -89,6 +92,7 @@ function OrderMessage({ title, children }: { title: string; children: ReactNode 
 
 function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; thankYou: boolean; accountLink: boolean }) {
   const firstName = order.contact.name.trim().split(/\s+/)[0] ?? ''
+  const { t } = useLocale()
 
   return (
     <section className="mx-auto max-w-sf px-4 py-8 lg:py-12" data-testid="order-page">
@@ -97,28 +101,31 @@ function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; than
           <>
             <p className="inline-flex items-center gap-2 font-semibold text-sf-highlight">
               <CircleCheckIcon aria-hidden className="size-5" />
-              Order placed
+              {t('orders.page.placed')}
             </p>
-            <h1 className="text-3xl font-extrabold lg:text-4xl">Thank you{firstName ? `, ${firstName}` : ''}!</h1>
+            <h1 className="text-3xl font-extrabold lg:text-4xl">{firstName ? t('orders.page.thankYouName', { name: firstName }) : t('orders.page.thankYou')}</h1>
             <p>
-              Your order number is <strong className="text-sf-heading" data-testid="order-number">{order.number}</strong>. We have sent a confirmation to {order.contact.email}.
+              {rich(t('orders.page.confirmation'), {
+                number: (
+                  <strong className="text-sf-heading" data-testid="order-number">
+                    {order.number}
+                  </strong>
+                ),
+                email: order.contact.email,
+              })}
             </p>
           </>
         ) : (
-          <h1 className="text-3xl font-extrabold lg:text-4xl">
-            Order <span data-testid="order-number">{order.number}</span>
-          </h1>
+          <h1 className="text-3xl font-extrabold lg:text-4xl">{rich(t('orders.title'), { number: <span data-testid="order-number">{order.number}</span> })}</h1>
         )}
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <OrderStatusBadge label={order.status_label} />
-          <span>
-            Placed <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time>
-          </span>
+          <span>{rich(t('orders.placedAt'), { date: <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time> })}</span>
         </p>
         {accountLink && (
           <p className="text-sm">
             <Link to={`/account/orders/${encodeURIComponent(order.number)}`} className="font-semibold text-sf-accent hover:underline" data-testid="account-order-link">
-              Track this order in My orders
+              {t('orders.page.trackInAccount')}
             </Link>
           </p>
         )}
@@ -139,7 +146,7 @@ function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; than
           <OrderTotalsCard order={order} />
           <OrderTimeline order={order} />
           <Link to="/shop" className={secondaryButtonClass}>
-            Continue shopping
+            {t('orders.continueShopping')}
           </Link>
         </div>
       </div>

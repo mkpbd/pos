@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Requests;
 
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Domain\MenuItemType;
 use App\Modules\Storefront\Presentation\Http\Rules\SafeLink;
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,7 +11,7 @@ use Illuminate\Validation\Rule;
 /**
  * The full, ordered item tree of a menu: up to three levels. Custom items carry a `url`;
  * page, category, brand, blog-category and blog-post items a `target_id` (the record); a
- * `blog` item (the blog index) neither.
+ * `blog` item (the blog index) neither. E12b: each item may carry `translations` {bn: {label}}.
  */
 class ReplaceMenuItemsRequest extends FormRequest
 {
@@ -33,6 +34,8 @@ class ReplaceMenuItemsRequest extends FormRequest
             $rules["{$prefix}.is_mega"] = ['sometimes', 'boolean'];
             $rules["{$prefix}.mega_columns"] = ['sometimes', 'nullable', 'integer', 'between:2,4'];
             $rules["{$prefix}.image_media_id"] = ['sometimes', 'nullable', 'uuid'];
+            // E12b: {bn: {label}}.
+            $rules += TranslationInput::rules(['label' => ['max:80']], "{$prefix}.translations");
             $rules["{$prefix}.children"] = $level < self::MAX_DEPTH ? ['sometimes', 'array'] : ['prohibited'];
             $prefix .= '.children.*';
         }

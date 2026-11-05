@@ -25,6 +25,7 @@ import { ProductCard } from '../catalog/product-card'
 import { HeaderSearch } from '../components/header-search'
 import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
+import { useLocale } from '../i18n/locale'
 import { usePriceFormat } from '../money'
 import type { Breadcrumb, ListingFacets, ProductListing, StoreBrand, StoreCategory } from '../types'
 import { useDocumentMeta } from '../use-document-meta'
@@ -79,6 +80,7 @@ function ListingPage({ scope }: { scope: ListingScope }) {
   const [params, setParams] = useSearchParams()
   const state = useMemo(() => parseListingState(params), [params])
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { t } = useLocale()
 
   const category = useCategoryQuery(scope.kind === 'category' ? scope.slug : '', scope.kind === 'category')
   const brand = useBrandQuery(scope.kind === 'brand' ? scope.slug : '', scope.kind === 'brand')
@@ -87,11 +89,11 @@ function ListingPage({ scope }: { scope: ListingScope }) {
 
   const heading =
     scope.kind === 'shop'
-      ? 'Shop'
+      ? t('catalog.listing.shop')
       : scope.kind === 'search'
         ? state.q
-          ? `Search results for “${state.q}”`
-          : 'Search'
+          ? t('catalog.listing.searchResults', { q: state.q })
+          : t('catalog.listing.search')
         : scope.kind === 'category'
           ? (category.data?.name ?? '')
           : (brand.data?.name ?? '')
@@ -139,12 +141,12 @@ function ListingPage({ scope }: { scope: ListingScope }) {
 
   if (notFound) return <NotFoundPage />
 
-  if ((scope.kind === 'category' && category.isPending) || (scope.kind === 'brand' && brand.isPending)) return <Spinner label="Loading" />
+  if ((scope.kind === 'category' && category.isPending) || (scope.kind === 'brand' && brand.isPending)) return <Spinner label={t('catalog.listing.loading')} />
 
   const breadcrumbs: Breadcrumb[] =
     scope.kind === 'category' && category.data
       ? category.data.breadcrumbs
-      : [{ name: 'Home', url: '/' }, { name: scope.kind === 'search' ? 'Search' : scope.kind === 'brand' ? heading : 'Shop', url: null }]
+      : [{ name: t('catalog.listing.home'), url: '/' }, { name: scope.kind === 'search' ? t('catalog.listing.search') : scope.kind === 'brand' ? heading : t('catalog.listing.shop'), url: null }]
 
   const data = listing.data
   const facets = data?.facets ?? null
@@ -159,25 +161,25 @@ function ListingPage({ scope }: { scope: ListingScope }) {
       <div className="mx-auto max-w-sf px-4 py-8">
         {needsTerm ? (
           <div className="mx-auto flex max-w-xl flex-col gap-4 rounded-sf-card bg-sf-surface p-6 text-center">
-            <p>What are you looking for?</p>
+            <p>{t('catalog.listing.lookingFor')}</p>
             <HeaderSearch />
           </div>
         ) : (
           <div className={cn('grid gap-8', filterPanel && 'lg:grid-cols-[16rem_minmax(0,1fr)]')}>
             {filterPanel && (
-              <aside aria-label="Filters" className="hidden self-start rounded-sf-card bg-sf-surface px-5 py-3 lg:block">
-                <h2 className="pt-2 text-lg font-extrabold">Filter by</h2>
+              <aside aria-label={t('catalog.listing.filters')} className="hidden self-start rounded-sf-card bg-sf-surface px-5 py-3 lg:block">
+                <h2 className="pt-2 text-lg font-extrabold">{t('catalog.listing.filterBy')}</h2>
                 {filterPanel}
               </aside>
             )}
 
-            <section aria-label="Products" className="min-w-0">
+            <section aria-label={t('catalog.listing.products')} className="min-w-0">
               <div className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-4">
                 {filterPanel && (
                   <Button variant="outline" className="self-start rounded-sf-button lg:hidden" onClick={() => setDrawerOpen(true)}>
                     <SlidersHorizontalIcon aria-hidden className="size-4" />
-                    Filters
-                    {hasActiveFilters(state) && <span className="sr-only">(active)</span>}
+                    {t('catalog.listing.filters')}
+                    {hasActiveFilters(state) && <span className="sr-only">{t('catalog.listing.filtersActive')}</span>}
                   </Button>
                 )}
                 <ListingToolbar
@@ -205,13 +207,13 @@ function ListingPage({ scope }: { scope: ListingScope }) {
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetContent side="left" className="w-80 max-w-[90vw] gap-0 p-0">
             <SheetHeader className="border-b">
-              <SheetTitle className="font-heading text-lg text-sf-heading">Filters</SheetTitle>
-              <SheetDescription className="sr-only">Narrow down the products</SheetDescription>
+              <SheetTitle className="font-heading text-lg text-sf-heading">{t('catalog.listing.filters')}</SheetTitle>
+              <SheetDescription className="sr-only">{t('catalog.listing.narrowDown')}</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto px-5">{filterPanel}</div>
             <div className="border-t p-4">
               <Button className="w-full rounded-sf-button" onClick={() => setDrawerOpen(false)}>
-                {data ? `Show ${data.pagination.total} ${data.pagination.total === 1 ? 'product' : 'products'}` : 'Show products'}
+                {data ? t('catalog.listing.showCount', { count: data.pagination.total }) : t('catalog.listing.showProducts')}
               </Button>
             </div>
           </SheetContent>
@@ -222,6 +224,7 @@ function ListingPage({ scope }: { scope: ListingScope }) {
 }
 
 function ListingHeader({ heading, breadcrumbs, category, brand }: { heading: string; breadcrumbs: Breadcrumb[]; category?: StoreCategory; brand?: StoreBrand }) {
+  const { t, formatNumber } = useLocale()
   return (
     <header className="bg-sf-surface">
       {category?.banner && (
@@ -236,7 +239,7 @@ function ListingHeader({ heading, breadcrumbs, category, brand }: { heading: str
         {category?.description_html && <RichText html={category.description_html} className="max-w-3xl" />}
         {brand?.description && <p className="max-w-3xl whitespace-pre-line">{brand.description}</p>}
         {category && category.children.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-2" aria-label="Subcategories">
+          <ul className="mt-2 flex flex-wrap gap-2" aria-label={t('catalog.listing.subcategories')}>
             {category.children.map((child) => (
               <li key={child.slug}>
                 <Link
@@ -249,7 +252,7 @@ function ListingHeader({ heading, breadcrumbs, category, brand }: { heading: str
                     <span aria-hidden className="size-2" />
                   )}
                   {child.name}
-                  <span className="font-normal text-sf-text">({child.product_count})</span>
+                  <span className="font-normal text-sf-text">({formatNumber(child.product_count)})</span>
                 </Link>
               </li>
             ))}
@@ -274,6 +277,7 @@ function ActiveFilters({
   onClear: () => void
 }) {
   const format = usePriceFormat()
+  const { t } = useLocale()
   const chips: { key: string; label: string; remove: Partial<ListingState> }[] = []
 
   if (state.category) chips.push({ key: 'category', label: listing?.context?.category?.name ?? state.category, remove: { category: null } })
@@ -282,31 +286,31 @@ function ActiveFilters({
   }
   for (const [slug, values] of Object.entries(state.attrs)) {
     const name = facets.attributes.find((a) => a.slug === slug)?.name ?? slug
-    for (const value of values) chips.push({ key: `attr-${slug}-${value}`, label: `${name}: ${value}`, remove: { attrs: toggleAttribute(state.attrs, slug, value) } })
+    for (const value of values) chips.push({ key: `attr-${slug}-${value}`, label: t('catalog.active.attribute', { name, value }), remove: { attrs: toggleAttribute(state.attrs, slug, value) } })
   }
   if (state.priceMin || state.priceMax) {
     const label =
       state.priceMin && state.priceMax
         ? `${format.price(state.priceMin)} – ${format.price(state.priceMax)}`
         : state.priceMin
-          ? `From ${format.price(state.priceMin)}`
-          : `Up to ${format.price(state.priceMax ?? '')}`
+          ? t('catalog.active.priceFrom', { price: format.price(state.priceMin) })
+          : t('catalog.active.priceUpTo', { price: format.price(state.priceMax ?? '') })
     chips.push({ key: 'price', label, remove: { priceMin: null, priceMax: null } })
   }
-  if (state.inStock) chips.push({ key: 'in-stock', label: 'In stock', remove: { inStock: false } })
-  if (state.onSale) chips.push({ key: 'on-sale', label: 'On sale', remove: { onSale: false } })
+  if (state.inStock) chips.push({ key: 'in-stock', label: t('catalog.stock.in'), remove: { inStock: false } })
+  if (state.onSale) chips.push({ key: 'on-sale', label: t('catalog.filter.onSale'), remove: { onSale: false } })
 
   if (chips.length === 0) return null
 
   return (
-    <ul className="flex flex-wrap items-center gap-2" aria-label="Active filters">
+    <ul className="flex flex-wrap items-center gap-2" aria-label={t('catalog.active.label')}>
       {chips.map((chip) => (
         <li key={chip.key}>
           <button
             type="button"
             onClick={() => onChange(chip.remove)}
             className="inline-flex items-center gap-1.5 rounded-full bg-sf-canvas px-3 py-1 text-sm font-medium text-sf-heading transition hover:bg-sf-accent hover:text-sf-accent-foreground"
-            aria-label={`Remove filter: ${chip.label}`}
+            aria-label={t('catalog.active.remove', { label: chip.label })}
           >
             {chip.label}
             <XIcon aria-hidden className="size-3.5" />
@@ -315,7 +319,7 @@ function ActiveFilters({
       ))}
       <li>
         <button type="button" onClick={onClear} className="text-sm font-semibold text-sf-accent underline-offset-4 hover:underline">
-          Clear all
+          {t('catalog.active.clearAll')}
         </button>
       </li>
     </ul>
@@ -333,13 +337,14 @@ function Results({
   scope: ListingScope
   onClear: () => void
 }) {
-  if (listing.isPending) return <Spinner label="Loading products" />
+  const { t } = useLocale()
+  if (listing.isPending) return <Spinner label={t('catalog.listing.loadingProducts')} />
 
   if (listing.isError) {
     return (
       <div className="rounded-sf-card bg-sf-surface px-4 py-12 text-center">
-        <p className="font-semibold text-sf-heading">The products could not be loaded.</p>
-        <Button className="mt-4 rounded-sf-button" onClick={() => void listing.refetch()}>Try again</Button>
+        <p className="font-semibold text-sf-heading">{t('catalog.listing.loadFailed')}</p>
+        <Button className="mt-4 rounded-sf-button" onClick={() => void listing.refetch()}>{t('common.tryAgain')}</Button>
       </div>
     )
   }
@@ -350,20 +355,20 @@ function Results({
     return (
       <div className="rounded-sf-card bg-sf-surface px-4 py-14 text-center" data-testid="listing-empty">
         <h2 className="text-2xl font-bold">
-          {filtered ? 'No products match these filters' : scope.kind === 'search' ? `Nothing found for “${state.q}”` : 'No products here yet'}
+          {filtered ? t('catalog.empty.filteredTitle') : scope.kind === 'search' ? t('catalog.empty.searchTitle', { q: state.q }) : t('catalog.empty.title')}
         </h2>
         <p className="mx-auto mt-2 max-w-md">
-          {filtered ? 'Try removing a filter or two.' : scope.kind === 'search' ? 'Check the spelling or try a more general word.' : 'Please check back soon.'}
+          {filtered ? t('catalog.empty.filteredText') : scope.kind === 'search' ? t('catalog.empty.searchText') : t('catalog.empty.text')}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {filtered && (
             <Button className="rounded-sf-button" onClick={onClear}>
-              Clear filters
+              {t('catalog.empty.clearFilters')}
             </Button>
           )}
           {scope.kind !== 'shop' && (
             <Link to="/shop" className="inline-flex h-9 items-center rounded-sf-button border px-4 text-sm font-semibold text-sf-heading hover:border-sf-accent">
-              Browse all products
+              {t('catalog.empty.browseAll')}
             </Link>
           )}
         </div>

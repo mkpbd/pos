@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Infrastructure\Caching;
 
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use Carbon\CarbonImmutable;
 use Closure;
 use DateTimeInterface;
@@ -13,13 +14,18 @@ use Illuminate\Support\Facades\DB;
  * Version counters in the default cache store (ADR-012, E12).
  *
  * Keys: `storefront:{organization}:version` holds the counter; cached read models live
- * under `storefront:{organization}:v{version}:{key}`. A missing counter (never set, or
+ * under `storefront:{organization}:v{version}:{locale}:{key}` — E12b: the request's
+ * language (LocaleContext) is part of every key, so a Bangla read never answers an English
+ * one or the other way round. A missing counter (never set, or
  * evicted) starts at the current time in milliseconds, so it never falls back to a value
  * an older entry was stored under.
  */
 class CacheStorefrontContentVersion implements StorefrontContentVersion
 {
-    public function __construct(private readonly Repository $cache) {}
+    public function __construct(
+        private readonly Repository $cache,
+        private readonly LocaleContext $locale,
+    ) {}
 
     public function current(string $organizationId): int
     {
@@ -56,7 +62,7 @@ class CacheStorefrontContentVersion implements StorefrontContentVersion
 
     public function remember(string $organizationId, string $key, Closure $build, DateTimeInterface|Closure|null $until = null): mixed
     {
-        $cacheKey = 'storefront:'.$organizationId.':v'.$this->current($organizationId).':'.$key;
+        $cacheKey = 'storefront:'.$organizationId.':v'.$this->current($organizationId).':'.$this->locale->current().':'.$key;
 
         // The stored envelope tells a cached null apart from a miss.
         $hit = $this->cache->get($cacheKey);

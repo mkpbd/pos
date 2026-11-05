@@ -79,7 +79,15 @@ export type StorefrontBootstrap = {
     currency?: string | null
     /** False when the owner asked search engines not to index the store (E12a); absent = true. */
     allow_indexing?: boolean
+    /** E12b: the languages the store offers (["en"] or ["en","bn"]); absent = English only. */
+    locales?: string[]
+    /** E12b: the language of URLs without `?lang=` ("en" unless the owner chose Bangla). */
+    default_locale?: string
+    /** E12b: Bengali digits for amounts and numbers in Bangla. */
+    bangla_digits?: boolean
   }
+  /** E12b: the language this payload was resolved in (`?lang=`, else the store default). */
+  locale?: string
   preview: boolean
   theme: StorefrontTheme
   menus: Partial<Record<MenuLocation, StorefrontMenu>>

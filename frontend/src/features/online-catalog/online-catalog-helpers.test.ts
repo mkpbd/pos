@@ -12,18 +12,21 @@ vi.mock('sonner', async (importOriginal) => {
 
 describe('online listing form', () => {
   it('maps the API document to form values and back without losing anything', () => {
-    const values = toListingFormValues(listingResponse())
+    const values = toListingFormValues(listingResponse({ translations: { bn: { name: 'আমের জুস', seo_title: null } } }))
+    expect(values.translations.bn).toEqual({ name: 'আমের জুস', short_description: '', description_html: '', seo_title: '', seo_description: '' })
     expect(values.variants).toEqual([
       { variant_id: 'v-1', selling_price: '120.00', compare_at_price: '', image_id: null },
       { variant_id: 'v-2', selling_price: '150.00', compare_at_price: '180.00', image_id: 'img-2' },
     ])
 
-    const { listing, related } = toListingInput({ ...values, seo_title: '  ', short_description: ' Fresh. ' })
+    const { listing, related } = toListingInput({ ...values, seo_title: '  ', short_description: ' Fresh. ', translations: { bn: { ...values.translations.bn, short_description: ' তাজা। ' } } })
     expect(listing).toEqual({
       slug: 'mango-juice', is_published: true, published_at: null, unpublished_at: null, is_featured: false, is_new_until: null,
       short_description: 'Fresh.', description_html: '<p>Sweet</p>', specifications: [{ label: 'Volume', value: '1 litre' }], seo_title: null, seo_description: null,
       sort_weight: 0,
       variants: [{ variant_id: 'v-1', compare_at_price: null, image_id: null }, { variant_id: 'v-2', compare_at_price: '180.00', image_id: 'img-2' }],
+      // Every translatable field is sent; "" removes a translation.
+      translations: { bn: { name: 'আমের জুস', short_description: 'তাজা।', description_html: '', seo_title: '', seo_description: '' } },
     })
     expect(related).toEqual({ related: ['p-9'], frequently_bought: [] })
   })

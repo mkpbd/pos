@@ -5,6 +5,7 @@ namespace App\Modules\Cms\Presentation\Http\Controllers;
 use App\Modules\Cms\Application\Actions\ManageFaq;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
 use App\Modules\Cms\Presentation\Http\Support\CmsPresenter;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -63,6 +64,8 @@ class FaqController
             'question' => [$required, 'string', 'max:255'],
             'answer_html' => [$required, 'string', 'max:20000'],
             'is_active' => ['sometimes', 'boolean'],
+            // E12b: {bn: {question, answer_html}} (partial; blank removes).
+            ...TranslationInput::rules(ManageFaq::TRANSLATABLE),
         ];
     }
 }

@@ -39,6 +39,8 @@ import { isCatalogSection, normalizeCatalogConfig, SECTION_ITEM_KIND, usesManual
 import type { PickedItem } from '@/features/online-catalog/move'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { ApiError } from '@/lib/api/client'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors, readBn, toTranslationsInput, validateBn, type BnValues, type TranslationField } from '@/features/translations/translations'
 import { fieldErrorMap } from '@/lib/forms'
 
 type Errors = Record<string, string>
@@ -323,7 +325,29 @@ function ConfigFields({ info, config, onChange, errors }: { info: SectionTypeInf
   }
 }
 
-type Draft = { title: string; subtitle: string; config: AnySectionConfig; bannerIds: string[]; items: PickedItem[]; isEnabled: boolean; startsAt: string; endsAt: string }
+type Draft = { title: string; subtitle: string; config: AnySectionConfig; bannerIds: string[]; items: PickedItem[]; isEnabled: boolean; startsAt: string; endsAt: string; bn: BnValues }
+
+/** Every key a section's Bangla texts can use (E12b). */
+const SECTION_TRANSLATION_NAMES = ['title', 'subtitle', 'body_html', 'text', 'button_label']
+
+/**
+ * The Bangla fields of a section type, with the English values of the draft: the title and
+ * subtitle (hero sliders have neither; their banners carry the text), the rich-text body and
+ * the newsletter's line and button.
+ */
+function sectionTranslations(type: SectionTypeInfo['type'], d: Pick<Draft, 'title' | 'subtitle' | 'config'>): TranslationField[] {
+  if (type === 'hero_slider') return []
+  const fields: TranslationField[] = [
+    { name: 'title', label: 'Title', base: d.title, max: 120 },
+    { name: 'subtitle', label: 'Subtitle', base: d.subtitle, max: 255 },
+  ]
+  if (type === 'rich_text') fields.push({ name: 'body_html', label: 'Section text', base: (d.config as SectionConfigs['rich_text']).body_html, kind: 'rich' })
+  if (type === 'newsletter') {
+    const c = d.config as SectionConfigs['newsletter']
+    fields.push({ name: 'text', label: 'Newsletter text', base: c.text, max: 255 }, { name: 'button_label', label: 'Button label', base: c.button_label, max: 30 })
+  }
+  return fields
+}
 
 /** Client checks before saving, keyed like the API's validation errors. */
 function validate(info: SectionTypeInfo, d: Draft): Errors {
@@ -350,6 +374,7 @@ function validate(info: SectionTypeInfo, d: Draft): Errors {
     })
   }
   if (d.startsAt && d.endsAt && d.endsAt <= d.startsAt) errors.ends_at = 'The end must be after the start.'
+  Object.assign(errors, validateBn(d.bn, sectionTranslations(info.type, d)))
   return errors
 }
 
@@ -366,9 +391,11 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
     isEnabled: section?.is_enabled ?? true,
     startsAt: toLocalInput(section?.starts_at ?? null),
     endsAt: toLocalInput(section?.ends_at ?? null),
+    bn: readBn(section?.translations, SECTION_TRANSLATION_NAMES),
   }))
   const [errors, setErrors] = useState<Errors>({})
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }))
+  const bnFields = sectionTranslations(info.type, draft)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -392,6 +419,7 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
       ...(info.banner_placement && info.items ? { banner_ids: draft.bannerIds } : {}),
       ...(SECTION_ITEM_KIND[info.type] ? { item_ids: usesManualItems(info.type, draft.config) ? draft.items.map((i) => i.id) : [] } : {}),
       ...(section ? {} : { type: info.type }),
+      ...(bnFields.length > 0 ? { translations: toTranslationsInput(draft.bn, bnFields.map((f) => f.name), section?.translations) } : {}),
     }
     save.mutate(
       { id: section?.id, input },
@@ -439,6 +467,8 @@ export function SectionEditor({ info, section, onDone }: { info: SectionTypeInfo
         <ConfigFields info={info} config={draft.config} onChange={(config) => set({ config })} errors={errors} />
       )}
       {errors.item_ids && !usesManualItems(info.type, draft.config) && <p className="text-sm text-destructive">{errors.item_ids}</p>}
+
+      {bnFields.length > 0 && <BanglaTranslations fields={bnFields} value={draft.bn} onChange={(bn) => set({ bn })} errors={bnErrors(errors)} />}
 
       <div className="grid gap-4 rounded-md bg-muted/50 p-3 sm:grid-cols-3">
         <div className="flex items-center gap-2">

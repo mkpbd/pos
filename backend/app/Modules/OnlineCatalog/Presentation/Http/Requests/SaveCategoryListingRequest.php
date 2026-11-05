@@ -2,7 +2,9 @@
 
 namespace App\Modules\OnlineCatalog\Presentation\Http\Requests;
 
+use App\Modules\OnlineCatalog\Application\Actions\SaveCategoryListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\CategoryListing;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Slug;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,6 +31,8 @@ class SaveCategoryListingRequest extends FormRequest
             'description_html' => ['sometimes', 'nullable', 'string', 'max:50000'],
             'seo_title' => ['sometimes', 'nullable', 'string', 'max:70'],
             'seo_description' => ['sometimes', 'nullable', 'string', 'max:160'],
+            // E12b: {bn: {name, description_html, seo_title, seo_description}}.
+            ...TranslationInput::rules(SaveCategoryListing::TRANSLATABLE),
         ];
     }
 

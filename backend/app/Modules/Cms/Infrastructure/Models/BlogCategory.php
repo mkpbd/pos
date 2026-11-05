@@ -20,8 +20,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ?string $description
  * @property int $sort_order
  * @property ?CarbonImmutable $updated_at
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'name', 'slug', 'description', 'sort_order'])]
+#[Fillable(['organization_id', 'name', 'slug', 'description', 'sort_order', 'translations'])]
 class BlogCategory extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, SoftDeletes, TracksAuthor;
@@ -33,6 +34,7 @@ class BlogCategory extends Model
         return [
             'sort_order' => 'integer',
             'updated_at' => 'immutable_datetime',
+            'translations' => 'array',
         ];
     }
 

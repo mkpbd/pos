@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Middleware;
 
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +24,8 @@ class StorefrontHttpCache
     public const PERSONAL = 'private, no-cache';
 
     public const NO_STORE = 'no-store, private';
+
+    public function __construct(private readonly LocaleContext $locale) {}
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -47,9 +50,10 @@ class StorefrontHttpCache
 
         $personal = $request->hasSession() || $response->headers->getCookies() !== [];
         $response->headers->set('Cache-Control', $personal ? self::PERSONAL : self::PUBLIC);
-        // The envelope's per-request id is not part of the payload.
+        // The envelope's per-request id is not part of the payload; the language is (E12b:
+        // an English and a Bangla answer never share an ETag, even with identical bodies).
         $payload = preg_replace('/"request_id":"[^"]*"/', '', $content) ?? $content;
-        $response->setEtag(hash('xxh128', $payload), true);
+        $response->setEtag(hash('xxh128', $this->locale->current().'|'.$payload), true);
         $response->isNotModified($request);
 
         return $response;

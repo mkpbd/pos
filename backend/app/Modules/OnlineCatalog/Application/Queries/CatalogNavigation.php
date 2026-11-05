@@ -6,7 +6,10 @@ use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Infrastructure\Models\BrandListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\CategoryListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
+use App\Modules\Shared\Application\Localization\FixedText;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\PlainText;
+use App\Modules\Shared\Domain\Translations;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -14,6 +17,9 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * Category and brand pages, the category tree, search suggestions and the category/brand
  * strips of the homepage. Only categories and brands with a visible listing and an active
  * record exist on the storefront.
+ *
+ * E12b: names, descriptions and SEO texts in the request's language (per-field fallback to
+ * the base text); suggestions match base and Bangla names.
  */
 class CatalogNavigation
 {
@@ -67,17 +73,18 @@ class CatalogNavigation
         $children = $tree->visibleChildren($id);
         $refs = $this->refs([$listing->image_media_id, $listing->banner_media_id,
             ...array_map(fn (string $c) => $this->catalog->categoryListings()[$c]->image_media_id, $children)]);
+        $text = Translations::pickMany($listing, ['description_html', 'seo_title', 'seo_description'], $this->catalog->locale());
 
         return [
             'id' => $id,
             'slug' => $listing->slug,
             'name' => $tree->node($id)['name'],
-            'description_html' => $listing->description_html,
+            'description_html' => $text['description_html'],
             'image' => $refs[$listing->image_media_id] ?? null,
             'banner' => $refs[$listing->banner_media_id] ?? null,
-            'seo' => ['title' => $listing->seo_title ?? $tree->node($id)['name'], 'description' => $listing->seo_description],
+            'seo' => ['title' => $text['seo_title'] ?? $tree->node($id)['name'], 'description' => $text['seo_description']],
             'breadcrumbs' => [
-                ['name' => 'Home', 'url' => '/'],
+                ['name' => $this->home(), 'url' => '/'],
                 ...array_map(fn (string $a) => ['name' => $tree->node($a)['name'], 'url' => '/category/'.$this->catalog->categoryListings()[$a]->slug], $tree->visibleAncestors($id)),
                 ['name' => $tree->node($id)['name'], 'url' => null],
             ],
@@ -122,13 +129,14 @@ class CatalogNavigation
     {
         $brand = $this->brandBySlug($slug) ?? throw (new ModelNotFoundException)->setModel(BrandListing::class);
         $listing = $brand['listing'];
+        $text = Translations::pickMany($listing, ['description', 'seo_title', 'seo_description'], $this->catalog->locale());
 
         return [
             'slug' => $brand['slug'],
             'name' => $brand['name'],
-            'description' => $listing->description,
+            'description' => $text['description'],
             'logo' => $this->refs([$listing->logo_media_id])[$listing->logo_media_id] ?? null,
-            'seo' => ['title' => $listing->seo_title ?? $brand['name'], 'description' => $listing->seo_description ?? $listing->description],
+            'seo' => ['title' => $text['seo_title'] ?? $brand['name'], 'description' => $text['seo_description'] ?? $text['description']],
         ];
     }
 
@@ -148,7 +156,7 @@ class CatalogNavigation
         $rank = fn (string $name) => [str_starts_with(mb_strtolower($name), $needle) ? 0 : 1, mb_strtolower($name)];
 
         $records = $this->catalog->products(['q' => $q]);
-        usort($records, fn (array $a, array $b) => $rank($a['name']) <=> $rank($b['name']));
+        usort($records, fn (array $a, array $b) => min($rank($a['name']), $rank($a['base_name'] ?? $a['name'])) <=> min($rank($b['name']), $rank($b['base_name'] ?? $b['name'])));
         $products = array_map(function (array $record) {
             $card = $this->catalog->card($record);
 
@@ -158,8 +166,12 @@ class CatalogNavigation
         $tree = $this->catalog->categoryTree();
         $categories = [];
         foreach ($this->catalog->categoryListings() as $id => $listing) {
-            $name = $tree->node($id)['name'] ?? null;
-            if ($name !== null && $tree->isVisible($id) && str_contains(mb_strtolower($name), $needle)) {
+            $node = $tree->node($id);
+            $name = $node['name'] ?? null;
+            // Base and translated names both match (E12b).
+            $matches = $name !== null && (str_contains(mb_strtolower($name), $needle) || str_contains(mb_strtolower((string) ($node['base_name'] ?? '')), $needle)
+                || str_contains(mb_strtolower((string) Translations::value($listing->translations, 'name', LocaleContext::BN, '')), $needle));
+            if ($matches && $tree->isVisible($id)) {
                 $categories[] = ['slug' => $listing->slug, 'name' => $name, 'url' => '/category/'.$listing->slug];
             }
         }
@@ -274,14 +286,15 @@ class CatalogNavigation
             $listing = $this->catalog->categoryListings()[$id];
             $refs = $this->refs([$listing->banner_media_id, $listing->image_media_id]);
             $name = $tree->node($id)['name'];
+            $text = Translations::pickMany($listing, ['description_html', 'seo_title', 'seo_description'], $this->catalog->locale());
 
             return [
-                'title' => $listing->seo_title ?? $name,
-                'description' => $listing->seo_description ?? PlainText::excerpt($listing->description_html, self::META_DESCRIPTION_LENGTH),
+                'title' => $text['seo_title'] ?? $name,
+                'description' => $text['seo_description'] ?? PlainText::excerpt($text['description_html'], self::META_DESCRIPTION_LENGTH),
                 'image_url' => ($refs[$listing->banner_media_id] ?? $refs[$listing->image_media_id] ?? null)['url'] ?? null,
                 'name' => $name,
                 'breadcrumbs' => [
-                    ['name' => 'Home', 'url' => '/'],
+                    ['name' => $this->home(), 'url' => '/'],
                     ...array_map(fn (string $a) => ['name' => $tree->node($a)['name'], 'url' => '/category/'.$this->catalog->categoryListings()[$a]->slug], $tree->visibleAncestors($id)),
                     ['name' => $name, 'url' => '/category/'.$listing->slug],
                 ],
@@ -293,14 +306,15 @@ class CatalogNavigation
                 return null;
             }
             $listing = $brand['listing'];
+            $text = Translations::pickMany($listing, ['description', 'seo_title', 'seo_description'], $this->catalog->locale());
 
             return [
-                'title' => $listing->seo_title ?? $brand['name'],
-                'description' => $listing->seo_description ?? PlainText::excerpt($listing->description, self::META_DESCRIPTION_LENGTH),
+                'title' => $text['seo_title'] ?? $brand['name'],
+                'description' => $text['seo_description'] ?? PlainText::excerpt($text['description'], self::META_DESCRIPTION_LENGTH),
                 'image_url' => $this->refs([$listing->logo_media_id])[$listing->logo_media_id]['url'] ?? null,
                 'name' => $brand['name'],
                 'breadcrumbs' => [
-                    ['name' => 'Home', 'url' => '/'],
+                    ['name' => $this->home(), 'url' => '/'],
                     ['name' => $brand['name'], 'url' => '/brand/'.$brand['slug']],
                 ],
             ];
@@ -311,11 +325,12 @@ class CatalogNavigation
             return null;
         }
         $listing = $record['listing'];
+        $text = Translations::pickMany($listing, ['short_description', 'description_html', 'seo_title', 'seo_description'], $this->catalog->locale());
 
         return [
-            'title' => $listing->seo_title ?? $record['name'],
-            'description' => $listing->seo_description
-                ?? PlainText::excerpt($listing->short_description ?? $listing->description_html, self::META_DESCRIPTION_LENGTH),
+            'title' => $text['seo_title'] ?? $record['name'],
+            'description' => $text['seo_description']
+                ?? PlainText::excerpt($text['short_description'] ?? $text['description_html'], self::META_DESCRIPTION_LENGTH),
             'image_url' => $record['images'][0]['url'] ?? null,
             'name' => $record['name'],
             'breadcrumbs' => [],
@@ -352,6 +367,11 @@ class CatalogNavigation
         usort($result, fn (array $a, array $b) => strcmp($a['slug'], $b['slug']));
 
         return $result;
+    }
+
+    private function home(): string
+    {
+        return FixedText::get('Home', $this->catalog->locale());
     }
 
     private function productCount(string $categoryId): int

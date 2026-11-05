@@ -7,6 +7,7 @@ use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Domain\BannerPlacement;
@@ -23,6 +24,15 @@ use Illuminate\Support\Facades\DB;
 class ManageBanners
 {
     public const MAX_PER_PLACEMENT = 50;
+
+    /** E12b: translatable texts with the limits of the base fields. */
+    public const TRANSLATABLE = [
+        'kicker' => ['max:60'],
+        'title' => ['max:120'],
+        'subtitle' => ['max:255'],
+        'button_label' => ['max:40'],
+        'secondary_button_label' => ['max:40'],
+    ];
 
     public function __construct(
         private readonly MediaLibrary $media,
@@ -46,6 +56,9 @@ class ManageBanners
             $creating = ! $banner->exists;
             $before = $creating ? [] : $this->snapshot($banner);
 
+            if (array_key_exists('translations', $attributes)) {
+                $attributes['translations'] = TranslationInput::apply($banner->translations, $attributes['translations'], array_keys(self::TRANSLATABLE));
+            }
             $banner->fill($attributes);
             // Popup settings (E11) belong to popups only; popups get the defaults for what is unset.
             if ($banner->placement === BannerPlacement::Popup) {
@@ -155,6 +168,7 @@ class ManageBanners
             'starts_at' => $banner->starts_at?->toIso8601String(),
             'ends_at' => $banner->ends_at?->toIso8601String(),
             'is_active' => $banner->is_active,
+            'translations' => $banner->translations,
         ];
     }
 }

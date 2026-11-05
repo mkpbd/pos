@@ -10,6 +10,7 @@ use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -22,6 +23,15 @@ use Illuminate\Validation\ValidationException;
  */
 class SaveProductListing
 {
+    /** E12b: translatable texts with the limits of their base fields (name: the product's). */
+    public const TRANSLATABLE = [
+        'name' => ['max:255'],
+        'short_description' => ['max:500'],
+        'description_html' => ['max:100000'],
+        'seo_title' => ['max:70'],
+        'seo_description' => ['max:160'],
+    ];
+
     public function __construct(
         private readonly CatalogReadModel $catalog,
         private readonly HtmlSanitizer $sanitizer,
@@ -66,6 +76,9 @@ class SaveProductListing
 
             $slug = isset($data['slug']) && $data['slug'] !== '' ? $data['slug'] : null;
             unset($data['slug']);
+            if (array_key_exists('translations', $data)) {
+                $data['translations'] = TranslationInput::apply($listing->translations, $data['translations'], array_keys(self::TRANSLATABLE), ['description_html'], $this->sanitizer);
+            }
             $listing->fill($data);
             $listing->slug = $slug ?? $listing->slug ?? ListingEditor::suggestSlug($product['name'], ProductListing::class, $listing->id);
             if ($listing->published_at !== null && $listing->unpublished_at !== null && $listing->unpublished_at <= $listing->published_at) {
@@ -157,6 +170,7 @@ class SaveProductListing
             'seo_title' => $l->seo_title,
             'seo_description' => $l->seo_description,
             'sort_weight' => $l->sort_weight,
+            'translations_hash' => $l->translations === null ? null : hash('xxh128', (string) json_encode($l->translations)),
         ];
     }
 }

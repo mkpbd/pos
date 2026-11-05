@@ -1,7 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, type ApiSuccess } from '@/lib/api/client'
 import { storeApi } from '../http'
-import { accountKeys, checkoutKeys, customerKeys } from '../store-keys'
+import type { MessageKey } from '../i18n/en'
+import { useLocale } from '../i18n/locale'
+import type { Translate } from '../i18n/translate'
+import { accountKeys, checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { AccountOrder, AccountOrderFilter, AccountOrderRow, ListingPagination, ReorderResult } from '../types'
 
 const noClientRetry = (count: number, error: unknown) => !(error instanceof ApiError && error.status < 500) && count < 1
@@ -33,8 +36,9 @@ export function parseOrderFilter(value: string | null): AccountOrderFilter | nul
 
 /** GET /store/account/orders — the signed-in customer's own orders, newest first, 10 per page. */
 export function useAccountOrdersQuery(status: AccountOrderFilter | null, page: number) {
-  return useQuery<Page<AccountOrderRow>, Error, Page<AccountOrderRow>, ReturnType<typeof accountKeys.orderList>>({
-    queryKey: accountKeys.orderList(status ?? 'all', page),
+  const { locale } = useLocale()
+  return useQuery<Page<AccountOrderRow>, Error, Page<AccountOrderRow>, readonly unknown[]>({
+    queryKey: localized(accountKeys.orderList(status ?? 'all', page), locale),
     queryFn: ({ signal }) =>
       storeApi.get<AccountOrderRow[]>('/store/account/orders', { signal, query: { status, page: page > 1 ? page : undefined } }).then((r): Page<AccountOrderRow> => toPage(r)),
     placeholderData: keepPreviousData,
@@ -44,8 +48,9 @@ export function useAccountOrdersQuery(status: AccountOrderFilter | null, page: n
 
 /** GET /store/account/orders/{number} — another customer's order is a 404. */
 export function useAccountOrderQuery(number: string) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: accountKeys.order(number),
+    queryKey: localized(accountKeys.order(number), locale),
     queryFn: ({ signal }) => storeApi.get<AccountOrder>(`/store/account/orders/${encodeURIComponent(number)}`, { signal }).then((r) => r.data),
     retry: noClientRetry,
   })
@@ -60,11 +65,12 @@ const isOrder = (value: unknown): value is AccountOrder => typeof value === 'obj
  */
 export function useCancelOrderMutation(number: string) {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: ({ reason, idempotencyKey }: { reason: string | null; idempotencyKey: string }) =>
       storeApi.post<AccountOrder | null>(`/store/account/orders/${encodeURIComponent(number)}/cancel`, reason ? { reason } : {}, { idempotencyKey }).then((r) => r.data),
     onSuccess: (order) => {
-      if (isOrder(order)) queryClient.setQueryData(accountKeys.order(number), order)
+      if (isOrder(order)) setLocalizedData(queryClient, accountKeys.order(number), locale, order)
       void queryClient.invalidateQueries({ queryKey: accountKeys.orders })
       void queryClient.invalidateQueries({ queryKey: checkoutKeys.order(number) })
     },
@@ -78,26 +84,27 @@ export function useCancelOrderMutation(number: string) {
 /** POST /store/account/orders/{number}/reorder — the lines go into the cart at today's prices. */
 export function useReorderMutation() {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: (number: string) => storeApi.post<ReorderResult>(`/store/account/orders/${encodeURIComponent(number)}/reorder`).then((r) => r.data),
     onSuccess: (result) => {
-      if (result?.cart) queryClient.setQueryData(customerKeys.cart, result.cart)
+      if (result?.cart) setLocalizedData(queryClient, customerKeys.cart, locale, result.cart)
       else void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
       void queryClient.invalidateQueries({ queryKey: checkoutKeys.previewAll })
     },
   })
 }
 
-const SKIP_REASONS: Record<string, string> = {
-  unavailable: 'no longer available',
-  out_of_stock: 'out of stock',
-  limit: 'cart limit reached',
+const SKIP_REASONS: Record<string, MessageKey> = {
+  unavailable: 'orders.reorder.skip.unavailable',
+  out_of_stock: 'orders.reorder.skip.outOfStock',
+  limit: 'orders.reorder.skip.limit',
 }
 
 /** The notice after "Buy again": what was added and what was left out (and why). */
-export function reorderNotice(result: Pick<ReorderResult, 'added' | 'skipped'>): string {
-  const skipped = result.skipped.map((s) => `${s.name} (${SKIP_REASONS[s.reason] ?? 'not available'})`).join(', ')
-  if (result.added.length === 0) return skipped ? `None of the items could be added to your cart: ${skipped}.` : 'None of the items could be added to your cart.'
-  const added = result.added.length === 1 ? '1 item was added to your cart.' : `${result.added.length} items were added to your cart.`
-  return skipped ? `${added} Not added: ${skipped}.` : added
+export function reorderNotice(result: Pick<ReorderResult, 'added' | 'skipped'>, t: Translate): string {
+  const skipped = result.skipped.map((s) => t('orders.reorder.skipped', { name: s.name, reason: t(SKIP_REASONS[s.reason] ?? 'orders.reorder.skip.other') })).join(', ')
+  if (result.added.length === 0) return skipped ? t('orders.reorder.noneAddedWith', { skipped }) : t('orders.reorder.noneAdded')
+  const added = t('orders.reorder.added', { count: result.added.length })
+  return skipped ? t('orders.reorder.addedNotAdded', { added, skipped }) : added
 }

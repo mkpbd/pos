@@ -9,6 +9,7 @@ use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Support\Changes;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
@@ -17,6 +18,14 @@ use Illuminate\Support\Facades\DB;
  */
 class SaveCategoryListing
 {
+    /** E12b: translatable texts with the limits of their base fields (name: the category's). */
+    public const TRANSLATABLE = [
+        'name' => ['max:100'],
+        'description_html' => ['max:50000'],
+        'seo_title' => ['max:70'],
+        'seo_description' => ['max:160'],
+    ];
+
     public function __construct(
         private readonly CatalogReadModel $catalog,
         private readonly MediaLibrary $media,
@@ -46,6 +55,9 @@ class SaveCategoryListing
 
             $slug = isset($data['slug']) && $data['slug'] !== '' ? $data['slug'] : null;
             unset($data['slug']);
+            if (array_key_exists('translations', $data)) {
+                $data['translations'] = TranslationInput::apply($listing->translations, $data['translations'], array_keys(self::TRANSLATABLE), ['description_html'], $this->sanitizer);
+            }
             $listing->fill(ListingMedia::blankToNull($data));
             $listing->slug = $slug ?? $listing->slug ?? ListingEditor::suggestSlug($node['name'], CategoryListing::class, $listing->id);
             $listing->save();

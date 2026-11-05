@@ -37,6 +37,8 @@ import {
   isInUse,
   isProductScope,
   offerLabel,
+  PROMOTION_DESCRIPTION_MAX,
+  PROMOTION_NAME_MAX,
   promotionErrorMap,
   SCOPE_LABELS,
   stateBadge,
@@ -46,6 +48,8 @@ import {
   validateDraft,
   type PromotionDraft,
 } from '@/features/promotions/promotions'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors } from '@/features/translations/translations'
 
 type Errors = Record<string, string>
 
@@ -81,7 +85,7 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
     }
     setErrors({})
     save.mutate(
-      { id: promotion?.id, input: toInput(draft, timeZone) },
+      { id: promotion?.id, input: toInput(draft, timeZone, promotion?.translations) },
       {
         onSuccess: (saved) => {
           setDraft(toDraft(saved, timeZone))
@@ -98,7 +102,7 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
 
   const productScope = isProductScope(draft.scope)
   const allowed = countdownAllowed(draft)
-  const other = Object.entries(errors).filter(([key]) => !SHOWN.has(key))
+  const other = Object.entries(errors).filter(([key]) => !SHOWN.has(key) && !key.startsWith('translations.'))
 
   return (
     <form id="promotion-form" noValidate onSubmit={submit}>
@@ -118,11 +122,21 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <FormField label="Name" error={errors.name} hint="Shown to shoppers on cards, in the cart and on the order.">
-                <Input maxLength={80} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
+                <Input maxLength={PROMOTION_NAME_MAX} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
               </FormField>
-              <FormField label="Description" error={errors.description} hint={`Optional, shown to shoppers, e.g. “10% off juices”. ${draft.description.length}/200`}>
-                <Textarea maxLength={200} rows={2} value={draft.description} onChange={(e) => set({ description: e.target.value })} />
+              <FormField label="Description" error={errors.description} hint={`Optional, shown to shoppers, e.g. “10% off juices”. ${draft.description.length}/${PROMOTION_DESCRIPTION_MAX}`}>
+                <Textarea maxLength={PROMOTION_DESCRIPTION_MAX} rows={2} value={draft.description} onChange={(e) => set({ description: e.target.value })} />
               </FormField>
+              <BanglaTranslations
+                fields={[
+                  { name: 'name', label: 'Name', base: draft.name, max: PROMOTION_NAME_MAX },
+                  { name: 'description', label: 'Description', base: draft.description, kind: 'textarea', max: PROMOTION_DESCRIPTION_MAX },
+                ]}
+                value={draft.bn}
+                onChange={(bn) => set({ bn })}
+                errors={bnErrors(errors)}
+                disabled={readOnly}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Discount type" error={errors.type}>
                   <Select value={draft.type} onValueChange={(v) => set({ type: v as PromotionType })}>

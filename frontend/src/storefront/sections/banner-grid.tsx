@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { MenuLink } from '../components/menu-link'
+import { useLocale } from '../i18n/locale'
 import type { StoreBanner, StoreSection } from '../types'
 import { BannerPicture, BannerText } from './banner-content'
 import { SectionHeading } from './section-heading'
@@ -13,6 +14,7 @@ const COLUMNS = {
 } as const
 
 function Tile({ banner, className }: { banner: StoreBanner; className?: string }) {
+  const { t } = useLocale()
   const linkWhole = banner.link_url && !banner.button_label
   const inner = (
     <>
@@ -28,7 +30,7 @@ function Tile({ banner, className }: { banner: StoreBanner; className?: string }
   return (
     <li className={cn('group relative min-h-56 overflow-hidden rounded-sf-card bg-sf-border', className)}>
       {linkWhole ? (
-        <MenuLink url={banner.link_url!} aria-label={banner.title ?? banner.image.alt ?? 'Open offer'} className="absolute inset-0 block focus-visible:outline-4 focus-visible:-outline-offset-4">
+        <MenuLink url={banner.link_url!} aria-label={banner.title ?? banner.image.alt ?? t('content.section.openOffer')} className="absolute inset-0 block focus-visible:outline-4 focus-visible:-outline-offset-4">
           {inner}
         </MenuLink>
       ) : (

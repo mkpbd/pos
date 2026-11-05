@@ -1,5 +1,19 @@
 import type { BlogPostDetail, BlogPostRow, Cart, CartLine, DisplayPromotion, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, OrderView, ShippingMethod, ListingFacets, MenuNode, ProductCard, ProductDetail, ProductVariant, StorefrontBootstrap, StorePopup } from './types'
 
+import { en } from './i18n/en'
+import { LANG_COOKIE, resetLocaleRuntime } from './i18n/runtime'
+import { createTranslator } from './i18n/translate'
+
+/** English `t()` for unit tests of helpers that take a translator. */
+export const tEn = createTranslator(en, { locale: 'en', banglaDigits: false })
+
+/** After a test that used Bangla: no `lang` cookie, no published locale, no `<html lang>`. */
+export function resetLocale() {
+  document.cookie = `${LANG_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+  resetLocaleRuntime()
+  document.documentElement.removeAttribute('lang')
+}
+
 let nextId = 0
 
 export function menuNode(label: string, url: string, overrides: Partial<MenuNode> = {}): MenuNode {
@@ -60,6 +74,12 @@ export function bootstrapFixture(overrides: Partial<StorefrontBootstrap> = {}): 
     },
     ...overrides,
   }
+}
+
+/** A store offering English and Bangla (E12b): default English, Latin digits unless `bangla_digits`. */
+export function bilingualBootstrap(store: Partial<StorefrontBootstrap['store']> = {}, overrides: Partial<StorefrontBootstrap> = {}): StorefrontBootstrap {
+  const base = bootstrapFixture(overrides)
+  return { ...base, store: { ...base.store, locales: ['en', 'bn'], default_locale: 'en', bangla_digits: false, ...store } }
 }
 
 /** A product card as GET /store/products returns it. */

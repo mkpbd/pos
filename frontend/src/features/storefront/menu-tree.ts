@@ -1,4 +1,5 @@
 import type { MenuItemNode, MenuItemType } from '@/features/storefront/api'
+import type { TranslationsMap } from '@/features/translations/translations'
 
 /**
  * Pure operations for the menu tree editor. Nodes are addressed by their index path
@@ -7,10 +8,15 @@ import type { MenuItemNode, MenuItemType } from '@/features/storefront/api'
  */
 export const MAX_MENU_DEPTH = 3
 export const MAX_MENU_ITEMS = 200
+export const MENU_LABEL_MAX = 80
 
-export type EditorNode = Omit<MenuItemNode, 'id' | 'type' | 'url' | 'target_id' | 'children'> & {
+export type EditorNode = Omit<MenuItemNode, 'id' | 'type' | 'url' | 'target_id' | 'children' | 'translations'> & {
   key: string
   type: MenuItemType
+  /** Bangla label (E12b); "" shows the English label. */
+  bn_label: string
+  /** The Bangla label as loaded, so clearing it is still sent. */
+  bn_saved: string
   /** Custom links; kept while the item points at a page, category or brand so switching back loses nothing. */
   url: string
   target_id: string | null
@@ -22,7 +28,12 @@ let sequence = 0
 const nextKey = () => `n${++sequence}`
 
 export function emptyNode(): EditorNode {
-  return { key: nextKey(), type: 'custom', label: '', url: '', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }
+  return { key: nextKey(), type: 'custom', label: '', bn_label: '', bn_saved: '', url: '', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }
+}
+
+function bnLabelOf(translations: TranslationsMap): string {
+  const label = translations?.bn?.label
+  return typeof label === 'string' ? label : ''
 }
 
 export function fromApi(items: MenuItemNode[]): EditorNode[] {
@@ -30,6 +41,8 @@ export function fromApi(items: MenuItemNode[]): EditorNode[] {
     key: nextKey(),
     type: i.type ?? 'custom',
     label: i.label,
+    bn_label: bnLabelOf(i.translations as TranslationsMap),
+    bn_saved: bnLabelOf(i.translations as TranslationsMap),
     url: i.url ?? '',
     target_id: i.target_id ?? null,
     open_in_new_tab: i.open_in_new_tab,
@@ -53,6 +66,7 @@ export function toApi(nodes: EditorNode[]): MenuItemNode[] {
     is_mega: n.is_mega,
     mega_columns: n.is_mega ? (n.mega_columns ?? 4) : null,
     image_media_id: n.is_mega ? n.image_media_id : null,
+    ...(n.bn_label.trim() || n.bn_saved ? { translations: { bn: { label: n.bn_label.trim() } } } : {}),
     children: toApi(n.children),
   }))
 }
@@ -132,7 +146,8 @@ export function validateTree(nodes: EditorNode[], allowsMega: boolean): Record<s
       const path = [...parent, i]
       const key = errorKey(path)
       if (!n.label.trim()) errors[`${key}.label`] = 'Enter a label.'
-      else if (n.label.trim().length > 80) errors[`${key}.label`] = 'At most 80 characters.'
+      else if (n.label.trim().length > MENU_LABEL_MAX) errors[`${key}.label`] = `At most ${MENU_LABEL_MAX} characters.`
+      if (n.bn_label.trim().length > MENU_LABEL_MAX) errors[`${key}.translations.bn.label`] = `At most ${MENU_LABEL_MAX} characters.`
       if (hasTarget(n.type)) {
         if (!n.target_id) errors[`${key}.target_id`] = `Choose a ${TARGET_NAMES[n.type]}.`
       } else if (n.type === 'custom' && !isSafeLink(n.url)) errors[`${key}.url`] = 'Use a site path such as /sale or an http(s) URL.'

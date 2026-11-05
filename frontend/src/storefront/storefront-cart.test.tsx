@@ -57,7 +57,7 @@ describe('header', () => {
 
     expect(await screen.findByRole('link', { name: 'Sign in' })).toBeInTheDocument()
     expect(await screen.findByText('You are signed out.')).toBeInTheDocument()
-    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/store/account/logout') && init?.method === 'POST')).toBe(true)
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/store/account/logout?lang=en') && init?.method === 'POST')).toBe(true)
   })
 })
 

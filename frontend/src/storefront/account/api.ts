@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
+import { useLocale } from '../i18n/locale'
 import { useNotice } from '../notices'
-import { accountKeys, customerKeys } from '../store-keys'
+import { accountKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { AddressInput, Customer, CustomerAddress, GeoDistrict, GeoDivision, SignInResult } from '../types'
 import { clearLocalWishlist, readLocalWishlist } from '../wishlist/local-wishlist'
 
 /** The signed-in customer, null for guests (GET /store/account/me also issues the CSRF cookie). */
 export function useMeQuery() {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.me,
+    queryKey: localized(customerKeys.me, locale),
     queryFn: ({ signal }) => storeApi.get<Customer | null>('/store/account/me', { signal }).then((r) => r.data ?? null),
     staleTime: 5 * 60_000,
     retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,
@@ -40,8 +42,8 @@ async function mergeLocalWishlist(): Promise<void> {
   }
 }
 
-function refreshCustomerData(queryClient: QueryClient, customer: Customer | null) {
-  if (customer) queryClient.setQueryData(customerKeys.me, customer)
+function refreshCustomerData(queryClient: QueryClient, locale: string, customer: Customer | null) {
+  if (customer) setLocalizedData(queryClient, customerKeys.me, locale, customer)
   else void queryClient.invalidateQueries({ queryKey: customerKeys.me })
   queryClient.removeQueries({ queryKey: customerKeys.profile })
   queryClient.removeQueries({ queryKey: customerKeys.addresses })
@@ -51,14 +53,16 @@ function refreshCustomerData(queryClient: QueryClient, customer: Customer | null
   void queryClient.invalidateQueries({ queryKey: customerKeys.cart })
 }
 
-export const CAPPED_NOTICE = 'Some items from your earlier cart were reduced to the quantity in stock. Please check your cart.'
+/** Shown after sign-in when the merged guest cart had to be capped to the stock. */
+export const CAPPED_NOTICE_KEY = 'account.notice.capped'
 
 function useSignInCompletion() {
   const queryClient = useQueryClient()
   const notice = useNotice()
+  const { locale, t } = useLocale()
   return (result: SignInResult) => {
-    refreshCustomerData(queryClient, result.customer)
-    if (result.merge && result.merge.capped_lines > 0) notice(CAPPED_NOTICE)
+    refreshCustomerData(queryClient, locale, result.customer)
+    if (result.merge && result.merge.capped_lines > 0) notice(t(CAPPED_NOTICE_KEY))
   }
 }
 
@@ -89,10 +93,11 @@ export function useRegisterMutation() {
 /** Sign-out; an account page that is open then sends the visitor to the home page (RequireCustomer). */
 export function useLogoutMutation() {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: () => storeApi.post<void>('/store/account/logout'),
     onSuccess: () => {
-      queryClient.setQueryData(customerKeys.me, null)
+      setLocalizedData(queryClient, customerKeys.me, locale, null)
       queryClient.removeQueries({ queryKey: customerKeys.profile })
       queryClient.removeQueries({ queryKey: customerKeys.addresses })
       queryClient.removeQueries({ queryKey: customerKeys.wishlist })
@@ -105,8 +110,6 @@ export function useLogoutMutation() {
 
 type MaybeMessage = { message?: string } | null | undefined
 
-export const FORGOT_PASSWORD_SENT = 'If an account exists for this e-mail address, we have sent a link to reset the password. Please check your inbox.'
-
 export function useForgotPasswordMutation() {
   return useMutation({
     mutationFn: (email: string) => storeApi.post<MaybeMessage>('/store/account/forgot-password', { email }).then((r) => r.data),
@@ -118,6 +121,7 @@ export type ResetPasswordInput = { email: string; token: string; password: strin
 /** A successful reset signs the customer in. */
 export function useResetPasswordMutation() {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   const complete = useSignInCompletion()
   return useMutation({
     mutationFn: async (input: ResetPasswordInput) => {
@@ -127,18 +131,19 @@ export function useResetPasswordMutation() {
     },
     onSuccess: (data) => {
       if (data?.customer) complete({ customer: data.customer, merge: data.merge ?? null })
-      else refreshCustomerData(queryClient, null)
+      else refreshCustomerData(queryClient, locale, null)
     },
   })
 }
 
 export function useVerifyEmailMutation() {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: (token: string) => storeApi.post<MaybeMessage>('/store/account/verify-email', { token }).then((r) => r.data),
     onSuccess: () => {
-      const me = queryClient.getQueryData<Customer | null>(customerKeys.me)
-      if (me) queryClient.setQueryData(customerKeys.me, { ...me, email_verified: true })
+      const me = queryClient.getQueryData<Customer | null>(localized(customerKeys.me, locale))
+      if (me) setLocalizedData(queryClient, customerKeys.me, locale, { ...me, email_verified: true })
       void queryClient.invalidateQueries({ queryKey: customerKeys.me })
     },
   })
@@ -153,20 +158,22 @@ export function useResendVerificationMutation() {
 export type ProfileInput = { name: string; phone: string | null }
 
 export function useProfileQuery() {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.profile,
+    queryKey: localized(customerKeys.profile, locale),
     queryFn: ({ signal }) => storeApi.get<Customer>('/store/account/profile', { signal }).then((r) => r.data),
   })
 }
 
 export function useUpdateProfileMutation() {
   const queryClient = useQueryClient()
+  const { locale } = useLocale()
   return useMutation({
     mutationFn: (input: ProfileInput) => storeApi.put<Customer>('/store/account/profile', input).then((r) => r.data),
     onSuccess: (profile, input) => {
-      if (profile) queryClient.setQueryData(customerKeys.profile, profile)
-      const me = queryClient.getQueryData<Customer | null>(customerKeys.me)
-      if (me) queryClient.setQueryData(customerKeys.me, { ...me, name: profile?.name ?? input.name, phone: profile?.phone ?? input.phone })
+      if (profile) setLocalizedData(queryClient, customerKeys.profile, locale, profile)
+      const me = queryClient.getQueryData<Customer | null>(localized(customerKeys.me, locale))
+      if (me) setLocalizedData(queryClient, customerKeys.me, locale, { ...me, name: profile?.name ?? input.name, phone: profile?.phone ?? input.phone })
       void queryClient.invalidateQueries({ queryKey: customerKeys.profile })
     },
   })
@@ -183,8 +190,9 @@ export function useChangePasswordMutation() {
 export const MAX_ADDRESSES = 10
 
 export function useAddressesQuery(enabled = true) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.addresses,
+    queryKey: localized(customerKeys.addresses, locale),
     queryFn: ({ signal }) => storeApi.get<CustomerAddress[]>('/store/account/addresses', { signal }).then((r) => r.data),
     enabled,
   })
@@ -211,16 +219,18 @@ export function useDeleteAddressMutation() {
 /* Geography (public, cached for a day by the server) ------------------------------------ */
 
 export function useDivisionsQuery() {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.divisions,
+    queryKey: localized(customerKeys.divisions, locale),
     queryFn: ({ signal }) => storeApi.get<GeoDivision[]>('/store/geo/divisions', { signal }).then((r) => r.data),
     staleTime: Infinity,
   })
 }
 
 export function useDistrictsQuery(divisionId: string) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: customerKeys.districts(divisionId),
+    queryKey: localized(customerKeys.districts(divisionId), locale),
     queryFn: ({ signal }) => storeApi.get<GeoDistrict[]>('/store/geo/districts', { signal, query: { division: divisionId } }).then((r) => r.data),
     enabled: divisionId !== '',
     staleTime: Infinity,

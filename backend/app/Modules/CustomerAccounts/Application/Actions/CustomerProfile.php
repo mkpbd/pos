@@ -31,6 +31,8 @@ class CustomerProfile
             'email' => $account->email,
             'phone' => $account->phone,
             'email_verified' => $account->email_verified_at !== null,
+            // E12b: en | bn (null before the first sign-in since E12b).
+            'preferred_locale' => $account->preferred_locale,
         ];
     }
 

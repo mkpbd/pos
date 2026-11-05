@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Courier, CourierInput, District, Division, MethodInput, ShippingMethod, ShippingZone } from '@/features/shipping/api'
+import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
 import { formatMoney, MONEY_PATTERN } from '@/lib/money'
 
@@ -51,6 +52,12 @@ export function feeSummary(method: Pick<ShippingMethod, 'fee' | 'free_over'>, cu
 const money = (label: string) => z.string().trim().regex(MONEY_PATTERN, `${label}: a non-negative amount with at most 2 decimals.`)
 const days = z.number({ error: 'Whole days, 0–30.' }).int('Whole days, 0–30.').min(0, 'Whole days, 0–30.').max(30, 'Whole days, 0–30.')
 
+export const METHOD_NAME_MAX = 60
+export const METHOD_DESCRIPTION_MAX = 160
+/** Translatable method texts shown at checkout (E12b). */
+const METHOD_TRANSLATIONS = [{ name: 'name', max: METHOD_NAME_MAX }, { name: 'description', max: METHOD_DESCRIPTION_MAX }] as const
+const METHOD_TRANSLATION_NAMES = METHOD_TRANSLATIONS.map((f) => f.name)
+
 export const methodSchema = z
   .object({
     name: z.string().trim().min(1, 'Required.').max(60),
@@ -63,12 +70,13 @@ export const methodSchema = z
     eta_max_days: days,
     is_active: z.boolean(),
     sort_order: z.number({ error: 'A whole number.' }).int('A whole number.').min(0, 'A whole number.'),
+    translations: translationsSchema(METHOD_TRANSLATIONS),
   })
   .refine((v) => v.eta_min_days <= v.eta_max_days, { path: ['eta_max_days'], message: 'At least the minimum.' })
   .refine((v) => !v.cod_allowed || MONEY_PATTERN.test(v.cod_fee), { path: ['cod_fee'], message: 'COD fee: a non-negative amount with at most 2 decimals.' })
 
 export type MethodValues = z.infer<typeof methodSchema>
-export const METHOD_FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order'] as const
+export const METHOD_FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'translations'] as const
 
 export function toMethodValues(method: ShippingMethod | null, nextSortOrder = 0): MethodValues {
   return {
@@ -82,10 +90,12 @@ export function toMethodValues(method: ShippingMethod | null, nextSortOrder = 0)
     eta_max_days: method?.eta_max_days ?? 3,
     is_active: method?.is_active ?? true,
     sort_order: method?.sort_order ?? nextSortOrder,
+    translations: { bn: readBn(method?.translations, METHOD_TRANSLATION_NAMES) },
   }
 }
 
-export function toMethodInput(v: MethodValues): MethodInput {
+/** `before`: the method's translations as loaded (null for a new method). */
+export function toMethodInput(v: MethodValues, before?: TranslationsMap): MethodInput {
   return {
     name: v.name,
     description: v.description || null,
@@ -97,6 +107,7 @@ export function toMethodInput(v: MethodValues): MethodInput {
     eta_max_days: v.eta_max_days,
     is_active: v.is_active,
     sort_order: v.sort_order,
+    translations: toTranslationsInput(v.translations.bn, METHOD_TRANSLATION_NAMES, before),
   }
 }
 

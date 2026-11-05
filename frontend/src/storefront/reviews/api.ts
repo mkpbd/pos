@@ -2,21 +2,24 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { ApiError, type ApiSuccess } from '@/lib/api/client'
 import { storeApi } from '../http'
 import { toPage } from '../orders/account-api'
-import { accountKeys, reviewKeys } from '../store-keys'
+import { useLocale } from '../i18n/locale'
+import type { Translate } from '../i18n/translate'
+import { accountKeys, localized, reviewKeys } from '../store-keys'
 import type { MyReview, ProductReviews, PublicReview, RatingSummary, ReviewInput, ReviewSort, ReviewStatus } from '../types'
 
 const noClientRetry = (count: number, error: unknown) => !(error instanceof ApiError && error.status < 500) && count < 1
 
-export const REVIEW_STATUS_LABELS: Record<string, string> = { pending: 'Pending', approved: 'Published', rejected: 'Rejected' }
+const REVIEW_STATUS_KEYS = { pending: 'reviews.status.pending', approved: 'reviews.status.approved', rejected: 'reviews.status.rejected' } as const
 
-export function reviewStatusLabel(status: ReviewStatus): string {
-  return REVIEW_STATUS_LABELS[status] ?? status
+export function reviewStatusLabel(status: ReviewStatus, t: Translate): string {
+  return status in REVIEW_STATUS_KEYS ? t(REVIEW_STATUS_KEYS[status as keyof typeof REVIEW_STATUS_KEYS]) : status
 }
 
 /** GET /store/account/reviews — the customer's own reviews in every status. */
 export function useMyReviewsQuery(enabled = true) {
+  const { locale } = useLocale()
   return useQuery({
-    queryKey: accountKeys.reviews,
+    queryKey: localized(accountKeys.reviews, locale),
     queryFn: ({ signal }) => storeApi.get<MyReview[]>('/store/account/reviews', { signal }).then((r) => (Array.isArray(r.data) ? r.data : [])),
     enabled,
     retry: noClientRetry,
@@ -61,11 +64,11 @@ export function useDeleteReviewMutation() {
 }
 
 /** A visitor-facing message for a failed review submission. */
-export function reviewErrorMessage(error: unknown): string | null {
+export function reviewErrorMessage(error: unknown, t: Translate): string | null {
   if (!(error instanceof ApiError)) return null
-  if (error.code === 'REVIEW_NOT_ALLOWED') return 'You can review a product once an order with it has been delivered to you.'
-  if (error.code === 'REVIEW_EXISTS') return 'You have already reviewed this product. You can change your review under My reviews.'
-  if (error.status === 404) return 'This review no longer exists.'
+  if (error.code === 'REVIEW_NOT_ALLOWED') return t('reviews.error.notAllowed')
+  if (error.code === 'REVIEW_EXISTS') return t('reviews.error.exists')
+  if (error.status === 404) return t('reviews.error.gone')
   return null
 }
 
@@ -93,8 +96,9 @@ export function normalizeReviews(response: ReviewsEnvelope): ProductReviews {
 
 /** GET /store/products/{slug}/reviews — approved only, 10 per page; the previous page stays while the next loads. */
 export function useProductReviewsQuery(slug: string, query: ReviewQuery) {
-  return useQuery<ProductReviews, Error, ProductReviews, ReturnType<typeof reviewKeys.product>>({
-    queryKey: reviewKeys.product(slug, query),
+  const { locale } = useLocale()
+  return useQuery<ProductReviews, Error, ProductReviews, readonly unknown[]>({
+    queryKey: localized(reviewKeys.product(slug, query), locale),
     queryFn: async ({ signal }) => {
       const response = await storeApi.get<PublicReview[]>(`/store/products/${encodeURIComponent(slug)}/reviews`, {
         signal,

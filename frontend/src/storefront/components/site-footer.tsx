@@ -1,5 +1,6 @@
 import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { useStorefront } from '../api'
+import { useLocale } from '../i18n/locale'
 import type { MenuLocation, SocialNetwork } from '../types'
 import { MediaImage } from './media-image'
 import { MenuLink } from './menu-link'
@@ -20,6 +21,7 @@ const SOCIAL_LABELS: Record<SocialNetwork, string> = {
 
 export function SiteFooter() {
   const { store, theme, menus } = useStorefront()
+  const { t, digits } = useLocale()
   const { about, contact, social, payment_logos, copyright } = theme.footer
   const columns = FOOTER_MENUS.flatMap((location) => {
     const menu = menus[location]
@@ -35,7 +37,7 @@ export function SiteFooter() {
           <p className="font-heading text-2xl font-extrabold text-sf-accent">{store.name}</p>
           {about && <p className="text-sm leading-relaxed whitespace-pre-line">{about}</p>}
           {payment_logos.length > 0 && (
-            <ul className="flex flex-wrap items-center gap-2" aria-label="Payment methods">
+            <ul className="flex flex-wrap items-center gap-2" aria-label={t('shell.footer.paymentMethods')}>
               {payment_logos.map((logo) => (
                 <li key={logo.id}>
                   <MediaImage media={logo} sizes="64px" className="h-6 w-auto object-contain" />
@@ -62,7 +64,7 @@ export function SiteFooter() {
 
         {hasContact && (
           <div>
-            <h2 className="mb-4 text-sm font-bold tracking-wide uppercase">Contact us</h2>
+            <h2 className="mb-4 text-sm font-bold tracking-wide uppercase">{t('shell.footer.contactUs')}</h2>
             <address className="space-y-3 text-sm not-italic">
               {contact.email && (
                 <p className="flex items-start gap-2">
@@ -89,12 +91,12 @@ export function SiteFooter() {
 
       {socialLinks.length > 0 && (
         <div className="border-t">
-          <ul className="mx-auto flex max-w-sf flex-wrap justify-center gap-x-8 gap-y-2 px-4 py-5 text-sm font-medium" aria-label="Social media">
+          <ul className="mx-auto flex max-w-sf flex-wrap justify-center gap-x-8 gap-y-2 px-4 py-5 text-sm font-medium" aria-label={t('shell.footer.social')}>
             {socialLinks.map(({ network, url }) => (
               <li key={network}>
                 <a href={url} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-sf-accent">
                   {SOCIAL_LABELS[network]}
-                  <span className="sr-only"> (opens in a new tab)</span>
+                  <span className="sr-only"> {t('shell.footer.newTab')}</span>
                 </a>
               </li>
             ))}
@@ -103,7 +105,7 @@ export function SiteFooter() {
       )}
 
       <div className="bg-sf-accent px-4 py-4 text-center text-sm text-sf-accent-foreground">
-        {copyright ?? `© ${CURRENT_YEAR} ${store.name}`}
+        {copyright ?? t('shell.footer.copyright', { year: digits(String(CURRENT_YEAR)), store: store.name })}
       </div>
     </footer>
   )

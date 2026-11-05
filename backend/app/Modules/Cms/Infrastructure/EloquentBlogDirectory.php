@@ -9,6 +9,7 @@ use App\Modules\Cms\Domain\BlogPostStatus;
 use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\Shared\Domain\Translations;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 
@@ -39,8 +40,8 @@ class EloquentBlogDirectory implements BlogDirectory
             return [];
         }
 
-        return BlogCategory::query()->whereIn('id', array_values(array_unique($ids)))->get(['id', 'slug', 'name'])
-            ->mapWithKeys(fn (BlogCategory $c) => [$c->id => ['id' => $c->id, 'slug' => $c->slug, 'name' => $c->name]])
+        return BlogCategory::query()->whereIn('id', array_values(array_unique($ids)))->get(['id', 'slug', 'name', 'translations'])
+            ->mapWithKeys(fn (BlogCategory $c) => [$c->id => ['id' => $c->id, 'slug' => $c->slug, 'name' => Translations::pick($c, 'name', $this->cards->locale())]])
             ->all();
     }
 
@@ -50,8 +51,8 @@ class EloquentBlogDirectory implements BlogDirectory
             return [];
         }
 
-        return BlogPost::query()->visible()->whereIn('id', array_values(array_unique($ids)))->get(['id', 'slug', 'title'])
-            ->mapWithKeys(fn (BlogPost $p) => [$p->id => ['id' => $p->id, 'slug' => $p->slug, 'title' => $p->title]])
+        return BlogPost::query()->visible()->whereIn('id', array_values(array_unique($ids)))->get(['id', 'slug', 'title', 'translations'])
+            ->mapWithKeys(fn (BlogPost $p) => [$p->id => ['id' => $p->id, 'slug' => $p->slug, 'title' => Translations::pick($p, 'title', $this->cards->locale())]])
             ->all();
     }
 
@@ -84,7 +85,7 @@ class EloquentBlogDirectory implements BlogDirectory
     {
         $category = BlogCategory::query()->whereRaw('lower(slug) = ?', [mb_strtolower($slug)])->first();
 
-        return $category === null ? null : ['name' => $category->name, 'slug' => $category->slug, 'description' => $category->description];
+        return $category === null ? null : ['slug' => $category->slug] + Translations::pickMany($category, ['name', 'description'], $this->cards->locale());
     }
 
     public function postMeta(string $slug, bool $includeUnpublished = false): ?array
@@ -95,17 +96,18 @@ class EloquentBlogDirectory implements BlogDirectory
             return null;
         }
         $cover = $post->cover_media_id === null ? null : ($this->media->refs([$post->cover_media_id])[$post->cover_media_id] ?? null);
+        $text = Translations::pickMany($post, ['title', 'excerpt', 'seo_title', 'seo_description'], $this->cards->locale());
 
         return [
             'slug' => $post->slug,
-            'title' => $post->title,
-            'seo_title' => $post->seo_title,
-            'description' => $post->seo_description ?? $post->excerpt,
+            'title' => $text['title'],
+            'seo_title' => $text['seo_title'],
+            'description' => $text['seo_description'] ?? $text['excerpt'],
             'image_url' => $cover['url'] ?? null,
             'published_at' => $post->published_at?->toIso8601String(),
             'updated_at' => $post->updated_at?->toIso8601String(),
             'author' => $this->cards->authorNames(collect([$post]))[$post->author_user_id ?? ''] ?? null,
-            'category' => $post->category === null ? null : ['name' => $post->category->name, 'slug' => $post->category->slug],
+            'category' => $post->category === null ? null : ['name' => Translations::pick($post->category, 'name', $this->cards->locale()), 'slug' => $post->category->slug],
         ];
     }
 

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Modules\Shared\Application\Authorization\PermissionRegistry;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Html\PurifierHtmlSanitizer;
 use App\Modules\Shared\Infrastructure\Sequences\DatabaseSequenceGenerator;
@@ -24,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // Per request (and per queued job / Octane request): never leaks between tenants.
         $this->app->scoped(TenantContext::class);
+        // E12b: the storefront language of this request (base language outside the storefront).
+        $this->app->scoped(LocaleContext::class);
         $this->app->singleton(PermissionRegistry::class);
         $this->app->bind(SequenceGenerator::class, DatabaseSequenceGenerator::class);
         // Rich-text images may only come from the media disk (same-origin /storage locally, the CDN URL otherwise).

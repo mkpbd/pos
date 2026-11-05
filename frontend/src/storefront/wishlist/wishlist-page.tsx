@@ -8,6 +8,8 @@ import { cartErrorMessage } from '../cart/quantity'
 import { useAllProductsBySlugsQuery } from '../catalog/api'
 import { ProductCard } from '../catalog/product-card'
 import type { ProductCard as Card } from '../types'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { useWishlist } from './api'
 
@@ -19,7 +21,8 @@ type Tile = { product: Card; itemId?: string }
  * cart in one click; others link to their page to choose options.
  */
 export function WishlistPage() {
-  useDocumentMeta(privatePage('Wishlist'))
+  const { t } = useLocale()
+  useDocumentMeta(privatePage(t('wishlist.title')))
   const wishlist = useWishlist()
   const guestProducts = useAllProductsBySlugsQuery(wishlist.signedIn ? [] : wishlist.local.map((entry) => entry.slug))
 
@@ -41,30 +44,35 @@ export function WishlistPage() {
 
   return (
     <section className="mx-auto max-w-sf px-4 py-8 lg:py-12" data-testid="wishlist-page">
-      <h1 className="text-3xl font-extrabold lg:text-4xl">Wishlist</h1>
+      <h1 className="text-3xl font-extrabold lg:text-4xl">{t('wishlist.title')}</h1>
       {wishlist.ready && !wishlist.signedIn && wishlist.local.length > 0 && (
         <p className="mt-2 text-sm">
-          Your wishlist is saved in this browser.{' '}
-          <Link to="/account/login?next=%2Fwishlist" className="font-semibold text-sf-accent underline-offset-4 hover:underline">Sign in</Link> to keep it in your account.
+          {rich(t('wishlist.localNote'), {
+            signIn: (
+              <Link to="/account/login?next=%2Fwishlist" className="font-semibold text-sf-accent underline-offset-4 hover:underline">
+                {t('wishlist.signIn')}
+              </Link>
+            ),
+          })}
         </p>
       )}
 
       {error && !tiles ? (
         <div className="mt-6 rounded-sf-card bg-sf-surface p-8 text-center">
-          <p role="alert">Your wishlist could not be loaded. Please try again.</p>
-          <button type="button" className={`${primaryButtonClass} mt-4`} onClick={retry}>Try again</button>
+          <p role="alert">{t('wishlist.loadFailed')}</p>
+          <button type="button" className={`${primaryButtonClass} mt-4`} onClick={retry}>{t('common.tryAgain')}</button>
         </div>
       ) : !tiles ? (
-        <Spinner label="Loading your wishlist" />
+        <Spinner label={t('wishlist.loading')} />
       ) : tiles.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-4 rounded-sf-card bg-sf-surface p-10 text-center">
           <HeartIcon aria-hidden className="size-14 text-sf-border" />
-          <p className="text-lg font-semibold text-sf-heading">Your wishlist is empty.</p>
-          <p className="text-sm">Tap the heart on a product to save it for later.</p>
-          <Link to="/shop" className={primaryButtonClass}>Start shopping</Link>
+          <p className="text-lg font-semibold text-sf-heading">{t('wishlist.empty')}</p>
+          <p className="text-sm">{t('wishlist.emptyHint')}</p>
+          <Link to="/shop" className={primaryButtonClass}>{t('wishlist.startShopping')}</Link>
         </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 lg:grid-cols-4" aria-label="Saved products">
+        <ul className="mt-6 grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 lg:grid-cols-4" aria-label={t('wishlist.savedProducts')}>
           {tiles.map((tile) => (
             <li key={tile.itemId ?? tile.product.id}>
               <ProductCard product={tile.product} actions={<WishlistActions tile={tile} />} />
@@ -81,6 +89,7 @@ function WishlistActions({ tile }: { tile: Tile }) {
   const wishlist = useWishlist()
   const add = useAddToCartMutation()
   const drawer = useCartDrawer()
+  const { t } = useLocale()
   const [error, setError] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
   const busy = add.isPending || removing
@@ -91,7 +100,7 @@ function WishlistActions({ tile }: { tile: Tile }) {
     try {
       await wishlist.removeItem({ itemId, productId: product.id })
     } catch {
-      setError('The wishlist could not be updated. Please try again.')
+      setError(t('wishlist.updateFailed'))
     } finally {
       setRemoving(false)
     }
@@ -107,7 +116,7 @@ function WishlistActions({ tile }: { tile: Tile }) {
           drawer?.open()
           void remove()
         },
-        onError: (e) => setError(cartErrorMessage(e)),
+        onError: (e) => setError(cartErrorMessage(e, t)),
       },
     )
   }
@@ -117,17 +126,17 @@ function WishlistActions({ tile }: { tile: Tile }) {
   return (
     <div className="flex flex-col gap-2">
       {single ? (
-        <button type="button" className={`${buttonClass} bg-sf-accent text-sf-accent-foreground hover:brightness-110`} disabled={busy || !product.in_stock} onClick={moveToCart} aria-label={`Move ${product.name} to the cart`}>
+        <button type="button" className={`${buttonClass} bg-sf-accent text-sf-accent-foreground hover:brightness-110`} disabled={busy || !product.in_stock} onClick={moveToCart} aria-label={t('wishlist.moveToCartLabel', { name: product.name })}>
           {add.isPending ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
-          {product.in_stock ? 'Move to cart' : 'Out of stock'}
+          {product.in_stock ? t('wishlist.moveToCart') : t('catalog.stock.out')}
         </button>
       ) : (
-        <Link to={product.url} className={`${buttonClass} border border-sf-accent text-sf-accent hover:bg-sf-accent hover:text-sf-accent-foreground`} aria-label={`Choose options: ${product.name}`}>
-          Choose options
+        <Link to={product.url} className={`${buttonClass} border border-sf-accent text-sf-accent hover:bg-sf-accent hover:text-sf-accent-foreground`} aria-label={t('wishlist.chooseOptionsLabel', { name: product.name })}>
+          {t('wishlist.chooseOptions')}
         </Link>
       )}
-      <button type="button" className="text-sm font-semibold text-sf-text underline-offset-4 hover:text-sf-sale hover:underline disabled:opacity-60" disabled={busy} onClick={() => void remove()} aria-label={`Remove ${product.name}`}>
-        Remove
+      <button type="button" className="text-sm font-semibold text-sf-text underline-offset-4 hover:text-sf-sale hover:underline disabled:opacity-60" disabled={busy} onClick={() => void remove()} aria-label={t('wishlist.removeLabel', { name: product.name })}>
+        {t('wishlist.remove')}
       </button>
       {error && <p role="alert" className="text-xs text-sf-sale">{error}</p>}
     </div>

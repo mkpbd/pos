@@ -1,5 +1,6 @@
 import type { Promotion, PromotionInput, PromotionScope, PromotionState, PromotionTarget, PromotionTrigger, PromotionType } from '@/features/promotions/api'
 import { fromZonedInput, toZonedInput } from '@/features/promotions/zoned-time'
+import { readBn, toTranslationsInput, validateBn, type BnValues, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
 import { compareDecimal, formatMoney, isZeroDecimal, MONEY_PATTERN, trimDecimal } from '@/lib/money'
 
@@ -73,6 +74,12 @@ export function generateError(count: string, prefix: string): Record<string, str
 
 // ── Editor draft ─────────────────────────────────────────────────────────────
 
+export const PROMOTION_NAME_MAX = 80
+export const PROMOTION_DESCRIPTION_MAX = 200
+/** Texts shoppers see, translatable to Bangla (E12b). */
+export const PROMOTION_TRANSLATIONS = [{ name: 'name', max: PROMOTION_NAME_MAX }, { name: 'description', max: PROMOTION_DESCRIPTION_MAX }] as const
+const PROMOTION_TRANSLATION_NAMES = PROMOTION_TRANSLATIONS.map((f) => f.name)
+
 export type PromotionDraft = {
   name: string
   description: string
@@ -89,6 +96,8 @@ export type PromotionDraft = {
   isActive: boolean
   usageLimit: string
   usageLimitPerCustomer: string
+  /** Bangla name and description (E12b), "" = not translated. */
+  bn: BnValues
 }
 
 export function toDraft(p: Promotion | undefined, timeZone: string | undefined): PromotionDraft {
@@ -108,6 +117,7 @@ export function toDraft(p: Promotion | undefined, timeZone: string | undefined):
     isActive: p?.is_active ?? true,
     usageLimit: p?.usage_limit == null ? '' : String(p.usage_limit),
     usageLimitPerCustomer: p?.usage_limit_per_customer == null ? '' : String(p.usage_limit_per_customer),
+    bn: readBn(p?.translations, PROMOTION_TRANSLATION_NAMES),
   }
 }
 
@@ -143,6 +153,7 @@ export function validateDraft(d: PromotionDraft): Record<string, string> {
   for (const [key, value] of [['usage_limit', d.usageLimit], ['usage_limit_per_customer', d.usageLimitPerCustomer]] as const) {
     if (value.trim() && (!LIMIT.test(value.trim()) || Number(value) < 1)) errors[key] = 'A whole number of at least 1, or empty for no limit.'
   }
+  Object.assign(errors, validateBn(d.bn, PROMOTION_TRANSLATIONS))
   return errors
 }
 
@@ -150,7 +161,7 @@ const orNull = (value: string) => value.trim() || null
 const intOrNull = (value: string) => (value.trim() ? Number(value.trim()) : null)
 
 /** The request body; fields that do not apply are sent empty. */
-export function toInput(d: PromotionDraft, timeZone: string | undefined): PromotionInput {
+export function toInput(d: PromotionDraft, timeZone: string | undefined, before?: TranslationsMap): PromotionInput {
   const scope = d.type === 'free_shipping' ? 'order' : d.scope
   return {
     name: d.name.trim(),
@@ -168,6 +179,7 @@ export function toInput(d: PromotionDraft, timeZone: string | undefined): Promot
     is_active: d.isActive,
     usage_limit: intOrNull(d.usageLimit),
     usage_limit_per_customer: intOrNull(d.usageLimitPerCustomer),
+    translations: toTranslationsInput(d.bn, PROMOTION_TRANSLATION_NAMES, before),
   }
 }
 
@@ -175,14 +187,15 @@ const FIELD_CODES = new Set(['VALIDATION_FAILED', 'PROMOTION_INVALID'])
 
 /**
  * Field errors of a refused save as `{field: message}`; dotted keys ("target_ids.0") collapse
- * to their field. Anything else lands under `form`.
+ * to their field, except Bangla texts ("translations.bn.name") which keep their key for the
+ * Bangla section. Anything else lands under `form`.
  */
 export function promotionErrorMap(error: unknown): Record<string, string> {
   if (error instanceof ApiError && FIELD_CODES.has(error.code)) {
     const map: Record<string, string> = {}
     for (const [key, messages] of Object.entries(error.details)) {
       const message = Array.isArray(messages) ? messages[0] : messages
-      const root = key.split('.')[0] as string
+      const root = key.startsWith('translations.') ? key : (key.split('.')[0] as string)
       if (typeof message === 'string' && !(root in map)) map[root] = message
     }
     if (Object.keys(map).length > 0) return map

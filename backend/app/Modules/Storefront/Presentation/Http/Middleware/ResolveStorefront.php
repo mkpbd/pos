@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Presentation\Http\Middleware;
 
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
@@ -20,6 +21,12 @@ use Symfony\Component\HttpFoundation\Response;
  * Unknown hosts, suspended organizations and closed storefronts are 404. Staff of the
  * organization holding storefront.view may still preview a closed storefront in the
  * browser they are signed in with. Usage: `storefront` (JSON) or `storefront:web` (HTML).
+ *
+ * E12b: it also resolves the request's language into the LocaleContext — JSON requests only
+ * from `?lang=` (the locale is part of the URL, so HTTP caches stay correct), HTML requests
+ * from `?lang=`, then the `lang` cookie, then the store's `default_locale`; a missing,
+ * unknown or disabled language means the default (`en` while Bangla is off). Every answer
+ * carries `Content-Language`.
  */
 class ResolveStorefront
 {
@@ -28,6 +35,7 @@ class ResolveStorefront
     public function __construct(
         private readonly TenantContext $context,
         private readonly OrganizationDirectory $organizations,
+        private readonly LocaleContext $locale,
     ) {}
 
     public function handle(Request $request, Closure $next, string $mode = 'api'): Response
@@ -42,10 +50,11 @@ class ResolveStorefront
             return $this->notFound($mode);
         }
 
-        $enabled = (bool) StorefrontSettings::query()
+        $settings = StorefrontSettings::query()
             ->withoutGlobalScope('organization')
             ->where('organization_id', $organizationId)
-            ->value('is_enabled');
+            ->first(['is_enabled', 'bangla_enabled', 'default_locale', 'bangla_digits']);
+        $enabled = (bool) $settings?->is_enabled;
 
         $preview = false;
         if (! $enabled) {
@@ -62,10 +71,23 @@ class ResolveStorefront
         $request->attributes->set(self::ATTRIBUTE, ['organization_id' => $organizationId, 'preview' => $preview]);
         $this->context->setOrganization($organizationId);
 
+        $bangla = (bool) ($settings->bangla_enabled ?? true);
+        $default = (string) ($settings->default_locale ?? LocaleContext::BASE);
+        $requested = $request->query('lang');
+        if ($mode === 'web' && LocaleContext::resolve($requested, $bangla, '') !== $requested) {
+            // No (valid) ?lang= on a page: the language the shopper picked last time.
+            $requested = $request->cookie('lang');
+        }
+        $this->locale->configure($bangla, $default, LocaleContext::resolve($requested, $bangla, $default), (bool) ($settings->bangla_digits ?? false));
+
         try {
-            return $next($request);
+            $response = $next($request);
+            $response->headers->set('Content-Language', $this->locale->current());
+
+            return $response;
         } finally {
             $this->context->setOrganization(null);
+            $this->locale->reset();
         }
     }
 

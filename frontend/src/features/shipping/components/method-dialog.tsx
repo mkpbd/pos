@@ -1,4 +1,4 @@
-import { useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useSaveMethodMutation, type ShippingMethod, type ShippingZone } from '@/features/shipping/api'
-import { METHOD_FIELDS, methodSchema, toMethodInput, toMethodValues, type MethodValues } from '@/features/shipping/shipping'
-import { handleFormError } from '@/lib/forms'
+import { METHOD_DESCRIPTION_MAX, METHOD_FIELDS, METHOD_NAME_MAX, methodSchema, toMethodInput, toMethodValues, type MethodValues } from '@/features/shipping/shipping'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { handleTranslatedFormError, rhfBnErrors } from '@/features/translations/translations'
 
 type Props = {
   zone: ShippingZone
@@ -25,35 +26,35 @@ export function MethodDialog({ zone, method, currency, onClose }: Props) {
   const save = useSaveMethodMutation()
   const form = useForm<MethodValues>({ resolver: zodResolver(methodSchema), defaultValues: toMethodValues(method, zone.methods.length) })
   const { errors } = form.formState
-  const [codAllowed, isActive] = useWatch({ control: form.control, name: ['cod_allowed', 'is_active'] })
+  const [codAllowed, isActive, name, description] = useWatch({ control: form.control, name: ['cod_allowed', 'is_active', 'name', 'description'] })
   const money = currency ? ` (${currency})` : ''
 
   const onSubmit = form.handleSubmit((values) =>
     save.mutate(
-      { zoneId: zone.id, id: method?.id, input: toMethodInput(values) },
+      { zoneId: zone.id, id: method?.id, input: toMethodInput(values, method?.translations) },
       {
         onSuccess: (saved) => {
           toast.success(`${saved.name} saved.`)
           onClose()
         },
-        onError: (error) => handleFormError(error, form.setError, METHOD_FIELDS),
+        onError: (error) => handleTranslatedFormError(error, form.setError, METHOD_FIELDS),
       },
     ),
   )
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !save.isPending) onClose() }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{method ? `Edit ${method.name}` : `New delivery method in ${zone.name}`}</DialogTitle>
           <DialogDescription>Fees are added after VAT at checkout.</DialogDescription>
         </DialogHeader>
         <form id="method-form" noValidate onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
           <FormField label="Name" error={errors.name?.message} className="sm:col-span-2">
-            <Input autoFocus maxLength={60} placeholder="e.g. Home delivery" {...form.register('name')} />
+            <Input autoFocus maxLength={METHOD_NAME_MAX} placeholder="e.g. Home delivery" {...form.register('name')} />
           </FormField>
           <FormField label="Description (optional)" error={errors.description?.message} className="sm:col-span-2">
-            <Textarea rows={2} maxLength={160} {...form.register('description')} />
+            <Textarea rows={2} maxLength={METHOD_DESCRIPTION_MAX} {...form.register('description')} />
           </FormField>
           <FormField label={`Delivery fee${money}`} error={errors.fee?.message}>
             <Input inputMode="decimal" className="font-mono" {...form.register('fee')} />
@@ -83,6 +84,18 @@ export function MethodDialog({ zone, method, currency, onClose }: Props) {
             <Switch id="method-active" checked={isActive} onCheckedChange={(v) => form.setValue('is_active', v, { shouldDirty: true })} />
             <Label htmlFor="method-active" className="font-normal">Active</Label>
           </div>
+          <Controller control={form.control} name="translations.bn" render={({ field }) => (
+            <BanglaTranslations
+              className="sm:col-span-2"
+              fields={[
+                { name: 'name', label: 'Name', base: name, max: METHOD_NAME_MAX },
+                { name: 'description', label: 'Description', base: description, kind: 'textarea', max: METHOD_DESCRIPTION_MAX },
+              ]}
+              value={field.value}
+              onChange={field.onChange}
+              errors={rhfBnErrors(errors.translations)}
+            />
+          )} />
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={save.isPending}>Cancel</Button>

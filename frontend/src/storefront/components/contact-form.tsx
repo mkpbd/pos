@@ -3,6 +3,7 @@ import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { useContactMutation } from '../api'
 import { storeFormError } from '../form-errors'
+import { useLocale } from '../i18n/locale'
 
 type Fields = { name: string; email: string; phone: string; subject: string; message: string; website: string }
 const EMPTY: Fields = { name: '', email: '', phone: '', subject: '', message: '', website: '' }
@@ -12,6 +13,7 @@ const inputClass = 'w-full rounded-lg border border-sf-border bg-sf-surface px-4
 /** The contact form; messages land in the admin under Content → Messages. */
 export function ContactForm() {
   const id = useId()
+  const { t } = useLocale()
   const send = useContactMutation()
   const [fields, setFields] = useState<Fields>(EMPTY)
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({})
@@ -21,7 +23,7 @@ export function ContactForm() {
     return (
       <div role="status" className="rounded-sf-card bg-sf-surface p-6">
         <p className="font-semibold text-sf-heading">{send.data.message}</p>
-        <button type="button" className="mt-3 text-sm underline" onClick={() => send.reset()}>Send another message</button>
+        <button type="button" className="mt-3 text-sm underline" onClick={() => send.reset()}>{t('shell.contact.sendAnother')}</button>
       </div>
     )
   }
@@ -29,9 +31,9 @@ export function ContactForm() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const local: typeof errors = {}
-    if (!fields.name.trim()) local.name = 'Please enter your name.'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) local.email = 'Please enter a valid e-mail address.'
-    if (fields.message.trim().length < 10) local.message = 'Please write at least 10 characters.'
+    if (!fields.name.trim()) local.name = t('shell.contact.nameRequired')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) local.email = t('shell.contact.emailInvalid')
+    if (fields.message.trim().length < 10) local.message = t('shell.contact.messageTooShort', { min: 10 })
     setErrors(local)
     if (Object.keys(local).length > 0) return
 
@@ -72,15 +74,15 @@ export function ContactForm() {
   )
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-6" aria-label="Contact form">
+    <form noValidate onSubmit={submit} className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-6" aria-label={t('shell.contact.form')}>
       <div className="grid gap-4 sm:grid-cols-2">
-        {field('name', 'Your name', { autoComplete: 'name', maxLength: 120, required: true })}
-        {field('email', 'E-mail', { type: 'email', autoComplete: 'email', maxLength: 254, required: true })}
-        {field('phone', 'Phone (optional)', { type: 'tel', autoComplete: 'tel', maxLength: 20 })}
-        {field('subject', 'Subject (optional)', { maxLength: 160 })}
+        {field('name', t('shell.contact.name'), { autoComplete: 'name', maxLength: 120, required: true })}
+        {field('email', t('shell.contact.email'), { type: 'email', autoComplete: 'email', maxLength: 254, required: true })}
+        {field('phone', t('shell.contact.phone'), { type: 'tel', autoComplete: 'tel', maxLength: 20 })}
+        {field('subject', t('shell.contact.subject'), { maxLength: 160 })}
       </div>
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${id}-message`} className="text-sm font-medium text-sf-heading">Message</label>
+        <label htmlFor={`${id}-message`} className="text-sm font-medium text-sf-heading">{t('shell.contact.message')}</label>
         <textarea
           id={`${id}-message`}
           rows={5}
@@ -96,12 +98,12 @@ export function ContactForm() {
       </div>
       {/* Honeypot: hidden from people and assistive technology, filled in only by bots. */}
       <div aria-hidden className="absolute -left-[10000px] h-px w-px overflow-hidden">
-        <label htmlFor={`${id}-website`}>Website</label>
+        <label htmlFor={`${id}-website`}>{t('shell.contact.website')}</label>
         <input id={`${id}-website`} tabIndex={-1} autoComplete="off" value={fields.website} onChange={(e) => set({ website: e.target.value })} />
       </div>
-      {send.isError && <p role="alert" className="text-sm font-medium text-sf-sale">{storeFormError(send.error)}</p>}
+      {send.isError && <p role="alert" className="text-sm font-medium text-sf-sale">{storeFormError(send.error, t)}</p>}
       <button type="submit" disabled={send.isPending} className="self-start rounded-sf-button bg-sf-accent px-6 py-3 font-semibold text-sf-accent-foreground transition hover:brightness-110 disabled:opacity-70">
-        {send.isPending ? 'Sending…' : 'Send message'}
+        {send.isPending ? t('shell.contact.sending') : t('shell.contact.send')}
       </button>
     </form>
   )

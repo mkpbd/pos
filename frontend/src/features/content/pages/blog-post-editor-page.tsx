@@ -19,6 +19,8 @@ import { BlogStateBadge } from '@/features/content/components/blog-state-badge'
 import { RichTextEditor } from '@/features/content/components/rich-text-editor'
 import { slugify } from '@/features/content/slug'
 import { MediaField } from '@/features/media/components/media-picker'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors } from '@/features/translations/translations'
 import { fieldErrorMap } from '@/lib/forms'
 
 const NONE = 'none'
@@ -128,6 +130,18 @@ function Editor({ post }: { post?: BlogPost }) {
               <RichTextEditor id="post-body" label="Post text" value={draft.body} onChange={(body) => set({ body })} invalid={!!errors.body_html} />
               {errors.body_html && <p className="text-sm text-destructive">{errors.body_html}</p>}
             </div>
+            <BanglaTranslations
+              fields={[
+                { name: 'title', label: 'Title', base: draft.title, max: BLOG_LIMITS.title },
+                { name: 'excerpt', label: 'Excerpt', base: draft.excerpt, kind: 'textarea', rows: 3, max: BLOG_LIMITS.excerpt },
+                { name: 'body_html', label: 'Post text', base: draft.body, kind: 'rich' },
+                { name: 'seo_title', label: 'SEO title', base: draft.seoTitle, max: BLOG_LIMITS.seoTitle },
+                { name: 'seo_description', label: 'Meta description', base: draft.seoDescription, kind: 'textarea', rows: 3, max: BLOG_LIMITS.seoDescription },
+              ]}
+              value={draft.bn}
+              onChange={(bn) => set({ bn })}
+              errors={bnErrors(errors)}
+            />
           </CardContent>
         </Card>
 

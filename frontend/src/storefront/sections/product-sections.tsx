@@ -5,6 +5,7 @@ import { PRODUCT_RAIL_ITEM, Rail } from '../catalog/product-rail'
 import { Tabs } from '../catalog/product-tabs'
 import { MediaImage } from '../components/media-image'
 import { MenuLink } from '../components/menu-link'
+import { useLocale } from '../i18n/locale'
 import type { ProductCard as Card, StoreSection } from '../types'
 import { SectionHeading } from './section-heading'
 
@@ -15,6 +16,7 @@ const GRID_COLUMNS: Record<3 | 4 | 5, string> = {
 }
 
 function ViewAll({ url }: { url: string | null | undefined }) {
+  const { t } = useLocale()
   if (!url) return null
 
   return (
@@ -23,7 +25,7 @@ function ViewAll({ url }: { url: string | null | undefined }) {
         url={url}
         className="inline-flex items-center gap-2 rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-bold tracking-wide text-sf-primary-foreground uppercase transition hover:brightness-105"
       >
-        View all
+        {t('content.section.viewAll')}
         <ArrowRightIcon aria-hidden className="size-4" />
       </MenuLink>
     </div>
@@ -41,18 +43,21 @@ function ProductRail({ label, products }: { label: string; products: Card[] }) {
 }
 
 export function ProductCarouselSection({ section }: { section: Extract<StoreSection, { type: 'product_carousel' }> }) {
+  const { t } = useLocale()
+  const label = section.title ?? t('content.section.products')
   return (
-    <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={section.title ?? 'Products'}>
+    <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={label}>
       <SectionHeading section={section} />
-      <ProductRail label={section.title ?? 'Products'} products={section.products} />
+      <ProductRail label={label} products={section.products} />
       <ViewAll url={section.config.view_all_url} />
     </section>
   )
 }
 
 export function ProductGridSection({ section }: { section: Extract<StoreSection, { type: 'product_grid' }> }) {
+  const { t } = useLocale()
   return (
-    <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={section.title ?? 'Products'}>
+    <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={section.title ?? t('content.section.products')}>
       <SectionHeading section={section} />
       <ul className={cn('grid grid-cols-2 gap-3 sm:gap-5', GRID_COLUMNS[section.config.columns] ?? GRID_COLUMNS[4])}>
         {section.products.map((p) => (
@@ -68,13 +73,14 @@ export function ProductGridSection({ section }: { section: Extract<StoreSection,
 
 /** Pill tabs (e.g. New arrivals / Best sellers / On sale), each a product carousel. Empty tabs are left out. */
 export function ProductTabsSection({ section }: { section: Extract<StoreSection, { type: 'product_tabs' }> }) {
-  const tabs = section.tabs.filter((t) => t.products.length > 0)
+  const { t } = useLocale()
+  const tabs = section.tabs.filter((tab) => tab.products.length > 0)
 
   return (
-    <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={section.title ?? 'Products'}>
+    <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={section.title ?? t('content.section.products')}>
       <SectionHeading section={section} />
       <Tabs
-        label={section.title ?? 'Product collections'}
+        label={section.title ?? t('content.section.productCollections')}
         tabListClassName="justify-center"
         tabs={tabs.map((tab, i) => ({ id: `${i}-${tab.label}`, label: tab.label, content: <ProductRail label={tab.label} products={tab.products} /> }))}
       />
@@ -83,7 +89,8 @@ export function ProductTabsSection({ section }: { section: Extract<StoreSection,
 }
 
 export function CategoryStrip({ section }: { section: Extract<StoreSection, { type: 'category_strip' }> }) {
-  const label = section.title ?? 'Shop by category'
+  const { t } = useLocale()
+  const label = section.title ?? t('content.section.shopByCategory')
 
   return (
     <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={label}>
@@ -102,7 +109,7 @@ export function CategoryStrip({ section }: { section: Extract<StoreSection, { ty
             </span>
             <span>
               <span className="block font-heading font-bold text-sf-heading group-hover:text-sf-accent">{c.name}</span>
-              <span className="block text-xs">{c.product_count === 1 ? '1 product' : `${c.product_count} products`}</span>
+              <span className="block text-xs">{t('content.section.productCount', { count: c.product_count })}</span>
             </span>
           </MenuLink>
         ))}
@@ -112,7 +119,8 @@ export function CategoryStrip({ section }: { section: Extract<StoreSection, { ty
 }
 
 export function BrandStrip({ section }: { section: Extract<StoreSection, { type: 'brand_strip' }> }) {
-  const label = section.title ?? 'Our brands'
+  const { t } = useLocale()
+  const label = section.title ?? t('content.section.ourBrands')
 
   return (
     <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={label}>

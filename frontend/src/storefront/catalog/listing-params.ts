@@ -1,3 +1,5 @@
+import type { MessageKey } from '../i18n/en'
+import type { Translate } from '../i18n/translate'
 import type { ListingPagination, SortKey } from '../types'
 
 /**
@@ -9,14 +11,15 @@ import type { ListingPagination, SortKey } from '../types'
  * API query: q, category, brand[], attr[slug][], price_min, price_max, in_stock, on_sale, sort, page, per_page
  */
 
-export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'featured', label: 'Featured' },
-  { value: 'popularity', label: 'Best selling' },
-  { value: 'rating', label: 'Top rated' },
-  { value: 'latest', label: 'Newest' },
-  { value: 'price_asc', label: 'Price: low to high' },
-  { value: 'price_desc', label: 'Price: high to low' },
-  { value: 'name', label: 'Name: A to Z' },
+/** Sort choices; `label` is the dictionary key of the option's text. */
+export const SORT_OPTIONS: { value: SortKey; label: MessageKey }[] = [
+  { value: 'featured', label: 'catalog.sort.featured' },
+  { value: 'popularity', label: 'catalog.sort.popularity' },
+  { value: 'rating', label: 'catalog.sort.rating' },
+  { value: 'latest', label: 'catalog.sort.latest' },
+  { value: 'price_asc', label: 'catalog.sort.priceAsc' },
+  { value: 'price_desc', label: 'catalog.sort.priceDesc' },
+  { value: 'name', label: 'catalog.sort.name' },
 ]
 
 export const PER_PAGE_OPTIONS = [12, 24, 36, 48] as const
@@ -198,10 +201,10 @@ export function searchUrl(q: string): string {
 }
 
 /** "Showing 1–24 of 57 products" — announced when the results change. */
-export function resultSummary({ current_page, per_page, total }: ListingPagination): string {
-  if (total === 0) return 'No products found'
-  if (total === 1) return 'Showing 1 product'
+export function resultSummary({ current_page, per_page, total }: ListingPagination, t: Translate): string {
+  if (total === 0) return t('catalog.results.none')
+  if (total === 1) return t('catalog.results.single', { count: 1 })
   const first = (current_page - 1) * per_page + 1
   const last = Math.min(total, current_page * per_page)
-  return first === 1 && last === total ? `Showing all ${total} products` : `Showing ${first}–${last} of ${total} products`
+  return first === 1 && last === total ? t('catalog.results.all', { total }) : t('catalog.results.range', { first, last, total })
 }

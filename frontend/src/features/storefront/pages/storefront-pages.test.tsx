@@ -129,6 +129,8 @@ describe('online store admin', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Add item' }))
     await user.type(screen.getByLabelText('Item 1 label'), 'Boys')
+    expect(screen.getByLabelText('Item 1 Bangla label')).toHaveAttribute('lang', 'bn')
+    await user.type(screen.getByLabelText('Item 1 Bangla label'), 'ছেলেদের')
     await user.type(screen.getByLabelText('Item 1 link'), '/boys')
     await user.click(screen.getByRole('button', { name: 'Add child to Item 1' }))
     await user.type(screen.getByLabelText('Item 1.1 label'), 'Shirts')
@@ -149,6 +151,7 @@ describe('online store admin', () => {
         items: [
           {
             type: 'custom', label: 'Boys', url: '/boys', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: true, mega_columns: 4, image_media_id: null,
+            translations: { bn: { label: 'ছেলেদের' } },
             children: [{ type: 'custom', label: 'Shirts', url: '/boys/shirts', target_id: null, open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }],
           },
         ],

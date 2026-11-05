@@ -27,9 +27,20 @@ import { RichTextEditor } from '@/features/content/components/rich-text-editor'
 import { PageStatusBadge } from '@/features/content/components/page-status-badge'
 import { slugify, SLUG_PATTERN } from '@/features/content/slug'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors, readBn, toTranslationsInput, validateBn, type BnValues } from '@/features/translations/translations'
 import { fieldErrorMap } from '@/lib/forms'
 
-type Draft = { title: string; slug: string; template: PageTemplate; status: PageStatus; publishAt: string; body: string; seoTitle: string; seoDescription: string }
+/** Translatable page fields (E12b) with the base fields' limits. */
+const PAGE_TRANSLATIONS = [
+  { name: 'title', max: 160 },
+  { name: 'body_html' },
+  { name: 'seo_title', max: 160 },
+  { name: 'seo_description', max: 300 },
+] as const
+const PAGE_TRANSLATION_NAMES = PAGE_TRANSLATIONS.map((f) => f.name)
+
+type Draft = { title: string; slug: string; template: PageTemplate; status: PageStatus; publishAt: string; body: string; seoTitle: string; seoDescription: string; bn: BnValues }
 
 const toDraft = (p?: CmsPage): Draft => ({
   title: p?.title ?? '',
@@ -40,6 +51,7 @@ const toDraft = (p?: CmsPage): Draft => ({
   body: p?.body_html ?? '',
   seoTitle: p?.seo_title ?? '',
   seoDescription: p?.seo_description ?? '',
+  bn: readBn(p?.translations, PAGE_TRANSLATION_NAMES),
 })
 
 function Editor({ page }: { page?: CmsPage }) {
@@ -57,6 +69,7 @@ function Editor({ page }: { page?: CmsPage }) {
     const local: Record<string, string> = {}
     if (!draft.title.trim()) local.title = 'Enter a title.'
     if (!SLUG_PATTERN.test(draft.slug)) local.slug = 'Lower-case letters, digits and single hyphens, e.g. about-us.'
+    Object.assign(local, validateBn(draft.bn, PAGE_TRANSLATIONS))
     if (Object.keys(local).length > 0) return setErrors(local)
     setErrors({})
 
@@ -69,6 +82,7 @@ function Editor({ page }: { page?: CmsPage }) {
       body_html: draft.body || null,
       seo_title: draft.seoTitle.trim() || null,
       seo_description: draft.seoDescription.trim() || null,
+      translations: toTranslationsInput(draft.bn, PAGE_TRANSLATION_NAMES, page?.translations),
     }
     save.mutate(
       { id: page?.id, input },
@@ -137,6 +151,17 @@ function Editor({ page }: { page?: CmsPage }) {
               <RichTextEditor id="page-body" label="Page text" value={draft.body} onChange={(body) => set({ body })} invalid={!!errors.body_html} />
               {errors.body_html && <p className="text-sm text-destructive">{errors.body_html}</p>}
             </div>
+            <BanglaTranslations
+              fields={[
+                { name: 'title', label: 'Title', base: draft.title, max: 160 },
+                { name: 'body_html', label: 'Page text', base: draft.body, kind: 'rich' },
+                { name: 'seo_title', label: 'SEO title', base: draft.seoTitle, max: 160 },
+                { name: 'seo_description', label: 'Meta description', base: draft.seoDescription, kind: 'textarea', rows: 3, max: 300 },
+              ]}
+              value={draft.bn}
+              onChange={(bn) => set({ bn })}
+              errors={bnErrors(errors)}
+            />
           </CardContent>
         </Card>
 

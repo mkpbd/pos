@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api, toPaginated, type ApiMeta, type Paginated } from '@/lib/api/client'
 
 export const PAGE_TEMPLATES = ['default', 'faq', 'contact'] as const
@@ -24,7 +25,8 @@ export type CmsPageSummary = {
   updated_at: string | null
 }
 
-export type CmsPage = CmsPageSummary & { body_html: string | null }
+/** `translations.bn` (E12b): title, body_html, seo_title, seo_description. */
+export type CmsPage = CmsPageSummary & { body_html: string | null; translations?: TranslationsMap }
 
 export type CmsPageInput = {
   slug: string
@@ -35,10 +37,12 @@ export type CmsPageInput = {
   published_at: string | null
   seo_title: string | null
   seo_description: string | null
+  translations?: TranslationsInput
 }
 
-export type FaqItem = { id: string; group: string | null; question: string; answer_html: string; is_active: boolean; sort_order: number }
-export type FaqInput = { group: string | null; question: string; answer_html: string; is_active: boolean }
+/** `translations.bn` (E12b): question, answer_html. */
+export type FaqItem = { id: string; group: string | null; question: string; answer_html: string; is_active: boolean; sort_order: number; translations?: TranslationsMap }
+export type FaqInput = { group: string | null; question: string; answer_html: string; is_active: boolean; translations?: TranslationsInput }
 
 export type ContactMessage = {
   id: string
@@ -197,8 +201,10 @@ export type BlogCategory = {
   post_count?: number
   published_post_count?: number
   updated_at?: string | null
+  /** `translations.bn` (E12b): name, description. */
+  translations?: TranslationsMap
 }
-export type BlogCategoryInput = { name: string; slug: string; description: string | null }
+export type BlogCategoryInput = { name: string; slug: string; description: string | null; translations?: TranslationsInput }
 
 /** A media reference as the API sends it for covers. */
 export type BlogCover = { id: string; url: string; srcset?: string | null; alt?: string | null }
@@ -226,6 +232,8 @@ export type BlogPost = BlogPostSummary & {
   body_html: string | null
   seo_title: string | null
   seo_description: string | null
+  /** `translations.bn` (E12b): title, excerpt, body_html, seo_title, seo_description. */
+  translations?: TranslationsMap
 }
 
 export type BlogPostInput = {
@@ -239,6 +247,7 @@ export type BlogPostInput = {
   published_at: string | null
   seo_title: string | null
   seo_description: string | null
+  translations?: TranslationsInput
 }
 
 /** `category_id: 'none'` lists uncategorised posts. */

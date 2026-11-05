@@ -3,6 +3,7 @@
 namespace App\Modules\Shipping\Presentation\Http\Support;
 
 use App\Modules\Geography\Application\Contracts\GeoDirectory;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shipping\Infrastructure\EloquentShippingRates;
 use App\Modules\Shipping\Infrastructure\Models\ShippingMethod;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
@@ -49,6 +50,8 @@ class ShippingPresenter
         return ['id' => $m->id, 'zone_id' => $m->zone_id] + EloquentShippingRates::option($m) + [
             'is_active' => $m->is_active,
             'sort_order' => $m->sort_order,
+            // E12b: {bn: {name, description}}.
+            'translations' => TranslationInput::present($m->translations),
         ];
     }
 }

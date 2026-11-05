@@ -1,9 +1,25 @@
 import type { BlogPost, BlogPostInput, BlogPostState, BlogPostSummary } from '@/features/content/api'
 import { SLUG_PATTERN } from '@/features/content/slug'
 import { fromZonedInput, toZonedInput } from '@/features/promotions/zoned-time'
+import { readBn, toTranslationsInput, validateBn, type BnValues } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
 
 export const BLOG_LIMITS = { title: 160, slug: 100, excerpt: 300, seoTitle: 70, seoDescription: 160, categoryName: 80, categoryDescription: 300 } as const
+
+/** Translatable post and category fields (E12b) with the base fields' limits. */
+export const BLOG_POST_TRANSLATIONS = [
+  { name: 'title', max: BLOG_LIMITS.title },
+  { name: 'excerpt', max: BLOG_LIMITS.excerpt },
+  { name: 'body_html' },
+  { name: 'seo_title', max: BLOG_LIMITS.seoTitle },
+  { name: 'seo_description', max: BLOG_LIMITS.seoDescription },
+] as const
+export const BLOG_POST_TRANSLATION_NAMES = BLOG_POST_TRANSLATIONS.map((f) => f.name)
+export const BLOG_CATEGORY_TRANSLATIONS = [
+  { name: 'name', max: BLOG_LIMITS.categoryName },
+  { name: 'description', max: BLOG_LIMITS.categoryDescription },
+] as const
+export const BLOG_CATEGORY_TRANSLATION_NAMES = BLOG_CATEGORY_TRANSLATIONS.map((f) => f.name)
 
 export const BLOG_STATE_LABELS: Record<BlogPostState, string> = { published: 'Published', scheduled: 'Scheduled', draft: 'Draft' }
 
@@ -39,6 +55,8 @@ export type BlogDraft = {
   publishAt: string
   seoTitle: string
   seoDescription: string
+  /** Bangla texts (E12b), "" = not translated. */
+  bn: BnValues
 }
 
 export function toBlogDraft(post: BlogPost | undefined, timeZone: string | undefined): BlogDraft {
@@ -54,6 +72,7 @@ export function toBlogDraft(post: BlogPost | undefined, timeZone: string | undef
     publishAt: state === 'scheduled' ? toZonedInput(post?.published_at, timeZone) : '',
     seoTitle: post?.seo_title ?? '',
     seoDescription: post?.seo_description ?? '',
+    bn: readBn(post?.translations, BLOG_POST_TRANSLATION_NAMES),
   }
 }
 
@@ -67,6 +86,7 @@ export function validateBlogDraft(d: BlogDraft, timeZone: string | undefined, no
     if (!at) errors.published_at = 'Choose when the post goes live.'
     else if (new Date(at).getTime() <= now.getTime()) errors.published_at = 'Choose a time in the future, or publish now.'
   }
+  Object.assign(errors, validateBn(d.bn, BLOG_POST_TRANSLATIONS))
   return errors
 }
 
@@ -90,6 +110,7 @@ export function toBlogInput(d: BlogDraft, existing: BlogPost | undefined, timeZo
     published_at: publishedAt,
     seo_title: d.seoTitle.trim() || null,
     seo_description: d.seoDescription.trim() || null,
+    translations: toTranslationsInput(d.bn, BLOG_POST_TRANSLATION_NAMES, existing?.translations),
   }
 }
 

@@ -2,6 +2,7 @@ import { BadgePercentIcon, ClockIcon, CreditCardIcon, GiftIcon, HeadsetIcon, Hea
 import { cn } from '@/lib/utils'
 import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
+import { useLocale } from '../i18n/locale'
 import type { FeatureIconKey, StoreSection } from '../types'
 import { SectionHeading } from './section-heading'
 
@@ -35,9 +36,10 @@ export function RichTextSection({ section }: { section: Extract<StoreSection, { 
 
 export function FeaturesStrip({ section }: { section: Extract<StoreSection, { type: 'features_strip' }> }) {
   const { config } = section
+  const { t } = useLocale()
 
   return (
-    <section style={config.background ? { backgroundColor: config.background } : undefined} aria-label={section.title ?? 'Why shop with us'}>
+    <section style={config.background ? { backgroundColor: config.background } : undefined} aria-label={section.title ?? t('content.section.whyShop')}>
       <div className="mx-auto max-w-sf px-4 py-10">
         <SectionHeading section={section} />
         <ul className={cn('grid gap-6 sm:grid-cols-2', config.items.length >= 4 ? 'lg:grid-cols-4' : config.items.length === 3 ? 'lg:grid-cols-3' : '')}>
@@ -62,8 +64,9 @@ export function FeaturesStrip({ section }: { section: Extract<StoreSection, { ty
 }
 
 function Stars({ rating }: { rating: number }) {
+  const { t } = useLocale()
   return (
-    <p className="flex gap-0.5 text-sf-primary" aria-label={`${rating} out of 5 stars`}>
+    <p className="flex gap-0.5 text-sf-primary" aria-label={t('content.section.stars', { rating, max: 5 })}>
       {Array.from({ length: 5 }, (_, i) => <StarIcon key={i} className={cn('size-4', i < rating ? 'fill-current' : 'opacity-30')} aria-hidden />)}
     </p>
   )
@@ -71,9 +74,10 @@ function Stars({ rating }: { rating: number }) {
 
 export function Testimonials({ section }: { section: Extract<StoreSection, { type: 'testimonials' }> }) {
   const { config } = section
+  const { t } = useLocale()
 
   return (
-    <section style={config.background ? { backgroundColor: config.background } : undefined} aria-label={section.title ?? 'Customer reviews'}>
+    <section style={config.background ? { backgroundColor: config.background } : undefined} aria-label={section.title ?? t('content.section.customerReviews')}>
       <div className="mx-auto max-w-sf px-4 py-12">
         <SectionHeading section={section} />
         <ul className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

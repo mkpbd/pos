@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { useLocale } from '../i18n/locale'
 import type { ProductDetail } from '../types'
 
 export type GalleryImage = ProductDetail['images'][number]
@@ -21,6 +22,7 @@ export function ProductLightbox({
   onIndexChange: (index: number) => void
   label: (i: number) => string
 }) {
+  const { t, formatNumber } = useLocale()
   const count = images.length
   const image = images[index]
   const go = (next: number) => onIndexChange((next + count) % count)
@@ -38,17 +40,17 @@ export function ProductLightbox({
         onKeyDown={onKeyDown}
       >
         <DialogTitle className="sr-only">{label(index)}</DialogTitle>
-        <DialogDescription className="sr-only">Use the arrow keys to see the other images.</DialogDescription>
+        <DialogDescription className="sr-only">{t('catalog.gallery.arrowHint')}</DialogDescription>
         {image && <img src={image.url} alt={image.alt || label(index)} decoding="async" className="max-h-[85dvh] max-w-full object-contain" />}
         {count > 1 && (
           <div className="flex items-center gap-4">
-            <button type="button" onClick={() => go(index - 1)} aria-label="Previous image" className="grid size-11 place-items-center rounded-full bg-white/15 hover:bg-white/30">
+            <button type="button" onClick={() => go(index - 1)} aria-label={t('catalog.gallery.previousImage')} className="grid size-11 place-items-center rounded-full bg-white/15 hover:bg-white/30">
               <ChevronLeftIcon aria-hidden className="size-6" />
             </button>
             <p aria-live="polite" className="text-sm tabular-nums">
-              {index + 1} / {count}
+              {formatNumber(index + 1)} / {formatNumber(count)}
             </p>
-            <button type="button" onClick={() => go(index + 1)} aria-label="Next image" className="grid size-11 place-items-center rounded-full bg-white/15 hover:bg-white/30">
+            <button type="button" onClick={() => go(index + 1)} aria-label={t('catalog.gallery.nextImage')} className="grid size-11 place-items-center rounded-full bg-white/15 hover:bg-white/30">
               <ChevronRightIcon aria-hidden className="size-6" />
             </button>
           </div>

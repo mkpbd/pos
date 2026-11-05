@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\HomepageSection;
@@ -41,6 +42,8 @@ final class ContentPresenter
             'is_live' => $b->isLive(),
             'state' => $b->state(),
             'sort_order' => $b->sort_order,
+            // E12b: {bn: {kicker, title, subtitle, button_label, secondary_button_label}}.
+            'translations' => TranslationInput::present($b->translations),
             'updated_at' => $b->updated_at?->toIso8601String(),
         ];
     }
@@ -72,6 +75,8 @@ final class ContentPresenter
             'ends_at' => $s->ends_at?->toIso8601String(),
             'state' => $s->scheduleState(),
             'sort_order' => $s->sort_order,
+            // E12b: {bn: {title, subtitle, + body_html (rich_text) / text, button_label (newsletter)}}.
+            'translations' => TranslationInput::present($s->translations),
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

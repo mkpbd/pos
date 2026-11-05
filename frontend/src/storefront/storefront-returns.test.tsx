@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api/client'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 import { canRequestReturn, returnErrorMessage } from './orders/returns-api'
 import { storefrontRoutes } from './routes'
-import { bootstrapFixture, cartFixture, customerFixture, listingBody, orderFixture, productCard } from './test-fixtures'
+import { bootstrapFixture, cartFixture, customerFixture, listingBody, orderFixture, productCard, tEn } from './test-fixtures'
 import type { AccountOrder, AccountReturn, OrderReturnSummary } from './types'
 
 type Routes = Parameters<typeof mockApi>[0]
@@ -336,8 +336,8 @@ describe('my returns page', () => {
 
 describe('return error messages', () => {
   it('falls back for unknown refusals', () => {
-    expect(returnErrorMessage(new ApiError(422, 'RETURN_NOT_ALLOWED', 'x', {}))).toBe('This order cannot be returned online. Please contact us for help.')
-    expect(returnErrorMessage(new ApiError(422, 'VALIDATION_FAILED', 'x', { note: ['The note may not be greater than 500 characters.'] }))).toBe(
+    expect(returnErrorMessage(new ApiError(422, 'RETURN_NOT_ALLOWED', 'x', {}), tEn)).toBe('This order cannot be returned online. Please contact us for help.')
+    expect(returnErrorMessage(new ApiError(422, 'VALIDATION_FAILED', 'x', { note: ['The note may not be greater than 500 characters.'] }), tEn)).toBe(
       'The note may not be greater than 500 characters.',
     )
   })

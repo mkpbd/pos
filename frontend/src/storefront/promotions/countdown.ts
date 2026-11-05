@@ -36,12 +36,12 @@ const pad = (n: number) => String(n).padStart(2, '0')
 
 /**
  * "05:04:03" under a day, "2d 05:04:03" from 24 hours on; with minute precision (reduced
- * motion) "05:04" / "2d 05:04".
+ * motion) "05:04" / "2d 05:04". `daySuffix` is the day unit of the shopper's language.
  */
-export function formatCountdown(remainingMs: number, precision: 'seconds' | 'minutes' = 'seconds'): string {
+export function formatCountdown(remainingMs: number, precision: 'seconds' | 'minutes' = 'seconds', daySuffix = 'd'): string {
   const { days, hours, minutes, seconds } = countdownParts(remainingMs, precision)
   const clock = precision === 'minutes' ? `${pad(hours)}:${pad(minutes)}` : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  return days > 0 ? `${days}d ${clock}` : clock
+  return days > 0 ? `${days}${daySuffix} ${clock}` : clock
 }
 
 /**

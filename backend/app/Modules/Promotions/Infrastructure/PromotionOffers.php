@@ -12,7 +12,9 @@ use App\Modules\Promotions\Infrastructure\Models\Coupon;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
 use App\Modules\Promotions\Infrastructure\Models\PromotionTarget;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\Translations;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -137,7 +139,8 @@ class PromotionOffers
 
         return new Offer(
             id: $promotion->id,
-            name: $promotion->name,
+            // E12b: the name shoppers see, in the request's language (base outside the storefront).
+            name: (string) Translations::pick($promotion, 'name', app(LocaleContext::class)->current()),
             type: $promotion->type,
             value: (string) $promotion->value,
             scope: $promotion->scope,

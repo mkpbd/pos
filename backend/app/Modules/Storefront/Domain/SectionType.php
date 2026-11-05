@@ -95,6 +95,32 @@ enum SectionType: string
     }
 
     /**
+     * Texts a section of this type can have translated (E12b), with the limits of their base
+     * fields: the title and subtitle of every section, plus the text block's `body_html`
+     * (rich text) and the newsletter's `text` and `button_label` from the config.
+     *
+     * @return array<string, list<string>>
+     */
+    public function translatable(): array
+    {
+        return ['title' => ['max:120'], 'subtitle' => ['max:255']] + match ($this) {
+            self::RichText => ['body_html' => ['max:50000']],
+            self::Newsletter => ['text' => ['max:255'], 'button_label' => ['max:30']],
+            default => [],
+        };
+    }
+
+    /**
+     * Translatable fields kept in the config rather than in columns (E12b).
+     *
+     * @return list<string>
+     */
+    public function translatableConfigFields(): array
+    {
+        return array_values(array_diff(array_keys($this->translatable()), ['title', 'subtitle']));
+    }
+
+    /**
      * The placement of the banners this type shows, or null when it has no items.
      */
     public function bannerPlacement(): ?BannerPlacement

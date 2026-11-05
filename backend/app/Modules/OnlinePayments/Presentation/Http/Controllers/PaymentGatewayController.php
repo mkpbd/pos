@@ -5,6 +5,7 @@ namespace App\Modules\OnlinePayments\Presentation\Http\Controllers;
 use App\Modules\OnlinePayments\Application\Actions\ConfigurePaymentMethod;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\OnlinePayments\Domain\GatewayCode;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -45,6 +46,8 @@ class PaymentGatewayController
             'instructions' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:9999'],
             'settings' => ['sometimes', 'array'],
+            // E12b: {bn: {display_name, instructions}} (partial; blank removes).
+            ...TranslationInput::rules(ConfigurePaymentMethod::TRANSLATABLE),
             ...match ($gateway) {
                 GatewayCode::BankTransfer => ['settings.hold_hours' => ['sometimes', 'integer', 'min:1', 'max:168']],
                 GatewayCode::CashOnDelivery => ['settings.max_order_total' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:99999999', 'decimal:0,2']],

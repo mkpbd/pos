@@ -1,16 +1,20 @@
 import { z } from 'zod'
 import { BD_MOBILE, normalizeBdPhone } from '../account/schemas'
+import type { MessageKey } from '../i18n/en'
 import type { CheckoutPreviewInput, Customer, CustomerAddress, GeoId, PaymentMethodCode, PlaceOrderInput } from '../types'
 
 /** The "New address" choice of the address radio list (the other choices are address ids). */
 export const NEW_ADDRESS = 'new'
 
-const mobile = (empty: string) =>
+/** Client-side messages are dictionary keys; the page shows them through translateMessage(). */
+const m = (key: MessageKey): MessageKey => key
+
+const mobile = (empty: MessageKey) =>
   z
     .string()
     .trim()
     .min(1, empty)
-    .refine((v) => BD_MOBILE.test(normalizeBdPhone(v)), 'Please enter a Bangladeshi mobile number, e.g. 01712345678.')
+    .refine((v) => BD_MOBILE.test(normalizeBdPhone(v)), m('checkout.validation.phoneInvalid'))
 
 /**
  * The checkout form. Client checks give a quick answer; the server has the final say (its
@@ -19,10 +23,10 @@ const mobile = (empty: string) =>
  */
 export const checkoutSchema = z
   .object({
-    name: z.string().trim().min(2, 'Please enter your name.').max(120, 'Use at most 120 characters.'),
-    email: z.string().trim().min(1, 'Please enter your e-mail address.').pipe(z.email('Please enter a valid e-mail address.')),
-    phone: mobile('Please enter your mobile number.'),
-    address_choice: z.string().min(1, 'Please choose a delivery address.'),
+    name: z.string().trim().min(2, m('checkout.validation.name')).max(120, m('checkout.validation.max120')),
+    email: z.string().trim().min(1, m('checkout.validation.emailRequired')).pipe(z.email(m('checkout.validation.emailInvalid'))),
+    phone: mobile('checkout.validation.phoneRequired'),
+    address_choice: z.string().min(1, m('checkout.validation.addressChoice')),
     recipient_name: z.string(),
     address_phone: z.string(),
     division_id: z.string(),
@@ -31,28 +35,28 @@ export const checkoutSchema = z
     address_line: z.string(),
     postcode: z.string(),
     save_address: z.boolean(),
-    shipping_method_id: z.string().min(1, 'Please choose a delivery method.'),
-    payment_method: z.string().refine((v) => v === 'cod' || v === 'bank_transfer', 'Please choose a payment method.'),
-    notes: z.string().max(500, 'Use at most 500 characters.'),
+    shipping_method_id: z.string().min(1, m('checkout.validation.shippingMethod')),
+    payment_method: z.string().refine((v) => v === 'cod' || v === 'bank_transfer', m('checkout.validation.paymentMethod')),
+    notes: z.string().max(500, m('checkout.validation.max500')),
   })
   .superRefine((values, ctx) => {
     if (values.address_choice !== NEW_ADDRESS) return
-    const issue = (path: keyof typeof values, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
+    const issue = (path: keyof typeof values, message: MessageKey) => ctx.addIssue({ code: 'custom', path: [path], message })
     const recipient = values.recipient_name.trim()
-    if (recipient.length < 2) issue('recipient_name', 'Please enter the recipient’s name.')
-    else if (recipient.length > 120) issue('recipient_name', 'Use at most 120 characters.')
+    if (recipient.length < 2) issue('recipient_name', 'checkout.validation.recipientName')
+    else if (recipient.length > 120) issue('recipient_name', 'checkout.validation.max120')
     const phone = values.address_phone.trim()
-    if (phone === '') issue('address_phone', 'Please enter a mobile number.')
-    else if (!BD_MOBILE.test(normalizeBdPhone(phone))) issue('address_phone', 'Please enter a Bangladeshi mobile number, e.g. 01712345678.')
-    if (values.division_id === '') issue('division_id', 'Please choose a division.')
-    if (values.district_id === '') issue('district_id', 'Please choose a district.')
+    if (phone === '') issue('address_phone', 'checkout.validation.addressPhoneRequired')
+    else if (!BD_MOBILE.test(normalizeBdPhone(phone))) issue('address_phone', 'checkout.validation.phoneInvalid')
+    if (values.division_id === '') issue('division_id', 'checkout.validation.division')
+    if (values.district_id === '') issue('district_id', 'checkout.validation.district')
     const area = values.area.trim()
-    if (area.length < 2) issue('area', 'Please enter the area or thana.')
-    else if (area.length > 100) issue('area', 'Use at most 100 characters.')
+    if (area.length < 2) issue('area', 'checkout.validation.area')
+    else if (area.length > 100) issue('area', 'checkout.validation.max100')
     const line = values.address_line.trim()
-    if (line.length < 3) issue('address_line', 'Please enter the street address.')
-    else if (line.length > 255) issue('address_line', 'Use at most 255 characters.')
-    if (values.postcode.trim() !== '' && !/^\d{4}$/.test(values.postcode.trim())) issue('postcode', 'A postcode has 4 digits.')
+    if (line.length < 3) issue('address_line', 'checkout.validation.addressLine')
+    else if (line.length > 255) issue('address_line', 'checkout.validation.max255')
+    if (values.postcode.trim() !== '' && !/^\d{4}$/.test(values.postcode.trim())) issue('postcode', 'checkout.validation.postcode')
   })
 
 export type CheckoutValues = z.input<typeof checkoutSchema>

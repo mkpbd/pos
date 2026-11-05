@@ -2,7 +2,9 @@
 
 namespace App\Modules\OnlineCatalog\Presentation\Http\Requests;
 
+use App\Modules\OnlineCatalog\Application\Actions\SaveBrandListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\BrandListing;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Slug;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,6 +30,8 @@ class SaveBrandListingRequest extends FormRequest
             'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'seo_title' => ['sometimes', 'nullable', 'string', 'max:70'],
             'seo_description' => ['sometimes', 'nullable', 'string', 'max:160'],
+            // E12b: {bn: {name, description, seo_title, seo_description}}.
+            ...TranslationInput::rules(SaveBrandListing::TRANSLATABLE),
         ];
     }
 

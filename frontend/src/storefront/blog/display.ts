@@ -1,15 +1,16 @@
-const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'long' })
+import { formatDate } from '../i18n/format'
+import type { Translate } from '../i18n/translate'
 
-/** "October 12, 2026"-style publication date; empty for a missing or unparsable value. */
+/** "October 12, 2026"-style publication date in the storefront's language; empty for a missing or unparsable value. */
 export function formatPostDate(iso: string | null | undefined): string {
   if (!iso) return ''
   const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '' : dateFormat.format(date)
+  return Number.isNaN(date.getTime()) ? '' : formatDate(iso, 'long')
 }
 
 /** "4 min read" (never below one minute). */
-export function readingTimeLabel(minutes: number | null | undefined): string {
-  return `${Math.max(1, Math.round(minutes ?? 1))} min read`
+export function readingTimeLabel(minutes: number | null | undefined, t: Translate): string {
+  return t('blog.readingTime', { count: Math.max(1, Math.round(minutes ?? 1)) })
 }
 
 export function blogPostUrl(slug: string): string {

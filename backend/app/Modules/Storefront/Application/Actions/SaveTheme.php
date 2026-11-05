@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Application\Actions;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\CustomCssPolicy;
@@ -27,6 +28,8 @@ class SaveTheme
     public function settings(array $settings): ThemeSettings
     {
         $settings = ThemeSchema::normalize($settings);
+        // E12b: the announcement's translations (the document is replaced, so are they).
+        $settings['announcement']['translations'] = TranslationInput::apply(null, $settings['announcement']['translations'], ['text']);
 
         $ids = ThemeSchema::mediaIds($settings);
         $missing = array_values(array_diff($ids, $this->media->existing($ids)));

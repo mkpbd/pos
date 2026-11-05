@@ -10,6 +10,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\RelatedProduct;
 use App\Modules\OnlineCatalog\Infrastructure\Models\VariantListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Slug;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -83,6 +84,8 @@ class ListingEditor
                 'seo_description' => $listing?->seo_description,
                 'sort_weight' => $listing->sort_weight ?? 0,
                 'state' => ($listing?->state() ?? ListingState::Draft)->value,
+                // E12b: {bn: {name, short_description, description_html, seo_title, seo_description}}.
+                'translations' => TranslationInput::present($listing?->translations),
                 'updated_at' => $listing?->updated_at?->toIso8601String(),
             ],
             'variants' => array_map(fn (array $v) => [
@@ -131,7 +134,7 @@ class ListingEditor
         $data = $listing === null
             ? ['exists' => false, 'slug' => self::suggestSlug($node['name'], CategoryListing::class, null), 'is_visible' => true,
                 'image_media_id' => null, 'banner_media_id' => null, 'image' => null, 'banner' => null,
-                'description_html' => null, 'seo_title' => null, 'seo_description' => null, 'updated_at' => null]
+                'description_html' => null, 'seo_title' => null, 'seo_description' => null, 'translations' => TranslationInput::present(null), 'updated_at' => null]
             : ['exists' => true] + $this->categoryListing($listing, $refs);
 
         return [
@@ -169,7 +172,7 @@ class ListingEditor
         $listing = BrandListing::query()->where('brand_id', $brandId)->first();
         $data = $listing === null
             ? ['exists' => false, 'slug' => self::suggestSlug($brand['name'], BrandListing::class, null), 'is_visible' => true,
-                'logo_media_id' => null, 'logo' => null, 'description' => null, 'seo_title' => null, 'seo_description' => null, 'updated_at' => null]
+                'logo_media_id' => null, 'logo' => null, 'description' => null, 'seo_title' => null, 'seo_description' => null, 'translations' => TranslationInput::present(null), 'updated_at' => null]
             : ['exists' => true] + $this->brandListing($listing, $this->refs([$listing->logo_media_id]));
 
         return [
@@ -212,6 +215,8 @@ class ListingEditor
             'description_html' => $l->description_html,
             'seo_title' => $l->seo_title,
             'seo_description' => $l->seo_description,
+            // E12b: {bn: {name, description_html, seo_title, seo_description}}.
+            'translations' => TranslationInput::present($l->translations),
             'updated_at' => $l->updated_at?->toIso8601String(),
         ];
     }
@@ -230,6 +235,8 @@ class ListingEditor
             'description' => $l->description,
             'seo_title' => $l->seo_title,
             'seo_description' => $l->seo_description,
+            // E12b: {bn: {name, description, seo_title, seo_description}}.
+            'translations' => TranslationInput::present($l->translations),
             'updated_at' => $l->updated_at?->toIso8601String(),
         ];
     }

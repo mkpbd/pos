@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { SLUG_PATTERN } from '@/features/content/slug'
 import type { ListingState, ProductListingInput, ProductListingResponse, RelatedInput, RelatedProduct } from '@/features/online-catalog/api'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
+import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
 import { handleFormError } from '@/lib/forms'
 import { compareDecimal, MONEY_PATTERN } from '@/lib/money'
@@ -13,6 +14,18 @@ export const SEO_TITLE_MAX = 70
 export const SEO_DESCRIPTION_MAX = 160
 export const SHORT_DESCRIPTION_MAX = 500
 export const SLUG_MAX = 120
+/** The product name's limit (products module). */
+export const PRODUCT_NAME_MAX = 255
+
+/** Translatable listing fields (E12b) with the base fields' limits. */
+export const LISTING_TRANSLATIONS = [
+  { name: 'name', max: PRODUCT_NAME_MAX },
+  { name: 'short_description', max: SHORT_DESCRIPTION_MAX },
+  { name: 'description_html' },
+  { name: 'seo_title', max: SEO_TITLE_MAX },
+  { name: 'seo_description', max: SEO_DESCRIPTION_MAX },
+] as const
+const LISTING_TRANSLATION_NAMES = LISTING_TRANSLATIONS.map((f) => f.name)
 
 export const LISTING_STATE: Record<ListingState, { label: string; variant: 'soft' | 'info' | 'success' | 'warning' }> = {
   draft: { label: 'Draft', variant: 'soft' },
@@ -57,6 +70,7 @@ export const listingFormSchema = z
     ),
     related: z.array(pickedProduct).max(MAX_RELATED, `At most ${MAX_RELATED} products.`),
     frequently_bought: z.array(pickedProduct).max(MAX_RELATED, `At most ${MAX_RELATED} products.`),
+    translations: translationsSchema(LISTING_TRANSLATIONS),
   })
   .superRefine((form, ctx) => {
     if (form.published_at && form.unpublished_at && form.unpublished_at <= form.published_at) {
@@ -99,10 +113,12 @@ export function toListingFormValues(data: ProductListingResponse): ListingFormVa
     })),
     related: data.related.related.map(toPicked),
     frequently_bought: data.related.frequently_bought.map(toPicked),
+    translations: { bn: readBn(listing.translations, LISTING_TRANSLATION_NAMES) },
   }
 }
 
-export function toListingInput(form: ListingFormValues): { listing: ProductListingInput; related: RelatedInput } {
+/** `before`: the listing's translations as loaded, so clearing them all is still sent. */
+export function toListingInput(form: ListingFormValues, before?: TranslationsMap): { listing: ProductListingInput; related: RelatedInput } {
   const text = (v: string) => v.trim() || null
   return {
     listing: {
@@ -119,6 +135,7 @@ export function toListingInput(form: ListingFormValues): { listing: ProductListi
       seo_description: text(form.seo_description),
       sort_weight: Number(form.sort_weight),
       variants: form.variants.map((v) => ({ variant_id: v.variant_id, compare_at_price: v.compare_at_price.trim() || null, image_id: v.image_id })),
+      translations: toTranslationsInput(form.translations.bn, LISTING_TRANSLATION_NAMES, before),
     },
     related: { related: form.related.map((p) => p.id), frequently_bought: form.frequently_bought.map((p) => p.id) },
   }
@@ -126,7 +143,7 @@ export function toListingInput(form: ListingFormValues): { listing: ProductListi
 
 const LISTING_FIELDS = [
   'is_published', 'published_at', 'unpublished_at', 'slug', 'is_featured', 'is_new_until', 'short_description', 'description_html',
-  'specifications', 'seo_title', 'seo_description', 'sort_weight', 'variants', 'related', 'frequently_bought',
+  'specifications', 'seo_title', 'seo_description', 'sort_weight', 'variants', 'related', 'frequently_bought', 'translations',
 ] as const
 
 /**

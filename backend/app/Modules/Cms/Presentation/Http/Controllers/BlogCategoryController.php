@@ -7,6 +7,7 @@ use App\Modules\Cms\Domain\PageSlug;
 use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Cms\Presentation\Http\Support\BlogPresenter;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
 use Illuminate\Http\JsonResponse;
@@ -93,6 +94,8 @@ class BlogCategoryController
                 (new TenantUnique('blog_categories', 'slug', $category?->id, softDeletes: true))->withMessage('Another blog category already uses this address.')],
             'description' => ['sometimes', 'nullable', 'string', 'max:300'],
             'sort_order' => ['sometimes', 'integer', 'between:0,32767'],
+            // E12b: {bn: {name, description}} (partial; blank removes).
+            ...TranslationInput::rules(ManageBlogCategories::TRANSLATABLE),
         ];
     }
 

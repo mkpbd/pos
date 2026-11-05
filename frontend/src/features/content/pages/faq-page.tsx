@@ -14,7 +14,13 @@ import { Switch } from '@/components/ui/switch'
 import { useDeleteFaqMutation, useFaqQuery, useReorderFaqMutation, useSaveFaqMutation, type FaqItem } from '@/features/content/api'
 import { ContentHeader } from '@/features/content/components/content-header'
 import { RichTextEditor } from '@/features/content/components/rich-text-editor'
+import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
+import { bnErrors, readBn, toTranslationsInput, validateBn, type BnValues } from '@/features/translations/translations'
 import { fieldErrorMap } from '@/lib/forms'
+
+/** Translatable FAQ fields (E12b): the API keys them like the base fields. */
+const FAQ_TRANSLATIONS = [{ name: 'question', max: 255 }, { name: 'answer_html' }] as const
+const FAQ_TRANSLATION_NAMES = FAQ_TRANSLATIONS.map((f) => f.name)
 
 /** Mounted inside DialogContent, so each opening starts from the entry (or empty). */
 function FaqForm({ item, onDone }: { item: FaqItem | null; onDone: () => void }) {
@@ -23,6 +29,7 @@ function FaqForm({ item, onDone }: { item: FaqItem | null; onDone: () => void })
   const [answer, setAnswer] = useState(item?.answer_html ?? '')
   const [group, setGroup] = useState(item?.group ?? '')
   const [active, setActive] = useState(item?.is_active ?? true)
+  const [bn, setBn] = useState<BnValues>(() => readBn(item?.translations, FAQ_TRANSLATION_NAMES))
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const submit = (e: React.FormEvent) => {
@@ -30,10 +37,14 @@ function FaqForm({ item, onDone }: { item: FaqItem | null; onDone: () => void })
     const local: Record<string, string> = {}
     if (!question.trim()) local.question = 'Enter the question.'
     if (!answer) local.answer_html = 'Enter the answer.'
+    Object.assign(local, validateBn(bn, FAQ_TRANSLATIONS))
     if (Object.keys(local).length > 0) return setErrors(local)
 
     save.mutate(
-      { id: item?.id, input: { question: question.trim(), answer_html: answer, group: group.trim() || null, is_active: active } },
+      {
+        id: item?.id,
+        input: { question: question.trim(), answer_html: answer, group: group.trim() || null, is_active: active, translations: toTranslationsInput(bn, FAQ_TRANSLATION_NAMES, item?.translations) },
+      },
       {
         onSuccess: () => {
           toast.success(item ? 'Entry saved.' : 'Entry added.')
@@ -65,6 +76,15 @@ function FaqForm({ item, onDone }: { item: FaqItem | null; onDone: () => void })
         <Switch id="faq-active" checked={active} onCheckedChange={setActive} />
         <Label htmlFor="faq-active">Shown in the store</Label>
       </div>
+      <BanglaTranslations
+        fields={[
+          { name: 'question', label: 'Question', base: question, max: 255 },
+          { name: 'answer_html', label: 'Answer', base: answer, kind: 'rich' },
+        ]}
+        value={bn}
+        onChange={setBn}
+        errors={bnErrors(errors)}
+      />
       {errors.form && <p role="alert" className="text-sm text-destructive">{errors.form}</p>}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>Cancel</Button>

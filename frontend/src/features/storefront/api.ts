@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
 
 export type StorefrontSettings = {
@@ -13,8 +14,16 @@ export type StorefrontSettings = {
   return_window_days?: number
   /** Search engines may index the store (default on; off = robots.txt "Disallow: /" and noindex on every page; E12a). */
   allow_indexing?: boolean
+  /** Shoppers may switch the store to Bangla (default on; E12b). */
+  bangla_enabled?: boolean
+  /** Language for visitors who have not chosen one; must be an enabled language (E12b). */
+  default_locale?: StoreLocale
+  /** Amounts and numbers in Bengali digits (০১২…) when the store is in Bangla (default off; E12b). */
+  bangla_digits?: boolean
   updated_at: string | null
 }
+
+export type StoreLocale = 'en' | 'bn'
 
 export type StorefrontDomain = { id: string; host: string; is_primary: boolean; created_at: string | null }
 
@@ -44,6 +53,8 @@ export type ThemeDocument = {
     foreground: string
     starts_at: string | null
     ends_at: string | null
+    /** Bangla announcement text (E12b): `{bn: {text}}`. */
+    translations?: TranslationsMap | TranslationsInput
   }
   footer: {
     about: string | null
@@ -90,6 +101,8 @@ export type MenuItemNode = {
   is_mega: boolean
   mega_columns: number | null
   image_media_id: string | null
+  /** Bangla label (E12b): `{bn: {label}}`. */
+  translations?: TranslationsMap | TranslationsInput
   children: MenuItemNode[]
 }
 
@@ -154,9 +167,11 @@ export type Banner = {
   state: 'live' | 'inactive' | 'scheduled' | 'ended'
   sort_order: number
   updated_at: string | null
+  /** Bangla texts (E12b): kicker, title, subtitle, button_label, secondary_button_label. */
+  translations?: TranslationsMap
 }
 
-export type BannerInput = Omit<Banner, 'id' | 'is_live' | 'state' | 'sort_order' | 'updated_at'>
+export type BannerInput = Omit<Banner, 'id' | 'is_live' | 'state' | 'sort_order' | 'updated_at' | 'translations'> & { translations?: TranslationsInput }
 
 export const SECTION_TYPES = [
   'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'newsletter',
@@ -216,6 +231,8 @@ export type HomepageSection = {
   state: SectionState
   sort_order: number
   updated_at: string | null
+  /** Bangla texts (E12b): title, subtitle, and the type's texts (rich text `body_html`; newsletter `text`, `button_label`). */
+  translations?: TranslationsMap
 }
 
 export type SectionItemRef = { id: string; name: string; image_url?: string | null }
@@ -239,6 +256,7 @@ export type SectionInput = {
   is_enabled: boolean
   starts_at: string | null
   ends_at: string | null
+  translations?: TranslationsInput
 }
 
 export const storefrontKeys = {
@@ -265,7 +283,9 @@ export function useSaveStorefrontSettingsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id' | 'guest_checkout_enabled' | 'return_window_days' | 'allow_indexing'>>) =>
+    mutationFn: (
+      input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id' | 'guest_checkout_enabled' | 'return_window_days' | 'allow_indexing' | 'bangla_enabled' | 'default_locale' | 'bangla_digits'>>,
+    ) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),
   })

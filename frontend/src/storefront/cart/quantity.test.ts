@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api/client'
+import { tEn } from '../test-fixtures'
 import { canDecrease, canIncrease, cartErrorMessage, displayQuantity, effectiveMax, maxQuantityHint, normalizeQuantity, stepQuantity } from './quantity'
 
 describe('cart quantities', () => {
@@ -48,13 +49,13 @@ describe('cart quantities', () => {
   it('turns the cart error codes into messages and reads the stock hint', () => {
     const insufficient = new ApiError(422, 'INSUFFICIENT_STOCK', 'Not enough stock', { max_quantity: '3.000' })
     expect(maxQuantityHint(insufficient)).toBe('3')
-    expect(cartErrorMessage(insufficient)).toBe('Only 3 available.')
+    expect(cartErrorMessage(insufficient, tEn)).toBe('Only 3 available.')
     expect(maxQuantityHint(new ApiError(422, 'OUT_OF_STOCK', 'x'))).toBeNull()
-    expect(cartErrorMessage(new ApiError(422, 'OUT_OF_STOCK', 'x'))).toBe('Sorry, this item is out of stock.')
-    expect(cartErrorMessage(new ApiError(422, 'VARIANT_NOT_PURCHASABLE', 'x'))).toBe('This product is not available any more.')
-    expect(cartErrorMessage(new ApiError(422, 'CART_FULL', 'x'))).toBe('Your cart is full. Remove an item to add another.')
-    expect(cartErrorMessage(new ApiError(422, 'VALIDATION_FAILED', 'x', { quantity: ['The quantity must be a whole number.'] }))).toBe('The quantity must be a whole number.')
-    expect(cartErrorMessage(new ApiError(429, 'TOO_MANY_REQUESTS', 'x'))).toBe('Too many requests. Please wait a moment and try again.')
-    expect(cartErrorMessage(new Error('boom'))).toBe('Something went wrong. Please try again.')
+    expect(cartErrorMessage(new ApiError(422, 'OUT_OF_STOCK', 'x'), tEn)).toBe('Sorry, this item is out of stock.')
+    expect(cartErrorMessage(new ApiError(422, 'VARIANT_NOT_PURCHASABLE', 'x'), tEn)).toBe('This product is not available any more.')
+    expect(cartErrorMessage(new ApiError(422, 'CART_FULL', 'x'), tEn)).toBe('Your cart is full. Remove an item to add another.')
+    expect(cartErrorMessage(new ApiError(422, 'VALIDATION_FAILED', 'x', { quantity: ['The quantity must be a whole number.'] }), tEn)).toBe('The quantity must be a whole number.')
+    expect(cartErrorMessage(new ApiError(429, 'TOO_MANY_REQUESTS', 'x'), tEn)).toBe('Too many requests. Please wait a moment and try again.')
+    expect(cartErrorMessage(new Error('boom'), tEn)).toBe('Something went wrong. Please try again.')
   })
 })

@@ -1,12 +1,14 @@
 import { Link } from 'react-router'
+import { useLocale } from '../i18n/locale'
 import type { Breadcrumb } from '../types'
 
 /** Breadcrumb trail; the last crumb (no URL) is the current page. */
 export function Breadcrumbs({ items, className }: { items: Breadcrumb[]; className?: string }) {
+  const { t } = useLocale()
   if (items.length === 0) return null
 
   return (
-    <nav aria-label="Breadcrumb" className={className}>
+    <nav aria-label={t('catalog.breadcrumbs.label')} className={className}>
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         {items.map((crumb, i) => {
           const last = i === items.length - 1

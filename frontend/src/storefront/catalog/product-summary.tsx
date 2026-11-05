@@ -4,6 +4,7 @@ import { compareDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
 import { Countdown } from '../promotions/countdown-timer'
+import { useLocale } from '../i18n/locale'
 import { usePromotionPricing } from '../promotions/display'
 import type { ProductDetail, ProductVariant } from '../types'
 import { Price } from './price'
@@ -11,11 +12,12 @@ import { VariantSelector } from './variant-selector'
 import type { Selection } from './variant-selection'
 
 function Availability({ inStock, lowStock }: { inStock: boolean; lowStock: boolean }) {
+  const { t } = useLocale()
   const [Icon, text, tone] = !inStock
-    ? [XCircleIcon, 'Out of stock', 'text-sf-sale']
+    ? [XCircleIcon, t('catalog.stock.out'), 'text-sf-sale']
     : lowStock
-      ? [CircleAlertIcon, 'Only a few left', 'text-sf-primary-foreground']
-      : [CheckCircle2Icon, 'In stock', 'text-sf-highlight']
+      ? [CircleAlertIcon, t('catalog.stock.low'), 'text-sf-primary-foreground']
+      : [CheckCircle2Icon, t('catalog.stock.in'), 'text-sf-highlight']
 
   return (
     <p className={cn('flex items-center gap-1.5 text-sm font-semibold', tone)} data-testid="availability">
@@ -41,6 +43,7 @@ export function ProductSummary({
   onChoose: (optionName: string, value: string) => void
 }) {
   const { store } = useStorefront()
+  const { t } = useLocale()
   const inStock = variant ? variant.in_stock : product.in_stock
   const promo = usePromotionPricing(product, variant)
   const range = compareDecimal(product.price, product.price_max) !== 0
@@ -49,7 +52,7 @@ export function ProductSummary({
     <div className="flex flex-col gap-5">
       {product.brand && (
         <p className="text-sm">
-          Brand:{' '}
+          {t('catalog.summary.brand')}{' '}
           {product.brand.slug ? (
             <Link to={`/brand/${product.brand.slug}`} className="font-semibold text-sf-accent hover:underline">
               {product.brand.name}
@@ -72,24 +75,24 @@ export function ProductSummary({
           {promo ? (
             promo.label && (
               <span className="rounded-full bg-sf-sale px-2.5 py-0.5 text-sm font-bold text-white" data-testid="promotion-badge">
-                <span className="sr-only">Offer: </span>
+                <span className="sr-only">{t('catalog.badges.offer')}</span>
                 {promo.label}
               </span>
             )
           ) : variant?.on_sale && variant.discount_percent ? (
-            <span className="rounded-full bg-sf-sale px-2.5 py-0.5 text-sm font-bold text-white">−{variant.discount_percent} %</span>
+            <span className="rounded-full bg-sf-sale px-2.5 py-0.5 text-sm font-bold text-white">{t('catalog.badges.discount', { percent: variant.discount_percent })}</span>
           ) : null}
-          {store.prices_include_tax === false && <span className="text-sm">Excl. VAT</span>}
+          {store.prices_include_tax === false && <span className="text-sm">{t('catalog.summary.exclVat')}</span>}
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
           <Availability inStock={inStock} lowStock={variant?.low_stock ?? false} />
           {variant && (
             <p className="text-sm">
-              SKU: <span className="font-medium text-sf-heading" data-testid="sku">{variant.sku}</span>
+              {t('catalog.summary.sku')} <span className="font-medium text-sf-heading" data-testid="sku">{variant.sku}</span>
             </p>
           )}
         </div>
-        {!variant && product.options.length > 0 && <p className="text-sm">Choose the options to see the price and availability.</p>}
+        {!variant && product.options.length > 0 && <p className="text-sm">{t('catalog.summary.chooseOptions')}</p>}
       </div>
 
       {promo && (

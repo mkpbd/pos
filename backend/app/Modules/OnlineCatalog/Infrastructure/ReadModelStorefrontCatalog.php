@@ -175,7 +175,7 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
                 $images = array_column($record['images'], null, 'id');
                 $picked = ($variant['image_id'] ?? null) !== null ? ($images[$variant['image_id']] ?? null) : null;
                 $picked ??= $record['images'][0] ?? null;
-                $image = $picked === null ? null : ['url' => $picked['url'], 'alt' => $v['product_name']];
+                $image = $picked === null ? null : ['url' => $picked['url'], 'alt' => $record['name']];
             }
             $optionValues = $variant['option_values'] ?? [];
             $name = $variant['name'] ?? null;
@@ -186,7 +186,8 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
                 'brand_id' => $record['brand_id'] ?? null,
                 'category_id' => $record['category_id'] ?? ($v['category_id'] ?? null),
                 'product_slug' => $record === null ? null : $record['listing']->slug,
-                'product_name' => $v['product_name'],
+                // E12b: the listing's name in the request's language (orders snapshot the base name).
+                'product_name' => $record['name'] ?? $v['product_name'],
                 'variant_name' => is_string($name) && $name !== '' ? $name : ($optionValues !== [] ? implode(' / ', $optionValues) : null),
                 'option_values' => $optionValues,
                 'sku' => $v['sku'],
@@ -232,8 +233,11 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         }
 
         $slugs = [];
+        $names = [];
         foreach ($this->catalog->products(['ids' => $productIds]) as $record) {
             $slugs[$record['id']] = $record['listing']->slug;
+            // E12b: live products show their name in the request's language.
+            $names[$record['id']] = $record['name'];
         }
         $images = $this->catalog->images($productIds);
 
@@ -243,7 +247,7 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
             ->get(['id', 'name'])
             ->mapWithKeys(fn ($p) => [$p->id => [
                 'id' => $p->id,
-                'name' => $p->name,
+                'name' => $names[$p->id] ?? $p->name,
                 'slug' => $slugs[$p->id] ?? null,
                 'image_url' => $images[$p->id][0]['url'] ?? null,
             ]])->all();

@@ -27,6 +27,7 @@ use Illuminate\Notifications\Notifiable;
  * @property ?CarbonImmutable $email_verification_sent_at
  * @property ?CarbonImmutable $last_login_at
  * @property ?CarbonImmutable $created_at
+ * @property ?string $preferred_locale en | bn, from the last sign-up / sign-in (E12b)
  */
 #[Fillable(['organization_id', 'customer_id', 'email', 'phone', 'password', 'status'])]
 #[Hidden(['password', 'remember_token', 'email_verification_token_hash'])]

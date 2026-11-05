@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { CalendarIcon, ClockIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MediaImage } from '../components/media-image'
+import { useLocale } from '../i18n/locale'
 import type { BlogPostRow } from '../types'
 import { blogCategoryUrl, blogPostUrl, formatPostDate, readingTimeLabel } from './display'
 
@@ -19,6 +20,7 @@ export function CategoryChip({ category, className }: { category: { name: string
 
 /** Date and reading time, e.g. "October 12, 2026 · 4 min read". */
 export function PostMeta({ post, className }: { post: Pick<BlogPostRow, 'published_at' | 'reading_minutes' | 'author'>; className?: string }) {
+  const { t } = useLocale()
   const date = formatPostDate(post.published_at)
   return (
     <p className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 text-sm', className)}>
@@ -30,9 +32,9 @@ export function PostMeta({ post, className }: { post: Pick<BlogPostRow, 'publish
       )}
       <span className="inline-flex items-center gap-1.5">
         <ClockIcon aria-hidden className="size-4" />
-        {readingTimeLabel(post.reading_minutes)}
+        {readingTimeLabel(post.reading_minutes, t)}
       </span>
-      {post.author && <span>By {post.author}</span>}
+      {post.author && <span>{t('blog.by', { author: post.author })}</span>}
     </p>
   )
 }

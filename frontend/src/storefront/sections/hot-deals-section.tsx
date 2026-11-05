@@ -7,6 +7,7 @@ import { PRODUCT_RAIL_ITEM, Rail } from '../catalog/product-rail'
 import { MenuLink } from '../components/menu-link'
 import { Countdown } from '../promotions/countdown-timer'
 import { useDeadline } from '../promotions/countdown'
+import { useLocale } from '../i18n/locale'
 import type { StoreSection } from '../types'
 
 type Props = { section: Extract<StoreSection, { type: 'hot_deals' }> }
@@ -20,7 +21,8 @@ type Props = { section: Extract<StoreSection, { type: 'hot_deals' }> }
 export function HotDealsSection({ section }: Props) {
   const queryClient = useQueryClient()
   const { expired } = useDeadline(section.ends_at)
-  const title = section.title ?? 'Hot deals'
+  const { t } = useLocale()
+  const title = section.title ?? t('content.section.hotDeals')
 
   useEffect(() => {
     // Once per end: the next homepage no longer has these deals (or has the next ones).
@@ -40,7 +42,7 @@ export function HotDealsSection({ section }: Props) {
             </h2>
             {section.subtitle && <p className="mt-2 max-w-2xl">{section.subtitle}</p>}
           </div>
-          {section.ends_at && <Countdown endsAt={section.ends_at} variant="large" prefix="Ends in" />}
+          {section.ends_at && <Countdown endsAt={section.ends_at} variant="large" prefix={t('promo.countdown.endsIn')} />}
         </header>
         <Rail label={title} count={section.products.length} itemClassName={PRODUCT_RAIL_ITEM}>
           {section.products.map((product) => (
@@ -53,7 +55,7 @@ export function HotDealsSection({ section }: Props) {
               url={section.config.view_all_url}
               className="inline-flex items-center gap-2 rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-bold tracking-wide text-sf-primary-foreground uppercase transition hover:brightness-105"
             >
-              View all deals
+              {t('content.section.viewAllDeals')}
               <ArrowRightIcon aria-hidden className="size-4" />
             </MenuLink>
           </div>

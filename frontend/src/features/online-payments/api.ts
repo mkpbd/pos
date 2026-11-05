@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
 
 export type OfflineGatewayCode = 'cod' | 'bank_transfer'
@@ -11,9 +12,11 @@ export type PaymentGateway = {
   instructions: string | null
   settings: Record<string, unknown>
   sort_order: number
+  /** Bangla texts (E12b): display_name, instructions. */
+  translations?: TranslationsMap
 }
 
-export type PaymentGatewayInput = Pick<PaymentGateway, 'display_name' | 'is_enabled' | 'instructions' | 'settings' | 'sort_order'>
+export type PaymentGatewayInput = Pick<PaymentGateway, 'display_name' | 'is_enabled' | 'instructions' | 'settings' | 'sort_order'> & { translations?: TranslationsInput }
 
 export const gatewayKeys = { all: ['payment-gateways'] as const }
 

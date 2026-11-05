@@ -7,6 +7,9 @@ import { displayQuantity } from '../cart/quantity'
 import { ProductImage } from '../catalog/product-image'
 import { etaLabel, formatDateTime } from '../checkout/delivery'
 import { SummaryTotals } from '../checkout/summary-totals'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
+import type { Translate } from '../i18n/translate'
 import { formatDiscount, formatPrice } from '../money'
 import type { OrderView } from '../types'
 
@@ -30,21 +33,30 @@ export function OrderStatusBadge({ label, className }: { label: string; classNam
 
 /** Bank transfer details while the order waits for the money. */
 export function PaymentInstructionsCard({ order }: { order: Pick<OrderView, 'payment_instructions' | 'total' | 'currency' | 'number' | 'expires_at'> }) {
+  const { t } = useLocale()
   if (!order.payment_instructions) return null
   return (
     <section aria-labelledby="order-payment-instructions" className="mt-6 flex flex-col gap-3 rounded-sf-card border-2 border-sf-primary bg-sf-surface p-5 md:p-6" data-testid="payment-instructions">
       <h2 id="order-payment-instructions" className={cn(orderHeadingClass, 'flex items-center gap-2')}>
         <BanknoteIcon aria-hidden className="size-5" />
-        Complete your payment
+        {t('orders.payment.title')}
       </h2>
       <p>
-        Please transfer <strong className="text-sf-heading">{formatPrice(order.total, order.currency)}</strong> using the details below and mention your order number{' '}
-        <strong className="text-sf-heading">{order.number}</strong> as the reference.
+        {rich(t('orders.payment.transfer'), {
+          amount: <strong className="text-sf-heading">{formatPrice(order.total, order.currency)}</strong>,
+          number: <strong className="text-sf-heading">{order.number}</strong>,
+        })}
       </p>
       <p className="rounded-lg bg-sf-canvas px-4 py-3 whitespace-pre-line text-sf-heading">{order.payment_instructions}</p>
       {order.expires_at && (
         <p className="text-sm" data-testid="payment-deadline">
-          We keep your order until <time dateTime={order.expires_at} className="font-semibold text-sf-heading">{formatDateTime(order.expires_at)}</time>. If the payment has not arrived by then, the order is cancelled.
+          {rich(t('orders.payment.deadline'), {
+            date: (
+              <time dateTime={order.expires_at} className="font-semibold text-sf-heading">
+                {formatDateTime(order.expires_at)}
+              </time>
+            ),
+          })}
         </p>
       )}
     </section>
@@ -53,13 +65,14 @@ export function PaymentInstructionsCard({ order }: { order: Pick<OrderView, 'pay
 
 /** The ordered items; `lineActions` adds controls under a line (e.g. "Write a review"). */
 export function OrderItemsCard<L extends Line>({ lines, currency, lineActions }: { lines: L[]; currency: string | null; lineActions?: (line: L) => ReactNode }) {
+  const { t, formatNumber } = useLocale()
   const price = (amount: string) => formatPrice(amount, currency)
   return (
     <section aria-labelledby="order-items" className={orderCardClass}>
       <h2 id="order-items" className={orderHeadingClass}>
-        Items
+        {t('orders.items.title')}
       </h2>
-      <ul className="flex flex-col divide-y" aria-label="Ordered items">
+      <ul className="flex flex-col divide-y" aria-label={t('orders.items.listLabel')}>
         {lines.map((line, index) => (
           <li key={`${line.sku}-${index}`} className="flex gap-3 py-3" data-testid="order-line">
             <ProductImage image={line.image_url ? { url: line.image_url, alt: null } : null} alt={line.product_name} className="w-16 shrink-0 self-start rounded-lg border" />
@@ -72,13 +85,13 @@ export function OrderItemsCard<L extends Line>({ lines, currency, lineActions }:
                 <span className="font-semibold text-sf-heading">{line.product_name}</span>
               )}
               {line.variant_name && <p>{line.variant_name}</p>}
-              <p className="text-xs">SKU: {line.sku}</p>
+              <p className="text-xs">{t('orders.items.sku', { sku: line.sku })}</p>
               <p className="text-xs">
-                {displayQuantity(line.quantity)} × {price(line.unit_price)}
+                {formatNumber(displayQuantity(line.quantity))} × {price(line.unit_price)}
               </p>
               {!isZeroDecimal(line.discount_amount ?? '0') && (
                 <p className="text-xs font-semibold text-sf-sale" data-testid="order-line-discount">
-                  Discount: {formatDiscount(line.discount_amount, currency)}
+                  {t('orders.items.discount', { amount: formatDiscount(line.discount_amount, currency) })}
                 </p>
               )}
               {lineActions?.(line)}
@@ -92,10 +105,11 @@ export function OrderItemsCard<L extends Line>({ lines, currency, lineActions }:
 }
 
 export function OrderAddressCard({ address }: { address: OrderView['shipping_address'] }) {
+  const { t } = useLocale()
   return (
     <section aria-labelledby="order-address" className={orderCardClass}>
       <h2 id="order-address" className={orderHeadingClass}>
-        Delivery address
+        {t('orders.address.title')}
       </h2>
       <address className="text-sm leading-relaxed not-italic">
         {address.recipient_name}
@@ -128,6 +142,7 @@ function safeTrackingUrl(url: string | null | undefined): string | null {
 
 /** "Track parcel" — opens the courier's tracking page in a new tab. */
 export function TrackParcelLink({ url }: { url: string | null | undefined }) {
+  const { t } = useLocale()
   const href = safeTrackingUrl(url)
   if (!href) return null
   return (
@@ -138,40 +153,41 @@ export function TrackParcelLink({ url }: { url: string | null | undefined }) {
       className="inline-flex items-center gap-1 font-semibold text-sf-accent underline-offset-4 hover:underline"
       data-testid="track-parcel"
     >
-      Track parcel <ExternalLinkIcon aria-hidden className="size-3.5" />
-      <span className="sr-only">(opens in a new tab)</span>
+      {t('orders.track.link')} <ExternalLinkIcon aria-hidden className="size-3.5" />
+      <span className="sr-only">{t('orders.track.newTab')}</span>
     </a>
   )
 }
 
-function paymentStateLabel(order: Pick<OrderView, 'payment_status' | 'payment_method'>): string {
-  return order.payment_status === 'paid' ? 'Paid' : order.payment_method === 'cod' ? 'Pay on delivery' : 'Awaiting payment'
+function paymentStateLabel(order: Pick<OrderView, 'payment_status' | 'payment_method'>, t: Translate): string {
+  return t(order.payment_status === 'paid' ? 'orders.paymentState.paid' : order.payment_method === 'cod' ? 'orders.paymentState.cod' : 'orders.paymentState.awaiting')
 }
 
 /** `showCourier: false` when the timeline shows the courier and tracking number instead. */
 export function OrderDeliveryCard({ order, showCourier = true }: { order: (OrderView | Omit<OrderView, 'lines'>) & Tracking; showCourier?: boolean }) {
-  const eta = etaLabel(order.eta_min_days, order.eta_max_days)
+  const { t } = useLocale()
+  const eta = etaLabel(order.eta_min_days, order.eta_max_days, t)
   return (
     <section aria-labelledby="order-delivery" className={orderCardClass}>
       <h2 id="order-delivery" className={orderHeadingClass}>
-        Delivery and payment
+        {t('orders.delivery.title')}
       </h2>
       <dl className="flex flex-col gap-2 text-sm">
         {order.shipping_method_name && (
           <div>
-            <dt className="font-medium text-sf-heading">Delivery</dt>
+            <dt className="font-medium text-sf-heading">{t('orders.delivery.delivery')}</dt>
             <dd>
               {order.shipping_method_name}
-              {eta ? ` — usually ${eta}` : ''}
+              {eta ? ` ${t('orders.delivery.usually', { eta })}` : ''}
             </dd>
           </div>
         )}
         {showCourier && order.courier_name && (
           <div>
-            <dt className="font-medium text-sf-heading">Courier</dt>
+            <dt className="font-medium text-sf-heading">{t('orders.delivery.courier')}</dt>
             <dd data-testid="order-courier">
               {order.courier_name}
-              {order.tracking_number ? `, tracking number ${order.tracking_number}` : ''}
+              {order.tracking_number ? t('orders.delivery.trackingNumber', { number: order.tracking_number }) : ''}
               {order.tracking_url && (
                 <>
                   {' '}
@@ -182,13 +198,13 @@ export function OrderDeliveryCard({ order, showCourier = true }: { order: (Order
           </div>
         )}
         <div>
-          <dt className="font-medium text-sf-heading">Payment</dt>
+          <dt className="font-medium text-sf-heading">{t('orders.delivery.payment')}</dt>
           <dd data-testid="order-payment">
-            {order.payment_method_label} · {paymentStateLabel(order)}
+            {order.payment_method_label} · {paymentStateLabel(order, t)}
           </dd>
         </div>
         <div>
-          <dt className="font-medium text-sf-heading">Contact</dt>
+          <dt className="font-medium text-sf-heading">{t('orders.delivery.contact')}</dt>
           <dd>
             {order.contact.name} · {order.contact.phone} · {order.contact.email}
           </dd>
@@ -199,10 +215,11 @@ export function OrderDeliveryCard({ order, showCourier = true }: { order: (Order
 }
 
 export function OrderTotalsCard({ order }: { order: OrderView | Omit<OrderView, 'lines'> }) {
+  const { t } = useLocale()
   return (
     <section aria-labelledby="order-totals" className={orderCardClass}>
       <h2 id="order-totals" className={orderHeadingClass}>
-        Order total
+        {t('orders.totals.title')}
       </h2>
       <SummaryTotals amounts={order} currency={order.currency} />
     </section>
@@ -214,11 +231,12 @@ export function OrderTotalsCard({ order }: { order: OrderView | Omit<OrderView, 
  * courier and tracking number under it once the order is shipped.
  */
 export function OrderTimeline({ order, withTracking = false }: { order: Pick<OrderView, 'history' | 'courier_name' | 'tracking_number'> & Tracking; withTracking?: boolean }) {
+  const { t } = useLocale()
   if (order.history.length === 0) return null
   return (
     <section aria-labelledby="order-history" className={orderCardClass}>
       <h2 id="order-history" className={orderHeadingClass}>
-        Status
+        {t('orders.timeline.title')}
       </h2>
       <ol className="flex flex-col gap-3 border-l-2 border-sf-border pl-4" data-testid="order-history">
         {order.history.map((entry, index) => {
@@ -236,11 +254,11 @@ export function OrderTimeline({ order, withTracking = false }: { order: Pick<Ord
       </ol>
       {withTracking && order.courier_name && (
         <p className="text-sm" data-testid="order-tracking">
-          Shipped with <strong className="text-sf-heading">{order.courier_name}</strong>
+          {rich(t('orders.timeline.shippedWith'), { courier: <strong className="text-sf-heading">{order.courier_name}</strong> })}
           {order.tracking_number ? (
             <>
               {' '}
-              — tracking number <strong className="text-sf-heading">{order.tracking_number}</strong>
+              {rich(t('orders.timeline.trackingNumber'), { number: <strong className="text-sf-heading">{order.tracking_number}</strong> })}
             </>
           ) : null}
           {order.tracking_url && (

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Actions\ManageBanners;
 use App\Modules\Storefront\Domain\BannerPlacement;
@@ -110,6 +111,8 @@ class BannerController
             'starts_at' => ['sometimes', 'nullable', 'date'],
             'ends_at' => ['sometimes', 'nullable', 'date'],
             'is_active' => ['sometimes', 'boolean'],
+            // E12b: {bn: {kicker, title, subtitle, button_label, secondary_button_label}}.
+            ...TranslationInput::rules(ManageBanners::TRANSLATABLE),
         ];
     }
 }

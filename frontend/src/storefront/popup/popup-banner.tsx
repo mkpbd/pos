@@ -4,6 +4,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { XIcon } from 'lucide-react'
 import { useStorefront } from '../api'
 import { MenuLink } from '../components/menu-link'
+import { useLocale } from '../i18n/locale'
 import type { StorePopup } from '../types'
 import { isPopupBlockedPath, isPopupDue, markPopupShown, popupDelayMs } from './frequency'
 
@@ -36,6 +37,7 @@ function PopupPicture({ popup }: { popup: StorePopup }) {
  */
 export function PopupBanner() {
   const { popup } = useStorefront()
+  const { t } = useLocale()
   const { pathname } = useLocation()
   const blocked = isPopupBlockedPath(pathname)
   const [shownId, setShownId] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export function PopupBanner() {
   // A link in the popup that leads to the cart or checkout closes it too.
   const open = shownId === popup.id && !blocked
   const close = () => setShownId(null)
-  const title = popup.title ?? 'Special offer'
+  const title = popup.title ?? t('promo.popup.specialOffer')
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && close()}>
@@ -97,7 +99,7 @@ export function PopupBanner() {
           </div>
           <DialogPrimitive.Close
             className="absolute top-3 right-3 grid size-9 place-items-center rounded-full bg-sf-surface/90 text-sf-heading shadow transition hover:bg-sf-surface focus-visible:outline-2 focus-visible:outline-offset-2"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <XIcon aria-hidden className="size-5" />
           </DialogPrimitive.Close>

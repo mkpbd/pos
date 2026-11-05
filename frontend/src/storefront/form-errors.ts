@@ -1,17 +1,19 @@
 import type { FieldValues, Path, UseFormSetError } from 'react-hook-form'
 import { ApiError } from '@/lib/api/client'
+import type { Translate } from './i18n/translate'
 
 /** A visitor-facing message for a failed storefront form submission. */
-export function storeFormError(error: unknown): string {
+export function storeFormError(error: unknown, t: Translate): string {
   if (error instanceof ApiError) {
-    if (error.status === 429) return 'Too many attempts. Please try again later.'
-    if (error.code === 'VALIDATION_FAILED') return 'Please check the highlighted fields.'
-    if (error.code === 'TOKEN_INVALID') return error.message
-    if (error.code === 'INVALID_CREDENTIALS') return 'The e-mail address or password is incorrect.'
-    if (error.status === 419) return 'Your session expired. Please try again.'
-    if (error.status === 401) return 'Please sign in again.'
+    if (error.status === 429) return t('common.form.tooManyAttempts')
+    if (error.code === 'VALIDATION_FAILED') return t('common.form.checkFields')
+    // English shows the server's own wording (which link: verification, reset, newsletter).
+    if (error.code === 'TOKEN_INVALID') return t('common.form.linkInvalid', { server: error.message })
+    if (error.code === 'INVALID_CREDENTIALS') return t('common.form.invalidCredentials')
+    if (error.status === 419) return t('common.form.sessionExpired')
+    if (error.status === 401) return t('common.form.signInAgain')
   }
-  return 'Something went wrong. Please try again.'
+  return t('common.genericError')
 }
 
 /**

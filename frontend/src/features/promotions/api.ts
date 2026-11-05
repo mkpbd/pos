@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api, toPaginated, type Paginated } from '@/lib/api/client'
 
 export const PROMOTION_TYPES = ['percent', 'fixed', 'free_shipping'] as const
@@ -45,6 +46,8 @@ export type Promotion = PromotionRow & {
   coupons_preview?: (CouponPreview | string)[]
   created_at?: string | null
   updated_at?: string | null
+  /** Bangla texts shown to shoppers (E12b): name, description. */
+  translations?: TranslationsMap
 }
 
 /** Body of POST /promotions and PATCH /promotions/{id}. */
@@ -64,6 +67,7 @@ export type PromotionInput = {
   is_active: boolean
   usage_limit: number | null
   usage_limit_per_customer: number | null
+  translations?: TranslationsInput
 }
 
 export type Coupon = {

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
 use App\Modules\Storefront\Infrastructure\Models\MenuItem;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
@@ -27,6 +28,9 @@ final class StorefrontPresenter
             'guest_checkout_enabled' => $s->guest_checkout_enabled,
             'return_window_days' => $s->return_window_days,
             'allow_indexing' => $s->allow_indexing,
+            'bangla_enabled' => $s->bangla_enabled,
+            'default_locale' => $s->default_locale,
+            'bangla_digits' => $s->bangla_digits,
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }
@@ -95,6 +99,8 @@ final class StorefrontPresenter
             'is_mega' => $i->is_mega,
             'mega_columns' => $i->mega_columns,
             'image_media_id' => $i->image_media_id,
+            // E12b: {bn: {label}}.
+            'translations' => TranslationInput::present($i->translations),
             'children' => self::items($items, $i->id),
         ])->values()->all();
     }

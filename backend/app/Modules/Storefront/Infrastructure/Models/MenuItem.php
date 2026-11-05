@@ -23,8 +23,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?int $mega_columns
  * @property ?string $image_media_id
  * @property int $sort_order
+ * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
-#[Fillable(['organization_id', 'menu_id', 'parent_id', 'type', 'label', 'url', 'target_id', 'open_in_new_tab', 'is_visible', 'is_mega', 'mega_columns', 'image_media_id', 'sort_order'])]
+#[Fillable(['organization_id', 'menu_id', 'parent_id', 'type', 'label', 'url', 'target_id', 'open_in_new_tab', 'is_visible', 'is_mega', 'mega_columns', 'image_media_id', 'sort_order', 'translations'])]
 class MenuItem extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
@@ -38,6 +39,7 @@ class MenuItem extends Model
             'is_mega' => 'boolean',
             'mega_columns' => 'integer',
             'sort_order' => 'integer',
+            'translations' => 'array',
         ];
     }
 }

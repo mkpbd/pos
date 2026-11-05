@@ -6,6 +6,7 @@ use App\Modules\Cms\Application\Queries\BlogPostCards;
 use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +56,7 @@ class StoreBlogController
         $cards = $items->isEmpty() ? [] : array_combine($items->pluck('id')->all(), $this->cards->cards($items));
 
         return ApiResponse::paginated($page, fn (BlogPost $p) => new JsonResource($cards[$p->id]), [
-            'category' => $category === null ? null : ['name' => $category->name, 'slug' => $category->slug, 'description' => $category->description],
+            'category' => $category === null ? null : ['slug' => $category->slug] + Translations::pickMany($category, ['name', 'description'], $this->cards->locale()),
         ]);
     }
 
@@ -71,7 +72,12 @@ class StoreBlogController
             ->selectRaw('category_id, COUNT(*) as aggregate')->pluck('aggregate', 'category_id');
 
         return ApiResponse::success(BlogCategory::query()->whereIn('id', $counts->keys()->all())->orderBy('sort_order')->orderBy('name')->get()
-            ->map(fn (BlogCategory $c) => ['name' => $c->name, 'slug' => $c->slug, 'description' => $c->description, 'post_count' => (int) $counts[$c->id]])
+            ->map(fn (BlogCategory $c) => [
+                'name' => Translations::pick($c, 'name', $this->cards->locale()),
+                'slug' => $c->slug,
+                'description' => Translations::pick($c, 'description', $this->cards->locale()),
+                'post_count' => (int) $counts[$c->id],
+            ])
             ->values()->all());
     }
 
@@ -100,9 +106,9 @@ class StoreBlogController
             ->orderByDesc('published_at')->orderByDesc('id')->limit(self::RELATED)->get();
 
         $data = $this->cards->cards(collect([$post]))[0] + [
-            'body_html' => $post->body_html,
-            'seo_title' => $post->seo_title,
-            'seo_description' => $post->seo_description,
+            'body_html' => Translations::pick($post, 'body_html', $this->cards->locale()),
+            'seo_title' => Translations::pick($post, 'seo_title', $this->cards->locale()),
+            'seo_description' => Translations::pick($post, 'seo_description', $this->cards->locale()),
             'prev' => $this->neighbour($post, older: true),
             'next' => $this->neighbour($post, older: false),
             'related' => $this->cards->cards($related),
@@ -133,9 +139,9 @@ class StoreBlogController
                 ? $q->where('published_at', '<', $at)->orWhere(fn (Builder $w) => $w->where('published_at', $at)->where('id', '<', $post->id))
                 : $q->where('published_at', '>', $at)->orWhere(fn (Builder $w) => $w->where('published_at', $at)->where('id', '>', $post->id)))
             ->orderBy('published_at', $older ? 'desc' : 'asc')->orderBy('id', $older ? 'desc' : 'asc')
-            ->first(['slug', 'title']);
+            ->first(['slug', 'title', 'translations']);
 
-        return $found === null ? null : ['slug' => $found->slug, 'title' => $found->title];
+        return $found === null ? null : ['slug' => $found->slug, 'title' => Translations::pick($found, 'title', $this->cards->locale())];
     }
 
     private function isStaff(Request $request): bool

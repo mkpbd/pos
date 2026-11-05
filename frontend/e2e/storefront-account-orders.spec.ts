@@ -287,7 +287,7 @@ test('the product page shows the rating and the approved reviews', async ({ page
   await reviews.getByRole('button', { name: /^4 stars: 1 review/ }).click()
   await expect(reviews.getByTestId('review')).toHaveCount(1)
   await expect(reviews.getByText('Sadia R.')).toBeVisible()
-  expect(state.reviewQueries).toContain('?sort=newest&rating=4')
+  expect(state.reviewQueries).toContain('?sort=newest&rating=4&lang=en')
 })
 
 test('a customer returns part of a delivered order and cancels the request', async ({ page }) => {

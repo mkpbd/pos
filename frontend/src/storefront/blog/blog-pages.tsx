@@ -9,6 +9,8 @@ import { Pagination } from '../catalog/listing-toolbar'
 import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
 import { NotFoundPage } from '../pages/not-found-page'
+import { useLocale } from '../i18n/locale'
+import { rich } from '../i18n/rich'
 import type { BlogCategory, Breadcrumb } from '../types'
 import { useDocumentMeta } from '../use-document-meta'
 import { useBlogCategoriesQuery, useBlogListQuery, useBlogPostQuery } from './api'
@@ -16,19 +18,21 @@ import { BlogGrid, CategoryChip, PostMeta } from './blog-card'
 import { blogCategoryUrl, blogListUrl, blogPostUrl, parsePage } from './display'
 
 function Loading() {
+  const { t } = useLocale()
   return (
     <div role="status" className="grid min-h-[50vh] place-items-center">
       <span className="size-10 animate-spin rounded-full border-4 border-sf-border border-t-sf-accent motion-reduce:animate-none" aria-hidden />
-      <span className="sr-only">Loading</span>
+      <span className="sr-only">{t('blog.loading')}</span>
     </div>
   )
 }
 
 function LoadError({ onRetry }: { onRetry: () => void }) {
+  const { t } = useLocale()
   return (
     <section className="mx-auto max-w-sf px-4 py-16 text-center">
-      <h1 className="text-2xl font-bold">This page could not be loaded</h1>
-      <Button className="mt-4 rounded-sf-button" onClick={onRetry}>Try again</Button>
+      <h1 className="text-2xl font-bold">{t('blog.loadError')}</h1>
+      <Button className="mt-4 rounded-sf-button" onClick={onRetry}>{t('common.tryAgain')}</Button>
     </section>
   )
 }
@@ -50,6 +54,7 @@ function TitleBand({ title, crumbs, children }: { title: string; crumbs: Breadcr
 
 /** "All posts" plus one chip per category with published posts; the current one is marked. */
 function CategoryChips({ categories, current }: { categories: BlogCategory[]; current: string | null }) {
+  const { t, formatNumber } = useLocale()
   if (categories.length === 0) return null
   const chip = (active: boolean) =>
     cn(
@@ -58,18 +63,18 @@ function CategoryChips({ categories, current }: { categories: BlogCategory[]; cu
     )
 
   return (
-    <nav aria-label="Blog categories" className="mb-8">
+    <nav aria-label={t('blog.categories')} className="mb-8">
       <ul className="flex flex-wrap justify-center gap-2">
         <li>
           <Link to="/blog" className={chip(current === null)} aria-current={current === null ? 'page' : undefined}>
-            All posts
+            {t('blog.allPosts')}
           </Link>
         </li>
         {categories.map((c) => (
           <li key={c.slug}>
             <Link to={blogCategoryUrl(c.slug)} className={chip(current === c.slug)} aria-current={current === c.slug ? 'page' : undefined}>
               {c.name}{' '}
-              <span className="text-xs opacity-80">({c.post_count})</span>
+              <span className="text-xs opacity-80">({formatNumber(c.post_count)})</span>
             </Link>
           </li>
         ))}
@@ -84,6 +89,7 @@ export function BlogIndexPage() {
   const category = slug ?? null
   const [params] = useSearchParams()
   const page = parsePage(params.get('page'))
+  const { t } = useLocale()
   const categories = useBlogCategoriesQuery()
   const list = useBlogListQuery(category, page)
 
@@ -91,7 +97,7 @@ export function BlogIndexPage() {
   // may link to it); the chips only list categories with posts. An unknown slug is a 404 from the API.
   const listed = list.data?.category?.slug === category ? list.data?.category : undefined
   const current = category ? (categories.data?.find((c) => c.slug === category) ?? listed ?? undefined) : undefined
-  const title = category ? (current?.name ?? null) : 'Blog'
+  const title = category ? (current?.name ?? null) : t('blog.title')
   useDocumentMeta(title === null || isNotFound(list.error) ? null : { title, description: current?.description })
 
   if (isNotFound(list.error)) return <NotFoundPage />
@@ -99,28 +105,29 @@ export function BlogIndexPage() {
   if (!list.data || (category && !current)) return <Loading />
 
   const { posts, pagination } = list.data
-  const crumbs: Breadcrumb[] = current ? [{ name: 'Home', url: '/' }, { name: 'Blog', url: '/blog' }, { name: current.name, url: null }] : [{ name: 'Home', url: '/' }, { name: 'Blog', url: null }]
+  const home = { name: t('blog.home'), url: '/' }
+  const crumbs: Breadcrumb[] = current ? [home, { name: t('blog.title'), url: '/blog' }, { name: current.name, url: null }] : [home, { name: t('blog.title'), url: null }]
 
   return (
     <div>
-      <TitleBand title={title ?? 'Blog'} crumbs={crumbs}>
+      <TitleBand title={title ?? t('blog.title')} crumbs={crumbs}>
         {current?.description && <p className="mx-auto max-w-2xl">{current.description}</p>}
       </TitleBand>
       <div className="mx-auto max-w-sf px-4 py-12">
         <CategoryChips categories={categories.data ?? []} current={category} />
         {posts.length > 0 ? (
           <div aria-busy={list.isPlaceholderData || undefined} className={cn(list.isPlaceholderData && 'opacity-60')}>
-            <BlogGrid posts={posts} label={current ? `Posts in ${current.name}` : 'Blog posts'} />
+            <BlogGrid posts={posts} label={current ? t('blog.postsIn', { category: current.name }) : t('blog.posts')} />
           </div>
         ) : (
           <div className="rounded-sf-card bg-sf-surface px-6 py-12 text-center">
             {page > 1 ? (
               <>
-                <h2 className="text-xl font-bold">There are no posts on this page</h2>
-                <Link to={blogListUrl(category, 1)} className="mt-4 inline-block font-semibold text-sf-accent hover:underline">Go to the first page</Link>
+                <h2 className="text-xl font-bold">{t('blog.emptyPage')}</h2>
+                <Link to={blogListUrl(category, 1)} className="mt-4 inline-block font-semibold text-sf-accent hover:underline">{t('blog.firstPage')}</Link>
               </>
             ) : (
-              <h2 className="text-xl font-bold">No posts have been published yet</h2>
+              <h2 className="text-xl font-bold">{t('blog.empty')}</h2>
             )}
           </div>
         )}
@@ -132,6 +139,7 @@ export function BlogIndexPage() {
 
 function AdjacentLink({ post, direction }: { post: { slug: string; title: string }; direction: 'prev' | 'next' }) {
   const prev = direction === 'prev'
+  const { t } = useLocale()
   return (
     <Link
       to={blogPostUrl(post.slug)}
@@ -140,7 +148,7 @@ function AdjacentLink({ post, direction }: { post: { slug: string; title: string
     >
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
         {prev && <ArrowLeftIcon aria-hidden className="size-4" />}
-        {prev ? 'Previous post' : 'Next post'}
+        {prev ? t('blog.previousPost') : t('blog.nextPost')}
         {!prev && <ArrowRightIcon aria-hidden className="size-4" />}
       </span>{' '}
       <span className="font-heading font-bold text-sf-heading group-hover:text-sf-accent">{post.title}</span>
@@ -153,6 +161,7 @@ export function BlogPostPage() {
   const { slug = '' } = useParams()
   const [params] = useSearchParams()
   const preview = params.get('preview') === '1'
+  const { t } = useLocale()
   const query = useBlogPostQuery(slug, preview)
   const post = query.data
   useDocumentMeta(
@@ -172,7 +181,7 @@ export function BlogPostPage() {
   if (isNotFound(query.error)) return <NotFoundPage />
   if (query.error || !post) return <LoadError onRetry={() => void query.refetch()} />
 
-  const crumbs: Breadcrumb[] = [{ name: 'Home', url: '/' }, { name: 'Blog', url: '/blog' }]
+  const crumbs: Breadcrumb[] = [{ name: t('blog.home'), url: '/' }, { name: t('blog.title'), url: '/blog' }]
   if (post.category) crumbs.push({ name: post.category.name, url: blogCategoryUrl(post.category.slug) })
   crumbs.push({ name: post.title, url: null })
   const related = post.related.slice(0, 3)
@@ -196,14 +205,17 @@ export function BlogPostPage() {
         <RichText html={post.body_html} className="mt-8" />
         {post.category && (
           <p className="mt-10 border-t pt-6 text-sm">
-            Filed under{' '}
-            <Link to={blogCategoryUrl(post.category.slug)} className="font-semibold text-sf-accent hover:underline">
-              {post.category.name}
-            </Link>
+            {rich(t('blog.filedUnder'), {
+              category: (
+                <Link to={blogCategoryUrl(post.category.slug)} className="font-semibold text-sf-accent hover:underline">
+                  {post.category.name}
+                </Link>
+              ),
+            })}
           </p>
         )}
         {(post.prev || post.next) && (
-          <nav aria-label="More posts" className="mt-8 grid gap-4 sm:grid-cols-2">
+          <nav aria-label={t('blog.morePosts')} className="mt-8 grid gap-4 sm:grid-cols-2">
             {post.prev && <AdjacentLink post={post.prev} direction="prev" />}
             {post.next && <AdjacentLink post={post.next} direction="next" />}
           </nav>
@@ -212,7 +224,7 @@ export function BlogPostPage() {
       {related.length > 0 && (
         <section aria-labelledby="related-posts" className="bg-sf-surface/60">
           <div className="mx-auto max-w-sf px-4 py-12">
-            <h2 id="related-posts" className="mb-8 text-center text-3xl font-extrabold">Related posts</h2>
+            <h2 id="related-posts" className="mb-8 text-center text-3xl font-extrabold">{t('blog.related')}</h2>
             <BlogGrid posts={related} headingLevel={3} />
           </div>
         </section>

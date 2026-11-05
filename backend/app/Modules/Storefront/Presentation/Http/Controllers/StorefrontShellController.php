@@ -6,6 +6,8 @@ use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\TenantUser;
+use App\Modules\Shared\Application\Localization\FixedText;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use App\Modules\Storefront\Presentation\Http\Support\StructuredData;
@@ -26,6 +28,13 @@ use Illuminate\Http\Response;
  * categories) — only Organization on noindex pages. Listings canonicalize to the unfiltered
  * URL (`?page=N` kept beyond page 1) and are noindex,follow when filtered or sorted. With
  * `allow_indexing` off every page is noindex.
+ *
+ * E12b: the page's language (LocaleContext: `?lang=` > `lang` cookie > store default) sets
+ * `<html lang>`, the localized title / description / Open Graph texts, `og:locale` (+ the
+ * other language as `og:locale:alternate`) and JSON-LD `inLanguage`. The canonical URL is
+ * the page in its language: `lang` is kept only when it is not the store default. Indexable
+ * pages of a store with Bangla on list both languages and `x-default` (the default
+ * language's URL) as `<link rel="alternate" hreflang>`.
  */
 class StorefrontShellController
 {
@@ -47,7 +56,7 @@ class StorefrontShellController
 
     public const ROBOTS_NOINDEX = 'noindex, follow';
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale): Response
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
@@ -59,7 +68,9 @@ class StorefrontShellController
         $path = '/'.ltrim($request->path(), '/');
         $meta = ['title' => $store, 'description' => $data['store']['description']];
         $status = in_array($path, self::KNOWN_PATHS, true) ? 200 : 404;
-        $ld = new StructuredData($request->getSchemeAndHttpHost());
+        $lang = $locale->current();
+        $t = fn (string $text) => FixedText::get($text, $lang);
+        $ld = new StructuredData($request->getSchemeAndHttpHost(), $lang);
         /** @var list<array<string, mixed>> $documents structured data besides Organization */
         $documents = [];
         $isListing = in_array($path, ['/shop', '/blog'], true);
@@ -73,11 +84,11 @@ class StorefrontShellController
                 'title' => ($page['seo_title'] ?? $page['title']).' | '.$store,
                 'description' => $page['seo_description'] ?? $data['store']['description'],
             ];
-            $documents[] = $ld->breadcrumbs([['name' => 'Home', 'url' => '/'], ['name' => $page['title'], 'url' => '/pages/'.$page['slug']]]);
+            $documents[] = $ld->breadcrumbs([['name' => $t('Home'), 'url' => '/'], ['name' => $page['title'], 'url' => '/pages/'.$page['slug']]]);
         }
         // The blog (E11): index, category pages and posts (staff may preview unpublished posts).
         if ($path === '/blog') {
-            $meta['title'] = 'Blog | '.$store;
+            $meta['title'] = $t('Blog').' | '.$store;
         }
         $blogPreview = false;
         if (preg_match('#^/blog/category/([A-Za-z0-9-]{1,100})$#', $path, $m) === 1 && ($category = $blog->categoryMeta($m[1])) !== null) {
@@ -88,8 +99,8 @@ class StorefrontShellController
                 'description' => $category['description'] ?? $data['store']['description'],
             ];
             $documents[] = $ld->breadcrumbs([
-                ['name' => 'Home', 'url' => '/'],
-                ['name' => 'Blog', 'url' => '/blog'],
+                ['name' => $t('Home'), 'url' => '/'],
+                ['name' => $t('Blog'), 'url' => '/blog'],
                 ['name' => $category['name'], 'url' => '/blog/category/'.$category['slug']],
             ]);
         } elseif (preg_match('#^/blog/([A-Za-z0-9-]{1,100})$#', $path, $m) === 1) {
@@ -106,33 +117,33 @@ class StorefrontShellController
                 $postUrl = $request->getSchemeAndHttpHost().'/blog/'.$post['slug'];
                 $documents[] = $ld->blogPosting($post, $postUrl, $this->organization($ld, $data));
                 $documents[] = $ld->breadcrumbs([
-                    ['name' => 'Home', 'url' => '/'],
-                    ['name' => 'Blog', 'url' => '/blog'],
+                    ['name' => $t('Home'), 'url' => '/'],
+                    ['name' => $t('Blog'), 'url' => '/blog'],
                     ...($post['category'] === null ? [] : [['name' => $post['category']['name'], 'url' => '/blog/category/'.$post['category']['slug']]]),
                     ['name' => $post['title'], 'url' => '/blog/'.$post['slug']],
                 ]);
             }
         }
         if ($path === '/shop') {
-            $meta['title'] = 'Shop | '.$store;
+            $meta['title'] = $t('Shop').' | '.$store;
         }
         if ($path === '/search') {
-            $meta['title'] = 'Search | '.$store;
+            $meta['title'] = $t('Search').' | '.$store;
         }
         if (in_array($path, self::ACCOUNT_PATHS, true)) {
-            $meta['title'] = match ($path) {
+            $meta['title'] = $t(match ($path) {
                 '/cart' => 'Cart',
                 '/wishlist' => 'Wishlist',
                 '/checkout' => 'Checkout',
                 default => 'My account',
-            }.' | '.$store;
+            }).' | '.$store;
         }
         // Order confirmation / status pages (E8a): personal, never indexed; the SPA asks the API.
         // and the customer's own order page in the account area (E9).
         $orderPage = preg_match('#^/(order|account/orders)/[A-Za-z0-9-]{1,40}$#', $path) === 1;
         if ($orderPage) {
             $status = 200;
-            $meta['title'] = 'Your order | '.$store;
+            $meta['title'] = $t('Your order').' | '.$store;
         }
         if (preg_match('#^/(category|brand|product)/([A-Za-z0-9-]{1,120})$#', $path, $m) === 1 && ($found = $catalog->pageMeta($m[1], $m[2])) !== null) {
             $status = 200;
@@ -158,7 +169,8 @@ class StorefrontShellController
         $canonical = $request->url();
         $filtered = false;
         if ($isListing && $status === 200) {
-            $query = array_diff_key($request->query(), array_flip(['page', ...self::TRACKING_PARAMETERS]));
+            // E12b: `lang` picks the language, it does not filter (the canonical keeps it below).
+            $query = array_diff_key($request->query(), array_flip(['page', 'lang', ...self::TRACKING_PARAMETERS]));
             $query = array_filter($query, fn ($v, $k) => ! str_starts_with((string) $k, 'utm_'), ARRAY_FILTER_USE_BOTH);
             $filtered = $query !== [];
             $page = filter_var($request->query('page'), FILTER_VALIDATE_INT);
@@ -174,12 +186,32 @@ class StorefrontShellController
         // Structured data never describes pages search engines should not index (except who runs the store).
         $documents = [$this->organization($ld, $data), ...($noindex ? [] : $documents)];
 
-        $html = $this->inject((string) file_get_contents($shell), $data, $meta, $canonical, $noindex, $documents);
+        // E12b: the canonical URL is the page in its language (`lang` only when not the
+        // default); indexable pages list every language and x-default.
+        $alternates = [];
+        if ($locale->banglaEnabled() && ! $noindex) {
+            foreach ($locale->enabled() as $code) {
+                $alternates[$code] = $this->inLanguage($canonical, $code, $locale->defaultLocale());
+            }
+            $alternates['x-default'] = $canonical;
+        }
+        $canonical = $this->inLanguage($canonical, $lang, $locale->defaultLocale());
+        $languages = ['current' => $lang, 'others' => array_values(array_diff($locale->enabled(), [$lang])), 'alternates' => $alternates];
 
-        return response($html, $status, ['Content-Type' => 'text/html; charset=UTF-8'])
+        $html = $this->inject((string) file_get_contents($shell), $data, $meta, $canonical, $noindex, $documents, $languages);
+
+        return response($html, $status, ['Content-Type' => 'text/html; charset=UTF-8', 'Vary' => 'Cookie'])
             // Previews of a closed store must never be cached or indexed.
             ->header('Cache-Control', $data['preview'] || $blogPreview ? 'no-store' : 'no-cache')
             ->header('X-Robots-Tag', $noindex ? 'noindex' : 'all');
+    }
+
+    /**
+     * The URL of the page in `$code`: the default language's URL has no `lang`.
+     */
+    private function inLanguage(string $url, string $code, string $default): string
+    {
+        return $code === $default ? $url : $url.(str_contains($url, '?') ? '&' : '?').'lang='.$code;
     }
 
     /**
@@ -208,8 +240,9 @@ class StorefrontShellController
      * @param  array<string, mixed>  $data
      * @param  array{title: string, description: ?string, image?: ?string, type?: string}  $meta
      * @param  list<array<string, mixed>>  $documents  JSON-LD
+     * @param  array{current: string, others: list<string>, alternates: array<string, string>}  $languages
      */
-    private function inject(string $html, array $data, array $meta, string $url, bool $noindex, array $documents): string
+    private function inject(string $html, array $data, array $meta, string $url, bool $noindex, array $documents, array $languages): string
     {
         $e = fn (?string $v) => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $name = $data['store']['name'];
@@ -224,7 +257,14 @@ class StorefrontShellController
             '<meta property="og:site_name" content="'.$e($name).'">',
             '<meta property="og:title" content="'.$e($title).'">',
             '<meta property="og:url" content="'.$e($url).'">',
+            '<meta property="og:locale" content="'.LocaleContext::ogLocale($languages['current']).'">',
         ];
+        foreach ($languages['others'] as $other) {
+            $head[] = '<meta property="og:locale:alternate" content="'.LocaleContext::ogLocale($other).'">';
+        }
+        foreach ($languages['alternates'] as $hreflang => $href) {
+            $head[] = '<link rel="alternate" hreflang="'.$e($hreflang).'" href="'.$e($href).'">';
+        }
         if ($description) {
             $head[] = '<meta property="og:description" content="'.$e($description).'">';
         }
@@ -245,6 +285,10 @@ class StorefrontShellController
         $head[] = '<script id="storefront-bootstrap" type="application/json">'.$json.'</script>';
 
         $html = preg_replace('#<title>.*?</title>#s', '<title>'.$e($title).'</title>', $html, 1) ?? $html;
+        // E12b: <html lang> is the page's language (replaced, or added when the build has none).
+        $html = preg_match('#<html[^>]*\slang="#', $html) === 1
+            ? (preg_replace('#<html([^>]*?)\slang="[^"]*"#', '<html$1 lang="'.$e($languages['current']).'"', $html, 1) ?? $html)
+            : (preg_replace('#<html(?=[\s>])#', '<html lang="'.$e($languages['current']).'"', $html, 1) ?? $html);
         if ($data['theme']['favicon']) {
             $html = preg_replace('#<link rel="icon"[^>]*>#', '', $html, 1) ?? $html;
         }

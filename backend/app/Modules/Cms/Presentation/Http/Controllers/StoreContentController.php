@@ -8,6 +8,7 @@ use App\Modules\Cms\Domain\PageTemplate;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
 use App\Modules\Cms\Presentation\Http\Support\CmsPresenter;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,17 +24,16 @@ class StoreContentController
      * A published page by slug; drafts, scheduled and deleted pages are 404. Pages with the
      * `faq` template include the active FAQ entries, grouped.
      */
-    public function page(string $slug): JsonResponse
+    public function page(string $slug, LocaleContext $locale): JsonResponse
     {
         $page = CmsPage::query()->visible()->whereRaw('lower(slug) = ?', [mb_strtolower($slug)])->first();
         if ($page === null) {
             return ApiResponse::error('NOT_FOUND', 'This page does not exist.', 404);
         }
 
-        $data = CmsPresenter::page($page, true);
-        unset($data['id'], $data['status'], $data['is_visible']);
+        $data = CmsPresenter::publicPage($page, $locale->current());
         if ($page->template === PageTemplate::Faq) {
-            $data['faq'] = CmsPresenter::publicFaq(FaqItem::query()->where('is_active', true)->get());
+            $data['faq'] = CmsPresenter::publicFaq(FaqItem::query()->where('is_active', true)->get(), $locale->current());
         }
 
         return ApiResponse::success($data);
@@ -44,9 +44,9 @@ class StoreContentController
      *
      * Active entries, grouped, in display order.
      */
-    public function faq(): JsonResponse
+    public function faq(LocaleContext $locale): JsonResponse
     {
-        return ApiResponse::success(CmsPresenter::publicFaq(FaqItem::query()->where('is_active', true)->get()));
+        return ApiResponse::success(CmsPresenter::publicFaq(FaqItem::query()->where('is_active', true)->get(), $locale->current()));
     }
 
     /**

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, type PointerEvent } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, ZoomInIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLocale } from '../i18n/locale'
 import type { GalleryImage } from './product-lightbox'
 import { ProductImage } from './product-image'
 
@@ -26,6 +27,7 @@ export function ProductGallery({
   /** Hover zoom and lightbox (off in quick view). */
   zoom?: boolean
 }) {
+  const { t } = useLocale()
   const [origin, setOrigin] = useState('50% 50%')
   const [lightbox, setLightbox] = useState(false)
   // Mounted from the first opening on, so closing keeps its exit animation.
@@ -41,7 +43,7 @@ export function ProductGallery({
     setOrigin(`${((event.clientX - rect.left) / rect.width) * 100}% ${((event.clientY - rect.top) / rect.height) * 100}%`)
   }
 
-  const label = (i: number) => `${name}, image ${i + 1} of ${count}`
+  const label = (i: number) => t('catalog.gallery.imageLabel', { name, index: i + 1, count })
 
   return (
     <div className="flex flex-col gap-3" data-testid="product-gallery">
@@ -55,7 +57,7 @@ export function ProductGallery({
               setLightbox(true)
             }}
             onPointerMove={onPointerMove}
-            aria-label={`Open ${label(index)} full screen`}
+            aria-label={t('catalog.gallery.openFullScreen', { image: label(index) })}
           >
             <ProductImage
               image={current}
@@ -75,10 +77,10 @@ export function ProductGallery({
 
         {count > 1 && (
           <>
-            <button type="button" onClick={() => go(index - 1)} aria-label="Previous image" className="absolute top-1/2 left-2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-sf-surface/90 text-sf-heading shadow md:hidden">
+            <button type="button" onClick={() => go(index - 1)} aria-label={t('catalog.gallery.previousImage')} className="absolute top-1/2 left-2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-sf-surface/90 text-sf-heading shadow md:hidden">
               <ChevronLeftIcon aria-hidden className="size-5" />
             </button>
-            <button type="button" onClick={() => go(index + 1)} aria-label="Next image" className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-sf-surface/90 text-sf-heading shadow md:hidden">
+            <button type="button" onClick={() => go(index + 1)} aria-label={t('catalog.gallery.nextImage')} className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-sf-surface/90 text-sf-heading shadow md:hidden">
               <ChevronRightIcon aria-hidden className="size-5" />
             </button>
           </>
@@ -86,13 +88,13 @@ export function ProductGallery({
       </div>
 
       {count > 1 && (
-        <ul className="grid grid-cols-5 gap-2" aria-label="Product images">
+        <ul className="grid grid-cols-5 gap-2" aria-label={t('catalog.gallery.images')}>
           {images.map((image, i) => (
             <li key={image.id}>
               <button
                 type="button"
                 onClick={() => onIndexChange(i)}
-                aria-label={`Show image ${i + 1} of ${count}`}
+                aria-label={t('catalog.gallery.showImage', { index: i + 1, count })}
                 aria-current={i === index ? 'true' : undefined}
                 className={cn('block w-full overflow-hidden rounded-lg border-2 transition', i === index ? 'border-sf-accent' : 'border-transparent hover:border-sf-border')}
               >

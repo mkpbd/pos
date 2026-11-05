@@ -7,6 +7,7 @@ use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Domain\PromotionType;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,6 +26,8 @@ class SavePromotionRequest extends FormRequest
         return [
             'name' => [$required, 'string', 'max:80'],
             'description' => ['sometimes', 'nullable', 'string', 'max:200'],
+            // E12b: {bn: {name, description}} as shoppers see them (partial; blank removes).
+            ...TranslationInput::rules(SavePromotion::TRANSLATABLE),
             'type' => [$required, Rule::enum(PromotionType::class)],
             'value' => ['sometimes', 'nullable', ...$money],
             'scope' => [$required, Rule::enum(PromotionScope::class)],

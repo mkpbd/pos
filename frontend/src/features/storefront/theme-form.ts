@@ -2,6 +2,12 @@ import { z } from 'zod'
 import { SOCIAL_NETWORKS, THEME_COLORS, type SocialNetwork, type ThemeColor, type ThemeDocument } from '@/features/storefront/api'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
+import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
+
+export const ANNOUNCEMENT_TEXT_MAX = 200
+/** The announcement's Bangla text (E12b) lives with it: `announcement.translations.bn.text`. */
+const ANNOUNCEMENT_TRANSLATIONS = [{ name: 'text', max: ANNOUNCEMENT_TEXT_MAX }] as const
+const ANNOUNCEMENT_TRANSLATION_NAMES = ANNOUNCEMENT_TRANSLATIONS.map((f) => f.name)
 
 /**
  * The theme editor works on form values (empty strings for "not set", local datetimes)
@@ -21,12 +27,13 @@ export const themeSchema = z
     favicon_media_id: z.string().nullable(),
     announcement: z.object({
       enabled: z.boolean(),
-      text: optional(200),
+      text: optional(ANNOUNCEMENT_TEXT_MAX),
       link: z.string().trim().refine((v) => v === '' || isSafeLink(v), 'Use a site path such as /sale or an http(s) URL.'),
       background: hex,
       foreground: hex,
       starts_at: z.string(),
       ends_at: z.string(),
+      translations: translationsSchema(ANNOUNCEMENT_TRANSLATIONS),
     }),
     footer: z.object({
       about: optional(500),
@@ -63,6 +70,7 @@ export function toFormValues(doc: ThemeDocument): ThemeFormValues {
       foreground: doc.announcement.foreground,
       starts_at: toLocalInput(doc.announcement.starts_at),
       ends_at: toLocalInput(doc.announcement.ends_at),
+      translations: { bn: readBn(doc.announcement.translations as TranslationsMap, ANNOUNCEMENT_TRANSLATION_NAMES) },
     },
     footer: {
       about: doc.footer.about ?? '',
@@ -75,7 +83,8 @@ export function toFormValues(doc: ThemeDocument): ThemeFormValues {
 }
 
 /** The complete document the API expects (PUT replaces the whole theme). */
-export function toDocument(v: ThemeFormValues): ThemeDocument {
+/** `before`: the announcement's translations as loaded, so clearing them is still sent. */
+export function toDocument(v: ThemeFormValues, before?: TranslationsMap): ThemeDocument {
   const blank = (s: string) => s.trim() || null
 
   return {
@@ -93,6 +102,7 @@ export function toDocument(v: ThemeFormValues): ThemeDocument {
       foreground: v.announcement.foreground,
       starts_at: fromLocalInput(v.announcement.starts_at),
       ends_at: fromLocalInput(v.announcement.ends_at),
+      translations: toTranslationsInput(v.announcement.translations.bn, ANNOUNCEMENT_TRANSLATION_NAMES, before),
     },
     footer: {
       about: blank(v.footer.about),
