@@ -381,9 +381,40 @@ Purchasing (`2026_11_08_100200_create_landed_cost_tables`):
 
 Supplier balance (computed on read) = opening balance + Σ receipts' `payable_total` + Σ receipt charges billed by the supplier (amount + tax) + Σ posted vouchers billed by it (`total`) − Σ returns − Σ payments. Supplier performance (SC3) is a read model over existing tables; it adds no table. All changes are additive. **The CHECKs and the triggers have not run on PostgreSQL yet.**
 
-### Phase 7 — Reporting
-- Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
-- Materialized views refreshed by the scheduler for heavy aggregates.
+### Phase 7 — Reporting (as built)
+
+There are **no new tables, views or materialized views**. The Reports module is read models only: each report is a query class that aggregates the source tables in SQL (`GROUP BY`), scoped by organization and the user's branches. The shared sales definition (`SalesFacts`) reads:
+- `sales` / `sale_lines` and `sale_returns` / `sale_return_lines`;
+- `orders` / `order_lines` and `order_returns` / `order_return_lines`.
+
+The other reports read:
+- `stock_levels`, `stock_movements`, `batches`, `stock_reorder_rules`;
+- `goods_receipts` and their lines, charges and landed cost allocations; `landed_cost_vouchers`; `purchase_returns`; supplier payments;
+- customer payments, `payments`, `expenses`.
+
+COGS comes from the `cost_total` snapshots on sale and order lines (and their return lines), which the stock ledger fills at the time of the movement. Nothing is stored for reporting. The dashboard caches its answer for 60 s in the application cache, not in the database.
+
+Indexes added (`Reports/Infrastructure/Database/Migrations/2026_11_09_100000_add_reporting_indexes`):
+- The migration is additive, with `CREATE INDEX IF NOT EXISTS` and `DROP INDEX IF EXISTS` on both drivers.
+- It lives in the Reports module although the tables belong to other modules (the E12a OnlineCatalog precedent).
+- Each index serves an organization-wide range scan that the existing `(organization_id, branch_id, …)` indexes cannot serve when no branch is chosen, or a date column the reports filter on that had no index.
+
+| Index | Table (owner) | Serves |
+|-------|---------------|--------|
+| `sales_org_status_sold_at_index` | `sales (organization_id, status, sold_at)` (Sales) | completed sales by sale time; cancelled sales per cashier |
+| `sale_returns_org_status_decided_at_index` | `sale_returns (organization_id, status, decided_at)` (Sales) | completed returns by completion time |
+| `orders_org_status_delivered_at_index` | `orders (organization_id, status, delivered_at)` (Orders) | delivered web orders by delivery time; delivery income |
+| `order_returns_org_status_refunded_at_index` | `order_returns (organization_id, status, refunded_at)` (Orders) | refunded web returns by refund time |
+| `payments_org_created_at_index` | `payments (organization_id, created_at)` (Payments) | payment collections over every branch |
+| `goods_receipts_org_invoice_date_index` | `goods_receipts (organization_id, invoice_date)` (Purchasing) | purchases, input tax, receipt charges by invoice date |
+| `purchase_returns_org_created_at_index` | `purchase_returns (organization_id, created_at)` (Purchasing) | purchase returns in a period |
+
+Stock movements, expiry, expenses and dues use existing indexes:
+- `stock_movements (store_id, variant_id, created_at)`;
+- `batches (organization_id, expires_on)`;
+- `expenses (organization_id, type, occurred_on)`.
+
+Daily summary tables or materialized views (the original plan) are deferred until PostgreSQL `EXPLAIN` on production-sized data shows the aggregates need them. **The indexes and the report SQL have not run on PostgreSQL yet.**
 
 ### Phase 8 — AI
 - `ai_conversations`, `ai_messages` (prompt/response metadata, token usage, no raw financial dumps), `ai_insights` (cached summaries)
@@ -394,7 +425,7 @@ Supplier balance (computed on read) = opening balance + Σ receipts' `payable_to
 - Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6). Storefront live listings: partial indexes on published `product_listings` windows and live `product_variants` (E12a). The Bangla-name search on `translations` jsonb (E12b) has no index (a GIN / trigram expression index can follow if `EXPLAIN` asks for it).
 - Case-insensitive uniqueness uses expression indexes, e.g. `brands (organization_id, lower(name))`, and partial indexes such as `customers (organization_id, phone) WHERE deleted_at IS NULL AND phone IS NOT NULL` — valid on PostgreSQL and SQLite alike.
 - Ledgers: `stock_movements (store_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down to the source document.
-- Reports: `sales (organization_id, branch_id, created_at)` and BRIN on large append-only `created_at` columns once volumes justify it.
+- Reports (Phase 7): `(organization_id, status, <event time>)` on `sales` (`sold_at`), `sale_returns` (`decided_at`), `orders` (`delivered_at`) and `order_returns` (`refunded_at`); `(organization_id, created_at)` on `payments` and `purchase_returns`; `(organization_id, invoice_date)` on `goods_receipts` (see § Phase 7). BRIN on large append-only `created_at` columns, or summary tables, once volumes and `EXPLAIN` justify it.
 
 ## 4. Concurrency model
 

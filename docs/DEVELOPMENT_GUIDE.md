@@ -41,6 +41,7 @@ The development seeder (refuses to run in production) creates:
 |---------|----------|------|
 | `admin@pos.test` | `password` | Platform admin (all organizations) |
 | `owner@demo.test` | `password` | Organization Admin of *Demo Mart* |
+| `manager@demo.test` | `password` | Branch Manager of *Dhaka Main* ("Demo Floor Manager", Phase 7 demo history) |
 | `cashier@demo.test` | `password` | Cashier at *Dhaka Main* |
 
 The seeder also creates a demo catalogue for *Demo Mart* (units, VAT rates, categories, brands, four products incl. a variant product and a service, two suppliers, a customer group and two customers) through the same application actions as the API.
@@ -48,6 +49,21 @@ The seeder also creates a demo catalogue for *Demo Mart* (units, VAT rates, cate
 Demo stock (`DemoStockSeeder`): an opening-stock adjustment in store `MAIN` (juice 60, rice 250.5 kg, polo shirts by size), purchase order `PO-000001` for 96 juice from Pran (placed, not yet received) and goods receipt `GRN-000001` for 100 kg rice from Local Mills (invoice `LM-1042`), so Inventory, Purchasing and supplier balances have data on first start.
 
 Demo sales (`DemoSalesSeeder`): `INV-MAIN-000001`, a walk-in cash sale by the cashier with change, and `INV-MAIN-000002`, Rahman Traders (wholesale group −5 %) paying 1,000 by card with the rest on account.
+
+Demo reporting history (`DemoReportsSeeder`, Phase 7, runs last) goes through the real sale, return, register, stock and web-order actions. It uses only products of its own, so earlier demo documents and the stock the full-stack tests count stay unchanged: juice 54, Miniket rice 321, `WEB-000001`–`003`, `PO-000001`–`004`, `GRN-000001`–`003`, and the owner's and cashier's open shifts. It creates:
+- categories *Snacks* (under *Grocery*) and *Household*;
+- *Butter Cookies 200g* (`DEMO-COOKIES-200`, VAT 15 %) and *Atta Flour 2kg* (`DEMO-ATTA-2KG`, no VAT);
+- *Bath Soap 100g* (`DEMO-SOAP-100`, VAT 15 %, batch-tracked): batch `SOAP-A` expires 12 days after seeding, so it shows in the *Expiry* report;
+- *Dishwashing Liquid 500ml* (`DEMO-DISH-500`, VAT 7.5 %): its reorder level 120 is above its stock, so it is on the dashboard's low-stock list and in the *Low stock* report;
+- an opening stock adjustment 61 days back;
+- `manager@demo.test` on the new register *T3 — Counter 2*, with 61 closed shifts `SES-MAIN-000003`…`063` (one per day for the last 60 days and today);
+- 276 POS sales `INV-MAIN-000003`…`278` (3–6 a day, cash, card or mobile banking);
+- 8 returns `RET-MAIN-000001`…`008` (one item every 7th day);
+- 6 delivered cash-on-delivery guest web orders `WEB-000004`…`009` (RedX, COD recorded). Their listings are published only while ordering, so the storefront catalogue is unchanged.
+
+After a fresh seed the next numbers are `INV-MAIN-000279`, `RET-MAIN-000009` and `WEB-000010`.
+
+Sign in as `owner@demo.test` or `manager@demo.test` to land on the *Dashboard*. `cashier@demo.test` still lands on the POS terminal and sees the dashboard of their branch without profit figures. Reports are under *Reports*; P&L and tax need `reports.financial`, and cost columns need `products.view_cost`. After pulling Phase 7, run `php artisan migrate` (reporting indexes) and `php artisan pos:permissions:sync` (`reports.view`, `reports.financial`, `dashboard.view`), or `php artisan migrate:fresh --seed` for the demo history.
 
 Existing databases created before Phase 5 need `php artisan pos:permissions:sync` so the built-in roles receive `pos.sell` and the `sales.*` permissions.
 

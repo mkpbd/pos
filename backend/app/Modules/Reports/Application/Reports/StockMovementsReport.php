@@ -53,11 +53,12 @@ class StockMovementsReport implements Report
                 ReportColumn::text('store', 'Store', sortable: false),
                 ReportColumn::text('type', 'Type', sortable: false),
                 ReportColumn::text('reference', 'Reference', sortable: false),
-                ReportColumn::quantity('quantity_in', 'In'),
-                ReportColumn::quantity('quantity_out', 'Out'),
-                ReportColumn::quantity('balance_after', 'Balance after'),
-                ReportColumn::money('unit_cost', 'Unit cost', costSensitive: true),
-                ReportColumn::money('value', 'Value', costSensitive: true),
+                // A movement ledger reads in time order: only the date is a sort key.
+                ReportColumn::quantity('quantity_in', 'In')->notSortable(),
+                ReportColumn::quantity('quantity_out', 'Out')->notSortable(),
+                ReportColumn::quantity('balance_after', 'Balance after')->notSortable(),
+                ReportColumn::money('unit_cost', 'Unit cost', costSensitive: true)->notSortable(),
+                ReportColumn::money('value', 'Value', costSensitive: true)->notSortable(),
             ],
             defaultSort: 'date',
         );

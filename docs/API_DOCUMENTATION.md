@@ -170,7 +170,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 
 ## Exports (X1)
 
-Admin list endpoints answer `?export=xlsx|pdf` with a file instead of the JSON page. The export is the list's own query: the same filters, `search` and `sort`, the same permission and tenant/branch scoping, **every matching row** (`page` and `per_page` are ignored).
+Admin list endpoints answer `?export=xlsx|pdf|csv` (`csv` since Phase 7) with a file instead of the JSON page. The export is the list's own query: the same filters, `search` and `sort`, the same permission and tenant/branch scoping, **every matching row** (`page` and `per_page` are ignored).
 
 ```
 GET /api/v1/sales?status=completed&from=2026-11-01&to=2026-11-05&sort=-sold_at&export=xlsx
@@ -182,15 +182,16 @@ GET /api/v1/sales?status=completed&from=2026-11-01&to=2026-11-05&sort=-sold_at&e
 
 | Rule | Value |
 |------|-------|
-| Formats | `xlsx` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), `pdf` (`application/pdf`). Any other `export` value → 422 `VALIDATION_FAILED` on `export`. |
-| File name | `<stem>-<organization slug>-<YYYYMMDD-HHmm>.<xlsx\|pdf>`, time in the organization's timezone (stems below). |
-| Row limits | xlsx 50 000, pdf 2 000 (`EXPORT_MAX_ROWS_XLSX`, `EXPORT_MAX_ROWS_PDF`). Above → 422 `EXPORT_TOO_LARGE`, `details: {limit, rows, format}`; the rows are counted before any is read. |
+| Formats | `xlsx` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), `pdf` (`application/pdf`), `csv` (`text/csv; charset=UTF-8`, Phase 7). Any other `export` value → 422 `VALIDATION_FAILED` on `export`. |
+| File name | `<stem>-<organization slug>-<YYYYMMDD-HHmm>.<xlsx\|pdf\|csv>`, time in the organization's timezone (stems below). |
+| Row limits | xlsx 50 000, csv 100 000, pdf 2 000 (`EXPORT_MAX_ROWS_XLSX`, `EXPORT_MAX_ROWS_CSV`, `EXPORT_MAX_ROWS_PDF`). Above → 422 `EXPORT_TOO_LARGE`, `details: {limit, rows, format}`; the rows are counted before any is read. |
 | Rate limit | 10 exports per minute per user (`EXPORT_RATE_LIMIT`) across all lists → 429 `TOO_MANY_REQUESTS` with `Retry-After`. Counted before the row limit, so a refused export counts too. The JSON list is not affected. |
 | PDF unavailable | 503 `PDF_UNAVAILABLE` when Chrome, Node or `backend/pdf-renderer/node_modules` is missing, or rendering fails or exceeds `PDF_TIMEOUT` (60 s). |
 | Permission | The list's own permission (table below); nothing extra. 403 `FORBIDDEN` without it. Columns *Cost* (products), *Value* (stock) and *Unit cost* (stock movements) are included only with `products.view_cost`; `/inventory/valuation` requires it. |
 | Audit | Each export writes `export.created` with `context: {list (stem), format, filters (query without export/page/per_page), rows}`. |
 | Excel content | Sheet named after the title (≤ 31 characters); bold, frozen header row; money as numbers with format `#,##0.00`; numbers and quantities as numbers; dates and date-times as date cells in the organization's timezone; statuses as readable labels ("Partially received"); text never written as a formula. |
 | PDF content | A4 (landscape above six columns): letterhead (name, legal name, address, phone, e-mail, tax number, storefront logo), title, filter summary ("Status: Completed · Branch: Dhaka Main · Date: 01 Nov–05 Nov 2026", or "All records"), generated-at in the organization's timezone and the user's name, table header repeated on each page, "Page X of Y". Embedded Poppins / Hind Siliguri, so Bangla text renders. |
+| CSV content | UTF-8 with a byte-order mark, RFC 4180 (comma, CRLF line ends, a field quoted when it holds a comma, quote or line break; quotes doubled); one header row of the column labels, then the rows; money, numbers and quantities as plain decimal strings (`1234.50`, never grouped); dates `Y-m-d`, date-times `Y-m-d H:i` in the organization's timezone; statuses as labels. Formula-injection guard: a text cell starting with `=`, `+`, `-`, `@`, tab or CR gets a leading `'` (an exact decimal such as `-12.50` stays a number). No letterhead or filter summary. Streamed to a temporary file like xlsx. |
 
 Exportable lists (columns in file order; ¹ only with `products.view_cost`):
 
@@ -235,8 +236,9 @@ Exportable lists (columns in file order; ¹ only with `products.view_cost`):
 | `/reviews` | `reviews.view` | `reviews` | Product reviews | Date, Product, Customer, E-mail, Rating, Title, Review, Status, Moderated by, Rejection reason |
 | `/cms/contact-messages` | `cms.manage` | `contact-messages` | Contact messages | Received, Name, E-mail, Phone, Subject, Message, Status (Open / Handled), Handled |
 | `/cms/newsletter-subscribers` | `cms.manage` | `newsletter-subscribers` | Newsletter subscribers | E-mail, Status, Signed up, Confirmed, Unsubscribed (the CSV `GET /cms/newsletter-subscribers/export` stays) |
+| `/reports/{key}` | the report's (`reports.view` or `reports.financial`) | `report-<key with hyphens>` | the report's title | the report's columns as this user receives them (cost-sensitive ones only with `products.view_cost`), last row *Total* when the report has totals (Phase 7, [§ Reports](#reports-and-dashboard-phase-7)) |
 
-Statements, the valuation, the promotion report, the reorder suggestions and supplier performance are computed by their endpoint first (bounded by their own period or store count); the other lists are read in 500-row chunks (`EXPORT_CHUNK_SIZE`). Lists without an export: catalog taxonomies, branches, roles, cash registers, blog, pages, FAQ, media, shipping, payment methods, web categories/brands, platform organizations.
+Statements, the valuation, the promotion report, the reorder suggestions, supplier performance and the reports (except `stock_movements`, which is chunked) are computed by their endpoint first (bounded by their own period or store count); the other lists are read in 500-row chunks (`EXPORT_CHUNK_SIZE`). Lists without an export: catalog taxonomies, branches, roles, cash registers, blog, pages, FAQ, media, shipping, payment methods, web categories/brands, platform organizations.
 
 ## Endpoints
 
@@ -1992,11 +1994,219 @@ score = round(Σ weight × component ÷ Σ weight of the components present). A 
 
 New error codes: `LANDED_COST_VOUCHER_LOCKED`, `LANDED_COST_VOUCHER_INCOMPLETE`, `EXPENSE_ON_ACCOUNT`. New permission: `purchases.landed_cost`.
 
+### Reports and dashboard (Phase 7)
+
+All reports run from one registry of whitelisted definitions (`Reports\Application\ReportRegistry`). The reports page renders from it, and so will the natural-language reporting of Phase 8 / E13. Nothing outside the registry can run.
+
+**Value formats:**
+- money: 2-decimal strings;
+- quantities: 3-decimal strings;
+- percentages: 2-decimal strings ("12.50" = 12.5 %), `null` when the base is 0;
+- unit costs: 4-decimal strings;
+- `date`: `Y-m-d` in the organization's timezone;
+- `datetime`: ISO 8601 with the organization's offset.
+
+**Permissions:**
+
+| Permission | Allows | Holders |
+|------------|--------|---------|
+| `reports.view` | Operational reports | Organization Admin (through `*`), Branch Manager, Accountant, Inventory Manager |
+| `reports.financial` | `profit_and_loss` and `tax` | Organization Admin, Branch Manager, Accountant |
+| `dashboard.view` | `GET /dashboard` | Organization Admin, Branch Manager, Accountant, Inventory Manager, Cashier |
+| `products.view_cost` (existing) | Cost-sensitive columns (cost, gross profit, margin, stock value, purchase money) | Its existing holders |
+
+The roles receive these after `php artisan pos:permissions:sync`.
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| GET | `/reports` | `reports.view` or `reports.financial` | Report catalog: the definitions this user may run, in catalog order; `meta.groups` = `[{key, label}]` (`sales`, `inventory`, `purchasing`, `finance`, `customers`). Neither permission → 403. |
+| GET | `/reports/{key}` | the report's `permission` | Run one report (JSON page), or `?export=xlsx\|csv\|pdf`. Unknown key → 404 `NOT_FOUND`; permission missing → 403. |
+| GET | `/dashboard` | `dashboard.view` | Dashboard (below). |
+
+**Definition** (one item of `GET /reports`):
+
+```json
+{"key": "sales_by_product", "title": "Sales by product", "description": "Quantity, net sales, cost, profit and margin per product …",
+ "group": "sales", "group_label": "Sales", "permission": "reports.view", "financial": false,
+ "time_based": true, "granularity": null, "max_range_days": 1827,
+ "params": [{"name": "date_from", "label": "From", "type": "date", "required": true},
+            {"name": "branch_id", "label": "Branch", "type": "entity", "required": false, "entity": "branch"},
+            {"name": "channel", "label": "Channel", "type": "enum", "required": false, "default": "all",
+             "options": [{"value": "all", "label": "All channels"}, {"value": "pos", "label": "POS"}, {"value": "online", "label": "Online"}]}],
+ "columns": [{"key": "product", "label": "Product", "type": "text", "cost_sensitive": false, "sortable": true},
+             {"key": "cost", "label": "Cost of goods", "type": "money", "cost_sensitive": true, "sortable": true}],
+ "default_sort": "-net_sales", "totals": true, "paginated": true, "omitted_columns": []}
+```
+
+**Parameter types:**
+- `date`: `Y-m-d`, an organization day.
+- `entity`: a uuid of `branch|store|product|category|brand|cashier|supplier|customer`. It must belong to the organization; a branch or store must also be accessible.
+- `enum`: one of `options`.
+- `integer`: between `min` and `max`.
+- `boolean`: `1|0|true|false`.
+
+Unknown query parameters are ignored, and defaults are applied. `cashier_id` carries `options`: the users assigned to the viewer's branches plus anyone who rang up a sale there. `omitted_columns` lists the cost-sensitive keys this user will not receive.
+
+**Run** (illustrative values) — `GET /reports/sales_by_product?date_from=2026-11-01&date_to=2026-11-07&channel=all&sort=-net_sales&page=1&per_page=50`:
+
+```json
+{"data": [{"product_id": "…", "product": "Butter Cookies 200g", "category_id": "…", "category": "Snacks", "brand_id": null, "brand": null,
+           "quantity": "84.000", "orders": 61, "gross_sales": "3360.00", "discounts": "0.00", "returns": "40.00", "net_sales": "3320.00",
+           "cost": "2324.00", "gross_profit": "996.00", "margin": "30.00"}],
+ "meta": {"report": "sales_by_product",
+          "pagination": {"current_page": 1, "per_page": 50, "total": 4, "last_page": 1},
+          "totals": {"quantity": "…", "orders": 145, "net_sales": "…", "cost": "…", "gross_profit": "…", "margin": "…"},
+          "params": {"date_from": "2026-11-01", "date_to": "2026-11-07", "branch_id": null, "store_id": null, "product_id": null,
+                     "category_id": null, "brand_id": null, "channel": "all", "timezone": "Asia/Dhaka", "currency": "BDT"},
+          "sort": "-net_sales", "generated_at": "2026-11-07T14:30:00+06:00",
+          "columns": [{"key": "product", "label": "Product", "type": "text", "cost_sensitive": false, "sortable": true}, "…"],
+          "omitted_columns": []}}
+```
+
+**Rows and meta:**
+- Rows carry the column keys plus ids for links (`product_id`, `branch_id`, `group_id`, …). Without `products.view_cost`, the cost-sensitive keys are removed from rows and totals and listed in `meta.omitted_columns`.
+- `meta.columns` are the columns this user gets for this run. A grouped report relabels its `group` column, e.g. "Category".
+- `totals` cover every row of the run, not only the page. It is `null` for statements.
+
+**Rules:**
+- **Dates:** `date_from` and `date_to` are required on time-based reports and are organization days, both inclusive. `date_to < date_from` → 422 on `date_to`.
+- **Range:** at most **366 days** for daily rows (`granularity` `day`, or `group_by=day`), otherwise **1 827 days (five years)**. A longer range → 422 `RANGE_TOO_LARGE`, `details: {max_days, days}`. `max_range_days` in the definition gives the limit.
+- **Branch scope:** the branches read are the user's accessible branches ∩ `branch_id`, never the client's word alone. A branch of another organization → 422 "does not exist". An inaccessible branch → 422 on `branch_id`. A store outside the scope → 422 on `store_id`. A `category_id` includes its sub-categories.
+- **Sort:** `sort=<column>` or `-<column>` must name a sortable column this user can see; otherwise 422 on `sort`. The default is the definition's `default_sort`. When that default is a cost column the user may not see, the first visible sortable column is used ascending. Ties keep the report's own order, and numbers compare exactly. Statements (`default_sort: null`) ignore `sort`.
+- **Paging:** `page` (default 1) and `per_page` (default 50, at most 500). Reports with `paginated: false` return every row on one page.
+- **Organization timezone:** `meta.params.timezone`; the currency is the organization's base currency.
+
+**Sales definitions** (`SalesFacts`, shared by every sales report, `profit_and_loss`, `tax` and the dashboard):
+
+| Figure | Definition |
+|--------|-----------|
+| POS | Lines of **completed** sales by `sold_at`, minus lines of **completed** sale returns by the return's `decided_at`. Cancelled sales count nowhere (see `sales_by_cashier.cancelled`). |
+| Online | Lines of web orders with status **`delivered`**, by `delivered_at` (revenue on delivery), minus lines of web returns with status **`refunded`**, by `refunded_at`. Pending, confirmed, processing, shipped, cancelled and failed orders never count. |
+| `gross_sales` | net + discounts (before discounts, excluding tax) |
+| `discounts` | POS: item discount + invoice-discount share; web: line discount (product and order promotions) |
+| `returns` | returned net (the line share of what was charged, excluding its tax) |
+| `net_sales` | gross_sales − discounts − returns, **excluding tax**. Tax-inclusive organizations report net of tax. |
+| `tax` | output tax: line tax − returned tax |
+| `delivery_income` | shipping + COD fees of delivered web orders − shipping refunds of refunded web returns; never part of net sales. It is `0.00` when a product, category or brand filter is set. |
+| `cost` (COGS) | Σ line `cost_total`, minus the cost of returned lines that were **restocked**. `cost_total` is the stock ledger's weighted-average cost of the goods out at the time, so landed costs are included through WAC. Written-off returns keep their cost. Value-only landed-cost expenses on stock already sold (SC3) are expenses, not COGS. |
+| `gross_profit` | net_sales − cost; `margin` = gross_profit ÷ net_sales × 100 |
+| `orders` | distinct POS sales + delivered web orders; `average_ticket` = net_sales ÷ orders |
+| Channel | `channel=pos\|online\|all` (default `all`). A `cashier_id` filter leaves web orders out, because they have no cashier. A web order counts for the branch and store it is fulfilled from. |
+
+**Reports.** ᶜ = cost-sensitive (needs `products.view_cost`).
+
+Common parameters:
+- *Range* = `date_from`, `date_to` (required).
+- *Branch* = `branch_id`.
+- *Channel* = `channel`.
+- Every report has a totals row unless noted.
+
+| Key | Group · permission | Parameters | Columns · default sort | Notes |
+|-----|--------------------|-----------|------------------------|-------|
+| `sales_daily` | sales · view | Range (≤ 366 days), Branch, Channel | `date`, `orders`, `gross_sales`, `discounts`, `returns`, `net_sales`, `tax`, `delivery_income`, `average_ticket`, `cost`ᶜ, `gross_profit`ᶜ, `margin`ᶜ · `date` | One row per organization day of the range; days without sales are zeros. |
+| `sales_monthly` | sales · view | Range (≤ 5 years), Branch, Channel | `month` (`YYYY-MM`; row also `month_label` "Nov 2026") + the daily figures · `month` | Every month the range touches; partial first and last months count only days inside the range. |
+| `sales_by_product` | sales · view | Range, Branch, `store_id`, `product_id`, `category_id`, `brand_id`, Channel | `product`, `category`, `brand`, `quantity` (sold − returned), `orders`, `gross_sales`, `discounts`, `returns`, `net_sales`, `cost`ᶜ, `gross_profit`ᶜ, `margin`ᶜ · `-net_sales` | One row per product (its variants together). |
+| `sales_by_category` | sales · view | Range, Branch, `store_id`, `category_id`, `brand_id`, Channel | `category`, product figures, `share` (% of net sales) · `-net_sales` | The product's own category; products without one are "Uncategorized". A category filter lists each sub-category as its own row. |
+| `sales_by_branch` | sales · view | Range, Branch, Channel | `branch` + the daily figures · `-net_sales` | Branches in scope with activity. |
+| `sales_by_cashier` | sales · view | Range, Branch, `cashier_id`, Channel | `cashier`, `orders`, `gross_sales`, `discounts`, `returns`, `net_sales`, `tax`, `average_ticket`, `cancelled` · `-net_sales` | Cashier = the user who rang the sale up (`created_by`); returns count against the original sale's cashier. One "Online" row for web orders, omitted with `channel=pos` or a `cashier_id`. `cancelled` = sales in the range cancelled afterwards; it is `null` on the Online row. |
+| `profit_and_loss` | finance · **financial** | Range, Branch | `label`, `amount`, `previous_amount`, `change`, `change_pct` (not sortable) | A statement (below): not paginated, no totals row, `sort` ignored. |
+| `inventory_valuation` | inventory · view | Branch, `store_id`, `category_id`, `brand_id`, `group_by` `store\|category\|product` (default `store`) | `group`, `items`, `quantity`, `value`ᶜ, `share`ᶜ · `-value` | As of now: positive stock on hand, all batches, value = Σ quantity × the level's average cost. `meta.as_of`. |
+| `stock_movements` | inventory · view | Range (≤ 5 years), Branch, `store_id`, `product_id`, `type` (movement type) | `date` (datetime), `product`, `sku`, `store`, `type`, `reference`, `quantity_in`, `quantity_out`, `balance_after`, `unit_cost`ᶜ, `value`ᶜ · `date` | Paged and sorted in SQL. Totals: `quantity_in`, `quantity_out`, `value`ᶜ; with `product_id` and no `type`, also `opening_quantity` (Σ before the range) and `closing_quantity` (opening + in − out). Value-only `landed_cost` movements show their `value` with quantity 0. Rows also carry `movement_type`, `reference_type`, `reference_id`. Only `date` is a sort key (the other columns are `sortable: false`; `sort=quantity_in` etc. → `422` on `sort`). |
+| `low_stock` | inventory · view | Branch, `store_id`, `product_id`, `category_id`, `brand_id`, `supplier_id` | `product`, `sku`, `store`, `on_hand`, `reorder_point`, `shortfall`, `suggested_purchase`, `suggested_transfer`, `supplier` · `-shortfall` | Now: stock-tracked, non-archived variants with on hand ≤ reorder point (> 0). The reorder point is the store's active SC1 rule `min_qty`, else the variant's `reorder_level`; a variant with a rule but no stock row counts as 0. Suggested quantities and the preferred supplier come from the SC1 reorder calculator (0 when it sees nothing to order). Totals: `items`, `suggested_purchase`, `suggested_transfer`. |
+| `expiry` | inventory · view | Branch, `store_id`, `product_id`, `days` (0–3650, default 30), `include_expired` (default true) | `product`, `sku`, `batch`, `expires_on`, `days_left`, `status` (Expired / Expires today / Expiring), `store`, `quantity`, `value`ᶜ · `expires_on` | Batches with stock that expire within `days` of the organization's today, plus those already expired unless `include_expired=0`. Totals: `quantity`, `value`, `batches`, `expired_batches`. |
+| `purchases` | purchasing · view | Range, Branch, `supplier_id`, `product_id`, `group_by` `supplier\|product` (default `supplier`) | `group`, `receipts`, `quantity`, `goods`ᶜ, `tax`ᶜ, `landed_cost`ᶜ, `landed_total`ᶜ, `returned_quantity`, `returns`ᶜ, `net_purchases`ᶜ · `-goods` | Goods receipts by `invoice_date`. goods = Σ line subtotal (excluding tax); landed_cost = receipt charges allocated to the lines + posted voucher allocations to them; landed_total = goods + landed_cost; returns = purchase return lines (excluding tax) in the period; net_purchases = goods − returns. Without cost access, the default sort falls back to `group`. |
+| `customer_dues` | customers · view | Branch, `customer_id` | `customer`, `code`, `phone`, `credit_limit`, `outstanding`, `days_0_30`, `days_31_60`, `days_61_90`, `days_over_90`, `last_payment_on` · `-outstanding` | As of today, the same balance as Sales' customer credit: opening balance + dues of completed sales − returns credited − customer payments. Aging is by sale day; the opening balance falls in "over 90"; credits settle the oldest buckets first; a credit balance leaves every bucket 0. Zero balances are omitted. Opening balances count only when the report covers every branch. Totals add `customers`. `meta.as_of`, `meta.includes_opening_balances`. |
+| `supplier_dues` | purchasing · view | Branch, `supplier_id` | `supplier`, `code`, `phone`, `outstanding`, buckets, `last_payment_on` · `-outstanding` | As of today, the SupplierAccount balance (SC3 included): opening + receipts at `payable_total` + receipt charges billed by the supplier + posted vouchers billed by it − purchase returns − supplier payments. Aging is by invoice / voucher date. Opening balances and payments without a branch count only for all branches. Totals add `suppliers`. Same meta as customer dues. |
+| `payment_collections` | finance · view | Range, Branch, `cashier_id` (who recorded the entry), `method`, Channel, `group_by` `day\|method\|branch\|cashier\|source` (default `method`) | `group`, `entries`, `collected`, `refunded`, `net`, `share` (% of collected) · `-collected` | Payments ledger by entry time. Collected = entries in from `sale`, `customer_payment`, `online_order` (bank transfers confirmed, COD recorded, including COD remittances). Refunded = entries out from `sale_cancellation`, `sale_return`, `online_order_refund`. Drawer cash in/out, expenses and other income are not collections. Channel `pos` = sale and customer-payment sources; `online` = web orders. Sources: POS sales, Customer collections, Online orders; entries without a branch or user are "System". |
+| `tax` | finance · **financial** | Range, Branch | `tax`, `rate`, `taxable_sales`, `output_tax`, `taxable_purchases`, `input_tax`, `net_tax` · `rate` | Per rate: output tax and taxable sales from SalesFacts (returns use the returned line's rate); input tax from goods receipts by invoice date minus purchase returns by date. One row "Charges (freight, duty, …)" with the recoverable tax of receipt charges and posted landed cost vouchers. net_tax = output − input (positive = payable). Delivery and COD fees are untaxed. |
+| `expenses` | finance · view | Range, Branch, `group_by` `category\|branch\|month` (default `category`) | `group`, `entries`, `amount`, `on_account`, `share` · `-amount` | Expense entries (type expense) by `occurred_on`, voided excluded. `on_account` = the part owed to a supplier with no money moved (SC3 landed cost). Month rows carry `group_label`. |
+
+**Profit and loss** rows are statement lines in order, each `{key, label, section, kind, level, amount, previous_amount, change, change_pct}`:
+- `section`: `revenue|cost|expenses|other_income|result`;
+- `kind`: `line|subtotal|total`;
+- `level`: 1 for category lines;
+- amounts are **signed**, so each subtotal is the sum of the lines above it in its section.
+
+| Key | Label | Amount |
+|-----|-------|--------|
+| `gross_sales` | Gross sales | + |
+| `discounts` | Discounts | − |
+| `returns` | Returns | − |
+| `net_sales` | **Net sales** (subtotal) | excluding tax |
+| `delivery_income` | Delivery income | + |
+| `total_revenue` | **Total revenue** (subtotal) | net sales + delivery income |
+| `cost_of_goods_sold` | Cost of goods sold | − |
+| `gross_profit` | **Gross profit** (subtotal) | total revenue − COGS |
+| `expense:<category id>` | one per expense category, by name | − (type expense, voided excluded, by `occurred_on`, on-account included) |
+| `total_expenses` | **Total operating expenses** (subtotal) | − |
+| `income:<category id>` | one per income category, by name | + (type income) |
+| `total_other_income` | **Total other income** (subtotal) | + |
+| `net_profit` | **Net profit** (total) | gross profit − operating expenses + other income |
+
+- The previous period has the same number of days and ends the day before `date_from`. A category that appears in only one period is listed with 0.00 in the other.
+- `meta.previous_period` = `{date_from, date_to}`; `meta.summary` = `{net_sales, gross_profit, net_profit, previous_net_profit}`.
+- The P&L gross profit includes delivery income. The `gross_profit` of the sales reports and the dashboard (net_sales − cost) does not.
+- P&L and tax figures are not cost-gated: `reports.financial` is sufficient.
+
+**Dashboard** (illustrative values) — `GET /dashboard?branch_id=&date_from=&date_to=`:
+- Dates are organization days. The default is the last 30 days up to today; `date_to` alone gives the 30 days ending then. At most 366 days (`RANGE_TOO_LARGE`).
+- Branch scope as for reports.
+- Every figure comes from SalesFacts.
+
+```json
+{"data": {
+  "kpis": {"total_sales": {"value": "45426.50", "previous": "40310.00", "change": "5116.50", "change_pct": "12.69"},
+           "today_revenue": {"…": "today vs yesterday"}, "orders_count": {"value": 145, "previous": 139, "change": 6, "change_pct": "4.32"},
+           "gross_profit": {"…": "null without products.view_cost"}, "average_ticket": {"…": "…"}, "returns_amount": {"…": "…"}},
+  "sales_trend": [{"date": "2026-10-09", "net_sales": "1530.00", "pos_net_sales": "1530.00", "online_net_sales": "0.00",
+                   "orders": 5, "pos_orders": 5, "online_orders": 0, "gross_profit": "380.00"}],
+  "top_products": [{"product_id": "…", "name": "Atta Flour 2kg", "quantity": "…", "net_sales": "…", "orders": 0}],
+  "low_stock": {"count": 1, "items": [{"variant_id": "…", "product_id": "…", "product": "Dishwashing Liquid 500ml", "sku": "DEMO-DISH-500",
+                                        "store_id": "…", "store": "Main Store", "on_hand": "…", "reorder_point": "120.000", "shortfall": "…"}]},
+  "recent_transactions": [{"type": "sale", "channel": "pos", "id": "…", "number": "INV-MAIN-000278", "date": "2026-11-07T13:05:00+06:00",
+                           "customer": "Walk-in", "total": "120.00", "status": "completed", "branch_id": "…", "link": "/sales/…"}],
+  "sales_by_channel": [{"channel": "pos", "label": "POS", "net_sales": "…", "orders": 0, "share": "…"},
+                       {"channel": "online", "label": "Online", "net_sales": "…", "orders": 0, "share": "…"}],
+  "sales_by_branch": null},
+ "meta": {"params": {"date_from": "2026-10-09", "date_to": "2026-11-07", "branch_id": null, "previous_from": "2026-09-09",
+                     "previous_to": "2026-10-08", "today": "2026-11-07", "timezone": "Asia/Dhaka", "currency": "BDT"},
+          "generated_at": "…", "omitted": [], "cache_seconds": 60}}
+```
+
+**KPIs:**
+- Each KPI is `{value, previous, change, change_pct}`; `change_pct` is `null` when the previous value is 0.
+- `total_sales` = net sales of the range (shown as *Net sales*).
+- `today_revenue` = today's net sales against yesterday's.
+- `orders_count` = POS sales + delivered web orders.
+- `gross_profit` is `null` and listed in `meta.omitted` without `products.view_cost`.
+- `average_ticket` = net sales ÷ orders.
+- `returns_amount` = returns excluding tax.
+
+**Lists:**
+- `sales_trend` has one point per day of the range, zeros included. `gross_profit` appears only with cost access.
+- `top_products`: 10 by net sales, then quantity.
+- `low_stock`: the `low_stock` rule; `count` plus the 10 with the largest shortfall.
+- `recent_transactions`: the 10 latest of POS sales (any status, by `sold_at`) and web orders (any status, by `placed_at`; only with `web_orders.view`). `link` is the admin path.
+- `sales_by_branch`: one row per branch in scope (`{branch_id, name, net_sales, orders}`), or `null` when the scope has one branch.
+
+**Cache:** 60 s, keyed by organization × the sorted list of branches the query reads × range × today × cost access × web-order access. A user with different branch access never gets another user's cached figures. The TTL is short and does not depend on any data version.
+
+**Exports:** `GET /reports/{key}?…&export=xlsx|csv|pdf` uses the X1 exporter (§ Exports):
+- the same permission, parameters, branch scope and sort as the JSON run;
+- **every row** (`page` / `per_page` ignored), plus a last row *Total* when the report has totals;
+- cost-sensitive columns are left out without `products.view_cost`;
+- stem `report-<key with hyphens>` (`report-sales-by-product-demo-mart-20261107-1430.csv`), title = the report title;
+- filter summary from the resolved parameters ("Period: 01 Nov–07 Nov 2026 · Branch: Dhaka Main · Group by: Category", "As of: …" for reports without a range, "Branches: your branches" for a branch-limited user);
+- `stock_movements` streams from SQL in chunks; the others are aggregated first;
+- row limits, throttle, audit (`export.created`, list = the stem) and errors as for lists;
+- column types map money → money, quantity → quantity, number and percent → number, date and datetime → date cells.
+
+**Errors:** `RANGE_TOO_LARGE` (422) is new. Parameter, sort and branch errors are `VALIDATION_FAILED` on the field. New permissions: `reports.view`, `reports.financial`, `dashboard.view`.
+
 ### Planned (by phase)
 
 | Phase | Resource paths |
 |-------|----------------|
-| 7 | `/reports/*`, `/dashboard` |
 | 8 | `/ai/insights`, `/ai/ask` |
 
 Each phase updates this section with request/response examples; Scramble remains the field-level source of truth.

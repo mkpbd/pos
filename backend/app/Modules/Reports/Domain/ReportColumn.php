@@ -52,6 +52,12 @@ final readonly class ReportColumn
         return new self($key, $label, ColumnType::Percent, $costSensitive);
     }
 
+    /** The same column, but not offered as a sort key (the report has no SQL order for it). */
+    public function notSortable(): self
+    {
+        return new self($this->key, $this->label, $this->type, $this->costSensitive, false);
+    }
+
     public function withLabel(string $label): self
     {
         return new self($this->key, $label, $this->type, $this->costSensitive, $this->sortable);

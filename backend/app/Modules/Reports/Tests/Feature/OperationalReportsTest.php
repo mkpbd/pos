@@ -59,6 +59,9 @@ class OperationalReportsTest extends TestCase
         $all = $this->report('stock_movements', ['date_from' => '2026-11-01', 'date_to' => '2026-11-07', 'per_page' => 2, 'sort' => '-date'])->assertOk();
         $all->assertJsonPath('meta.pagination.total', 5)->assertJsonCount(2, 'data')->assertJsonPath('data.0.type', 'Sale')->assertJsonMissingPath('meta.totals.opening_quantity');
         $this->report('stock_movements', ['date_from' => '2026-11-01', 'date_to' => '2026-11-07', 'type' => 'sale'])->assertJsonPath('meta.pagination.total', 1);
+        // The ledger reads in time order: other columns are not sort keys (422, never a server error).
+        $this->report('stock_movements', ['date_from' => '2026-11-01', 'date_to' => '2026-11-07', 'sort' => 'quantity_in'])
+            ->assertStatus(422)->assertJsonValidationErrorFor('sort', 'error.details');
 
         // Low stock: juice 3 ≤ 10 (reorder level), the ruled item has no stock row (0 ≤ 5). The SC1
         // calculator adds cover for the 1 sold in 30 days: target 10 + ceil(1/30 × 14) = 11 → buy 8.

@@ -43,6 +43,9 @@ A registry of 17 whitelisted reports (sales, inventory, purchasing, finance, cus
 - **Demo history:** the seed now holds 60 days of trading. After a fresh seed, the next numbers are `INV-MAIN-000279`, `RET-MAIN-000009` and `WEB-000010` (they were `INV-MAIN-000003`, `RET-MAIN-000001` and `WEB-000004`).
 - Full-stack `integration.spec.ts`: 15 owner sign-in assertions expect the *Dashboard* heading instead of *POS terminal*. The shared sign-in helper accepts either.
 
+#### Fixed
+- `stock_movements` report: the quantity and cost columns were offered as sort keys but had no SQL order, so `sort=quantity_in` (etc.) would have failed with a server error; they are now `sortable: false` (only `date` sorts → others `422` on `sort`), and `ReportRunner` ignores a sort key without an expression instead of failing. `.env.example` gains `EXPORT_MAX_ROWS_CSV`.
+
 #### Notes
 - **Sales definitions** (`SalesFacts`, shared by every sales report, P&L, tax and the dashboard):
   - **POS:** completed sales by `sold_at`, minus completed returns by `decided_at`. Cancelled sales are excluded entirely.

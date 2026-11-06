@@ -152,7 +152,7 @@ PDF and Excel export on admin lists (X1):
   - **Containers / root:** Chrome's sandbox needs user namespaces. Where they are unavailable (most containers, or Chrome running as root) set `PDF_NO_SANDBOX=true`; the HTML rendered is the app's own, escaped, with JavaScript disabled, but prefer running PHP-FPM as a non-root user with the sandbox on.
   - `PDF_TIMEOUT` (default 60 s) bounds one render; a timeout answers 503. Rendering writes a temporary directory under `storage/app/private/pdf-render` and removes it.
   - Fonts (Poppins, Hind Siliguri) ship in `backend/resources/fonts` and are inlined — no system fonts or network access needed for Bangla.
-- **Environment keys** (all optional): `EXPORT_MAX_ROWS_XLSX` (50000), `EXPORT_MAX_ROWS_PDF` (2000), `EXPORT_RATE_LIMIT` (10 per minute per user), `EXPORT_CHUNK_SIZE` (500 rows per query); `PDF_CHROME_PATH`, `PDF_NODE_BINARY`, `PDF_NPM_BINARY`, `PDF_NODE_MODULES_PATH`, `PDF_RENDERER_SCRIPT`, `PDF_TIMEOUT`, `PDF_NO_SANDBOX`. Run `php artisan optimize` after changing them (config cache).
+- **Environment keys** (all optional): `EXPORT_MAX_ROWS_XLSX` (50000), `EXPORT_MAX_ROWS_PDF` (2000), `EXPORT_MAX_ROWS_CSV` (100000, Phase 7), `EXPORT_RATE_LIMIT` (10 per minute per user), `EXPORT_CHUNK_SIZE` (500 rows per query); `PDF_CHROME_PATH`, `PDF_NODE_BINARY`, `PDF_NPM_BINARY`, `PDF_NODE_MODULES_PATH`, `PDF_RENDERER_SCRIPT`, `PDF_TIMEOUT`, `PDF_NO_SANDBOX`. Run `php artisan optimize` after changing them (config cache).
 - Check after deploying: `GET /api/v1/customers?export=pdf` as an admin returns `application/pdf`; a 503 `PDF_UNAVAILABLE` means Chrome, Node or `node_modules` is missing (the reason is logged as "PDF rendering failed." at warning level when Chrome itself fails).
 - Exports run inside the web request (no queue); a 2 000-row PDF takes seconds. Keep PHP-FPM's `request_terminate_timeout` and the proxy timeout above `PDF_TIMEOUT`.
 - Licenses: OpenSpout and Browsershot MIT, puppeteer-core Apache-2.0, fonts SIL OFL 1.1 (license files kept beside the fonts).
@@ -187,6 +187,30 @@ Landed cost and supplier performance (SC3):
 - No new environment variable, queue job, scheduled command, rate limiter or dependency.
 - The new PostgreSQL CHECKs and triggers have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
 
+Reports and dashboard (Phase 7):
+- **Migration** (additive, no data change): Reports `2026_11_09_100000_add_reporting_indexes`. It creates seven indexes with `CREATE INDEX IF NOT EXISTS`:
+  - `sales (organization_id, status, sold_at)`;
+  - `sale_returns (organization_id, status, decided_at)`;
+  - `orders (organization_id, status, delivered_at)`;
+  - `order_returns (organization_id, status, refunded_at)`;
+  - `payments (organization_id, created_at)`;
+  - `goods_receipts (organization_id, invoice_date)`;
+  - `purchase_returns (organization_id, created_at)`.
+
+  `CREATE INDEX` without `CONCURRENTLY` blocks writes to that table while it builds. On large `sales` / `payments` tables, run the migration in the deploy window, or create the same indexes beforehand with `CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON …` (same names) so the migration finds them. `php artisan migrate --force` as usual. No tables, views or materialized views.
+- **Run `php artisan pos:permissions:sync`.** New permissions `reports.view`, `reports.financial` and `dashboard.view`. The sync also applies the changed role map:
+  - Branch Manager and Accountant: `reports.*` + `dashboard.view`;
+  - Inventory Manager: `reports.view` + `dashboard.view`, replacing the old undefined `reports.inventory`;
+  - Cashier: `dashboard.view`;
+  - Organization Admin through `*`.
+
+  Until the sync nobody, the Organization Admin included, sees *Dashboard* or *Reports*: the sidebar entries need the permissions, and `/dashboard` and `/reports*` answer 403. Custom roles need the permissions added by hand. Only give `reports.financial` to roles that should see COGS and gross profit: P&L and tax are not filtered by `products.view_cost`.
+- **Landing page:** after the sync, owners, managers, accountants and inventory managers land on *Dashboard* instead of the POS terminal or their first page. Cashiers still land on the POS terminal.
+- **CSV exports:** every export endpoint now accepts `?export=csv` (`text/csv; charset=UTF-8`). It is written to `storage/app/private/exports` like xlsx, so that directory needs the same write permission. Optional `EXPORT_MAX_ROWS_CSV` (default 100000; not in `.env.example`). The export throttle and audit cover CSV.
+- **Dashboard cache:** answers are cached for 60 s in the default cache store per organization × branch scope × range × day × access. No invalidation, no tags, plain arrays: any store works, and Redis is recommended as for the storefront.
+- No new queue job, scheduled command, rate limiter or dependency (charts are hand-written SVG).
+- **The report SQL and the new indexes have not run on PostgreSQL yet** (PostgreSQL run pending). Run the suite on PostgreSQL and `EXPLAIN ANALYZE` the sales, P&L, tax and dashboard queries on production-sized data before production. Summary tables or materialized views are deferred until then.
+
 ## Release steps
 
 ```bash
@@ -194,7 +218,7 @@ Landed cost and supplier performance (SC3):
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan storage:link        # once: media and product images under /storage
-php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings; SC3: purchases.landed_cost)
+php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings; SC3: purchases.landed_cost; Phase 7: reports.view/financial, dashboard.view)
 php artisan optimize            # config, routes, events, views cache
 php artisan queue:restart
 (cd pdf-renderer && PUPPETEER_SKIP_DOWNLOAD=1 npm ci)   # PDF exports (X1); needs Node >= 22.12 and a system Chromium

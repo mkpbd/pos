@@ -123,7 +123,8 @@ final class ReportRunner
     {
         $query = clone $result->query;
         $direction = $descending ? ' DESC' : ' ASC';
-        if ($sortKey !== null) {
+        // A column without a SQL sort expression keeps the query's natural order rather than failing.
+        if ($sortKey !== null && isset($result->sorts[$sortKey])) {
             $query->orderByRaw($result->sorts[$sortKey].$direction);
         }
         if (isset($result->sorts[self::TIEBREAK])) {

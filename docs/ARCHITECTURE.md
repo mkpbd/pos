@@ -74,7 +74,7 @@ Each module has a `<Module>ServiceProvider` listed in `backend/bootstrap/provide
 |------|-----------|---------|
 | Synchronous query/command | Interface in the provider module's `Application/Contracts`, bound in its service provider | Sales asks `Inventory\Application\Contracts\StockReservation` to deduct stock |
 | React to something that happened | Domain event + listener in the consuming module | `SaleCompleted` → Loyalty awards points, Notifications alerts low stock |
-| Reporting across modules | Read-only PostgreSQL views owned by the Reports module | `v_sales_by_day` |
+| Reporting across modules | Read-only aggregate queries in the Reports module (read-model exception below; no views, Phase 7 §3t) | `Reports\Application\Support\SalesFacts` |
 
 | Orchestrating a use case that spans modules | Call the other module's `Application/Actions` (its public API) inside one transaction | `ProvisionOrganization` → `Branches\CreateBranch` + `Users\ProvisionSystemRoles` + `Users\CreateUser` |
 
@@ -82,7 +82,7 @@ Foreign keys across module tables are allowed (referential integrity matters mor
 
 - the Authentication module operates on the Users module's `User` model (it is Laravel's auth model);
 - `ProvisionOrganization` receives the `User` returned by the Users module's `CreateUser` action, and `pos:permissions:sync` (Users) iterates `Organization` rows — both are provisioning/maintenance paths, not request paths;
-- **read models may join foreign tables read-only** when a directory round-trip would make a list unfilterable — e.g. `GET /inventory/stock` joins `product_variants` to filter by search text and reorder level; SC1: `GET /purchasing/supplier-products` and `GET /inventory/reorder-rules` join `product_variants` / `products` to order by product, and `ReplenishmentData` reads `product_variants.reorder_level` as the fallback rule. The join is confined to the presenting controller and never writes;
+- **read models may join foreign tables read-only** when a directory round-trip would make a list unfilterable — e.g. `GET /inventory/stock` joins `product_variants` to filter by search text and reorder level; SC1: `GET /purchasing/supplier-products` and `GET /inventory/reorder-rules` join `product_variants` / `products` to order by product, and `ReplenishmentData` reads `product_variants.reorder_level` as the fallback rule. The join is confined to the presenting controller and never writes. Phase 7: the **Reports** module is a read model over other modules' tables by design — each report is one query class that reads sales, orders, stock, purchasing, payments and expenses tables read-only, always filtered by organization and branch scope, and writes nothing (§3t);
 - model factories and tests may reference foreign models to build data.
 
 ### Permissions are declared by modules
@@ -273,7 +273,7 @@ The e-commerce track (plan and decisions in `docs/ecommerce/`) adds a public sto
 - **Definitions.** `<Module>\Presentation\Http\Exports\*Export extends ListExport`: `name()` (filename stem and audit list name), `title()`, `columns()` (`ExportColumn::text|number|money|quantity|date|dateTime|status|yesNo`, a dot path into the presented row or a closure) and `filters()` (`FilterSummary`: search, plain values humanized, ids shown by name through directories, booleans, flags, date ranges). Module base classes (`SalesListExport`, `PurchasingListExport`, `InventoryListExport`, `PaymentsListExport`) share filter vocabulary. Cost columns are added only when `Gate::allows('products.view_cost')`.
 - **Exporter.** `ListExporter` throttles (`exports|{user id}`, `exports.rate_limit` per minute, applied inside because the same routes serve the JSON list), checks `exports.max_rows.{format}` (`EXPORT_TOO_LARGE`), builds an `ExportDocument` (title, columns, row stream, total, filter lines, letterhead, organization timezone, generated-at, user name), runs the writer, records `export.created` through `AuditTrail` and sets `Content-Type`, `Content-Disposition` (`<stem>-<org slug>-<YYYYMMDD-HHmm>.<ext>`), `Cache-Control: no-store, private` and `X-Export-Rows`. Controllers return a Symfony `Response` (JSON through `ApiResponse` or the file).
 - **Values.** `ExportValues` turns presented values into exact decimal strings (money stays a string until the Excel cell — the only place it becomes a binary number), instants in the organization's timezone (calendar dates `Y-m-d` stay calendar days), readable statuses and plain text.
-- **Writers.** `XlsxExportWriter` (OpenSpout) streams to a temporary file (`storage/app/private/exports`, deleted after sending): bold frozen header, `NumericCell` with `#,##0.00` for money, `DateTimeCell` for dates, column widths by type, sheet name ≤ 31 characters, `StringCell` for text so nothing becomes a formula. `PdfExportWriter` renders the Blade view `resources/views/exports/list.blade.php` (letterhead, title, filter summary, generated-at and user, `thead { display: table-header-group }` so the header repeats on each page, escaped values) and calls `PdfRenderer::render($html, $landscape, $footerHtml)` — landscape above 6 columns, footer "Page X of Y" from Chrome's `pageNumber` / `totalPages`. PDF rows are collected in memory (bounded by the 2 000-row limit).
+- **Writers.** `CsvExportWriter` (Phase 7): UTF-8 with BOM, RFC 4180, CRLF, plain decimal strings, `Y-m-d` / `Y-m-d H:i` in the organization's timezone, text starting with `= + - @`, tab or CR prefixed with `'` (formula-injection guard); streamed to a temporary file like xlsx. `XlsxExportWriter` (OpenSpout) streams to a temporary file (`storage/app/private/exports`, deleted after sending): bold frozen header, `NumericCell` with `#,##0.00` for money, `DateTimeCell` for dates, column widths by type, sheet name ≤ 31 characters, `StringCell` for text so nothing becomes a formula. `PdfExportWriter` renders the Blade view `resources/views/exports/list.blade.php` (letterhead, title, filter summary, generated-at and user, `thead { display: table-header-group }` so the header repeats on each page, escaped values) and calls `PdfRenderer::render($html, $landscape, $footerHtml)` — landscape above 6 columns, footer "Page X of Y" from Chrome's `pageNumber` / `totalPages`. PDF rows are collected in memory (bounded by the 2 000-row limit).
 - **`PdfRenderer` contract** (`Shared\Application\Export`): HTML in, PDF bytes out; failures throw `PdfUnavailable` (503 `PDF_UNAVAILABLE`), never a raw error. `BrowsershotPdfRenderer` (bound in `AppServiceProvider`) writes the HTML to a private temp directory and runs `spatie/browsershot` with JavaScript disabled, A4, backgrounds, the configured Chrome (`ChromeLocator`: `pdf.chrome_path`, else the newest Playwright Chromium, else system paths), Node, `pdf.node_modules_path` and `pdf.renderer_script` — `backend/pdf-renderer/browser.cjs`, which runs Browsershot's own script with `puppeteer-core` (no bundled Chromium). Tests bind `FakePdfRenderer` and assert the HTML.
 - **Letterhead contract** `Shared\Application\Contracts\DocumentLetterhead::forOrganization($id)` → `{name, legal_name, address, phone, email, tax_number, slug, timezone, logo}`. Organizations binds `OrganizationLetterhead` (profile, no logo); Storefront `extend()`s it with `ThemeLogoLetterhead`, which adds the theme logo as a data URI (`MediaLibrary::dataUri()`: a rendition ≥ 240 px wide when one exists, ≤ 512 KB) and never fails the document.
 - **Fonts.** Poppins (Latin) and Hind Siliguri (Bengali, Latin fallback), woff2 subsets in `backend/resources/fonts` with OFL licenses; `PdfFonts::css()` inlines them as `@font-face` data URIs with `unicode-range`, so Chrome shapes Bangla without network or file access.
@@ -332,6 +332,57 @@ Slice 3, the last of the supply chain track. Purchasing owns charges, vouchers a
 - **Permissions.** `purchases.landed_cost` for voucher writes and the preview (Branch Manager, Inventory Manager, Accountant; Organization Admin through `*`); everything else reads with `purchases.view`; receipt charges ride on `purchases.receive`.
 - **Admin.** `src/features/landed-cost` (allocation mirror, charges editor, receipt landed preview and charges detail, receipt picker, voucher form with a debounced server preview, voucher pages; posting with an `Idempotency-Key` kept across retries) and `src/features/supplier-performance` (filters in the URL, score badge, sortable table, supplier *Performance* tab), wired into `features/purchasing` (receipt editor and detail, statement labels), `features/supply-chain` (supplier page tab), `features/inventory` (Purchasing tabs, movement label) and `app/routes.tsx`.
 
+## 3t. Reports and dashboard (Phase 7)
+
+Module `Reports`: read models only, no tables and no writes. The dashboard cache is its only state. Endpoints and formulas: [API_DOCUMENTATION.md § Reports](API_DOCUMENTATION.md#reports-and-dashboard-phase-7).
+
+- **Registry = whitelist.** `ReportRegistry::REPORTS` lists the 17 report classes (`Application/Reports/*`, contract `Application\Contracts\Report`: `definition()` + `run(ReportContext)`).
+  - A `ReportDefinition` holds key, title, group, permission, typed `ReportParam`s (`date|entity|enum|integer|boolean`), `ReportColumn`s (type, `cost_sensitive`, `sortable`), default sort, totals, paginated and granularity.
+  - `GET /reports` serves the definitions the user may run; `GET /reports/{key}` runs one. Nothing else can run.
+  - **Phase 8 natural-language reporting will choose a key and parameters from this registry** and call the same runner ([AI_INTEGRATION.md](AI_INTEGRATION.md)). The model never writes SQL.
+- **Read-model exception.** Report classes read other modules' tables directly through the query builder. Going through directories would make filtering and aggregation in SQL impossible. The rules:
+  - read-only;
+  - always `organization_id` = the tenant, and `ReportContext::scopeBranches()` on the document's branch column;
+  - aggregates in the database (`GROUP BY`), never PHP loops over raw document rows;
+  - the database groups the rows, and PHP then merges, sorts and pages them. `stock_movements` is the exception: it can be long, so it returns a query that the runner sorts and pages in SQL and that exports stream in chunks.
+
+  `low_stock` (and the dashboard) also calls Purchasing's `ReorderSuggestions` for suggested quantities, which is not a published contract.
+- **One pipeline.** `ParameterResolver` validates shape, applies defaults, checks the range (366 days for daily rows, five years otherwise, `RANGE_TOO_LARGE`) and checks entities: ids of the organization, branch or store accessible, else 422. It resolves the branch scope = accessible branches ∩ `branch_id`, and a category with its descendants. `ReportRunner` builds the `ReportContext`, runs the report, strips cost-sensitive keys without `products.view_cost` (`meta.omitted_columns`), validates the sort against visible sortable columns, and pages. The reports page, exports and the dashboard all use this path, and Phase 8 will too.
+- **One sales definition.** `Support\SalesFacts::aggregate(ctx, dims)` is the only definition of sales. It runs four aggregate queries (POS lines, POS returns, delivered web order lines, refunded web return lines) plus two for delivery income, groups them by any of `day, month, branch, store, product, category, brand, cashier, channel, tax_rate`, and merges them per group with `Decimal`. The sales reports, P&L, tax and the dashboard all call it, so their figures agree.
+- **Revenue recognition.**
+  - POS revenue is recognised at `sold_at` for completed sales. Returns reduce the period in which they are completed (`decided_at`), not the period of the sale. Cancelled sales are excluded entirely.
+  - **Online revenue is recognised on delivery** (`delivered_at` of `delivered` orders): goods after discounts, excluding tax. Shipping and COD fees are *delivery income*, shown separately. Refunds reduce the period of `refunded_at`.
+  - Net sales exclude tax, including for tax-inclusive organizations.
+- **COGS from line snapshots.** Sale and order lines store `cost_total` when the stock ledger posts the goods out, at the weighted average cost of that moment. WAC includes receipt charges and voucher revaluations (SC3), so landed costs reach COGS automatically. COGS = Σ line cost − cost of returned lines that were restocked; written-off returns stay in COGS. COGS is recognised in the same period as the revenue. The on-account expense for landed cost on stock already sold is an operating expense in the P&L, not COGS.
+- **Timezones.**
+  - Report dates are organization days (`OrganizationDate`). Ranges become UTC instants (local midnight to local midnight after `date_to`) for timestamp columns. Business-date columns (`invoice_date`, `occurred_on`, `voucher_date`) are compared as dates.
+  - Grouping by local day or month uses `Support\Sql`. On **PostgreSQL** it uses `to_char(col AT TIME ZONE '<tz>', …)`, which is exact and DST-aware. On **SQLite** (tests) it shifts by the zone's UTC offset at the start of the range, which is exact for zones without DST such as Asia/Dhaka.
+  - The timezone is checked against the IANA list before it is inlined, because PostgreSQL treats differently bound GROUP BY expressions as different.
+  - Aggregates come back as exact decimal strings and are rounded once in PHP.
+- **Permissions and cost.**
+  - `reports.view` (operational), `reports.financial` (P&L, tax), `dashboard.view`.
+  - Columns marked `cost_sensitive` (cost, gross profit, margin, stock value, purchase amounts) need `products.view_cost` and are removed from rows, totals and exports otherwise. When the default sort is such a column, the first visible sortable column is used instead.
+  - P&L and tax are gated by `reports.financial` alone.
+- **Dashboard.** `Application\Dashboard\Dashboard` builds KPIs (current vs previous period of equal length; today vs yesterday), the daily trend (POS / online), top products, low stock, recent transactions and the channel and branch splits, all from `SalesFacts` and `LowStock`. The answer is cached through the cache repository (`remember`) for **60 s**. The key is `reports:dashboard:v1` + organization + hash of the **sorted branch scope** + range + today + cost access + web-order access, so one user's figures are never served to a user with other branches or permissions. The TTL is short and does not depend on any data version, so writes need no invalidation hook. Only arrays are cached, so serializing stores are safe.
+- **Exports.** `ReportExport` (a `ListExport`) feeds X1's `ListExporter`:
+  - the visible columns, `FilterDescription` lines ("Period: … · Branch: …") and stem `report-<key>`;
+  - row results become a `RowSource::fromRows()` with a final *Total* row; `stock_movements` streams through `RowSource::fromQuery()`.
+  - Excel, CSV and PDF behave the same as on lists.
+- **Indexes, no views.** There are no PostgreSQL views or materialized views: the original plan's `v_*` views would duplicate `SalesFacts` and could not apply the per-user branch and cost rules. Seven `(organization_id, status|…, <date>)` indexes on the scanned tables live in the Reports migration ([DATABASE_DESIGN.md § Phase 7](DATABASE_DESIGN.md)). Summary tables can follow after PostgreSQL `EXPLAIN`.
+- **Admin.**
+  - `src/features/reports`:
+    - catalog page grouped by section;
+    - report page driven by the definition: filters from `params`, URL-held state, `max_range_days` pre-check, table with `aria-sort` and totals, cost columns hidden with a note, `ExportMenu list="report"`;
+    - `pnl-statement` statement layout;
+    - `report-chart` for daily and monthly sales.
+  - `src/features/dashboard`.
+  - `src/components/common/charts`: accessible SVG charts **without a chart library**:
+    - `trend-chart`: line or stacked area, one tab stop, arrow keys / Home / End, tooltip on hover and focus;
+    - `bar-chart`;
+    - `chart-data-table`: a visually hidden table alternative;
+    - `chart-utils`: scales, ticks, and series colours as CSS variables `--viz-1..3` chosen for contrast in light and dark.
+  - `app/navigation.ts` `homePath()`: the first sidebar entry (*Dashboard*), except till staff (`pos.sell` without any `reports.*`), who land on `/pos`.
+
 ## 4. Authentication and authorization
 
 - **Web SPA:** Laravel Sanctum **cookie-based SPA authentication** (session + CSRF via `XSRF-TOKEN`). No bearer tokens in browser storage, so XSS cannot exfiltrate long-lived credentials. The Vite dev server proxies `/api` and `/sanctum` so the SPA is same-origin.
@@ -364,7 +415,7 @@ Versioned REST under `/api/v1`, one envelope for every response, OpenAPI generat
 
 ## 7. Asynchronous work
 
-- **Queues** (Redis in staging/production, database driver locally): notifications, report exports, low-stock checks, AI summaries. List exports (X1, §3p) are synchronous downloads, bounded by their row limits.
+- **Queues** (Redis in staging/production, database driver locally): notifications, report exports, low-stock checks, AI summaries. List and report exports (X1, §3p; Phase 7, §3t) are synchronous downloads, bounded by their row limits.
 - **Events/listeners:** cross-module reactions; listeners that touch external systems are queued. Events raised inside financial transactions implement `ShouldDispatchAfterCommit` (first one: `StockFellBelowReorderLevel` → queued `NotifyLowStock`).
 - **In-app notifications** use Laravel's database channel (`notifications` table, UUID ids, JSON payload with a `type` and an in-app `link` or `url`); the SPA bell polls the unread count every 60 s and opens `url` (else `link`) when it is a same-origin path. E8a: "New online order" (`orders.new_online_order`) to every active user with `web_orders.view`; the order confirmation e-mail is a queued mail notification sent after the placement commits.
 - **Scheduler:** daily summaries, expiry alerts, idempotency-key cleanup, cash-register reminders; hourly storefront product stats (E6); daily `cart:prune` of expired guest carts (E7); `orders:expire-pending` every minute (E8a, see §3h). `purchasing:reorder-notifications` hourly, effective once per store and organization-local day from 07:00 (SC1, §3q). `purchasing:rfq-reminders` hourly, effective once per RFQ and organization-local day from 07:00 (SC2, §3r).
@@ -377,7 +428,7 @@ Versioned REST under `/api/v1`, one envelope for every response, OpenAPI generat
 frontend/src/
   app/            Providers, routes, layouts, navigation config, route error boundary
   components/ui   shadcn/ui primitives (generated; edit sparingly)
-  components/common  Cross-feature building blocks (state views, theme toggle, …)
+  components/common  Cross-feature building blocks (state views, theme toggle, export menu, charts — Phase 7, …)
   features/<module>/ api.ts (query/mutation hooks), pages/, components/, schemas (Zod)
   lib/            api client, query client, utilities
   stores/         Zustand stores for client-only state (theme, POS cart, terminal session)
