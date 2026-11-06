@@ -14,4 +14,12 @@ interface SupplierDirectory
      * @return array<string, array{id: string, code: string, name: string}>
      */
     public function summaries(string $organizationId, array $supplierIds): array;
+
+    /**
+     * Contact details for documents sent to suppliers (SC2: RFQ PDFs and e-mails).
+     *
+     * @param  list<string>  $supplierIds
+     * @return array<string, array{id: string, code: string, name: string, contact_person: ?string, email: ?string, phone: ?string, address: ?string, is_active: bool, archived: bool}>
+     */
+    public function contacts(string $organizationId, array $supplierIds): array;
 }

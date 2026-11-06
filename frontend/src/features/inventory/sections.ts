@@ -1,4 +1,5 @@
-export type SectionTab = { to: string; label: string; permission?: string }
+/** `permission`: required to see the tab, or any of a list. */
+export type SectionTab = { to: string; label: string; permission?: string | string[] }
 
 export const INVENTORY_TABS: SectionTab[] = [
   { to: '/inventory', label: 'Stock' },
@@ -9,12 +10,17 @@ export const INVENTORY_TABS: SectionTab[] = [
   { to: '/inventory/settings', label: 'Settings', permission: 'inventory.manage' },
 ]
 
+/** Requesters and approvers may lack purchases.view, so every tab names its permission. */
 export const PURCHASING_TABS: SectionTab[] = [
-  { to: '/purchasing/orders', label: 'Purchase orders' },
-  { to: '/purchasing/reorder', label: 'Reorder' },
-  { to: '/purchasing/receipts', label: 'Receipts' },
-  { to: '/purchasing/returns', label: 'Returns' },
-  { to: '/purchasing/payments', label: 'Supplier payments' },
+  { to: '/purchasing/orders', label: 'Purchase orders', permission: 'purchases.view' },
+  { to: '/purchasing/requisitions', label: 'Requisitions', permission: ['purchases.view', 'purchases.request', 'purchases.approve', 'purchases.approve_high'] },
+  { to: '/purchasing/approvals', label: 'Approvals', permission: ['purchases.approve', 'purchases.approve_high'] },
+  { to: '/purchasing/rfqs', label: 'RFQs', permission: 'purchases.view' },
+  { to: '/purchasing/reorder', label: 'Reorder', permission: 'purchases.view' },
+  { to: '/purchasing/receipts', label: 'Receipts', permission: 'purchases.view' },
+  { to: '/purchasing/returns', label: 'Returns', permission: 'purchases.view' },
+  { to: '/purchasing/payments', label: 'Supplier payments', permission: 'purchases.view' },
+  { to: '/purchasing/settings', label: 'Settings', permission: 'purchases.settings' },
 ]
 
 export const REGISTER_TABS: SectionTab[] = [

@@ -134,17 +134,21 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `EXPORT_TOO_LARGE` | A list export above the format's row limit (`details.limit`, `rows`, `format`); narrow the filters (X1, see [Exports](#exports-x1)). |
 | 422 | `SUPPLIER_PRODUCT_INACTIVE`, `SUPPLIER_INACTIVE` | Making an inactive supplier catalog row preferred / a row of an inactive or archived supplier (SC1). |
 | 422 | `NO_SOURCE_STORE`, `SOURCE_IS_DESTINATION`, `SOURCE_STORE_INACTIVE`, `SOURCE_STORE_NOT_ACCESSIBLE` | A replenishment transfer without a source store in the settings, for the source store itself, from an inactive source store, or by a user without access to the source store's branch (SC1). |
+| 403 | `SELF_APPROVAL_NOT_ALLOWED`, `APPROVAL_LIMIT_EXCEEDED` | Approving or rejecting a requisition you raised or a purchase order you created or submitted (also for the Organization Admin); approver without the level's permission or the branch (`details.approval_level`, `required_permission`, `amount`) (SC2). |
+| 422 | `APPROVAL_REQUIRED` | `POST /purchasing/orders/{id}/place` on a draft that needs approval (`details.approval_level`, `total`); submit it instead (SC2). |
+| 422 | `REQUISITION_LOCKED`, `REQUISITION_EMPTY`, `REQUISITION_NOT_APPROVED` | Editing a requisition that is not a draft; submitting one without lines; converting one that is not approved (`details.status`) (SC2). |
+| 422 | `RFQ_LOCKED`, `RFQ_LINES_LOCKED`, `RFQ_EMPTY`, `RFQ_SUPPLIERS_REQUIRED`, `RFQ_NOT_OPEN` | Editing an RFQ that is not a draft; changing the lines of an RFQ raised from a requisition; sending without lines or with fewer than 2 invited suppliers (`details.min`, `invited`); recording a quote on an RFQ that is not sent (`details.status`) (SC2). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
-| 503 | `PDF_UNAVAILABLE` | A PDF list export cannot be rendered on this server (Chrome, Node or the renderer's `node_modules` missing, render failure or timeout); Excel still works (X1). |
+| 503 | `PDF_UNAVAILABLE` | A PDF list export cannot be rendered on this server (Chrome, Node or the renderer's `node_modules` missing, render failure or timeout); Excel still works (X1). Also: sending an RFQ to a supplier with an e-mail address, and the RFQ PDF download (SC2). |
 
 ## Cross-cutting headers
 
 | Header | Direction | Purpose |
 |--------|-----------|---------|
 | `X-Request-Id` | both | Correlation id. Clients may send one (8–64 chars `[A-Za-z0-9-_.]`); the server always returns it. |
-| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses`, `/register-sessions/{id}/cash-movements`, the six web order steps `/web-orders/{id}/*` and the storefront's `POST /store/checkout`: 8–100 characters (`[A-Za-z0-9_\-:.]`), one per logical operation (the SPA uses a UUID); reuse it when retrying. Missing → `428 IDEMPOTENCY_KEY_REQUIRED`. A replayed response carries `Idempotent-Replayed: true`. Keys are scoped (ADR-014): staff `user:{id}`, signed-in shopper `customer:{account id}`, guest `cart:{cart token hash}`. |
+| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses`, `/register-sessions/{id}/cash-movements`, the six web order steps `/web-orders/{id}/*`, the storefront's `POST /store/checkout` and (SC1/SC2) the purchasing transitions listed in [Supply chain](#supply-chain--purchase-requisitions-approvals-and-supplier-quotes-sc2): 8–100 characters (`[A-Za-z0-9_\-:.]`), one per logical operation (the SPA uses a UUID); reuse it when retrying. Missing → `428 IDEMPOTENCY_KEY_REQUIRED`. A replayed response carries `Idempotent-Replayed: true`. Keys are scoped (ADR-014): staff `user:{id}`, signed-in shopper `customer:{account id}`, guest `cart:{cart token hash}`. |
 | `X-Branch-Id` | request | Active branch. Optional; when sent it must be an active branch of the organization that the user is assigned to (or `branches.access_all`). Branch-scoped endpoints (Phase 4+) require it. |
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). Also required on unsafe storefront requests that run the `storefront.session` stack (account, cart, wishlist). |
@@ -202,6 +206,9 @@ Exportable lists (columns in file order; ¹ only with `products.view_cost`):
 | `/purchasing/orders` | `purchases.view` | `purchase-orders` | Purchase orders | Order, Order date, Expected, Supplier, Store, Subtotal, Tax, Total, Status |
 | `/purchasing/reorder-suggestions` (`store_id` required) | `purchases.view` | `reorder-suggestions` | Reorder suggestions | Product, Variant, SKU, On hand, On order, In transit, Avg. daily, Days of cover, Reorder point, Target, Transfer, Purchase, Supplier, Unit cost, Lead time (days), Reason (SC1) |
 | `/purchasing/supplier-products` | `purchases.view` | `supplier-catalog` | Supplier catalog | Product, Variant, SKU, Supplier, Supplier SKU, Unit cost, Pack size, Min. order, Lead time (days), Preferred, Last cost, Last purchased, Active (SC1) |
+| `/purchasing/requisitions` | `purchases.view`, `.request` (own only), `.approve` or `.approve_high` | `purchase-requisitions` | Purchase requisitions | Requisition, Created, Store, Requested by, Needed by, Lines, Estimated total, Approval level, Approved by, Status (SC2) |
+| `/purchasing/rfqs` | `purchases.view` | `rfqs` | Requests for quotation | RFQ, Title, Store, Requisition, Reply by, Suppliers, Quotes, Sent, Status (SC2) |
+| `/purchasing/approvals` | `purchases.approve` or `.approve_high` | `pending-approvals` | Waiting for my approval | Document, Number, Submitted, Requested by, Store, Supplier, Amount, Approval level (SC2) |
 | `/purchasing/receipts` | `purchases.view` | `goods-receipts` | Goods receipts | Receipt, Invoice date, Supplier invoice, Supplier, Store, Due date, Subtotal, Tax, Total |
 | `/purchasing/returns` | `purchases.view` | `purchase-returns` | Purchase returns | Return, Date, Supplier, Store, Reason, Subtotal, Tax, Total |
 | `/purchasing/payments` | `purchases.view` | `supplier-payments` | Supplier payments | Number, Paid on, Supplier, Method, Reference, Amount, Notes |
@@ -287,7 +294,7 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | POST | `/inventory/transfers/{id}/receive`, `/cancel` | tenant | `inventory.transfer` | Receive adds stock to the destination (destination branch access); cancel returns it to the source (source branch access). |
 | GET / POST | `/purchasing/orders` | tenant | `purchases.view` / `purchases.manage` | `status`, `supplier_id`, `search`. Created as `draft`; totals computed by the server. Numbered `PO-000001`. |
 | GET / PUT | `/purchasing/orders/{id}` | tenant | `purchases.view` / `purchases.manage` | Only drafts can be replaced (`PURCHASE_ORDER_LOCKED`). Lines show `received_quantity`. |
-| POST | `/purchasing/orders/{id}/place`, `/cancel` | tenant | `purchases.manage` | `draft → ordered`; cancel only before anything was received. |
+| POST | `/purchasing/orders/{id}/place`, `/cancel` | tenant | `purchases.manage` | `draft → ordered`; cancel only before anything was received. Since SC2 `place` only where no approval is needed (else 422 `APPROVAL_REQUIRED`) and cancel also from `pending_approval`; `submit` / `approve` / `reject`: see [SC2](#supply-chain--purchase-requisitions-approvals-and-supplier-quotes-sc2). |
 | GET / POST | `/purchasing/receipts` | tenant | `purchases.view` / `purchases.receive` | Goods receipt = supplier invoice: stock in + amount owed. `supplier_id`, `purchase_order_id`, `from`/`to`, `search` (number, supplier invoice no.). Duplicate supplier invoice numbers per supplier are rejected. `due_date` defaults to invoice date + payment terms. Numbered `GRN-000001`. |
 | GET | `/purchasing/receipts/{id}` | tenant | `purchases.view` | Lines show `returned_quantity`. |
 | POST | `/purchasing/receipts/{id}/returns` | tenant | `purchases.return` | `{reason, notes, lines: [{goods_receipt_line_id, quantity}]}`; at most the quantity not yet returned, at the original unit cost and batch. Numbered `PRN-000001`. |
@@ -1594,13 +1601,236 @@ Transfers have no draft state, so the transfer is **dispatched** through `Transf
 
 New error codes: `SUPPLIER_PRODUCT_INACTIVE`, `SUPPLIER_INACTIVE`, `NO_SOURCE_STORE`, `SOURCE_IS_DESTINATION`, `SOURCE_STORE_INACTIVE`, `SOURCE_STORE_NOT_ACCESSIBLE`. New permission: `inventory.manage`.
 
+### Supply chain — purchase requisitions, approvals and supplier quotes (SC2)
+
+Slice 2 of the supply chain track. Money is a 2-decimal string, unit costs / quoted prices 4, quantities 3. Requisitions and RFQs belong to a store and its branch: lists are limited to the user's branches, another branch's or organization's document answers 404, a store outside the user's branches answers 422 `VALIDATION_FAILED` on `store_id`. Every status transition takes an `Idempotency-Key` (428 `IDEMPOTENCY_KEY_REQUIRED` without; a retry with the same key and body replays the first answer). Transitions run in one transaction under the document's row lock, are audited and append a status history row; a step not allowed from the current status answers 422 `INVALID_STATUS_CHANGE` (`details.from`, `to` where given).
+
+**Permissions** (new: `purchases.request`, `purchases.approve`, `purchases.approve_high`, `purchases.settings`; built-in roles after `php artisan pos:permissions:sync`):
+
+| Role | Purchasing permissions |
+|------|------------------------|
+| Organization Admin | all (`*`) — the only built-in holder of `purchases.approve_high` and `purchases.settings` |
+| Branch Manager | `view`, `manage`, `receive`, `return`, `pay`, `request`, `approve` (replaces `purchases.*`) |
+| Inventory Manager | `view`, `manage`, `receive`, `return`, `pay`, `request` (replaces `purchases.*`; does not approve) |
+| Cashier | `request` (new) |
+| Accountant | `view`, `pay` (unchanged) |
+
+**Approval rules** (`Purchasing\Domain\Procurement\ApprovalPolicy`, pure; amount = requisition estimate or order total incl. tax, base currency):
+
+| Amount | Level | Who may approve |
+|--------|-------|-----------------|
+| ≤ `auto_approve_limit` (default 10 000.00) | `none` | Nobody: a requisition is approved on submit (`approved_by` null, `auto_approved: true`, history note "Approved automatically…", no notification); an order is placed on submit. |
+| ≤ `manager_limit` (default 100 000.00) | `manager` | `purchases.approve` or `purchases.approve_high` |
+| > `manager_limit` | `high` | `purchases.approve_high` |
+
+- Boundaries belong to the lower tier (10 000.00 → `none`, 10 000.01 → `manager`; equal limits skip the manager tier).
+- Single step: one approval by an eligible approver completes the document. The approver must have the permission **and** access to the document's branch, and must not be the requester (requisitions) or the creator or submitter (orders): 403 `SELF_APPROVAL_NOT_ALLOWED` (also for the Organization Admin) / 403 `APPROVAL_LIMIT_EXCEEDED` `{approval_level, required_permission, amount}`. Approve and reject follow the same rule.
+- The level is fixed when the document is submitted; later limit changes apply to documents submitted afterwards.
+- Purchase orders need no approval when `require_po_approval` is false, the total is ≤ the auto limit, or the order is **pre-approved** (created from an approved requisition, directly or through an RFQ award) and its total ≤ `round(approved_amount × 1.05, 2)` (`pre_approval_limit`). An order whose total grows beyond that needs approval at its own level.
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| GET | `/purchasing/approval-settings` | any of `purchases.view`, `.request`, `.approve`, `.approve_high`, `.settings` | `{auto_approve_limit, manager_limit, require_po_approval, updated_at, currency}` (defaults until first saved; `updated_at` null). |
+| PATCH | `/purchasing/approval-settings` | `purchases.settings` | Partial update → 200 settings. Limits ≥ 0 with up to 2 decimals; auto above manager → 422 `VALIDATION_FAILED` on `auto_approve_limit`. Audited `purchase_approval_settings.updated`. |
+| GET | `/purchasing/approvals` | `purchases.approve` or `.approve_high` (else 403) | Approvals inbox (below). `?export=xlsx\|pdf` (stem `pending-approvals`). |
+| GET | `/purchasing/requisitions` | any of `purchases.view`, `.request`, `.approve`, `.approve_high` | List; holders of only `purchases.request` get their own. Filters `status`, `approval_level`, `store_id`, `requested_by`, `mine=1`, `search` (number); `sort` `created_at` (default, newest first) \| `number` \| `estimated_total` \| `needed_by` \| `submitted_at`; `?export=xlsx\|pdf` (stem `purchase-requisitions`). |
+| GET | `/purchasing/requisitions/estimates?variant_ids[]=&supplier_id=` | as the list | 1–100 variants → list of `{variant_id, estimated_unit_cost, source, tax_rate, preferred_supplier}`; `source` `supplier_catalog` (the given supplier's active row) \| `preferred_catalog` \| `last_cost` (latest goods receipt line) \| `variant_cost` (purchase price). |
+| POST | `/purchasing/requisitions` | `purchases.request` | Create a draft → 201 requisition. Not idempotent (a create, like purchase orders). Audited `purchase_requisition.created`. |
+| GET | `/purchasing/requisitions/{id}` | as the list, or `purchases.manage` | Requisition with lines, linked POs and RFQs, history and abilities; a request-only user gets 404 for others' requisitions. |
+| PUT | `/purchasing/requisitions/{id}` | `purchases.request` or `.manage` | Replace a **draft** (requester or `purchases.manage`, else 403); otherwise 422 `REQUISITION_LOCKED`. |
+| POST | `/purchasing/requisitions/{id}/submit` | `purchases.request` or `.manage` + key | `draft → submitted` (requester or `purchases.manage`); level decided now; at `none` → `approved` at once; else eligible approvers are notified. 422 `REQUISITION_EMPTY` without lines. |
+| POST | `/purchasing/requisitions/{id}/approve` | `purchases.approve` or `.approve_high` + key | `submitted → approved`; requester notified. |
+| POST | `/purchasing/requisitions/{id}/reject` | `purchases.approve` or `.approve_high` + key | `{reason}` (required, ≤ 500) → `rejected`; requester notified. |
+| POST | `/purchasing/requisitions/{id}/cancel` | `purchases.request` or `.manage` + key | `{reason?}` (≤ 500). Requester: from `draft` / `submitted`; `purchases.manage`: also from `approved` while no line is converted (else `INVALID_STATUS_CHANGE`). |
+| POST | `/purchasing/requisitions/{id}/convert` | `purchases.manage` + key | Approved requisition → draft POs and/or one RFQ → 201 (below). 422 `REQUISITION_NOT_APPROVED` (`details.status`). |
+| POST | `/purchasing/reorder-suggestions/requisitions` | `purchases.request` + key | One draft requisition from selected reorder suggestions → 201 requisition (below). |
+| POST | `/purchasing/orders/{id}/submit` | `purchases.manage` + key | `draft → ordered` when no approval is needed (history note says why), else `→ pending_approval` with `approval_level` and approvers notified. |
+| POST | `/purchasing/orders/{id}/approve` | `purchases.approve` or `.approve_high` + key | `pending_approval → ordered` (`ordered_at`, `approved_by/at`); submitter notified. |
+| POST | `/purchasing/orders/{id}/reject` | `purchases.approve` or `.approve_high` + key | `{reason}` (required, ≤ 500) → back to `draft` (`rejected_by/at`, `rejection_reason`; editable again); submitter notified. |
+| POST | `/purchasing/orders/{id}/place` | `purchases.manage` | Unchanged path; only when no approval is needed, else 422 `APPROVAL_REQUIRED` `{approval_level, total}`. |
+| POST | `/purchasing/orders/{id}/cancel` | `purchases.manage` | Also from `pending_approval`. Lines that came from a requisition (each PO line carries `requisition_line_id`, null otherwise) give their unreceived quantity back to the requisition; a `converted` requisition reopens as `approved` (history: "Quantities released by PO-… (cancelled)."). |
+| GET | `/purchasing/rfqs` | `purchases.view` | List. Filters `status`, `requisition_id`, `supplier_id` (invited), `search` (number, title); `sort` `created_at` (default) \| `number` \| `reply_by` \| `sent_at`; `?export=xlsx\|pdf` (stem `rfqs`). |
+| POST | `/purchasing/rfqs` | `purchases.manage` | Blank draft → 201 RFQ. `{store_id, title (≤ 150), needed_by?, reply_by?, notes? (≤ 2000), supplier_ids? (≤ 20), lines: [{variant_id, quantity, notes?}] (1–200)}`. |
+| GET | `/purchasing/rfqs/{id}` | `purchases.view` | RFQ with lines, invited suppliers and their quotes, awards, POs, history, abilities. |
+| PUT | `/purchasing/rfqs/{id}` | `purchases.manage` | Draft only (`RFQ_LOCKED`). Header fields; `lines` replace the lines (blank RFQs only — `RFQ_LINES_LOCKED` for one raised from a requisition, whose store is fixed too); `supplier_ids` replace the invited list. |
+| POST | `/purchasing/rfqs/{id}/suppliers` | `purchases.manage` + key | `{supplier_ids}` (1–20, active, not archived) added while `draft` or `sent`; on a sent RFQ the new suppliers are issued the request (PDF / e-mail) at once. |
+| DELETE | `/purchasing/rfqs/{id}/suppliers/{supplierId}` | `purchases.manage` | Draft only; not invited → 422 `VALIDATION_FAILED` on `supplier_id`. |
+| POST | `/purchasing/rfqs/{id}/send` | `purchases.manage` + key | `draft → sent` (below). |
+| GET | `/purchasing/rfqs/{id}/suppliers/{supplierId}/pdf` | `purchases.view` | The request PDF for one invited supplier (`attachment; filename="RFQ-000001-<supplier code slug>.pdf"`, `Cache-Control: no-store, private`); not invited → 404; 503 `PDF_UNAVAILABLE`. |
+| POST | `/purchasing/rfqs/{id}/quotes` | `purchases.manage` + key | Record (or replace) one supplier's answer → 200 RFQ (below). |
+| GET | `/purchasing/rfqs/{id}/comparison` | `purchases.view` | Quote comparison (below). |
+| POST | `/purchasing/rfqs/{id}/award` | `purchases.manage` + key | Sent RFQs only (else `INVALID_STATUS_CHANGE`) → 201 (below). |
+| POST | `/purchasing/rfqs/{id}/close` | `purchases.manage` + key | `{reason?}`: `sent → closed` (no award; terminal). |
+| POST | `/purchasing/rfqs/{id}/cancel` | `purchases.manage` + key | `{reason?}`: `draft` / `sent → cancelled`. |
+
+Statuses — requisition `draft|submitted|approved|rejected|cancelled|converted`; purchase order `draft|pending_approval|ordered|partially_received|received|cancelled`; RFQ `draft|sent|closed|awarded|cancelled`; quote `received|declined`.
+
+**Requisition** (`POST`/`PUT` body; lines 1–200):
+
+```json
+{"store_id": "…", "needed_by": "2026-11-13", "notes": "Eid demand: juice and rice running low.",
+ "lines": [{"variant_id": "…", "quantity": "480", "estimated_unit_cost": null, "suggested_supplier_id": "…", "notes": null},
+           {"variant_id": "…", "quantity": "100"}]}
+```
+
+`variant_id` distinct, sellable (archived / inactive refused; untracked allowed); `quantity` > 0 (whole for whole-unit products); `estimated_unit_cost` ≥ 0 with up to 4 decimals, empty → prefilled as by the estimates endpoint (tax-exclusive; tax rate = the variant's); `suggested_supplier_id` must be active and not archived; `needed_by` not before today in the organization's timezone; `notes` ≤ 1000 (lines ≤ 255). Answer (detail; the list row has the header fields with `line_count` and no lines / links / abilities):
+
+```json
+{"id": "…", "number": "PR-000001", "status": "submitted",
+ "branch": {"id": "…", "name": "Dhaka Main"}, "store": {"id": "…", "code": "MAIN", "name": "Main store", "branch_id": "…", "branch_name": "Dhaka Main"},
+ "requested_by": {"id": "…", "name": "Demo Cashier"}, "needed_by": "2026-11-13", "notes": "…", "currency": "BDT",
+ "estimated_subtotal": "14740.00", "estimated_tax": "1296.00", "estimated_total": "16036.00",
+ "approval_level": "manager", "approver_permission": "purchases.approve", "submitted_at": "…",
+ "approved_by": null, "approved_at": null, "auto_approved": false, "rejected_by": null, "rejected_at": null, "rejection_reason": null,
+ "cancelled_by": null, "cancelled_at": null, "cancellation_reason": null, "converted_at": null, "line_count": 2,
+ "created_at": "…", "updated_at": "…",
+ "lines": [{"id": "…", "variant": {"id": "…", "product_name": "Pran Mango Juice 250ml", "variant_name": null, "sku": "…", "unit_code": "pcs", "allow_decimal": false},
+            "quantity": "480.000", "estimated_unit_cost": "18.0000", "tax_rate": "15.0000", "estimated_total": "9936.00",
+            "suggested_supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd"}, "notes": null,
+            "converted_quantity": "0.000", "remaining_quantity": "480.000"}],
+ "purchase_orders": [], "rfqs": [],
+ "history": [{"id": "…", "from_status": null, "to_status": "draft", "note": null, "user": {"id": "…", "name": "Demo Cashier"}, "at": "…"},
+             {"id": "…", "from_status": "draft", "to_status": "submitted", "note": null, "user": {"id": "…", "name": "Demo Cashier"}, "at": "…"}],
+ "can_edit": false, "can_submit": false, "can_approve": false, "can_reject": false, "can_cancel": true, "can_convert": false}
+```
+
+`approval_level` is null until submitted; history `user` null = the system (automatic approval, quantities released by an RFQ). `can_approve` / `can_reject` apply the approval rules for the current user.
+
+**Convert** — `POST /purchasing/requisitions/{id}/convert`:
+
+```http
+POST /api/v1/purchasing/requisitions/{id}/convert
+Idempotency-Key: convert-5d1e…
+{"purchase_orders": {"lines": [{"requisition_line_id": "…", "quantity": null, "supplier_id": null}]},
+ "rfq": {"lines": [{"requisition_line_id": "…"}], "title": null, "reply_by": "2026-11-12", "notes": null, "supplier_ids": []}}
+→ 201 {"data": {"requisition": {…, "status": "converted"},
+        "purchase_orders": [{"id": "…", "number": "PO-000004", "status": "draft", "supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd"},
+                             "currency": "BDT", "total": "9936.00", "line_count": 1, "expected_date": "2026-11-13", "pre_approved": true, "approved_amount": "9936.00"}],
+        "rfq": {"id": "…", "number": "RFQ-000002", "status": "draft"}}}
+```
+
+- At least one of `purchase_orders.lines` / `rfq.lines` (each ≤ 200; a line at most once per target); `quantity` defaults to what is still open, may not exceed it across both targets ("Only N still open on this line.", "This line is already fully converted."), whole for whole-unit products.
+- Purchase order lines: supplier = `supplier_id`, else the line's suggested supplier, else the variant's preferred catalog supplier — none → 422 on `purchase_orders.lines.N.supplier_id` ("Choose a supplier for …"); the supplier must be active and not archived. One draft per supplier through `SavePurchaseOrder`: unit cost = the supplier's active catalog cost, else the line estimate; `order_date` today (organization timezone); `expected_date` = the requisition's `needed_by` when not past, else today + the longest catalog lead time (7 without a row); notes "From requisition PR-…"; `requisition_id` set; `approved_amount` = Σ line estimate × converted quantity / line quantity (2 dp).
+- RFQ lines: one draft RFQ for the requisition's store (title default "Requisition PR-…", `needed_by` and notes from the requisition, `reply_by` not in the past, optional `supplier_ids`), lines linked by `requisition_line_id`.
+- `converted_quantity` grows by what was converted; when every line is fully converted the requisition becomes `converted` (`converted_at`). Partly converted requisitions stay `approved` and can be converted again. Cancelling a converted **purchase order** does not give quantities back; RFQs that are closed, cancelled or awarded for less give the rest back (history note "Quantities released by RFQ-… (…)", `converted → approved` when needed).
+
+**Requisition from reorder suggestions** — `POST /purchasing/reorder-suggestions/requisitions`: `{store_id, needed_by?, notes?, submit?, lines: [{variant_id, quantity, supplier_id?, unit_cost?}]}` (1–200 lines). Each line's `supplier_id` becomes the suggested supplier, `unit_cost` the estimate (prefilled when omitted); history note "Raised from reorder suggestions."; `submit: true` submits it in the same transaction. → 201 requisition.
+
+**Purchase order fields (SC2)** added to `GET/POST/PUT /purchasing/orders/{id}` and every transition answer:
+
+```json
+{"status": "pending_approval", "requisition_id": "…", "rfq_id": null, "submitted_at": "…",
+ "requisition": {"id": "…", "number": "PR-000002", "status": "converted"}, "rfq": null,
+ "approval_level": "manager", "approver_permission": "purchases.approve",
+ "pre_approved_amount": "15250.00", "pre_approval_limit": "16012.50",
+ "submit_requires_approval": false, "submit_approval_level": null,
+ "submitted_by": {"id": "…", "name": "…"}, "approved_by": null, "approved_at": null,
+ "rejected_by": null, "rejected_at": null, "rejection_reason": null,
+ "history": [{"id": "…", "from_status": null, "to_status": "draft", "note": null, "user": {…}, "at": "…"}],
+ "can_approve": false}
+```
+
+`submit_requires_approval` / `submit_approval_level` say what submitting a **draft** would do (false / null for other statuses). History rows are written on creation, every transition and goods receipts (`partially_received` / `received`).
+
+**Approvals inbox** — `GET /purchasing/approvals`: submitted requisitions and orders `pending_approval` in the user's branches, at levels the user may approve, not raised (requisitions) or created / submitted (orders) by the user; oldest `submitted_at` first. Filters `kind=requisition|purchase_order`, `approval_level=manager|high`, `search` (number); paginated in memory; `meta.counts: {requisition, purchase_order}`. Row:
+
+```json
+{"kind": "requisition", "id": "…", "number": "PR-000001", "status": "submitted", "amount": "16036.00", "currency": "BDT",
+ "approval_level": "manager", "approver_permission": "purchases.approve", "requested_by": {"id": "…", "name": "Demo Cashier"},
+ "submitted_at": "…", "needed_by": "2026-11-13", "branch": {"id": "…", "name": "Dhaka Main"}, "store": {…},
+ "supplier": null, "line_count": 2, "link": "/purchasing/requisitions/…"}
+```
+
+For orders `amount` = total, `requested_by` = submitter (else creator), `needed_by` = expected date, `supplier` set, `link` `/purchasing/orders/…`.
+
+**RFQ** (detail; list rows carry the header with `line_count`, `supplier_count`, `quote_count`):
+
+```json
+{"id": "…", "number": "RFQ-000001", "status": "sent", "title": "Cotton polo shirts for the winter season",
+ "branch": {…}, "store": {…}, "requisition": null, "currency": "BDT", "needed_by": "…", "reply_by": "…", "notes": "…",
+ "sent_at": "…", "closed_at": null, "awarded_at": null, "cancelled_at": null, "created_by": {"id": "…", "name": "Demo Owner"}, "created_at": "…",
+ "line_count": 2, "supplier_count": 2, "quote_count": 1,
+ "lines": [{"id": "…", "variant": {…}, "quantity": "30.000", "requisition_line_id": null, "notes": null}],
+ "suppliers": [{"id": "…", "supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd", "email": null}, "has_email": false,
+                "invited_at": "…", "sent_at": "…", "emailed_at": null, "emailed_to": null, "send_manually": true,
+                "quote": {"id": "…", "status": "received", "received_at": "…", "valid_until": "…", "notes": "…",
+                          "lines": [{"id": "…", "rfq_line_id": "…", "unit_price": "295.0000", "quantity_offered": null, "lead_time_days": 10, "notes": null}]}}],
+ "awards": [], "purchase_orders": [], "history": [{…}],
+ "can_edit": false, "can_send": false, "can_invite": true, "can_record_quotes": true, "can_award": true, "can_close": true, "can_cancel": true}
+```
+
+Lines: 1–200, `variant_id` distinct and sellable, `quantity` > 0. `needed_by` / `reply_by` may not be in the past (organization today).
+
+**Send** — needs ≥ 2 invited suppliers (422 `RFQ_SUPPLIERS_REQUIRED`, `details.min`, `invited`), a line (`RFQ_EMPTY`) and `reply_by` (422 `VALIDATION_FAILED` on `reply_by`). Every invited supplier gets `sent_at`; a supplier with a valid e-mail address also gets a queued e-mail (`RfqRequestMail`, subject "Request for quotation RFQ-… — {organization}", reply-to the organization's e-mail, the PDF attached) and `emailed_at` / `emailed_to`; the others show `send_manually: true` (download the PDF). PDFs for e-mail are rendered inside the transaction, so 503 `PDF_UNAVAILABLE` sends nothing; e-mails are queued after commit. History note "Sent to N suppliers (M by e-mail)." The PDF (A4 portrait, letterhead, "Page X of Y"): RFQ number and date, supplier, deliver-to store / branch address, reply-by and needed-by, lines (SKU, item, quantity, unit) with blank *Your unit price* and *Lead time (days)* columns, notes — never prices.
+
+**Quote** — `POST /purchasing/rfqs/{id}/quotes`:
+
+```json
+{"supplier_id": "…", "status": "received", "valid_until": "2026-12-06", "notes": "Prices per piece, delivery included.",
+ "lines": [{"rfq_line_id": "…", "unit_price": "295.00", "lead_time_days": 10},
+           {"rfq_line_id": "…", "unit_price": "305.00", "quantity_offered": "25", "lead_time_days": 10}]}
+```
+
+Only while `sent` (422 `RFQ_NOT_OPEN`); `supplier_id` must be invited (422 on `supplier_id`). `received` needs ≥ 1 line (any subset of the RFQ lines; `rfq_line_id` distinct and of this RFQ); `unit_price` ≥ 0 (4 dp, per base unit, tax-exclusive); `quantity_offered` > 0, whole for whole-unit products; `lead_time_days` 0–365. `declined` stores no lines and no validity. Recording again replaces the supplier's answer. Audited `rfq.quote_recorded` / `rfq.quote_declined`.
+
+**Comparison** — `GET /purchasing/rfqs/{id}/comparison`:
+
+```json
+{"rfq": {"id": "…", "number": "RFQ-000001", "status": "sent"}, "currency": "BDT", "line_count": 2,
+ "suppliers": [{"supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd", "email": null}, "supplier_id": "…",
+                "status": "received", "valid_until": "…", "expired": false, "lines_quoted": 2, "lines_total": 2,
+                "coverage_percent": 100, "complete": true, "total": "18000.00"},
+               {"supplier": {…}, "supplier_id": "…", "status": "pending", "valid_until": null, "expired": false,
+                "lines_quoted": 0, "lines_total": 2, "coverage_percent": 0, "complete": false, "total": "0.00"}],
+ "lines": [{"rfq_line_id": "…", "line": {"id": "…", "variant": {…}, "quantity": "30.000", "requisition_line_id": null, "notes": null},
+            "quantity": "30.000",
+            "quotes": [{"supplier_id": "…", "unit_price": "305.0000", "quantity_offered": "25.000", "line_total": "9150.00",
+                        "lead_time_days": 10, "valid_until": "…", "expired": false, "partial": true, "lowest_price": true, "fastest": true}],
+            "lowest_price_supplier_ids": ["…"], "fastest_supplier_ids": ["…"]}]}
+```
+
+Supplier `status` `pending` (no answer) \| `received` \| `declined`. Line total = requested quantity × unit price (tax-exclusive, so suppliers compare on the same quantity); `partial` when `quantity_offered` is below the requested quantity; `lowest_price` flags every supplier tied at the lowest unit price; `fastest` the shortest stated lead time; `expired` when `valid_until` is before today. Supplier `total` = sum of its quoted line totals; `coverage_percent` = lines quoted × 100 / lines (integer).
+
+**Award** — `POST /purchasing/rfqs/{id}/award`:
+
+```http
+POST /api/v1/purchasing/rfqs/{id}/award
+Idempotency-Key: award-0c4b…
+{"lines": [{"rfq_line_id": "…", "supplier_id": "…", "quantity": "20"},
+           {"rfq_line_id": "…", "supplier_id": "…", "quantity": "10"}], "update_catalog": true}
+→ 201 {"data": {"rfq": {…, "status": "awarded"}, "purchase_orders": [{…, "pre_approved": false, "approved_amount": null}], "catalog_updated": 2}}
+```
+
+- `lines` 1–500; per line several suppliers may share the quantity (split award), each supplier once per line, the sum ≤ the RFQ line quantity ("Only N requested on the RFQ for this line."); the supplier must be invited, have quoted the line (a received quote) and be active and not archived; whole units for whole-unit products.
+- One draft PO per supplier at the quoted unit prices (`SavePurchaseOrder`): `expected_date` = the RFQ's `needed_by` when not past, else today + the longest lead time (quoted, else catalog, else 7); notes "Awarded from RFQ-…"; `rfq_id` and `requisition_id` set; `rfq_awards` rows (append-only) record line, supplier, PO, quantity and price.
+- When the RFQ came from an approved requisition, each PO is pre-approved for the requisition estimate of what it covers (same 5 % rule); otherwise `approved_amount` is null and the normal PO approval applies.
+- `update_catalog: true` writes the quoted cost (and the quoted lead time, when given) into the supplier's catalog row, creating it when missing (SC1 `ManageSupplierCatalog`; audited). `catalog_updated` = rows written.
+- The RFQ becomes `awarded`; requisition quantities not awarded are given back.
+
+**Notifications** (database channel, sent after commit; payload `{title, message, link, number, …ids}`):
+
+| `type` | Recipients | Extra payload |
+|--------|-----------|---------------|
+| `purchasing.requisition_submitted` | Active users with the level's approve permission in the requisition's branch, except the requester (not sent on automatic approval) | `requisition_id`, `amount`, `approval_level` |
+| `purchasing.requisition_approved`, `purchasing.requisition_rejected` | The requester | `requisition_id` (message carries the reason on rejection) |
+| `purchasing.order_pending_approval` | Eligible approvers of the order's branch, except its creator and submitter | `purchase_order_id`, `amount`, `approval_level` |
+| `purchasing.order_approved`, `purchasing.order_rejected` | The submitter | `purchase_order_id` |
+| `purchasing.rfq_replies_overdue` | The RFQ's creator | `rfq_id`, `missing`, `supplier_ids`, `date` |
+
+Links: `/purchasing/requisitions/{id}`, `/purchasing/orders/{id}`, `/purchasing/rfqs/{id}`.
+
+**Quotes-overdue reminder.** `php artisan purchasing:rfq-reminders [--any-hour]`, scheduled **hourly** (`withoutOverlapping`). For each active organization whose local time is 07:00 or later (`--any-hour` skips that check), every `sent` RFQ whose `reply_by` is before the organization's local today and that still has invited suppliers without an answer (received or declined) gets one notification per local day to its creator. The RFQ and day are claimed first in `rfq_reminder_runs` (unique `(rfq_id, run_on)`, insert-or-ignore), so repeated or overlapping runs never notify twice. Output: "Sent N RFQ reminder(s)."; a failing organization is reported and skipped.
+
+**Exports (X1).** `/purchasing/requisitions`, `/purchasing/rfqs` and `/purchasing/approvals` take `?export=xlsx|pdf` (see the table under [Exports](#exports-x1)).
+
+New error codes: `SELF_APPROVAL_NOT_ALLOWED`, `APPROVAL_LIMIT_EXCEEDED`, `APPROVAL_REQUIRED`, `REQUISITION_LOCKED`, `REQUISITION_EMPTY`, `REQUISITION_NOT_APPROVED`, `RFQ_LOCKED`, `RFQ_LINES_LOCKED`, `RFQ_EMPTY`, `RFQ_SUPPLIERS_REQUIRED`, `RFQ_NOT_OPEN`. New permissions: `purchases.request`, `purchases.approve`, `purchases.approve_high`, `purchases.settings`.
+
 ### Planned (by phase)
 
 | Phase | Resource paths |
 |-------|----------------|
 | 7 | `/reports/*`, `/dashboard` |
 | 8 | `/ai/insights`, `/ai/ask` |
-| SC2 | Purchase requisitions and approvals, requests for quotation and supplier quotes (paths to be fixed in SC2) |
 | SC3 | Landed cost on goods receipts, supplier performance (paths to be fixed in SC3) |
 
 Each phase updates this section with request/response examples; Scramble remains the field-level source of truth.

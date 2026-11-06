@@ -51,16 +51,23 @@ enum SystemRole: string
             self::BranchManager => [
                 'organization.view', 'branches.view', 'users.view', 'roles.view',
                 'products.*', 'categories.*', 'brands.*', 'units.*', 'customers.*', 'suppliers.*',
-                'inventory.*', 'purchases.*', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
+                // SC2: approves requisitions / orders up to the manager limit; above it and the
+                // approval limits themselves stay with the Organization Admin.
+                'inventory.*', 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay',
+                'purchases.request', 'purchases.approve', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
                 'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*', 'ai.*',
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
                 'pos.*', 'sales.view', 'cash_registers.operate', 'returns.view', 'returns.create', 'payments.collect',
+                // SC2: branch staff raise purchase requisitions (their own).
+                'purchases.request',
             ],
             self::InventoryManager => [
                 'branches.view', 'products.*', 'categories.*', 'brands.*', 'units.*',
-                'suppliers.*', 'inventory.*', 'purchases.*', 'reports.inventory',
+                'suppliers.*', 'inventory.*', 'reports.inventory',
+                // SC2: runs purchasing (requisitions → orders, RFQs) but does not approve.
+                'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay', 'purchases.request',
             ],
             self::Accountant => [
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',

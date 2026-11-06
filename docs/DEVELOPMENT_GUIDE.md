@@ -76,6 +76,8 @@ php artisan schedule:work
 
 The daily reorder alert (SC1) runs hourly from 07:00 organization time; to send it now: `php artisan purchasing:reorder-notifications --any-hour` (once per store and day — a second run the same day sends nothing). After pulling SC1, run `php artisan pos:permissions:sync` so the built-in roles get `inventory.manage`.
 
+The quotes-overdue reminder (SC2) also runs hourly from 07:00 organization time; to run it now: `php artisan purchasing:rfq-reminders --any-hour` (prints "Sent N RFQ reminder(s)."; it only reminds about `sent` RFQs whose reply-by date is before today with suppliers that have not answered, once per RFQ and day — the seeded `RFQ-000001` replies by 5 days after seeding, so a fresh seed sends nothing). After pulling SC2, run `php artisan migrate` and `php artisan pos:permissions:sync` (new `purchases.request`, `purchases.approve`, `purchases.approve_high`, `purchases.settings` and the changed Branch Manager / Inventory Manager / Cashier lists), or `php artisan migrate:fresh --seed` for the demo requisitions and RFQ. Sign in as `cashier@demo.test` to raise a requisition (*Requisitions* in the sidebar) and as `owner@demo.test` to approve it (*Purchasing → Approvals*). RFQ e-mails are queued, so they go out only while `php artisan queue:work` runs (or with `QUEUE_CONNECTION=sync`); the seeded suppliers have no e-mail address — add one to a supplier to try it (with the `log` mailer the message ends up in `storage/logs/laravel.log`). Sending to a supplier with an address and the PDF download need the X1 PDF renderer (see above).
+
 ### 3. Frontend
 
 ```powershell

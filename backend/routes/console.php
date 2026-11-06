@@ -22,5 +22,9 @@ Schedule::command('cart:prune')->daily();
 // timezone (hourly runs; one notification per store and local day).
 Schedule::command('purchasing:reorder-notifications')->hourly()->withoutOverlapping();
 
+// SC2: daily "quotes overdue" reminder per RFQ past its reply-by date, from 07:00 local time
+// (hourly runs; one notification per RFQ and local day).
+Schedule::command('purchasing:rfq-reminders')->hourly()->withoutOverlapping();
+
 // Unpaid bank-transfer web orders are cancelled (and restocked) when their payment hold runs out.
 Schedule::command('orders:expire-pending')->everyMinute()->withoutOverlapping();

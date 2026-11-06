@@ -4,10 +4,12 @@ namespace App\Modules\Purchasing\Presentation\Http\Controllers;
 
 use App\Modules\Purchasing\Application\Actions\ChangePurchaseOrderStatus;
 use App\Modules\Purchasing\Application\Actions\SavePurchaseOrder;
+use App\Modules\Purchasing\Application\Services\ApprovalRules;
 use App\Modules\Purchasing\Domain\PurchaseOrderStatus;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrder;
 use App\Modules\Purchasing\Presentation\Http\Exports\PurchaseOrdersExport;
 use App\Modules\Purchasing\Presentation\Http\Requests\SavePurchaseOrderRequest;
+use App\Modules\Purchasing\Presentation\Http\Support\ProcurementPresenter;
 use App\Modules\Purchasing\Presentation\Http\Support\PurchasingPresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
@@ -24,7 +26,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PurchaseOrderController
 {
-    public function __construct(private readonly PurchasingPresenter $presenter) {}
+    public function __construct(
+        private readonly PurchasingPresenter $presenter,
+        private readonly ProcurementPresenter $procurement,
+        private readonly ApprovalRules $rules,
+    ) {}
 
     /**
      * List purchase orders
@@ -51,35 +57,88 @@ class PurchaseOrderController
 
     public function store(SavePurchaseOrderRequest $request, SavePurchaseOrder $save): JsonResponse
     {
-        return ApiResponse::created($this->presenter->document($save($this->user($request), null, $request->validated())));
+        return ApiResponse::created($this->present($request, $save($this->user($request), null, $request->validated())));
     }
 
     public function show(Request $request, PurchaseOrder $order): JsonResponse
     {
         $this->presenter->assertVisible($this->user($request), $order->branch_id);
 
-        return ApiResponse::success($this->presenter->document($order));
+        return ApiResponse::success($this->present($request, $order));
     }
 
     public function update(SavePurchaseOrderRequest $request, PurchaseOrder $order, SavePurchaseOrder $save): JsonResponse
     {
         $this->presenter->assertVisible($this->user($request), $order->branch_id);
 
-        return ApiResponse::success($this->presenter->document($save($this->user($request), $order, $request->validated())));
+        return ApiResponse::success($this->present($request, $save($this->user($request), $order, $request->validated())));
     }
 
+    /**
+     * Mark a draft as ordered
+     *
+     * Only when no approval is needed (SC2: approval not required, at or below the auto-approve
+     * limit, or pre-approved within 5 %); otherwise `APPROVAL_REQUIRED` — use submit.
+     */
     public function place(Request $request, PurchaseOrder $order, ChangePurchaseOrderStatus $status): JsonResponse
     {
         $this->presenter->assertVisible($this->user($request), $order->branch_id);
 
-        return ApiResponse::success($this->presenter->document($status->place($order)));
+        return ApiResponse::success($this->present($request, $status->place($order)));
     }
 
     public function cancel(Request $request, PurchaseOrder $order, ChangePurchaseOrderStatus $status): JsonResponse
     {
         $this->presenter->assertVisible($this->user($request), $order->branch_id);
 
-        return ApiResponse::success($this->presenter->document($status->cancel($order)));
+        return ApiResponse::success($this->present($request, $status->cancel($order)));
+    }
+
+    /**
+     * Submit a draft (SC2)
+     *
+     * Ordered at once when no approval is needed, else `pending_approval` (approvers notified).
+     * Requires an `Idempotency-Key` header.
+     */
+    public function submit(Request $request, PurchaseOrder $order, ChangePurchaseOrderStatus $status): JsonResponse
+    {
+        $this->presenter->assertVisible($this->user($request), $order->branch_id);
+
+        return ApiResponse::success($this->present($request, $status->submit($this->user($request), $order)));
+    }
+
+    /**
+     * Approve an order pending approval (SC2) → ordered. Requires an `Idempotency-Key` header.
+     */
+    public function approve(Request $request, PurchaseOrder $order, ChangePurchaseOrderStatus $status): JsonResponse
+    {
+        $user = $this->user($request);
+        $this->presenter->assertVisible($user, $order->branch_id);
+        $this->rules->requireAny($user, ['purchases.approve', 'purchases.approve_high']);
+
+        return ApiResponse::success($this->present($request, $status->approve($user, $order)));
+    }
+
+    /**
+     * Reject an order pending approval (SC2) → back to draft with the reason. Requires an
+     * `Idempotency-Key` header.
+     */
+    public function reject(Request $request, PurchaseOrder $order, ChangePurchaseOrderStatus $status): JsonResponse
+    {
+        $user = $this->user($request);
+        $this->presenter->assertVisible($user, $order->branch_id);
+        $this->rules->requireAny($user, ['purchases.approve', 'purchases.approve_high']);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+
+        return ApiResponse::success($this->present($request, $status->reject($user, $order, $data['reason'])));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function present(Request $request, PurchaseOrder $order): array
+    {
+        return $this->presenter->document($order) + $this->procurement->orderApproval($order, $this->user($request));
     }
 
     private function user(Request $request): TenantUser

@@ -88,6 +88,7 @@ class PurchasingPresenter
                     'batch' => $batch,
                     'quantity' => $l->quantity,
                     'received_quantity' => $l instanceof PurchaseOrderLine ? $l->received_quantity : false,
+                    'requisition_line_id' => $l instanceof PurchaseOrderLine ? $l->requisition_line_id : false,
                     'returned_quantity' => $l instanceof GoodsReceiptLine ? $l->returned_quantity : false,
                     'purchase_order_line_id' => $l instanceof GoodsReceiptLine ? $l->purchase_order_line_id : false,
                     'goods_receipt_line_id' => $l instanceof PurchaseReturnLine ? $l->goods_receipt_line_id : false,
@@ -127,6 +128,11 @@ class PurchasingPresenter
                 'order_date' => $doc->order_date->toDateString(),
                 'expected_date' => $doc->expected_date?->toDateString(),
                 'ordered_at' => $doc->ordered_at?->toIso8601String(),
+                // SC2: approval.
+                'requisition_id' => $doc->requisition_id,
+                'rfq_id' => $doc->rfq_id,
+                'approval_level' => $doc->approval_level?->value,
+                'submitted_at' => $doc->submitted_at?->toIso8601String(),
             ],
             $doc instanceof GoodsReceipt => $base + [
                 'purchase_order_id' => $doc->purchase_order_id,

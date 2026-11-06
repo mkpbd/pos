@@ -9,6 +9,7 @@ use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
+use App\Modules\Purchasing\Application\Services\ProcurementHistory;
 use App\Modules\Purchasing\Application\Services\PurchasingContext;
 use App\Modules\Purchasing\Domain\PurchaseOrderStatus;
 use App\Modules\Purchasing\Domain\PurchaseTotals;
@@ -43,6 +44,7 @@ class PostGoodsReceipt
         private readonly StockLedger $ledger,
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
+        private readonly ProcurementHistory $history,
     ) {}
 
     /**
@@ -197,6 +199,10 @@ class PostGoodsReceipt
         }
 
         $complete = $orderLines->every(fn (PurchaseOrderLine $l) => Decimal::compare($l->received_quantity, $l->quantity) >= 0);
+        $from = $order->status;
         $order->forceFill(['status' => $complete ? PurchaseOrderStatus::Received : PurchaseOrderStatus::PartiallyReceived])->save();
+        if ($order->status !== $from) {
+            $this->history->order($order, $from->value, $order->status->value);
+        }
     }
 }

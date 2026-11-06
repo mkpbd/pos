@@ -27,6 +27,14 @@ interface UserDirectory
     public function withPermission(string $organizationId, string $permission): Collection;
 
     /**
+     * The given users when they are active users of the organization (SC2: notify a requester).
+     *
+     * @param  list<string>  $userIds
+     * @return Collection<int, Authenticatable&RoutesNotifications>
+     */
+    public function active(string $organizationId, array $userIds): Collection;
+
+    /**
      * Display names keyed by user id (users of other organizations are left out).
      *
      * @param  list<string>  $userIds

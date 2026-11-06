@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowRightLeftIcon, SearchIcon, ShoppingCartIcon } from 'lucide-react'
+import { ArrowRightLeftIcon, ClipboardListIcon, SearchIcon, ShoppingCartIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
@@ -37,6 +37,8 @@ import {
   type SuggestionFilter,
 } from '@/features/supply-chain/api'
 import { PurchasePreviewDialog, TransferDialog } from '@/features/supply-chain/components/reorder-dialogs'
+import { PROCUREMENT_PERMISSIONS } from '@/features/procurement/api'
+import { RaiseRequisitionDialog } from '@/features/procurement/components/raise-requisition-dialog'
 import { catalogHint, normalizeQuantity } from '@/features/supply-chain/quantities'
 import { effectiveRow, groupPurchases, quantityError, wants, type EffectiveRow, type RowEdit } from '@/features/supply-chain/reorder-lines'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
@@ -160,8 +162,11 @@ export function ReorderPage() {
   const me = useAuth()
   const can = useCan()
   const canPurchase = can(SUPPLY_PERMISSIONS.managePurchasing)
+  // Staff who cannot order directly raise a requisition for approval instead (SC2).
+  const canRequisition = !canPurchase && can(PROCUREMENT_PERMISSIONS.request)
+  const canEditPurchase = canPurchase || canRequisition
   const canTransfer = can(SUPPLY_PERMISSIONS.transfer)
-  const canAct = canPurchase || canTransfer
+  const canAct = canEditPurchase || canTransfer
   const currency = me.organization?.base_currency
 
   const defaults = useDefaultStore()
@@ -177,7 +182,7 @@ export function ReorderPage() {
 
   const [edits, setEdits] = useState<Record<string, RowEdit>>({})
   const [selected, setSelected] = useState<Map<string, ReorderSuggestion>>(new Map())
-  const [dialog, setDialog] = useState<'purchase' | 'transfer' | null>(null)
+  const [dialog, setDialog] = useState<'purchase' | 'transfer' | 'requisition' | null>(null)
   const [createdOrders, setCreatedOrders] = useState<CreatedPurchaseOrder[] | null>(null)
   const [createdTransfers, setCreatedTransfers] = useState<CreatedTransfer[] | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -228,7 +233,7 @@ export function ReorderPage() {
     setEdits((e) => Object.fromEntries(Object.entries(e).filter(([id]) => !variantIds.includes(id))))
   }
 
-  const openDialog = (kind: 'purchase' | 'transfer') => {
+  const openDialog = (kind: 'purchase' | 'transfer' | 'requisition') => {
     if (invalid.length > 0) {
       toast.error(`Fix the quantity of ${variantDisplayName(invalid[0]!.row.variant)} first.`)
       return
@@ -306,6 +311,11 @@ export function ReorderPage() {
             {canPurchase && (
               <Button disabled={purchases.groups.length === 0 && purchases.withoutSupplier.length === 0} onClick={() => openDialog('purchase')}>
                 <ShoppingCartIcon data-icon="inline-start" /> Create purchase orders
+              </Button>
+            )}
+            {canRequisition && (
+              <Button disabled={!selectedRows.some((r) => wants(r.purchase))} onClick={() => openDialog('requisition')}>
+                <ClipboardListIcon data-icon="inline-start" /> Raise requisition
               </Button>
             )}
           </>
@@ -399,7 +409,7 @@ export function ReorderPage() {
                           <TableCell className="hidden text-right sm:table-cell">{row.days_of_cover === null ? <span className="text-muted-foreground" title="No sales in the period">—</span> : `${trimDecimal(row.days_of_cover)} d`}</TableCell>
                           {showPurchase && (
                             <TableCell className="text-right align-top">
-                              {canPurchase ? (
+                              {canEditPurchase ? (
                                 <QuantityInput label={`Purchase quantity of ${name}`} value={r.purchase} allowDecimal={row.variant.allow_decimal} hint={r.supplier ? catalogHint(r.purchase, r.packSize, r.minOrder) : null} onChange={(v) => edit(row.variant.id, { purchase: v })} />
                               ) : (
                                 <span className="font-mono">{r.purchase}</span>
@@ -408,7 +418,7 @@ export function ReorderPage() {
                           )}
                           {showPurchase && (
                             <TableCell className="align-top">
-                              {canPurchase ? <RowSupplierSelect row={row} current={r.supplier} onChange={(supplier) => edit(row.variant.id, { supplier })} /> : <span className="text-sm">{r.supplier?.name ?? '—'}</span>}
+                              {canEditPurchase ? <RowSupplierSelect row={row} current={r.supplier} onChange={(supplier) => edit(row.variant.id, { supplier })} /> : <span className="text-sm">{r.supplier?.name ?? '—'}</span>}
                               {row.lead_time_days > 0 && !edits[row.variant.id]?.supplier && r.supplier && <div className="mt-1 text-xs text-muted-foreground">Lead {row.lead_time_days} d</div>}
                             </TableCell>
                           )}
@@ -446,6 +456,17 @@ export function ReorderPage() {
           error={actionError}
           created={createdOrders}
           onConfirm={submitOrders}
+        />
+      )}
+      {canRequisition && storeId && dialog === 'requisition' && (
+        <RaiseRequisitionDialog
+          open
+          onOpenChange={(o) => !o && setDialog(null)}
+          storeId={storeId}
+          storeName={storeName}
+          rows={selectedRows}
+          currency={currency}
+          onCreated={forget}
         />
       )}
       {canTransfer && (

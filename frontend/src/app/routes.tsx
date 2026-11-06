@@ -61,6 +61,12 @@ const pages = {
   reorder: page(() => import('@/features/supply-chain/pages/reorder-page'), 'ReorderPage'),
   supplier: page(() => import('@/features/supply-chain/pages/supplier-page'), 'SupplierPage'),
   inventorySettings: page(() => import('@/features/supply-chain/pages/inventory-settings-page'), 'InventorySettingsPage'),
+  requisitions: page(() => import('@/features/procurement/pages/requisition-pages'), 'RequisitionsPage'),
+  requisition: page(() => import('@/features/procurement/pages/requisition-pages'), 'RequisitionPage'),
+  approvals: page(() => import('@/features/procurement/pages/approvals-page'), 'ApprovalsPage'),
+  rfqs: page(() => import('@/features/procurement/pages/rfq-pages'), 'RfqsPage'),
+  rfq: page(() => import('@/features/procurement/pages/rfq-pages'), 'RfqPage'),
+  purchasingSettings: page(() => import('@/features/procurement/pages/purchasing-settings-page'), 'PurchasingSettingsPage'),
   posTerminal: page(() => import('@/features/pos/pages/pos-terminal-page'), 'PosTerminalPage'),
   sales: page(() => import('@/features/sales/pages/sales-pages'), 'SalesPage'),
   sale: page(() => import('@/features/sales/pages/sales-pages'), 'SalePage'),
@@ -107,6 +113,8 @@ const pages = {
 }
 
 const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage']
+/** Requesters see their own requisitions; approvers and purchasing staff see the branch's (SC2). */
+const REQUISITION_PERMISSIONS = ['purchases.view', 'purchases.request', 'purchases.approve', 'purchases.approve_high']
 
 export const routes: RouteObject[] = [
   {
@@ -194,6 +202,15 @@ export const routes: RouteObject[] = [
               guarded('purchases.view', 'purchasing/orders', pages.purchaseOrders),
               guarded('purchases.view', 'purchasing/reorder', pages.reorder),
               guarded('purchases.manage', 'purchasing/orders/new', pages.purchaseOrder),
+              guarded(REQUISITION_PERMISSIONS, 'purchasing/requisitions', pages.requisitions),
+              guarded('purchases.request', 'purchasing/requisitions/new', pages.requisition),
+              guarded(REQUISITION_PERMISSIONS, 'purchasing/requisitions/:requisitionId', pages.requisition),
+              guarded(['purchases.approve', 'purchases.approve_high'], 'purchasing/approvals', pages.approvals),
+              // Viewers see RFQs read-only; creating, sending, quotes and awards need purchases.manage.
+              guarded('purchases.view', 'purchasing/rfqs', pages.rfqs),
+              guarded('purchases.manage', 'purchasing/rfqs/new', pages.rfq),
+              guarded('purchases.view', 'purchasing/rfqs/:rfqId', pages.rfq),
+              guarded('purchases.settings', 'purchasing/settings', pages.purchasingSettings),
               guarded('purchases.view', 'purchasing/orders/:orderId', pages.purchaseOrder),
               guarded('purchases.view', 'purchasing/receipts', pages.receipts),
               guarded('purchases.receive', 'purchasing/receipts/new', pages.newReceipt),

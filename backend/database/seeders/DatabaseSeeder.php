@@ -76,5 +76,7 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoTranslationsSeeder::class, ['organizationId' => $result['organization']->id]);
         // SC1: supplier catalog and reorder rules (no documents or stock change).
         $this->callWith(DemoSupplyChainSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
+        // SC2: approval limits, two requisitions (one waiting, one converted into a draft PO) and a sent RFQ with a quote.
+        $this->callWith(DemoProcurementSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
     }
 }

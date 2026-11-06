@@ -9,7 +9,7 @@ export function SectionTabs({ tabs, label }: { tabs: SectionTab[]; label: string
 
   return (
     <nav aria-label={label} className="flex gap-1 overflow-x-auto border-b">
-      {tabs.filter((t) => !t.permission || can(t.permission)).map((t) => (
+      {tabs.filter((t) => !t.permission || (Array.isArray(t.permission) ? t.permission.some(can) : can(t.permission))).map((t) => (
         <NavLink
           key={t.to}
           to={t.to}

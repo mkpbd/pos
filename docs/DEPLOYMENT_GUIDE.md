@@ -169,6 +169,17 @@ Supplier catalog, reorder suggestions and replenishment (SC1):
 - No new environment variable, queue job, rate limiter or dependency.
 - The new PostgreSQL CHECKs and the partial unique index have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
 
+Purchase requisitions, approvals and supplier quotes (SC2):
+- **Migration** (additive, no backfill): Purchasing `2026_11_07_100000_create_procurement_tables` — `purchase_approval_settings`, `purchase_requisitions` + lines + status history, `rfqs`, `rfq_lines`, `rfq_suppliers`, `supplier_quotes` + lines, `rfq_awards`, `rfq_status_history`, `rfq_reminder_runs`, `purchase_order_status_history`, approval columns on `purchase_orders`; on PostgreSQL it rebuilds `purchase_orders_status_check` (adds `pending_approval`) and creates the function `prevent_procurement_history_mutation()` with four append-only triggers. Existing orders keep their status. `php artisan migrate --force` as usual.
+- **Run `php artisan pos:permissions:sync`.** New permissions `purchases.request`, `purchases.approve`, `purchases.approve_high`, `purchases.settings`; the sync also applies the changed role map: Branch Manager's and Inventory Manager's `purchases.*` become explicit lists (Branch Manager approves up to the manager limit, Inventory Manager does not approve), Cashier gains `purchases.request`, Organization Admin keeps all through `*` (the only built-in role with `purchases.approve_high` and `purchases.settings`). Built-in roles hold expanded permission lists, so until the sync **nobody — the Organization Admin included — holds the new permissions**: requisitions, approvals and the approval limits are unavailable, while purchase order approval is already enforced (default on), so drafts above 10 000.00 cannot be approved or placed. Run the sync right after migrating. Custom roles need the permissions added by hand.
+- **Check the approval limits** under *Purchasing → Settings* (defaults: auto-approve up to 10 000.00, manager up to 100 000.00, purchase order approval on). With approval on, draft orders above the auto limit can no longer be placed directly (*Save & submit* sends them for approval; `POST …/place` answers `APPROVAL_REQUIRED`); integrations that place orders through the API must submit instead, or the setting must be turned off.
+- **A queue worker must run** for RFQ e-mails: suppliers with an e-mail address get a queued mail with the PDF attached (base64 inside the job, so allow for job payloads of a few hundred KB on the queue backend). Configure outgoing mail (`MAIL_*`) and the organization's e-mail (used as reply-to). Without a worker the RFQ shows the supplier as e-mailed but nothing leaves; suppliers without an address are always "send manually" (download the PDF).
+- **PDF prerequisites are those of X1** (system Chromium, `backend/pdf-renderer` with `npm ci`, `PDF_*` keys above): the RFQ PDF is rendered when an RFQ is sent to a supplier with an e-mail address and on each download. Without a renderer those requests answer 503 `PDF_UNAVAILABLE` and nothing is sent; RFQs to suppliers without an e-mail address can still be sent.
+- **The scheduler must run:** `purchasing:rfq-reminders` is scheduled **hourly** (`withoutOverlapping`) and reminds each RFQ's creator from 07:00 organization time, once per RFQ and local day, while suppliers have not answered after the reply-by date (claimed in `rfq_reminder_runs`). Manual run: `php artisan purchasing:rfq-reminders --any-hour`.
+- Approval and reminder notifications are database notifications (no e-mail, no queue job).
+- No new environment variable, rate limiter or dependency.
+- The new PostgreSQL CHECKs and triggers have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash
@@ -176,7 +187,7 @@ Supplier catalog, reorder suggestions and replenishment (SC1):
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan storage:link        # once: media and product images under /storage
-php artisan pos:permissions:sync  # new module permissions -> built-in roles (SC1: inventory.manage)
+php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings)
 php artisan optimize            # config, routes, events, views cache
 php artisan queue:restart
 (cd pdf-renderer && PUPPETEER_SKIP_DOWNLOAD=1 npm ci)   # PDF exports (X1); needs Node >= 22.12 and a system Chromium
@@ -191,7 +202,7 @@ npm run build                   # publish frontend/dist
 | Process | Command | Supervision |
 |---------|---------|-------------|
 | Queue workers | `php artisan queue:work redis --tries=3 --max-time=3600` | systemd/Supervisor, ≥2 workers |
-| Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`), sends the daily reorder alerts (`purchasing:reorder-notifications`, hourly, from 07:00 organization time, once per store and day) | cron |
+| Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`), sends the daily reorder alerts (`purchasing:reorder-notifications`, hourly, from 07:00 organization time, once per store and day) and the quotes-overdue reminders (`purchasing:rfq-reminders`, hourly, from 07:00 organization time, once per RFQ and day) | cron |
 | Health probe | `GET /api/v1/health` (200 / 503) and `GET /up` | load balancer |
 
 ## Database

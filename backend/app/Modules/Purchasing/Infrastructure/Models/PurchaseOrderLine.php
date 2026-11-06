@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $id
  * @property string $purchase_order_id
  * @property string $variant_id
+ * @property ?string $requisition_line_id converted from this requisition line (directly or via an RFQ award)
  * @property string $quantity
  * @property string $received_quantity
  * @property string $unit_cost
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $line_total
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'purchase_order_id', 'variant_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'received_quantity', 'sort_order'])]
+#[Fillable(['organization_id', 'purchase_order_id', 'variant_id', 'requisition_line_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'received_quantity', 'sort_order'])]
 class PurchaseOrderLine extends Model
 {
     use BelongsToOrganization, HasUuids;

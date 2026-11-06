@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -10,6 +10,8 @@ export type NavItem = {
   permission?: string | string[]
   /** Platform-admin only. */
   platform?: boolean
+  /** Hidden for users holding any of these (they reach the page through another entry). */
+  unless?: string[]
 }
 
 /**
@@ -32,6 +34,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/catalog', label: 'Catalog', icon: TagsIcon, permission: 'products.view' },
   { to: '/inventory', label: 'Inventory', icon: BoxesIcon, permission: 'inventory.view' },
   { to: '/purchasing/orders', label: 'Purchasing', icon: ShoppingCartIcon, permission: 'purchases.view' },
+  // Requesters and approvers without purchases.view (SC2); others reach requisitions from Purchasing.
+  { to: '/purchasing/requisitions', label: 'Requisitions', icon: ClipboardListIcon, permission: ['purchases.request', 'purchases.approve', 'purchases.approve_high'], unless: ['purchases.view'] },
   { to: '/customers', label: 'Customers', icon: ContactIcon, permission: 'customers.view' },
   { to: '/suppliers', label: 'Suppliers', icon: TruckIcon, permission: 'suppliers.view' },
   { to: '/loyalty', label: 'Loyalty', icon: GiftIcon, permission: ['loyalty.view', 'loyalty.manage'] },
@@ -52,6 +56,7 @@ export function visibleNavItems(me: CurrentUser): NavItem[] {
 
   return NAV_ITEMS.filter((item) => {
     if (item.platform) return isPlatform
+    if (item.unless && (isPlatform || item.unless.some((p) => me.permissions.includes(p)))) return false
     // Tenant pages need an organization; platform admins without one only see platform pages.
     if (item.permission && !me.organization) return false
     const required = item.permission === undefined ? [] : Array.isArray(item.permission) ? item.permission : [item.permission]

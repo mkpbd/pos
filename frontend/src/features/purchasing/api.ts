@@ -3,7 +3,7 @@ import { api, toPaginated, type Paginated } from '@/lib/api/client'
 import type { BatchRef, StoreRef } from '@/features/inventory/api'
 import { inventoryKeys } from '@/features/inventory/api'
 
-export type PurchaseOrderStatus = 'draft' | 'ordered' | 'partially_received' | 'received' | 'cancelled'
+export type PurchaseOrderStatus = 'draft' | 'pending_approval' | 'ordered' | 'partially_received' | 'received' | 'cancelled'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_banking' | 'cheque' | 'card' | 'other'
 
 export type SupplierRef = { id: string; code: string; name: string }
@@ -38,7 +38,34 @@ type DocumentBase = {
   lines?: PurchaseLine[]
 }
 
-export type PurchaseOrder = DocumentBase & { status: PurchaseOrderStatus; order_date: string; expected_date: string | null; ordered_at: string | null }
+type PersonRef = { id: string; name: string }
+
+/** SC2 approval fields (present when the API sends them). */
+export type PurchaseOrderApproval = {
+  approval_level?: 'none' | 'manager' | 'high' | null
+  /** Created from an approved requisition / RFQ award within the approved amount. */
+  pre_approved?: boolean
+  /** The approved requisition amount the order is pre-approved for, and the ceiling (+5 %). */
+  pre_approved_amount?: string | null
+  pre_approval_limit?: string | null
+  /** Drafts: whether submitting needs an approval, and at which level. */
+  submit_requires_approval?: boolean
+  submit_approval_level?: 'none' | 'manager' | 'high' | null
+  history?: { from_status?: string | null; to_status?: string; status?: string; at: string; user?: PersonRef | null; note?: string | null }[]
+  requisition?: { id: string; number: string } | null
+  rfq?: { id: string; number: string } | null
+  created_by?: PersonRef | null
+  submitted_by?: PersonRef | null
+  submitted_at?: string | null
+  approved_by?: PersonRef | null
+  approved_at?: string | null
+  rejected_by?: PersonRef | null
+  rejected_at?: string | null
+  rejection_reason?: string | null
+  can_approve?: boolean
+}
+
+export type PurchaseOrder = DocumentBase & PurchaseOrderApproval & { status: PurchaseOrderStatus; order_date: string; expected_date: string | null; ordered_at: string | null }
 export type GoodsReceipt = DocumentBase & { purchase_order_id: string | null; supplier_invoice_number: string | null; invoice_date: string; due_date: string | null }
 export type PurchaseReturn = DocumentBase & { goods_receipt_id: string; reason: string }
 
@@ -171,6 +198,7 @@ export function useRecordPaymentMutation() {
 
 export const PO_STATUS: Record<PurchaseOrderStatus, { label: string; variant: 'outline' | 'soft' | 'warning' | 'success' | 'destructive' }> = {
   draft: { label: 'Draft', variant: 'outline' },
+  pending_approval: { label: 'Pending approval', variant: 'warning' },
   ordered: { label: 'Ordered', variant: 'soft' },
   partially_received: { label: 'Partially received', variant: 'warning' },
   received: { label: 'Received', variant: 'success' },

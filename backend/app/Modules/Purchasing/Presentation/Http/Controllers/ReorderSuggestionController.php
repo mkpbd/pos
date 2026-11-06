@@ -5,12 +5,15 @@ namespace App\Modules\Purchasing\Presentation\Http\Controllers;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Purchasing\Application\Actions\CreateReorderPurchaseOrders;
+use App\Modules\Purchasing\Application\Actions\CreateReorderRequisition;
 use App\Modules\Purchasing\Application\Actions\CreateReorderTransfer;
 use App\Modules\Purchasing\Application\Queries\ReorderSuggestions;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrder;
 use App\Modules\Purchasing\Presentation\Http\Exports\ReorderSuggestionsExport;
 use App\Modules\Purchasing\Presentation\Http\Requests\CreateReorderPurchaseOrdersRequest;
+use App\Modules\Purchasing\Presentation\Http\Requests\CreateReorderRequisitionRequest;
 use App\Modules\Purchasing\Presentation\Http\Requests\CreateReorderTransferRequest;
+use App\Modules\Purchasing\Presentation\Http\Support\ProcurementPresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
@@ -98,6 +101,20 @@ class ReorderSuggestionController
             'total' => $o->total,
             'expected_date' => $o->expected_date?->toDateString(),
         ], $orders)]);
+    }
+
+    /**
+     * Raise a requisition from suggestions (SC2)
+     *
+     * For branch staff without `purchases.manage`: one draft requisition for the store (the
+     * line's supplier becomes the suggested supplier, the unit cost the estimate — prefilled when
+     * omitted); `submit: true` submits it at once. Requires an `Idempotency-Key` header.
+     */
+    public function requisitions(CreateReorderRequisitionRequest $request, CreateReorderRequisition $create, ProcurementPresenter $presenter): JsonResponse
+    {
+        $user = $this->user($request);
+
+        return ApiResponse::created($presenter->requisition($create($user, $request->validated()), $user));
     }
 
     /**

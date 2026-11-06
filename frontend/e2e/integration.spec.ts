@@ -910,3 +910,34 @@ test('reorder suggestions turn into a draft purchase order from the preferred su
   const quantity = Number((await line.getByRole('cell').nth(1).innerText()).replace(/[^\d.]/g, ''))
   expect(quantity % 24).toBe(0)
 })
+
+test('a manager approves a branch requisition from the inbox and converts it into pre-approved purchase orders', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin purchasing flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // Seeded: the cashier's PR-000001 (juice + rice, above the 10,000 auto-approve limit) waits for a manager.
+  await page.goto('/admin/purchasing/approvals')
+  const inbox = page.getByRole('table', { name: 'Waiting for approval' })
+  await expect(inbox.getByRole('row').filter({ hasText: 'PR-000001' })).toBeVisible()
+  await inbox.getByRole('button', { name: 'Approve PR-000001' }).click()
+  await expect(inbox.getByRole('row').filter({ hasText: 'PR-000001' })).toHaveCount(0)
+
+  // Converted: the juice line (suggested supplier Pran) becomes a pre-approved purchase order; the rice line has no
+  // suggested supplier, so it goes out for quotes on a new RFQ.
+  await page.goto('/admin/purchasing/requisitions')
+  await page.getByRole('table', { name: 'Requisitions' }).getByRole('link', { name: /PR-000001/ }).click()
+  await expect(page.getByText('Approved').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Convert' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Convert PR-000001' })
+  await dialog.getByRole('button', { name: 'Convert', exact: true }).click()
+  const created = page.getByRole('dialog', { name: 'PR-000001 converted' }).getByRole('list', { name: 'Created purchase orders' })
+  await expect(created.getByRole('link')).toHaveCount(1)
+  await expect(page.getByRole('dialog', { name: 'PR-000001 converted' })).toContainText('RFQ-000002')
+  await created.getByRole('link').first().click()
+  await expect(page.getByText('Pre-approved').first()).toBeVisible()
+})

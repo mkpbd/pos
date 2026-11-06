@@ -52,7 +52,8 @@ class ReorderSuggestions
 
         $preferred = $this->preferredCatalog($organizationId, $ids);
         $onOrder = $this->openOrderQuantities($organizationId, $storeId, $ids, [PurchaseOrderStatus::Ordered, PurchaseOrderStatus::PartiallyReceived]);
-        $drafts = $this->openOrderQuantities($organizationId, $storeId, $ids, [PurchaseOrderStatus::Draft]);
+        // Not yet committed to a supplier (SC2: orders waiting for approval count as drafts).
+        $drafts = $this->openOrderQuantities($organizationId, $storeId, $ids, [PurchaseOrderStatus::Draft, PurchaseOrderStatus::PendingApproval]);
         $source = $this->sourceStore($organizationId, $settings['source_store_id'], $storeId);
 
         // First pass without a source, to find what needs reordering at all.
@@ -239,7 +240,7 @@ class ReorderSuggestions
      * @param  list<string>  $variantIds
      * @return array<string, string>
      */
-    private function lastPurchaseCosts(string $organizationId, array $variantIds): array
+    public function lastPurchaseCosts(string $organizationId, array $variantIds): array
     {
         if ($variantIds === []) {
             return [];

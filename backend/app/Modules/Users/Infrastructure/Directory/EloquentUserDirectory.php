@@ -32,6 +32,20 @@ class EloquentUserDirectory implements UserDirectory
             ->values();
     }
 
+    public function active(string $organizationId, array $userIds): Collection
+    {
+        if ($userIds === []) {
+            return collect();
+        }
+
+        return User::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $organizationId)
+            ->where('status', UserStatus::Active->value)
+            ->whereKey(array_values(array_unique($userIds)))
+            ->get()
+            ->values();
+    }
+
     public function names(string $organizationId, array $userIds): array
     {
         if ($userIds === []) {

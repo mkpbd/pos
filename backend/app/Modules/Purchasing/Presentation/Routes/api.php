@@ -1,8 +1,11 @@
 <?php
 
+use App\Modules\Purchasing\Presentation\Http\Controllers\ApprovalController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\GoodsReceiptController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\PurchaseOrderController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\ReorderSuggestionController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\RequisitionController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\RfqController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierPaymentController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierProductController;
 use Illuminate\Support\Facades\Route;
@@ -40,4 +43,41 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::get('reorder-suggestions', [ReorderSuggestionController::class, 'index'])->middleware('can:purchases.view');
     Route::post('reorder-suggestions/purchase-orders', [ReorderSuggestionController::class, 'purchaseOrders'])->middleware(['can:purchases.manage', 'idempotent']);
     Route::post('reorder-suggestions/transfers', [ReorderSuggestionController::class, 'transfers'])->middleware(['can:inventory.transfer', 'idempotent']);
+
+    // SC2: approval limits, purchase order approval, requisitions, RFQs and the approvals inbox.
+    // Routes without a `can:` guard check "any of" permissions in the controller.
+    Route::get('approval-settings', [ApprovalController::class, 'settings']);
+    Route::patch('approval-settings', [ApprovalController::class, 'updateSettings'])->middleware('can:purchases.settings');
+    Route::get('approvals', [ApprovalController::class, 'index']);
+
+    Route::post('orders/{order}/submit', [PurchaseOrderController::class, 'submit'])->middleware(['can:purchases.manage', 'idempotent']);
+    Route::post('orders/{order}/approve', [PurchaseOrderController::class, 'approve'])->middleware('idempotent');
+    Route::post('orders/{order}/reject', [PurchaseOrderController::class, 'reject'])->middleware('idempotent');
+
+    Route::post('reorder-suggestions/requisitions', [ReorderSuggestionController::class, 'requisitions'])->middleware(['can:purchases.request', 'idempotent']);
+
+    Route::get('requisitions', [RequisitionController::class, 'index']);
+    Route::get('requisitions/estimates', [RequisitionController::class, 'estimates']);
+    Route::post('requisitions', [RequisitionController::class, 'store'])->middleware('can:purchases.request');
+    Route::get('requisitions/{requisition}', [RequisitionController::class, 'show'])->whereUuid('requisition');
+    Route::put('requisitions/{requisition}', [RequisitionController::class, 'update'])->whereUuid('requisition');
+    Route::post('requisitions/{requisition}/submit', [RequisitionController::class, 'submit'])->whereUuid('requisition')->middleware('idempotent');
+    Route::post('requisitions/{requisition}/approve', [RequisitionController::class, 'approve'])->whereUuid('requisition')->middleware('idempotent');
+    Route::post('requisitions/{requisition}/reject', [RequisitionController::class, 'reject'])->whereUuid('requisition')->middleware('idempotent');
+    Route::post('requisitions/{requisition}/cancel', [RequisitionController::class, 'cancel'])->whereUuid('requisition')->middleware('idempotent');
+    Route::post('requisitions/{requisition}/convert', [RequisitionController::class, 'convert'])->whereUuid('requisition')->middleware(['can:purchases.manage', 'idempotent']);
+
+    Route::get('rfqs', [RfqController::class, 'index'])->middleware('can:purchases.view');
+    Route::post('rfqs', [RfqController::class, 'store'])->middleware('can:purchases.manage');
+    Route::get('rfqs/{rfq}', [RfqController::class, 'show'])->whereUuid('rfq')->middleware('can:purchases.view');
+    Route::put('rfqs/{rfq}', [RfqController::class, 'update'])->whereUuid('rfq')->middleware('can:purchases.manage');
+    Route::post('rfqs/{rfq}/suppliers', [RfqController::class, 'invite'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
+    Route::delete('rfqs/{rfq}/suppliers/{supplierId}', [RfqController::class, 'removeSupplier'])->whereUuid(['rfq', 'supplierId'])->middleware('can:purchases.manage');
+    Route::get('rfqs/{rfq}/suppliers/{supplierId}/pdf', [RfqController::class, 'pdf'])->whereUuid(['rfq', 'supplierId'])->middleware('can:purchases.view');
+    Route::post('rfqs/{rfq}/send', [RfqController::class, 'send'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
+    Route::post('rfqs/{rfq}/quotes', [RfqController::class, 'quote'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
+    Route::get('rfqs/{rfq}/comparison', [RfqController::class, 'comparison'])->whereUuid('rfq')->middleware('can:purchases.view');
+    Route::post('rfqs/{rfq}/award', [RfqController::class, 'award'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
+    Route::post('rfqs/{rfq}/close', [RfqController::class, 'close'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
+    Route::post('rfqs/{rfq}/cancel', [RfqController::class, 'cancel'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
 });
