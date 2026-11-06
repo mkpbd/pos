@@ -1008,3 +1008,28 @@ test('the dashboard and the reports show the seeded sales history, and a report 
   await page.getByRole('link', { name: /Profit and loss/ }).first().click()
   await expect(page.getByTestId('pnl-statement')).toContainText('Net profit')
 })
+
+test('with AI switched off the insights still show their figures and the assistant says it is off', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin AI flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
+
+  // AI is off by default (AI_ENABLED=false): the deterministic facts are real, only the narratives are missing.
+  await page.goto('/admin/ai?tab=business')
+  await expect(page.getByTestId('ai-off-notice')).toContainText('AI summaries are turned off')
+  await expect(page.getByText(/Net sales/).first()).toBeVisible()
+
+  await page.goto('/admin/ai?tab=customers')
+  await expect(page.getByText(/Champions|Loyal|Potential|New|At risk|Hibernating/).first()).toBeVisible()
+
+  await page.goto('/admin/ai?tab=ask')
+  await expect(page.getByTestId('ask-unavailable')).toContainText('turned off for your organization')
+
+  // Nothing else depends on AI: the dashboard and a report still answer.
+  await page.goto('/admin/reports/sales_daily')
+  await expect(page.getByTestId('report-totals')).toBeVisible()
+})

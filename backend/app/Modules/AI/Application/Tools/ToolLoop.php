@@ -3,7 +3,6 @@
 namespace App\Modules\AI\Application\Tools;
 
 use App\Modules\AI\Domain\Contracts\LanguageModel;
-use App\Modules\AI\Domain\Llm\Completion;
 use App\Modules\AI\Domain\Llm\CompletionOptions;
 use App\Modules\AI\Domain\Llm\Conversation;
 use App\Modules\AI\Domain\Llm\Message;

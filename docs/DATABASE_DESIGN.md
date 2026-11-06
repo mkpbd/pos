@@ -416,8 +416,58 @@ Stock movements, expiry, expenses and dues use existing indexes:
 
 Daily summary tables or materialized views (the original plan) are deferred until PostgreSQL `EXPLAIN` on production-sized data shows the aggregates need them. **The indexes and the report SQL have not run on PostgreSQL yet.**
 
-### Phase 8 — AI
-- `ai_conversations`, `ai_messages` (prompt/response metadata, token usage, no raw financial dumps), `ai_insights` (cached summaries)
+### Phase 8 — AI (AI1)
+
+One migration, `AI/Infrastructure/Database/Migrations/2026_11_10_100000_create_ai_tables` (additive, new tables only). UUID keys, timestamps timestamptz, foreign keys `RESTRICT` unless noted, users `SET NULL`. Nothing is stored that the model was shown or answered: no questions, prompts, answers or result rows.
+
+`ai_settings` — one row per organization, created on the first save (no row = defaults):
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `organization_id` | uuid | unique |
+| `enabled` | boolean, default true | the organization switch (AI also needs `AI_ENABLED` and a provider) |
+| `monthly_token_budget` | bigint NULL | NULL = `AI_MONTHLY_TOKEN_BUDGET`; 0 = unlimited |
+| `data_sharing_level` | varchar(20), default `aggregates` | PostgreSQL CHECK `ai_settings_sharing_check` (`aggregates` only in AI1) |
+| `updated_by` | uuid NULL → users (`SET NULL`) | |
+
+`ai_requests` — usage and audit log, one row per model-backed request (also failed ones; requests refused because AI is off are not logged). Append-only by convention; `created_at` only:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `organization_id` | uuid | |
+| `user_id` | uuid NULL → users (`SET NULL`) | NULL for the daily job |
+| `feature` | varchar(30) | `ask`, `explain_reorder`, `insights`, `daily_insights`, `customer_insights` |
+| `intent` | varchar(255) NULL | tool / report keys used, comma-separated |
+| `params` | json NULL | `[{tool, params, ok}]`, ≤ 20 calls, validated scalar parameters only |
+| `input_tokens`, `output_tokens` | unsigned int | input includes cache creation and cache reads |
+| `model` | varchar(100) NULL | |
+| `status` | varchar(20) | `ok` \| `refused` \| `failed` |
+| `duration_ms` | unsigned int | |
+| `error_code` | varchar(50) NULL | `AiUnavailable` reason, `AI_BUDGET_EXCEEDED` or `error` |
+| `summary` | varchar(255) NULL | redacted ("2 tool call(s), 3 round(s), answer 412 chars"; "narrative 640 chars") |
+
+Indexes `(organization_id, created_at)` (monthly budget sum) and `(organization_id, feature, created_at)` (usage by feature).
+
+`ai_insights` — cached business insights of a whole scope:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `organization_id` | uuid | |
+| `scope_key` | varchar(36) | `all` or the branch id (a NULL branch would defeat the unique key) |
+| `branch_id` | uuid NULL → branches | |
+| `period` | varchar(10) | PostgreSQL CHECK `ai_insights_period_check` (`daily`, `monthly`) |
+| `period_date` | date | the day, or the first of the month; organization-local |
+| `with_cost` | boolean | facts computed with cost figures (served only to users with `products.view_cost`) |
+| `facts` | json | the deterministic facts |
+| `narrative` | text NULL | |
+| `narrative_status` | varchar(20) | `ok`, `disabled`, `unavailable`, `budget_exceeded`, `refused`, `empty` |
+| `model` | varchar(100) NULL | |
+| `input_tokens`, `output_tokens` | unsigned int | |
+| `generated_at` | timestamptz | |
+
+Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_date, with_cost)`: the daily job and concurrent first reads insert with `INSERT … ON CONFLICT DO NOTHING` (`insertOrIgnore`), so a scope-day is computed once. Only closed periods are stored; a row with a missing narrative is completed in place once AI is available. Running periods and multi-branch scopes use the cache store (15 min; customer insights 1 h), not the database.
+
+`json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. **The CHECKs and the migration have not run on PostgreSQL yet.**
 
 ## 3. Indexing strategy
 

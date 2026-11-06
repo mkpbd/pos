@@ -2,6 +2,7 @@
 
 namespace App\Modules\AI\Application\Services;
 
+use App\Modules\AI\Application\Support\Figures;
 use App\Modules\AI\Domain\Exceptions\AiBudgetExceeded;
 use App\Modules\AI\Infrastructure\Models\AiRequest;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
@@ -78,7 +79,7 @@ final class UsageMeter
             'input_tokens' => $input,
             'output_tokens' => $output,
             'remaining_tokens' => $budget === 0 ? null : max(0, $budget - $used),
-            'used_pct' => $budget === 0 ? null : round(min(100, $used * 100 / $budget), 1),
+            'used_pct' => $budget === 0 ? null : Figures::percent((string) $used, (string) $budget),
             'requests' => array_sum(array_column($byFeature, 'requests')),
             'failed_requests' => array_sum(array_column($byFeature, 'failed')),
             'by_feature' => $byFeature,

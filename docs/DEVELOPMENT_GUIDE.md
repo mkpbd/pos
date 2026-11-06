@@ -94,6 +94,14 @@ The daily reorder alert (SC1) runs hourly from 07:00 organization time; to send 
 
 The quotes-overdue reminder (SC2) also runs hourly from 07:00 organization time; to run it now: `php artisan purchasing:rfq-reminders --any-hour` (prints "Sent N RFQ reminder(s)."; it only reminds about `sent` RFQs whose reply-by date is before today with suppliers that have not answered, once per RFQ and day — the seeded `RFQ-000001` replies by 5 days after seeding, so a fresh seed sends nothing). After pulling SC2, run `php artisan migrate` and `php artisan pos:permissions:sync` (new `purchases.request`, `purchases.approve`, `purchases.approve_high`, `purchases.settings` and the changed Branch Manager / Inventory Manager / Cashier lists), or `php artisan migrate:fresh --seed` for the demo requisitions and RFQ. Sign in as `cashier@demo.test` to raise a requisition (*Requisitions* in the sidebar) and as `owner@demo.test` to approve it (*Purchasing → Approvals*). RFQ e-mails are queued, so they go out only while `php artisan queue:work` runs (or with `QUEUE_CONNECTION=sync`); the seeded suppliers have no e-mail address — add one to a supplier to try it (with the `log` mailer the message ends up in `storage/logs/laravel.log`). Sending to a supplier with an address and the PDF download need the X1 PDF renderer (see above).
 
+AI (Phase 8 / AI1) is off by default and every other screen works without it; *AI Insights* still shows its deterministic facts. To try it:
+
+- **Without a key (UI only):** in `backend/.env` set `AI_ENABLED=true` and `AI_PROVIDER=fake` (allowed only when `APP_ENV` is not `production`). Every model call then answers the fixed text "This is a test answer." without calling tools, so Ask shows that text with no report table, and the insight pages show it as their summary. Useful for checking the screens, settings, usage and budget; not for answers.
+- **With a key:** `AI_ENABLED=true`, `AI_PROVIDER=anthropic`, `AI_API_KEY=<your key>` (optionally `AI_MODEL`, default `claude-sonnet-5-5`). Never commit the key; `backend/.env` is git-ignored. Then `php artisan config:clear` if the config is cached. Sign in as `owner@demo.test` → *AI Insights* → *Ask* ("How were sales in the last 7 days?", "আজকের বিক্রি কত?"), *Business* (yesterday / this month), *Customers*; *Purchasing → Reorder* → *Explain with AI*; *Organization → AI* for the switch, budget and usage. Calls go to `api.anthropic.com` and cost tokens.
+- `php artisan ai:daily-insights --any-hour` stores yesterday's insights now (once per organization / branch and day; `--date=Y-m-d` for another closed day).
+- After pulling Phase 8: `php artisan migrate` (AI tables) and `php artisan pos:permissions:sync` (`ai.ask`, `ai.insights`, `ai.manage`).
+- Tests never call the provider: `phpunit.xml` forces AI off and the AI tests use a scripted model.
+
 ### 3. Frontend
 
 ```powershell
@@ -158,4 +166,6 @@ Selling needs an open register session (Phase 6). After seeding, the demo cashie
 | `ORGANIZATION_CONTEXT_REQUIRED` as platform admin | Tenant endpoints need `X-Organization-Id` for platform admins. |
 | A new permission does not show up in a built-in role | Run `php artisan pos:permissions:sync`. |
 | `composer install` fails with "requires php ^8.4" | PHP 8.3 is first on `PATH`; prepend `C:\laragon\bin\php\php-8.4.16-nts-Win32-vs17-x64`. |
+| *Ask* says AI is unavailable / `503 AI_UNAVAILABLE` | `AI_ENABLED` not `true`, no `AI_API_KEY` (with `AI_PROVIDER=anthropic`), `AI_PROVIDER=fake` with `APP_ENV=production`, the organization switched AI off (*Organization → AI*), or a cached config (`php artisan config:clear`). `details.reason` says which (`disabled`, `not_configured`, `provider_auth`, `timeout`, …). |
+| `429 AI_BUDGET_EXCEEDED` | The organization used its monthly token budget; raise it under *Organization → AI* (`0` = unlimited). |
 | PDF export answers 503 `PDF_UNAVAILABLE` | `backend/pdf-renderer/node_modules` missing (`PUPPETEER_SKIP_DOWNLOAD=1 npm ci` there), no Chromium (`npx playwright install chromium`, or set `PDF_CHROME_PATH`), or `node` not on the server process's `PATH` (`PDF_NODE_BINARY`). Render failures are logged as "PDF rendering failed.". |

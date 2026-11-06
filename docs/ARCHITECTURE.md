@@ -63,6 +63,7 @@ Code every module may depend on. Kept small and stable.
 | `Application/Support/Changes` | Before/after diff for audit entries. |
 | `Application/Export/*`, `Infrastructure/Export/*`, `Infrastructure/Http/Exports/*` | List exports to Excel and PDF (X1, §3p): `ListExporter`, `ListExport`, `RowSource`, `FilterSummary`, writers, `PdfRenderer`. |
 | `Application/Contracts/DocumentLetterhead` | Organization details and logo printed on generated documents (implemented by Organizations, decorated by Storefront). |
+| `Application/Contracts/AiFeatures` | Whether AI may be used for an organization (`/auth/me` `ai_enabled`); default `Support/NoAiFeatures` (false), bound to the AI module's `AiGate` when it is registered (Phase 8). |
 
 ### Module registration
 
@@ -336,10 +337,10 @@ Slice 3, the last of the supply chain track. Purchasing owns charges, vouchers a
 
 Module `Reports`: read models only, no tables and no writes. The dashboard cache is its only state. Endpoints and formulas: [API_DOCUMENTATION.md § Reports](API_DOCUMENTATION.md#reports-and-dashboard-phase-7).
 
-- **Registry = whitelist.** `ReportRegistry::REPORTS` lists the 17 report classes (`Application/Reports/*`, contract `Application\Contracts\Report`: `definition()` + `run(ReportContext)`).
+- **Registry = whitelist.** `ReportRegistry::REPORTS` lists the 18 report classes (17 in Phase 7; `sales_by_customer` added in Phase 8) (`Application/Reports/*`, contract `Application\Contracts\Report`: `definition()` + `run(ReportContext)`).
   - A `ReportDefinition` holds key, title, group, permission, typed `ReportParam`s (`date|entity|enum|integer|boolean`), `ReportColumn`s (type, `cost_sensitive`, `sortable`), default sort, totals, paginated and granularity.
   - `GET /reports` serves the definitions the user may run; `GET /reports/{key}` runs one. Nothing else can run.
-  - **Phase 8 natural-language reporting will choose a key and parameters from this registry** and call the same runner ([AI_INTEGRATION.md](AI_INTEGRATION.md)). The model never writes SQL.
+  - **Phase 8 natural-language reporting chooses a key and parameters from this registry** (one tool per definition the user may run) and calls the same runner ([§ 9](#9-optional-ai-module-phase-8--ai1)). The model never writes SQL.
 - **Read-model exception.** Report classes read other modules' tables directly through the query builder. Going through directories would make filtering and aggregation in SQL impossible. The rules:
   - read-only;
   - always `organization_id` = the tenant, and `ReportContext::scopeBranches()` on the document's branch column;
@@ -347,8 +348,8 @@ Module `Reports`: read models only, no tables and no writes. The dashboard cache
   - the database groups the rows, and PHP then merges, sorts and pages them. `stock_movements` is the exception: it can be long, so it returns a query that the runner sorts and pages in SQL and that exports stream in chunks.
 
   `low_stock` (and the dashboard) also calls Purchasing's `ReorderSuggestions` for suggested quantities, which is not a published contract.
-- **One pipeline.** `ParameterResolver` validates shape, applies defaults, checks the range (366 days for daily rows, five years otherwise, `RANGE_TOO_LARGE`) and checks entities: ids of the organization, branch or store accessible, else 422. It resolves the branch scope = accessible branches ∩ `branch_id`, and a category with its descendants. `ReportRunner` builds the `ReportContext`, runs the report, strips cost-sensitive keys without `products.view_cost` (`meta.omitted_columns`), validates the sort against visible sortable columns, and pages. The reports page, exports and the dashboard all use this path, and Phase 8 will too.
-- **One sales definition.** `Support\SalesFacts::aggregate(ctx, dims)` is the only definition of sales. It runs four aggregate queries (POS lines, POS returns, delivered web order lines, refunded web return lines) plus two for delivery income, groups them by any of `day, month, branch, store, product, category, brand, cashier, channel, tax_rate`, and merges them per group with `Decimal`. The sales reports, P&L, tax and the dashboard all call it, so their figures agree.
+- **One pipeline.** `ParameterResolver` validates shape, applies defaults, checks the range (366 days for daily rows, five years otherwise, `RANGE_TOO_LARGE`) and checks entities: ids of the organization, branch or store accessible, else 422. It resolves the branch scope = accessible branches ∩ `branch_id`, and a category with its descendants. `ReportRunner` builds the `ReportContext`, runs the report, strips cost-sensitive keys without `products.view_cost` (`meta.omitted_columns`), validates the sort against visible sortable columns, and pages. The reports page, exports, the dashboard and the Phase 8 AI tools all use this path.
+- **One sales definition.** `Support\SalesFacts::aggregate(ctx, dims)` is the only definition of sales. It runs four aggregate queries (POS lines, POS returns, delivered web order lines, refunded web return lines) plus two for delivery income, groups them by any of `day, month, branch, store, product, category, brand, cashier, channel, tax_rate, customer` (`customer` since Phase 8; walk-ins NULL), and merges them per group with `Decimal`. The sales reports, P&L, tax and the dashboard all call it, so their figures agree.
 - **Revenue recognition.**
   - POS revenue is recognised at `sold_at` for completed sales. Returns reduce the period in which they are completed (`decided_at`), not the period of the sale. Cancelled sales are excluded entirely.
   - **Online revenue is recognised on delivery** (`delivered_at` of `delivered` orders): goods after discounts, excluding tax. Shipping and COD fees are *delivery income*, shown separately. Refunds reduce the period of `refunded_at`.
@@ -415,10 +416,10 @@ Versioned REST under `/api/v1`, one envelope for every response, OpenAPI generat
 
 ## 7. Asynchronous work
 
-- **Queues** (Redis in staging/production, database driver locally): notifications, report exports, low-stock checks, AI summaries. List and report exports (X1, §3p; Phase 7, §3t) are synchronous downloads, bounded by their row limits.
+- **Queues** (Redis in staging/production, database driver locally): notifications, report exports, low-stock checks. AI narratives are written synchronously in the request or by the scheduled `ai:daily-insights` (Phase 8). List and report exports (X1, §3p; Phase 7, §3t) are synchronous downloads, bounded by their row limits.
 - **Events/listeners:** cross-module reactions; listeners that touch external systems are queued. Events raised inside financial transactions implement `ShouldDispatchAfterCommit` (first one: `StockFellBelowReorderLevel` → queued `NotifyLowStock`).
 - **In-app notifications** use Laravel's database channel (`notifications` table, UUID ids, JSON payload with a `type` and an in-app `link` or `url`); the SPA bell polls the unread count every 60 s and opens `url` (else `link`) when it is a same-origin path. E8a: "New online order" (`orders.new_online_order`) to every active user with `web_orders.view`; the order confirmation e-mail is a queued mail notification sent after the placement commits.
-- **Scheduler:** daily summaries, expiry alerts, idempotency-key cleanup, cash-register reminders; hourly storefront product stats (E6); daily `cart:prune` of expired guest carts (E7); `orders:expire-pending` every minute (E8a, see §3h). `purchasing:reorder-notifications` hourly, effective once per store and organization-local day from 07:00 (SC1, §3q). `purchasing:rfq-reminders` hourly, effective once per RFQ and organization-local day from 07:00 (SC2, §3r).
+- **Scheduler:** daily summaries, expiry alerts, idempotency-key cleanup, cash-register reminders; hourly storefront product stats (E6); daily `cart:prune` of expired guest carts (E7); `orders:expire-pending` every minute (E8a, see §3h). `purchasing:reorder-notifications` hourly, effective once per store and organization-local day from 07:00 (SC1, §3q). `purchasing:rfq-reminders` hourly, effective once per RFQ and organization-local day from 07:00 (SC2, §3r). `ai:daily-insights` every 30 minutes, effective once per organization / branch scope and day from 07:30 organization time (Phase 8, §9).
 - **RFQ e-mails** (SC2, §3r) are queued mail notifications with the PDF attached; without a queue worker they are not delivered (the RFQ still shows them as e-mailed).
 - Request id is propagated to jobs through Laravel `Context`.
 
@@ -444,9 +445,19 @@ e2e/              Playwright specs
 - **Visual theme** lives in `src/index.css` as CSS variables (light on `:root`, dark on `.dark`) mapped into Tailwind with `@theme inline`. Beyond the shadcn tokens it defines `canvas` (page background behind cards), `heading`, `topbar*`, soft status colours (`success`, `warning`, `info` with `*-soft-foreground`) and the shell sizes `--topbar-height` / `--sidebar-width` (utilities `h-topbar`, `w-sidebar`, `md:ml-sidebar`). The shell is a full-width purple top bar over a fixed icon sidebar; cards are flat with a hairline shadow and uppercase titles; status badges use the soft variants (`success`, `warning`, `info`, `soft`, `destructive`). Font: Plus Jakarta Sans (self-hosted via Fontsource, no external font requests). Colour pairs are chosen for WCAG AA text contrast in both themes.
 - Receipts print from the browser: the receipt is rendered into a print-only portal with an `@page` size for 58 mm or 80 mm thermal rolls or A4. Cash drawers wired to the receipt printer open through the printer driver's "open drawer on print" setting; browsers cannot drive a drawer directly.
 
-## 9. Optional AI module
+## 9. Optional AI module (Phase 8 / AI1)
 
-Provider-independent, disabled-by-default, read-only with respect to business data. See [AI_INTEGRATION.md](AI_INTEGRATION.md).
+Provider-independent, disabled by default, read-only with respect to business data. Full design as built: [AI_INTEGRATION.md](AI_INTEGRATION.md); endpoints: [API_DOCUMENTATION.md § AI](API_DOCUMENTATION.md#ai-assistant-and-insights-phase-8--ai1).
+
+- **Contract.** `AI\Domain\Contracts\LanguageModel::complete(Conversation, tools, CompletionOptions): Completion` with provider-neutral value objects (`Domain\Llm`). Bound per request by `AIServiceProvider`: `AnthropicLanguageModel` (Claude Messages API over Laravel's HTTP client, no SDK), `NullLanguageModel` (AI off / no key: every call → `503 AI_UNAVAILABLE`), `FakeLanguageModel` (tests; `AI_PROVIDER=fake` outside production).
+- **Gate.** `AiGate` = `AI_ENABLED` × provider configured × the organization's `ai_settings.enabled`. It implements Shared's `AiFeatures`, so `/auth/me` reports `ai_enabled` without the Authentication module knowing the AI module (default binding `NoAiFeatures`).
+- **Tools are the only data path.** `Toolbox::forUser()` builds one tool per registry report the user may run (`ReportRegistry::visibleTo`, run through `ReportRunner::run()` with `ParameterResolver`, branch scope and cost stripping as on the reports page), plus `dashboard_kpis`, `reorder_suggestions` (SC1, `StoreAccess`) and the analytics `sales_anomalies`, `slow_movers`, `shortage_risk`, each behind its permission. Schemas reject unknown keys; a rejected call is a tool error, nothing runs. `ToolLoop` runs server-side, at most `AI_MAX_TOOL_ROUNDS` rounds, then a final call with `tool_choice: none`. No tool writes.
+- **Least data.** ≤ 50 rows + totals per tool; phone, e-mail, customer id and code removed; customer names → `Customer #n`; customer insights send segment aggregates only; facts drop product / store / branch ids. `ai_requests` keeps metadata and validated parameters, never questions, answers, prompts or rows.
+- **Deterministic first.** `InsightsCalculator` (KPIs vs the previous period, top movers, z-score anomalies, margin drop, return spike, slow movers, shortage risk), `RfmScorer` + `LoyaltySuggestions` and the SC1 suggestions compute every number; the model writes a narrative from them (`NarrativeWriter`). Insight pages never fail because of AI: facts with `narrative: null` and a `narrative_status`.
+- **Metering.** `AiRunner` wraps every model-backed request: gate (off → 503, not logged) → monthly budget (`UsageMeter`, organization month; over → `429 AI_BUDGET_EXCEEDED`) → call → one `ai_requests` row, also on failure.
+- **Caching.** Closed-period business insights per organization or branch scope × day × cost visibility in `ai_insights` (computed by `InsightsReader`, a permission-limited non-person reader), filled for yesterday by `ai:daily-insights` from 07:30 organization time; running periods and multi-branch scopes 15 min in the cache store; customer insights 1 h.
+- **Cross-module reads.** Reports (`ReportRegistry`, `ReportRunner`, `Dashboard`; new `SalesFacts` `customer` dimension and `sales_by_customer` report), Purchasing `ReorderSuggestions` (not a published contract, as in `low_stock`), Inventory `StoreAccess`, Loyalty `LoyaltyBalances` (new contract), Customers `CustomerDirectory`, Branches / Organizations directories. Nothing calls the AI module except through `AiFeatures`.
+- **Failure isolation.** Provider errors after retries become `AiUnavailable`; timeouts are per attempt (`AI_TIMEOUT`); no AI call happens inside a business transaction or on a POS write path.
 
 ## 10. Technology versions
 
@@ -470,4 +481,4 @@ Provider-independent, disabled-by-default, read-only with respect to business da
 | Rounding disputes | Single pricing service, `Money` VO, documented rounding (per line, half away from zero), golden-value tests. |
 | Offline POS terminals | Out of scope for v1; terminals require connectivity. Hold/resume drafts are server-side. |
 | Very new toolchain (TS 7, Vite 8, React Router 8) | Pinned lockfiles; upgrade only with green test suite. |
-| AI misuse | No SQL generation, whitelisted report intents, permission-checked tools, no write actions without user confirmation. |
+| AI misuse | No SQL generation; tools generated from the report registry and the user's permissions, scope-checked by `ParameterResolver` / `StoreAccess`; no write tools; least-data payloads; monthly token budget per organization; prompts treat data as data. |

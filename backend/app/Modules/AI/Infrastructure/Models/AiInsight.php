@@ -3,6 +3,7 @@
 namespace App\Modules\AI\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $scope_key
  * @property ?string $branch_id
  * @property string $period
- * @property \Carbon\CarbonImmutable $period_date
+ * @property CarbonImmutable $period_date
  * @property bool $with_cost
  * @property array<string, mixed> $facts
  * @property ?string $narrative
@@ -25,7 +26,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $model
  * @property int $input_tokens
  * @property int $output_tokens
- * @property \Carbon\CarbonImmutable $generated_at
+ * @property CarbonImmutable $generated_at
  */
 #[Table('ai_insights')]
 #[Fillable(['organization_id', 'scope_key', 'branch_id', 'period', 'period_date', 'with_cost', 'facts', 'narrative', 'narrative_status', 'model', 'input_tokens', 'output_tokens', 'generated_at'])]

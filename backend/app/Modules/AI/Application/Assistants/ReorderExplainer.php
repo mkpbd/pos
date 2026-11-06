@@ -4,8 +4,8 @@ namespace App\Modules\AI\Application\Assistants;
 
 use App\Modules\AI\Application\Services\AiGate;
 use App\Modules\AI\Application\Services\NarrativeWriter;
-use App\Modules\AI\Domain\Llm\Usage;
 use App\Modules\AI\Application\Support\ReorderRows;
+use App\Modules\AI\Domain\Llm\Usage;
 use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Purchasing\Application\Queries\ReorderSuggestions;
 use App\Modules\Shared\Application\Contracts\TenantUser;

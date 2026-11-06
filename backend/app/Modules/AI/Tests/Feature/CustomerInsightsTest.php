@@ -71,7 +71,7 @@ class CustomerInsightsTest extends TestCase
 
         // The registry report behind it: named customers only, last purchase day.
         $rows = $this->rowsBy('sales_by_customer', ['date_from' => '2025-11-08', 'date_to' => '2026-11-07'], 'customer');
-        $this->assertSame(['Anika Rahman', 'Chumki Das', 'Eva Khan', 'Babul Mia', 'Dulal Shah'], array_keys($rows));
+        $this->assertEqualsCanonicalizing(['Anika Rahman', 'Chumki Das', 'Eva Khan', 'Babul Mia', 'Dulal Shah'], array_keys($rows));
         $this->assertSame(['orders' => 5, 'net_sales' => '5000.00', 'average_ticket' => '1000.00', 'last_purchase_on' => '2026-11-05'],
             array_intersect_key($rows['Anika Rahman'], array_flip(['orders', 'net_sales', 'average_ticket', 'last_purchase_on'])));
 

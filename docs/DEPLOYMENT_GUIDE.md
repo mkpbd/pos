@@ -47,7 +47,7 @@ LOG_LEVEL=warning
 TRUSTED_PROXIES=10.0.0.0/8
 ```
 
-Secrets (`APP_KEY`, `DB_PASSWORD`, `REDIS_PASSWORD`, AI provider keys) come from the host's secret store or environment, never from the repository.
+Secrets (`APP_KEY`, `DB_PASSWORD`, `REDIS_PASSWORD`, `AI_API_KEY`) come from the host's secret store or environment, never from the repository.
 
 > **`SESSION_DOMAIN` — leave it unset.** Host-only session cookies are what a multi-domain setup needs: the back office and every storefront host (`shop.example.com`, `www.another-shop.com`, …) each get their own cookie. Setting `SESSION_DOMAIN=pos.example.com` makes browsers drop the session cookie on every storefront host (shopper sign-in, cart and checkout then fail with 419). Set it to a common parent (`.example.com`) only if the back office and *all* storefronts live under that parent. Earlier versions of this guide showed `SESSION_DOMAIN=pos.example.com` in the sample; remove it.
 
@@ -211,6 +211,31 @@ Reports and dashboard (Phase 7):
 - No new queue job, scheduled command, rate limiter or dependency (charts are hand-written SVG).
 - **The report SQL and the new indexes have not run on PostgreSQL yet** (PostgreSQL run pending). Run the suite on PostgreSQL and `EXPLAIN ANALYZE` the sales, P&L, tax and dashboard queries on production-sized data before production. Summary tables or materialized views are deferred until then.
 
+AI assistant and insights (Phase 8 / AI1, optional — [AI_INTEGRATION.md](AI_INTEGRATION.md)):
+- **Off by default.** Nothing changes for a deployment that leaves `AI_ENABLED` unset: the assistant answers `503 AI_UNAVAILABLE`, insight pages show their facts without a summary, every other function is unaffected.
+- **Migration** (additive): AI `2026_11_10_100000_create_ai_tables` creates `ai_settings`, `ai_requests`, `ai_insights` (PostgreSQL CHECKs on `period` and `data_sharing_level`). No change to existing tables.
+- **Run `php artisan pos:permissions:sync`.** New permissions `ai.ask`, `ai.insights`, `ai.manage`. The role map changes: Branch Manager `ai.ask` + `ai.insights` (replacing the undefined `ai.*`, which would have matched `ai.manage`), Accountant `ai.ask` + `ai.insights`, Inventory Manager `ai.ask`, Organization Admin through `*`. Until the sync nobody, the Organization Admin included, sees *AI Insights* or the *AI* settings card (built-in roles hold expanded permission lists). Custom roles need the permissions added by hand.
+- **Environment** (backend `.env`, from the secret store):
+
+  ```
+  AI_ENABLED=true
+  AI_PROVIDER=anthropic
+  AI_MODEL=claude-sonnet-5-5
+  AI_API_KEY=<from the secret store>
+  # optional: AI_TIMEOUT=30, AI_MAX_TOOL_ROUNDS=4, AI_MONTHLY_TOKEN_BUDGET=2000000 (0 = unlimited), AI_TOOL_ROW_LIMIT=50,
+  # AI_ASK_RATE_LIMIT=20, AI_MAX_TOKENS=8000, AI_EFFORT=low, AI_REFUSAL_FALLBACK=true, AI_MAX_RETRIES=2,
+  # AI_ANTHROPIC_BASE_URL=https://api.anthropic.com, AI_ANTHROPIC_VERSION=2026-10-21, AI_RETRY_BASE_MS=500, AI_RETRY_MAX_MS=8000
+  ```
+
+  **Never commit the key** (not in `.env.example`, not in the repository, not in CI logs). The application never logs, stores or returns it; provider errors log only status, error type and request id. Rotate it in the provider console if it leaks. `AI_PROVIDER=fake` is ignored in production (no provider is bound). Re-run `php artisan optimize` (config cache) after changing these keys.
+- **Egress:** the API servers (PHP-FPM and the scheduler host) need outbound HTTPS to `api.anthropic.com:443` (or `AI_ANTHROPIC_BASE_URL`). Calls are synchronous in the request. Each attempt times out after `AI_TIMEOUT` seconds (connect ≤ 10 s) and is retried up to `AI_MAX_RETRIES` times with backoff (worst case about 100 s per call with the defaults), and a question makes up to `AI_MAX_TOOL_ROUNDS` + 1 calls. Size the PHP-FPM pool and the proxy / load balancer read timeout for `/api/v1/ai/*` with that in mind, or lower `AI_TIMEOUT` / `AI_MAX_RETRIES`.
+- **The scheduler must run:** `ai:daily-insights` is scheduled every 30 minutes (`withoutOverlapping`) and stores yesterday's daily insight per organization and active branch from 07:30 organization time, once per scope and day (unique key in `ai_insights`). Without it the first reader of a day computes the insight on demand (slower first load). Manual run: `php artisan ai:daily-insights --any-hour [--date=Y-m-d]`. It stores facts even with AI off.
+- **Enabling per organization:** with `AI_ENABLED=true` and a key, AI is on for every organization (`ai_settings.enabled` defaults to true). An Organization Admin turns it off, sets a monthly token budget (empty = `AI_MONTHLY_TOKEN_BUDGET`, `0` = unlimited) and watches usage under *Organization → AI*. When a month's input + output tokens reach the budget, the assistant answers `429 AI_BUDGET_EXCEEDED` until the next month (organization timezone) or a higher budget; one request may end slightly above it. Usage is in `ai_requests` (no questions, answers or result rows are stored).
+- **Rate limit:** `AI_ASK_RATE_LIMIT` (20) requests per minute per user on `/ai/ask` and `/ai/explain-reorder` (limiter `ai`, cache store). Behind a proxy keep `TRUSTED_PROXIES` right as for the other limiters.
+- **Cache:** insights of running periods 15 min and customer insights 1 h in the default cache store (plain arrays; any store works).
+- **Not yet verified:** no call to the live Anthropic API has been made from this codebase (the adapter is tested against recorded responses); make one test question in staging with a real key before enabling AI in production. The AI tables have not run on PostgreSQL yet.
+- No queue job and no new dependency (the provider is called with Laravel's HTTP client).
+
 ## Release steps
 
 ```bash
@@ -218,7 +243,7 @@ Reports and dashboard (Phase 7):
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan storage:link        # once: media and product images under /storage
-php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings; SC3: purchases.landed_cost; Phase 7: reports.view/financial, dashboard.view)
+php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings; SC3: purchases.landed_cost; Phase 7: reports.view/financial, dashboard.view; Phase 8: ai.ask/insights/manage)
 php artisan optimize            # config, routes, events, views cache
 php artisan queue:restart
 (cd pdf-renderer && PUPPETEER_SKIP_DOWNLOAD=1 npm ci)   # PDF exports (X1); needs Node >= 22.12 and a system Chromium
@@ -233,7 +258,7 @@ npm run build                   # publish frontend/dist
 | Process | Command | Supervision |
 |---------|---------|-------------|
 | Queue workers | `php artisan queue:work redis --tries=3 --max-time=3600` | systemd/Supervisor, ≥2 workers |
-| Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`), sends the daily reorder alerts (`purchasing:reorder-notifications`, hourly, from 07:00 organization time, once per store and day) and the quotes-overdue reminders (`purchasing:rfq-reminders`, hourly, from 07:00 organization time, once per RFQ and day) | cron |
+| Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`), sends the daily reorder alerts (`purchasing:reorder-notifications`, hourly, from 07:00 organization time, once per store and day) and the quotes-overdue reminders (`purchasing:rfq-reminders`, hourly, from 07:00 organization time, once per RFQ and day), and caches the daily AI insights (`ai:daily-insights`, every 30 min, from 07:30 organization time, once per organization / branch and day; Phase 8) | cron |
 | Health probe | `GET /api/v1/health` (200 / 503) and `GET /up` | load balancer |
 
 ## Database
@@ -250,3 +275,4 @@ npm run build                   # publish frontend/dist
 - Rate limiters enabled; fail2ban or WAF on login endpoints.
 - Behind a load balancer or reverse proxy: `TRUSTED_PROXIES` lists exactly its addresses (or `*` only when PHP cannot be reached around it), so client IPs and HTTPS are taken from trusted headers only. `SESSION_DOMAIN` unset (or a parent covering every host).
 - Log shipping with `request_id` correlation; alerts on 5xx rate and queue backlog.
+- AI (Phase 8): `AI_API_KEY` only in the secret store; outbound HTTPS limited to `api.anthropic.com`; a monthly token budget set (`AI_MONTHLY_TOKEN_BUDGET` or per organization); alert on `ai_requests` rows with `status = failed` (`provider_auth` = a bad or revoked key).

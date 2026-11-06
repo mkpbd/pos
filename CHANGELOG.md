@@ -4,6 +4,68 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Phase 8 / AI1 — AI assistant, insights and customer segments
+
+An optional AI module for the admin and POS side: questions answered from the report registry, business insights, customer segments and a reorder explanation. It is off by default. Every number comes from deterministic code; the model reads aggregates through read-only tools and writes text. Design as built: [AI_INTEGRATION.md](docs/AI_INTEGRATION.md).
+
+#### Added
+- **AI module** (`app/Modules/AI`):
+  - contract `Domain\Contracts\LanguageModel::complete(Conversation, tools, CompletionOptions): Completion` with provider-neutral value objects (`Domain\Llm`);
+  - providers `AnthropicLanguageModel` (Claude Messages API over Laravel's HTTP client — no SDK; `anthropic-version` `2026-10-21`, top-level `cache_control`, `output_config.effort`, `fallbacks: "default"` with beta `server-side-fallback-2026-07-01`, opaque blocks echoed, retries on 429 / 5xx / connection errors with backoff and `retry-after`, errors → `AiUnavailable`, key never logged), `NullLanguageModel` (AI off / no key) and `FakeLanguageModel` (tests; `AI_PROVIDER=fake` outside production);
+  - `AiGate` (application switch × provider configured × organization switch), `AiRunner` (gate, budget, usage row), `UsageMeter`, `AiRequestLog`, `AiSettingsService`, `NarrativeWriter`, `Prompts`.
+- **Tools** (the only data the model can reach): one per registry report the user may run (`ReportRunner::run()` with `ParameterResolver`, branch scope and cost stripping; `branch` / `store` entity parameters only; `sort` enum; `additionalProperties: false`; ≤ 50 rows + totals), `dashboard_kpis`, `reorder_suggestions` (SC1, `StoreAccess`), `sales_anomalies`, `slow_movers`, `shortage_risk`. Server-side tool loop, at most `AI_MAX_TOOL_ROUNDS` (4) rounds, then a final answer with `tool_choice: none`. Rejected calls go back to the model as tool errors.
+- **Endpoints:**
+  - `POST /ai/ask` (`ai.ask`, 20/min/user): `{question, branch_id?, history?}` → `answer` (Markdown), `report` (key, title, params, columns, rows ≤ 50, totals, total_rows, omitted_columns, `link` to `/reports/<key>?…`) or `null`, `tools_used`, `usage`, `model`, `refused`, `truncated`;
+  - `POST /ai/explain-reorder` (`ai.ask` + `purchases.view`): a prioritised narrative over one store's SC1 suggestions (`nothing_to_explain` without a model call);
+  - `GET /ai/insights?period=daily|monthly&date=&branch_id=` and `GET /ai/customer-insights?branch_id=` (`ai.insights`): facts always, `narrative` + `narrative_status`;
+  - `GET/PATCH /ai/settings`, `GET /ai/usage?month=` (`ai.manage`).
+
+  Shapes and errors: [API_DOCUMENTATION.md § AI](docs/API_DOCUMENTATION.md#ai-assistant-and-insights-phase-8--ai1).
+- **Business insights** (`InsightsCalculator`): KPIs vs the previous period (daily: the day before; monthly: the same number of days of the previous month), top 5 movers up / down, anomalies (|z| ≥ 2.5 against the trailing 28 days, sample σ, ≥ 14 trading days), margin drop (≥ 5 points), return spike (≥ 5 % and double the previous rate), slow movers (stock, no sales in 30 days), shortage risk (SC1 days of cover < lead time).
+- **Customer insights:** RFM over 365 days of `sales_by_customer` (quintile scores, ties shared) → Champions, Loyal, Potential, New, At risk, Hibernating; top 5 per segment masked (name only with `customers.view`, last 3 phone digits); loyalty suggestions by rule (`remind_points`, `win_back_points`, `reward_champions`, `second_purchase`, `enroll_potential`, `reactivate`).
+- **Tables** (`AI/Infrastructure/Database/Migrations/2026_11_10_100000_create_ai_tables`): `ai_settings` (organization switch, budget override, `data_sharing_level` `aggregates`), `ai_requests` (usage and audit: feature, tools, validated parameters, tokens, model, status, duration, error code, redacted summary — no questions, answers, prompts or rows), `ai_insights` (cached closed-period insights per organization / branch × period × day × cost visibility).
+- **Scheduler:** `ai:daily-insights` every 30 min (`withoutOverlapping`), from 07:30 organization time, yesterday's insight per organization and active branch, idempotent; `--any-hour`, `--date=`.
+- **Budget:** per organization per month (organization timezone), default `AI_MONTHLY_TOKEN_BUDGET` 2 000 000, `0` = unlimited; checked before each call → `429 AI_BUDGET_EXCEEDED` (`details.budget`, `used`, `month`).
+- **Config** `config/ai.php` and `.env.example`: `AI_ENABLED` (false), `AI_PROVIDER` (anthropic), `AI_MODEL` (`claude-sonnet-5-5`), `AI_API_KEY`, `AI_TIMEOUT` (30), `AI_MAX_TOOL_ROUNDS` (4), `AI_MONTHLY_TOKEN_BUDGET`, `AI_TOOL_ROW_LIMIT` (50), `AI_ASK_RATE_LIMIT` (20), `AI_MAX_TOKENS` (8000), `AI_EFFORT` (low), `AI_REFUSAL_FALLBACK` (true), `AI_MAX_RETRIES` (2), `AI_ANTHROPIC_BASE_URL`, `AI_ANTHROPIC_VERSION`; `AI_RETRY_BASE_MS` / `AI_RETRY_MAX_MS` in config only.
+- **Permissions:** `ai.ask`, `ai.insights`, `ai.manage`.
+- **Shared** `AiFeatures` contract (default `NoAiFeatures`); **Loyalty** `LoyaltyBalances` contract (`EloquentLoyaltyBalances`); **Reports** `SalesFacts` `customer` dimension and the report `sales_by_customer`.
+- **Admin:**
+  - *AI Insights* (`/ai`, sidebar after *Reports*, `ai.insights` or `ai.ask`), tabs *Ask* (example questions, safe Markdown answer, report table with *Open full report*, tools used, token usage, error states), *Business* (daily / monthly facts, anomalies, slow movers, shortage risk, narrative card), *Customers* (segment cards, masked top customers, suggestions);
+  - *Organization → AI* card (`ai.manage`): switch, monthly budget, data sharing level, usage this month by feature;
+  - *Purchasing → Reorder*: *Explain with AI* side panel;
+  - safe Markdown renderer (`features/ai/markdown.ts`, no new dependency): paragraphs, headings as bold, lists, fenced code, tables, bold / italic / code; raw HTML and links shown as text.
+- Tests: backend 37 new (`AI/Tests`: `SalesAnomaliesTest` 5, `RfmScorerTest` 3, `InsightRulesTest` 4, `AnthropicLanguageModelTest` 7, `AskAiTest` 8, `ToolsAreReadOnlyTest` 1, `BusinessInsightsTest` 4, `CustomerInsightsTest` 1, `AiSettingsAndReorderTest` 3; `Reports/Tests/Feature/SalesByCustomerReportTest` 1). Frontend 35 new Vitest tests (31 in `features/ai`). New mocked Playwright `ai-admin.spec.ts` (6 tests × 2 projects). New full-stack test for AI switched off.
+
+#### Changed
+- **Role map:** Branch Manager `ai.ask` + `ai.insights`, replacing the undefined `ai.*` (which would have granted `ai.manage` once the permission existed); Accountant `ai.ask` + `ai.insights`; Inventory Manager `ai.ask`; Cashier and Online Store Manager none; Organization Admin through `*`. Run `php artisan pos:permissions:sync`.
+- **Reports:** 18th report `sales_by_customer` (customers group, `reports.view`; walk-ins excluded; `gross_profit` cost-sensitive). `GET /reports` lists 18 for Organization Admin, Branch Manager and Accountant, 16 for the Inventory Manager.
+- **`/auth/me`** (and login / registration) returns `ai_enabled`.
+- *Organization* page and sidebar entry open for `organization.view` **or** `ai.manage`.
+- `phpunit.xml` forces `AI_ENABLED=false`, empty `AI_API_KEY` and `AI_PROVIDER=anthropic`.
+
+#### Notes
+- **AI is off by default** (`AI_ENABLED=false`). With AI off, or the organization switched off, or no key: `/ai/ask` and `/ai/explain-reorder` answer `503 AI_UNAVAILABLE` (not logged), the insight pages return their facts with `narrative: null`, and nothing else changes (tested).
+- **The live Anthropic call is not verified yet:** no key on the dev box. The request and response handling follow the Messages API reference and are tested against faked HTTP responses only. Make a test call in staging before enabling AI in production.
+- **Least data:** ≤ 50 rows + totals per tool; `phone`, `email`, `customer_id`, `code` removed; customer names → `Customer #n`; customer insights send segment aggregates only; the dashboard tool leaves out recent transactions.
+- **Deviations from the AI1 brief:**
+  1. A new report `sales_by_customer` was added to the registry as the RFM input, rather than a query of the AI module's own.
+  2. One `AskAssistant` covers the sales and inventory assistant (by its tools) instead of separate assistant classes.
+  3. Insights live in `Application/Insights`; the daily run is an artisan command scheduled every 30 min (effective from 07:30 local) rather than a job class.
+  4. Default model `claude-sonnet-5-5`, effort `low`, server-side refusal fallback on.
+  5. Extra response fields: `narrative_status`, `cached`, `ai_enabled` (insights), `refused`, `truncated`, `total_rows`, `omitted_columns` (ask).
+  6. Narratives are English only (no language parameter); Ask answers in the language of the question.
+  7. The budget is checked before each request, so a request may finish slightly above it.
+  8. Only `branch` / `store` entity parameters are offered to the model (it cannot know product or customer ids).
+  9. The admin does not expose the insights `date` parameter or multi-turn history yet.
+- A cached insight is shared by all users of its scope. Its narrative is written from facts that include shortage risk, which the response hides from users without `purchases.view` (every built-in role with `ai.insights` has it).
+- **Run `php artisan migrate` and `php artisan pos:permissions:sync`** after deploying. Production also needs the scheduler for `ai:daily-insights`, outbound HTTPS to `api.anthropic.com` and `AI_API_KEY` from the secret store ([DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)).
+- Results:
+  - backend 747 tests (741 pass, 6 skipped), Pint clean;
+  - frontend typecheck, lint, build and 875 Vitest tests (116 files);
+  - mocked Playwright 154 pass, 50 skipped (+2 skipped: the new full-stack test on both projects without `E2E_BACKEND`);
+  - full stack 24/24 on desktop against a fresh seed, including the new "with AI switched off the insights still show their figures and the assistant says it is off".
+- Open issues: the **PostgreSQL run is still pending** (AI tables and CHECKs, plus the Phase 7 report SQL). **AI2** (online store: descriptions and SEO with approval, category suggestions, co-purchase recommendations, support assistant) is next.
+
 ### Phase 7 — Reports and dashboard analytics
 
 A registry of 17 whitelisted reports (sales, inventory, purchasing, finance, customers) with typed parameters, a dashboard, and CSV next to Excel and PDF on every export. One shared definition of sales covers POS and web orders. The registry is the list that natural-language reporting (Phase 8 / E13) will choose from.

@@ -58,7 +58,7 @@ final class LoyaltySuggestions
             $add(Segment::Hibernating, 'win_back_points', $n, $p, "Send a win-back message to {$n} hibernating ".self::customers($n)." holding {$p} points.");
         }
         $n = $all(Segment::Champions);
-        $add(Segment::Champions, 'reward_champions', $n, null, "Reward {$n} ".self::customers($n, 'champion')." with bonus points or early access to offers.");
+        $add(Segment::Champions, 'reward_champions', $n, null, "Reward {$n} ".self::customers($n, 'champion').' with bonus points or early access to offers.');
         $n = $all(Segment::New);
         $add(Segment::New, 'second_purchase', $n, null, "Encourage a second purchase from {$n} new ".self::customers($n).'.');
         if ($programEnabled) {

@@ -140,9 +140,11 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `RFQ_LOCKED`, `RFQ_LINES_LOCKED`, `RFQ_EMPTY`, `RFQ_SUPPLIERS_REQUIRED`, `RFQ_NOT_OPEN` | Editing an RFQ that is not a draft; changing the lines of an RFQ raised from a requisition; sending without lines or with fewer than 2 invited suppliers (`details.min`, `invited`); recording a quote on an RFQ that is not sent (`details.status`) (SC2). |
 | 422 | `LANDED_COST_VOUCHER_LOCKED`, `LANDED_COST_VOUCHER_INCOMPLETE` | Editing or deleting a landed cost voucher that is posted; posting one without a charge or a goods receipt (SC3). Posting a posted voucher again (with a new key) → `INVALID_STATUS_CHANGE` (`details.status`). |
 | 422 | `EXPENSE_ON_ACCOUNT` | Voiding an expense booked on a supplier's account by a landed cost voucher (SC3). |
+| 429 | `AI_BUDGET_EXCEEDED` | The organization's monthly AI token budget is used up (`details.budget`, `used`, `month`) (Phase 8, see [AI](#ai-assistant-and-insights-phase-8--ai1)). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
+| 503 | `AI_UNAVAILABLE` | AI is off for the application or the organization, no provider is configured, or the provider failed after retries (`details.reason`). Only the assistant endpoints `/ai/ask` and `/ai/explain-reorder`; insight endpoints return their facts with `narrative: null` (Phase 8). |
 | 503 | `PDF_UNAVAILABLE` | A PDF list export cannot be rendered on this server (Chrome, Node or the renderer's `node_modules` missing, render failure or timeout); Excel still works (X1). Also: sending an RFQ to a supplier with an e-mail address, and the RFQ PDF download (SC2). |
 
 ## Cross-cutting headers
@@ -254,7 +256,7 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | POST | `/auth/tokens` | public | — | Device token: `{email, password, device_name}` → `{token, token_type, expires_at}` (plain token shown once). |
 | POST | `/auth/forgot-password` | public | — | Always 200; e-mails a link to `{FRONTEND_URL}/reset-password?token=…&email=…`. |
 | POST | `/auth/reset-password` | public | — | `{token, email, password, password_confirmation}`; revokes all sessions/tokens. |
-| GET | `/auth/me` | auth | — | User, organization, roles, effective permissions, accessible branches. |
+| GET | `/auth/me` | auth | — | User, organization, roles, effective permissions, accessible branches, `ai_enabled` (Phase 8: AI usable for the organization). |
 | POST | `/auth/logout` | auth | — | Ends the session, or deletes the presented token. |
 | PUT | `/auth/password` | auth | — | `{current_password, password, password_confirmation}`; signs out other sessions/devices. |
 | GET | `/auth/tokens` | auth | — | Own device tokens (`is_current` marks the presented one). |
@@ -437,6 +439,7 @@ POST /api/v1/auth/login                   X-XSRF-TOKEN: <cookie value>
     "organization": { "id": "0193…", "name": "Demo Mart", "base_currency": "BDT", "tax_mode": "exclusive", "…": "…" },
     "roles": [{ "id": "0193…", "name": "Organization Admin", "system_key": "organization_admin" }],
     "permissions": ["audit.view", "branches.access_all", "branches.manage", "…"],
+    "ai_enabled": false,
     "branches": [{ "id": "0193…", "code": "MAIN", "name": "Dhaka Main", "is_active": true }]
   },
   "meta": { "request_id": "0193…" }
@@ -1996,7 +1999,7 @@ New error codes: `LANDED_COST_VOUCHER_LOCKED`, `LANDED_COST_VOUCHER_INCOMPLETE`,
 
 ### Reports and dashboard (Phase 7)
 
-All reports run from one registry of whitelisted definitions (`Reports\Application\ReportRegistry`). The reports page renders from it, and so will the natural-language reporting of Phase 8 / E13. Nothing outside the registry can run.
+All reports run from one registry of whitelisted definitions (`Reports\Application\ReportRegistry`): **18 reports** (17 in Phase 7; `sales_by_customer` added in Phase 8). The reports page renders from it, and the Phase 8 AI assistant turns each definition the user may run into a tool ([§ AI](#ai-assistant-and-insights-phase-8--ai1)). Nothing outside the registry can run.
 
 **Value formats:**
 - money: 2-decimal strings;
@@ -2019,7 +2022,7 @@ The roles receive these after `php artisan pos:permissions:sync`.
 
 | Method | Path | Permission | Description |
 |--------|------|------------|-------------|
-| GET | `/reports` | `reports.view` or `reports.financial` | Report catalog: the definitions this user may run, in catalog order; `meta.groups` = `[{key, label}]` (`sales`, `inventory`, `purchasing`, `finance`, `customers`). Neither permission → 403. |
+| GET | `/reports` | `reports.view` or `reports.financial` | Report catalog: the definitions this user may run (all 18 for Organization Admin, Branch Manager and Accountant; 16 without `reports.financial`), in catalog order; `meta.groups` = `[{key, label}]` (`sales`, `inventory`, `purchasing`, `finance`, `customers`). Neither permission → 403. |
 | GET | `/reports/{key}` | the report's `permission` | Run one report (JSON page), or `?export=xlsx\|csv\|pdf`. Unknown key → 404 `NOT_FOUND`; permission missing → 403. |
 | GET | `/dashboard` | `dashboard.view` | Dashboard (below). |
 
@@ -2092,6 +2095,7 @@ Unknown query parameters are ignored, and defaults are applied. `cashier_id` car
 | `gross_profit` | net_sales − cost; `margin` = gross_profit ÷ net_sales × 100 |
 | `orders` | distinct POS sales + delivered web orders; `average_ticket` = net_sales ÷ orders |
 | Channel | `channel=pos\|online\|all` (default `all`). A `cashier_id` filter leaves web orders out, because they have no cashier. A web order counts for the branch and store it is fulfilled from. |
+| Customer (Phase 8) | the sale's / web order's `customer_id`; walk-in sales have none; returns count against the original document's customer. |
 
 **Reports.** ᶜ = cost-sensitive (needs `products.view_cost`).
 
@@ -2115,6 +2119,7 @@ Common parameters:
 | `low_stock` | inventory · view | Branch, `store_id`, `product_id`, `category_id`, `brand_id`, `supplier_id` | `product`, `sku`, `store`, `on_hand`, `reorder_point`, `shortfall`, `suggested_purchase`, `suggested_transfer`, `supplier` · `-shortfall` | Now: stock-tracked, non-archived variants with on hand ≤ reorder point (> 0). The reorder point is the store's active SC1 rule `min_qty`, else the variant's `reorder_level`; a variant with a rule but no stock row counts as 0. Suggested quantities and the preferred supplier come from the SC1 reorder calculator (0 when it sees nothing to order). Totals: `items`, `suggested_purchase`, `suggested_transfer`. |
 | `expiry` | inventory · view | Branch, `store_id`, `product_id`, `days` (0–3650, default 30), `include_expired` (default true) | `product`, `sku`, `batch`, `expires_on`, `days_left`, `status` (Expired / Expires today / Expiring), `store`, `quantity`, `value`ᶜ · `expires_on` | Batches with stock that expire within `days` of the organization's today, plus those already expired unless `include_expired=0`. Totals: `quantity`, `value`, `batches`, `expired_batches`. |
 | `purchases` | purchasing · view | Range, Branch, `supplier_id`, `product_id`, `group_by` `supplier\|product` (default `supplier`) | `group`, `receipts`, `quantity`, `goods`ᶜ, `tax`ᶜ, `landed_cost`ᶜ, `landed_total`ᶜ, `returned_quantity`, `returns`ᶜ, `net_purchases`ᶜ · `-goods` | Goods receipts by `invoice_date`. goods = Σ line subtotal (excluding tax); landed_cost = receipt charges allocated to the lines + posted voucher allocations to them; landed_total = goods + landed_cost; returns = purchase return lines (excluding tax) in the period; net_purchases = goods − returns. Without cost access, the default sort falls back to `group`. |
+| `sales_by_customer` | customers · view | Range, Branch, `customer_id`, Channel | `customer`, `code`, `orders`, `returns`, `net_sales`, `average_ticket`, `gross_profit`ᶜ, `last_purchase_on` · `-net_sales` | Phase 8. One row per **named** customer with sales in the range: POS sales and delivered web orders, net of returns (returns count against the original document's customer; `SalesFacts` `customer` dimension). Walk-in sales are excluded, so totals cover named customers only. `last_purchase_on` = the organization day of the latest completed sale or delivered web order in the range and scope. Rows also carry `customer_id`. Totals: `orders`, `returns`, `net_sales`, `average_ticket`, `gross_profit`ᶜ. Input of the AI customer insights (RFM). |
 | `customer_dues` | customers · view | Branch, `customer_id` | `customer`, `code`, `phone`, `credit_limit`, `outstanding`, `days_0_30`, `days_31_60`, `days_61_90`, `days_over_90`, `last_payment_on` · `-outstanding` | As of today, the same balance as Sales' customer credit: opening balance + dues of completed sales − returns credited − customer payments. Aging is by sale day; the opening balance falls in "over 90"; credits settle the oldest buckets first; a credit balance leaves every bucket 0. Zero balances are omitted. Opening balances count only when the report covers every branch. Totals add `customers`. `meta.as_of`, `meta.includes_opening_balances`. |
 | `supplier_dues` | purchasing · view | Branch, `supplier_id` | `supplier`, `code`, `phone`, `outstanding`, buckets, `last_payment_on` · `-outstanding` | As of today, the SupplierAccount balance (SC3 included): opening + receipts at `payable_total` + receipt charges billed by the supplier + posted vouchers billed by it − purchase returns − supplier payments. Aging is by invoice / voucher date. Opening balances and payments without a branch count only for all branches. Totals add `suppliers`. Same meta as customer dues. |
 | `payment_collections` | finance · view | Range, Branch, `cashier_id` (who recorded the entry), `method`, Channel, `group_by` `day\|method\|branch\|cashier\|source` (default `method`) | `group`, `entries`, `collected`, `refunded`, `net`, `share` (% of collected) · `-collected` | Payments ledger by entry time. Collected = entries in from `sale`, `customer_payment`, `online_order` (bank transfers confirmed, COD recorded, including COD remittances). Refunded = entries out from `sale_cancellation`, `sale_return`, `online_order_refund`. Drawer cash in/out, expenses and other income are not collections. Channel `pos` = sale and customer-payment sources; `online` = web orders. Sources: POS sales, Customer collections, Online orders; entries without a branch or user are "System". |
@@ -2203,10 +2208,161 @@ Common parameters:
 
 **Errors:** `RANGE_TOO_LARGE` (422) is new. Parameter, sort and branch errors are `VALIDATION_FAILED` on the field. New permissions: `reports.view`, `reports.financial`, `dashboard.view`.
 
+### AI assistant and insights (Phase 8 / AI1)
+
+Optional module ([AI_INTEGRATION.md](AI_INTEGRATION.md)). It is off unless `AI_ENABLED=true`, a provider is configured and the organization has not turned it off. Every route needs `auth:sanctum` + tenant. No route changes business data.
+
+**Permissions** (after `php artisan pos:permissions:sync`):
+
+| Permission | Allows | Holders |
+|------------|--------|---------|
+| `ai.ask` | `POST /ai/ask`; `POST /ai/explain-reorder` (with `purchases.view`) | Organization Admin (`*`), Branch Manager, Accountant, Inventory Manager |
+| `ai.insights` | `GET /ai/insights`, `GET /ai/customer-insights` | Organization Admin, Branch Manager, Accountant |
+| `ai.manage` | `GET/PATCH /ai/settings`, `GET /ai/usage` | Organization Admin |
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| POST | `/ai/ask` | `ai.ask` (throttle `ai`: 20/min/user) | Answer a question from the user's report tools. |
+| POST | `/ai/explain-reorder` | `ai.ask` + `purchases.view` (throttle `ai`) | Narrative over one store's SC1 reorder suggestions. |
+| GET | `/ai/insights` | `ai.insights` | Business insight facts + narrative. Never 503. |
+| GET | `/ai/customer-insights` | `ai.insights` | RFM segments, masked top customers, loyalty suggestions + narrative. Never 503. |
+| GET | `/ai/settings` | `ai.manage` | Organization AI settings. |
+| PATCH | `/ai/settings` | `ai.manage` | Update them (audited `ai.settings_updated`). |
+| GET | `/ai/usage` | `ai.manage` | Token usage of a month. |
+
+`GET /auth/me` (and the login and registration responses) also returns a top-level `ai_enabled` boolean: application switch × provider configured × organization switch.
+
+**Errors:**
+
+| HTTP | `error.code` | When |
+|------|--------------|------|
+| 503 | `AI_UNAVAILABLE` | `/ai/ask`, `/ai/explain-reorder`: AI off or not configured (`details.reason` `disabled` \| `not_configured`), or the provider failed after retries (`timeout` \| `rate_limited` \| `provider_error` \| `provider_auth` \| `provider_rejected`). |
+| 429 | `AI_BUDGET_EXCEEDED` | The organization's monthly token budget is used up. `details: {budget, used, month}`. It renews next month or when an administrator raises the budget. |
+| 429 | `TOO_MANY_REQUESTS` | More than `AI_ASK_RATE_LIMIT` (20) ask / explain requests per minute per user. |
+| 422 | `VALIDATION_FAILED` | The fields below; an unknown or inaccessible `branch_id` / `store_id`; a `date` in the future. |
+| 403 | `FORBIDDEN` | Permission missing. |
+
+**Ask** — `POST /ai/ask`:
+
+```json
+{"question": "Which products sold best this month?", "branch_id": "…",
+ "history": [{"role": "user", "content": "…"}, {"role": "assistant", "content": "…"}]}
+```
+
+- `question`: string, 2–1000 chars. `branch_id`: optional uuid of an accessible branch, the default branch of the question.
+- `history`: optional, ≤ 6 turns `{role: user|assistant, content ≤ 4000 chars}`, alternating, starting with `user` and ending with `assistant` (otherwise 422 on `history`). Nothing is stored on the server.
+
+```json
+{"data": {
+  "answer": "**Net sales this month (1–7 Nov 2026, all branches): ৳45,426.50.** …",
+  "report": {"key": "sales_by_product", "title": "Sales by product",
+             "params": {"date_from": "2026-11-01", "date_to": "2026-11-07", "branch_id": null, "channel": "all", "…": "…"},
+             "columns": [{"key": "product", "label": "Product", "type": "text", "cost_sensitive": false, "sortable": true}, "…"],
+             "rows": [{"product_id": "…", "product": "Butter Cookies 200g", "net_sales": "3320.00", "…": "…"}],
+             "totals": {"net_sales": "…"}, "total_rows": 4, "omitted_columns": [],
+             "link": "/reports/sales_by_product?date_from=2026-11-01&date_to=2026-11-07&channel=all&sort=-net_sales"},
+  "tools_used": [{"name": "sales_by_product", "params": {"date_from": "2026-11-01", "date_to": "2026-11-07", "sort": "-net_sales"}, "ok": true}],
+  "usage": {"input_tokens": 5120, "output_tokens": 310, "rounds": 2},
+  "model": "claude-sonnet-5-5", "refused": false, "truncated": false}}
+```
+
+- `answer`: Markdown (no HTML), in the language of the question (English or Bangla).
+- `report`: the last registry report a tool ran, as the user may see it: ≤ 50 rows, names kept, cost columns per `products.view_cost`, `link` = the admin reports URL with the resolved parameters. `null` when no report ran, the question is unsupported or the model refused.
+- `tools_used`: every tool call. `ok: false` = rejected and not run (unknown tool, invalid parameters, out of scope, no permission). `params` are the validated parameters (the raw scalar arguments for rejected calls).
+- `usage.rounds`: model calls made. `refused: true` → a fixed answer and `report: null`. `truncated: true` → the answer hit `max_tokens`.
+
+**Explain reorder** — `POST /ai/explain-reorder {"store_id": "…"}` (uuid of an active store of an accessible branch; AI is checked before the store):
+
+```json
+{"data": {"narrative": "12 items need attention in Main Store: 3 to buy, …", "status": "ok",
+          "store": {"id": "…", "name": "Main Store", "branch_id": "…", "branch_name": "Dhaka Main"},
+          "items_total": 12, "items_considered": 12, "to_purchase": 3, "to_transfer": 0,
+          "usage": {"input_tokens": 2400, "output_tokens": 380}, "model": "claude-sonnet-5-5", "generated_at": "2026-11-07T09:15:00+00:00"}}
+```
+
+`status`: `ok` | `refused` | `empty` | `nothing_to_explain`. `nothing_to_explain` means the store has no suggestions: a fixed narrative, no model call, zero usage, `model: null`. With `refused` or `empty` the narrative is a fixed sentence. The suggestions themselves are unchanged. At most 50 items are sent to the model (`items_considered`).
+
+**Business insights** — `GET /ai/insights?period=daily|monthly&date=Y-m-d&branch_id=`:
+
+- `period`: default `daily`. `date`: default yesterday (daily) or the current month (monthly; any day of the month); not in the future.
+- `branch_id`: optional, an accessible branch. A user with exactly one branch gets that branch.
+
+```json
+{"data": {
+  "facts": {"period": "daily", "date_from": "2026-11-06", "date_to": "2026-11-06", "previous_from": "2026-11-05", "previous_to": "2026-11-05",
+            "branch_id": null, "timezone": "Asia/Dhaka", "currency": "BDT",
+            "kpis": {"net_sales": {"value": "1530.00", "previous": "1210.00", "change": "320.00", "change_pct": "26.45"},
+                     "orders": {"value": 5, "previous": 4, "change": 1, "change_pct": "25.00"},
+                     "average_ticket": {"…": "…"}, "gross_sales": {"…": "…"}, "returns": {"…": "…"},
+                     "gross_profit": {"…": "with products.view_cost"}, "margin": {"value": "24.84", "previous": "25.10"}},
+            "top_movers": {"up": [{"product_id": "…", "product": "Atta Flour 2kg", "net_sales": "600.00", "previous": "300.00", "change": "300.00"}], "down": []},
+            "anomalies": [{"date": "2026-11-06", "value": "1530.00", "mean": "780.40", "stddev": "210.12", "z_score": "3.57", "direction": "spike", "history_days": 28}],
+            "margin_drop": {"current": "24.84", "previous": "25.10", "change_points": "-0.26", "flagged": false},
+            "return_spike": {"rate": "0.00", "previous_rate": "2.10", "returns": "0.00", "flagged": false},
+            "slow_movers": {"days": 30, "count": 1, "items": [{"product_id": "…", "product": "…", "on_hand": "…", "variants_in_stock": 1, "stock_value": "…"}]},
+            "shortage_risk": {"count": 1, "stores_checked": 1, "items": [{"store_id": "…", "store": "Main Store", "product": "…", "sku": "…", "on_hand": "…",
+                              "avg_daily": "…", "days_of_cover": "1.5", "lead_time_days": 3, "suggested_purchase": "…", "suggested_transfer": "…", "supplier": "…"}]},
+            "omitted": []},
+  "narrative": "- Net sales ৳1,530.00, up 26.45 % on the day before …",
+  "narrative_status": "ok", "ai_enabled": true, "generated_at": "2026-11-07T01:30:04+00:00", "cached": true}}
+```
+
+- KPI `change_pct` is `null` when the previous value is 0. Without `products.view_cost`: no `gross_profit` / `margin` KPIs, `margin_drop` `null`, no `stock_value` on slow movers, and `omitted` = `gross_profit`, `margin`, `margin_drop`, `stock_value`.
+- `shortage_risk` is `null` without `purchases.view`.
+- `narrative_status`: `ok` | `disabled` (AI off or not configured) | `unavailable` (provider failed) | `budget_exceeded` | `refused` | `empty`. `narrative` is `null` unless `ok`.
+- `cached: true` = served from `ai_insights` (a closed period of the organization or of one branch). `false` = computed for a running period or a multi-branch scope and kept 15 min.
+- Formulas: [AI_INTEGRATION.md § Business insights](AI_INTEGRATION.md#business-insights).
+
+**Customer insights** — `GET /ai/customer-insights?branch_id=`:
+
+```json
+{"data": {"ai_enabled": true, "period": {"date_from": "2025-11-08", "date_to": "2026-11-07"}, "branch_id": null,
+  "customers_analyzed": 2, "loyalty_program_enabled": true,
+  "segments": [{"segment": "champions", "label": "Champions", "description": "Bought recently, buy often and spend the most.",
+                "count": 1, "share": "50.00", "net_sales": "12500.00", "average_orders": "8.00", "average_recency_days": "3.0",
+                "average_net_sales": "12500.00", "with_loyalty_points": 1,
+                "top_customers": [{"customer_id": "…", "name": "Rahman Traders", "phone_hint": "…789", "orders": 8, "net_sales": "12500.00",
+                                   "last_purchase_on": "2026-11-04", "recency_days": 3, "loyalty_points": 120, "scores": {"r": 5, "f": 5, "m": 5}}]},
+               "… one entry per segment: champions, loyal, potential, new, at_risk, hibernating …"],
+  "suggestions": [{"segment": "champions", "code": "reward_champions", "customers": 1, "points": null, "value": null,
+                   "message": "Reward 1 champion with bonus points or early access to offers."}],
+  "narrative": null, "narrative_status": "disabled", "generated_at": "2026-11-07T09:15:00+00:00"}}
+```
+
+- Window: 365 days up to today. Customers: named customers with at least one POS sale or delivered web order in the user's scope (`sales_by_customer`).
+- Every segment is listed, also with `count: 0` (averages `null`). Top 5 customers per segment by net sales. `customer_id` and `name` are `null` without `customers.view`; `phone_hint` is the last 3 digits, or `null`.
+- Suggestion codes: `remind_points`, `win_back_points`, `reward_champions`, `second_purchase`, `enroll_potential`, `reactivate`. `points` and `value` (points × point value) are set only on the point-based ones. Rules and RFM formulas: [AI_INTEGRATION.md § Customer insights](AI_INTEGRATION.md#customer-insights-rfm).
+- Cached 1 h per scope, day and `customers.view`.
+
+**Settings** — `GET /ai/settings` (also the `PATCH` response):
+
+```json
+{"data": {"enabled": true, "app_enabled": true, "provider_configured": true, "effective_enabled": true,
+          "provider": "anthropic", "model": "claude-sonnet-5-5",
+          "monthly_token_budget": null, "default_monthly_token_budget": 2000000, "effective_monthly_token_budget": 2000000,
+          "data_sharing_level": "aggregates",
+          "data_sharing_levels": [{"value": "aggregates", "label": "Aggregates only", "description": "…"}],
+          "updated_at": null}}
+```
+
+- `enabled` = the organization switch (default true). `app_enabled` = `AI_ENABLED`. `provider` and `model` are `null` when no provider is configured. The API key is never returned.
+- `PATCH /ai/settings`, any subset: `enabled` boolean; `monthly_token_budget` integer 0–10 000 000 000 (`0` = unlimited) or `null` (the application default); `data_sharing_level` `aggregates`. Audited as `ai.settings_updated` with old and new values.
+
+**Usage** — `GET /ai/usage?month=Y-m` (default: the current month in the organization's timezone):
+
+```json
+{"data": {"month": "2026-11", "budget": 2000000, "budget_source": "default", "unlimited": false,
+          "used_tokens": 500000, "input_tokens": 400000, "output_tokens": 100000, "remaining_tokens": 1500000, "used_pct": "25.00",
+          "requests": 14, "failed_requests": 1,
+          "by_feature": [{"feature": "ask", "requests": 10, "failed": 1, "input_tokens": 340000, "output_tokens": 80000, "tokens": 420000}]}}
+```
+
+`budget_source`: `default` | `organization`. With an unlimited budget `remaining_tokens` and `used_pct` are `null`. Features: `ask`, `explain_reorder`, `insights`, `daily_insights`, `customer_insights`. Failed requests count with the tokens they used. Requests refused because AI is off are not recorded.
+
 ### Planned (by phase)
 
 | Phase | Resource paths |
 |-------|----------------|
-| 8 | `/ai/insights`, `/ai/ask` |
+| 8 / AI2 | Online store AI (product descriptions and SEO with approval, category suggestions, co-purchase recommendations, support assistant) — paths decided in AI2 |
 
 Each phase updates this section with request/response examples; Scramble remains the field-level source of truth.

@@ -15,6 +15,7 @@ use App\Modules\AI\Domain\Llm\ToolResult;
 use App\Modules\AI\Infrastructure\Providers\AnthropicLanguageModel;
 use App\Modules\AI\Infrastructure\Providers\NullLanguageModel;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +40,7 @@ class AnthropicLanguageModelTest extends TestCase
 
     private function model(array $options = []): AnthropicLanguageModel
     {
-        return new AnthropicLanguageModel(app(\Illuminate\Http\Client\Factory::class), self::KEY, 'claude-sonnet-5-5', 30, $options + [
+        return new AnthropicLanguageModel(app(Factory::class), self::KEY, 'claude-sonnet-5-5', 30, $options + [
             'base_url' => 'https://api.anthropic.com',
             'version' => '2026-10-21',
             'max_tokens' => 8000,
