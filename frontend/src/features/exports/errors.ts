@@ -1,7 +1,7 @@
 import { ApiError } from '@/lib/api/client'
 import type { ExportFormat } from '@/features/exports/lists'
 
-const FORMAT_NAME: Record<ExportFormat, string> = { xlsx: 'Excel', pdf: 'PDF' }
+const FORMAT_NAME: Record<ExportFormat, string> = { xlsx: 'Excel', pdf: 'PDF', csv: 'CSV' }
 
 function count(value: unknown): string | null {
   const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN

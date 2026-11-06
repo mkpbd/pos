@@ -13,8 +13,8 @@ test('organization admin signs in with a real Sanctum session and manages users'
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  // Lands on the first page the role may open.
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  // Lands on the first page the role may open (the dashboard since Phase 7; cashiers stay on the POS terminal).
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
   await page.getByRole('link', { name: 'Branches' }).first().click()
   await expect(page.getByRole('cell', { name: 'Dhaka Main', exact: true })).toBeVisible()
 
@@ -147,7 +147,7 @@ test('cashier requests a return; the owner approves it and refunds cash from the
     await page.getByLabel('E-mail').fill(email)
     await page.getByLabel('Password').fill('password')
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+    await expect(page.getByRole('heading', { name: /^(POS terminal|Dashboard)$/ }).first()).toBeAttached()
     return page
   }
 
@@ -224,7 +224,7 @@ test('theme colour and menu changes made in the admin reach the storefront', asy
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.goto('/admin/storefront/theme')
   await page.getByLabel('Accent', { exact: true }).fill('#1d4ed8')
@@ -262,7 +262,7 @@ test('a banner edited and a section added in the admin show on the storefront in
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // Brief checks 1-2: change the seeded hero banner's headline.
   await page.goto('/admin/storefront/banners')
@@ -315,7 +315,7 @@ test('a product created and repriced in the admin shows its current price everyw
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // Brief check 7: create the product and publish it, featured, on the online store.
   await page.goto('/admin/products/new')
@@ -459,7 +459,7 @@ test('a guest places a cash-on-delivery order; the admin sees it and stock goes 
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Web orders' }).first().click()
   const row = page.getByRole('row').filter({ hasText: number })
@@ -539,7 +539,7 @@ test('a flash sale and the WELCOME50 coupon lower the price from card to placed 
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Web orders' }).first().click()
   await page.getByRole('row').filter({ hasText: number }).getByRole('link', { name: number }).click()
@@ -601,7 +601,7 @@ test('a shopper cancels an order, buys again and reviews a delivered product; th
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Reviews' }).first().click()
   const card = page.getByRole('listitem', { name: /Review of Pran Mango Juice 250ml/ }).filter({ hasText: 'Great with ice' })
@@ -626,7 +626,7 @@ test('a COD parcel is delivered and paid through a courier remittance in the adm
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // The seeded WEB-000003 is on its way with Steadfast; the courier reports it delivered.
   await page.getByRole('link', { name: 'Web orders' }).first().click()
@@ -685,7 +685,7 @@ test('a shopper returns a delivered item; staff approve, receive it back into st
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Web returns' }).first().click()
   await page.getByRole('row').filter({ hasText: 'RTN-WEB-000001' }).getByRole('link').first().click()
@@ -724,7 +724,7 @@ test('a blog post written in the admin shows on the blog, its category, the home
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.goto('/admin/content/blog/new')
   await page.getByLabel('Title', { exact: true }).fill(title)
@@ -761,7 +761,7 @@ test('a paid order whose parcel came back is cancelled with a refund and its sto
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // The guest's cash-on-delivery order from the checkout test: processed, shipped, paid by hand, then returned.
   await page.getByRole('link', { name: 'Web orders' }).first().click()
@@ -858,7 +858,7 @@ test('an admin list exports to Excel and PDF with the current filters', async ({
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Products' }).first().click()
   await expect(page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })).toBeVisible()
@@ -882,7 +882,7 @@ test('reorder suggestions turn into a draft purchase order from the preferred su
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // Seeded catalog: Pran is the preferred juice supplier (cartons of 24) and the main store has a 160/288 rule.
   await page.goto('/admin/purchasing/reorder')
@@ -918,7 +918,7 @@ test('a manager approves a branch requisition from the inbox and converts it int
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // Seeded: the cashier's PR-000001 (juice + rice, above the 10,000 auto-approve limit) waits for a manager.
   await page.goto('/admin/purchasing/approvals')
@@ -949,7 +949,7 @@ test('landed costs reach stock cost and the supplier scorecard shows a late, sho
   await page.getByLabel('E-mail').fill('owner@demo.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
   // Seeded LCV-000001: 800.00 customs duty on GRN-000002 — returned XL units are expensed, the rest goes to stock.
   await page.goto('/admin/purchasing/landed-costs')
@@ -972,4 +972,39 @@ test('landed costs reach stock cost and the supplier scorecard shows a late, sho
   const score = Number(title?.match(/Score (\d+) of 100/)?.[1])
   expect(score).toBeGreaterThanOrEqual(0)
   expect(score).toBeLessThan(100)
+})
+
+test('the dashboard and the reports show the seeded sales history, and a report exports to CSV', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin reports flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  // The owner lands on the dashboard: key figures, trend, top products, recent transactions from 60 days of demo sales.
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
+  await expect(page).toHaveURL(/\/admin\/dashboard/)
+  const figures = page.getByRole('region', { name: 'Key figures' })
+  await expect(figures).toBeVisible()
+  await expect(figures).toContainText('Net sales')
+  await expect(figures).toContainText('Gross profit')
+  await expect(page.getByRole('list', { name: 'Recent transactions' }).getByRole('listitem').first()).toBeVisible()
+
+  // Sales by product includes the seeded demo products; the totals row is present.
+  await page.goto('/admin/reports')
+  await page.getByRole('link', { name: /Sales by product/ }).first().click()
+  await expect(page.getByRole('table').first()).toContainText('Butter Cookies 200g')
+  await expect(page.getByTestId('report-totals')).toBeVisible()
+
+  // CSV export of the same report.
+  await page.getByRole('button', { name: 'Export' }).click()
+  const download = page.waitForEvent('download')
+  await page.getByRole('menuitem', { name: /CSV/ }).click()
+  expect((await download).suggestedFilename()).toMatch(/^report-sales-by-product-.+-\d{8}-\d{4}\.csv$/)
+
+  // Profit and loss as a statement ending in net profit.
+  await page.goto('/admin/reports')
+  await page.getByRole('link', { name: /Profit and loss/ }).first().click()
+  await expect(page.getByTestId('pnl-statement')).toContainText('Net profit')
 })

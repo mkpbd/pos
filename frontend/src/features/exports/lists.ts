@@ -1,8 +1,8 @@
 /**
- * Every admin list that can be exported to Excel / PDF (X1).
+ * Every admin list that can be exported to Excel / CSV / PDF (X1; CSV since Phase 7).
  *
  * `endpoint` is the list's own API endpoint (GET, relative to /api/v1); the export is the
- * same request plus `export=xlsx|pdf`, so filters, search and sort carry over unchanged.
+ * same request plus `export=xlsx|csv|pdf`, so filters, search and sort carry over unchanged.
  * `route` is the admin page that shows the Export menu, or null when the list lives inside
  * another screen (`screen` says where) — e.g. a statement sheet or the promotion report.
  * Endpoints with `:param` segments are filled from ExportMenu's `pathParams`.
@@ -53,11 +53,15 @@ export const EXPORTABLE_LISTS = {
   newsletterSubscribers: { label: 'Newsletter subscribers', endpoint: '/cms/newsletter-subscribers', route: '/content/newsletter' },
   users: { label: 'Users', endpoint: '/users', route: '/users' },
   auditLog: { label: 'Audit log', endpoint: '/audit-logs', route: '/audit-log' },
+  report: { label: 'Report', endpoint: '/reports/:key', route: null, screen: 'Reports → any report page' },
 } as const satisfies Record<string, ExportableList>
 
 export type ExportListKey = keyof typeof EXPORTABLE_LISTS
 
-export type ExportFormat = 'xlsx' | 'pdf'
+export type ExportFormat = 'xlsx' | 'pdf' | 'csv'
+
+/** Formats every list offers (CSV since Phase 7: UTF-8 with BOM, opens in Excel with Bangla intact). */
+export const DEFAULT_EXPORT_FORMATS: readonly ExportFormat[] = ['xlsx', 'csv', 'pdf']
 
 /** The list endpoint with its `:param` segments filled in (URL-encoded). */
 export function exportEndpoint(list: ExportListKey, pathParams: Record<string, string> = {}): string {
@@ -69,7 +73,7 @@ export function exportEndpoint(list: ExportListKey, pathParams: Record<string, s
 }
 
 /** Used only when the server sends no Content-Disposition filename. */
-export function fallbackExportFilename(list: ExportListKey, format: ExportFormat): string {
-  const slug = EXPORTABLE_LISTS[list].label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+export function fallbackExportFilename(list: ExportListKey, format: ExportFormat, title?: string): string {
+  const slug = (title ?? EXPORTABLE_LISTS[list].label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   return `${slug}.${format}`
 }

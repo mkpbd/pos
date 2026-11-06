@@ -23,6 +23,7 @@ use App\Modules\Pos\PosServiceProvider;
 use App\Modules\Products\ProductsServiceProvider;
 use App\Modules\Promotions\PromotionsServiceProvider;
 use App\Modules\Purchasing\PurchasingServiceProvider;
+use App\Modules\Reports\ReportsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Shipping\ShippingServiceProvider;
@@ -65,6 +66,8 @@ return [
     OnlinePaymentsServiceProvider::class,
     OrdersServiceProvider::class,
     ReviewsServiceProvider::class,
+    // Phase 7: reports and the dashboard (read models over the modules above).
+    ReportsServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

@@ -38,7 +38,7 @@ export function mockApiWithExports(routes: Parameters<typeof mockApi>[0], reply?
     if (reply) return reply(url)
     const name = url.pathname.replace(/^\/api\/v1\//, '').replace(/\//g, '-')
     const format = url.searchParams.get('export') ?? 'xlsx'
-    return fileResponse(`${name}-corner-shop-20261105-1430.${format}`, format === 'pdf' ? 'application/pdf' : XLSX_TYPE)
+    return fileResponse(`${name}-corner-shop-20261105-1430.${format}`, format === 'pdf' ? 'application/pdf' : format === 'csv' ? 'text/csv; charset=UTF-8' : XLSX_TYPE)
   })
   vi.stubGlobal('fetch', fetchMock)
   return { fetchMock, exportCalls }

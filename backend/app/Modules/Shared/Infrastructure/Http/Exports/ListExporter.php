@@ -8,6 +8,7 @@ use App\Modules\Shared\Application\Export\ExportDocument;
 use App\Modules\Shared\Application\Export\ExportFormat;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Shared\Infrastructure\Export\CsvExportWriter;
 use App\Modules\Shared\Infrastructure\Export\PdfExportWriter;
 use App\Modules\Shared\Infrastructure\Export\XlsxExportWriter;
 use Carbon\CarbonImmutable;
@@ -22,7 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
- * Answers `?export=xlsx|pdf` on admin list endpoints: the list's own filtered, sorted and
+ * Answers `?export=xlsx|pdf|csv` (csv since Phase 7) on admin list endpoints: the list's own filtered, sorted and
  * tenant-scoped query (every page), within the format's row limit (422 EXPORT_TOO_LARGE),
  * throttled per user (`exports` limiter), audited (`export.created`) and returned as a
  * download (`<list>-<org-slug>-<YYYYMMDD-HHmm>.<ext>`, no-store).
@@ -40,6 +41,7 @@ final class ListExporter
         private readonly Container $container,
         private readonly XlsxExportWriter $xlsx,
         private readonly PdfExportWriter $pdf,
+        private readonly CsvExportWriter $csv,
         private readonly AuditTrail $audit,
         private readonly DocumentLetterhead $letterhead,
         private readonly TenantContext $tenant,
@@ -54,7 +56,7 @@ final class ListExporter
         if (! $request->query->has(self::PARAM)) {
             return null;
         }
-        Validator::make($request->query(), [self::PARAM => ['required', 'string', 'in:xlsx,pdf']])->validate();
+        Validator::make($request->query(), [self::PARAM => ['required', 'string', 'in:xlsx,pdf,csv']])->validate();
 
         return ExportFormat::from((string) $request->query(self::PARAM));
     }
@@ -71,7 +73,7 @@ final class ListExporter
         if ($source->total > $limit) {
             throw new BusinessRuleViolation(
                 'EXPORT_TOO_LARGE',
-                sprintf('This list has %s rows; %s exports are limited to %s. Narrow the filters and try again.', number_format($source->total), $format === ExportFormat::Pdf ? 'PDF' : 'Excel', number_format($limit)),
+                sprintf('This list has %s rows; %s exports are limited to %s. Narrow the filters and try again.', number_format($source->total), $format->label(), number_format($limit)),
                 ['limit' => $limit, 'rows' => $source->total, 'format' => $format->value],
             );
         }
@@ -94,10 +96,10 @@ final class ListExporter
         $slug = Str::slug($letterhead['slug'] !== '' ? $letterhead['slug'] : $letterhead['name']) ?: 'organization';
         $filename = sprintf('%s-%s-%s.%s', $list->name(), $slug, $now->format('Ymd-Hi'), $format->value);
 
-        if ($format === ExportFormat::Xlsx) {
-            $path = $this->temporaryFile();
+        if ($format === ExportFormat::Xlsx || $format === ExportFormat::Csv) {
+            $path = $this->temporaryFile($format->value);
             try {
-                $count = $this->xlsx->write($document, $path);
+                $count = $format === ExportFormat::Xlsx ? $this->xlsx->write($document, $path) : $this->csv->write($document, $path);
             } catch (Throwable $e) {
                 @unlink($path);
 
@@ -155,13 +157,13 @@ final class ListExporter
             ->all();
     }
 
-    private function temporaryFile(): string
+    private function temporaryFile(string $extension): string
     {
         $directory = storage_path('app/private/exports');
         if (! is_dir($directory)) {
             mkdir($directory, 0700, true);
         }
 
-        return $directory.DIRECTORY_SEPARATOR.Str::uuid()->toString().'.xlsx';
+        return $directory.DIRECTORY_SEPARATOR.Str::uuid()->toString().'.'.$extension;
     }
 }

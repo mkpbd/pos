@@ -4,6 +4,87 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Phase 7 — Reports and dashboard analytics
+
+A registry of 17 whitelisted reports (sales, inventory, purchasing, finance, customers) with typed parameters, a dashboard, and CSV next to Excel and PDF on every export. One shared definition of sales covers POS and web orders. The registry is the list that natural-language reporting (Phase 8 / E13) will choose from.
+
+#### Added
+- **Reports module** (`app/Modules/Reports`, read models only, no tables): `ReportRegistry` (whitelist), `ReportDefinition` / `ReportParam` / `ReportColumn` / `ReportGroup`, `ParameterResolver`, `ReportRunner`, one query class per report (`Application/Reports/*`), `Support\SalesFacts`, `Dashboard`. Reports read other modules' tables read-only under the read-model exception and aggregate in SQL (`GROUP BY`).
+- **Catalog:** `GET /reports` (`reports.view` or `reports.financial`) returns the definitions the user may run: `key, title, description, group, group_label, permission, financial, time_based, granularity, max_range_days, params[], columns[], default_sort, totals, paginated, omitted_columns`; `meta.groups`. `cashier_id` carries `options`: users of the viewer's branches plus anyone who sold there. These options let users without `users.view` filter by cashier.
+- **Run:** `GET /reports/{key}?<params>&sort=&page=&per_page=` returns `data` (one page of rows) and `meta {report, pagination, totals, params (resolved + timezone, currency), sort, generated_at, columns, omitted_columns}` plus report-specific meta (P&L `previous_period`, `summary`; dues `as_of`, `includes_opening_balances`; valuation `as_of`; stock movements opening/closing quantity in `totals`). Errors: unknown key 404, missing permission 403, invalid parameter or sort 422 `VALIDATION_FAILED`, range too long 422 `RANGE_TOO_LARGE`.
+- **17 reports:** `sales_daily`, `sales_monthly`, `sales_by_product`, `sales_by_category`, `sales_by_branch`, `sales_by_cashier`, `profit_and_loss` (financial), `inventory_valuation`, `stock_movements`, `low_stock`, `expiry`, `purchases`, `customer_dues`, `supplier_dues`, `payment_collections`, `tax` (financial), `expenses`. Parameters, columns and formulas: [API_DOCUMENTATION.md § Reports](docs/API_DOCUMENTATION.md#reports-and-dashboard-phase-7).
+- **Dashboard:** `GET /dashboard?branch_id=&date_from=&date_to=` (`dashboard.view`; default the last 30 days up to today, at most 366 days). Returns `kpis` (`total_sales`, `today_revenue` vs yesterday, `orders_count`, `gross_profit` (null without `products.view_cost`), `average_ticket`, `returns_amount`), each as `{value, previous, change, change_pct}` against the previous period of equal length. Also returns `sales_trend` (every day; POS / online split; gross profit only with cost access), `top_products` (10), `low_stock` `{count, items (10)}`, `recent_transactions` (10; web orders only with `web_orders.view`), `sales_by_channel`, and `sales_by_branch` (null for one branch). It is cached for 60 s.
+- **CSV export** (Shared): `ExportFormat::Csv`, `Infrastructure\Export\CsvExportWriter`. The file is UTF-8 with BOM and follows RFC 4180: CRLF line ends and quoted fields when needed. It has one header row. Numbers are plain decimal strings, dates are `Y-m-d`, and date-times are `Y-m-d H:i` in the organization's timezone. Formula-injection guard: text starting with `= + - @`, a tab or CR gets a leading `'`. It is streamed to a temporary file like xlsx. Row limit 100 000 (`EXPORT_MAX_ROWS_CSV`). Reports export with `?export=xlsx|csv|pdf`: every row in the requested sort, plus a *Total* row when the report has totals. The stem is `report-<key with hyphens>`, e.g. `report-sales-by-product-demo-mart-20261107-1430.csv`. The filter summary looks like "Period: … · Branch: …". Throttle, row limits and audit are the same as X1.
+- **Permissions:** `reports.view` (operational reports; cost and profit columns also need `products.view_cost`), `reports.financial` (profit and loss, tax), `dashboard.view`.
+- **Indexes** (`Reports/Infrastructure/Database/Migrations/2026_11_09_100000_add_reporting_indexes`, `CREATE INDEX IF NOT EXISTS` on both drivers): `sales (organization_id, status, sold_at)`, `sale_returns (organization_id, status, decided_at)`, `orders (organization_id, status, delivered_at)`, `order_returns (organization_id, status, refunded_at)`, `payments (organization_id, created_at)`, `goods_receipts (organization_id, invoice_date)`, `purchase_returns (organization_id, created_at)`.
+- **Admin:**
+  - *Dashboard* (`src/features/dashboard`): KPI cards with the change against the previous period, sales trend, POS vs online bars, top products, low stock with a *Reorder* link (`purchases.view`), recent transactions linking to sales and web orders, and branch and date-range filters.
+  - *Reports* (`src/features/reports`): a catalog grouped by section. Each report page is built from its definition:
+    - a filter bar from the parameter schema: date presets Today / Yesterday / This week / This month / Last month / This year, and entity pickers gated by their list permissions, with values from a shared link shown as removable chips;
+    - a sortable table with `aria-sort`, a sticky first column, a totals row, pagination (25 / 50 / 100 / 200, default 50) and an *Export* menu;
+    - cost columns hidden with a note;
+    - parameters kept in the URL;
+    - an inline chart for daily and monthly sales;
+    - P&L shown as a statement with sections, subtotal rules, a double rule under net profit, negatives in brackets and a previous-period column.
+  - Charts (`src/components/common/charts`: `trend-chart`, `bar-chart`, `chart-data-table`, `chart-utils`) are hand-rolled SVG with no chart library. They have one tab stop, arrow keys / Home / End with a tooltip on focus and hover, a visually hidden data table, and colours `--viz-1..3` that work in light and dark themes.
+- **Demo data** (`DemoReportsSeeder`, runs last, through the real actions, on products of its own): 60 days of POS history, returns and delivered web orders, and the user `manager@demo.test` (Branch Manager). Details under Notes.
+- Tests: backend 29 new (`Reports/Tests`: `SalesReportsTest` 7, `ReportAccessTest` 8, `OperationalReportsTest` 3, `DashboardTest` 3, `ReportExportTest` 3, `Unit/AgingTest` 3; `Shared/Tests/Unit/CsvExportWriterTest` 1; `ExportableListsTest` +1 list). Frontend 43 new Vitest tests (charts 9, reports 24, dashboard 7, routes and export menu). New mocked Playwright `reports-admin.spec.ts` (3 tests × 2 projects). New full-stack test for the dashboard, reports and CSV.
+
+#### Changed
+- **Landing page:** `/` goes to the first sidebar entry, which is now *Dashboard* for every role with `dashboard.view`: Organization Admin, Branch Manager, Accountant, Inventory Manager. Users who can `pos.sell` but hold neither `reports.view` nor `reports.financial` stay on the POS terminal (cashiers). Sidebar: *Dashboard* first, *Reports* after *Expenses*.
+- **CSV on every export:** every X1 list accepts `?export=csv`, and the *Export* menu offers *Excel (.xlsx)*, *CSV (.csv)* and *PDF* everywhere. Before, `csv` answered 422. Other values still do: the validation test now uses `ods`. The `EXPORT_TOO_LARGE` message names the format ("CSV exports are limited to …").
+- **Role map:**
+  - Branch Manager and Accountant: `reports.*` (= `reports.view` + `reports.financial`) + `dashboard.view`.
+  - Inventory Manager: `reports.view` + `dashboard.view`, replacing the undefined `reports.inventory`.
+  - Cashier: `dashboard.view` (own branches, no profit figures without `products.view_cost`).
+  - Organization Admin through `*`.
+
+  Run `php artisan pos:permissions:sync`.
+- **Demo history:** the seed now holds 60 days of trading. After a fresh seed, the next numbers are `INV-MAIN-000279`, `RET-MAIN-000009` and `WEB-000010` (they were `INV-MAIN-000003`, `RET-MAIN-000001` and `WEB-000004`).
+- Full-stack `integration.spec.ts`: 15 owner sign-in assertions expect the *Dashboard* heading instead of *POS terminal*. The shared sign-in helper accepts either.
+
+#### Notes
+- **Sales definitions** (`SalesFacts`, shared by every sales report, P&L, tax and the dashboard):
+  - **POS:** completed sales by `sold_at`, minus completed returns by `decided_at`. Cancelled sales are excluded entirely.
+  - **Online:** web orders are recognised **on delivery** (status `delivered`, by `delivered_at`), minus web returns with status `refunded` (by `refunded_at`). Pending, confirmed, shipped, cancelled and failed orders never count.
+  - **Amounts:** net = Σ line net after item and invoice discounts, excluding tax. Gross = net + discounts. Returns = returned net excluding tax. Net sales = gross − discounts − returns. Tax-inclusive organizations report net of tax.
+  - **Tax:** output tax = line tax − returned tax.
+  - **Delivery income:** shipping + COD fees of delivered orders − shipping refunds, kept out of net sales. It is 0 when a product, category or brand filter is set, or for product, category, brand, cashier or tax-rate groupings.
+  - **Orders:** POS sales + delivered web orders.
+- **COGS** = Σ line `cost_total` snapshots (the stock ledger's weighted-average cost of the goods out at the time, which includes landed costs) − cost of returned lines that were restocked. Written-off returns keep their cost. Value-only landed cost expenses on stock already sold (SC3, on account) are operating expenses in the P&L, not COGS.
+- **Registry = whitelist.** Nothing outside `ReportRegistry::REPORTS` can run, and parameters are typed and resolved on the server. The branch scope is the user's branches ∩ `branch_id` and never comes from the client alone. Phase 8 natural-language reporting will map a question to one key and its parameters ([AI_INTEGRATION.md](docs/AI_INTEGRATION.md)).
+- **Deviations from the Phase 7 brief:**
+  1. COGS comes from sale / order line cost snapshots rather than from re-reading stock movements; it is the same figure, recognised with revenue.
+  2. Column type `datetime` was added (stock movements).
+  3. Daily and monthly sales are two keys (`sales_daily`, `sales_monthly`).
+  4. `per_page` allows at most 500.
+  5. Every money column of `purchases` is cost-sensitive.
+  6. Opening balances count in customer and supplier dues only when the report covers every branch (`includes_opening_balances`).
+  7. A branch or store the user cannot access is a 422, not an empty report.
+  8. P&L amounts are signed, with expense and income categories by name.
+  9. CSV was added to every list, not only reports.
+  10. On SQLite, local days use the zone's fixed UTC offset at the start of the range (exact for Asia/Dhaka); on PostgreSQL they use `AT TIME ZONE` (DST-aware).
+  11. `low_stock` uses Purchasing's `ReorderSuggestions`, which is not a published contract.
+  12. Indexes on other modules' tables live in the Reports migration (the E12a precedent).
+  13. P&L and tax figures, COGS included, are not cost-gated: `reports.financial` is enough. Every built-in role that has it also has `products.view_cost`.
+- **No views or materialized views** in Phase 7: each report is one aggregate query family over the source tables. Daily summary tables or materialized views can follow if PostgreSQL `EXPLAIN` on production-sized data asks for them.
+- **Demo history** (`DemoReportsSeeder`): it changes no figure the full-stack tests assert. Juice stays 54 and rice 321. `WEB-000001`–`003`, `PO-000001`–`004` and `GRN-000001`–`003` are unchanged, and so are the owner's and cashier's open shifts. It adds:
+  - categories *Snacks* (under *Grocery*) and *Household*;
+  - four products: *Butter Cookies 200g* (VAT 15 %), *Atta Flour 2kg* (no VAT), *Bath Soap 100g* (VAT 15 %, batch `SOAP-A` expiring 12 days after seeding), *Dishwashing Liquid 500ml* (VAT 7.5 %, reorder level above stock, so it shows as low stock);
+  - an opening adjustment 61 days back;
+  - user *Demo Floor Manager* `manager@demo.test` / `password` (Branch Manager, Dhaka Main) on the new register *T3 — Counter 2*;
+  - 61 closed shifts `SES-MAIN-000003`…`063`;
+  - 276 POS sales `INV-MAIN-000003`…`278`;
+  - 8 returns `RET-MAIN-000001`…`008`;
+  - 6 delivered COD web orders `WEB-000004`…`009` (RedX). Listings are published only while ordering, so the storefront catalogue is unchanged.
+- **Run `php artisan pos:permissions:sync`** after deploying. Until then nobody, the Organization Admin included, sees *Dashboard* or *Reports*.
+- Results:
+  - backend 710 tests (704 pass, 6 skipped), Pint clean;
+  - frontend typecheck, lint, build and 840 Vitest tests (112 files);
+  - mocked Playwright 142 pass, 48 skipped (+2: the new full-stack test on both projects without `E2E_BACKEND`);
+  - full stack 23/23 on desktop: 22 on a fresh seed, plus the Phase 7 test on the same database.
+- Open issues: the **PostgreSQL run is still pending**, including `EXPLAIN` of the report and dashboard SQL against the new indexes.
+
 ### SC3 — Landed cost and supplier performance (supply chain)
 
 Freight, duty and similar charges become part of the stock cost — on the goods receipt, or later through landed cost vouchers — and are owed to whoever bills them; a supplier scorecard measures on-time delivery, fill rate, returns, price changes and quote responsiveness. Third and last slice of the supply chain track.

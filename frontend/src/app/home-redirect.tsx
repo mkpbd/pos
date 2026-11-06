@@ -1,13 +1,13 @@
 import { Navigate } from 'react-router'
-import { visibleNavItems } from '@/app/navigation'
+import { homePath } from '@/app/navigation'
 import { useAuth } from '@/features/auth/use-auth'
 
 /**
- * "/" lands on the first page the user may open. Replaced by the dashboard in Phase 7.
+ * "/" lands on the dashboard for roles that have it, the POS terminal for till staff, and
+ * otherwise on the first page the user may open.
  */
 export function HomeRedirect() {
   const me = useAuth()
-  const first = visibleNavItems(me)[0]
 
-  return <Navigate to={first?.to ?? '/profile'} replace />
+  return <Navigate to={homePath(me)} replace />
 }

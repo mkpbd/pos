@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -19,6 +19,7 @@ export type NavItem = {
  * working API endpoints — no placeholder links.
  */
 export const NAV_ITEMS: NavItem[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboardIcon, permission: 'dashboard.view' },
   { to: '/pos', label: 'POS Terminal', icon: ScanBarcodeIcon, permission: 'pos.sell' },
   { to: '/sales', label: 'Sales', icon: ReceiptTextIcon, permission: 'sales.view' },
   { to: '/web-orders', label: 'Web orders', icon: ShoppingBagIcon, permission: 'web_orders.view' },
@@ -30,6 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/cash-registers', label: 'Cash registers', icon: WalletIcon, permission: ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage'] },
   { to: '/payments', label: 'Payments', icon: HandCoinsIcon, permission: 'payments.view' },
   { to: '/expenses', label: 'Expenses', icon: ReceiptIcon, permission: 'expenses.view' },
+  { to: '/reports', label: 'Reports', icon: ChartColumnIcon, permission: ['reports.view', 'reports.financial'] },
   { to: '/products', label: 'Products', icon: PackageIcon, permission: 'products.view' },
   { to: '/catalog', label: 'Catalog', icon: TagsIcon, permission: 'products.view' },
   { to: '/inventory', label: 'Inventory', icon: BoxesIcon, permission: 'inventory.view' },
@@ -62,4 +64,16 @@ export function visibleNavItems(me: CurrentUser): NavItem[] {
     const required = item.permission === undefined ? [] : Array.isArray(item.permission) ? item.permission : [item.permission]
     return required.length === 0 || isPlatform || required.some((p) => me.permissions.includes(p))
   })
+}
+
+/**
+ * Where "/" lands: the first sidebar entry, except that till staff — who can sell but run no
+ * reports — stay on the POS terminal even though they may open the dashboard.
+ */
+export function homePath(me: CurrentUser): string {
+  const items = visibleNavItems(me)
+  const can = (p: string) => me.user.is_platform_admin || me.permissions.includes(p)
+  const tillOnly = can('pos.sell') && !can('reports.view') && !can('reports.financial')
+  if (tillOnly && items.some((i) => i.to === '/pos')) return '/pos'
+  return items[0]?.to ?? '/profile'
 }

@@ -56,16 +56,21 @@ enum SystemRole: string
                 'inventory.*', 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay',
                 'purchases.request', 'purchases.approve', 'purchases.landed_cost', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
                 'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*', 'ai.*',
+                // Phase 7: reports.* = reports.view + reports.financial.
+                'dashboard.view',
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
                 'pos.*', 'sales.view', 'cash_registers.operate', 'returns.view', 'returns.create', 'payments.collect',
                 // SC2: branch staff raise purchase requisitions (their own).
                 'purchases.request',
+                // Phase 7: the dashboard of their branch (no cost, so no profit figures).
+                'dashboard.view',
             ],
             self::InventoryManager => [
                 'branches.view', 'products.*', 'categories.*', 'brands.*', 'units.*',
-                'suppliers.*', 'inventory.*', 'reports.inventory',
+                // Phase 7: operational reports (cost columns via products.view_cost) and the dashboard.
+                'suppliers.*', 'inventory.*', 'reports.view', 'dashboard.view',
                 // SC2: runs purchasing (requisitions → orders, RFQs) but does not approve.
                 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay', 'purchases.request',
                 // SC3: books landed cost vouchers (freight / duty bills that arrive later).
@@ -74,7 +79,7 @@ enum SystemRole: string
             self::Accountant => [
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
                 'sales.view', 'purchases.view', 'purchases.pay', 'purchases.landed_cost', 'customers.view', 'suppliers.view',
-                'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'audit.view',
+                'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'dashboard.view', 'audit.view',
                 // E10a: couriers' COD remittances (and the web orders they settle); E10b: online refunds.
                 'web_orders.view', 'web_orders.remit', 'web_orders.refund',
             ],

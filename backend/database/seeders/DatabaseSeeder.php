@@ -80,5 +80,7 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoProcurementSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
         // SC3: polo shirts bought with landed costs (receipt charges, a late/short delivery, a return, a posted landed cost voucher).
         $this->callWith(DemoLandedCostSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
+        // Phase 7: 60 days of POS and web history on four products of its own (reports, dashboard); last, so no tested number moves.
+        $this->callWith(DemoReportsSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
     }
 }

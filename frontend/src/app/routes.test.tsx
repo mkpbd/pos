@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
 import { setContextHeaderProvider } from '@/lib/api/client'
 import { useSessionStore } from '@/stores/session-store'
-import { cashier, makeCurrentUser } from '@/test/fixtures'
+import { cashier, makeCurrentUser, posCashier } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 
 const emptyPage = ok([], { pagination: { current_page: 1, per_page: 25, total: 0, last_page: 1 } })
@@ -78,5 +78,30 @@ describe('app routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument()
+  })
+
+  it('lands roles with the dashboard on it, first in the sidebar', async () => {
+    const manager = makeCurrentUser({ permissions: ['branches.view', 'dashboard.view', 'pos.sell', 'reports.view', 'sales.view'] })
+    mockApi({ 'GET /auth/me': ok(manager), 'GET /dashboard': ok({ kpis: {}, sales_trend: [], top_products: [], low_stock: { count: 0, items: [] }, recent_transactions: [], sales_by_channel: [] }) })
+
+    const { router } = renderRoutes(routes, '/')
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/dashboard')
+    const links = within(screen.getByRole('navigation', { name: 'Main' })).getAllByRole('link').map((a) => a.textContent)
+    expect(links[0]).toBe('Dashboard')
+    expect(links).toContain('Reports')
+  })
+
+  it('keeps cashiers on the POS terminal even with the dashboard', async () => {
+    const till = makeCurrentUser({ ...posCashier(), permissions: [...posCashier().permissions, 'dashboard.view'] })
+    mockApi({ 'GET /auth/me': ok(till) })
+
+    const { router } = renderRoutes(routes, '/')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/pos'))
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument()
   })
 })

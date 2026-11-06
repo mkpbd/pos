@@ -31,6 +31,9 @@ function guarded(permission: string | string[], path: string, lazyPage: Pick<Rou
 }
 
 const pages = {
+  dashboard: page(() => import('@/features/dashboard/pages/dashboard-page'), 'DashboardPage'),
+  reports: page(() => import('@/features/reports/pages/reports-page'), 'ReportsPage'),
+  report: page(() => import('@/features/reports/pages/report-page'), 'ReportPage'),
   products: page(() => import('@/features/products/pages/products-page'), 'ProductsPage'),
   productEditor: page(() => import('@/features/products/pages/product-editor-page'), 'ProductEditorPage'),
   catalog: page(() => import('@/features/catalog/pages/catalog-page'), 'CatalogPage'),
@@ -120,6 +123,8 @@ const LANDED_COST_MANAGE = 'purchases.landed_cost'
 const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage']
 /** Requesters see their own requisitions; approvers and purchasing staff see the branch's (SC2). */
 const REQUISITION_PERMISSIONS = ['purchases.view', 'purchases.request', 'purchases.approve', 'purchases.approve_high']
+/** Operational and financial reports (Phase 7); each report's own permission is checked by the API. */
+const REPORT_PERMISSIONS = ['reports.view', 'reports.financial']
 
 export const routes: RouteObject[] = [
   {
@@ -149,6 +154,9 @@ export const routes: RouteObject[] = [
             element: <AppLayout />,
             children: [
               { index: true, element: <HomeRedirect /> },
+              guarded('dashboard.view', 'dashboard', pages.dashboard),
+              guarded(REPORT_PERMISSIONS, 'reports', pages.reports),
+              guarded(REPORT_PERMISSIONS, 'reports/:reportKey', pages.report),
               guarded('pos.sell', 'pos', pages.posTerminal),
               guarded('sales.view', 'sales', pages.sales),
               guarded('sales.view', 'sales/:saleId', pages.sale),

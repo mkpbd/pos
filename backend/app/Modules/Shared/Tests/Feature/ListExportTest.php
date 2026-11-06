@@ -155,6 +155,9 @@ class ListExportTest extends TestCase
         $this->get('/api/v1/customers?export=xlsx')->assertOk();
         $this->getJson('/api/v1/customers?export=pdf&search=Customer%20A')->assertOk();
         $this->assertSame(2, AuditLog::query()->where('action', 'export.created')->count());
+        config(['exports.max_rows.csv' => 2]);
+        $this->getJson('/api/v1/customers?export=csv')->assertStatus(422)->assertJsonPath('error.code', 'EXPORT_TOO_LARGE')
+            ->assertJsonPath('error.message', 'This list has 3 rows; CSV exports are limited to 2. Narrow the filters and try again.');
     }
 
     public function test_unknown_formats_are_a_validation_error(): void
@@ -162,7 +165,8 @@ class ListExportTest extends TestCase
         ['admin' => $admin] = $this->provisionTenant();
         $this->actingAsUser($admin);
 
-        $this->getJson('/api/v1/customers?export=csv')
+        // csv is a format since Phase 7.
+        $this->getJson('/api/v1/customers?export=ods')
             ->assertStatus(422)
             ->assertJsonPath('error.code', 'VALIDATION_FAILED')
             ->assertJsonStructure(['error' => ['details' => ['export']]]);

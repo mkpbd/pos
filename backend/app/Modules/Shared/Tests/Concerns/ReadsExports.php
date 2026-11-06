@@ -20,9 +20,41 @@ trait ReadsExports
      */
     protected function tearDownReadsExports(): void
     {
-        foreach (glob(storage_path('app/private/exports/*.xlsx')) ?: [] as $file) {
+        foreach ([...(glob(storage_path('app/private/exports/*.xlsx')) ?: []), ...(glob(storage_path('app/private/exports/*.csv')) ?: [])] as $file) {
             @unlink($file);
         }
+    }
+
+    /**
+     * The raw bytes of a .csv download (BOM included).
+     */
+    protected function csvContent(TestResponse $response): string
+    {
+        $base = $response->baseResponse;
+        $this->assertInstanceOf(BinaryFileResponse::class, $base, 'Expected a .csv file download.');
+
+        return (string) file_get_contents($base->getFile()->getPathname());
+    }
+
+    /**
+     * Records of a .csv download (header first), parsed as RFC 4180 without the BOM.
+     *
+     * @return list<list<string>>
+     */
+    protected function csvRows(TestResponse $response): array
+    {
+        $content = $this->csvContent($response);
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $handle = fopen('php://memory', 'r+');
+        fwrite($handle, substr($content, 3));
+        rewind($handle);
+        $rows = [];
+        while (($row = fgetcsv($handle, escape: '')) !== false) {
+            $rows[] = array_map(fn ($v) => (string) $v, $row);
+        }
+        fclose($handle);
+
+        return $rows;
     }
 
     protected function fakePdfRenderer(): FakePdfRenderer

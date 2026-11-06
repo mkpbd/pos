@@ -19,7 +19,7 @@ beforeEach(() => {
   toastError.mockReset()
 })
 
-async function choose(format: 'Excel (.xlsx)' | 'PDF') {
+async function choose(format: 'Excel (.xlsx)' | 'CSV (.csv)' | 'PDF') {
   const user = userEvent.setup()
   await user.click(screen.getByRole('button', { name: 'Export' }))
   await user.click(await screen.findByRole('menuitem', { name: format }))
@@ -55,6 +55,23 @@ describe('ExportMenu', () => {
     expect(exportCalls[0]!.url.pathname).toBe('/api/v1/customers/c%201/statement')
     expect(exportCalls[0]!.url.search).toBe('?export=pdf')
     expect(saved[0]?.filename).toBe('customer-statement-corner-shop-20261105-1430.pdf')
+  })
+
+  it('offers Excel, CSV and PDF; CSV keeps the filters (Phase 7)', async () => {
+    const user = userEvent.setup()
+    const saved = captureDownloads()
+    const { exportCalls } = mockApiWithExports({}, () => fileResponse('report-corner-shop-20261105-1430.csv', 'text/csv; charset=UTF-8'))
+    render(<ExportMenu list="report" pathParams={{ key: 'sales_daily' }} title="Daily sales" query={{ date_from: '2026-11-01', date_to: '2026-11-07', page: 2 }} />)
+
+    await user.click(screen.getByRole('button', { name: 'Export' }))
+    expect((await screen.findAllByRole('menuitem')).map((m) => m.textContent?.trim())).toEqual(['Excel (.xlsx)', 'CSV (.csv)', 'PDF'])
+    expect(screen.getByText('Daily sales — all matching rows')).toBeInTheDocument()
+    await user.click(screen.getByRole('menuitem', { name: 'CSV (.csv)' }))
+
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(exportCalls[0]!.url.pathname).toBe('/api/v1/reports/sales_daily')
+    expect(Object.fromEntries(exportCalls[0]!.url.searchParams)).toEqual({ date_from: '2026-11-01', date_to: '2026-11-07', export: 'csv' })
+    expect(fallbackExportFilename('report', 'csv', 'Daily sales')).toBe('daily-sales.csv')
   })
 
   it('shows a busy button while the file is prepared', async () => {
