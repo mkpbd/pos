@@ -26,6 +26,7 @@ import { PURCHASING_TABS } from '@/features/inventory/sections'
 import { linesSchema, toApiLine } from '@/features/inventory/lines'
 import { DocumentLinesTable } from '@/features/purchasing/components/document-totals'
 import { SupplierSelect } from '@/features/purchasing/components/supplier-select'
+import { PurchaseOrderCatalogHints } from '@/features/supply-chain/components/po-catalog-hints'
 import {
   PO_STATUS,
   today,
@@ -256,6 +257,9 @@ function OrderForm({ order }: { order?: PurchaseOrder }) {
         <CardHeader><CardTitle>Items</CardTitle></CardHeader>
         <CardContent>
           <LinesEditor control={form.control} register={form.register} setValue={form.setValue} errors={errors} config={{ ...LINE_OPTIONS, currency: me.organization?.base_currency }} />
+          <div className="mt-3">
+            <PurchaseOrderCatalogHints control={form.control} setValue={form.setValue} initialSupplierId={order?.supplier?.id} />
+          </div>
         </CardContent>
       </Card>
       <div className="flex justify-end gap-2">

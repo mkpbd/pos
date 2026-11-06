@@ -77,6 +77,28 @@ class EloquentBranchDirectory implements BranchDirectory
             ->all();
     }
 
+    public function activeStores(string $organizationId): array
+    {
+        return Store::query()->withoutGlobalScope('organization')
+            ->select('stores.*')
+            ->join('branches', 'branches.id', '=', 'stores.branch_id')
+            ->where('stores.organization_id', $organizationId)
+            ->where('stores.is_active', true)
+            ->where('branches.is_active', true)
+            ->orderBy('branches.name')->orderBy('stores.name')
+            ->with(['branch' => fn ($q) => $q->withoutGlobalScope('organization')])
+            ->get()
+            ->map(fn (Store $s) => [
+                'id' => $s->id,
+                'code' => $s->code,
+                'name' => $s->name,
+                'branch_id' => $s->branch_id,
+                'branch_name' => $s->branch->name,
+            ])
+            ->values()
+            ->all();
+    }
+
     public function profile(string $branchId, string $organizationId): ?array
     {
         $branch = $this->query($organizationId)->find($branchId);

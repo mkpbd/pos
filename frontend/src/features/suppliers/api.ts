@@ -58,3 +58,11 @@ export function useArchiveSupplierMutation() {
     onSuccess: invalidate,
   })
 }
+
+export function useSupplierQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: [...supplierKeys.all, 'detail', id],
+    queryFn: ({ signal }) => api.get<Supplier>(`/suppliers/${id}`, { signal }).then((r) => r.data),
+    enabled: !!id,
+  })
+}

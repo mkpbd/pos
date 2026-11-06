@@ -6,11 +6,11 @@
 |------|---------|----------------------------------|
 | PHP | 8.4 with `bcmath`, `intl`, `pdo_pgsql`, `pgsql`, `gd`, `zip` | `C:\laragon\bin\php\php-8.4.16-nts-Win32-vs17-x64` — put it first on `PATH` |
 | Composer | 2.x | |
-| Node.js | 22+ / npm 10+ | |
+| Node.js | 22.12+ / npm 10+ | 22.12 is the minimum of `backend/pdf-renderer` (PDF exports) |
 | PostgreSQL | 18 | Windows service on `127.0.0.1:5432`; `psql` at `C:\Program Files\PostgreSQL\18\bin` |
 | Redis | 5+ (optional locally) | `C:\laragon\bin\redis`; the app uses the `predis` client, no PHP extension required |
 
-`BCMath\Number` (PHP 8.4) backs all money arithmetic, so `bcmath` is mandatory.
+`BCMath\Number` (PHP 8.4) backs all money arithmetic, so `bcmath` is mandatory. Since X1 `composer.json` requires `php ^8.4` (OpenSpout 5), so Composer refuses PHP 8.3 — on this box 8.3 is first on `PATH` by default.
 
 ## First-time setup
 
@@ -57,12 +57,24 @@ After adding permissions to a module, run `php artisan pos:permissions:sync` to 
 
 Without Redis running, keep `CACHE_STORE=database`, `QUEUE_CONNECTION=database`, `SESSION_DRIVER=database`. With Redis, switch them to `redis`.
 
+**List exports (X1).** Excel works out of the box. PDF needs the renderer package and a Chrome once:
+
+```powershell
+cd backend\pdf-renderer
+$env:PUPPETEER_SKIP_DOWNLOAD='1'; npm ci     # puppeteer-core only, no Chromium download
+cd ..\..\frontend; npx playwright install chromium   # if not installed yet (also used by the E2E tests)
+```
+
+Leave `PDF_CHROME_PATH` empty locally: the app uses the newest Playwright Chromium under `%LOCALAPPDATA%\ms-playwright\chromium-*\chrome-win64` (or `chrome-win`). The PHP server process must see `LOCALAPPDATA` and have `node` on `PATH`; otherwise set `PDF_CHROME_PATH` / `PDF_NODE_BINARY` in `backend/.env`. Without them PDF answers 503 `PDF_UNAVAILABLE` and Excel still works. Settings: `config/exports.php`, `config/pdf.php` (keys in [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)).
+
 Queue worker and scheduler during development (low-stock notifications are queued, so they only appear in the bell while a worker runs):
 
 ```powershell
 php artisan queue:work
 php artisan schedule:work
 ```
+
+The daily reorder alert (SC1) runs hourly from 07:00 organization time; to send it now: `php artisan purchasing:reorder-notifications --any-hour` (once per store and day — a second run the same day sends nothing). After pulling SC1, run `php artisan pos:permissions:sync` so the built-in roles get `inventory.manage`.
 
 ### 3. Frontend
 
@@ -82,7 +94,7 @@ Selling needs an open register session (Phase 6). After seeding, the demo cashie
 
 | Task | Backend (`backend/`) | Frontend (`frontend/`) |
 |------|----------------------|------------------------|
-| Run tests | `php artisan test` | `npm test` |
+| Run tests | `php artisan test` (real PDF render: `$env:PDF_E2E='1'; php artisan test --filter=test_real_pdf_rendering_with_chrome`, `PDF_E2E_OUT=<file>` keeps the PDF) | `npm test` |
 | Single test/filter | `php artisan test --filter=MoneyTest` | `npx vitest run src/lib` |
 | E2E | — | `npm run test:e2e` |
 | Format / lint | `vendor/bin/pint` | `npm run lint` |
@@ -127,3 +139,5 @@ Selling needs an open register session (Phase 6). After seeding, the demo cashie
 | `Failed to listen on 127.0.0.1:8000 (… forbidden by its access permissions)` | Windows reserves that port (Hyper-V/WSL excluded range; check `netsh interface ipv4 show excludedportrange protocol=tcp`). Use another port: `php artisan serve --port=8010` and `VITE_BACKEND_ORIGIN=http://127.0.0.1:8010` in `frontend/.env.local`. |
 | `ORGANIZATION_CONTEXT_REQUIRED` as platform admin | Tenant endpoints need `X-Organization-Id` for platform admins. |
 | A new permission does not show up in a built-in role | Run `php artisan pos:permissions:sync`. |
+| `composer install` fails with "requires php ^8.4" | PHP 8.3 is first on `PATH`; prepend `C:\laragon\bin\php\php-8.4.16-nts-Win32-vs17-x64`. |
+| PDF export answers 503 `PDF_UNAVAILABLE` | `backend/pdf-renderer/node_modules` missing (`PUPPETEER_SKIP_DOWNLOAD=1 npm ci` there), no Chromium (`npx playwright install chromium`, or set `PDF_CHROME_PATH`), or `node` not on the server process's `PATH` (`PDF_NODE_BINARY`). Render failures are logged as "PDF rendering failed.". |

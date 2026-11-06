@@ -21,6 +21,8 @@ Browser ──▶ │ Nginx                                                │
                          PostgreSQL 18      Redis
 ```
 
+The PHP-FPM hosts also need Node.js ≥ 22.12 and a Chromium for PDF exports (X1, below).
+
 Serving the SPA and API from the **same origin** is required for Sanctum cookie authentication without third-party cookies.
 
 ## Environment (`backend/.env` in production)
@@ -140,6 +142,33 @@ Bangla storefront and content translations (E12b):
 - E-mails stay English (localized e-mails: E13). No new permission, environment variable, scheduler job or rate limiter.
 - The new PostgreSQL CHECKs and the jsonb search expression (`lower(translations->'bn'->>'name') LIKE …`) have not run yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
 
+PDF and Excel export on admin lists (X1):
+- **PHP 8.4 is required** (`composer.json` `php` `^8.4`; OpenSpout 5 needs it). `composer install` refuses PHP 8.3.
+- **Excel** needs nothing beyond `composer install` (OpenSpout, pure PHP; `zip` extension as before). Files are written to `storage/app/private/exports` and deleted after sending — the storage directory must be writable.
+- **PDF prerequisites** (otherwise PDF answers 503 `PDF_UNAVAILABLE` and Excel keeps working):
+  - **Node.js ≥ 22.12** on the PHP host (`PDF_NODE_BINARY`, default `node` on `PATH` of the PHP-FPM user; `PDF_NPM_BINARY`, default `npm`).
+  - **A system Chrome or Chromium** (e.g. `apt install chromium`). Set `PDF_CHROME_PATH` to its executable; when empty the app tries `/usr/bin/chromium`, `/usr/bin/chromium-browser`, `/usr/bin/google-chrome`, `/usr/bin/google-chrome-stable`, `/snap/bin/chromium`. A configured path that does not exist is not replaced by auto-detection.
+  - **The renderer package:** `cd backend/pdf-renderer && PUPPETEER_SKIP_DOWNLOAD=1 npm ci` on every release (installs `puppeteer-core` from the committed lockfile; no Chromium download). `PDF_NODE_MODULES_PATH` (default `backend/pdf-renderer/node_modules`) and `PDF_RENDERER_SCRIPT` (default `backend/pdf-renderer/browser.cjs`) only need changing for a non-standard layout.
+  - **Containers / root:** Chrome's sandbox needs user namespaces. Where they are unavailable (most containers, or Chrome running as root) set `PDF_NO_SANDBOX=true`; the HTML rendered is the app's own, escaped, with JavaScript disabled, but prefer running PHP-FPM as a non-root user with the sandbox on.
+  - `PDF_TIMEOUT` (default 60 s) bounds one render; a timeout answers 503. Rendering writes a temporary directory under `storage/app/private/pdf-render` and removes it.
+  - Fonts (Poppins, Hind Siliguri) ship in `backend/resources/fonts` and are inlined — no system fonts or network access needed for Bangla.
+- **Environment keys** (all optional): `EXPORT_MAX_ROWS_XLSX` (50000), `EXPORT_MAX_ROWS_PDF` (2000), `EXPORT_RATE_LIMIT` (10 per minute per user), `EXPORT_CHUNK_SIZE` (500 rows per query); `PDF_CHROME_PATH`, `PDF_NODE_BINARY`, `PDF_NPM_BINARY`, `PDF_NODE_MODULES_PATH`, `PDF_RENDERER_SCRIPT`, `PDF_TIMEOUT`, `PDF_NO_SANDBOX`. Run `php artisan optimize` after changing them (config cache).
+- Check after deploying: `GET /api/v1/customers?export=pdf` as an admin returns `application/pdf`; a 503 `PDF_UNAVAILABLE` means Chrome, Node or `node_modules` is missing (the reason is logged as "PDF rendering failed." at warning level when Chrome itself fails).
+- Exports run inside the web request (no queue); a 2 000-row PDF takes seconds. Keep PHP-FPM's `request_terminate_timeout` and the proxy timeout above `PDF_TIMEOUT`.
+- Licenses: OpenSpout and Browsershot MIT, puppeteer-core Apache-2.0, fonts SIL OFL 1.1 (license files kept beside the fonts).
+- No migration, permission, scheduler job or queue job. Exports are audited (`export.created`).
+- Business dates (GRN invoice and manufacturing dates, supplier payments, expenses) are now checked against today in the organization's timezone; set each organization's timezone correctly. `config/app.php` stays UTC.
+- The PostgreSQL run is still pending — run the full suite on PostgreSQL before production.
+
+Supplier catalog, reorder suggestions and replenishment (SC1):
+- **Migrations** (additive, no backfill): Inventory `2026_11_06_100000_create_replenishment_tables` (`stock_reorder_rules`, `replenishment_settings`), Purchasing `2026_11_06_100100_create_supplier_catalog_tables` (`supplier_products` with the partial unique index `supplier_products_preferred_unique`, `reorder_notification_runs`). `php artisan migrate --force` as usual.
+- **Run `php artisan pos:permissions:sync`.** The new permission `inventory.manage` (reorder rules, replenishment settings) reaches the built-in roles Organization Admin (`*`), Branch Manager and Inventory Manager (`inventory.*`) only after the sync; until then the *Inventory → Settings* tab is hidden, reorder rules are read-only and `PUT /inventory/reorder-rules` / `PATCH /inventory/replenishment-settings` answer 403. Custom roles need it added by hand.
+- **The scheduler must run** (`php artisan schedule:run` every minute from cron, or `schedule:work`): `purchasing:reorder-notifications` is scheduled **hourly** (`withoutOverlapping`) and notifies each organization from 07:00 in its own timezone, once per store and local day (claimed in `reorder_notification_runs`). Without the scheduler there are no daily *Reorder needed* alerts; the Reorder page works regardless. Manual run: `php artisan purchasing:reorder-notifications --any-hour`. Set each organization's timezone correctly.
+- Recipients are users with `purchases.manage` in the store's branch (database notifications, no e-mail, no queue job).
+- Optional after deploying: choose a source (central) store under *Inventory → Settings → Replenishment* to get transfer suggestions; without one every suggestion is a purchase. Replenishment transfers are dispatched immediately (stock leaves the source at once).
+- No new environment variable, queue job, rate limiter or dependency.
+- The new PostgreSQL CHECKs and the partial unique index have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash
@@ -147,9 +176,10 @@ Bangla storefront and content translations (E12b):
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan storage:link        # once: media and product images under /storage
-php artisan pos:permissions:sync  # new module permissions -> built-in roles
+php artisan pos:permissions:sync  # new module permissions -> built-in roles (SC1: inventory.manage)
 php artisan optimize            # config, routes, events, views cache
 php artisan queue:restart
+(cd pdf-renderer && PUPPETEER_SKIP_DOWNLOAD=1 npm ci)   # PDF exports (X1); needs Node >= 22.12 and a system Chromium
 
 # frontend
 npm ci
@@ -161,7 +191,7 @@ npm run build                   # publish frontend/dist
 | Process | Command | Supervision |
 |---------|---------|-------------|
 | Queue workers | `php artisan queue:work redis --tries=3 --max-time=3600` | systemd/Supervisor, ≥2 workers |
-| Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`) | cron |
+| Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`), sends the daily reorder alerts (`purchasing:reorder-notifications`, hourly, from 07:00 organization time, once per store and day) | cron |
 | Health probe | `GET /api/v1/health` (200 / 503) and `GET /up` | load balancer |
 
 ## Database

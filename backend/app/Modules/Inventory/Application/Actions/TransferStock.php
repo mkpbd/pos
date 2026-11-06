@@ -42,8 +42,11 @@ class TransferStock
 
     /**
      * @param  array{from_store_id: string, to_store_id: string, note?: ?string, lines: list<array{variant_id: string, quantity: string, batch_id?: ?string}>}  $data
+     * @param  bool  $allocateBatches  lines without a batch of batch-tracked products are taken
+     *                                 first-expiry-first-out by the ledger, one transfer line per batch
+     *                                 (replenishment transfers, SC1)
      */
-    public function dispatch(TenantUser $actor, array $data): StockTransfer
+    public function dispatch(TenantUser $actor, array $data, bool $allocateBatches = false): StockTransfer
     {
         $organizationId = $this->tenant->requireOrganization();
         $from = $this->storeAccess->require($actor, $data['from_store_id'], 'from_store_id');
@@ -55,9 +58,9 @@ class TransferStock
         if ($to['id'] === $from['id']) {
             throw ValidationException::withMessages(['to_store_id' => ['Choose a different store than the source.']]);
         }
-        $this->lineRules->validate($organizationId, $data['lines'], 'out');
+        $this->lineRules->validate($organizationId, $data['lines'], 'out', checkBatches: ! $allocateBatches);
 
-        return DB::transaction(function () use ($actor, $organizationId, $from, $to, $data) {
+        return DB::transaction(function () use ($actor, $organizationId, $from, $to, $data, $allocateBatches) {
             $transfer = StockTransfer::query()->create([
                 'organization_id' => $organizationId,
                 'number' => $this->sequences->next($organizationId, 'stock_transfer', 'TRF-'),
@@ -71,10 +74,29 @@ class TransferStock
                 'dispatched_at' => now(),
             ]);
 
-            $changes = array_map(fn (array $l) => new StockChange($from['id'], $l['variant_id'], $l['batch_id'] ?? null, MovementType::TransferOut, $l['quantity']), $data['lines']);
+            $lines = array_values($data['lines']);
+            $changes = array_map(fn (array $l) => new StockChange(
+                $from['id'], $l['variant_id'], $l['batch_id'] ?? null, MovementType::TransferOut, $l['quantity'],
+                allocateBatches: $allocateBatches && ($l['batch_id'] ?? null) === null,
+            ), $lines);
             $posted = $this->ledger->post($changes, new StockReference('stock_transfer', $transfer->id, $transfer->number));
 
-            foreach (array_values($data['lines']) as $i => $line) {
+            foreach ($lines as $i => $line) {
+                $allocations = $allocateBatches && isset($posted[$i]) ? $posted[$i]['allocations'] : [];
+                if (count($allocations) > 1 || ($allocations[0]['batch_id'] ?? null) !== null) {
+                    // One line per batch taken, so the destination receives the same batches.
+                    foreach ($allocations as $allocation) {
+                        $transfer->lines()->create([
+                            'organization_id' => $organizationId,
+                            'variant_id' => $line['variant_id'],
+                            'batch_id' => $allocation['batch_id'],
+                            'quantity' => $allocation['quantity'],
+                            'unit_cost' => $allocation['unit_cost'],
+                        ]);
+                    }
+
+                    continue;
+                }
                 $transfer->lines()->create([
                     'organization_id' => $organizationId,
                     'variant_id' => $line['variant_id'],

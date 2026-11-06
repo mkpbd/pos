@@ -40,6 +40,13 @@ interface BranchDirectory
     public function storeSummaries(string $organizationId, array $storeIds): array;
 
     /**
+     * Active stores of active branches of the organization, by branch and store name.
+     *
+     * @return list<array{id: string, code: string, name: string, branch_id: string, branch_name: string}>
+     */
+    public function activeStores(string $organizationId): array;
+
+    /**
      * Contact details printed on documents (receipts, invoices).
      *
      * @return array{id: string, code: string, name: string, address: ?string, phone: ?string, email: ?string}|null

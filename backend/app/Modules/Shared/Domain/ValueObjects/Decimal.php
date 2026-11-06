@@ -68,6 +68,36 @@ final class Decimal
         return $n->compare($n->floor()) === 0;
     }
 
+    /**
+     * Smallest value with `$scale` decimals that is not below `$a` (2.0001 -> 3 at scale 0).
+     */
+    public static function ceil(string $a, int $scale = 0): string
+    {
+        $factor = (new Number('1'))->mul((new Number('10'))->pow($scale));
+
+        return bcadd((string) self::n($a)->mul($factor)->ceil()->div($factor, $scale), '0', $scale);
+    }
+
+    /**
+     * Largest value with `$scale` decimals that is not above `$a` (2.9 -> 2 at scale 0).
+     */
+    public static function floor(string $a, int $scale = 0): string
+    {
+        $factor = (new Number('1'))->mul((new Number('10'))->pow($scale));
+
+        return bcadd((string) self::n($a)->mul($factor)->floor()->div($factor, $scale), '0', $scale);
+    }
+
+    public static function max(string $a, string $b): string
+    {
+        return self::compare($a, $b) >= 0 ? $a : $b;
+    }
+
+    public static function min(string $a, string $b): string
+    {
+        return self::compare($a, $b) <= 0 ? $a : $b;
+    }
+
     public static function round(string $a, int $scale): string
     {
         return self::fix(self::n($a), $scale);

@@ -40,6 +40,19 @@ class DecimalTest extends TestCase
         Decimal::div('1', '0.000', 2);
     }
 
+    public function test_ceil_floor_min_max(): void
+    {
+        $this->assertSame('3', Decimal::ceil('2.0001'));
+        $this->assertSame('2', Decimal::ceil('2.000'));
+        $this->assertSame('-2', Decimal::ceil('-2.5'));
+        $this->assertSame('2.51', Decimal::ceil('2.501', 2));
+        $this->assertSame('2', Decimal::floor('2.999'));
+        $this->assertSame('-3', Decimal::floor('-2.5'));
+        $this->assertSame('2.50', Decimal::floor('2.509', 2));
+        $this->assertSame('5', Decimal::max('5', '4.9'));
+        $this->assertSame('4.9', Decimal::min('5', '4.9'));
+    }
+
     public function test_money_of_product_rounds_once(): void
     {
         // 1.250 kg × 33.3333 = 41.666625 → 41.67

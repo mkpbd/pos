@@ -131,9 +131,13 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `REFUND_REQUIRED` | Staff cancelling a paid web order without `refund.method` (`details.refund_amount`) (E11). |
 | 422 | `CATEGORY_NOT_FOUND` | Also: a blog post naming a blog category that is not (any more) in the organization (`details.category_id`) (E11). |
 | 422 | `BLOG_CATEGORY_NOT_FOUND`, `BLOG_POST_NOT_FOUND` | A menu item or homepage `blog_posts` section naming a blog category or post that does not exist (`details.blog_category_ids` / `blog_post_ids`; section: `details.category_id`) (E11). |
+| 422 | `EXPORT_TOO_LARGE` | A list export above the format's row limit (`details.limit`, `rows`, `format`); narrow the filters (X1, see [Exports](#exports-x1)). |
+| 422 | `SUPPLIER_PRODUCT_INACTIVE`, `SUPPLIER_INACTIVE` | Making an inactive supplier catalog row preferred / a row of an inactive or archived supplier (SC1). |
+| 422 | `NO_SOURCE_STORE`, `SOURCE_IS_DESTINATION`, `SOURCE_STORE_INACTIVE`, `SOURCE_STORE_NOT_ACCESSIBLE` | A replenishment transfer without a source store in the settings, for the source store itself, from an inactive source store, or by a user without access to the source store's branch (SC1). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
+| 503 | `PDF_UNAVAILABLE` | A PDF list export cannot be rendered on this server (Chrome, Node or the renderer's `node_modules` missing, render failure or timeout); Excel still works (X1). |
 
 ## Cross-cutting headers
 
@@ -146,6 +150,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). Also required on unsafe storefront requests that run the `storefront.session` stack (account, cart, wishlist). |
 | `Retry-After`, `X-RateLimit-*` | response | Rate-limit information. |
 | `Content-Language` | response | Storefront requests (E12b): `en` or `bn`, the language of the answer. The public API takes the language from `?lang=` only; storefront pages also from the `lang` cookie. |
+| `Content-Disposition`, `X-Export-Rows` | response | List exports (X1): `attachment` with the file name; number of data rows in the file. |
 
 ## Conventions
 
@@ -156,6 +161,71 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 - **Rate limits:** 120 requests/minute per user (or IP when unauthenticated) on the `api` group; credential endpoints (`auth` limiter) 5/min per e-mail+IP and 20/min per IP; public storefront (`storefront` limiter) 300/min per IP; shopper credential endpoints (`customer-auth`) as `auth` (`POS_AUTH_RATE_LIMIT` per e-mail+IP, four times that per IP); shopper writes (`storefront-write`) 60/min per IP and 60/min per signed-in customer; checkout preview and placement (`checkout`) `POS_CHECKOUT_RATE_LIMIT` (default 10)/min per IP and shopper (customer account or guest cart); coupon attempts (`coupon`, `POST /store/cart/coupon`) `POS_COUPON_RATE_LIMIT` (default 10)/min per signed-in customer, else per guest cart, else per IP.
 - **Identifiers:** UUIDv7 strings (device token ids are integers).
 - **Versioning:** breaking changes go to `/api/v2`; additive changes stay in v1.
+
+## Exports (X1)
+
+Admin list endpoints answer `?export=xlsx|pdf` with a file instead of the JSON page. The export is the list's own query: the same filters, `search` and `sort`, the same permission and tenant/branch scoping, **every matching row** (`page` and `per_page` are ignored).
+
+```
+GET /api/v1/sales?status=completed&from=2026-11-01&to=2026-11-05&sort=-sold_at&export=xlsx
+→ 200  Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+       Content-Disposition: attachment; filename=sales-demo-mart-20261105-1430.xlsx
+       Cache-Control: no-store, private
+       X-Export-Rows: 42
+```
+
+| Rule | Value |
+|------|-------|
+| Formats | `xlsx` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), `pdf` (`application/pdf`). Any other `export` value → 422 `VALIDATION_FAILED` on `export`. |
+| File name | `<stem>-<organization slug>-<YYYYMMDD-HHmm>.<xlsx\|pdf>`, time in the organization's timezone (stems below). |
+| Row limits | xlsx 50 000, pdf 2 000 (`EXPORT_MAX_ROWS_XLSX`, `EXPORT_MAX_ROWS_PDF`). Above → 422 `EXPORT_TOO_LARGE`, `details: {limit, rows, format}`; the rows are counted before any is read. |
+| Rate limit | 10 exports per minute per user (`EXPORT_RATE_LIMIT`) across all lists → 429 `TOO_MANY_REQUESTS` with `Retry-After`. Counted before the row limit, so a refused export counts too. The JSON list is not affected. |
+| PDF unavailable | 503 `PDF_UNAVAILABLE` when Chrome, Node or `backend/pdf-renderer/node_modules` is missing, or rendering fails or exceeds `PDF_TIMEOUT` (60 s). |
+| Permission | The list's own permission (table below); nothing extra. 403 `FORBIDDEN` without it. Columns *Cost* (products), *Value* (stock) and *Unit cost* (stock movements) are included only with `products.view_cost`; `/inventory/valuation` requires it. |
+| Audit | Each export writes `export.created` with `context: {list (stem), format, filters (query without export/page/per_page), rows}`. |
+| Excel content | Sheet named after the title (≤ 31 characters); bold, frozen header row; money as numbers with format `#,##0.00`; numbers and quantities as numbers; dates and date-times as date cells in the organization's timezone; statuses as readable labels ("Partially received"); text never written as a formula. |
+| PDF content | A4 (landscape above six columns): letterhead (name, legal name, address, phone, e-mail, tax number, storefront logo), title, filter summary ("Status: Completed · Branch: Dhaka Main · Date: 01 Nov–05 Nov 2026", or "All records"), generated-at in the organization's timezone and the user's name, table header repeated on each page, "Page X of Y". Embedded Poppins / Hind Siliguri, so Bangla text renders. |
+
+Exportable lists (columns in file order; ¹ only with `products.view_cost`):
+
+| Endpoint | Permission | Stem | Title | Columns |
+|----------|-----------|------|-------|---------|
+| `/sales` | `sales.view` (or `pos.sell`: own sales) | `sales` | Sales | Invoice, Date, Branch, Store, Customer, Cashier, Subtotal, Discount, Tax, Total, Paid, Due, Status |
+| `/returns` | `returns.view` | `sale-returns` | Sales returns | Return, Requested, Invoice, Branch, Customer, Reason, Total, Credited, Refunded, Status, Requested by |
+| `/customer-payments` | `payments.view` | `customer-payments` | Customer payments | Number, Date, Customer, Customer code, Method, Reference, Amount, Received by |
+| `/customers/{id}/statement` | `sales.view` or `payments.view` | `customer-statement` | Customer statement — {customer} | Date, Type, Number, Description, Amount, Balance |
+| `/customers` | `customers.view` | `customers` | Customers | Code, Name, Phone, E-mail, Group, Credit limit, Opening balance, Active, Created |
+| `/suppliers` | `suppliers.view` | `suppliers` | Suppliers | Code, Name, Contact person, Phone, E-mail, Tax no., Terms (days), Opening balance, Active |
+| `/products` | `products.view` | `products` | Products | Product, SKU, Barcodes, Type, Category, Brand, Unit, Variants, Price, Cost¹, Active (SKU and barcodes of all variants; price and cost = the lowest) |
+| `/users` | `users.view` | `users` | Users | Name, E-mail, Phone, Roles, Branches, Status, Last sign-in, Created |
+| `/audit-logs` | `audit.view` | `audit-log` | Audit log | Date, Action, User, Subject, Subject id, Changed fields, Details (context, ≤ 300 characters), IP address |
+| `/purchasing/orders` | `purchases.view` | `purchase-orders` | Purchase orders | Order, Order date, Expected, Supplier, Store, Subtotal, Tax, Total, Status |
+| `/purchasing/reorder-suggestions` (`store_id` required) | `purchases.view` | `reorder-suggestions` | Reorder suggestions | Product, Variant, SKU, On hand, On order, In transit, Avg. daily, Days of cover, Reorder point, Target, Transfer, Purchase, Supplier, Unit cost, Lead time (days), Reason (SC1) |
+| `/purchasing/supplier-products` | `purchases.view` | `supplier-catalog` | Supplier catalog | Product, Variant, SKU, Supplier, Supplier SKU, Unit cost, Pack size, Min. order, Lead time (days), Preferred, Last cost, Last purchased, Active (SC1) |
+| `/purchasing/receipts` | `purchases.view` | `goods-receipts` | Goods receipts | Receipt, Invoice date, Supplier invoice, Supplier, Store, Due date, Subtotal, Tax, Total |
+| `/purchasing/returns` | `purchases.view` | `purchase-returns` | Purchase returns | Return, Date, Supplier, Store, Reason, Subtotal, Tax, Total |
+| `/purchasing/payments` | `purchases.view` | `supplier-payments` | Supplier payments | Number, Paid on, Supplier, Method, Reference, Amount, Notes |
+| `/purchasing/suppliers/{id}/statement` | `purchases.view` | `supplier-statement` | Supplier statement — {supplier} | Date, Type, Number, Reference, Amount, Balance |
+| `/inventory/stock` | `inventory.view` | `stock` | Stock on hand | Product, Variant, SKU, Store, Branch, On hand, Unit, Reorder level, Low stock, Value¹ |
+| `/inventory/batches` | `inventory.view` | `batches` | Stock by batch | Product, Variant, SKU, Batch, Expires, Store, Quantity, Expired |
+| `/inventory/movements` | `inventory.view` | `stock-movements` | Stock movements | Date, Type, Product, Variant, SKU, Batch, Store, Quantity, Balance, Unit cost¹, Reference, By |
+| `/inventory/valuation` | `inventory.view` + `products.view_cost` | `stock-valuation` | Inventory valuation | Store, Branch, Products, Value (last row: Total) |
+| `/inventory/adjustments` | `inventory.view` | `stock-adjustments` | Stock adjustments | Adjustment, Date, Reason, Store, Lines, Note, By |
+| `/inventory/transfers` | `inventory.view` | `stock-transfers` | Stock transfers | Transfer, Dispatched, From, To, Lines, Status, Completed, Note |
+| `/register-sessions` | `cash_registers.view` (or `.operate`: own) | `register-sessions` | Register sessions | Session, Register, Branch, Opened by, Opened, Closed, Opening float, Expected cash, Counted cash, Variance, Status |
+| `/payments` | `payments.view` | `payments` | Payments ledger | Date, Direction, Method, Source, Document, Branch, Reference, Session, Amount, By |
+| `/expenses` (`type=expense`, default) | `expenses.view` | `expenses` | Expenses | Number, Date, Category, Branch, Method, Reference, Amount, Recorded by, Void reason |
+| `/expenses?type=income` | `expenses.view` | `income` | Other income | as expenses |
+| `/web-orders` | `web_orders.view` | `web-orders` | Web orders | Order, Placed, Customer, Phone, District, Items, Total, Payment, Payment status, Status, Courier, Tracking no., Delivered |
+| `/web-order-returns` | `web_orders.view` | `web-returns` | Web order returns | Return, Requested, Order, Customer, Reason, Refund, Status |
+| `/cod-remittances` | `web_orders.remit` | `cod-remittances` | COD remittances | Remittance, Received, Courier, Reference, Method, Orders, Collected, Courier fee, Net received, Recorded by |
+| `/promotions` | `promotions.view` | `promotions` | Promotions | Promotion, Type, Value, Applies to, Trigger, Starts, Ends, Status, Coupons, Redemptions, Discount given |
+| `/promotions/{id}/report` | `promotions.view` | `promotion-report` | Promotion report — {promotion} | Date, Redemptions, Discount (last row: Total) |
+| `/reviews` | `reviews.view` | `reviews` | Product reviews | Date, Product, Customer, E-mail, Rating, Title, Review, Status, Moderated by, Rejection reason |
+| `/cms/contact-messages` | `cms.manage` | `contact-messages` | Contact messages | Received, Name, E-mail, Phone, Subject, Message, Status (Open / Handled), Handled |
+| `/cms/newsletter-subscribers` | `cms.manage` | `newsletter-subscribers` | Newsletter subscribers | E-mail, Status, Signed up, Confirmed, Unsubscribed (the CSV `GET /cms/newsletter-subscribers/export` stays) |
+
+Statements, the valuation, the promotion report and the reorder suggestions are computed by their endpoint first (bounded by their own period or store count); the other lists are read in 500-row chunks (`EXPORT_CHUNK_SIZE`). Lists without an export: catalog taxonomies, branches, roles, cash registers, blog, pages, FAQ, media, shipping, payment methods, web categories/brands, platform organizations.
 
 ## Endpoints
 
@@ -1382,11 +1452,155 @@ PUT /api/v1/online-catalog/categories/{categoryId}
 
 No new error codes or permissions.
 
+### Supply chain — supplier catalog, reorder suggestions and replenishment (SC1)
+
+Slice 1 of the supply chain track (SC2: purchase requisitions with approvals and RFQ / quote comparison; SC3: landed cost and supplier performance). Quantities are decimal strings with 3 places, unit costs 4, money 2. Scoping as in the rest of purchasing and inventory: the catalog and the settings are organization-wide; rules, suggestions and the documents created from them follow branch access (a store of another organization or of a branch the user cannot access answers 422 `VALIDATION_FAILED` on `store_id`, "The selected store does not exist."; another organization's catalog row or rule answers 404).
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| GET | `/purchasing/supplier-products` | `purchases.view` | Supplier catalog. Filters `supplier_id`, `variant_id`, `is_active`, `is_preferred`, `search` (supplier SKU, or product name, SKU or barcode); `sort` `product` (default) \| `unit_cost` \| `lead_time_days` \| `created_at` \| `updated_at` (`-` = descending); paginated; `?export=xlsx\|pdf` (stem `supplier-catalog`). |
+| GET | `/purchasing/supplier-products/lookup?supplier_id=&variant_ids[]=` | `purchases.view` | Active catalog rows of one supplier for 1–500 variants (purchase order prefill). A list (not a map) of `{supplier_product_id, variant_id, supplier_sku, unit_cost, pack_size, min_order_qty, lead_time_days, is_preferred, last_purchase_cost}`; variants without an active row are absent. |
+| POST | `/purchasing/supplier-products` | `purchases.manage` | Create a row → 201 (shape below). Audited `supplier_product.created`. |
+| PATCH | `/purchasing/supplier-products/{id}` | `purchases.manage` | Partial update → 200; `supplier_id` and `variant_id` are prohibited (fixed once created). `is_active: false` also clears `is_preferred`. Audited `supplier_product.updated`. |
+| DELETE | `/purchasing/supplier-products/{id}` | `purchases.manage` | Hard delete → 204. Audited `supplier_product.deleted`. |
+| POST | `/purchasing/supplier-products/{id}/preferred` | `purchases.manage` | No body. Makes the row the variant's preferred supplier and unsets the previous one in the same transaction → 200 row. 422 `SUPPLIER_PRODUCT_INACTIVE` (row inactive), `SUPPLIER_INACTIVE` (supplier inactive or archived). Audited `supplier_product.preferred`. |
+| GET | `/inventory/reorder-rules` | `inventory.view` | Rules of the user's branches. Filters `store_id`, `variant_id`, `is_active`, `search` (product name, SKU or barcode); ordered by product; paginated (`per_page` ≤ 100). |
+| PUT | `/inventory/reorder-rules` | `inventory.manage` | Bulk upsert of one store's rules by variant → 200 list of the saved rules in input order. Audited `reorder_rules.saved` (`store_id`, number of rules). |
+| DELETE | `/inventory/reorder-rules/{id}` | `inventory.manage` | → 204; a rule of a branch the user cannot access → 404. Audited `reorder_rule.deleted`. |
+| GET | `/inventory/replenishment-settings` | `inventory.view` | The organization's settings (defaults until first saved). |
+| PATCH | `/inventory/replenishment-settings` | `inventory.manage` | Partial update → 200 settings. Audited `replenishment_settings.updated` (before / after). |
+| GET | `/purchasing/reorder-suggestions?store_id=` | `purchases.view` | Suggestions for one store (`store_id` required). Filters `supplier_id` (the preferred supplier), `search` (product name, SKU or barcode), `only=purchase\|transfer`; paginated (computed in memory, then paged); `?export=xlsx\|pdf` (stem `reorder-suggestions`). |
+| POST | `/purchasing/reorder-suggestions/purchase-orders` | `purchases.manage` + `Idempotency-Key` | Draft purchase orders, one per supplier → 201. |
+| POST | `/purchasing/reorder-suggestions/transfers` | `inventory.transfer` + `Idempotency-Key` | One replenishment transfer from the source store, dispatched at once → 201. |
+
+`inventory.manage` is new (Inventory module: "Manage per-store reorder rules and replenishment settings"); built-in roles Organization Admin (`*`), Branch Manager and Inventory Manager (`inventory.*`) receive it after `php artisan pos:permissions:sync`. Without an `Idempotency-Key` header the two POSTs answer 428 `IDEMPOTENCY_KEY_REQUIRED`; a retry with the same key and body replays the first answer and never creates a second set.
+
+**Catalog row** (list, create, update, preferred):
+
+```json
+{"id": "…", "supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd"},
+ "variant": {"id": "…", "product_id": "…", "sku": "…", "product_name": "Pran Mango Juice 250ml", "variant_name": null, "unit": "pcs", "allow_decimal": false},
+ "supplier_sku": "PRN-MJ250", "unit_cost": "18.0000", "pack_size": "24.000", "min_order_qty": null, "lead_time_days": 3,
+ "is_preferred": true, "last_purchase_cost": null, "last_purchased_at": null, "is_active": true,
+ "created_at": "2026-11-06T02:00:00+00:00", "updated_at": "2026-11-06T02:00:00+00:00"}
+```
+
+| Field (POST / PATCH) | Rules |
+|----------------------|-------|
+| `supplier_id`, `variant_id` | Required on POST, prohibited on PATCH. The supplier must exist, not be archived and be active (`supplier_id`: "The selected supplier does not exist." / "… is inactive."); the variant must belong to the organization and not be archived or inactive (`variant_id`); one row per supplier and variant (`variant_id`: "This product is already in the supplier's catalog."). |
+| `unit_cost` | Required on POST; ≥ 0, up to 4 decimals; per base unit, tax-exclusive (as on purchase orders). |
+| `pack_size` | Optional, ≥ 1, up to 3 decimals; `null` = 1. Purchase suggestions are rounded up to whole packs. |
+| `min_order_qty` | Optional, > 0, up to 3 decimals, or `null`. |
+| `lead_time_days` | Optional integer 0–365; `null` = 7. |
+| `supplier_sku` | Optional, ≤ 64 characters (trimmed; blank = `null`). |
+| `is_preferred` | Optional boolean. `true` unsets the variant's other preferred row; refused on `is_preferred` for an inactive row or an inactive / archived supplier. |
+| `is_active` | Optional boolean, default `true`. |
+| `last_purchase_cost`, `last_purchased_at` | Prohibited. Posting a goods receipt sets them on the receipt supplier's existing rows for the received variants (the last line of a variant wins); receipts never create catalog rows. |
+
+Whole-unit products (unit without decimals) need whole `pack_size` and `min_order_qty` ("… is bought in whole units (pcs).").
+
+**Reorder rules.** `PUT {store_id, rules: [{variant_id, min_qty, max_qty?, is_active?}]}` — 1–500 rules, `variant_id` distinct. `min_qty` (reorder point) ≥ 0; `max_qty` (order-up-to level) ≥ `min_qty` or `null` (= cover `coverage_days` of sales); up to 3 decimals, whole for whole-unit products; `is_active` defaults to `true`; an omitted `max_qty` is saved as `null`. Errors (422 `VALIDATION_FAILED`, nothing saved): `store_id` not accessible or inactive; `rules.N.variant_id` unknown or not stock-tracked; `rules.N.max_qty` "The maximum must be at least the minimum."; fractional quantities of whole-unit products. Row: `{id, store: {id, code, name, branch_id, branch_name}, variant: {id, product_id, product_name, variant_name, sku, unit_code, track_batches, allow_decimal}, min_qty, max_qty, is_active, updated_at}`. Without an active rule a store uses the variant's `reorder_level` as `min_qty` and no maximum.
+
+**Replenishment settings** (`GET` answer; `PATCH` takes the same fields except `source_store`):
+
+```json
+{"source_store": {"id": "…", "code": "WH", "name": "Central warehouse", "branch_id": "…", "branch_name": "Head office"},
+ "source_store_id": "…", "coverage_days": 14, "velocity_days": 30, "safety_days": 3}
+```
+
+| Field | Default | Rules |
+|-------|---------|-------|
+| `source_store_id` | `null` | The central store that replenishes the others; `null` = purchase only. Must be a store of the organization ("The selected store does not exist.") that is active in an active branch ("The selected store is inactive."). |
+| `coverage_days` | 14 | 1–180: days of sales a reorder covers beyond the reorder point (rules without `max_qty`). |
+| `velocity_days` | 30 | 7–180: sales history used for the daily rate. |
+| `safety_days` | 3 | 0–60: added to the lead time for the reorder point. |
+
+**Suggestion row** (`GET /purchasing/reorder-suggestions`; illustrative values):
+
+```json
+{"variant": {"id": "…", "sku": "…", "product_name": "Pran Mango Juice 250ml", "variant_name": null, "unit": "pcs", "allow_decimal": false},
+ "on_hand": "150.000", "on_order": "0.000", "in_transit": "0.000", "avg_daily": "0.067",
+ "reorder_point": "160.000", "target": "288.000", "suggested_purchase": "144.000", "suggested_transfer": "0.000",
+ "supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd"}, "unit_cost": "18.0000", "lead_time_days": 3,
+ "reason": "below_min", "days_of_cover": "2250.0",
+ "pack_size": "24.000", "min_order_qty": null, "min_qty": "160.000", "max_qty": "288.000", "has_rule": true, "draft_on_order": "0.000"}
+```
+
+`meta`: `pagination`, `store` `{id, code, name, branch_id, branch_name}`, `source_store` (same shape; `null` when none is set, it is this store, or it is inactive) and `settings` `{coverage_days, velocity_days, safety_days}`. Rows are ordered by product name, variant name and SKU. `supplier` is `null` when the variant has no usable preferred supplier (an active preferred row of an active, non-archived supplier); the purchase is still suggested (pack 1, lead 7) and the admin flags it. `unit_cost` = the preferred catalog cost, else the unit cost of the variant's most recent goods receipt line (any supplier), else the variant's purchase price. `lead_time_days` = the preferred row's lead time, else 7. `pack_size` / `min_order_qty` come from the preferred row (`1.000` / `null` without one); `min_qty`, `max_qty`, `has_rule` show the effective rule. `draft_on_order` = outstanding quantity on the store's **draft** purchase orders — shown as a warning, not counted as available.
+
+Calculation (`Purchasing\Domain\Reorder\ReorderCalculator`, pure — no database, no clock; inputs gathered by `Purchasing\Application\Queries\ReorderSuggestions`):
+
+| Value | As implemented |
+|-------|----------------|
+| Candidates | Variants with an active rule in the store, a `reorder_level` > 0, sales in the window, or negative stock — then only stock-tracked, sellable variants. |
+| `on_hand` | Σ `stock_levels.quantity` of the store (all batches). |
+| `on_order` | Σ (`quantity − received_quantity`) of the store's purchase order lines in status `ordered` or `partially_received` (drafts excluded). |
+| `in_transit` | Σ line quantities of `in_transit` transfers into the store. |
+| `sold` | Net units sold at the store since now − `velocity_days` (a rolling window): −Σ signed `stock_movements.quantity` of types `sale`, `online_order`, `sale_cancellation`, `online_order_cancel`, `sale_return`, `online_return`; never below 0. Web orders count at their fulfilment store. |
+| `avg_daily` | `sold / velocity_days` (3 dp). |
+| `min_qty`, `max_qty` | The store's active rule, else `reorder_level` and `null`. |
+| `reorder_point` | `max(min_qty, ceil(sold × (lead_time_days + safety_days) / velocity_days))` — the velocity part is rounded up to whole units for every product (2.4 kg → 3). |
+| `target` | `max_qty` when set, else `reorder_point + ceil(sold × coverage_days / velocity_days)`. |
+| `available` | `on_hand + on_order + in_transit`. A row is returned only when `available ≤ reorder_point` and `need = target − available` > 0 (whole-unit products: `need` rounded up). |
+| `suggested_transfer` | When a source store is set, active and not this store: `min(need, surplus)` with `surplus = max(0, source on_hand − source reorder_point)` (the source's own rule or reorder level and sales, the same lead and safety days); whole-unit products round both down. Otherwise 0. |
+| `suggested_purchase` | `need − suggested_transfer`, when > 0: raised to `min_order_qty`, then rounded up to whole multiples of `pack_size`; whole-unit products whole. |
+| `reason` | `below_min` when `available ≤ min_qty`, else `velocity`. |
+| `days_of_cover` | `on_hand × velocity_days / sold` (1 dp, ≥ 0); `null` when nothing was sold. |
+
+**Create purchase orders** — `POST /purchasing/reorder-suggestions/purchase-orders` (illustrative values):
+
+```http
+POST /api/v1/purchasing/reorder-suggestions/purchase-orders
+Idempotency-Key: reorder-7f3c…
+{"store_id": "…", "lines": [{"variant_id": "…", "supplier_id": "…", "quantity": "144", "unit_cost": "18.00"}]}
+→ 201 {"data": {"purchase_orders": [{"id": "…", "number": "PO-000004", "status": "draft",
+        "supplier": {"id": "…", "code": "…", "name": "Pran Distribution Ltd"},
+        "line_count": 1, "total": "2592.00", "expected_date": "2026-11-09"}]}}
+```
+
+`lines`: 1–500, `variant_id` distinct, `quantity` > 0 with up to 3 decimals, `unit_cost` ≥ 0 with up to 4. Lines are grouped by `supplier_id` into one **draft** order each through `SavePurchaseOrder` (server totals, `PO-` numbering, audit), all in one transaction: `order_date` = today in the organization's timezone, `expected_date` = today + the longest catalog lead time among the order's lines (7 for a line without a catalog row of that supplier), notes "Created from reorder suggestions.". Quantities and costs are taken as sent (pack sizes are a client hint, not enforced). Errors (422 `VALIDATION_FAILED`, nothing created): `store_id` not accessible or inactive; `lines.N.variant_id` unknown, archived / inactive or not stock-tracked; `lines.N.quantity` fractional for a whole-unit product; `lines.N.supplier_id` unknown, archived or inactive.
+
+**Create a transfer** — `POST /purchasing/reorder-suggestions/transfers` (illustrative values):
+
+```http
+POST /api/v1/purchasing/reorder-suggestions/transfers
+Idempotency-Key: transfer-91ab…
+{"store_id": "…", "lines": [{"variant_id": "…", "quantity": "24"}]}
+→ 201 {"data": {"transfers": [{"id": "…", "number": "TRF-000003", "status": "in_transit",
+        "from_store": {"id": "…", "code": "WH", "name": "Central warehouse", "branch_id": "…", "branch_name": "Head office"},
+        "to_store": {"id": "…", "code": "MAIN", "name": "Main store", "branch_id": "…", "branch_name": "Dhaka Main"},
+        "lines_count": 1}]}}
+```
+
+Transfers have no draft state, so the transfer is **dispatched** through `TransferStock::dispatch(…, allocateBatches: true)`: stock leaves the source now (status `in_transit`, note "Replenishment from reorder suggestions.") and the store receives it with `POST /inventory/transfers/{id}/receive`. Lines without a batch of batch-tracked products are taken first-expiry-first-out by the ledger and stored as one transfer line per batch taken, so `lines_count` can exceed the number of request lines (`lines_count` here, `line_count` on purchase orders). `lines` as above, without supplier and cost.
+
+| Error (422) | When |
+|-------------|------|
+| `NO_SOURCE_STORE` | No `source_store_id` in the replenishment settings. |
+| `SOURCE_IS_DESTINATION` | `store_id` is the source store. |
+| `SOURCE_STORE_INACTIVE` | The source store or its branch is inactive. |
+| `SOURCE_STORE_NOT_ACCESSIBLE` | The user has no access to the source store's branch (someone there must dispatch). |
+| `INSUFFICIENT_STOCK` | The source store lacks the quantity (`details` as for any stock posting). |
+| `VALIDATION_FAILED` | `store_id` not accessible or inactive; unknown or untracked variant; fractional quantity of a whole-unit product. |
+
+**Daily reorder notification.** `php artisan purchasing:reorder-notifications [--any-hour]`, scheduled **hourly** (`withoutOverlapping`). For each active organization whose local time is 07:00 or later (`--any-hour` skips that check, for manual runs), each active store of an active branch with at least one suggestion gets one in-app (database channel) notification per organization-local day, sent to the users holding `purchases.manage` in the store's branch. The store and day are claimed first in `reorder_notification_runs` (unique, insert-or-ignore), so repeated or overlapping runs never notify twice; a store without suggestions is not claimed and is checked again on the next run that day. A failing store is reported and skipped. Payload (`type` `purchasing.reorder_needed`):
+
+```json
+{"title": "Reorder needed: Main store", "message": "3 items need reordering at Main store.",
+ "store_id": "…", "branch_id": "…", "items": 3, "date": "2026-11-06", "link": "/purchasing/reorder?store_id=…"}
+```
+
+**Exports (X1).** `/purchasing/supplier-products` and `/purchasing/reorder-suggestions` take `?export=xlsx|pdf` (see the table under [Exports](#exports-x1)); the suggestions export holds every row of the current filters.
+
+New error codes: `SUPPLIER_PRODUCT_INACTIVE`, `SUPPLIER_INACTIVE`, `NO_SOURCE_STORE`, `SOURCE_IS_DESTINATION`, `SOURCE_STORE_INACTIVE`, `SOURCE_STORE_NOT_ACCESSIBLE`. New permission: `inventory.manage`.
+
 ### Planned (by phase)
 
 | Phase | Resource paths |
 |-------|----------------|
 | 7 | `/reports/*`, `/dashboard` |
 | 8 | `/ai/insights`, `/ai/ask` |
+| SC2 | Purchase requisitions and approvals, requests for quotation and supplier quotes (paths to be fixed in SC2) |
+| SC3 | Landed cost on goods receipts, supplier performance (paths to be fixed in SC3) |
 
 Each phase updates this section with request/response examples; Scramble remains the field-level source of truth.

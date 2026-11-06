@@ -2,7 +2,9 @@
 
 namespace App\Modules\Shared\Tests\Feature;
 
+use App\Modules\Inventory\Infrastructure\Models\StockReorderRule;
 use App\Modules\Promotions\Tests\Concerns\BuildsPromotions;
+use App\Modules\Purchasing\Infrastructure\Models\SupplierProduct;
 use App\Modules\Sales\Tests\Concerns\InteractsWithSales;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
@@ -47,6 +49,8 @@ class ExportableListsTest extends TestCase
             'purchase returns' => ['purchasing/returns', 'purchasing/returns', 'Return', 'purchase-returns', 0],
             'supplier payments' => ['purchasing/payments', 'purchasing/payments', 'Number', 'supplier-payments', 0],
             'supplier statement' => ['purchasing/suppliers/{supplierId}/statement', 'purchasing/suppliers/{supplier}/statement', 'Date', 'supplier-statement', 0],
+            'supplier catalog' => ['purchasing/supplier-products', 'purchasing/supplier-products?is_active=1', 'Product', 'supplier-catalog', 1],
+            'reorder suggestions' => ['purchasing/reorder-suggestions', 'purchasing/reorder-suggestions?store_id={store}&only=purchase', 'Product', 'reorder-suggestions', 1],
             'stock' => ['inventory/stock', 'inventory/stock?low_stock=0', 'Product', 'stock', 1],
             'batches' => ['inventory/batches', 'inventory/batches', 'Product', 'batches', 1],
             'stock movements' => ['inventory/movements', 'inventory/movements', 'Date', 'stock-movements', 1],
@@ -78,12 +82,17 @@ class ExportableListsTest extends TestCase
         $promotion = $this->makePromotion($org, ['name' => 'Eid sale', 'type' => 'percent', 'value' => '10']);
         $syrup = $this->sellable($org, 'Syrup', '100.00', ['batches' => true]);
         $store = $this->mainStoreId($org);
+        // SC1: a preferred catalog row and a reorder rule the stock falls below.
+        $this->inTenant($org, function () use ($supplier, $syrup, $store, $branch) {
+            SupplierProduct::query()->create(['supplier_id' => $supplier->id, 'variant_id' => $syrup->id, 'unit_cost' => '55', 'pack_size' => '6', 'is_preferred' => true]);
+            StockReorderRule::query()->create(['branch_id' => $branch->id, 'store_id' => $store, 'variant_id' => $syrup->id, 'min_qty' => '20', 'max_qty' => '30']);
+        });
         $this->actingAsUser($admin);
         // Stock (adjustment, movements, batch), a part-paid sale (session, ledger) and a customer payment.
         $this->stockUp($store, $syrup, '10', '60.00', 'B1', now()->addMonth()->toDateString());
         $this->checkout($this->cart($store, [[$syrup, '1']], [['cash', '60']], ['customer_id' => $customer->id]))->assertCreated();
         $this->postJson('/api/v1/customer-payments', ['customer_id' => $customer->id, 'branch_id' => $branch->id, 'amount' => '20', 'method' => 'cash'], ['Idempotency-Key' => (string) Str::uuid()])->assertCreated();
-        $uri = '/api/v1/'.strtr($uri, ['{customer}' => $customer->id, '{supplier}' => $supplier->id, '{promotion}' => $promotion->id]);
+        $uri = '/api/v1/'.strtr($uri, ['{customer}' => $customer->id, '{supplier}' => $supplier->id, '{promotion}' => $promotion->id, '{store}' => $store]);
         $separator = str_contains($uri, '?') ? '&' : '?';
 
         $xlsx = $this->get($uri.$separator.'export=xlsx')->assertOk();

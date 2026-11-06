@@ -3,6 +3,7 @@
 namespace App\Modules\Organizations\Infrastructure\Directory;
 
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Organizations\Domain\Enums\OrganizationStatus;
 use App\Modules\Organizations\Infrastructure\Models\Organization;
 
 class EloquentOrganizationDirectory implements OrganizationDirectory
@@ -10,6 +11,11 @@ class EloquentOrganizationDirectory implements OrganizationDirectory
     public function isActive(string $organizationId): bool
     {
         return Organization::query()->find($organizationId)?->isActive() ?? false;
+    }
+
+    public function activeIds(): array
+    {
+        return Organization::query()->where('status', OrganizationStatus::Active->value)->orderBy('created_at')->pluck('id')->all();
     }
 
     public function summary(string $organizationId): ?array

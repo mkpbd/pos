@@ -10,6 +10,13 @@ interface OrganizationDirectory
     public function isActive(string $organizationId): bool;
 
     /**
+     * Ids of all active (not suspended) organizations, for scheduled per-tenant jobs.
+     *
+     * @return list<string>
+     */
+    public function activeIds(): array;
+
+    /**
      * Profile plus the document settings other modules print (invoice prefix, receipt texts)
      * and the contact details printed on documents (E10a: legal name, tax/BIN number, e-mail,
      * phone, address).

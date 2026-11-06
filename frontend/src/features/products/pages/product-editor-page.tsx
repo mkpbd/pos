@@ -26,6 +26,7 @@ import {
   type Product,
 } from '@/features/products/api'
 import { VariantFields } from '@/features/products/components/variant-fields'
+import { VariantSupplySection } from '@/features/supply-chain/components/variant-supply-section'
 import { generateVariants, productFormSchema, toFormValues, toProductInput, type ProductFormValues } from '@/features/products/product-form'
 import { handleFormError } from '@/lib/forms'
 import { trimDecimal } from '@/lib/money'
@@ -372,6 +373,7 @@ export function ProductEditorPage() {
   return (
     <div className="flex flex-col gap-6">
       <ProductForm key={data.id} product={data} />
+      <VariantSupplySection product={data} />
       {can('online_catalog.view') && (
         <div className="mx-auto w-full max-w-5xl">
           <OnlineListingSection productId={data.id} />

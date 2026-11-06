@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArchiveIcon, ArchiveRestoreIcon, FileTextIcon, Loader2Icon, PencilIcon, PlusIcon, SearchIcon } from 'lucide-react'
@@ -184,7 +185,7 @@ export function SuppliersPage() {
                 {data.items.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.code}</TableCell>
-                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="font-medium"><Link to={`/suppliers/${s.id}`} className="underline-offset-4 hover:underline">{s.name}</Link></TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{[s.contact_person, s.phone].filter(Boolean).join(' · ') || '—'}</TableCell>
                     <TableCell className="hidden sm:table-cell">{s.payment_terms_days ? `${s.payment_terms_days} days` : 'Cash'}</TableCell>
                     <TableCell className="hidden text-right font-mono text-sm lg:table-cell">

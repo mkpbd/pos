@@ -874,3 +874,39 @@ test('an admin list exports to Excel and PDF with the current filters', async ({
     expect(size).toBeGreaterThan(extension === 'pdf' ? 5_000 : 1_000)
   }
 })
+
+test('reorder suggestions turn into a draft purchase order from the preferred supplier', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin purchasing flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // Seeded catalog: Pran is the preferred juice supplier (cartons of 24) and the main store has a 160/288 rule.
+  await page.goto('/admin/purchasing/reorder')
+  const juice = page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })
+  await expect(juice).toBeVisible()
+  await expect(juice).toContainText('Pran')
+  await juice.getByRole('checkbox').click()
+
+  await page.getByRole('button', { name: 'Create purchase orders' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Create draft purchase orders' })
+  await expect(dialog.getByRole('region', { name: /Order from Pran/ })).toBeVisible()
+  await dialog.getByRole('button', { name: /^Create 1 draft order$/ }).click()
+
+  const created = page.getByRole('dialog', { name: 'Draft purchase orders created' })
+  const link = created.getByRole('list', { name: 'Created purchase orders' }).getByRole('link').first()
+  const number = (await link.innerText()).match(/PO-\d{6}/)?.[0] ?? ''
+  expect(number).toMatch(/^PO-\d{6}$/)
+  await link.click()
+
+  // The draft is from Pran, for the main store, with the juice in whole cartons.
+  await expect(page.getByRole('heading', { name: new RegExp(number) })).toBeVisible()
+  await expect(page.getByText('Draft').first()).toBeVisible()
+  await expect(page.getByText('Pran Distribution Ltd').first()).toBeVisible()
+  const line = page.getByRole('row').filter({ hasText: 'Pran Mango Juice 250ml' })
+  const quantity = Number((await line.getByRole('cell').nth(1).innerText()).replace(/[^\d.]/g, ''))
+  expect(quantity % 24).toBe(0)
+})

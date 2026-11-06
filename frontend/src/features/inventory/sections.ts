@@ -6,10 +6,12 @@ export const INVENTORY_TABS: SectionTab[] = [
   { to: '/inventory/movements', label: 'Movements' },
   { to: '/inventory/adjustments', label: 'Adjustments' },
   { to: '/inventory/transfers', label: 'Transfers' },
+  { to: '/inventory/settings', label: 'Settings', permission: 'inventory.manage' },
 ]
 
 export const PURCHASING_TABS: SectionTab[] = [
   { to: '/purchasing/orders', label: 'Purchase orders' },
+  { to: '/purchasing/reorder', label: 'Reorder' },
   { to: '/purchasing/receipts', label: 'Receipts' },
   { to: '/purchasing/returns', label: 'Returns' },
   { to: '/purchasing/payments', label: 'Supplier payments' },

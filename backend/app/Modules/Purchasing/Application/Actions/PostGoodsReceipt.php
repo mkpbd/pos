@@ -15,6 +15,7 @@ use App\Modules\Purchasing\Domain\PurchaseTotals;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrder;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrderLine;
+use App\Modules\Purchasing\Infrastructure\Models\SupplierProduct;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
 use App\Modules\Shared\Application\Contracts\TenantUser;
@@ -104,6 +105,7 @@ class PostGoodsReceipt
             }
 
             $this->ledger->post($changes, new StockReference('goods_receipt', $receipt->id, $receipt->number));
+            $this->recordCatalogCosts($receipt->supplier_id, $lines);
 
             if ($order !== null) {
                 $this->updateOrder($order, $lines);
@@ -119,6 +121,25 @@ class PostGoodsReceipt
 
             return $receipt;
         });
+    }
+
+    /**
+     * SC1: the supplier's catalog rows for the received variants remember the cost of this
+     * receipt (the last line wins when a variant appears twice). Rows are never created here.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     */
+    private function recordCatalogCosts(string $supplierId, array $lines): void
+    {
+        $costs = [];
+        foreach ($lines as $line) {
+            $costs[$line['variant_id']] = Decimal::round($line['unit_cost'], 4);
+        }
+        $now = now();
+        foreach ($costs as $variantId => $cost) {
+            SupplierProduct::query()->where('supplier_id', $supplierId)->where('variant_id', $variantId)
+                ->update(['last_purchase_cost' => $cost, 'last_purchased_at' => $now]);
+        }
     }
 
     /**

@@ -18,5 +18,9 @@ Schedule::command('storefront:refresh-product-stats')->hourly()->withoutOverlapp
 // Guest carts expire 30 days after their last change.
 Schedule::command('cart:prune')->daily();
 
+// SC1: daily "items need reordering" inbox alert per store, from 07:00 in each organization's
+// timezone (hourly runs; one notification per store and local day).
+Schedule::command('purchasing:reorder-notifications')->hourly()->withoutOverlapping();
+
 // Unpaid bank-transfer web orders are cancelled (and restocked) when their payment hold runs out.
 Schedule::command('orders:expire-pending')->everyMinute()->withoutOverlapping();

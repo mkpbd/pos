@@ -74,5 +74,7 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoAccountSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
         // E12b: Bangla translations of the demo content (translations columns only).
         $this->callWith(DemoTranslationsSeeder::class, ['organizationId' => $result['organization']->id]);
+        // SC1: supplier catalog and reorder rules (no documents or stock change).
+        $this->callWith(DemoSupplyChainSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
     }
 }

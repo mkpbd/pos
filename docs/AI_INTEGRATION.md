@@ -49,7 +49,7 @@ User question ──▶ permission check (ai.ask) ──▶ LLM with report tool
 | Feature | Data source | Output |
 |---------|-------------|--------|
 | Sales assistant | sales views | best sellers, period summaries, Q&A |
-| Inventory assistant | stock ledger, sales velocity | reorder suggestions (moving average + lead time), slow movers, shortage risk |
+| Inventory assistant | stock ledger, sales velocity; SC1 reorder suggestions (`ReorderSuggestions` — deterministic, already computed per store) | explains and prioritizes the SC1 reorder suggestions, slow movers, shortage risk |
 | Business insights | daily/monthly aggregates | narrative summaries, anomalies (z-score on daily sales) |
 | Customer insights | customer purchase aggregates | RFM segments, loyalty suggestions |
 

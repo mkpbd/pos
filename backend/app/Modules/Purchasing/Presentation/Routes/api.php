@@ -2,7 +2,9 @@
 
 use App\Modules\Purchasing\Presentation\Http\Controllers\GoodsReceiptController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\PurchaseOrderController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\ReorderSuggestionController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierPaymentController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierProductController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(function () {
@@ -25,4 +27,17 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::post('payments', [SupplierPaymentController::class, 'store'])->middleware('can:purchases.pay');
     Route::get('supplier-balances', [SupplierPaymentController::class, 'balances'])->middleware('can:purchases.view');
     Route::get('suppliers/{supplierId}/statement', [SupplierPaymentController::class, 'statement'])->whereUuid('supplierId')->middleware('can:purchases.view');
+
+    // SC1: supplier catalog.
+    Route::get('supplier-products', [SupplierProductController::class, 'index'])->middleware('can:purchases.view');
+    Route::get('supplier-products/lookup', [SupplierProductController::class, 'lookup'])->middleware('can:purchases.view');
+    Route::post('supplier-products', [SupplierProductController::class, 'store'])->middleware('can:purchases.manage');
+    Route::patch('supplier-products/{supplierProduct}', [SupplierProductController::class, 'update'])->whereUuid('supplierProduct')->middleware('can:purchases.manage');
+    Route::delete('supplier-products/{supplierProduct}', [SupplierProductController::class, 'destroy'])->whereUuid('supplierProduct')->middleware('can:purchases.manage');
+    Route::post('supplier-products/{supplierProduct}/preferred', [SupplierProductController::class, 'prefer'])->whereUuid('supplierProduct')->middleware('can:purchases.manage');
+
+    // SC1: reorder suggestions → draft purchase orders and replenishment transfers.
+    Route::get('reorder-suggestions', [ReorderSuggestionController::class, 'index'])->middleware('can:purchases.view');
+    Route::post('reorder-suggestions/purchase-orders', [ReorderSuggestionController::class, 'purchaseOrders'])->middleware(['can:purchases.manage', 'idempotent']);
+    Route::post('reorder-suggestions/transfers', [ReorderSuggestionController::class, 'transfers'])->middleware(['can:inventory.transfer', 'idempotent']);
 });

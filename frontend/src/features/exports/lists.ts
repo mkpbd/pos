@@ -35,6 +35,8 @@ export const EXPORTABLE_LISTS = {
   adjustments: { label: 'Stock adjustments', endpoint: '/inventory/adjustments', route: '/inventory/adjustments' },
   transfers: { label: 'Stock transfers', endpoint: '/inventory/transfers', route: '/inventory/transfers' },
   purchaseOrders: { label: 'Purchase orders', endpoint: '/purchasing/orders', route: '/purchasing/orders' },
+  reorderSuggestions: { label: 'Reorder suggestions', endpoint: '/purchasing/reorder-suggestions', route: '/purchasing/reorder' },
+  supplierCatalog: { label: 'Supplier catalog', endpoint: '/purchasing/supplier-products', route: null, screen: 'Suppliers → supplier page → Catalog tab' },
   goodsReceipts: { label: 'Goods receipts', endpoint: '/purchasing/receipts', route: '/purchasing/receipts' },
   purchaseReturns: { label: 'Purchase returns', endpoint: '/purchasing/returns', route: '/purchasing/returns' },
   supplierPayments: { label: 'Supplier payments', endpoint: '/purchasing/payments', route: '/purchasing/payments' },
