@@ -62,7 +62,7 @@ Purchasing module (money `NUMERIC(18,2)`, quantities `NUMERIC(18,3)`, unit costs
 - `goods_receipts` — the supplier invoice (number `GRN-000001`, supplier, store, purchase_order_id nullable, supplier_invoice_number, invoice_date, due_date, totals) + `goods_receipt_lines` (purchase_order_line_id nullable, batch, amounts, returned_quantity). Unique `(organization_id, supplier_id, lower(supplier_invoice_number))` stops double entry of an invoice.
 - `purchase_returns` (number `PRN-000001`, goods_receipt_id, reason, totals) + `purchase_return_lines` (goods_receipt_line_id, batch, amounts at the receipt's cost).
 - `supplier_payments` (number `SPAY-000001`, supplier, amount, method `cash|bank_transfer|mobile_banking|cheque|card|other`, reference, paid_on).
-- Supplier balance = `suppliers.opening_balance` + Σ receipts − Σ returns − Σ payments, computed on read (no stored balance column to drift).
+- Supplier balance = `suppliers.opening_balance` + Σ receipts − Σ returns − Σ payments, computed on read (no stored balance column to drift). SC3: receipts at `payable_total`, plus charges and landed cost vouchers billed by the supplier (below).
 
 Notifications module:
 - `notifications` (Laravel's table with UUID `id`, `notifiable` morph, `type`, `data` JSON, `read_at`).
@@ -110,7 +110,7 @@ Sales module additions:
 
 Expenses module:
 - `expense_categories` — type `expense|income`, name (unique per organization and type), active.
-- `expenses` — type, number `EXP-000001` / `INC-000001`, branch, category, amount, method, reference, party, occurred_on, notes, void fields. Expenses and other income share one table (the planned `incomes` table became `type = income`).
+- `expenses` — type, number `EXP-000001` / `INC-000001`, branch, category, amount, method, reference, party, occurred_on, notes, void fields (SC3: `on_account`). Expenses and other income share one table (the planned `incomes` table became `type = income`).
 
 Loyalty module:
 - `loyalty_settings` — one row per organization: is_enabled, spend_amount, points_per_spend, point_value, min_redeem_points.
@@ -358,6 +358,29 @@ Purchasing module (`2026_11_07_100000_create_procurement_tables`). Foreign keys 
 
 Existing rows are untouched: orders keep their status, have no history before SC2 and no approval data. **The CHECKs and the triggers have not run on PostgreSQL yet.**
 
+### Supply chain SC3 — Landed cost (implemented)
+
+Three migrations; money `NUMERIC(18,2)`, unit costs and averages `NUMERIC(18,4)`, quantities `NUMERIC(18,3)`; foreign keys `RESTRICT` unless noted, actor columns → users `SET NULL`, timestamps timestamptz.
+
+Inventory (`2026_11_08_100000_add_value_to_stock_movements`):
+- `stock_movements.value` `NUMERIC(18,2)` NULL — the value a value-only movement added to its level. New type `landed_cost`: quantity 0, `unit_cost` = the per-unit increase of the average, `balance_after` = the unchanged quantity. PostgreSQL CHECK `stock_movements_value_only_check`: `(type = 'landed_cost') = (value IS NOT NULL) AND (type <> 'landed_cost' OR (quantity = 0 AND value > 0))`. Existing rows keep `value` NULL (no backfill needed). The ledger stays append-only (existing trigger).
+
+Expenses (`2026_11_08_100100_add_on_account_to_expenses`):
+- `expenses.on_account` boolean default false — owed to a supplier (landed cost on stock already sold): no `payments` row, not voidable. Existing rows false.
+
+Purchasing (`2026_11_08_100200_create_landed_cost_tables`):
+- `goods_receipts` gains `charges_total`, `charges_tax_total`, `landed_total`, `payable_total` (all default 0). **Backfill:** `landed_total = subtotal`, `payable_total = total` for existing receipts (no charges). CHECK `goods_receipts_landed_check` (all ≥ 0).
+- `goods_receipt_lines` gains `landed_cost` `NUMERIC(18,2)` default 0 and `landed_unit_cost` `NUMERIC(18,4)` default 0. **Backfill:** `landed_unit_cost = unit_cost`. CHECK `goods_receipt_lines_landed_check` (both ≥ 0). Landed cost from later vouchers is not written here (it lives in `landed_cost_allocations`).
+- `goods_receipt_charges` — organization_id, goods_receipt_id, type varchar(20), description varchar(120) NULL, amount, tax_amount default 0, allocation varchar(10), charge_supplier_id → suppliers NULL (NULL = on the receipt's own invoice), sort_order, created_at. Indexes `goods_receipt_id`, `(organization_id, charge_supplier_id)`. CHECK `goods_receipt_charges_values_check` (type `freight|duty|insurance|handling|other`, allocation `value|quantity`, `amount > 0`, `tax_amount >= 0`). **Append-only.**
+- `landed_cost_vouchers` — organization_id, number varchar(30) (`LCV-000001`, `SequenceGenerator` key `landed_cost_voucher`; unique `(organization_id, number)`), branch_id, status varchar(10) default `draft`, voucher_date date, charge_supplier_id → suppliers (NOT NULL), reference varchar(64) NULL, notes varchar(1000) NULL, currency char(3), charges_total / tax_total / total, on_hand_total and consumed_total NULL (set on posting), expense_id → expenses NULL and expense_number varchar(40) NULL, posted_by / posted_at, created_by / updated_by, timestamps. Indexes `(organization_id, status)`, `(organization_id, branch_id, voucher_date)`, `(organization_id, charge_supplier_id)`. CHECKs `landed_cost_vouchers_status_check` (`draft|posted`), `_totals_check` (`charges_total >= 0 AND tax_total >= 0 AND total = charges_total + tax_total`), `_posted_check` (posted ⇒ `posted_at` set, `on_hand_total >= 0`, `consumed_total >= 0`, `on_hand_total + consumed_total = charges_total`).
+- `landed_cost_voucher_charges` — organization_id, landed_cost_voucher_id (`CASCADE`), type, description, amount, tax_amount, allocation, sort_order. CHECK `landed_cost_voucher_charges_values_check` (as receipt charges). Replaced on every draft save.
+- `landed_cost_voucher_receipts` — organization_id, landed_cost_voucher_id (`CASCADE`), goods_receipt_id, sort_order. Unique `(landed_cost_voucher_id, goods_receipt_id)`; index `goods_receipt_id`.
+- `landed_cost_allocations` — one row per receipt line when a voucher is posted: organization_id, landed_cost_voucher_id, goods_receipt_id, goods_receipt_line_id, variant_id → product_variants, store_id, batch_id NULL, received_quantity, on_hand_quantity, amount, on_hand_amount, consumed_amount, average_cost_before / average_cost_after NULL (the level's), stock_movement_id → stock_movements NULL, sort_order, created_at. Indexes `landed_cost_voucher_id`, `goods_receipt_line_id`. CHECK `landed_cost_allocations_values_check` (amounts ≥ 0, `on_hand_amount + consumed_amount = amount`, `0 <= on_hand_quantity <= received_quantity`). **Append-only.**
+
+**Append-only enforcement:** PostgreSQL function `prevent_landed_cost_mutation()` with `BEFORE UPDATE OR DELETE` triggers `landed_cost_allocations_append_only` and `goods_receipt_charges_append_only`; both models use the `AppendOnly` trait on every driver. Vouchers have no void, so posted rows are final.
+
+Supplier balance (computed on read) = opening balance + Σ receipts' `payable_total` + Σ receipt charges billed by the supplier (amount + tax) + Σ posted vouchers billed by it (`total`) − Σ returns − Σ payments. Supplier performance (SC3) is a read model over existing tables; it adds no table. All changes are additive. **The CHECKs and the triggers have not run on PostgreSQL yet.**
+
 ### Phase 7 — Reporting
 - Views: `v_sales_daily`, `v_sales_by_product`, `v_sales_by_cashier`, `v_inventory_valuation`, `v_customer_dues`, `v_supplier_dues`, …
 - Materialized views refreshed by the scheduler for heavy aggregates.
@@ -383,6 +406,7 @@ Existing rows are untouched: orders keep their status, have no history before SC
 - Every stock posting (adjustment, transfer, receipt, return; checkout from Phase 5; web orders from E8a) locks `stock_levels` rows `FOR UPDATE` in ascending `store|variant|batch` order, creating missing rows first with `INSERT … ON CONFLICT DO NOTHING` so there is always a row to lock.
 - Supplier catalog (SC1): making a row preferred locks the variant's catalog rows `FOR UPDATE`, unsets the previous preferred row and sets the new one in one transaction; the partial unique index `(organization_id, variant_id) WHERE is_preferred` rejects a concurrent second preferred row. Reorder rule upserts lock the store's existing rules for the given variants `FOR UPDATE` before writing; settings saves lock the organization's row. The daily reorder alert claims `(store_id, run_on)` with `INSERT … ON CONFLICT DO NOTHING` (`insertOrIgnore`) before notifying, so overlapping runs never notify twice.
 - Procurement (SC2): every requisition, purchase order and RFQ transition re-reads its row `FOR UPDATE` and checks the status under the lock, so two approvers (or an approve and a cancel) cannot both succeed; the loser gets `INVALID_STATUS_CHANGE`, and the `Idempotency-Key` replays the first answer to a retry. Convert locks the requisition, then its lines; award, close and cancel lock the RFQ, then (to give quantities back) the requisition and its lines; recording a quote locks the RFQ. Approval-settings saves lock the organization's row. The quotes-overdue reminder claims `(rfq_id, run_on)` with `insertOrIgnore` before notifying.
+- Landed cost vouchers (SC3): posting locks the voucher row `FOR UPDATE` and checks it is still a draft (a second post gets `INVALID_STATUS_CHANGE`; the `Idempotency-Key` replays the first answer), then locks the affected `stock_levels` rows in the ledger's `store|variant|batch` order before reading on-hand quantities, so the attribution and the revaluation see the same stock and cannot deadlock with a stock posting. Draft edits and deletes lock the voucher row.
 - Receiving locks the purchase order row and returning locks the receipt lines first, so two concurrent receipts (or returns) cannot both take the last open (or returnable) quantity.
 - `register_sessions` row is locked when posting cash payments.
 - Document numbers allocated from locked `document_sequences` rows.

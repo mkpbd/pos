@@ -36,6 +36,10 @@ class VoidExpense
             if ($locked->voided_at !== null) {
                 throw new BusinessRuleViolation('ALREADY_VOIDED', "{$locked->number} is already void.");
             }
+            if ($locked->on_account) {
+                // SC3: owed to a supplier and booked by its document (a landed cost voucher).
+                throw new BusinessRuleViolation('EXPENSE_ON_ACCOUNT', "{$locked->number} was booked on a supplier's account by {$locked->reference} and cannot be voided on its own.");
+            }
 
             $reverse = $locked->type->direction() === PaymentDirection::Out ? PaymentDirection::In : PaymentDirection::Out;
             $this->payments->record($actor, $locked->branch_id, [

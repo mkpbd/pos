@@ -19,7 +19,9 @@ export const PURCHASING_TABS: SectionTab[] = [
   { to: '/purchasing/reorder', label: 'Reorder', permission: 'purchases.view' },
   { to: '/purchasing/receipts', label: 'Receipts', permission: 'purchases.view' },
   { to: '/purchasing/returns', label: 'Returns', permission: 'purchases.view' },
+  { to: '/purchasing/landed-costs', label: 'Landed costs', permission: 'purchases.view' },
   { to: '/purchasing/payments', label: 'Supplier payments', permission: 'purchases.view' },
+  { to: '/purchasing/supplier-performance', label: 'Supplier performance', permission: 'purchases.view' },
   { to: '/purchasing/settings', label: 'Settings', permission: 'purchases.settings' },
 ]
 

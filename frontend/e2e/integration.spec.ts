@@ -941,3 +941,35 @@ test('a manager approves a branch requisition from the inbox and converts it int
   await created.getByRole('link').first().click()
   await expect(page.getByText('Pre-approved').first()).toBeVisible()
 })
+
+test('landed costs reach stock cost and the supplier scorecard shows a late, short supplier', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin purchasing flow runs on desktop')
+
+  await page.goto('/admin/login')
+  await page.getByLabel('E-mail').fill('owner@demo.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+
+  // Seeded LCV-000001: 800.00 customs duty on GRN-000002 — returned XL units are expensed, the rest goes to stock.
+  await page.goto('/admin/purchasing/landed-costs')
+  await page.getByRole('table', { name: 'Landed cost vouchers' }).getByRole('link', { name: /LCV-000001/ }).click()
+  await expect(page.getByText('Sundarban Freight Services').first()).toBeVisible()
+  await expect(page.getByText('EXP-000002').first()).toBeVisible()
+  const allocation = page.getByRole('table', { name: 'Posted allocation' })
+  await expect(allocation).toContainText('560.00')
+  await expect(allocation).toContainText('80.00')
+
+  // The receipt carries its own freight + handling charges in the landed unit cost.
+  await page.getByRole('list', { name: 'Receipts on the voucher' }).getByRole('link', { name: /GRN-000002/ }).click()
+  await expect(page.getByText('315.1427').first()).toBeVisible()
+
+  // Supplier performance: Dhaka Apparel Sourcing delivered late and short, so it scores below the on-time Local Mills.
+  await page.goto('/admin/purchasing/supplier-performance')
+  const apparel = page.getByRole('row').filter({ hasText: 'Dhaka Apparel Sourcing' })
+  await expect(apparel).toBeVisible()
+  const title = await apparel.locator('[title^="Score "]').first().getAttribute('title')
+  const score = Number(title?.match(/Score (\d+) of 100/)?.[1])
+  expect(score).toBeGreaterThanOrEqual(0)
+  expect(score).toBeLessThan(100)
+})

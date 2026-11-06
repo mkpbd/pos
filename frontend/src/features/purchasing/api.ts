@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated, type Paginated } from '@/lib/api/client'
 import type { BatchRef, StoreRef } from '@/features/inventory/api'
 import { inventoryKeys } from '@/features/inventory/api'
+import type { ChargeInput, ReceiptCharge } from '@/features/landed-cost/api'
 
 export type PurchaseOrderStatus = 'draft' | 'pending_approval' | 'ordered' | 'partially_received' | 'received' | 'cancelled'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_banking' | 'cheque' | 'card' | 'other'
@@ -22,6 +23,11 @@ export type PurchaseLine = {
   line_subtotal: string
   line_tax: string
   line_total: string
+  /** SC3 receipts: charges allocated to the line, and the unit cost the stock entered at. */
+  landed_cost?: string | null
+  landed_unit_cost?: string | null
+  /** Σ posted landed cost vouchers allocated to the line later. */
+  voucher_landed_cost?: string | null
 }
 
 type DocumentBase = {
@@ -66,7 +72,22 @@ export type PurchaseOrderApproval = {
 }
 
 export type PurchaseOrder = DocumentBase & PurchaseOrderApproval & { status: PurchaseOrderStatus; order_date: string; expected_date: string | null; ordered_at: string | null }
-export type GoodsReceipt = DocumentBase & { purchase_order_id: string | null; supplier_invoice_number: string | null; invoice_date: string; due_date: string | null }
+export type GoodsReceipt = DocumentBase & {
+  purchase_order_id: string | null
+  supplier_invoice_number: string | null
+  invoice_date: string
+  due_date: string | null
+  /** SC3 landed cost: charges on the receipt and the totals they make. */
+  charges?: ReceiptCharge[]
+  goods_total?: string | null
+  charges_total?: string | null
+  charges_tax_total?: string | null
+  landed_total?: string | null
+  /** What the main supplier invoiced: total + charges (with tax) not billed by another supplier. */
+  payable_total?: string | null
+  /** Landed cost vouchers posted against this receipt later. */
+  landed_cost_vouchers?: { id: string; number: string; voucher_date?: string; amount?: string | null }[]
+}
 export type PurchaseReturn = DocumentBase & { goods_receipt_id: string; reason: string }
 
 export type SupplierPayment = {
@@ -81,7 +102,7 @@ export type SupplierPayment = {
   notes: string | null
 }
 
-export type StatementEntry = { date: string; type: 'goods_receipt' | 'purchase_return' | 'payment'; id: string; number: string; reference: string | null; amount: string; balance: string }
+export type StatementEntry = { date: string; type: 'goods_receipt' | 'receipt_charge' | 'landed_cost_voucher' | 'purchase_return' | 'payment'; id: string; number: string; reference: string | null; amount: string; balance: string }
 export type SupplierStatement = { supplier: SupplierRef; opening_balance: string; entries: StatementEntry[]; closing_balance: string }
 
 type LineInput = { variant_id: string; quantity: string; unit_cost?: string | null; tax_rate?: string | null; batch_number?: string; expires_on?: string | null; purchase_order_line_id?: string }
@@ -96,6 +117,7 @@ export type GoodsReceiptInput = {
   due_date: string | null
   notes: string | null
   lines: LineInput[]
+  charges?: ChargeInput[]
 }
 
 export const purchasingKeys = { all: ['purchasing'] as const }

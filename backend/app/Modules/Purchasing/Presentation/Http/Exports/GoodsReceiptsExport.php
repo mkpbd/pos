@@ -32,6 +32,9 @@ class GoodsReceiptsExport extends PurchasingListExport
             ExportColumn::money('subtotal', 'Subtotal'),
             ExportColumn::money('tax_total', 'Tax'),
             ExportColumn::money('total', 'Total'),
+            // SC3: landed cost charges and what the supplier invoiced in all.
+            ExportColumn::money('charges_total', 'Charges'),
+            ExportColumn::money('payable_total', 'Payable'),
         ];
     }
 

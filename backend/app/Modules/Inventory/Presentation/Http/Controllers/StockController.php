@@ -266,6 +266,8 @@ class StockController
             'batch' => $m->batch_id ? ($lookups['batches'][$m->batch_id] ?? null) : null,
             'quantity' => $m->quantity,
             'unit_cost' => $withCost ? $m->unit_cost : null,
+            // SC3: value added by a value-only movement (landed_cost); null otherwise.
+            'value' => $withCost ? $m->value : null,
             'balance_after' => $m->balance_after,
             'reference' => ['type' => $m->reference_type, 'id' => $m->reference_id, 'number' => $m->reference_number],
             'created_by' => $m->created_by,

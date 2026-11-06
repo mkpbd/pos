@@ -168,7 +168,9 @@ class ExpenseController
             'currency' => $e->currency,
             'amount' => $e->amount,
             'method' => $e->method->value,
-            'method_label' => $e->method->label(),
+            'method_label' => $e->on_account ? 'On supplier account' : $e->method->label(),
+            // SC3: owed to a supplier (landed cost voucher) — no payment recorded, not voidable.
+            'on_account' => (bool) $e->on_account,
             'reference' => $e->reference,
             'party' => $e->party,
             'occurred_on' => $e->occurred_on->toDateString(),

@@ -41,8 +41,9 @@ class RecordSystemExpense implements ExpenseRecorder
             throw new InvalidArgumentException('An expense amount must be greater than zero.');
         }
         $clean = fn (string $key) => filled($data[$key] ?? null) ? trim((string) $data[$key]) : null;
+        $onAccount = (bool) ($data['on_account'] ?? false);
 
-        return DB::transaction(function () use ($data, $actorId, $organizationId, $currency, $amount, $clean) {
+        return DB::transaction(function () use ($data, $actorId, $organizationId, $currency, $amount, $clean, $onAccount) {
             $category = $this->category(trim($data['category']), $actorId);
             $expense = Expense::query()->create([
                 'organization_id' => $organizationId,
@@ -53,6 +54,7 @@ class RecordSystemExpense implements ExpenseRecorder
                 'currency' => $currency,
                 'amount' => $amount->amount(),
                 'method' => $data['method'],
+                'on_account' => $onAccount,
                 'reference' => $clean('reference'),
                 'party' => $clean('party'),
                 'occurred_on' => $data['occurred_on'],
@@ -60,15 +62,18 @@ class RecordSystemExpense implements ExpenseRecorder
                 'created_by' => $actorId,
             ]);
 
-            $this->payments->recordSystem($expense->branch_id, [
-                new LedgerEntry(EntryType::Expense->direction(), $data['method'], $expense->amount, reference: $expense->reference, description: trim($category->name.' '.($expense->party ?? ''))),
-            ], new PaymentSource(EntryType::Expense->value, $expense->id, $expense->number), $actorId);
+            if (! $onAccount) {
+                $this->payments->recordSystem($expense->branch_id, [
+                    new LedgerEntry(EntryType::Expense->direction(), $data['method'], $expense->amount, reference: $expense->reference, description: trim($category->name.' '.($expense->party ?? ''))),
+                ], new PaymentSource(EntryType::Expense->value, $expense->id, $expense->number), $actorId);
+            }
 
             $this->audit->record('expense.recorded', $expense, new: [
                 'number' => $expense->number,
                 'category' => $category->name,
                 'amount' => $expense->amount,
                 'method' => $data['method']->value,
+                'on_account' => $onAccount,
                 'reference' => $expense->reference,
             ]);
 

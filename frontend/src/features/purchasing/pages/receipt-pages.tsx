@@ -14,7 +14,7 @@ import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { StoreSelect } from '@/components/common/store-select'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -35,8 +35,13 @@ import {
   useReceiptsQuery,
   useReturnsQuery,
   type GoodsReceipt,
+  type PurchaseLine,
   type PurchaseOrder,
 } from '@/features/purchasing/api'
+import { ChargesEditor } from '@/features/landed-cost/components/charges-editor'
+import { ReceiptLandedPreview } from '@/features/landed-cost/components/receipt-landed-preview'
+import { ReceiptCharges } from '@/features/landed-cost/components/receipt-charges'
+import { chargesSchema, hasLandedCosts, toChargeInput } from '@/features/landed-cost/charges'
 import { handleFormError } from '@/lib/forms'
 import { compareDecimal, formatMoney, subtractDecimal, trimDecimal } from '@/lib/money'
 
@@ -110,6 +115,7 @@ const schema = z.object({
   due_date: z.string(),
   notes: z.string().max(2000),
   lines: linesSchema(LINE_OPTIONS),
+  charges: chargesSchema,
 })
 type Values = z.infer<typeof schema>
 
@@ -146,7 +152,7 @@ export function NewReceiptPage() {
   const post = usePostReceiptMutation()
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { supplier_id: '', store_id: '', supplier_invoice_number: '', invoice_date: today(), due_date: '', notes: '', lines: [emptyLine()] },
+    defaultValues: { supplier_id: '', store_id: '', supplier_invoice_number: '', invoice_date: today(), due_date: '', notes: '', lines: [emptyLine()], charges: [] },
   })
   const { errors } = form.formState
 
@@ -171,13 +177,14 @@ export function NewReceiptPage() {
         due_date: values.due_date || null,
         notes: values.notes.trim() || null,
         lines: values.lines.map((l) => toApiLine(l, { ...LINE_OPTIONS, sourceField: 'purchase_order_line_id' })),
+        ...(values.charges.length > 0 ? { charges: values.charges.map(toChargeInput) } : {}),
       },
       {
         onSuccess: (r) => {
           toast.success(`${r.number} posted — stock updated.`)
           navigate(`/purchasing/receipts/${r.id}`, { replace: true })
         },
-        onError: (error) => handleFormError(error, form.setError, ['supplier_id', 'store_id', 'supplier_invoice_number', 'invoice_date', 'due_date', 'notes', 'lines'], { nested: true }),
+        onError: (error) => handleFormError(error, form.setError, ['supplier_id', 'store_id', 'supplier_invoice_number', 'invoice_date', 'due_date', 'notes', 'lines', 'charges'], { nested: true }),
       },
     ),
   )
@@ -205,8 +212,19 @@ export function NewReceiptPage() {
       </Card>
       <Card>
         <CardHeader><CardTitle>Goods received</CardTitle></CardHeader>
-        <CardContent>
+        {/* relative: keeps the lines table's absolutely positioned sr-only text inside the card, so phones don't widen the page. */}
+        <CardContent className="relative">
           <LinesEditor control={form.control} register={form.register} setValue={form.setValue} errors={errors} config={{ ...LINE_OPTIONS, fixedProducts: !!orderId, currency: me.organization?.base_currency }} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Charges</CardTitle>
+          <CardDescription>Freight, duty, insurance or handling on this delivery. They are spread over the lines and added to the stock cost.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ChargesEditor control={form.control} register={form.register} errors={errors} billedBy optional />
+          <ReceiptLandedPreview control={form.control} currency={me.organization?.base_currency} />
         </CardContent>
       </Card>
       <div className="flex justify-end gap-2">
@@ -290,6 +308,7 @@ export function ReceiptPage() {
 
   if (isPending) return <LoadingState rows={6} label="Loading receipt" />
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />
+  const landed = hasLandedCosts(data)
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -314,8 +333,18 @@ export function ReceiptPage() {
         subtotal={data.subtotal}
         taxTotal={data.tax_total}
         total={data.total}
-        extra={{ header: 'Returned', cell: (l) => trimDecimal(l.returned_quantity ?? '0') }}
+        extra={[
+          { header: 'Returned', cell: (l) => trimDecimal(l.returned_quantity ?? '0') },
+          ...(landed
+            ? [
+                { header: 'Charges', cell: (l: PurchaseLine) => formatMoney(l.landed_cost ?? '0') },
+                { header: 'Landed unit cost', cell: (l: PurchaseLine) => (l.landed_unit_cost ? formatMoney(l.landed_unit_cost, undefined, 4) : '—') },
+              ]
+            : []),
+          ...((data.landed_cost_vouchers ?? []).length > 0 ? [{ header: 'Later vouchers', cell: (l: PurchaseLine) => formatMoney(l.voucher_landed_cost ?? '0') }] : []),
+        ]}
       />
+      <ReceiptCharges receipt={data} />
       <ReturnDialog receipt={data} open={returning} onOpenChange={setReturning} />
     </div>
   )

@@ -78,5 +78,7 @@ class DatabaseSeeder extends Seeder
         $this->callWith(DemoSupplyChainSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
         // SC2: approval limits, two requisitions (one waiting, one converted into a draft PO) and a sent RFQ with a quote.
         $this->callWith(DemoProcurementSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
+        // SC3: polo shirts bought with landed costs (receipt charges, a late/short delivery, a return, a posted landed cost voucher).
+        $this->callWith(DemoLandedCostSeeder::class, ['organizationId' => $result['organization']->id, 'adminId' => $result['admin']->id]);
     }
 }

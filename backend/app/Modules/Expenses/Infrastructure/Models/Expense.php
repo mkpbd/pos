@@ -23,6 +23,7 @@ use LogicException;
  * @property string $currency
  * @property string $amount
  * @property PaymentMethod $method
+ * @property bool $on_account SC3: owed to a supplier (no payments-ledger entry, not voidable)
  * @property ?string $reference
  * @property ?string $party
  * @property Carbon $occurred_on
@@ -34,7 +35,7 @@ use LogicException;
  * @property Carbon $created_at
  */
 #[Fillable([
-    'organization_id', 'branch_id', 'type', 'number', 'expense_category_id', 'currency', 'amount', 'method', 'reference',
+    'organization_id', 'branch_id', 'type', 'number', 'expense_category_id', 'currency', 'amount', 'method', 'on_account', 'reference',
     'party', 'occurred_on', 'notes', 'created_by', 'voided_at', 'voided_by', 'void_reason',
 ])]
 class Expense extends Model
@@ -49,6 +50,7 @@ class Expense extends Model
             'type' => EntryType::class,
             'amount' => 'decimal:2',
             'method' => PaymentMethod::class,
+            'on_account' => 'boolean',
             'occurred_on' => 'date',
             'voided_at' => 'datetime',
         ];

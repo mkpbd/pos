@@ -2,11 +2,13 @@
 
 use App\Modules\Purchasing\Presentation\Http\Controllers\ApprovalController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\GoodsReceiptController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\LandedCostVoucherController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\PurchaseOrderController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\ReorderSuggestionController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\RequisitionController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\RfqController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierPaymentController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierPerformanceController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierProductController;
 use Illuminate\Support\Facades\Route;
 
@@ -80,4 +82,16 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::post('rfqs/{rfq}/award', [RfqController::class, 'award'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
     Route::post('rfqs/{rfq}/close', [RfqController::class, 'close'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
     Route::post('rfqs/{rfq}/cancel', [RfqController::class, 'cancel'])->whereUuid('rfq')->middleware(['can:purchases.manage', 'idempotent']);
+
+    // SC3: landed cost vouchers and supplier performance.
+    Route::get('landed-cost-vouchers', [LandedCostVoucherController::class, 'index'])->middleware('can:purchases.view');
+    Route::post('landed-cost-vouchers/preview', [LandedCostVoucherController::class, 'preview'])->middleware('can:purchases.landed_cost');
+    Route::post('landed-cost-vouchers', [LandedCostVoucherController::class, 'store'])->middleware('can:purchases.landed_cost');
+    Route::get('landed-cost-vouchers/{landedCostVoucher}', [LandedCostVoucherController::class, 'show'])->whereUuid('landedCostVoucher')->middleware('can:purchases.view');
+    Route::put('landed-cost-vouchers/{landedCostVoucher}', [LandedCostVoucherController::class, 'update'])->whereUuid('landedCostVoucher')->middleware('can:purchases.landed_cost');
+    Route::delete('landed-cost-vouchers/{landedCostVoucher}', [LandedCostVoucherController::class, 'destroy'])->whereUuid('landedCostVoucher')->middleware('can:purchases.landed_cost');
+    Route::post('landed-cost-vouchers/{landedCostVoucher}/post', [LandedCostVoucherController::class, 'post'])->whereUuid('landedCostVoucher')->middleware(['can:purchases.landed_cost', 'idempotent']);
+
+    Route::get('supplier-performance', [SupplierPerformanceController::class, 'index'])->middleware('can:purchases.view');
+    Route::get('suppliers/{supplierId}/performance', [SupplierPerformanceController::class, 'show'])->whereUuid('supplierId')->middleware('can:purchases.view');
 });

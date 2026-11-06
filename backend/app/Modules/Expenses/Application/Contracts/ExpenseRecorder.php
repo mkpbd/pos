@@ -16,7 +16,12 @@ interface ExpenseRecorder
      * Records an expense in the named category of the current organization (created when
      * missing; matched case-insensitively). Numbered `EXP-…` like any expense.
      *
-     * @param  array{branch_id: string, category: string, amount: string, method: PaymentMethod, occurred_on: string, reference?: ?string, party?: ?string, notes?: ?string}  $data
+     * SC3: `on_account: true` books an expense that is owed to a supplier rather than paid
+     * (landed cost on stock already sold — the payable sits on the supplier's account and is
+     * settled by a supplier payment). No payments-ledger entry is written, `method` is the
+     * expected way of settling it, and the entry cannot be voided on its own.
+     *
+     * @param  array{branch_id: string, category: string, amount: string, method: PaymentMethod, occurred_on: string, reference?: ?string, party?: ?string, notes?: ?string, on_account?: bool}  $data
      * @param  ?string  $actorId  the staff user (users.id), null for the system
      * @return array{id: string, number: string}
      */

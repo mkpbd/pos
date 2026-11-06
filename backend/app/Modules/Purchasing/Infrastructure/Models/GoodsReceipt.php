@@ -26,11 +26,17 @@ use Illuminate\Support\Carbon;
  * @property string $subtotal
  * @property string $tax_total
  * @property string $total
+ * @property string $charges_total SC3: Σ charge amounts (capitalised)
+ * @property string $charges_tax_total SC3: Σ charge tax (recoverable, not capitalised)
+ * @property string $landed_total SC3: subtotal + charges_total
+ * @property string $payable_total SC3: total + charges (with tax) billed on the main supplier's invoice
  * @property ?string $created_by
+ * @property Carbon $created_at
  */
 #[Fillable([
     'organization_id', 'number', 'supplier_id', 'branch_id', 'store_id', 'purchase_order_id', 'supplier_invoice_number',
-    'invoice_date', 'due_date', 'notes', 'currency', 'subtotal', 'tax_total', 'total', 'created_by',
+    'invoice_date', 'due_date', 'notes', 'currency', 'subtotal', 'tax_total', 'total', 'charges_total', 'charges_tax_total',
+    'landed_total', 'payable_total', 'created_by',
 ])]
 class GoodsReceipt extends Model
 {
@@ -44,7 +50,19 @@ class GoodsReceipt extends Model
             'subtotal' => 'decimal:2',
             'tax_total' => 'decimal:2',
             'total' => 'decimal:2',
+            'charges_total' => 'decimal:2',
+            'charges_tax_total' => 'decimal:2',
+            'landed_total' => 'decimal:2',
+            'payable_total' => 'decimal:2',
         ];
+    }
+
+    /**
+     * @return HasMany<GoodsReceiptCharge, $this>
+     */
+    public function charges(): HasMany
+    {
+        return $this->hasMany(GoodsReceiptCharge::class)->orderBy('sort_order');
     }
 
     /**

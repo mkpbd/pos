@@ -9,6 +9,9 @@ import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useSupplierQuery, type Supplier } from '@/features/suppliers/api'
 import { SUPPLY_PERMISSIONS } from '@/features/supply-chain/api'
 import { SupplierCatalog } from '@/features/supply-chain/components/supplier-catalog'
+import { SupplierPerformanceTab } from '@/features/supplier-performance/components/supplier-performance-tab'
+
+const SECONDARY_TABS = ['performance', 'details'] as const
 
 function Details({ supplier }: { supplier: Supplier }) {
   const rows: [string, string | null][] = [
@@ -34,7 +37,7 @@ function Details({ supplier }: { supplier: Supplier }) {
   )
 }
 
-/** One supplier: contact details and (with purchasing access) the catalog of what it sells. */
+/** One supplier: contact details and (with purchasing access) the catalog of what it sells and its performance. */
 export function SupplierPage() {
   const { supplierId } = useParams()
   const can = useCan()
@@ -42,7 +45,8 @@ export function SupplierPage() {
   const [params, setParams] = useSearchParams()
   const { data, error, isPending, refetch } = useSupplierQuery(supplierId)
   const canCatalog = can(SUPPLY_PERMISSIONS.viewPurchasing)
-  const tab = canCatalog && params.get('tab') !== 'details' ? 'catalog' : 'details'
+  const requested = params.get('tab')
+  const tab = !canCatalog ? 'details' : (SECONDARY_TABS as readonly string[]).includes(requested ?? '') ? (requested as string) : 'catalog'
 
   if (isPending) return <LoadingState rows={6} label="Loading supplier" />
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />
@@ -59,10 +63,14 @@ export function SupplierPage() {
         <Tabs value={tab} onValueChange={(v) => setParams(v === 'catalog' ? {} : { tab: v }, { replace: true })}>
           <TabsList>
             <TabsTrigger value="catalog">Catalog</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="details">Details</TabsTrigger>
           </TabsList>
           <TabsContent value="catalog" className="pt-4">
             <SupplierCatalog supplierId={data.id} supplierName={data.name} currency={me.organization?.base_currency} />
+          </TabsContent>
+          <TabsContent value="performance" className="pt-4">
+            {tab === 'performance' && <SupplierPerformanceTab supplierId={data.id} />}
           </TabsContent>
           <TabsContent value="details" className="pt-4">
             <Details supplier={data} />

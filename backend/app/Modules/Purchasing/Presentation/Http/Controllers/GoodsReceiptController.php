@@ -33,7 +33,7 @@ class GoodsReceiptController
     /**
      * Purchase history
      *
-     * Filters: `supplier_id`, `purchase_order_id`, `from`/`to` (invoice date); `search` matches
+     * Filters: `supplier_id`, `purchase_order_id`, `branch_id` (SC3), `from`/`to` (invoice date); `search` matches
      * our number or the supplier's invoice number.
      */
     public function index(Request $request, ListExporter $exports): Response
@@ -41,11 +41,14 @@ class GoodsReceiptController
         $request->validate([
             'supplier_id' => ['sometimes', 'uuid'],
             'purchase_order_id' => ['sometimes', 'uuid'],
+            'branch_id' => ['sometimes', 'uuid'],
             'from' => ['sometimes', 'date'],
             'to' => ['sometimes', 'date', 'after_or_equal:from'],
         ]);
         $query = GoodsReceipt::query()
             ->when($request->query('supplier_id'), fn (Builder $q, string $v) => $q->where('supplier_id', $v))
+            // SC3: the landed cost voucher editor picks receipts of one branch.
+            ->when($request->query('branch_id'), fn (Builder $q, string $v) => $q->where('branch_id', $v))
             ->when($request->query('purchase_order_id'), fn (Builder $q, string $v) => $q->where('purchase_order_id', $v))
             ->when($request->query('from'), fn (Builder $q, string $v) => $q->where('invoice_date', '>=', $v))
             ->when($request->query('to'), fn (Builder $q, string $v) => $q->where('invoice_date', '<=', $v));

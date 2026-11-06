@@ -180,6 +180,13 @@ Purchase requisitions, approvals and supplier quotes (SC2):
 - No new environment variable, rate limiter or dependency.
 - The new PostgreSQL CHECKs and triggers have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
 
+Landed cost and supplier performance (SC3):
+- **Migrations** (additive; run in this order by their timestamps): Inventory `2026_11_08_100000_add_value_to_stock_movements` (nullable `stock_movements.value`; on PostgreSQL the CHECK `stock_movements_value_only_check` — existing rows satisfy it, `value` stays NULL), Expenses `2026_11_08_100100_add_on_account_to_expenses` (`expenses.on_account` default false), Purchasing `2026_11_08_100200_create_landed_cost_tables` (receipt totals and line columns, `goods_receipt_charges`, `landed_cost_vouchers` + charges + receipts, `landed_cost_allocations`; on PostgreSQL the CHECKs, the function `prevent_landed_cost_mutation()` and two append-only triggers). **Backfill inside the migration:** every existing goods receipt gets `landed_total = subtotal` and `payable_total = total`, every existing receipt line `landed_unit_cost = unit_cost` (one `UPDATE` per table — on a large `goods_receipt_lines` table plan for it inside the deploy window). Supplier balances are unchanged by the backfill (`payable_total` = the old `total`). `php artisan migrate --force` as usual.
+- **Run `php artisan pos:permissions:sync`.** New permission `purchases.landed_cost` (create, edit, delete and post landed cost vouchers, and the voucher preview) for Branch Manager, Inventory Manager and Accountant; Organization Admin through `*`. Built-in roles hold expanded permission lists, so until the sync **nobody — the Organization Admin included — holds it**: the *Landed costs* list is readable (`purchases.view`) but vouchers cannot be created or posted. Custom roles need it added by hand. Receipt charges need no new permission (`purchases.receive`); supplier performance reads with `purchases.view`.
+- From this release goods receipts with charges post stock at the landed unit cost, and supplier balances count receipts at `payable_total`. Expenses booked by vouchers are **on account**: they write no payments-ledger row (cash and bank reports do not show them as outflows; the supplier payment does) and cannot be voided.
+- No new environment variable, queue job, scheduled command, rate limiter or dependency.
+- The new PostgreSQL CHECKs and triggers have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+
 ## Release steps
 
 ```bash
@@ -187,7 +194,7 @@ Purchase requisitions, approvals and supplier quotes (SC2):
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan storage:link        # once: media and product images under /storage
-php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings)
+php artisan pos:permissions:sync  # new module permissions + role map -> built-in roles (SC1: inventory.manage; SC2: purchases.request/approve/approve_high/settings; SC3: purchases.landed_cost)
 php artisan optimize            # config, routes, events, views cache
 php artisan queue:restart
 (cd pdf-renderer && PUPPETEER_SKIP_DOWNLOAD=1 npm ci)   # PDF exports (X1); needs Node >= 22.12 and a system Chromium

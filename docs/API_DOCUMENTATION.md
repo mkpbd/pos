@@ -138,6 +138,8 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | 422 | `APPROVAL_REQUIRED` | `POST /purchasing/orders/{id}/place` on a draft that needs approval (`details.approval_level`, `total`); submit it instead (SC2). |
 | 422 | `REQUISITION_LOCKED`, `REQUISITION_EMPTY`, `REQUISITION_NOT_APPROVED` | Editing a requisition that is not a draft; submitting one without lines; converting one that is not approved (`details.status`) (SC2). |
 | 422 | `RFQ_LOCKED`, `RFQ_LINES_LOCKED`, `RFQ_EMPTY`, `RFQ_SUPPLIERS_REQUIRED`, `RFQ_NOT_OPEN` | Editing an RFQ that is not a draft; changing the lines of an RFQ raised from a requisition; sending without lines or with fewer than 2 invited suppliers (`details.min`, `invited`); recording a quote on an RFQ that is not sent (`details.status`) (SC2). |
+| 422 | `LANDED_COST_VOUCHER_LOCKED`, `LANDED_COST_VOUCHER_INCOMPLETE` | Editing or deleting a landed cost voucher that is posted; posting one without a charge or a goods receipt (SC3). Posting a posted voucher again (with a new key) → `INVALID_STATUS_CHANGE` (`details.status`). |
+| 422 | `EXPENSE_ON_ACCOUNT` | Voiding an expense booked on a supplier's account by a landed cost voucher (SC3). |
 | 429 | `TOO_MANY_REQUESTS` | Rate limited; honour `Retry-After`. |
 | 500 | `SERVER_ERROR` | Unexpected; quote `meta.request_id` when reporting. |
 | 503 | `SERVICE_UNAVAILABLE` | Maintenance or dependency outage. |
@@ -148,7 +150,7 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 | Header | Direction | Purpose |
 |--------|-----------|---------|
 | `X-Request-Id` | both | Correlation id. Clients may send one (8–64 chars `[A-Za-z0-9-_.]`); the server always returns it. |
-| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses`, `/register-sessions/{id}/cash-movements`, the six web order steps `/web-orders/{id}/*`, the storefront's `POST /store/checkout` and (SC1/SC2) the purchasing transitions listed in [Supply chain](#supply-chain--purchase-requisitions-approvals-and-supplier-quotes-sc2): 8–100 characters (`[A-Za-z0-9_\-:.]`), one per logical operation (the SPA uses a UUID); reuse it when retrying. Missing → `428 IDEMPOTENCY_KEY_REQUIRED`. A replayed response carries `Idempotent-Replayed: true`. Keys are scoped (ADR-014): staff `user:{id}`, signed-in shopper `customer:{account id}`, guest `cart:{cart token hash}`. |
+| `Idempotency-Key` | request | Required on `POST /pos/checkout`, `/returns`, `/returns/{id}/approve`, `/customer-payments`, `/expenses`, `/register-sessions/{id}/cash-movements`, the six web order steps `/web-orders/{id}/*`, the storefront's `POST /store/checkout`, (SC1/SC2) the purchasing transitions listed in [Supply chain](#supply-chain--purchase-requisitions-approvals-and-supplier-quotes-sc2) and (SC3) `POST /purchasing/landed-cost-vouchers/{id}/post`: 8–100 characters (`[A-Za-z0-9_\-:.]`), one per logical operation (the SPA uses a UUID); reuse it when retrying. Missing → `428 IDEMPOTENCY_KEY_REQUIRED`. A replayed response carries `Idempotent-Replayed: true`. Keys are scoped (ADR-014): staff `user:{id}`, signed-in shopper `customer:{account id}`, guest `cart:{cart token hash}`. |
 | `X-Branch-Id` | request | Active branch. Optional; when sent it must be an active branch of the organization that the user is assigned to (or `branches.access_all`). Branch-scoped endpoints (Phase 4+) require it. |
 | `X-Organization-Id` | request | Platform admins only: organization to act in. Ignored for tenant users. |
 | `X-XSRF-TOKEN` | request | SPA cookie auth CSRF token (sent automatically by the frontend client). Also required on unsafe storefront requests that run the `storefront.session` stack (account, cart, wishlist). |
@@ -209,7 +211,9 @@ Exportable lists (columns in file order; ¹ only with `products.view_cost`):
 | `/purchasing/requisitions` | `purchases.view`, `.request` (own only), `.approve` or `.approve_high` | `purchase-requisitions` | Purchase requisitions | Requisition, Created, Store, Requested by, Needed by, Lines, Estimated total, Approval level, Approved by, Status (SC2) |
 | `/purchasing/rfqs` | `purchases.view` | `rfqs` | Requests for quotation | RFQ, Title, Store, Requisition, Reply by, Suppliers, Quotes, Sent, Status (SC2) |
 | `/purchasing/approvals` | `purchases.approve` or `.approve_high` | `pending-approvals` | Waiting for my approval | Document, Number, Submitted, Requested by, Store, Supplier, Amount, Approval level (SC2) |
-| `/purchasing/receipts` | `purchases.view` | `goods-receipts` | Goods receipts | Receipt, Invoice date, Supplier invoice, Supplier, Store, Due date, Subtotal, Tax, Total |
+| `/purchasing/landed-cost-vouchers` | `purchases.view` | `landed-cost-vouchers` | Landed cost vouchers | Voucher, Date, Branch, Billed by, Reference, Receipts, Charges, Tax, Total, To stock, Expensed, Status (SC3) |
+| `/purchasing/supplier-performance` | `purchases.view` | `supplier-performance` | Supplier performance | Supplier, Score, Orders, Spend, On time %, Fill %, Lead days, Returns %, Price change %, Quote response %, Quotes won (SC3; the list's period, branch and sort) |
+| `/purchasing/receipts` | `purchases.view` | `goods-receipts` | Goods receipts | Receipt, Invoice date, Supplier invoice, Supplier, Store, Due date, Subtotal, Tax, Total, Charges, Payable (the last two SC3) |
 | `/purchasing/returns` | `purchases.view` | `purchase-returns` | Purchase returns | Return, Date, Supplier, Store, Reason, Subtotal, Tax, Total |
 | `/purchasing/payments` | `purchases.view` | `supplier-payments` | Supplier payments | Number, Paid on, Supplier, Method, Reference, Amount, Notes |
 | `/purchasing/suppliers/{id}/statement` | `purchases.view` | `supplier-statement` | Supplier statement — {supplier} | Date, Type, Number, Reference, Amount, Balance |
@@ -232,7 +236,7 @@ Exportable lists (columns in file order; ¹ only with `products.view_cost`):
 | `/cms/contact-messages` | `cms.manage` | `contact-messages` | Contact messages | Received, Name, E-mail, Phone, Subject, Message, Status (Open / Handled), Handled |
 | `/cms/newsletter-subscribers` | `cms.manage` | `newsletter-subscribers` | Newsletter subscribers | E-mail, Status, Signed up, Confirmed, Unsubscribed (the CSV `GET /cms/newsletter-subscribers/export` stays) |
 
-Statements, the valuation, the promotion report and the reorder suggestions are computed by their endpoint first (bounded by their own period or store count); the other lists are read in 500-row chunks (`EXPORT_CHUNK_SIZE`). Lists without an export: catalog taxonomies, branches, roles, cash registers, blog, pages, FAQ, media, shipping, payment methods, web categories/brands, platform organizations.
+Statements, the valuation, the promotion report, the reorder suggestions and supplier performance are computed by their endpoint first (bounded by their own period or store count); the other lists are read in 500-row chunks (`EXPORT_CHUNK_SIZE`). Lists without an export: catalog taxonomies, branches, roles, cash registers, blog, pages, FAQ, media, shipping, payment methods, web categories/brands, platform organizations.
 
 ## Endpoints
 
@@ -285,7 +289,7 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET / POST / PATCH / DELETE | `/customer-groups[/{id}]` | tenant | `customers.view` / `customers.manage` | `discount_percent` 0–100; delete → `IN_USE` while customers belong to it. |
 | GET | `/inventory/stock` | tenant | `inventory.view` | Stock levels of accessible branches. Filters `branch_id`, `store_id`, `variant_id`, `search`, `low_stock=1` (on hand ≤ reorder level). `value` is `null` without `products.view_cost`. |
 | GET | `/inventory/batches` | tenant | `inventory.view` | Batch balances with expiry; `store_id`, `branch_id`, `variant_id`, `expiring_within_days`. |
-| GET | `/inventory/movements` | tenant | `inventory.view` | Append-only stock ledger; `store_id`, `branch_id`, `variant_id`, `type`, `from`, `to`. Each row carries `balance_after` and the source document (`reference_type`, `reference_number`). |
+| GET | `/inventory/movements` | tenant | `inventory.view` | Append-only stock ledger; `store_id`, `branch_id`, `variant_id`, `type`, `from`, `to`. Each row carries `balance_after` and the source document (`reference_type`, `reference_number`). SC3: type `landed_cost` (quantity 0) and `value` (the value it added; null for other types; with `products.view_cost` only, like `unit_cost`). |
 | GET | `/inventory/valuation` | tenant | `inventory.view` + `products.view_cost` | Quantity and value (weighted average cost) per store; `branch_id`. |
 | GET / POST | `/inventory/adjustments` | tenant | `inventory.view` / `inventory.adjust` | `reason`: `opening` (positive only), `count`, `correction`, `other` (signed), `damage`, `expiry`, `theft` (negative only). Incoming lines take `unit_cost` (default: purchase price) and `batch_number`/`expires_on`; outgoing batch lines take `batch_id`. Numbered `ADJ-000001`. |
 | GET | `/inventory/adjustments/{id}` | tenant | `inventory.view` | With lines. |
@@ -295,13 +299,13 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET / POST | `/purchasing/orders` | tenant | `purchases.view` / `purchases.manage` | `status`, `supplier_id`, `search`. Created as `draft`; totals computed by the server. Numbered `PO-000001`. |
 | GET / PUT | `/purchasing/orders/{id}` | tenant | `purchases.view` / `purchases.manage` | Only drafts can be replaced (`PURCHASE_ORDER_LOCKED`). Lines show `received_quantity`. |
 | POST | `/purchasing/orders/{id}/place`, `/cancel` | tenant | `purchases.manage` | `draft → ordered`; cancel only before anything was received. Since SC2 `place` only where no approval is needed (else 422 `APPROVAL_REQUIRED`) and cancel also from `pending_approval`; `submit` / `approve` / `reject`: see [SC2](#supply-chain--purchase-requisitions-approvals-and-supplier-quotes-sc2). |
-| GET / POST | `/purchasing/receipts` | tenant | `purchases.view` / `purchases.receive` | Goods receipt = supplier invoice: stock in + amount owed. `supplier_id`, `purchase_order_id`, `from`/`to`, `search` (number, supplier invoice no.). Duplicate supplier invoice numbers per supplier are rejected. `due_date` defaults to invoice date + payment terms. Numbered `GRN-000001`. |
-| GET | `/purchasing/receipts/{id}` | tenant | `purchases.view` | Lines show `returned_quantity`. |
+| GET / POST | `/purchasing/receipts` | tenant | `purchases.view` / `purchases.receive` | Goods receipt = supplier invoice: stock in + amount owed. `supplier_id`, `purchase_order_id`, `from`/`to`, `search` (number, supplier invoice no.). Duplicate supplier invoice numbers per supplier are rejected. `due_date` defaults to invoice date + payment terms. Numbered `GRN-000001`. Since SC3 also `branch_id` (filter) and `charges[]` (landed costs, see [SC3](#supply-chain--landed-cost-and-supplier-performance-sc3)); stock enters at the landed unit cost. |
+| GET | `/purchasing/receipts/{id}` | tenant | `purchases.view` | Lines show `returned_quantity`; since SC3 `landed_cost`, `landed_unit_cost`, `voucher_landed_cost`, and the receipt `charges[]`, `landed_cost_vouchers[]` and the landed / payable totals. |
 | POST | `/purchasing/receipts/{id}/returns` | tenant | `purchases.return` | `{reason, notes, lines: [{goods_receipt_line_id, quantity}]}`; at most the quantity not yet returned, at the original unit cost and batch. Numbered `PRN-000001`. |
 | GET | `/purchasing/returns[/{id}]` | tenant | `purchases.view` | `supplier_id`, `goods_receipt_id`. |
 | GET / POST | `/purchasing/payments` | tenant | `purchases.view` / `purchases.pay` | Supplier payments (`method`: `cash`, `bank_transfer`, `mobile_banking`, `cheque`, `card`, `other`); `supplier_id`, `from`, `to`. Numbered `SPAY-000001`. |
-| GET | `/purchasing/supplier-balances?supplier_ids[]=` | tenant | `purchases.view` | `{supplier_id: "amount owed"}` = opening balance + receipts − returns − payments. |
-| GET | `/purchasing/suppliers/{id}/statement` | tenant | `purchases.view` | Running statement; optional `from`/`to` (earlier activity is folded into `opening_balance`). |
+| GET | `/purchasing/supplier-balances?supplier_ids[]=` | tenant | `purchases.view` | `{supplier_id: "amount owed"}` = opening balance + receipts − returns − payments; since SC3 receipts count at `payable_total`, plus receipt charges and posted landed cost vouchers the supplier billed. |
+| GET | `/purchasing/suppliers/{id}/statement` | tenant | `purchases.view` | Running statement; optional `from`/`to` (earlier activity is folded into `opening_balance`). Entry types `goods_receipt` (+payable total), `receipt_charge` and `landed_cost_voucher` (+, SC3), `purchase_return` (−), `payment` (−). |
 | GET | `/pos/catalog` | tenant | `pos.sell` | Product grid for `store_id`: sellable variants with `price`, `tax_rate`, `on_hand` (null for untracked items), `image_url`. `category_id` includes sub-categories; `search` matches name, SKU or exact barcode; `page`, `per_page` (≤ 100, default 48). |
 | GET | `/pos/lookup?store_id=&code=` | tenant | `pos.sell` | Scanned/typed code → item (exact barcode, then SKU). `404` unknown, `PRODUCT_NOT_SELLABLE`. |
 | POST | `/pos/price` | tenant | `pos.sell` | Prices a cart without saving: lines with amounts and informational `available`, `invoice_discount` (+ `source`), totals, customer credit position. Same rules as checkout. |
@@ -337,7 +341,7 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET | `/expenses` | tenant | `expenses.view` | `type` (default `expense`), `branch_id`, `expense_category_id`, `method`, `from`/`to` (`occurred_on`), `voided`, `search`; `meta.totals.amount`, `meta.by_category[]`. |
 | POST | `/expenses` | tenant | `expenses.manage` + `Idempotency-Key` | `{type, branch_id, expense_category_id, amount, method, occurred_on, reference?, party?, notes?}` → `EXP-000001` / `INC-000001`; cash through the caller's session. |
 | GET | `/expenses/{id}` | tenant | `expenses.view` | One entry. |
-| POST | `/expenses/{id}/void` | tenant | `expenses.manage` | `{reason}`; books the opposite payment; `ALREADY_VOIDED`. |
+| POST | `/expenses/{id}/void` | tenant | `expenses.manage` | `{reason}`; books the opposite payment; `ALREADY_VOIDED`; an on-account expense (`on_account: true`, SC3) → `EXPENSE_ON_ACCOUNT`. |
 | GET / PUT | `/loyalty/settings` | tenant | read: `loyalty.*`, `customers.view` or `pos.sell`; write: `loyalty.manage` | `{is_enabled, spend_amount, points_per_spend, point_value, min_redeem_points}`. |
 | GET | `/loyalty/balances?customer_ids[]=` | tenant | as settings read | `{customer_id: points}`. |
 | GET | `/loyalty/customers/{id}` | tenant | as settings read | `balance`, `lifetime_earned`, `lifetime_redeemed`, latest 100 `transactions` (`earn`, `redeem`, `earn_reversal`, `redeem_reversal`, `refund`, `adjustment`). |
@@ -1825,12 +1829,174 @@ Links: `/purchasing/requisitions/{id}`, `/purchasing/orders/{id}`, `/purchasing/
 
 New error codes: `SELF_APPROVAL_NOT_ALLOWED`, `APPROVAL_LIMIT_EXCEEDED`, `APPROVAL_REQUIRED`, `REQUISITION_LOCKED`, `REQUISITION_EMPTY`, `REQUISITION_NOT_APPROVED`, `RFQ_LOCKED`, `RFQ_LINES_LOCKED`, `RFQ_EMPTY`, `RFQ_SUPPLIERS_REQUIRED`, `RFQ_NOT_OPEN`. New permissions: `purchases.request`, `purchases.approve`, `purchases.approve_high`, `purchases.settings`.
 
+### Supply chain — landed cost and supplier performance (SC3)
+
+Slice 3, the last of the supply chain track. Money is a 2-decimal string, unit costs and averages 4, quantities 3, rates and percentages 2. Vouchers belong to a branch: lists are limited to the user's branches, another branch's or organization's voucher answers 404, a branch the user cannot access answers 422 `VALIDATION_FAILED` on `branch_id`.
+
+**Permissions:** reads `purchases.view`; receipt charges come with `purchases.receive` (the receipt); vouchers — create, edit, delete, preview, post — need the new `purchases.landed_cost` (Organization Admin through `*`, Branch Manager, Inventory Manager, Accountant after `php artisan pos:permissions:sync`).
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| POST | `/purchasing/receipts` | `purchases.receive` | Also takes `charges[]` (below). |
+| GET | `/purchasing/landed-cost-vouchers` | `purchases.view` | List (header rows). Filters `status` (`draft\|posted`), `branch_id`, `charge_supplier_id`, `goods_receipt_id`, `from`/`to` (voucher date), `search` (number, reference); `sort` `created_at` (default, newest first) \| `voucher_date` \| `number` \| `total`; `?export=xlsx\|pdf` (stem `landed-cost-vouchers`). |
+| POST | `/purchasing/landed-cost-vouchers/preview` | `purchases.landed_cost` | The draft body (as for create) → the allocation table; nothing is saved. Same validation as create. |
+| POST | `/purchasing/landed-cost-vouchers` | `purchases.landed_cost` | Create a draft → 201 voucher. The number (`LCV-000001`, sequence key `landed_cost_voucher`) is taken now. Audited `landed_cost_voucher.created`. Not idempotent (a create, like purchase orders). |
+| GET | `/purchasing/landed-cost-vouchers/{id}` | `purchases.view` | Voucher with charges, receipts and allocation table: `allocation_source` `posted` (the stored rows) or `preview` (a draft, computed against the stock on hand now). |
+| PUT | `/purchasing/landed-cost-vouchers/{id}` | `purchases.landed_cost` | Replace a draft (same body); posted → 422 `LANDED_COST_VOUCHER_LOCKED`. Audited `landed_cost_voucher.updated`. |
+| DELETE | `/purchasing/landed-cost-vouchers/{id}` | `purchases.landed_cost` | Delete a draft → 204; posted → `LANDED_COST_VOUCHER_LOCKED`. The number is not reused. Audited. |
+| POST | `/purchasing/landed-cost-vouchers/{id}/post` | `purchases.landed_cost` + key | `draft → posted` (below) → 200 voucher. Posted → 422 `INVALID_STATUS_CHANGE` (`details.status`; a retry with the same key replays the first answer); no charge or receipt → `LANDED_COST_VOUCHER_INCOMPLETE`; charge supplier archived or inactive → 422 on `charge_supplier_id`. There is no void. |
+| GET | `/purchasing/supplier-performance` | `purchases.view` | Scorecard (below). `?export=xlsx\|pdf` (stem `supplier-performance`). |
+| GET | `/purchasing/suppliers/{id}/performance` | `purchases.view` | One supplier: metrics, monthly trend, late / short deliveries (below). Unknown or another organization's supplier → 404. |
+
+**Receipt charges** — `POST /purchasing/receipts` with `charges` (optional, ≤ 20):
+
+```json
+{"supplier_id": "…", "store_id": "…", "purchase_order_id": "…", "supplier_invoice_number": "DAS-2207", "invoice_date": "2026-10-10",
+ "lines": [{"variant_id": "…", "purchase_order_line_id": "…", "quantity": "15", "unit_cost": "280.00", "tax_rate": "15"},
+           {"variant_id": "…", "purchase_order_line_id": "…", "quantity": "6", "unit_cost": "300.00", "tax_rate": "15"}],
+ "charges": [{"type": "freight", "description": "Sea freight Chattogram → Dhaka", "amount": "600.00", "tax_amount": "90.00", "allocation": "value", "charge_supplier_id": "…"},
+             {"type": "handling", "description": "Packing and loading", "amount": "150.00", "allocation": "quantity"}]}
+```
+
+- `type` `freight|duty|insurance|handling|other`; `description` ≤ 120; `amount` > 0 and `tax_amount` ≥ 0 (default 0), up to 2 decimals; `allocation` `value` (by line subtotal, before tax) or `quantity` (by base quantity); `charge_supplier_id` — who bills the charge: empty = on this receipt's invoice, else an active, non-archived supplier (422 on `charges.N.charge_supplier_id`).
+- **Allocation:** each charge separately, largest remainder (`Money::allocate`; leftover cents to the largest remainders, ties to the earlier line), so a charge's parts add up exactly; a `value` charge over lines that are all worth 0 is spread by quantity. Line `landed_cost` = Σ its parts; `landed_unit_cost` = round(unit_cost + landed_cost ÷ quantity, 4). The stock movement of the line is posted at `landed_unit_cost` (equal to `unit_cost` without charges), so the weighted average and the batch level include the charges.
+- **Totals:** `subtotal` / `tax_total` / `total` stay the goods; `charges_total` = Σ amounts (capitalised), `charges_tax_total` = Σ tax (recoverable, not capitalised), `landed_total` = subtotal + charges_total, `payable_total` = total + amount and tax of the charges without a charge supplier — what the main supplier is owed for this invoice. Charges with a charge supplier are owed to that supplier (amount + tax).
+
+Receipt document additions (example: the demo `GRN-000002`):
+
+```json
+{"number": "GRN-000002", "subtotal": "6000.00", "tax_total": "900.00", "total": "6900.00",
+ "charges_total": "750.00", "charges_tax_total": "90.00", "landed_total": "6750.00", "payable_total": "7050.00",
+ "lines": [{"quantity": "15.000", "unit_cost": "280.0000", "line_subtotal": "4200.00", "returned_quantity": "0.000",
+            "landed_cost": "527.14", "landed_unit_cost": "315.1427", "voucher_landed_cost": "560.00", "…": "…"}],
+ "charges": [{"id": "…", "type": "freight", "type_label": "Freight", "description": "Sea freight Chattogram → Dhaka", "amount": "600.00", "tax_amount": "90.00",
+              "allocation": "value", "charge_supplier": {"id": "…", "code": "…", "name": "Sundarban Freight Services"}}],
+ "landed_cost_vouchers": [{"id": "…", "number": "LCV-000001", "voucher_date": "2026-10-27", "amount": "800.00"}]}
+```
+
+`voucher_landed_cost` = Σ posted voucher amounts allocated to the line; `landed_cost_vouchers[].amount` = Σ over the receipt's lines. Receipt list rows carry the four new totals too.
+
+**Landed cost voucher** (`POST` / `PUT` / preview body):
+
+```json
+{"branch_id": "…", "voucher_date": "2026-10-27", "charge_supplier_id": "…", "reference": "SFS-INV-5521",
+ "notes": "Customs duty and port charges for the DAS-2207 shipment.",
+ "charges": [{"type": "duty", "description": "Customs duty and port charges", "amount": "800.00", "tax_amount": "0", "allocation": "value"}],
+ "receipt_ids": ["…"]}
+```
+
+`branch_id` an active branch the user can access; `voucher_date` (`Y-m-d`) not after today in the organization's timezone; `charge_supplier_id` required (the voucher is always owed to a supplier), active and not archived; `reference` ≤ 64 (the supplier's bill number); `notes` ≤ 1000; `charges` 1–20 (as receipt charges, without `charge_supplier_id`); `receipt_ids` 1–50, distinct, goods receipts of the voucher's branch (422 on `receipt_ids.N`: "Choose a goods receipt of the voucher's branch."). Totals are computed: `charges_total`, `tax_total`, `total` = charges + tax.
+
+Answer (detail; list rows are the header without `charges`, `receipts`, `allocation_source`, `allocations`):
+
+```json
+{"id": "…", "number": "LCV-000001", "status": "posted", "branch": {"id": "…", "name": "Dhaka Main"}, "voucher_date": "2026-10-27",
+ "charge_supplier": {"id": "…", "code": "…", "name": "Sundarban Freight Services"}, "reference": "SFS-INV-5521", "notes": "…", "currency": "BDT",
+ "charges_total": "800.00", "tax_total": "0.00", "total": "800.00", "on_hand_total": "720.00", "consumed_total": "80.00",
+ "expense": {"id": "…", "number": "EXP-000002"}, "receipt_numbers": ["GRN-000002"], "receipt_count": 1,
+ "posted_at": "…", "posted_by": {"id": "…", "name": "Demo Owner"}, "created_by": {"id": "…", "name": "Demo Owner"}, "created_at": "…", "updated_at": "…",
+ "charges": [{"id": "…", "type": "duty", "type_label": "Duty", "description": "Customs duty and port charges", "amount": "800.00", "tax_amount": "0.00", "allocation": "value"}],
+ "receipts": [{"id": "…", "number": "GRN-000002", "supplier": {…}, "store": {…}, "supplier_invoice_number": "DAS-2207", "invoice_date": "…",
+               "subtotal": "6000.00", "charges_total": "750.00", "landed_total": "6750.00"}],
+ "allocation_source": "posted",
+ "allocations": [{"goods_receipt_id": "…", "goods_receipt_number": "GRN-000002", "goods_receipt_line_id": "…", "store": {…},
+                  "variant": {"id": "…", "product_name": "Cotton Polo Shirt", "variant_name": "L", "sku": "…", "unit_code": "pcs"}, "batch": null,
+                  "received_quantity": "15.000", "returned_quantity": "0.000", "on_hand_quantity": "15.000", "consumed_quantity": "0.000",
+                  "line_value": "4200.00", "amount": "560.00", "on_hand_amount": "560.00", "consumed_amount": "0.00",
+                  "landed_unit_cost": "315.1427", "previous_voucher_cost": "0.00", "new_landed_unit_cost": "352.4760",
+                  "average_cost_before": "309.4286", "average_cost_after": "323.4286", "stock_movement_id": "…"}]}
+```
+
+While draft, `on_hand_total`, `consumed_total`, `expense`, `posted_*` are null and the allocation rows are a preview (`stock_movement_id` null). `consumed_quantity` = received − on hand (sold, used, written off or returned to the supplier). `previous_voucher_cost` = what earlier posted vouchers added to the line; `new_landed_unit_cost` = round(landed_unit_cost + (previous + amount) ÷ received quantity, 4). `average_cost_before` / `after` are the stock level's (one store × variant × batch, shared by every line on it), null for a line with nothing on hand. The preview answers `{currency, charges_total, tax_total, total, on_hand_total, consumed_total, receipts, allocations}`.
+
+**Posting** — `POST /purchasing/landed-cost-vouchers/{id}/post` with `Idempotency-Key`, one transaction:
+
+1. Lock the voucher; anything but a draft → `INVALID_STATUS_CHANGE`. The charge supplier must still be active.
+2. Spread every charge over all lines of the voucher's receipts (receipts in voucher order, then line id; same allocator as receipt charges).
+3. **On hand per line** (Inventory `StockValuation::onHandFromDocument`, levels locked `FOR UPDATE` in `store|variant|batch` order): on hand from the receipt on its level = clamp(level quantity now − quantity posted into the level by other documents after the receipt's movement, 0, quantity the receipt brought), capped by the line's received − returned quantity; several lines of one receipt on the same level take it last line first. The ledger pools units per level, so this assumes the newest stock is still on hand (first in, first out); it is exact for batch-tracked lines whose batch nothing else fills. Products that do not track stock have nothing on hand.
+4. Split each line's amount exactly (largest remainder) into `on_hand_amount` (amount × on hand ÷ received) and `consumed_amount` (the rest).
+5. On-hand shares summed per level → one movement per level, type `landed_cost`, quantity 0, `value` = the share, `unit_cost` = the per-unit increase, `balance_after` = the unchanged quantity, reference `landed_cost_voucher` / the voucher number; the level's average becomes (quantity × average + value) ÷ quantity (4 dp).
+6. Consumed shares summed → one expense `EXP-…` in the category "Landed cost on sold stock" (created on first use), dated the voucher date, reference the voucher number, party the charge supplier, `on_account: true` (no payments-ledger entry, `method` `bank_transfer`, `method_label` "On supplier account", not voidable: `EXPENSE_ON_ACCOUNT`).
+7. Append-only `landed_cost_allocations` rows per receipt line; totals, `expense`, `posted_by` / `posted_at`; audited `landed_cost_voucher.posted`.
+
+The voucher `total` (with tax) is then owed to the charge supplier: statement entry `landed_cost_voucher` (date = voucher date, reference = the voucher's reference or "Landed cost"), included in `/purchasing/supplier-balances` and settled by supplier payments.
+
+**Supplier payables (SC3).** Balance = opening balance + Σ receipts' `payable_total` + Σ receipt charges the supplier billed (amount + tax; statement entry `receipt_charge`, `id` / `number` = the receipt's, reference "Charge on GRN-…: Freight — {description}", date = the receipt's invoice date) + Σ posted vouchers it billed − Σ purchase returns − Σ payments. Payments are on account. Purchase returns still credit the supplier's unit cost (not the landed cost).
+
+**Supplier performance** — `GET /purchasing/supplier-performance?date_from=&date_to=&branch_id=&supplier_id=&sort=`:
+
+- Dates are the organization's (`Y-m-d`); `date_to` defaults to today, `date_from` to `date_to` − 89 days; `date_from` after `date_to` (or after today without `date_to`) → 422; ranges over ten years → 422. The previous period has the same length and ends the day before `date_from`.
+- Scope: the user's branches (`branch_id` narrows to one; a branch outside them gives no data). `supplier_id` limits to one supplier.
+- `sort`: `score` (default `-score`), `name`, `orders`, `spend`, `on_time_rate`, `fill_rate`, `avg_lead_days`, `return_rate`, `price_change_pct`, `quote_response_rate`, `quotes_won`, `-` for descending; null values last in both directions; ties by name. Unknown key → 422.
+- Not paginated: `data` is the list of suppliers with activity in the range (an order, spend, a receipt line, an RFQ invitation or an award); `meta.period` `{date_from, date_to, previous_from, previous_to}`.
+
+```json
+{"data": [{"supplier": {"id": "…", "code": "…", "name": "Dhaka Apparel Sourcing"},
+           "orders": 2, "spend": "10327.50", "on_time_rate": "50.00", "on_time_orders": 2,
+           "fill_rate": "88.57", "ordered_quantity": "35.000", "received_quantity": "31.000", "avg_lead_days": "10.0",
+           "return_rate": "6.45", "price_change_pct": null, "quote_invitations": 0, "quote_responses": 0, "quote_response_rate": null, "quotes_won": 0,
+           "late_deliveries": 1, "short_deliveries": 1, "score": "68",
+           "score_components": {"on_time": "50.00", "fill": "88.57", "returns": "67.75", "price_stability": null, "responsiveness": null},
+           "score_weights": {"on_time": 35, "fill": 30, "returns": 15}}],
+ "meta": {"period": {"date_from": "…", "date_to": "…", "previous_from": "…", "previous_to": "…"}}}
+```
+
+Example values worked out by hand from the seeded *Dhaka Apparel Sourcing* (default range; spend counts invoices, so the return does not reduce it). Metrics per supplier over [`date_from`, `date_to`]:
+
+| Field | Definition |
+|-------|------------|
+| `orders` | Purchase orders placed (`ordered_at` set) with `order_date` in range. |
+| `spend` | Σ `payable_total` of its receipts (invoice date in range) + Σ receipt charges it billed (amount + tax; the receipt's invoice date) + Σ posted landed cost vouchers it billed (`total`; voucher date). Tax included. |
+| `on_time_rate` | Of those orders with an `expected_date` and at least one receipt: % whose delivery date ≤ `expected_date`. Delivery date = the invoice date of the receipt that completed the order when it is fully received, else the first receipt's. `on_time_orders` = the orders counted. |
+| `fill_rate` | Σ received ÷ Σ ordered (base quantities; received capped per line at the ordered quantity) over those orders that are `received`, still `ordered` / `partially_received` past their expected date, or cancelled after a partial receipt. |
+| `avg_lead_days` | Mean days from order date to the first receipt (orders with a receipt), 1 decimal. |
+| `return_rate` | Σ returned ÷ Σ received quantity on its receipt lines with invoice date in range. |
+| `price_change_pct` | Per variant: average unit price (Σ line subtotal ÷ Σ quantity, the supplier's price before charges and tax) in range vs the previous period, as a % change; weighted by the variant's line subtotal in range. Null without a variant bought in both periods. |
+| `quote_response_rate` | RFQ invitations sent to it in range (`rfq_suppliers.sent_at`, converted to the organization's date) that have a recorded quote (received or declined) ÷ invitations. `quote_invitations`, `quote_responses` = the counts. |
+| `quotes_won` | RFQ award rows for it in range (`rfq_awards.created_at`, organization date). |
+| `late_deliveries`, `short_deliveries` | Orders in range delivered after the expected date or still undelivered past it (not cancelled); fill-eligible orders received short. |
+| `score` | Below; integer 0–100 as a string, null when no component has data. |
+
+Rates are percentages with 2 decimals; null when there is nothing to measure.
+
+**Score** (`Purchasing\Domain\Performance\SupplierScore`, pure): components 0–100 (clamped) and weights —
+
+| Component | Weight | Value |
+|-----------|--------|-------|
+| `on_time` | 35 | `on_time_rate` |
+| `fill` | 30 | `fill_rate` |
+| `returns` | 15 | 100 − 5 × `return_rate` (20 % returned → 0) |
+| `price_stability` | 10 | 100 − 5 × max(0, `price_change_pct`) (decreases count as stable; +20 % → 0) |
+| `responsiveness` | 10 | `quote_response_rate` |
+
+score = round(Σ weight × component ÷ Σ weight of the components present). A component without data is left out and the others are scaled up to 100 (`score_weights` lists the weights used); none → null.
+
+**One supplier** — `GET /purchasing/suppliers/{id}/performance?date_from=&date_to=&branch_id=` (same date rules, no `sort`):
+
+```json
+{"supplier": {"id": "…", "code": "…", "name": "Dhaka Apparel Sourcing"},
+ "date_from": "…", "date_to": "…", "previous_from": "…", "previous_to": "…",
+ "metrics": {"orders": 2, "spend": "10327.50", "…": "…", "score": "68", "score_components": {…}, "score_weights": {…}},
+ "trend": [{"month": "2025-12", "orders": 0, "on_time_rate": null, "fill_rate": null, "spend": "0.00"}, "… 12 months up to date_to's month …"],
+ "problem_deliveries": [{"purchase_order": {"id": "…", "number": "PO-000003"}, "status": "partially_received",
+                         "order_date": "…", "expected_date": "…", "received_date": "…", "first_received_on": "…", "completed_on": null,
+                         "days_late": 3, "ordered_quantity": "25.000", "received_quantity": "21.000", "short_quantity": "4.000",
+                         "is_late": true, "is_short": true}]}
+```
+
+`metrics` as a list row without `supplier`. `trend`: the 12 calendar months ending with `date_to`'s month (the last month cut at `date_to`), each with orders, on-time rate, fill rate and spend by the same rules (no price change per month). `problem_deliveries`: orders placed in those 12 months that are late or short, most recent expected date first, at most 20; `received_date` = the delivery date judged for on-time (completing receipt, else first); `days_late` counts to the delivery date, or to today for an order still undelivered.
+
+**Exports (X1).** `/purchasing/landed-cost-vouchers` and `/purchasing/supplier-performance` take `?export=xlsx|pdf` (see the table under [Exports](#exports-x1)); the goods receipts export gains *Charges* and *Payable*. The stock movements export has no *Value* column.
+
+**Other changes.** `GET /purchasing/receipts` filter `branch_id`. Stock movements: type `landed_cost`, field `value`. Expenses: field `on_account` (list and detail), `method_label` "On supplier account" for those; `GET /expenses?method=bank_transfer` includes them.
+
+New error codes: `LANDED_COST_VOUCHER_LOCKED`, `LANDED_COST_VOUCHER_INCOMPLETE`, `EXPENSE_ON_ACCOUNT`. New permission: `purchases.landed_cost`.
+
 ### Planned (by phase)
 
 | Phase | Resource paths |
 |-------|----------------|
 | 7 | `/reports/*`, `/dashboard` |
 | 8 | `/ai/insights`, `/ai/ask` |
-| SC3 | Landed cost on goods receipts, supplier performance (paths to be fixed in SC3) |
 
 Each phase updates this section with request/response examples; Scramble remains the field-level source of truth.

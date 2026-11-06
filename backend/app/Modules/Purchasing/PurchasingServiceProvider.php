@@ -5,6 +5,7 @@ namespace App\Modules\Purchasing;
 use App\Modules\Purchasing\Infrastructure\Console\SendReorderNotificationsCommand;
 use App\Modules\Purchasing\Infrastructure\Console\SendRfqRemindersCommand;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
+use App\Modules\Purchasing\Infrastructure\Models\LandedCostVoucher;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrder;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseRequisition;
 use App\Modules\Purchasing\Infrastructure\Models\Rfq;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\Route;
  * and supplier balances; the supplier catalog, reorder suggestions and the daily reorder
  * notification (`purchasing:reorder-notifications`, SC1); purchase requisitions with
  * amount-based approval, purchase order approval, RFQs with supplier quotes and awards, and
- * the daily quotes-overdue reminder (`purchasing:rfq-reminders`, SC2).
+ * the daily quotes-overdue reminder (`purchasing:rfq-reminders`, SC2); landed costs on receipts
+ * and landed cost vouchers, and the supplier performance read model (SC3).
  */
 class PurchasingServiceProvider extends ModuleServiceProvider
 {
@@ -26,6 +28,7 @@ class PurchasingServiceProvider extends ModuleServiceProvider
         Route::model('receipt', GoodsReceipt::class);
         Route::model('requisition', PurchaseRequisition::class);
         Route::model('rfq', Rfq::class);
+        Route::model('landedCostVoucher', LandedCostVoucher::class);
 
         parent::boot();
 
@@ -47,6 +50,8 @@ class PurchasingServiceProvider extends ModuleServiceProvider
             'purchases.approve' => 'Approve requisitions and purchase orders up to the manager limit',
             'purchases.approve_high' => 'Approve requisitions and purchase orders above the manager limit',
             'purchases.settings' => 'Change purchase approval limits',
+            // SC3: landed costs billed after the goods (freight, duty…).
+            'purchases.landed_cost' => 'Create, edit, delete and post landed cost vouchers',
         ];
     }
 }

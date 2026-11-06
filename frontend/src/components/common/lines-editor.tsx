@@ -71,7 +71,7 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-3xl border-separate border-spacing-y-1 text-sm">
           <thead className="text-left text-xs text-muted-foreground">
             <tr>

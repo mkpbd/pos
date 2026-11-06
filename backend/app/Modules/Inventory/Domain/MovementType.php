@@ -18,6 +18,16 @@ enum MovementType: string
     case OnlineOrderCancel = 'online_order_cancel';
     /** Goods of a delivered web order coming back on an online return (E10b). */
     case OnlineReturn = 'online_return';
+    /**
+     * SC3: a value-only cost adjustment (landed cost posted after the receipt). Quantity 0;
+     * the stock value of the level grows by the movement's `value`, so its average cost rises.
+     */
+    case LandedCost = 'landed_cost';
+
+    public function isValueOnly(): bool
+    {
+        return $this === self::LandedCost;
+    }
 
     /**
      * Inbound movements bring their own unit cost and update the weighted average;

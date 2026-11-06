@@ -6,10 +6,12 @@ use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Inventory\Application\Contracts\ReplenishmentData;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Contracts\StockLevels;
+use App\Modules\Inventory\Application\Contracts\StockValuation;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
 use App\Modules\Inventory\Infrastructure\Directory\EloquentBatchDirectory;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLedger;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLevels;
+use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockValuation;
 use App\Modules\Inventory\Infrastructure\Models\StockAdjustment;
 use App\Modules\Inventory\Infrastructure\Models\StockReorderRule;
 use App\Modules\Inventory\Infrastructure\Models\StockTransfer;
@@ -30,6 +32,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
         $this->app->bind(StockLedger::class, EloquentStockLedger::class);
         $this->app->bind(BatchDirectory::class, EloquentBatchDirectory::class);
         $this->app->bind(StockLevels::class, EloquentStockLevels::class);
+        $this->app->bind(StockValuation::class, EloquentStockValuation::class);
         $this->app->bind(ReplenishmentData::class, EloquentReplenishmentData::class);
     }
 

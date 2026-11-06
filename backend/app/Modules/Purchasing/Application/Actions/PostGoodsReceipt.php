@@ -11,6 +11,7 @@ use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Purchasing\Application\Services\ProcurementHistory;
 use App\Modules\Purchasing\Application\Services\PurchasingContext;
+use App\Modules\Purchasing\Domain\LandedCost\LandedCostAllocator;
 use App\Modules\Purchasing\Domain\PurchaseOrderStatus;
 use App\Modules\Purchasing\Domain\PurchaseTotals;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
@@ -22,6 +23,7 @@ use App\Modules\Shared\Application\Contracts\SequenceGenerator;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Domain\ValueObjects\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -33,6 +35,11 @@ use Illuminate\Validation\ValidationException;
  * server-computed totals, stock in at the received unit cost (weighted average), batches,
  * and — when received against a purchase order — the order's received quantities and status.
  * Receiving more than is still open on an order line is refused.
+ *
+ * SC3: landed cost charges (freight, duty…) are allocated over the lines (LandedCostAllocator)
+ * and the stock enters at unit cost + landed cost ÷ quantity. Charges without a charge
+ * supplier are part of this invoice (`payable_total`); the others are payables on the charge
+ * supplier's account (SupplierAccount).
  */
 class PostGoodsReceipt
 {
@@ -48,7 +55,7 @@ class PostGoodsReceipt
     ) {}
 
     /**
-     * @param  array{supplier_id: string, store_id: string, purchase_order_id?: ?string, supplier_invoice_number?: ?string, invoice_date: string, due_date?: ?string, notes?: ?string, lines: list<array{variant_id: string, quantity: string, unit_cost: string, tax_rate?: ?string, purchase_order_line_id?: ?string, batch_number?: ?string, expires_on?: ?string, manufactured_on?: ?string}>}  $data
+     * @param  array{supplier_id: string, store_id: string, purchase_order_id?: ?string, supplier_invoice_number?: ?string, invoice_date: string, due_date?: ?string, notes?: ?string, lines: list<array{variant_id: string, quantity: string, unit_cost: string, tax_rate?: ?string, purchase_order_line_id?: ?string, batch_number?: ?string, expires_on?: ?string, manufactured_on?: ?string}>, charges?: list<array{type: string, description?: ?string, amount: string, tax_amount?: ?string, allocation: string, charge_supplier_id?: ?string}>}  $data
      */
     public function __invoke(TenantUser $actor, array $data): GoodsReceipt
     {
@@ -64,8 +71,10 @@ class PostGoodsReceipt
         $currency = $this->context->currency();
         $totals = PurchaseTotals::calculate($lines, $currency);
         $dueDate = $data['due_date'] ?? Carbon::parse($data['invoice_date'])->addDays($supplier['payment_terms_days'])->toDateString();
+        $charges = $this->charges(array_values($data['charges'] ?? []));
+        $landed = $this->landedCosts($charges, $lines, $totals, $currency);
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $data, $lines, $totals, $currency, $dueDate) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $data, $lines, $totals, $currency, $dueDate, $charges, $landed) {
             $order = isset($data['purchase_order_id']) ? $this->lockOrder($data, $store['id'], $lines) : null;
 
             $receipt = GoodsReceipt::query()->create([
@@ -83,8 +92,27 @@ class PostGoodsReceipt
                 'subtotal' => $totals['subtotal'],
                 'tax_total' => $totals['tax_total'],
                 'total' => $totals['total'],
+                'charges_total' => $landed['charges_total'],
+                'charges_tax_total' => $landed['charges_tax_total'],
+                'landed_total' => $landed['landed_total'],
+                'payable_total' => $landed['payable_total'],
                 'created_by' => $actor->getAuthIdentifier(),
             ]);
+
+            $now = now();
+            foreach ($charges as $i => $charge) {
+                $receipt->charges()->create([
+                    'organization_id' => $organizationId,
+                    'type' => $charge['type'],
+                    'description' => $charge['description'],
+                    'amount' => $charge['amount'],
+                    'tax_amount' => $charge['tax_amount'],
+                    'allocation' => $charge['allocation'],
+                    'charge_supplier_id' => $charge['charge_supplier_id'],
+                    'sort_order' => $i,
+                    'created_at' => $now,
+                ]);
+            }
 
             $changes = [];
             $created = [];
@@ -102,8 +130,11 @@ class PostGoodsReceipt
                     'unit_cost' => Decimal::round($line['unit_cost'], 4),
                     'tax_rate' => $line['tax_rate'],
                     ...$totals['lines'][$i],
+                    'landed_cost' => $landed['lines'][$i]['landed_cost'],
+                    'landed_unit_cost' => $landed['lines'][$i]['landed_unit_cost'],
                 ]);
-                $changes[] = new StockChange($store['id'], $line['variant_id'], $batchId, MovementType::PurchaseReceipt, $line['quantity'], $line['unit_cost']);
+                // SC3: stock enters at the landed unit cost, so the weighted average includes the charges.
+                $changes[] = new StockChange($store['id'], $line['variant_id'], $batchId, MovementType::PurchaseReceipt, $line['quantity'], $landed['lines'][$i]['landed_unit_cost']);
             }
 
             $this->ledger->post($changes, new StockReference('goods_receipt', $receipt->id, $receipt->number));
@@ -119,10 +150,80 @@ class PostGoodsReceipt
                 'purchase_order_id' => $receipt->purchase_order_id,
                 'supplier_invoice_number' => $receipt->supplier_invoice_number,
                 'total' => $receipt->total,
+                'charges_total' => $receipt->charges_total,
+                'payable_total' => $receipt->payable_total,
             ]);
 
             return $receipt;
         });
+    }
+
+    /**
+     * SC3: normalized charges; a charge supplier must be an active supplier.
+     *
+     * @param  list<array<string, mixed>>  $charges
+     * @return list<array{type: string, description: ?string, amount: string, tax_amount: string, allocation: string, charge_supplier_id: ?string}>
+     */
+    private function charges(array $charges): array
+    {
+        $normalized = [];
+        foreach ($charges as $i => $charge) {
+            $supplierId = $charge['charge_supplier_id'] ?? null;
+            if ($supplierId !== null) {
+                $this->context->requireActiveSupplier($supplierId, "charges.{$i}.charge_supplier_id");
+            }
+            $normalized[] = [
+                'type' => (string) $charge['type'],
+                'description' => filled($charge['description'] ?? null) ? trim((string) $charge['description']) : null,
+                'amount' => Decimal::round((string) $charge['amount'], 2),
+                'tax_amount' => Decimal::round((string) ($charge['tax_amount'] ?? '0'), 2),
+                'allocation' => (string) $charge['allocation'],
+                'charge_supplier_id' => $supplierId,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * SC3: each charge spread over the lines (largest remainder, exact), the landed unit cost
+     * per line, and the receipt's landed and payable totals.
+     *
+     * @param  list<array{type: string, description: ?string, amount: string, tax_amount: string, allocation: string, charge_supplier_id: ?string}>  $charges
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array{lines: list<array{line_subtotal: string}>, subtotal: string, total: string}  $totals
+     * @return array{lines: list<array{landed_cost: string, landed_unit_cost: string}>, charges_total: string, charges_tax_total: string, landed_total: string, payable_total: string}
+     */
+    private function landedCosts(array $charges, array $lines, array $totals, string $currency): array
+    {
+        $allocated = $charges === []
+            ? ['lines' => array_fill(0, count($lines), Money::zero($currency)->amount())]
+            : LandedCostAllocator::allocate($charges, array_map(fn (array $l, int $i) => [
+                'quantity' => (string) $l['quantity'],
+                'value' => $totals['lines'][$i]['line_subtotal'],
+            ], $lines, array_keys($lines)), $currency);
+
+        $chargesTotal = Money::zero($currency);
+        $chargesTax = Money::zero($currency);
+        $payable = Money::of($totals['total'], $currency);
+        foreach ($charges as $charge) {
+            $chargesTotal = $chargesTotal->plus(Money::of($charge['amount'], $currency));
+            $chargesTax = $chargesTax->plus(Money::of($charge['tax_amount'], $currency));
+            if ($charge['charge_supplier_id'] === null) {
+                $payable = $payable->plus(Money::of($charge['amount'], $currency))->plus(Money::of($charge['tax_amount'], $currency));
+            }
+        }
+
+        return [
+            'lines' => array_map(fn (array $l, int $i) => [
+                'landed_cost' => $allocated['lines'][$i],
+                'landed_unit_cost' => LandedCostAllocator::landedUnitCost((string) $l['unit_cost'], $allocated['lines'][$i], (string) $l['quantity']),
+            ], $lines, array_keys($lines)),
+            'charges_total' => $chargesTotal->amount(),
+            'charges_tax_total' => $chargesTax->amount(),
+            'landed_total' => Money::of($totals['subtotal'], $currency)->plus($chargesTotal)->amount(),
+            'payable_total' => $payable->amount(),
+        ];
     }
 
     /**

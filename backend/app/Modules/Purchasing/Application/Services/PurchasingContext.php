@@ -31,15 +31,15 @@ class PurchasingContext
     /**
      * @return array{id: string, code: string, name: string, is_active: bool, archived: bool, opening_balance: string, payment_terms_days: int}
      */
-    public function requireActiveSupplier(string $supplierId): array
+    public function requireActiveSupplier(string $supplierId, string $field = 'supplier_id'): array
     {
         $supplier = $this->suppliers->find($supplierId, $this->organizationId());
 
         if ($supplier === null || $supplier['archived']) {
-            throw ValidationException::withMessages(['supplier_id' => ['The selected supplier does not exist.']]);
+            throw ValidationException::withMessages([$field => ['The selected supplier does not exist.']]);
         }
         if (! $supplier['is_active']) {
-            throw ValidationException::withMessages(['supplier_id' => ['The selected supplier is inactive.']]);
+            throw ValidationException::withMessages([$field => ['The selected supplier is inactive.']]);
         }
 
         return $supplier;

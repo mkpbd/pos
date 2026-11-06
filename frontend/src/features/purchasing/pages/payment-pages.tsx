@@ -155,7 +155,7 @@ export function PaymentsPage() {
   )
 }
 
-const ENTRY_LABELS = { goods_receipt: 'Purchase', purchase_return: 'Return', payment: 'Payment' } as const
+const ENTRY_LABELS: Record<string, string> = { goods_receipt: 'Purchase', receipt_charge: 'Charge', landed_cost_voucher: 'Landed cost', purchase_return: 'Return', payment: 'Payment' }
 
 /** Running account of one supplier, opened from the Suppliers page. */
 export function SupplierStatementSheet({ supplierId, onOpenChange }: { supplierId: string | null; onOpenChange: (open: boolean) => void }) {
@@ -203,10 +203,10 @@ export function SupplierStatementSheet({ supplierId, onOpenChange }: { supplierI
                     <TableCell colSpan={3} className="text-sm text-muted-foreground">Opening balance</TableCell>
                     <TableCell className="text-right font-mono">{formatMoney(data.opening_balance)}</TableCell>
                   </TableRow>
-                  {data.entries.map((e) => (
-                    <TableRow key={`${e.type}-${e.id}`}>
+                  {data.entries.map((e, i) => (
+                    <TableRow key={`${e.type}-${e.id}-${i}`}>
                       <TableCell className="text-sm whitespace-nowrap">{e.date}</TableCell>
-                      <TableCell className="text-sm">{ENTRY_LABELS[e.type]} <span className="font-mono text-xs text-muted-foreground">{e.number}{e.reference && ` · ${e.reference}`}</span></TableCell>
+                      <TableCell className="text-sm">{ENTRY_LABELS[e.type] ?? e.type} <span className="font-mono text-xs text-muted-foreground">{e.number}{e.reference && ` · ${e.reference}`}</span></TableCell>
                       <TableCell className={`text-right font-mono ${e.amount.startsWith('-') ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>{formatMoney(e.amount)}</TableCell>
                       <TableCell className="text-right font-mono">{formatMoney(e.balance)}</TableCell>
                     </TableRow>

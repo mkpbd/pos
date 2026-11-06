@@ -21,9 +21,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $line_subtotal
  * @property string $line_tax
  * @property string $line_total
+ * @property string $landed_cost SC3: the line's share of the receipt's charges
+ * @property string $landed_unit_cost SC3: unit_cost + landed_cost / quantity (the cost stock entered at)
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'goods_receipt_id', 'purchase_order_line_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'returned_quantity'])]
+#[Fillable(['organization_id', 'goods_receipt_id', 'purchase_order_line_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'landed_cost', 'landed_unit_cost', 'returned_quantity'])]
 class GoodsReceiptLine extends Model
 {
     use BelongsToOrganization, HasUuids;
@@ -37,6 +39,8 @@ class GoodsReceiptLine extends Model
             'line_subtotal' => 'decimal:2',
             'line_tax' => 'decimal:2',
             'line_total' => 'decimal:2',
+            'landed_cost' => 'decimal:2',
+            'landed_unit_cost' => 'decimal:4',
             'returned_quantity' => 'decimal:3',
         ];
     }

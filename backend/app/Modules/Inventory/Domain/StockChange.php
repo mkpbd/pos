@@ -25,6 +25,9 @@ final readonly class StockChange
          */
         public bool $allocateBatches = false,
     ) {
+        if ($type->isValueOnly()) {
+            throw new InvalidArgumentException('Value-only adjustments go through StockValuation::revalue().');
+        }
         if (Decimal::compare($quantity, '0') <= 0) {
             throw new InvalidArgumentException('Stock change quantity must be positive.');
         }

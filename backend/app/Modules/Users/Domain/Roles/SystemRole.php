@@ -54,7 +54,7 @@ enum SystemRole: string
                 // SC2: approves requisitions / orders up to the manager limit; above it and the
                 // approval limits themselves stay with the Organization Admin.
                 'inventory.*', 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay',
-                'purchases.request', 'purchases.approve', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
+                'purchases.request', 'purchases.approve', 'purchases.landed_cost', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
                 'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*', 'ai.*',
             ],
             self::Cashier => [
@@ -68,10 +68,12 @@ enum SystemRole: string
                 'suppliers.*', 'inventory.*', 'reports.inventory',
                 // SC2: runs purchasing (requisitions → orders, RFQs) but does not approve.
                 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay', 'purchases.request',
+                // SC3: books landed cost vouchers (freight / duty bills that arrive later).
+                'purchases.landed_cost',
             ],
             self::Accountant => [
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
-                'sales.view', 'purchases.view', 'purchases.pay', 'customers.view', 'suppliers.view',
+                'sales.view', 'purchases.view', 'purchases.pay', 'purchases.landed_cost', 'customers.view', 'suppliers.view',
                 'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'audit.view',
                 // E10a: couriers' COD remittances (and the web orders they settle); E10b: online refunds.
                 'web_orders.view', 'web_orders.remit', 'web_orders.refund',

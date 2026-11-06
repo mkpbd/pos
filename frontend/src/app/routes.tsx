@@ -66,6 +66,9 @@ const pages = {
   approvals: page(() => import('@/features/procurement/pages/approvals-page'), 'ApprovalsPage'),
   rfqs: page(() => import('@/features/procurement/pages/rfq-pages'), 'RfqsPage'),
   rfq: page(() => import('@/features/procurement/pages/rfq-pages'), 'RfqPage'),
+  landedCosts: page(() => import('@/features/landed-cost/pages/voucher-pages'), 'VouchersPage'),
+  landedCost: page(() => import('@/features/landed-cost/pages/voucher-pages'), 'VoucherPage'),
+  supplierPerformance: page(() => import('@/features/supplier-performance/pages/supplier-performance-page'), 'SupplierPerformancePage'),
   purchasingSettings: page(() => import('@/features/procurement/pages/purchasing-settings-page'), 'PurchasingSettingsPage'),
   posTerminal: page(() => import('@/features/pos/pages/pos-terminal-page'), 'PosTerminalPage'),
   sales: page(() => import('@/features/sales/pages/sales-pages'), 'SalesPage'),
@@ -112,6 +115,8 @@ const pages = {
   storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
 }
 
+/** Landed cost vouchers (SC3): creating, editing and posting. Mirrors LANDED_COST_PERMISSIONS.manage. */
+const LANDED_COST_MANAGE = 'purchases.landed_cost'
 const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage']
 /** Requesters see their own requisitions; approvers and purchasing staff see the branch's (SC2). */
 const REQUISITION_PERMISSIONS = ['purchases.view', 'purchases.request', 'purchases.approve', 'purchases.approve_high']
@@ -217,6 +222,10 @@ export const routes: RouteObject[] = [
               guarded('purchases.view', 'purchasing/receipts/:receiptId', pages.receipt),
               guarded('purchases.view', 'purchasing/returns', pages.purchaseReturns),
               guarded('purchases.view', 'purchasing/payments', pages.payments),
+              guarded('purchases.view', 'purchasing/landed-costs', pages.landedCosts),
+              guarded(LANDED_COST_MANAGE, 'purchasing/landed-costs/new', pages.landedCost),
+              guarded('purchases.view', 'purchasing/landed-costs/:voucherId', pages.landedCost),
+              guarded('purchases.view', 'purchasing/supplier-performance', pages.supplierPerformance),
               guarded('storefront.view', 'storefront', pages.storefrontSettings),
               guarded('storefront.view', 'storefront/theme', pages.storefrontTheme),
               guarded('storefront.view', 'storefront/menus', pages.storefrontMenus),

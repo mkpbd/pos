@@ -42,6 +42,8 @@ export const EXPORTABLE_LISTS = {
   supplierCatalog: { label: 'Supplier catalog', endpoint: '/purchasing/supplier-products', route: null, screen: 'Suppliers → supplier page → Catalog tab' },
   goodsReceipts: { label: 'Goods receipts', endpoint: '/purchasing/receipts', route: '/purchasing/receipts' },
   purchaseReturns: { label: 'Purchase returns', endpoint: '/purchasing/returns', route: '/purchasing/returns' },
+  landedCostVouchers: { label: 'Landed cost vouchers', endpoint: '/purchasing/landed-cost-vouchers', route: '/purchasing/landed-costs' },
+  supplierPerformance: { label: 'Supplier performance', endpoint: '/purchasing/supplier-performance', route: '/purchasing/supplier-performance' },
   supplierPayments: { label: 'Supplier payments', endpoint: '/purchasing/payments', route: '/purchasing/payments' },
   supplierStatement: { label: 'Supplier statement', endpoint: '/purchasing/suppliers/:id/statement', route: null, screen: 'Suppliers → Statement sheet' },
   customers: { label: 'Customers', endpoint: '/customers', route: '/customers' },

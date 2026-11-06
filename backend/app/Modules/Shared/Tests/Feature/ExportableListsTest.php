@@ -54,6 +54,8 @@ class ExportableListsTest extends TestCase
             'purchase requisitions' => ['purchasing/requisitions', 'purchasing/requisitions?status=draft', 'Requisition', 'purchase-requisitions', 0],
             'rfqs' => ['purchasing/rfqs', 'purchasing/rfqs?status=sent', 'RFQ', 'rfqs', 0],
             'pending approvals' => ['purchasing/approvals', 'purchasing/approvals?kind=requisition', 'Document', 'pending-approvals', 0],
+            'landed cost vouchers' => ['purchasing/landed-cost-vouchers', 'purchasing/landed-cost-vouchers?status=posted', 'Voucher', 'landed-cost-vouchers', 0],
+            'supplier performance' => ['purchasing/supplier-performance', 'purchasing/supplier-performance?date_from=2026-01-01', 'Supplier', 'supplier-performance', 0],
             'stock' => ['inventory/stock', 'inventory/stock?low_stock=0', 'Product', 'stock', 1],
             'batches' => ['inventory/batches', 'inventory/batches', 'Product', 'batches', 1],
             'stock movements' => ['inventory/movements', 'inventory/movements', 'Date', 'stock-movements', 1],
