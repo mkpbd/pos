@@ -29,6 +29,8 @@ final class ReportRegistry
         Reports\LowStockReport::class,
         Reports\ExpiryReport::class,
         Reports\PurchasesReport::class,
+        // Phase 8: per-customer purchases (also the input of the AI's RFM customer insights).
+        Reports\SalesByCustomerReport::class,
         Reports\CustomerDuesReport::class,
         Reports\SupplierDuesReport::class,
         Reports\PaymentCollectionsReport::class,

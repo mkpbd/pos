@@ -13,6 +13,8 @@ export type OrganizationSummary = {
   timezone: string
   tax_mode: 'exclusive' | 'inclusive'
   status: 'active' | 'suspended'
+  /** Phase 8: AI features switched on for the organization (app and organization settings). */
+  ai_enabled?: boolean
 }
 
 export type CurrentUser = {
@@ -28,4 +30,6 @@ export type CurrentUser = {
   roles: { id: string; name: string; system_key: string | null }[]
   permissions: string[]
   branches: BranchSummary[]
+  /** Phase 8: AI features switched on for the organization (app and organization settings). */
+  ai_enabled?: boolean
 }

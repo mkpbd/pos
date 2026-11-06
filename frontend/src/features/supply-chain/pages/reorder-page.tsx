@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ExplainReorderButton } from '@/features/ai/components/explain-reorder'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useBranchesQuery } from '@/features/branches/api'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
@@ -303,6 +304,7 @@ export function ReorderPage() {
         actions={
           <>
             <ExportMenu list="reorderSuggestions" query={filters} disabled={!storeId || !data?.items.length} />
+            <ExplainReorderButton storeId={storeId} storeName={storeName} />
             {canTransfer && (
               <Button variant="outline" disabled={transferRows.length === 0} onClick={() => openDialog('transfer')}>
                 <ArrowRightLeftIcon data-icon="inline-start" /> Create transfers

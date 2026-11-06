@@ -26,5 +26,9 @@ Schedule::command('purchasing:reorder-notifications')->hourly()->withoutOverlapp
 // (hourly runs; one notification per RFQ and local day).
 Schedule::command('purchasing:rfq-reminders')->hourly()->withoutOverlapping();
 
+// Phase 8: yesterday's business insights per organization and branch, from 07:30 in each
+// organization's timezone (runs every 30 minutes; one cached insight per scope and day).
+Schedule::command('ai:daily-insights')->everyThirtyMinutes()->withoutOverlapping();
+
 // Unpaid bank-transfer web orders are cancelled (and restocked) when their payment hold runs out.
 Schedule::command('orders:expire-pending')->everyMinute()->withoutOverlapping();

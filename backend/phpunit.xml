@@ -38,5 +38,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Phase 8: tests never reach a real AI provider (they fake the HTTP client or bind FakeLanguageModel). -->
+        <env name="AI_ENABLED" value="false" force="true"/>
+        <env name="AI_API_KEY" value="" force="true"/>
+        <env name="AI_PROVIDER" value="anthropic" force="true"/>
     </php>
 </phpunit>

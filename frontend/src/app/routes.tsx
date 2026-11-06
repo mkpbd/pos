@@ -33,6 +33,7 @@ function guarded(permission: string | string[], path: string, lazyPage: Pick<Rou
 const pages = {
   dashboard: page(() => import('@/features/dashboard/pages/dashboard-page'), 'DashboardPage'),
   reports: page(() => import('@/features/reports/pages/reports-page'), 'ReportsPage'),
+  aiInsights: page(() => import('@/features/ai/pages/ai-insights-page'), 'AiInsightsPage'),
   report: page(() => import('@/features/reports/pages/report-page'), 'ReportPage'),
   products: page(() => import('@/features/products/pages/products-page'), 'ProductsPage'),
   productEditor: page(() => import('@/features/products/pages/product-editor-page'), 'ProductEditorPage'),
@@ -125,6 +126,10 @@ const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', '
 const REQUISITION_PERMISSIONS = ['purchases.view', 'purchases.request', 'purchases.approve', 'purchases.approve_high']
 /** Operational and financial reports (Phase 7); each report's own permission is checked by the API. */
 const REPORT_PERMISSIONS = ['reports.view', 'reports.financial']
+/** AI Insights (Phase 8): Ask needs ai.ask, the insight tabs ai.insights. Mirrors AI_PAGE_PERMISSIONS. */
+const AI_PAGE_PERMISSIONS = ['ai.insights', 'ai.ask']
+/** The AI settings card lives on the Organization page (ai.manage). */
+const ORGANIZATION_PERMISSIONS = ['organization.view', 'ai.manage']
 
 export const routes: RouteObject[] = [
   {
@@ -157,6 +162,7 @@ export const routes: RouteObject[] = [
               guarded('dashboard.view', 'dashboard', pages.dashboard),
               guarded(REPORT_PERMISSIONS, 'reports', pages.reports),
               guarded(REPORT_PERMISSIONS, 'reports/:reportKey', pages.report),
+              guarded(AI_PAGE_PERMISSIONS, 'ai', pages.aiInsights),
               guarded('pos.sell', 'pos', pages.posTerminal),
               guarded('sales.view', 'sales', pages.sales),
               guarded('sales.view', 'sales/:saleId', pages.sale),
@@ -258,7 +264,7 @@ export const routes: RouteObject[] = [
               guarded('branches.view', 'branches', pages.branches),
               guarded('users.view', 'users', pages.users),
               guarded('roles.view', 'roles', pages.roles),
-              guarded('organization.view', 'organization', pages.organization),
+              guarded(ORGANIZATION_PERMISSIONS, 'organization', pages.organization),
               guarded('audit.view', 'audit-log', pages.auditLog),
               { element: <RequirePlatformAdmin />, children: [{ path: 'platform/organizations', ...pages.platformOrganizations }] },
               { path: 'profile', ...pages.profile },

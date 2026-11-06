@@ -55,9 +55,12 @@ enum SystemRole: string
                 // approval limits themselves stay with the Organization Admin.
                 'inventory.*', 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay',
                 'purchases.request', 'purchases.approve', 'purchases.landed_cost', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
-                'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*', 'ai.*',
+                'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*',
                 // Phase 7: reports.* = reports.view + reports.financial.
                 'dashboard.view',
+                // Phase 8: the AI assistant and insights; AI settings / budget (ai.manage) stay with the
+                // Organization Admin (this role held the undefined `ai.*` before Phase 8).
+                'ai.ask', 'ai.insights',
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
@@ -75,6 +78,8 @@ enum SystemRole: string
                 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay', 'purchases.request',
                 // SC3: books landed cost vouchers (freight / duty bills that arrive later).
                 'purchases.landed_cost',
+                // Phase 8: the AI assistant (its tools follow the role's permissions: no financial reports).
+                'ai.ask',
             ],
             self::Accountant => [
                 'organization.view', 'branches.view', 'products.view', 'products.view_cost', 'taxes.manage',
@@ -82,6 +87,8 @@ enum SystemRole: string
                 'payments.*', 'expenses.*', 'cash_registers.view', 'returns.view', 'reports.*', 'dashboard.view', 'audit.view',
                 // E10a: couriers' COD remittances (and the web orders they settle); E10b: online refunds.
                 'web_orders.view', 'web_orders.remit', 'web_orders.refund',
+                // Phase 8: the AI assistant and insights.
+                'ai.ask', 'ai.insights',
             ],
             // Custom CSS and payment gateway credentials stay with the Organization Admin (ADR-016).
             self::OnlineStoreManager => [

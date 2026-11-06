@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\AI\AIServiceProvider;
 use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Authentication\AuthenticationServiceProvider;
 use App\Modules\Branches\BranchesServiceProvider;
@@ -68,6 +69,8 @@ return [
     ReviewsServiceProvider::class,
     // Phase 7: reports and the dashboard (read models over the modules above).
     ReportsServiceProvider::class,
+    // Phase 8: optional AI module (reads through the Reports registry; off unless AI_ENABLED).
+    AIServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

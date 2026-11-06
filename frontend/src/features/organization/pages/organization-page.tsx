@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { AiSettingsCard } from '@/features/ai/components/ai-settings-card'
 import { useCan } from '@/features/auth/use-auth'
 import { useOrganizationQuery, useUpdateOrganizationMutation, type Organization } from '@/features/organization/api'
 import { handleFormError } from '@/lib/forms'
@@ -138,20 +139,28 @@ function OrganizationForm({ organization, readOnly }: { organization: Organizati
   )
 }
 
-export function OrganizationPage() {
+function OrganizationSettings() {
   const can = useCan()
   const { data, error, isPending, refetch } = useOrganizationQuery()
+
+  return isPending ? (
+    <LoadingState rows={6} label="Loading organization" />
+  ) : error ? (
+    <ErrorState error={error} onRetry={() => refetch()} />
+  ) : (
+    <OrganizationForm organization={data} readOnly={!can('organization.update')} />
+  )
+}
+
+/** Organization profile (organization.view) and the AI assistant card (ai.manage, Phase 8). */
+export function OrganizationPage() {
+  const can = useCan()
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader title="Organization" description="Profile, tax mode and receipt settings for every branch." />
-      {isPending ? (
-        <LoadingState rows={6} label="Loading organization" />
-      ) : error ? (
-        <ErrorState error={error} onRetry={() => refetch()} />
-      ) : (
-        <OrganizationForm organization={data} readOnly={!can('organization.update')} />
-      )}
+      {can('organization.view') && <OrganizationSettings />}
+      {can('ai.manage') && <AiSettingsCard />}
     </div>
   )
 }

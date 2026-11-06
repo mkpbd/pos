@@ -5,6 +5,7 @@ namespace App\Modules\Authentication\Presentation\Http\Resources;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Authorization\PermissionRegistry;
+use App\Modules\Shared\Application\Contracts\AiFeatures;
 use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -42,6 +43,8 @@ class CurrentUserResource extends JsonResource
                 'system_key' => $role->system_key?->value,
             ])->values(),
             'permissions' => $permissions,
+            // Phase 8: whether AI summaries / the assistant are on for the organization (app + organization switch).
+            'ai_enabled' => app(AiFeatures::class)->enabledFor($this->organization_id),
             'branches' => $organization
                 ? app(BranchDirectory::class)->summaries($this->organization_id, $this->accessibleBranchIds())
                 : [],

@@ -243,7 +243,7 @@ function normalizeColumn(raw: unknown): ReportColumn | null {
   }
 }
 
-function normalizeColumns(raw: unknown): ReportColumn[] {
+export function normalizeColumns(raw: unknown): ReportColumn[] {
   if (Array.isArray(raw)) return raw.map(normalizeColumn).filter((c): c is ReportColumn => c !== null)
   if (raw && typeof raw === 'object') return Object.entries(raw as Record<string, unknown>).map(([key, spec]) => normalizeColumn({ key, ...(spec as object) })).filter((c): c is ReportColumn => c !== null)
   return []

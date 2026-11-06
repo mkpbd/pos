@@ -40,11 +40,12 @@ use Illuminate\Support\Facades\DB;
  * Dimensions: day, month (organization-local), branch, store, product, category, brand,
  * cashier (POS `created_by`; web orders have none → NULL, shown as "Online"; returns count
  * against the original sale's cashier), channel, tax_rate (the line's rate; returns use the
- * rate of the line they return).
+ * rate of the line they return), customer (Phase 8: the sale's / web order's customer; walk-in
+ * sales → NULL; returns count against the original document's customer).
  */
 final class SalesFacts
 {
-    public const DIMENSIONS = ['day', 'month', 'branch', 'store', 'product', 'category', 'brand', 'cashier', 'channel', 'tax_rate'];
+    public const DIMENSIONS = ['day', 'month', 'branch', 'store', 'product', 'category', 'brand', 'cashier', 'channel', 'tax_rate', 'customer'];
 
     private const DELIVERY_DIMENSIONS = ['day', 'month', 'branch', 'store', 'channel'];
 
@@ -216,6 +217,7 @@ final class SalesFacts
             'brand' => 'p.brand_id',
             'cashier' => 's.created_by',
             'tax_rate' => 'sl.tax_rate',
+            'customer' => 's.customer_id',
         ], [
             'docs' => 'COUNT(DISTINCT s.id)',
             'qty' => 'SUM(sl.quantity)',
@@ -254,6 +256,7 @@ final class SalesFacts
             'brand' => 'p.brand_id',
             'cashier' => 's.created_by',
             'tax_rate' => 'osl.tax_rate',
+            'customer' => 's.customer_id',
         ], [
             'rdocs' => 'COUNT(DISTINCT r.id)',
             'rqty' => 'SUM(rl.quantity)',
@@ -290,6 +293,7 @@ final class SalesFacts
             'brand' => 'p.brand_id',
             'cashier' => null,
             'tax_rate' => 'ol.tax_rate',
+            'customer' => 'o.customer_id',
         ], [
             'docs' => 'COUNT(DISTINCT o.id)',
             'qty' => 'SUM(ol.quantity)',
@@ -329,6 +333,7 @@ final class SalesFacts
             'brand' => 'p.brand_id',
             'cashier' => null,
             'tax_rate' => 'ol.tax_rate',
+            'customer' => 'o.customer_id',
         ], [
             'rdocs' => 'COUNT(DISTINCT r.id)',
             'rqty' => 'SUM(rl.quantity)',

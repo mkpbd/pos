@@ -26,9 +26,9 @@ class ReportAccessTest extends TestCase
         $keys = fn (User $user) => array_column($this->actingAsUser($user)->getJson('/api/v1/reports')->assertOk()->json('data'), 'key');
 
         $all = $keys($admin);
-        $this->assertCount(17, $all);
+        $this->assertCount(18, $all);
         $this->assertSame(['sales_daily', 'sales_monthly', 'sales_by_product', 'sales_by_category', 'sales_by_branch', 'sales_by_cashier', 'profit_and_loss',
-            'inventory_valuation', 'stock_movements', 'low_stock', 'expiry', 'purchases', 'customer_dues', 'supplier_dues', 'payment_collections', 'tax', 'expenses'], $all);
+            'inventory_valuation', 'stock_movements', 'low_stock', 'expiry', 'purchases', 'sales_by_customer', 'customer_dues', 'supplier_dues', 'payment_collections', 'tax', 'expenses'], $all);
         $this->assertSame($all, $keys($this->createUserWithRole($org, SystemRole::Accountant, [$branch->id])));
         $this->assertSame($all, $keys($this->createUserWithRole($org, SystemRole::BranchManager, [$branch->id])));
         $this->assertSame(array_values(array_diff($all, ['profit_and_loss', 'tax'])), $keys($this->createUserWithRole($org, SystemRole::InventoryManager, [$branch->id])));

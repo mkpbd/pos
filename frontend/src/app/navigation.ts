@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -32,6 +32,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/payments', label: 'Payments', icon: HandCoinsIcon, permission: 'payments.view' },
   { to: '/expenses', label: 'Expenses', icon: ReceiptIcon, permission: 'expenses.view' },
   { to: '/reports', label: 'Reports', icon: ChartColumnIcon, permission: ['reports.view', 'reports.financial'] },
+  // Shown with the permission even when AI is off: the insight facts are deterministic (Phase 8).
+  { to: '/ai', label: 'AI Insights', icon: SparklesIcon, permission: ['ai.insights', 'ai.ask'] },
   { to: '/products', label: 'Products', icon: PackageIcon, permission: 'products.view' },
   { to: '/catalog', label: 'Catalog', icon: TagsIcon, permission: 'products.view' },
   { to: '/inventory', label: 'Inventory', icon: BoxesIcon, permission: 'inventory.view' },
@@ -47,7 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/branches', label: 'Branches', icon: StoreIcon, permission: 'branches.view' },
   { to: '/users', label: 'Users', icon: UsersIcon, permission: 'users.view' },
   { to: '/roles', label: 'Roles & permissions', icon: ShieldCheckIcon, permission: 'roles.view' },
-  { to: '/organization', label: 'Organization', icon: BuildingIcon, permission: 'organization.view' },
+  { to: '/organization', label: 'Organization', icon: BuildingIcon, permission: ['organization.view', 'ai.manage'] },
   { to: '/audit-log', label: 'Audit log', icon: ScrollTextIcon, permission: 'audit.view' },
   { to: '/platform/organizations', label: 'All organizations', icon: Building2Icon, platform: true },
   { to: '/system-status', label: 'System status', icon: ActivityIcon },
