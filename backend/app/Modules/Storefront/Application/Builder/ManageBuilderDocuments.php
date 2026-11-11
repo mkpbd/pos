@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Store builder documents (B1): create (blank or from the current homepage), save the draft
  * with optimistic concurrency, publish (a new immutable version), discard the draft, restore
- * a version into the draft, delete a landing page. Publishing, discarding, restoring and
- * deleting are audited; what shoppers see changes only on publish (and deleting a published
+ * a version into the draft, delete a landing page, rename (B2). Publishing, discarding,
+ * restoring, deleting and renaming are audited; what shoppers see changes only on publish (and deleting a published
  * landing page), which bumps the storefront content version through the model.
  */
 class ManageBuilderDocuments
@@ -79,6 +79,29 @@ class ManageBuilderDocuments
             }
 
             return $this->writeDraft($locked, $content);
+        });
+    }
+
+    /**
+     * B2: a new title (audited; an unchanged title is a no-op). The title of a published
+     * page is what shoppers see in the tab, so the model refreshes the storefront cache then.
+     */
+    public function rename(BuilderDocument $document, string $title): BuilderDocument
+    {
+        $title = trim($title);
+
+        return DB::transaction(function () use ($document, $title) {
+            $locked = $this->lock($document);
+            $before = $locked->title;
+            if ($before === $title) {
+                return $locked;
+            }
+
+            $locked->title = $title;
+            $locked->save();
+            $this->audit->record('storefront.builder_renamed', $locked, ['title' => $before], ['title' => $title]);
+
+            return $locked;
         });
     }
 

@@ -8,6 +8,8 @@
             ┌──────────── HTTPS (TLS terminates here) ────────────┐
 Browser ──▶ │ Nginx                                                │
             │  /assets/*   → frontend/dist/assets (static)         │
+            │  /admin/builder-canvas                               │
+            │              → frontend/dist/builder-canvas.html     │
             │  /admin/*    → frontend/dist/index.html (admin SPA)  │
             │  /api, /sanctum, /docs, /storage, /robots.txt,       │
             │  /sitemap*.xml, all other paths                      │
@@ -24,6 +26,13 @@ Browser ──▶ │ Nginx                                                │
 The PHP-FPM hosts also need Node.js ≥ 22.12 and a Chromium for PDF exports (X1, below).
 
 Serving the SPA and API from the **same origin** is required for Sanctum cookie authentication without third-party cookies.
+
+The store builder's canvas (B2) is a third built page that the admin editor loads in an iframe from the same origin. Map it before the `/admin/` fallback:
+
+```nginx
+location = /admin/builder-canvas { try_files /builder-canvas.html =404; }   # root = frontend/dist
+location /admin/ { try_files $uri /index.html; }
+```
 
 ## Environment (`backend/.env` in production)
 

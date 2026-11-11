@@ -1,6 +1,6 @@
 # Visual Store Builder — analysis and architecture (B1–B5)
 
-Status: **approved 2026-11-11** (decisions in §10). **B1 done** (engine; see §11); B2 (editor) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
+Status: **approved 2026-11-11** (decisions in §10). **B1 + B2 done** (engine, editor; see §11); B3 (design controls) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
 
 ## 1. What already exists (reused)
 
@@ -239,3 +239,23 @@ Original questions:
   - `compileStyles` re-validates every value; selectors are `[data-b]` / `[data-b-row]`; breakpoints are 1023 / 639 px; `prefers-reduced-motion` is respected
 - **Importer** (`from: homepage`): one `full-bleed` section per homepage section (the section components draw their own container). Disabled sections become `hidden`; schedules go on the section node. A full-stack test converts Classic Shop's homepage and publishes it: same headings, product cards and links.
 - **For B2:** drafts are strictly validated, so the editor must collect a wrapped element's required content (e.g. banners) before inserting it. Built-in templates (`organization_id` null) need `withoutGlobalScope` in B5.
+
+### As built — B2 (2026-11-11)
+
+- **Admin code:**
+  - Editor: `frontend/src/features/store-builder/`. The state in `store.ts` is zustand, one store per document, with snapshot history (≤ 100 steps, 800 ms typing coalescing); pure tree operations live in `tree.ts`, checked by `check.ts`.
+  - Inspector: `inspector/`. It reuses `features/storefront/components/section-editor.tsx` (`BannerChooser`, `ConfigFields`, …); the helpers moved to `section-draft.ts`.
+- **Canvas:** `frontend/src/storefront/builder/canvas/`, served from `builder-canvas.html` at `/admin/builder-canvas`.
+  - The postMessage protocol (`protocol.ts`, `v: 1`, source `pos-builder`, origin and window checks) adds `scroll-by` (drag autoscroll) and a `pending` list (skeletons for sections still loading) to the plan.
+  - The editor builds the render tree locally, so text and layout changes show instantly. `POST /builder/resolve` is called 400 ms after a change, only for changed wrapped elements and unknown media.
+- **Drag & drop:** dnd-kit in the editor. While dragging, a transparent layer covers the iframe and drop targets come from the canvas `rects`. Layers support the keyboard sensor.
+- **Autosave:** 1.5 s after a change, and on blur, hide, preview, publish and leave. One save runs at a time, always with the latest revision.
+  - 409 opens a dialog: *Load their version* / *Keep mine*.
+  - 422 maps problems to nodes, shown red in the canvas, the layers and the inspector.
+  - Network errors retry with backoff (2 → 30 s).
+- **Choices:**
+  - The canvas renders the default language; Bangla is edited in the inspector.
+  - A hidden node disappears from the canvas unless it is selected.
+  - The setup dialog opens only when an element type's defaults are invalid.
+  - Version "View" is available for the live version only (no endpoint previews older versions).
+- **Polish for B3:** layers rows say only "Section"; name them after their content.

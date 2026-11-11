@@ -1,0 +1,362 @@
+import { readFileSync } from 'node:fs'
+import { expect, test, type FrameLocator, type Page, type Route } from '@playwright/test'
+
+/*
+ * The visual store builder editor (B2) on a mocked backend: create the home page from the current
+ * homepage, drag a Heading from the Add panel onto the canvas between two sections, edit it in the
+ * inspector (the canvas updates before any save), reorder / duplicate / hide in Layers, the mobile
+ * canvas width, undo / redo, autosave with the right revision, the 409 dialog, publish with a note,
+ * restoring a version, and the unsaved-change guard. Desktop only (the editor is a desktop tool).
+ */
+
+const envelope = (data: unknown, meta: Record<string, unknown> = {}) => ({ success: true, data, meta: { request_id: 'e2e', ...meta } })
+const failure = (status: number, code: string, message: string, details: Record<string, unknown> = {}) => ({
+  status,
+  json: { success: false, error: { code, message, details }, meta: { request_id: 'e2e' } },
+})
+
+type AnyNode = { id: string; hidden?: boolean; columns?: { elements: AnyNode[] }[] } & Record<string, unknown>
+const sample = JSON.parse(readFileSync(new URL('../src/storefront/builder/__fixtures__/sample-document.v1.json', import.meta.url), 'utf8')) as { schema_version: 1; sections: AnyNode[] }
+
+const me = {
+  user: { id: 'u-1', name: 'Nadia Store', email: 'nadia@berry.test', phone: null, is_platform_admin: false, last_login_at: null },
+  organization: { id: 'o-1', name: 'Green Basket', slug: 'green-basket', base_currency: 'BDT', timezone: 'Asia/Dhaka', tax_mode: 'exclusive', status: 'active' },
+  roles: [{ id: 'r-9', name: 'Online Store Manager', system_key: 'online_store_manager' }],
+  permissions: ['branches.view', 'media.manage', 'storefront.manage', 'storefront.view', 'storefront.publish'],
+  branches: [{ id: 'b-1', code: 'MAIN', name: 'Main Branch', is_active: true }],
+}
+
+const bootstrap = {
+  store: { name: 'Green Basket', description: 'Organic groceries', prices_include_tax: true, currency: 'BDT', locales: ['en'], default_locale: 'en' },
+  locale: 'en',
+  preview: false,
+  builder: { home: false },
+  theme: {
+    colors: { primary: '#f59e0b', primary_foreground: '#3b2500', accent: '#6f55c2', accent_foreground: '#ffffff', highlight: '#2fb79a', sale: '#c2410c', heading: '#3d3d3d', text: '#5f6368', canvas: '#f3f7fa', surface: '#ffffff', border: '#e1e1e1' },
+    typography: { heading_font: 'baloo', body_font: 'poppins' },
+    shape: { button_style: 'pill', card_radius: 12 },
+    layout: { container_width: 1170, sticky_header: true },
+    logo: null,
+    favicon: null,
+    announcement: null,
+    footer: { about: null, copyright: null, contact: { email: null, phone: null, address: null }, social: {}, payment_logos: [] },
+    custom_css: null,
+  },
+  menus: {},
+}
+
+const image = { id: 'img-1', url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 600, alt: null }
+const product = (slug: string, name: string) => ({
+  id: `p-${slug}`, slug, name, url: `/product/${slug}`, image: { url: '/favicon.svg', alt: name }, hover_image: null, price: '120.00', price_max: '120.00',
+  compare_at_price: null, on_sale: false, discount_percent: null, in_stock: true, is_new: false, is_featured: false, brand: null, category: null,
+  variant_count: 1, default_variant_id: `v-${slug}`, short_description: null, promotion: null,
+})
+const sectionData: Record<string, unknown> = {
+  e_slider: {
+    id: 'e_slider', type: 'hero_slider', title: null, subtitle: null, config: { autoplay_seconds: 0, height: 'large' },
+    banners: [{ id: 'b-1', kicker: null, title: 'Farm boxes are back', subtitle: null, link_url: '/shop', button_label: 'Order a box', secondary_link_url: null, secondary_button_label: null, image, mobile_image: null, text_color: '#ffffff', text_position: 'left' }],
+  },
+  e_grid: {
+    id: 'e_grid', type: 'product_grid', title: 'Best sellers', subtitle: null, config: { source: 'best_sellers', limit: 8, columns: 4, view_all_url: null },
+    products: [product('spinach', 'Fresh Spinach'), product('carrots', 'Organic Carrots')],
+  },
+}
+
+const meta = (type: string, group: string, label: string, translatable: string[], props: Record<string, unknown>, children: 'columns' | null = null) => ({ type, group, label, translatable, props, children })
+const wrapped = (type: string, group: string, label: string, config: Record<string, unknown>) => meta(type, group, label, ['title', 'subtitle'], { title: null, subtitle: null, config, items: [] })
+/** GET /storefront/builder/elements (the registry's metadata; a subset of the wrapped types). */
+const ELEMENTS = [
+  meta('heading', 'content', 'Heading', ['text'], { text: 'Heading', level: 2, link: null }),
+  meta('text', 'content', 'Text', ['html'], { html: '<p>Write something here.</p>' }),
+  meta('image', 'content', 'Image', ['alt'], { media_id: null, alt: '', link: null, aspect: 'auto', fit: 'cover' }),
+  meta('button', 'content', 'Button', ['label'], { label: 'Shop now', link: { url: '/shop' }, variant: 'primary', size: 'md', full_width: false }),
+  meta('spacer', 'layout', 'Spacer', [], {}),
+  meta('divider', 'layout', 'Divider', [], { line: 'solid', thickness: 1, width: 100, color: 'theme:border', align: 'center' }),
+  meta('inner_row', 'layout', 'Inner row', [], {}, 'columns'),
+  wrapped('hero_slider', 'marketing', 'Hero slider', { autoplay_seconds: 6, height: 'large' }),
+  wrapped('product_grid', 'commerce', 'Product grid', { source: 'featured', category_id: null, limit: 8, columns: 4, view_all_url: null }),
+]
+
+const DOC_ID = '01a1c9d9-0000-7000-8000-0000000000d1'
+
+type Backend = {
+  revision: number
+  content: unknown
+  published: { version_id: string; number: number; published_at: string } | null
+  exists: boolean
+  puts: { revision: number; content: { sections: AnyNode[] } }[]
+  conflictNext: boolean
+  publishes: { note?: string }[]
+  restores: string[]
+}
+
+function summary(b: Backend) {
+  return {
+    id: DOC_ID, kind: 'page', key: 'home', title: 'Home', schema_version: 1, draft_revision: b.revision, has_unpublished_changes: true,
+    draft_updated_at: '2026-11-11T08:00:00+00:00', published: b.published, path: '/', preview_url: 'http://shop.test/?preview=draft',
+  }
+}
+
+async function mockBackend(page: Page, options: { exists?: boolean } = {}): Promise<Backend> {
+  const b: Backend = { revision: 1, content: structuredClone(sample), published: null, exists: options.exists ?? false, puts: [], conflictNext: false, publishes: [], restores: [] }
+  // Anything else the editor or the inspector asks for: an empty list.
+  await page.route('**/api/v1/**', (route) => route.fulfill({ json: envelope([], { pagination: { current_page: 1, per_page: 24, total: 0, last_page: 1 } }) }))
+  await page.route('**/sanctum/csrf-cookie', (route) => route.fulfill({ status: 204, headers: { 'Set-Cookie': 'XSRF-TOKEN=e2e; Path=/' } }))
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: envelope(me) }))
+  await page.route('**/api/v1/storefront/link-targets*', (route) => route.fulfill({ json: envelope({ pages: [], categories: [], brands: [], blog_categories: [], blog_posts: [] }) }))
+  await page.route('**/api/v1/notifications/unread-count', (route) => route.fulfill({ json: envelope({ count: 0 }) }))
+  await page.route('**/api/v1/storefront/builder/elements', (route) =>
+    route.fulfill({ json: envelope({ types: ELEMENTS, limits: {}, enums: {} }) }),
+  )
+  await page.route('**/api/v1/storefront/builder/canvas-context*', (route) => route.fulfill({ json: envelope({ bootstrap, store_url: 'http://shop.test', locales: ['en'] }) }))
+  await page.route('**/api/v1/storefront/builder/resolve', (route) => {
+    const body = route.request().postDataJSON() as { elements: { id: string }[]; media_ids: string[] }
+    const data = Object.fromEntries(body.elements.filter((e) => sectionData[e.id]).map((e) => [e.id, sectionData[e.id]]))
+    const media = Object.fromEntries(body.media_ids.map((id) => [id, { url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 1200, alt: null }]))
+    return route.fulfill({ json: envelope({ data, media, errors: {} }) })
+  })
+  await page.route('**/api/v1/storefront/builder/documents', (route) => {
+    if (route.request().method() === 'POST') {
+      b.exists = true
+      return route.fulfill({ status: 201, json: envelope({ ...summary(b), content: b.content }) })
+    }
+    return route.fulfill({ json: envelope(b.exists ? [summary(b)] : []) })
+  })
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}`, (route) => route.fulfill({ json: envelope({ ...summary(b), content: b.content }) }))
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/draft`, (route) => {
+    const body = route.request().postDataJSON() as Backend['puts'][number]
+    b.puts.push(body)
+    if (b.conflictNext || body.revision !== b.revision) {
+      b.conflictNext = false
+      return route.fulfill(failure(409, 'DRAFT_CONFLICT', 'The draft changed.', { revision: b.revision }))
+    }
+    b.revision += 1
+    b.content = body.content
+    return route.fulfill({ json: envelope({ ...summary(b), content: b.content }) })
+  })
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/publish`, (route) => {
+    b.publishes.push((route.request().postDataJSON() ?? {}) as { note?: string })
+    b.published = { version_id: 'v-2', number: 2, published_at: '2026-11-11T09:00:00+00:00' }
+    return route.fulfill({ json: envelope({ ...summary(b), content: b.content }) })
+  })
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/versions`, (route) =>
+    route.fulfill({
+      json: envelope([
+        { id: 'v-2', number: 2, note: 'Eid banners', published_at: '2026-11-11T09:00:00+00:00', created_by: { id: 'u-1', name: 'Nadia Store' }, created_at: '2026-11-11T09:00:00+00:00' },
+        { id: 'v-1', number: 1, note: null, published_at: '2026-11-01T09:00:00+00:00', created_by: { id: 'u-1', name: 'Nadia Store' }, created_at: '2026-11-01T09:00:00+00:00' },
+      ]),
+    }),
+  )
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/versions/*/restore`, (route) => {
+    b.restores.push(route.request().url())
+    b.revision += 1
+    b.content = { schema_version: 1, sections: (sample.sections as AnyNode[]).slice(0, 1) }
+    return route.fulfill({ json: envelope({ ...summary(b), content: b.content }) })
+  })
+  return b
+}
+
+const toolbar = (page: Page) => page.getByRole('banner', { name: 'Editor toolbar' })
+const canvas = (page: Page): FrameLocator => page.frameLocator('[data-testid="builder-canvas"]')
+
+async function openEditor(page: Page, b: Backend) {
+  b.exists = true
+  await page.goto(`/admin/storefront/builder/${DOC_ID}`)
+  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+}
+
+function sectionOrder(b: Backend): string[] {
+  return (b.puts.at(-1)?.content.sections ?? []).map((s) => s.id)
+}
+
+test.beforeEach(({ isMobile }) => {
+  test.skip(isMobile, 'The page builder is a desktop tool; its mobile canvas is checked in the device test.')
+})
+
+test('creates the home page from the current homepage and adds a heading by dragging it between two sections', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page)
+  await page.goto('/admin/storefront/pages')
+  await expect(page.getByRole('link', { name: 'Page builder' })).toBeVisible()
+  await page.getByRole('button', { name: 'Copy my current homepage' }).click()
+
+  // The editor chunk is compiled on first use by the dev server.
+  await expect(page).toHaveURL(new RegExp(`/admin/storefront/builder/${DOC_ID}$`), { timeout: 30_000 })
+  const frame = canvas(page)
+  await expect(frame.getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+  await expect(frame.getByText('Farm boxes are back')).toBeVisible()
+
+  // Drag "Heading" from the Add panel to the top edge of the features section.
+  const source = page.getByTestId('add-heading')
+  const target = (await frame.locator('[data-b="s_features"]').boundingBox())!
+  const from = (await source.boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 40, from.y + 10, { steps: 4 })
+  await page.mouse.move(target.x + target.width / 2, target.y + 6, { steps: 8 })
+  await expect(page.getByTestId('drop-indicator')).toBeVisible()
+  await page.mouse.up()
+
+  const heading = frame.getByRole('heading', { name: 'Your heading' })
+  await expect(heading).toBeVisible()
+  // In its own new section, between the story and the features.
+  const story = (await frame.locator('[data-b="s_story"]').boundingBox())!
+  const features = (await frame.locator('[data-b="s_features"]').boundingBox())!
+  const box = (await heading.boundingBox())!
+  expect(box.y).toBeGreaterThan(story.y + story.height - 1)
+  expect(box.y + box.height).toBeLessThan(features.y + 1)
+
+  // The inspector edits it; the canvas shows the text before any save.
+  const text = page.getByLabel('Heading text')
+  await text.fill('Fresh from the farm')
+  await expect(frame.getByRole('heading', { name: 'Fresh from the farm' })).toBeVisible()
+  expect(b.puts).toHaveLength(0)
+
+  // Autosave sends the draft with the revision the server gave.
+  await expect.poll(() => b.puts.length, { timeout: 5000 }).toBeGreaterThan(0)
+  expect(b.puts[0]!.revision).toBe(1)
+  const order = sectionOrder(b)
+  expect(order.indexOf('s_features') - order.indexOf('s_story')).toBe(2)
+  await expect(page.getByTestId('save-status')).toContainText('Saved')
+})
+
+test('reorders, duplicates and hides in Layers; undo and redo', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  const frame = canvas(page)
+  await page.getByRole('tab', { name: 'Layers' }).click()
+
+  // Reorder: drag the button above the heading.
+  const handle = page.getByRole('button', { name: /^Drag Button/ })
+  const headingRow = page.getByTestId('layer-e_heading')
+  const from = (await handle.boundingBox())!
+  const to = (await headingRow.boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(from.x + from.width / 2, from.y - 10, { steps: 4 })
+  await page.mouse.move(to.x + 40, to.y + 3, { steps: 8 })
+  await page.mouse.up()
+  const order = async () => frame.locator('[data-b="c_story_text"] > [data-b]').evaluateAll((els) => els.map((el) => el.getAttribute('data-b')))
+  await expect.poll(order).toEqual(['e_button', 'e_heading', 'e_text'])
+
+  // Undo / redo (keyboard and buttons).
+  await page.keyboard.press('Control+z')
+  await expect.poll(order).toEqual(['e_heading', 'e_text', 'e_button'])
+  await toolbar(page).getByRole('button', { name: 'Redo' }).click()
+  await expect.poll(order).toEqual(['e_button', 'e_heading', 'e_text'])
+
+  // Duplicate the text.
+  await page.getByRole('button', { name: /^More actions for Text: Small batches/ }).click()
+  await page.getByRole('menuitem', { name: 'Duplicate' }).click()
+  await expect(frame.getByText('Small batches, local farms and')).toHaveCount(2)
+
+  // Keyboard drag (dnd-kit keyboard sensor): the image's handle, Space, arrows, Space moves it next to the button.
+  await page.getByRole('button', { name: /^Drag Image/ }).focus()
+  await page.keyboard.press('Space')
+  // One row per press (the list may scroll instead): up until the button row is under it.
+  for (let i = 0; i < 6 && !(await page.getByText(/over droppable area layer:e_button/).count()); i += 1) await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('Space')
+  await expect.poll(async () => frame.locator('[data-b="c_story_media"] [data-b]').count()).toBe(0)
+
+
+  await expect(frame.getByRole('img', { name: 'Fresh vegetables on a table' })).toBeVisible()
+  await page.getByRole('button', { name: /^Hide Image/ }).click()
+  // While selected it stays drawn, marked hidden, so it can still be edited; selecting something else hides it.
+  await expect(frame.locator('[data-node-state="hidden"]')).toContainText('Hidden')
+  await page.getByTestId('layer-e_heading').getByRole('button', { name: /^Heading/ }).click()
+  await expect(frame.getByRole('img', { name: 'Fresh vegetables on a table' })).toHaveCount(0)
+  await toolbar(page).getByRole('button', { name: 'Undo' }).click()
+  await expect(frame.getByRole('img', { name: 'Fresh vegetables on a table' })).toBeVisible()
+})
+
+test('device toggle: the mobile canvas is 375 px wide and the columns stack', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  const frame = canvas(page)
+  const sideBySide = async () => {
+    const text = (await frame.locator('[data-b="c_story_text"]').boundingBox())!
+    const media = (await frame.locator('[data-b="c_story_media"]').boundingBox())!
+    return media.x > text.x + text.width - 1
+  }
+  expect(await sideBySide()).toBe(true)
+
+  await page.getByRole('button', { name: 'Mobile view' }).click()
+  await expect(page.getByTestId('builder-canvas')).toHaveCSS('width', '375px')
+  await expect.poll(async () => frame.locator('html').evaluate('window.innerWidth')).toBe(375)
+  await expect.poll(sideBySide).toBe(false)
+  const text = (await frame.locator('[data-b="c_story_text"]').boundingBox())!
+  const media = (await frame.locator('[data-b="c_story_media"]').boundingBox())!
+  expect(media.y).toBeGreaterThan(text.y + text.height - 1)
+})
+
+test('a stale revision opens the conflict dialog; keeping mine saves over theirs', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  const frame = canvas(page)
+
+  b.conflictNext = true
+  b.revision = 5 // someone else saved meanwhile
+  await frame.getByRole('heading', { name: 'Made fresh every morning' }).click()
+  await page.getByLabel('Heading text').fill('Baked at dawn')
+  await expect(page.getByRole('alertdialog', { name: 'This page changed in another tab or by someone else' })).toBeVisible({ timeout: 6000 })
+  expect(b.puts.at(-1)!.revision).toBe(1)
+
+  await page.getByRole('button', { name: 'Keep mine' }).click()
+  await expect.poll(() => b.puts.at(-1)?.revision).toBe(5)
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
+  await expect(page.getByTestId('save-status')).toContainText('Saved')
+  await expect(frame.getByRole('heading', { name: 'Baked at dawn' })).toBeVisible()
+})
+
+test('publishes with a note, restores a version from the history', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  const frame = canvas(page)
+
+  await page.getByRole('button', { name: 'Publish' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Publish this page?' })
+  await dialog.getByLabel('Note (optional)').fill('Eid banners')
+  await dialog.getByRole('button', { name: 'Publish' }).click()
+  await expect(page.getByText('Published — version 2 is live.')).toBeVisible()
+  expect(b.publishes).toEqual([{ note: 'Eid banners' }])
+
+  await page.getByRole('button', { name: 'More page actions' }).click()
+  await page.getByRole('menuitem', { name: 'Version history' }).click()
+  const history = page.getByRole('dialog', { name: 'Version history' })
+  await expect(history.getByTestId('version-2')).toContainText('Live')
+  await expect(history.getByTestId('version-2')).toContainText('Eid banners')
+  await history.getByRole('button', { name: 'Restore version 1 to the draft' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Restore' }).click()
+  await expect(page.getByText('Version 1 is now your draft.')).toBeVisible()
+  expect(b.restores[0]).toContain('/versions/v-1/restore')
+  // The restored draft (only the hero section) is in the editor.
+  await expect(frame.getByRole('heading', { name: 'Made fresh every morning' })).toHaveCount(0)
+  await expect(frame.getByText('Farm boxes are back')).toBeVisible()
+  await expect(toolbar(page).getByRole('button', { name: 'Undo' })).toBeDisabled()
+})
+
+test('guards unsaved changes when leaving', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  // Saves fail (offline), so the change stays unsaved.
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/draft`, (route: Route) => route.abort('failed'))
+  await openEditor(page, b)
+  const frame = canvas(page)
+  await frame.getByRole('heading', { name: 'Made fresh every morning' }).click()
+  await page.getByLabel('Heading text').fill('Not saved yet')
+
+  await page.getByRole('link', { name: 'Back to pages' }).click()
+  const leave = page.getByRole('alertdialog', { name: 'Leave without saving?' })
+  await expect(leave).toBeVisible()
+  await leave.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page).toHaveURL(new RegExp(`/builder/${DOC_ID}$`))
+  await expect(page.getByTestId('save-status')).toContainText('Offline')
+
+  await page.getByRole('link', { name: 'Back to pages' }).click()
+  await page.getByRole('alertdialog', { name: 'Leave without saving?' }).getByRole('button', { name: 'Leave anyway' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/pages$/)
+})

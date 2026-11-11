@@ -4,11 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 
+/** The store builder canvas page (third entry); production Nginx maps it to dist/builder-canvas.html. */
+const BUILDER_CANVAS_PATH = '/admin/builder-canvas'
+
 /** Paths served by Laravel (proxied in development), never by either SPA. */
 const BACKEND_PATHS = ['/api', '/sanctum', '/storage']
 
 /**
- * Two apps, one dev server — mirrors the production routing (ADR-007):
+ * Two apps (plus the builder canvas), one dev server — mirrors the production routing (ADR-007):
  * /admin/* is the back-office SPA (index.html), every other page is the storefront
  * (storefront.html). Only HTML navigations are rewritten; modules and assets pass through.
  */
@@ -20,7 +23,8 @@ function appEntries(): Plugin {
         const path = (req.url ?? '/').split('?')[0]
         const wantsHtml = req.method === 'GET' && (req.headers.accept ?? '').includes('text/html')
         if (wantsHtml && !BACKEND_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
-          req.url = path === '/admin' || path.startsWith('/admin/') ? '/index.html' : '/storefront.html'
+          // The store builder's canvas (B2): the storefront renderer alone, in the editor's iframe.
+          req.url = path === BUILDER_CANVAS_PATH ? '/builder-canvas.html' : path === '/admin' || path.startsWith('/admin/') ? '/index.html' : '/storefront.html'
         }
         next()
       })
@@ -43,6 +47,7 @@ export default defineConfig(({ mode }) => {
         input: {
           admin: fileURLToPath(new URL('./index.html', import.meta.url)),
           storefront: fileURLToPath(new URL('./storefront.html', import.meta.url)),
+          builderCanvas: fileURLToPath(new URL('./builder-canvas.html', import.meta.url)),
         },
       },
     },

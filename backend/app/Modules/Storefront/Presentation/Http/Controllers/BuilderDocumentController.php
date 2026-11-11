@@ -4,13 +4,16 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Storefront\Application\Builder\BuilderCanvasContext;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
 use App\Modules\Storefront\Application\Builder\ManageBuilderDocuments;
+use App\Modules\Storefront\Application\Builder\ResolveBuilderElements;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
 use App\Modules\Storefront\Presentation\Http\Requests\CreateBuilderDocumentRequest;
+use App\Modules\Storefront\Presentation\Http\Requests\ResolveBuilderElementsRequest;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveBuilderDraftRequest;
 use App\Modules\Storefront\Presentation\Http\Support\BuilderPresenter;
 use Illuminate\Http\JsonResponse;
@@ -19,21 +22,22 @@ use Illuminate\Validation\Rule;
 
 /**
  * Store builder documents (B1): pages with a draft, immutable published versions, discard
- * and restore. Reading needs storefront.view, editing storefront.manage, publishing also
- * storefront.publish.
+ * and restore; B2 adds rename, the editor's canvas context and the canvas resolver for unsaved
+ * elements. Reading needs storefront.view, editing (and resolving) storefront.manage,
+ * publishing also storefront.publish.
  */
 class BuilderDocumentController
 {
     /**
      * List builder documents
      *
-     * Each with its draft revision, whether the draft differs from the live version and the
-     * published version (or null).
+     * Each with its draft revision, whether the draft differs from the live version, the
+     * published version (or null), its `path` on the store (`/`, `/p/<slug>`) and
+     * `preview_url` (the draft on the store's primary domain; null without a domain).
      */
     public function index(): JsonResponse
     {
-        return ApiResponse::success(BuilderDocument::query()->with('publishedVersion')->orderBy('key')->get()
-            ->map(fn (BuilderDocument $d) => BuilderPresenter::summary($d))->all());
+        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->with('publishedVersion')->orderBy('key')->get()));
     }
 
     /**
@@ -55,6 +59,18 @@ class BuilderDocumentController
     public function show(BuilderDocument $document): JsonResponse
     {
         return ApiResponse::success(BuilderPresenter::document($document->load('publishedVersion')));
+    }
+
+    /**
+     * Rename a builder document
+     *
+     * `{title}` (1–160 characters). Audited; the draft and the live page are unchanged.
+     */
+    public function rename(Request $request, BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
+    {
+        $title = $request->validate(['title' => ['required', 'string', 'max:160']])['title'];
+
+        return ApiResponse::success(BuilderPresenter::document($documents->rename($document, $title)->load('publishedVersion')));
     }
 
     /**
@@ -134,6 +150,35 @@ class BuilderDocumentController
     public function elements(): JsonResponse
     {
         return ApiResponse::success(ElementRegistry::metadata());
+    }
+
+    /**
+     * Resolve unsaved elements for the canvas
+     *
+     * `{elements: [{id, type, title, subtitle, config, items, translations}] (≤ 60), media_ids:
+     * uuid[] (≤ 200), locale?}`. Each wrapped-section element is validated on its own with the
+     * draft-save rules; a valid one is resolved to its draft-render object (with `state`).
+     * Returns `{data: {<element id>: …}, media: {<media id>: {url, srcset, width, height,
+     * alt}}, errors: {<element or media id>: [{path, message, code?, ids?}]}}` — invalid
+     * elements and unknown (or another organization's) media appear only in `errors`. 422
+     * only for a malformed envelope.
+     */
+    public function resolve(ResolveBuilderElementsRequest $request, ResolveBuilderElements $resolve): JsonResponse
+    {
+        return ApiResponse::success($resolve($request->elements(), $request->mediaIds(), $request->validated('locale')));
+    }
+
+    /**
+     * Canvas context
+     *
+     * `{bootstrap, store_url, locales}`: the `/store/bootstrap` payload of the signed-in
+     * staff member's organization (also while the store is closed or has no domain; `lang`
+     * picks the language), the primary store URL (null without a domain) and the enabled
+     * languages.
+     */
+    public function canvasContext(Request $request, BuilderCanvasContext $context): JsonResponse
+    {
+        return ApiResponse::success($context->build($request->query('lang')));
     }
 
     /**

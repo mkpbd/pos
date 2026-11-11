@@ -27,6 +27,23 @@ class PrepareBuilderContent
      */
     public function __invoke(array $content): array
     {
+        $document = $this->sanitized($content);
+        $this->references->check($document);
+
+        return $document;
+    }
+
+    /**
+     * Normalized and sanitized, without the reference check (B2: the canvas resolver checks
+     * the references of many elements at once).
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     *
+     * @throws InvalidBuilderDocument
+     */
+    public function sanitized(array $content): array
+    {
         $document = BuilderDocumentSchema::normalize($content);
 
         $errors = [];
@@ -36,8 +53,6 @@ class PrepareBuilderContent
         if ($errors !== []) {
             throw new InvalidBuilderDocument($errors);
         }
-
-        $this->references->check($document);
 
         return $document;
     }

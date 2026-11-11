@@ -1,0 +1,64 @@
+/*
+ * Contract types between the editor (agent A: shell, state, canvas) and the inspector (B2 plan
+ * §4). The document types themselves are the B1 ones from `storefront/builder/types.ts`.
+ */
+
+import type { MediaRef } from '@/storefront/types'
+import type { ElementMeta } from '@/storefront/builder/registry'
+import type { BuilderDocument, Column, Element, Section } from '@/storefront/builder/types'
+
+/** The whole draft content (schema v1). */
+export type BuilderContent = BuilderDocument
+
+/** Anything the editor can select: a section, a column (of a section or an inner row) or an element. */
+export type BuilderNode = Section | Column | Element
+
+/** GET /storefront/builder/elements (backend ElementRegistry::metadata). */
+export type ElementsMetadata = {
+  types: ElementMeta[]
+  limits: Record<string, unknown>
+  enums: Record<string, unknown>
+}
+
+/**
+ * A validation problem. `path` is relative to the node (`props.config.limit`, `props.items`,
+ * `translations.bn.title`); document paths (`sections.0.columns.1.elements.2.props.text`) are
+ * accepted too. Server problems may carry a `code` (e.g. BANNER_NOT_FOUND) and the offending `ids`.
+ */
+export type Problem = { path: string; message: string; code?: string; ids?: string[] }
+
+export type ColumnPreset = '1' | '1-1' | '1-2' | '2-1' | '1-1-1' | '1-1-1-1' | '1-2-1'
+
+export type InspectorCommand =
+  | { type: 'set-column-preset'; nodeId: string; preset: ColumnPreset }
+  | { type: 'select'; nodeId: string | null }
+
+export type InspectorChangeOptions = {
+  /** Edits with the same key within a short time are one undo step (typing). */
+  coalesceKey?: string
+  /** Media chosen in this edit, so the canvas can draw it before the next resolve. */
+  media?: Record<string, MediaRef>
+}
+
+export type InspectorDocument = {
+  id: string
+  title: string
+  path: string
+  published: { number: number; published_at: string } | null
+}
+
+export type InspectorProps = {
+  /** The whole draft. */
+  content: BuilderContent
+  /** The selected node, or null for the page settings. */
+  node: BuilderNode | null
+  document: InspectorDocument
+  registry: ElementsMetadata
+  /** Enabled storefront languages; `bn` adds the Bangla fields. */
+  locales: string[]
+  /** Server problems for this node (from a 422 on save). */
+  errors: Problem[]
+  /** Replace the node (same id); the editor records history. */
+  onChange(next: BuilderNode, opts?: InspectorChangeOptions): void
+  onCommand(cmd: InspectorCommand): void
+}

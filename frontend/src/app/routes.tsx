@@ -83,6 +83,8 @@ const pages = {
   mediaLibrary: page(() => import('@/features/media/pages/media-library-page'), 'MediaLibraryPage'),
   storefrontHomepage: page(() => import('@/features/storefront/pages/homepage-page'), 'HomepagePage'),
   storefrontBanners: page(() => import('@/features/storefront/pages/banners-page'), 'BannersPage'),
+  storeBuilderPages: page(() => import('@/features/store-builder/pages/pages-page'), 'StoreBuilderPagesPage'),
+  storeBuilderEditor: page(() => import('@/features/store-builder/pages/editor-page'), 'StoreBuilderEditorPage'),
   webCategories: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebCategoriesPage'),
   webBrands: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebBrandsPage'),
   productListing: page(() => import('@/features/online-catalog/pages/product-listing-page'), 'ProductListingPage'),
@@ -155,6 +157,8 @@ export const routes: RouteObject[] = [
         children: [
           // Print sheets: own minimal layout, no admin chrome (E10a).
           guarded('web_orders.view', 'web-orders/print', pages.webOrdersPrint),
+          // Store builder editor (B2): full screen, outside the admin shell.
+          guarded('storefront.manage', 'storefront/builder/:documentId', pages.storeBuilderEditor),
           {
             element: <AppLayout />,
             children: [
@@ -245,6 +249,7 @@ export const routes: RouteObject[] = [
               guarded('storefront.view', 'storefront/menus', pages.storefrontMenus),
               guarded('storefront.view', 'storefront/homepage', pages.storefrontHomepage),
               guarded('storefront.view', 'storefront/banners', pages.storefrontBanners),
+              guarded('storefront.view', 'storefront/pages', pages.storeBuilderPages),
               guarded('shipping.manage', 'storefront/shipping', pages.storefrontShipping),
               guarded('shipping.manage', 'storefront/shipping/couriers', pages.storefrontCouriers),
               guarded('payment_gateways.manage', 'storefront/payments', pages.storefrontPayments),

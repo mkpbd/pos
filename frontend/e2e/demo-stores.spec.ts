@@ -239,3 +239,59 @@ test('B1: Classic Shop converts its homepage into a builder page; once published
   expect(after.products).toBe(before.products)
   expect(after.links).toEqual(before.links)
 })
+
+test('B2: the Mati & Co. owner builds the homepage in the page builder and publishes it to shoppers', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The page builder is a desktop tool')
+  test.setTimeout(180_000)
+  const base = origin('handmade.shop.localhost')
+  await page.setViewportSize({ width: 1600, height: 1000 })
+
+  await signIn(page, base, 'owner@mati.test')
+  await page.goto(`${base}/admin/storefront/pages`)
+  await page.getByRole('button', { name: 'Copy my current homepage' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]{36}$/, { timeout: 60_000 })
+  const frame = page.frameLocator('[data-testid="builder-canvas"]')
+  const pick = frame.getByRole('heading', { name: "Editor's pick" })
+  await expect(pick).toBeVisible({ timeout: 30_000 })
+
+  // Drag a Heading from the Add panel onto the top edge of the "Editor's pick" section.
+  const section = frame.locator('[data-b]').filter({ has: pick }).first()
+  await section.scrollIntoViewIfNeeded()
+  const target = (await section.boundingBox())!
+  const source = page.getByTestId('add-heading')
+  const from = (await source.boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 40, from.y + 10, { steps: 4 })
+  await page.mouse.move(target.x + target.width / 2, target.y + 6, { steps: 10 })
+  await expect(page.getByTestId('drop-indicator')).toBeVisible()
+  await page.mouse.up()
+  await expect(frame.getByRole('heading', { name: 'Your heading' })).toBeVisible()
+
+  // Edit it in the inspector: the canvas follows at once; autosave stores the draft.
+  await page.getByLabel('Heading text').fill('Handmade in Mirpur, every piece')
+  await expect(frame.getByRole('heading', { name: 'Handmade in Mirpur, every piece' })).toBeVisible()
+  await expect(page.getByTestId('save-status')).toContainText('Saved', { timeout: 20_000 })
+
+  // The draft is not live yet.
+  const shopper = await page.context().browser()!.newContext()
+  const store = await shopper.newPage()
+  await store.goto(`${base}/`)
+  await expect(store.getByRole('heading', { name: "Editor's pick" })).toBeVisible({ timeout: 15_000 })
+  await expect(store.getByRole('heading', { name: 'Handmade in Mirpur, every piece' })).toHaveCount(0)
+
+  // Publish with a note; shoppers now see the new heading above the editor's pick.
+  await page.getByRole('button', { name: 'Publish' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Publish this page?' })
+  await dialog.getByLabel('Note (optional)').fill('New welcome heading')
+  await dialog.getByRole('button', { name: 'Publish' }).click()
+  await expect(page.getByText('Published — version 1 is live.')).toBeVisible({ timeout: 20_000 })
+
+  await store.goto(`${base}/`)
+  const welcome = store.getByRole('heading', { name: 'Handmade in Mirpur, every piece' })
+  await expect(welcome).toBeVisible({ timeout: 15_000 })
+  const live = store.getByRole('heading', { name: "Editor's pick" })
+  await expect(live).toBeVisible()
+  expect((await welcome.boundingBox())!.y).toBeLessThan((await live.boundingBox())!.y)
+  await shopper.close()
+})

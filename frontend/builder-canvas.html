@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Store builder canvas</title>
+  </head>
+  <body>
+    <!-- B2: the visual store builder's canvas. Loaded only inside the admin editor's iframe at
+         /admin/builder-canvas; it renders the draft with the storefront renderer and talks to the
+         editor through postMessage (same origin only). Production Nginx serves this file for
+         that path (docs/DEPLOYMENT_GUIDE.md). -->
+    <div id="root"></div>
+    <script type="module" src="/src/storefront/builder/canvas/main.tsx"></script>
+  </body>
+</html>

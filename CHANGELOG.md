@@ -21,6 +21,43 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B2 — Visual store builder: the editor
+
+A full-screen drag-and-drop editor for the home page and landing pages, on top of the B1 engine. Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built). Style controls are B3.
+
+#### Added
+- Admin *Online store → Page builder*: home page (copy the current homepage or start blank), landing pages (`/p/<slug>`) with status, edit, view and delete.
+- Editor `/admin/storefront/builder/:id`, full screen:
+  - **Add panel:** grouped, searchable; drag onto the page or click to insert.
+  - **Layers tree:** drag, keyboard drag, hide, duplicate, delete.
+  - **Canvas:** the real storefront in an iframe at 1366 / 768 / 375 px, with a selection outline and mini toolbar. Drop indicators work across the iframe.
+  - **Inspector:**
+    - Content forms for every element. The 13 section types reuse the homepage section forms, including inline banner creation.
+    - Bangla fields; device visibility, hidden and schedule.
+    - Setup dialogs for elements that need content first.
+  - **Toolbar:** undo / redo (100 steps, typing coalesced), autosave with revision conflicts (409 dialog), problems shown per node (422), offline retry and an unsaved-changes guard; preview, publish with a note, discard, version history with restore.
+- Canvas page `builder-canvas.html` at `/admin/builder-canvas`: a third Vite entry with storefront CSS only, a versioned postMessage protocol checked for origin and source, and no store API calls. Production Nginx rule in DEPLOYMENT_GUIDE.
+- API:
+  - `POST /storefront/builder/resolve`: section data and media for unsaved elements, with per-element errors.
+  - `GET /storefront/builder/canvas-context`: bootstrap, store URL and locales.
+  - `PATCH /storefront/builder/documents/{id}` (rename).
+  - Document summaries now carry `path` and `preview_url`.
+- Dependencies: `@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, `@dnd-kit/utilities` 3.2.2 (admin only).
+
+#### Fixed
+- Signing out of the admin no longer triggers "an error during concurrent rendering" (seen in every full-stack run since T2). The account menu read the user after the session was cleared and before the redirect. `useAuth()` now keeps the last user for that render, while `useCan()` follows the live session.
+
+#### Tests
+- Backend 797 (PostgreSQL 796 + 1 skip; SQLite 791 + 6 skip).
+- Vitest 1069, including tree operations (every result valid), history, autosave and conflicts, the canvas protocol, drop targets, inspector forms and validation, and `useAuth` during sign-out.
+- Mocked Playwright 182 passed, 80 skipped. `store-builder.spec.ts` covers drag-and-drop into the canvas, inspector edits, layers, duplicate, hide, device widths, undo / redo, autosave, the 409 dialog, publish, history restore and the leave guard.
+- Full-stack:
+  - New test: the Mati & Co. owner copies the homepage, drags in a heading, edits it, autosaves (not live), publishes, and shoppers see it above *Editor's pick*.
+  - Demo stores 7/7, integration 24/24.
+
+#### Docs
+- Bangla manual §17.3 Page builder (screenshots 43–45), API documentation, deployment guide (canvas route), plan §11.
+
 ### B1 — Visual store builder: engine
 
 The engine of the no-code store builder: validated JSON page documents, draft / publish / version history, and builder-rendered storefront pages. Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built). There is no admin UI yet; the drag-and-drop editor is B2.

@@ -1,0 +1,277 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { BootstrapContext, storefrontKeys } from '../../api'
+import { NoticeProvider } from '../../components/notice-provider'
+import { useDictionary } from '../../i18n/dictionaries'
+import { buildLocaleValue, LocaleContext } from '../../i18n/locale'
+import { parseLocale, setLocaleRuntime, type Locale } from '../../i18n/runtime'
+import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../../theme'
+import type { StorefrontBootstrap } from '../../types'
+import { PageRenderer } from '../page-renderer'
+import { NODE_ID } from '../registry'
+import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
+import { envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type ParentMessage, type Rect } from './protocol'
+import { sanitizeHtml } from './sanitize'
+
+/*
+ * The store builder canvas (B2), inside the editor's iframe at /admin/builder-canvas. It draws the
+ * draft the editor sends with the storefront's own renderer, theme and language, and reports
+ * back where every node is (`rects`), what was clicked or hovered and the editor's shortcut keys.
+ * It is display-only: clicks never reach links, buttons or forms; nothing is fetched from the
+ * store API (the query client is offline, see ./main.tsx).
+ */
+
+type RenderFrame = Extract<ParentMessage, { type: 'render' }>
+type InitFrame = Extract<ParentMessage, { type: 'init' }>
+
+const noop = () => {}
+
+/** Text elements from the unsaved draft are cleaned here too (the canvas shares the admin's origin). */
+function cleanSections(sections: RenderSection[]): RenderSection[] {
+  const element = (node: RenderElement): RenderElement => {
+    if (node.type === 'text') return { ...node, props: { ...node.props, html: sanitizeHtml(String(node.props?.html ?? '')) } } as RenderElement
+    if ('columns' in node && Array.isArray(node.columns)) return { ...node, columns: node.columns.map(column) } as RenderElement
+    return node
+  }
+  const column = (col: RenderColumn): RenderColumn => ({ ...col, elements: Array.isArray(col.elements) ? col.elements.map(element) : [] })
+  return (Array.isArray(sections) ? sections : []).map((section) => ({ ...section, columns: Array.isArray(section.columns) ? section.columns.map(column) : [] }))
+}
+
+const safeIds = (ids: readonly (string | null | undefined)[]) => ids.filter((id): id is string => typeof id === 'string' && NODE_ID.test(id))
+
+/** Outlines for the selection, hover and nodes with problems; ids are checked against the id pattern before they reach a selector. */
+function outlineCss(frame: RenderFrame | null): string {
+  if (!frame) return ''
+  const rules: string[] = []
+  const [selection] = safeIds([frame.selection])
+  const [hover] = safeIds([frame.hover])
+  for (const id of safeIds(frame.errors ?? [])) rules.push(`[data-b="${id}"]{outline:2px solid #dc2626 !important;outline-offset:-2px}`)
+  if (hover && hover !== selection) rules.push(`[data-b="${hover}"]{outline:1px dashed #2563eb !important;outline-offset:-1px}`)
+  if (selection) rules.push(`[data-b="${selection}"]{outline:2px solid #2563eb !important;outline-offset:-2px}`)
+  return rules.join('\n')
+}
+
+/** Editor-only affordances: empty columns get room to drop into; nothing looks clickable. */
+const EDITOR_CSS = `
+.b-col:empty{min-height:72px;outline:1px dashed #94a3b8;outline-offset:-6px;background:repeating-linear-gradient(135deg,transparent 0 8px,rgba(148,163,184,.12) 8px 16px)}
+.b-page a,.b-page button,.b-page input,.b-page label{cursor:default}
+html{scroll-behavior:auto}
+`
+
+const PRODUCT_TYPES = new Set(['product_grid', 'product_carousel', 'product_tabs', 'hot_deals', 'category_strip', 'brand_strip', 'blog_posts'])
+
+/** A grey shape of the element's type while its data loads. */
+function Skeleton({ element }: { element: RenderElement }) {
+  const bar = 'rounded bg-neutral-200'
+  let body: ReactNode
+  if (element.type === 'hero_slider') body = <div className={`${bar} h-72 w-full`} />
+  else if (element.type === 'banner_grid') body = <div className="grid grid-cols-3 gap-4">{[0, 1, 2].map((i) => <div key={i} className={`${bar} h-40`} />)}</div>
+  else if (PRODUCT_TYPES.has(element.type)) {
+    body = (
+      <>
+        <div className={`${bar} mx-auto mb-6 h-7 w-56`} />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className={`${bar} h-48`} />)}</div>
+      </>
+    )
+  } else body = <div className="space-y-3"><div className={`${bar} h-6 w-1/2`} /><div className={`${bar} h-4 w-full`} /><div className={`${bar} h-4 w-5/6`} /></div>
+  return (
+    <div data-b={element.id} data-testid="canvas-skeleton" aria-busy="true" className="mx-auto max-w-sf animate-pulse px-4 py-10">
+      {body}
+    </div>
+  )
+}
+
+function useThemeEffects(bootstrap: StorefrontBootstrap | null) {
+  const theme = bootstrap?.theme
+  useLayoutEffect(() => (theme ? applyCssVars(document.documentElement, themeToCssVars(theme)) : undefined), [theme])
+  useLayoutEffect(() => (theme ? applyDataAttributes(document.documentElement, themeDataAttributes(theme)) : undefined), [theme])
+}
+
+type Props = {
+  /** The editor window (tests pass their own). */
+  parent?: Window
+  origin?: string
+}
+
+export function CanvasApp({ parent = window.parent, origin = window.location.origin }: Props) {
+  const [init, setInit] = useState<InitFrame | null>(null)
+  const [frame, setFrame] = useState<RenderFrame | null>(null)
+  const pendingRects = useRef(false)
+  const queryClient = useQueryClient()
+
+  const post = useCallback((message: CanvasMessage) => parent.postMessage(envelope(message), origin), [parent, origin])
+
+  const reportRects = useCallback(() => {
+    if (pendingRects.current) return
+    pendingRects.current = true
+    requestAnimationFrame(() => {
+      pendingRects.current = false
+      const nodes: Record<string, Rect> = {}
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-b]'))) {
+        const id = el.dataset.b
+        if (!id || Object.hasOwn(nodes, id)) continue
+        const r = el.getBoundingClientRect()
+        nodes[id] = { x: r.x, y: r.y, w: r.width, h: r.height }
+      }
+      post({ type: 'rects', nodes, scrollY: window.scrollY, height: document.documentElement.scrollHeight, viewport: { w: window.innerWidth, h: window.innerHeight } })
+    })
+  }, [post])
+
+  // Messages from the editor.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const message = readParentMessage(event, origin, parent)
+      if (!message) return
+      if (message.type === 'init') {
+        // Anything that reads the bootstrap from the cache finds the editor's copy.
+        queryClient.setQueryData(storefrontKeys.bootstrapFor(null), message.bootstrap)
+        const requested = parseLocale(message.locale)
+        if (requested) queryClient.setQueryData(storefrontKeys.bootstrapFor(requested), message.bootstrap)
+        setInit(message)
+      }
+      else if (message.type === 'render') setFrame(message)
+      else if (message.type === 'scroll-to') {
+        if (!NODE_ID.test(message.id)) return
+        const el = document.querySelector(`[data-b="${message.id}"]`)
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ block: r.height > window.innerHeight ? 'start' : 'center' })
+      } else if (message.type === 'scroll-by' && Number.isFinite(message.dy)) window.scrollBy(0, Math.max(-200, Math.min(200, message.dy)))
+    }
+    window.addEventListener('message', onMessage)
+    post({ type: 'ready' })
+    return () => window.removeEventListener('message', onMessage)
+  }, [origin, parent, post, queryClient])
+
+  // Display only: pointer input selects, links and forms do nothing, editor shortcuts go to the editor.
+  useEffect(() => {
+    let hovered: string | null = null
+    const idAt = (target: EventTarget | null) => (target instanceof Element ? (target.closest<HTMLElement>('[data-b]')?.dataset.b ?? null) : null)
+    const swallow = (event: Event) => {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    const onClick = (event: MouseEvent) => {
+      swallow(event)
+      if (event.type === 'click') post({ type: 'click', id: idAt(event.target) })
+    }
+    const onOver = (event: MouseEvent) => {
+      const id = idAt(event.target)
+      if (id === hovered) return
+      hovered = id
+      post({ type: 'hover', id })
+    }
+    const onLeave = () => {
+      if (hovered === null) return
+      hovered = null
+      post({ type: 'hover', id: null })
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (!isEditorShortcut(event)) return
+      event.preventDefault()
+      post({ type: 'key', key: event.key, ctrl: event.ctrlKey, shift: event.shiftKey, meta: event.metaKey })
+    }
+    const options = { capture: true }
+    document.addEventListener('click', onClick, options)
+    document.addEventListener('auxclick', onClick, options)
+    document.addEventListener('dblclick', swallow, options)
+    document.addEventListener('pointerdown', swallow, options)
+    document.addEventListener('mousedown', swallow, options)
+    document.addEventListener('submit', swallow, options)
+    document.addEventListener('dragstart', swallow, options)
+    document.addEventListener('mouseover', onOver, options)
+    document.documentElement.addEventListener('mouseleave', onLeave)
+    document.addEventListener('keydown', onKey, options)
+    window.addEventListener('scroll', reportRects, { passive: true })
+    window.addEventListener('resize', reportRects)
+    // Images change the layout as they load.
+    document.addEventListener('load', reportRects, options)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reportRects)
+    observer?.observe(document.body)
+    return () => {
+      document.removeEventListener('click', onClick, options)
+      document.removeEventListener('auxclick', onClick, options)
+      document.removeEventListener('dblclick', swallow, options)
+      document.removeEventListener('pointerdown', swallow, options)
+      document.removeEventListener('mousedown', swallow, options)
+      document.removeEventListener('submit', swallow, options)
+      document.removeEventListener('dragstart', swallow, options)
+      document.removeEventListener('mouseover', onOver, options)
+      document.documentElement.removeEventListener('mouseleave', onLeave)
+      document.removeEventListener('keydown', onKey, options)
+      window.removeEventListener('scroll', reportRects)
+      window.removeEventListener('resize', reportRects)
+      document.removeEventListener('load', reportRects, options)
+      observer?.disconnect()
+    }
+  }, [post, reportRects])
+
+  const bootstrap = init?.bootstrap ?? null
+  const locale: Locale = parseLocale(init?.locale) ?? 'en'
+  useThemeEffects(bootstrap)
+  useLayoutEffect(() => {
+    document.documentElement.lang = locale
+    setLocaleRuntime({ lang: locale, banglaDigits: locale === 'bn' && bootstrap?.store.bangla_digits === true })
+  }, [locale, bootstrap])
+  useLayoutEffect(() => {
+    if (frame?.device) document.documentElement.dataset.device = frame.device
+  }, [frame?.device])
+
+  const loaded = useDictionary(locale)
+  const localeValue = useMemo(
+    () =>
+      loaded && bootstrap
+        ? buildLocaleValue({
+            locale: loaded.locale,
+            dictionary: loaded.dictionary,
+            locales: [loaded.locale],
+            defaultLocale: loaded.locale,
+            banglaDigits: loaded.locale === 'bn' && bootstrap.store.bangla_digits === true,
+            setLocale: noop,
+          })
+        : null,
+    [loaded, bootstrap],
+  )
+
+  const sections = useMemo(() => (frame ? cleanSections(frame.sections) : []), [frame])
+  const page = useMemo<BuilderPage | null>(
+    () => (frame ? { document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' }, sections, media: frame.media ?? {}, data: frame.data ?? {} } : null),
+    [frame, sections],
+  )
+  const pending = useMemo(() => new Set(frame?.pending ?? []), [frame])
+  const placeholder = useCallback((element: RenderElement) => (pending.has(element.id) ? <Skeleton element={element} /> : null), [pending])
+
+  // Report positions after every drawn frame.
+  useLayoutEffect(() => {
+    if (page) reportRects()
+  }, [page, reportRects, localeValue])
+
+  if (!bootstrap || !localeValue || !page) {
+    return (
+      <div role="status" className="grid min-h-screen place-items-center">
+        <span className="size-10 animate-spin rounded-full border-4 border-neutral-200 border-t-neutral-500" aria-hidden />
+        <span className="sr-only">Loading the canvas</span>
+      </div>
+    )
+  }
+
+  return (
+    <LocaleContext value={localeValue}>
+      <BootstrapContext value={bootstrap}>
+        <NoticeProvider>
+          <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
+          <style data-testid="canvas-outlines">{outlineCss(frame)}</style>
+          <main id="main" className="min-h-screen">
+            {page.sections.length === 0 ? (
+              <div data-testid="canvas-empty" className="grid min-h-[60vh] place-items-center p-8 text-center text-neutral-500">
+                <p className="max-w-sm text-sm">This page is empty. Drag an element from the Add panel onto this area, or click one to add it.</p>
+              </div>
+            ) : (
+              <PageRenderer page={page} placeholder={placeholder} />
+            )}
+          </main>
+        </NoticeProvider>
+      </BootstrapContext>
+    </LocaleContext>
+  )
+}

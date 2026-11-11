@@ -76,10 +76,15 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::get('documents/{document}', [BuilderDocumentController::class, 'show'])->whereUuid('document');
         Route::get('documents/{document}/versions', [BuilderDocumentController::class, 'versions'])->whereUuid('document');
         Route::get('documents/{document}/render', [BuilderDocumentController::class, 'render'])->whereUuid('document');
+        // B2: the editor canvas — the store bootstrap of the staff member's own organization.
+        Route::get('canvas-context', [BuilderDocumentController::class, 'canvasContext']);
     });
 
     Route::middleware('can:storefront.manage')->group(function () {
         Route::post('documents', [BuilderDocumentController::class, 'store']);
+        Route::patch('documents/{document}', [BuilderDocumentController::class, 'rename'])->whereUuid('document');
+        // B2: canvas data for unsaved elements and media (validated per element).
+        Route::post('resolve', [BuilderDocumentController::class, 'resolve']);
         Route::put('documents/{document}/draft', [BuilderDocumentController::class, 'saveDraft'])->whereUuid('document');
         Route::post('documents/{document}/publish', [BuilderDocumentController::class, 'publish'])->whereUuid('document')->middleware('can:storefront.publish');
         Route::post('documents/{document}/discard', [BuilderDocumentController::class, 'discard'])->whereUuid('document');

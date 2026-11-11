@@ -89,6 +89,20 @@ class BuilderDocument extends Model
         return str_starts_with($this->key, self::LANDING_PREFIX) ? substr($this->key, strlen(self::LANDING_PREFIX)) : null;
     }
 
+    /**
+     * Where the page is on the store (B2): `/` for the home page, `/p/<slug>` for a landing
+     * page; null for documents that are not pages of their own.
+     */
+    public function storePath(): ?string
+    {
+        if ($this->isHome()) {
+            return '/';
+        }
+        $slug = $this->landingSlug();
+
+        return $slug === null ? null : '/p/'.$slug;
+    }
+
     protected function affectsStorefront(): bool
     {
         if (! $this->exists) {

@@ -143,6 +143,10 @@ export type Section = NodeCommon & {
 /** A stored document (draft or published version content). */
 export type BuilderDocument = { schema_version: 1; sections: Section[] }
 
+/** The editor's names (B2): the whole draft, and any node of it (section, column or element). */
+export type BuilderContent = BuilderDocument
+export type BuilderNode = Section | Column | Element
+
 /* ----------------------------------------------------------------------------------------------
  * Render payload
  * -------------------------------------------------------------------------------------------- */

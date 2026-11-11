@@ -5,6 +5,7 @@ export const STOREFRONT_TABS: SectionTab[] = [
   { to: '/storefront/theme', label: 'Theme', permission: 'storefront.view' },
   { to: '/storefront/menus', label: 'Menus', permission: 'storefront.view' },
   { to: '/storefront/homepage', label: 'Homepage', permission: 'storefront.view' },
+  { to: '/storefront/pages', label: 'Page builder', permission: 'storefront.view' },
   { to: '/storefront/banners', label: 'Banners', permission: 'storefront.view' },
   { to: '/storefront/shipping', label: 'Shipping', permission: 'shipping.manage' },
   { to: '/storefront/payments', label: 'Payments', permission: 'payment_gateways.manage' },

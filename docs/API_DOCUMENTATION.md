@@ -2381,6 +2381,9 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
 | DELETE `/storefront/builder/documents/{id}` | manage | Landing pages only (`422 CANNOT_DELETE_HOME`) → 204 |
 | GET `/storefront/builder/documents/{id}/render?source=draft\|published` | view | Render payload (below); unpublished `published` → `409 NOTHING_PUBLISHED` |
 | GET `/storefront/builder/elements` | view | Element registry: `{types: [{type, group, label, translatable, props, children}], limits, enums}` |
+| POST `/storefront/builder/resolve` | manage | B2 canvas. `{elements: [{id, type, title, subtitle, config, items, translations}] (≤ 60, unique ids), media_ids: uuid[] (≤ 200), locale?}` → `{data: {<id>: <section object, preview state>}, media: {<id>: ref}, errors: {<id or media id>: [{path, message, code?, ids?}]}}`. Each element is validated on its own, and an invalid one only appears in `errors`. A malformed envelope → 422. |
+| GET `/storefront/builder/canvas-context` | view | B2. `{bootstrap: <the /store/bootstrap payload of the user's organization, also for a closed store>, store_url: string\|null, locales}`; `?lang=` as in the storefront. |
+| PATCH `/storefront/builder/documents/{id}` | manage | B2. `{title}` (1–160) → document (revision unchanged); audited `storefront.builder_renamed`. Summaries also carry `path` (`/` or `/p/<slug>`) and `preview_url` (or null without a domain). |
 | GET `/store/builder/pages/home`, `/store/builder/pages/{slug}` | public | Published render payload. `404 PAGE_NOT_FOUND`. `?preview=draft` for signed-in staff with `storefront.view` → the draft with `state` on non-live nodes, `no-store`. Otherwise ETag / 304 like `/store/homepage`. |
 
 **Render payload:** `{document: {id, key, title, version, source}, sections: <tree>, media: {<media_id>: {url, srcset, width, height, alt}}, data: {<element_id>: <homepage section object>}}`.

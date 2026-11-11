@@ -19,7 +19,7 @@ import { ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
  * Used by the live store and, in B2, by the editor canvas.
  */
 
-type PageContext = { page: BuilderPage; draft: boolean }
+type PageContext = { page: BuilderPage; draft: boolean; placeholder?: (element: RenderElement) => ReactNode }
 
 const PageCtx = createContext<PageContext | null>(null)
 
@@ -275,10 +275,13 @@ function Divider({ element }: { element: Extract<RenderElement, { type: 'divider
 }
 
 function WrappedSection({ element, state }: { element: RenderElement; state: NodeState | null }) {
-  const { page, draft } = usePage()
+  const { page, draft, placeholder } = usePage()
   const data = Object.hasOwn(page.data ?? {}, element.id) ? page.data[element.id] : undefined
 
   if (!data || data.type !== element.type) {
+    // The editor canvas draws its own placeholder (a skeleton while the data loads).
+    const custom = draft && placeholder ? placeholder(element) : null
+    if (custom) return <>{custom}</>
     // Nothing resolved (no data): visitors see nothing; a draft preview keeps a marked placeholder.
     return draft ? (
       <PreviewMark state={state ?? 'empty'}>
@@ -296,12 +299,16 @@ function WrappedSection({ element, state }: { element: RenderElement; state: Nod
   )
 }
 
-/** A builder page: its compiled styles and its sections. */
-export function PageRenderer({ page }: { page: BuilderPage }) {
+/**
+ * A builder page: its compiled styles and its sections. `placeholder` (draft only, the editor
+ * canvas): drawn instead of a wrapped section that has no data yet; null falls back to the
+ * default marked placeholder.
+ */
+export function PageRenderer({ page, placeholder }: { page: BuilderPage; placeholder?: (element: RenderElement) => ReactNode }) {
   const draft = page.document?.source === 'draft'
   const sections = useMemo(() => (Array.isArray(page.sections) ? page.sections : []), [page.sections])
   const css = useMemo(() => compileStyles(sections, { media: page.media ?? {} }), [sections, page.media])
-  const context = useMemo(() => ({ page, draft }), [page, draft])
+  const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
 
   return (
     <PageCtx.Provider value={context}>
