@@ -52,6 +52,7 @@ AI assistant and insights (Phase 8 / AI1, optional, **off by default**): *AI Ins
 | [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) | Setup, commands, coding standards |
 | [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) | Test suites, coverage matrix, definition of done |
 | [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) | Production topology, release steps, security checklist |
+| [USER_MANUAL.bn.md](docs/USER_MANUAL.bn.md) | User manual in simple Bangla with screenshots (shop staff, managers, owners) |
 | [AI_INTEGRATION.md](docs/AI_INTEGRATION.md) | Optional, provider-independent, read-only AI module (as built in AI1) |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per phase |
 

@@ -4,6 +4,11 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Docs — user manual in Bangla
+
+- `docs/USER_MANUAL.bn.md`: a step-by-step user manual in simple Bangla for owners, managers and cashiers (sign-in, dashboard, POS sale and payment, cash sessions, returns, products, inventory, purchasing, customers, expenses, web orders and COD, promotions, reports and exports, AI insights, online store settings, users and roles, the shopper's view, a daily checklist and troubleshooting), with 37 screenshots from the seeded demo in `docs/manual/images/`.
+- `frontend/e2e/manual-shots.spec.ts` (opt-in, `MANUAL_SHOTS=1`): regenerates those screenshots against a seeded backend.
+
 ### PostgreSQL verification
 
 The first run of the whole system on PostgreSQL 18 (local, role `pos_app`, databases `pos` / `pos_test` / `pos_e2e`, 2026-11-11). Until then every backend test had run on SQLite only. The run found the bugs below; all are fixed.
