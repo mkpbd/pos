@@ -43,6 +43,18 @@ async function mockBackend(page: Page) {
       ? route.fulfill({ json: envelope({ ...theme, settings: route.request().postDataJSON() }) })
       : route.fulfill({ json: envelope(theme) }),
   )
+  await page.route('**/api/v1/storefront/theme/presets', (route) =>
+    route.fulfill({
+      json: envelope(
+        (['default', 'vegan', 'handmade', 'classic'] as const).map((key) => ({
+          key,
+          name: key === 'default' ? 'Default' : key[0].toUpperCase() + key.slice(1),
+          description: `The ${key} look.`,
+          theme: theme.settings,
+        })),
+      ),
+    }),
+  )
   await page.route('**/api/v1/storefront/menus', (route) => route.fulfill({ json: envelope([mainMenu]) }))
   await page.route('**/api/v1/storefront/link-targets', (route) => route.fulfill({ json: envelope({ pages: [] }) }))
   await page.route('**/api/v1/storefront/menus/m-1', (route) => route.fulfill({ json: envelope({ ...mainMenu, items: [] }) }))

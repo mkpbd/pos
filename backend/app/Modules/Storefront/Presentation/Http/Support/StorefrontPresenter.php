@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
 use App\Modules\Shared\Application\Support\TranslationInput;
+use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
 use App\Modules\Storefront\Infrastructure\Models\MenuItem;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
@@ -59,6 +60,21 @@ final class StorefrontPresenter
             'has_custom_css' => $t->custom_css !== null,
             'updated_at' => $t->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * T1: the presets with the complete theme each produces on a blank theme.
+     *
+     * @return list<array{key: string, name: string, description: string, theme: array<string, mixed>}>
+     */
+    public static function themePresets(): array
+    {
+        return array_map(fn (string $key) => [
+            'key' => $key,
+            'name' => ThemePresets::name($key),
+            'description' => ThemePresets::description($key),
+            'theme' => ThemePresets::theme($key),
+        ], ThemePresets::KEYS);
     }
 
     /**

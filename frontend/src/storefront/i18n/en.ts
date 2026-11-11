@@ -9,6 +9,7 @@ import { orders } from './en/orders'
 import { promo } from './en/promo'
 import { reviews } from './en/reviews'
 import { shell } from './en/shell'
+import { theme } from './en/theme'
 import { wishlist } from './en/wishlist'
 
 /**
@@ -29,6 +30,7 @@ export const en = {
   ...checkout,
   ...account,
   ...orders,
+  ...theme,
 }
 
 export type MessageKey = keyof typeof en

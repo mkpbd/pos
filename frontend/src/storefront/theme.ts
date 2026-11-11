@@ -1,16 +1,88 @@
-import type { BodyFont, ButtonStyle, HeadingFont, StorefrontTheme } from './types'
+import { useStorefront } from './api'
+import type { BodyFont, ButtonStyle, HeadingCase, HeadingFont, LayoutVariants, StorefrontTheme } from './types'
 
 const SYSTEM_STACK = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 
+const SERIF_FALLBACK = "Georgia, 'Times New Roman', serif"
+
+/*
+ * Bangla pages put Hind Siliguri / Baloo Da 2 in front of whichever stack is chosen
+ * (storefront.css, `:lang(bn)`), so every stack renders Bengali text.
+ */
 const HEADING_STACKS: Record<HeadingFont, string> = {
   baloo: `'Baloo 2 Variable', 'Poppins', ${SYSTEM_STACK}`,
   poppins: `'Poppins', ${SYSTEM_STACK}`,
+  playfair: `'Playfair Display Variable', ${SERIF_FALLBACK}`,
+  jost: `'Jost Variable', 'Poppins', ${SYSTEM_STACK}`,
   system: SYSTEM_STACK,
 }
 
 const BODY_STACKS: Record<BodyFont, string> = {
   poppins: `'Poppins', ${SYSTEM_STACK}`,
+  jost: `'Jost Variable', 'Poppins', ${SYSTEM_STACK}`,
   system: SYSTEM_STACK,
+}
+
+/** Today's look: what a theme without the T1 layout keys (or with unknown values) gets. */
+export const DEFAULT_LAYOUT: LayoutVariants = {
+  header_style: 'standard',
+  footer_style: 'columns',
+  card_style: 'standard',
+  hero_style: 'full',
+  heading_case: 'normal',
+  top_bar: 'none',
+}
+
+const LAYOUT_OPTIONS: { [K in keyof LayoutVariants]: readonly LayoutVariants[K][] } = {
+  header_style: ['standard', 'centered', 'commerce'],
+  footer_style: ['columns', 'showcase', 'widgets'],
+  card_style: ['standard', 'minimal', 'commerce'],
+  hero_style: ['full', 'tiles', 'sale'],
+  heading_case: ['normal', 'lowercase', 'uppercase'],
+  top_bar: ['none', 'ticker', 'utility'],
+}
+
+const HEADING_TRANSFORMS: Record<HeadingCase, string> = { normal: 'none', lowercase: 'lowercase', uppercase: 'uppercase' }
+
+/** The theme's layout variants with every key set: missing or unknown values fall back to today's look. */
+export function resolveLayout(layout: StorefrontTheme['layout']): LayoutVariants {
+  const resolved = { ...DEFAULT_LAYOUT }
+  for (const key of Object.keys(LAYOUT_OPTIONS) as (keyof LayoutVariants)[]) {
+    const value = layout[key]
+    if (value !== undefined && (LAYOUT_OPTIONS[key] as readonly string[]).includes(value)) (resolved as Record<string, string>)[key] = value
+  }
+  return resolved
+}
+
+/** The store's layout (header, footer, card, hero, heading case, top bar) plus content width and sticky header. */
+export function useStoreLayout(): LayoutVariants & { container_width: number; sticky_header: boolean } {
+  const { layout } = useStorefront().theme
+  return { ...resolveLayout(layout), container_width: layout.container_width, sticky_header: layout.sticky_header }
+}
+
+/**
+ * `data-sf-*` attributes for the document root, so custom CSS (and tests) can target a preset
+ * or variant: `[data-sf-card="minimal"] …`.
+ */
+export function themeDataAttributes(theme: StorefrontTheme): Record<string, string> {
+  const layout = resolveLayout(theme.layout)
+  return {
+    'data-sf-preset': theme.preset ?? 'default',
+    'data-sf-header': layout.header_style,
+    'data-sf-footer': layout.footer_style,
+    'data-sf-card': layout.card_style,
+    'data-sf-hero': layout.hero_style,
+    'data-sf-heading-case': layout.heading_case,
+    'data-sf-top-bar': layout.top_bar,
+  }
+}
+
+/** Sets the attributes on an element and returns a function that removes them again. */
+export function applyDataAttributes(element: HTMLElement, attributes: Record<string, string>): () => void {
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value)
+  return () => {
+    for (const name of Object.keys(attributes)) element.removeAttribute(name)
+  }
 }
 
 const BUTTON_RADII: Record<ButtonStyle, string> = {
@@ -33,6 +105,10 @@ export function themeToCssVars(theme: StorefrontTheme): Record<string, string> {
   vars['--sf-radius-button'] = BUTTON_RADII[theme.shape.button_style] ?? BUTTON_RADII.rounded
   vars['--sf-radius-card'] = `${theme.shape.card_radius}px`
   vars['--sf-container'] = `${theme.layout.container_width}px`
+  const headingCase = resolveLayout(theme.layout).heading_case
+  vars['--sf-heading-transform'] = HEADING_TRANSFORMS[headingCase]
+  // Capitals read better slightly spaced.
+  vars['--sf-heading-tracking'] = headingCase === 'uppercase' ? '0.04em' : 'normal'
   return vars
 }
 

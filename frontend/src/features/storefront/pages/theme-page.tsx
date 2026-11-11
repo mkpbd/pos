@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Controller, useForm, useWatch, type Control } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2Icon, XIcon } from 'lucide-react'
+import { CheckIcon, ExternalLinkIcon, Loader2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
+// The storefront's font faces, so the preset previews and font choices show in their real typeface.
+import '@fontsource-variable/baloo-2'
+import '@fontsource-variable/jost'
+import '@fontsource-variable/playfair-display'
+import '@fontsource/poppins/600.css'
+import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +22,25 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
 import { useMediaLookup } from '@/features/media/api'
 import { MediaField, MediaPicker, MediaThumb } from '@/features/media/components/media-picker'
-import { MAX_PAYMENT_LOGOS, SOCIAL_NETWORKS, THEME_COLORS, type SocialNetwork, useSaveCustomCssMutation, useSaveThemeMutation, useThemeQuery, type ThemeResponse } from '@/features/storefront/api'
+import {
+  BODY_FONTS,
+  BUTTON_STYLES,
+  HEADING_FONTS,
+  LAYOUT_OPTIONS,
+  MAX_PAYMENT_LOGOS,
+  SOCIAL_NETWORKS,
+  THEME_COLORS,
+  type LayoutVariantKey,
+  type SocialNetwork,
+  type ThemePreset,
+  type ThemePresetKey,
+  type ThemeResponse,
+  useApplyThemePresetMutation,
+  useSaveCustomCssMutation,
+  useSaveThemeMutation,
+  useThemePresetsQuery,
+  useThemeQuery,
+} from '@/features/storefront/api'
 import { ColorField } from '@/features/storefront/components/color-field'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { contrastRatio, meetsAA } from '@/features/storefront/contrast'
@@ -25,8 +49,31 @@ import { BanglaTranslations } from '@/features/translations/components/bangla-tr
 import { rhfBnErrors, type TranslationsMap } from '@/features/translations/translations'
 import { handleFormError } from '@/lib/forms'
 
-const FONT_LABELS: Record<string, string> = { baloo: 'Baloo (rounded, playful)', poppins: 'Poppins (geometric)', system: 'System font' }
+const FONT_LABELS: Record<string, string> = {
+  baloo: 'Baloo (rounded, playful)',
+  poppins: 'Poppins (geometric)',
+  playfair: 'Playfair Display (serif, elegant)',
+  jost: 'Jost (clean, modern)',
+  system: 'System font',
+}
+/** The typefaces as the storefront stacks them (storefront/theme.ts), for the previews. */
+const FONT_FAMILIES: Record<string, string> = {
+  baloo: "'Baloo 2 Variable', 'Poppins', system-ui, sans-serif",
+  poppins: "'Poppins', system-ui, sans-serif",
+  playfair: "'Playfair Display Variable', Georgia, serif",
+  jost: "'Jost Variable', system-ui, sans-serif",
+  system: 'system-ui, sans-serif',
+}
 const BUTTON_LABELS: Record<string, string> = { pill: 'Pill', rounded: 'Rounded', square: 'Square' }
+
+const LAYOUT_FIELDS: { key: LayoutVariantKey; label: string; hint: string; options: Record<string, string> }[] = [
+  { key: 'top_bar', label: 'Top bar', hint: 'Above the header on wide screens.', options: { none: 'Announcement bar', ticker: 'Scrolling announcement', utility: 'Contact & account links' } },
+  { key: 'header_style', label: 'Header', hint: 'Phones always get the compact header.', options: { standard: 'Standard — search beside the logo', centered: 'Centered brand, search icon', commerce: 'Shop — wide search, cart total' } },
+  { key: 'hero_style', label: 'Hero slider', hint: 'How the hero slider section is shown.', options: { full: 'Full-width slides', tiles: 'Up to three editorial tiles', sale: 'Sale slides — bold uppercase' } },
+  { key: 'card_style', label: 'Product cards', hint: 'Grids and carousels; list view stays standard.', options: { standard: 'Standard', minimal: 'Minimal — image-led, no buttons', commerce: 'Shop — hover actions, ratings' } },
+  { key: 'footer_style', label: 'Footer', hint: 'Product lists use your best sellers, newest and top-rated products.', options: { columns: 'Link columns', showcase: 'Brand & product showcase', widgets: 'Widgets — posts, products, newsletter' } },
+  { key: 'heading_case', label: 'Section headings', hint: 'Letter case of section and banner headings.', options: { normal: 'As written', lowercase: 'lowercase', uppercase: 'UPPERCASE' } },
+]
 const SOCIAL_LABELS: Record<SocialNetwork, string> = { facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', tiktok: 'TikTok', x: 'X (Twitter)', linkedin: 'LinkedIn' }
 
 function ContrastChecks({ control }: { control: Control<ThemeFormValues> }) {
@@ -152,7 +199,7 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
                 <Controller control={control} name="typography.heading_font" render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>{['baloo', 'poppins', 'system'].map((f) => <SelectItem key={f} value={f}>{FONT_LABELS[f]}</SelectItem>)}</SelectContent>
+                    <SelectContent>{HEADING_FONTS.map((f) => <SelectItem key={f} value={f}><span style={{ fontFamily: FONT_FAMILIES[f] }}>{FONT_LABELS[f]}</span></SelectItem>)}</SelectContent>
                   </Select>
                 )} />
               </FormField>
@@ -160,7 +207,7 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
                 <Controller control={control} name="typography.body_font" render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>{['poppins', 'system'].map((f) => <SelectItem key={f} value={f}>{FONT_LABELS[f]}</SelectItem>)}</SelectContent>
+                    <SelectContent>{BODY_FONTS.map((f) => <SelectItem key={f} value={f}><span style={{ fontFamily: FONT_FAMILIES[f] }}>{FONT_LABELS[f]}</span></SelectItem>)}</SelectContent>
                   </Select>
                 )} />
               </FormField>
@@ -168,7 +215,7 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
                 <Controller control={control} name="shape.button_style" render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>{['pill', 'rounded', 'square'].map((s) => <SelectItem key={s} value={s}>{BUTTON_LABELS[s]}</SelectItem>)}</SelectContent>
+                    <SelectContent>{BUTTON_STYLES.map((s) => <SelectItem key={s} value={s}>{BUTTON_LABELS[s]}</SelectItem>)}</SelectContent>
                   </Select>
                 )} />
               </FormField>
@@ -187,6 +234,27 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
             </CardContent>
           </Card>
         </div>
+
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Layout</CardTitle>
+            <CardDescription>The page structure of the store. A preset sets these for you; each one can be changed on its own.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {LAYOUT_FIELDS.map(({ key, label, hint, options }) => (
+              <Controller key={key} control={control} name={`layout.${key}`} render={({ field }) => (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={`layout-${key}`}>{label}</Label>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={!canManage}>
+                    <SelectTrigger id={`layout-${key}`} className="w-full" aria-describedby={`layout-${key}-hint`}><SelectValue /></SelectTrigger>
+                    <SelectContent>{(LAYOUT_OPTIONS[key] as readonly string[]).map((o) => <SelectItem key={o} value={o}>{options[o]}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <p id={`layout-${key}-hint`} className={errors.layout?.[key] ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>{errors.layout?.[key]?.message ?? hint}</p>
+                </div>
+              )} />
+            ))}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -266,6 +334,127 @@ function ThemeForm({ theme, canManage }: { theme: ThemeResponse; canManage: bool
   )
 }
 
+const PREVIEW_SWATCHES = ['primary', 'accent', 'highlight', 'sale', 'heading', 'canvas'] as const
+
+/** A preset as a selectable card: a miniature of its colours, heading font and buttons. */
+function PresetOption({ preset, checked, current, disabled, onSelect }: { preset: ThemePreset; checked: boolean; current: boolean; disabled: boolean; onSelect: () => void }) {
+  const { colors, typography, shape } = preset.theme
+  const descriptionId = `preset-${preset.key}-description`
+  const buttonRadius = shape.button_style === 'pill' ? '9999px' : shape.button_style === 'rounded' ? '0.375rem' : '0'
+
+  return (
+    <label
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-card transition hover:border-primary/60 has-[:checked]:border-primary has-[:checked]:ring-2 has-[:checked]:ring-primary/30 has-[:disabled]:cursor-default has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+      data-testid={`preset-${preset.key}`}
+    >
+      <input type="radio" name="theme-preset" value={preset.key} checked={checked} onChange={onSelect} disabled={disabled} aria-label={preset.name} aria-describedby={descriptionId} className="sr-only" />
+      <div aria-hidden className="flex h-32 flex-col justify-between p-4" style={{ background: colors.canvas, borderBottom: `4px solid ${colors.primary}` }}>
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-4xl leading-none" style={{ fontFamily: FONT_FAMILIES[typography.heading_font], color: colors.heading, fontWeight: 600 }}>
+            Aa
+          </span>
+          <span className="px-3 py-1 text-[0.65rem] font-semibold" style={{ background: colors.primary, color: colors.primary_foreground, borderRadius: buttonRadius, fontFamily: FONT_FAMILIES[typography.body_font] }}>
+            Shop
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {PREVIEW_SWATCHES.map((c) => (
+            <span key={c} className="size-5 rounded-full border border-black/10" style={{ background: colors[c] }} />
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-4">
+        <span className="flex items-center justify-between gap-2 font-medium">
+          {preset.name}
+          {current && <Badge variant="secondary">Current</Badge>}
+        </span>
+        <span id={descriptionId} className="text-sm text-muted-foreground">{preset.description}</span>
+        <span className="mt-1 text-xs text-muted-foreground">
+          {FONT_LABELS[typography.heading_font]?.split(' (')[0]} · {FONT_LABELS[typography.body_font]?.split(' (')[0]}
+        </span>
+      </div>
+      {checked && (
+        <span aria-hidden className="absolute top-2 right-2 grid size-6 place-items-center rounded-full bg-primary text-primary-foreground">
+          <CheckIcon className="size-4" />
+        </span>
+      )}
+    </label>
+  )
+}
+
+/**
+ * The preset gallery: choose a complete look and apply it after a confirmation. Applying replaces
+ * colours, fonts, shape and layout; the logo, favicon, announcement and footer content stay.
+ */
+function PresetCard({ theme, canManage }: { theme: ThemeResponse; canManage: boolean }) {
+  const presets = useThemePresetsQuery()
+  const apply = useApplyThemePresetMutation()
+  const current: ThemePresetKey = theme.settings.preset ?? 'default'
+  const [selected, setSelected] = useState<ThemePresetKey>(current)
+  const [confirming, setConfirming] = useState(false)
+  const chosen = presets.data?.find((p) => p.key === selected)
+
+  const onConfirm = () => {
+    if (!chosen) return
+    apply.mutate(chosen.key, {
+      onSuccess: () => {
+        setConfirming(false)
+        toast.success(`${chosen.name} preset applied.`)
+      },
+      onError: (e) => {
+        setConfirming(false)
+        toast.error(e.message)
+      },
+    })
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1.5">
+          <CardTitle>Preset</CardTitle>
+          <CardDescription>Start from a complete look: colours, fonts, buttons and layout. Everything stays editable below.</CardDescription>
+        </div>
+        <Button asChild variant="outline">
+          <a href="/?preview=1" target="_blank" rel="noreferrer"><ExternalLinkIcon data-icon="inline-start" /> View store</a>
+        </Button>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {presets.isPending ? (
+          <LoadingState rows={2} label="Loading presets" />
+        ) : presets.error ? (
+          <ErrorState error={presets.error} onRetry={() => presets.refetch()} />
+        ) : (
+          <div role="radiogroup" aria-label="Theme presets" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {presets.data.map((preset) => (
+              <PresetOption key={preset.key} preset={preset} checked={selected === preset.key} current={current === preset.key} disabled={!canManage || apply.isPending} onSelect={() => setSelected(preset.key)} />
+            ))}
+          </div>
+        )}
+        {canManage && presets.data && (
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {apply.isError && <p role="alert" className="text-sm text-destructive">{apply.error.message}</p>}
+            <Button type="button" disabled={!chosen || apply.isPending} onClick={() => setConfirming(true)}>
+              {apply.isPending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
+              Apply preset
+            </Button>
+          </div>
+        )}
+      </CardContent>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={(open) => !apply.isPending && setConfirming(open)}
+        title={`Apply the ${chosen?.name ?? ''} preset?`}
+        description="Replaces colours, fonts and layout; keeps your logo, announcement and footer text. Unsaved changes in the theme form are discarded."
+        confirmLabel="Apply preset"
+        destructive={false}
+        pending={apply.isPending}
+        onConfirm={onConfirm}
+      />
+    </Card>
+  )
+}
+
 function CustomCssCard({ theme }: { theme: ThemeResponse }) {
   const save = useSaveCustomCssMutation()
   const [css, setCss] = useState(theme.custom_css ?? '')
@@ -316,6 +505,7 @@ export function ThemePage() {
         <ErrorState error={theme.error} onRetry={() => theme.refetch()} />
       ) : (
         <>
+          <PresetCard theme={theme.data} canManage={can('storefront.manage')} />
           <ThemeForm theme={theme.data} canManage={can('storefront.manage')} />
           {can('storefront.custom_css') && <CustomCssCard key={theme.data.custom_css ?? ''} theme={theme.data} />}
         </>

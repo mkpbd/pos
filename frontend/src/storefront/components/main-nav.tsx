@@ -6,6 +6,33 @@ import type { MenuNode } from '../types'
 import { MediaImage } from './media-image'
 import { MenuLink } from './menu-link'
 
+/**
+ * How the bar looks per header variant: `bar` (standard header — accent bar, uppercase),
+ * `centered` (airy row under a centred brand), `commerce` (dark full-width bar).
+ */
+export type NavAppearance = 'bar' | 'centered' | 'commerce'
+
+const APPEARANCE: Record<NavAppearance, { nav: string; list: string; link: string; toggle: string }> = {
+  bar: {
+    nav: 'bg-sf-accent text-sf-accent-foreground',
+    list: '',
+    link: 'flex items-center px-4 py-4 text-sm font-semibold tracking-wide uppercase transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none',
+    toggle: 'flex items-center pr-3 pl-1 transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none',
+  },
+  centered: {
+    nav: 'border-t bg-sf-surface text-sf-heading',
+    list: 'justify-center gap-x-2',
+    link: 'flex items-center px-4 py-3.5 text-[0.95rem] font-medium tracking-wide transition-colors hover:text-sf-accent focus-visible:text-sf-accent focus-visible:underline focus-visible:underline-offset-8 focus-visible:outline-none',
+    toggle: 'flex items-center pr-3 pl-0.5 transition-colors hover:text-sf-accent focus-visible:text-sf-accent focus-visible:outline-none',
+  },
+  commerce: {
+    nav: 'bg-sf-heading text-sf-surface',
+    list: '',
+    link: 'flex items-center px-4 py-3.5 text-[0.8rem] font-bold tracking-wider uppercase transition-colors hover:bg-white/10 focus-visible:bg-white/15 focus-visible:outline-none',
+    toggle: 'flex items-center pr-3 pl-1 transition-colors hover:bg-white/10 focus-visible:bg-white/15 focus-visible:outline-none',
+  },
+}
+
 const MEGA_GRID: Record<number, string> = {
   2: 'grid-cols-2',
   3: 'grid-cols-3',
@@ -18,7 +45,7 @@ const MEGA_GRID: Record<number, string> = {
  * (Enter/Space), close on Escape (focus returns to the toggle) and when focus leaves.
  * Mega items open a full-width panel: one column per child, grandchildren as links.
  */
-export function MainNav({ items }: { items: MenuNode[] }) {
+export function MainNav({ items, appearance = 'bar' }: { items: MenuNode[]; appearance?: NavAppearance }) {
   const [openId, setOpenId] = useState<string | null>(null)
   const navRef = useRef<HTMLElement>(null)
   const { t } = useLocale()
@@ -36,12 +63,13 @@ export function MainNav({ items }: { items: MenuNode[] }) {
   if (items.length === 0) return null
 
   return (
-    <nav ref={navRef} aria-label={t('shell.nav.main')} className="relative hidden bg-sf-accent text-sf-accent-foreground lg:block">
-      <ul className="mx-auto flex max-w-sf flex-wrap items-stretch px-4">
+    <nav ref={navRef} aria-label={t('shell.nav.main')} className={cn('relative hidden lg:block', APPEARANCE[appearance].nav)} data-appearance={appearance}>
+      <ul className={cn('mx-auto flex max-w-sf flex-wrap items-stretch px-4', APPEARANCE[appearance].list)}>
         {items.map((item) => (
           <NavItem
             key={item.id}
             item={item}
+            appearance={appearance}
             open={openId === item.id}
             onOpenChange={(open) => setOpenId((current) => (open ? item.id : current === item.id ? null : current))}
           />
@@ -51,13 +79,13 @@ export function MainNav({ items }: { items: MenuNode[] }) {
   )
 }
 
-function NavItem({ item, open, onOpenChange }: { item: MenuNode; open: boolean; onOpenChange: (open: boolean) => void }) {
+function NavItem({ item, appearance, open, onOpenChange }: { item: MenuNode; appearance: NavAppearance; open: boolean; onOpenChange: (open: boolean) => void }) {
   const panelId = useId()
   const toggleRef = useRef<HTMLButtonElement>(null)
   const { t } = useLocale()
   const hasPanel = item.children.length > 0 || (item.is_mega && item.image !== null)
 
-  const linkClass = 'flex items-center px-4 py-4 text-sm font-semibold tracking-wide uppercase transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none'
+  const linkClass = APPEARANCE[appearance].link
 
   if (!hasPanel) {
     return (
@@ -94,7 +122,7 @@ function NavItem({ item, open, onOpenChange }: { item: MenuNode; open: boolean; 
       <button
         ref={toggleRef}
         type="button"
-        className="flex items-center pr-3 pl-1 transition-colors hover:bg-black/10 focus-visible:bg-black/10 focus-visible:outline-none"
+        className={APPEARANCE[appearance].toggle}
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={t('common.submenu', { label: item.label })}

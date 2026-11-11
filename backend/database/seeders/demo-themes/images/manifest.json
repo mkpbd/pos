@@ -1,0 +1,560 @@
+{
+    "vegan/almond-milk.jpg": {
+        "source": "https://unsplash.com/photos/8Pp9M13xuzs",
+        "photographer": "Sandi Benedicta",
+        "licence": "Unsplash License",
+        "alt": "Glass bottle of almond milk with almonds"
+    },
+    "vegan/aloe-gel.jpg": {
+        "source": "https://unsplash.com/photos/person-holding-blue-plastic-container-I-6Ap7JXHq8",
+        "photographer": "Nataliya Melnychuk",
+        "licence": "Unsplash License",
+        "alt": "Hands opening a jar of clear aloe gel"
+    },
+    "vegan/avocado-2.jpg": {
+        "source": "https://unsplash.com/photos/an-avocado-cut-in-half-on-a-white-surface-gcfeUzFW2i0",
+        "photographer": "John Vid",
+        "licence": "Unsplash License",
+        "alt": "Whole and halved Hass avocado on a light surface"
+    },
+    "vegan/avocado.jpg": {
+        "source": "https://unsplash.com/photos/sliced-avocado-EMX1eJ1BcgU",
+        "photographer": "Thought Catalog",
+        "licence": "Unsplash License",
+        "alt": "Halved avocado on a white background"
+    },
+    "vegan/baby-spinach.jpg": {
+        "source": "https://unsplash.com/photos/green-leaves-on-brown-wooden-table-3YTtK5LRtDI",
+        "photographer": "Gil Ndjouwou",
+        "licence": "Unsplash License",
+        "alt": "Fresh baby spinach leaves on a wooden table"
+    },
+    "vegan/bamboo-toothbrush.jpg": {
+        "source": "https://unsplash.com/photos/VCC5Vc0X2F8",
+        "photographer": "Harold Hisona",
+        "licence": "Unsplash License",
+        "alt": "Bamboo toothbrushes in a glass jar with eucalyptus"
+    },
+    "vegan/banner-brand.jpg": {
+        "source": "https://unsplash.com/photos/IQVFVH0ajag",
+        "photographer": "Dan Meyers",
+        "licence": "Unsplash License",
+        "alt": "Rows of green crops in a farm field at sunset"
+    },
+    "vegan/banner-hero-1.jpg": {
+        "source": "https://unsplash.com/photos/a-pile-of-different-types-of-vegetables-on-a-white-surface-5aJVJvJ9rG8",
+        "photographer": "Randy Fath",
+        "licence": "Unsplash License",
+        "alt": "Flat lay of colourful fresh vegetables on a white surface"
+    },
+    "vegan/banner-hero-2.jpg": {
+        "source": "https://unsplash.com/photos/red-and-black-berries-in-white-ceramic-bowl-XKqIOpMMTOQ",
+        "photographer": "Bakd&Raw by Karolin Baitinger",
+        "licence": "Unsplash License",
+        "alt": "Pink berry smoothie bowls on white marble"
+    },
+    "vegan/banner-promo.jpg": {
+        "source": "https://unsplash.com/photos/bowl-of-vegetable-salads-IGfIGP5ONV0",
+        "photographer": "Anna Pelzer",
+        "licence": "Unsplash License",
+        "alt": "Colourful vegan salad bowl with avocado and chickpeas"
+    },
+    "vegan/broccoli.jpg": {
+        "source": "https://unsplash.com/photos/TL6bTnQWMbk",
+        "photographer": "Katherine Jenswold",
+        "licence": "Unsplash License",
+        "alt": "Fresh broccoli on a white background"
+    },
+    "vegan/cat-beauty.jpg": {
+        "source": "https://unsplash.com/photos/green-plant-on-brown-pot-dgvFsLfIX9E",
+        "photographer": "feey",
+        "licence": "Unsplash License",
+        "alt": "Hand holding a fresh aloe vera plant against white"
+    },
+    "vegan/cat-drinks.jpg": {
+        "source": "https://unsplash.com/photos/hom5fPULf4I",
+        "photographer": "Birgith Roosipuu",
+        "licence": "Unsplash License",
+        "alt": "Bottles of fresh green juice with citrus on white"
+    },
+    "vegan/cat-fitness.jpg": {
+        "source": "https://unsplash.com/photos/wxtscG-05wo",
+        "photographer": "Alex Saks",
+        "licence": "Unsplash License",
+        "alt": "Scoop of protein powder on a sunlit wooden surface"
+    },
+    "vegan/cat-produce.jpg": {
+        "source": "https://unsplash.com/photos/M_xIaxQE3Ms",
+        "photographer": "Julia Zolotova",
+        "licence": "Unsplash License",
+        "alt": "Assorted fresh fruit, top view"
+    },
+    "vegan/coconut-oil.jpg": {
+        "source": "https://unsplash.com/photos/Bb8_yBkb_6E",
+        "photographer": "Tijana Drndarski",
+        "licence": "Unsplash License",
+        "alt": "Halved coconuts with a jar of coconut oil"
+    },
+    "vegan/energy-bars.jpg": {
+        "source": "https://unsplash.com/photos/two-healthy-granola-bars-topped-with-seeds-and-cranberries-M8IPYqtvo14",
+        "photographer": "Crystal Stone",
+        "licence": "Unsplash License",
+        "alt": "Energy bars topped with seeds and cranberries"
+    },
+    "vegan/granola.jpg": {
+        "source": "https://unsplash.com/photos/LQftwRfGjOM",
+        "photographer": "Mayte Baque",
+        "licence": "Unsplash License",
+        "alt": "Glass jar of granola with a wooden spoon"
+    },
+    "vegan/green-smoothie.jpg": {
+        "source": "https://unsplash.com/photos/person-holding-clear-drinking-glass-with-green-liquid--ZvC04d-xLw",
+        "photographer": "Alex Lvrs",
+        "licence": "Unsplash License",
+        "alt": "Green juice being poured into glasses"
+    },
+    "vegan/kombucha.jpg": {
+        "source": "https://unsplash.com/photos/a-jar-of-liquid-next-to-a-glass-bottle-of-liquid-1rsbPBoWUaA",
+        "photographer": "hyeongju seo",
+        "licence": "Unsplash License",
+        "alt": "Jar and swing-top bottle of home-brewed kombucha"
+    },
+    "vegan/mixed-berries.jpg": {
+        "source": "https://unsplash.com/photos/raspberry-and-blueberry-lot-pYpnKA52a-A",
+        "photographer": "Timo Volz",
+        "licence": "Unsplash License",
+        "alt": "Punnets of mixed raspberries, blueberries and strawberries"
+    },
+    "vegan/oat-milk-2.jpg": {
+        "source": "https://unsplash.com/photos/juBur46D3VI",
+        "photographer": "No Revisions",
+        "licence": "Unsplash License",
+        "alt": "Swing-top glass bottle of plant milk"
+    },
+    "vegan/oat-milk.jpg": {
+        "source": "https://unsplash.com/photos/S1HuosAnX-Y",
+        "photographer": "Nikolai Chernichenko",
+        "licence": "Unsplash License",
+        "alt": "Plant milk being poured into a glass jar"
+    },
+    "vegan/organic-tomatoes.jpg": {
+        "source": "https://unsplash.com/photos/6Z7Ss9jlEL0",
+        "photographer": "Lars Blankers",
+        "licence": "Unsplash License",
+        "alt": "Ripe red vine tomatoes, top view"
+    },
+    "vegan/peanut-butter.jpg": {
+        "source": "https://unsplash.com/photos/peanut-butter-with-black-spoon-u256GzFi7Gw",
+        "photographer": "Corleto Peanut butter",
+        "licence": "Unsplash License",
+        "alt": "Open jar of peanut butter with peanuts on marble"
+    },
+    "vegan/plant-protein-2.jpg": {
+        "source": "https://unsplash.com/photos/R23MqZKCBcM",
+        "photographer": "Alex Saks",
+        "licence": "Unsplash License",
+        "alt": "Tub of protein powder with a scoop"
+    },
+    "vegan/plant-protein.jpg": {
+        "source": "https://unsplash.com/photos/a-scoop-of-powder-sitting-on-top-of-a-table-MUlIfSNODXE",
+        "photographer": "Alex Saks",
+        "licence": "Unsplash License",
+        "alt": "Scoop of plant protein powder"
+    },
+    "vegan/quinoa.jpg": {
+        "source": "https://www.pexels.com/photo/small-quinoa-grains-7421202/",
+        "photographer": "Vie Studio",
+        "licence": "Pexels License",
+        "alt": "White quinoa grains scattered on kraft paper"
+    },
+    "vegan/tofu.jpg": {
+        "source": "https://unsplash.com/photos/a-pile-of-tofu-cubes-sitting-on-top-of-a-cutting-board-SGSJOJcEIL8",
+        "photographer": "Kamala Bright",
+        "licence": "Unsplash License",
+        "alt": "Cubes of firm tofu on a cutting board"
+    },
+    "vegan/tote-bag.jpg": {
+        "source": "https://unsplash.com/photos/PENodSVsL1s",
+        "photographer": "Mediamodifier",
+        "licence": "Unsplash License",
+        "alt": "Person holding a plain white cotton tote bag"
+    },
+    "handmade/banner-artisan.jpg": {
+        "source": "https://unsplash.com/photos/hands-shaping-clay-on-a-pottery-wheel-5fO9grtkVYo",
+        "photographer": "Laura Tommasina",
+        "licence": "Unsplash License",
+        "alt": "Potter's hands shaping clay on a wheel"
+    },
+    "handmade/banner-meet.jpg": {
+        "source": "https://www.pexels.com/photo/rustic-pottery-cups-and-bowls-on-wooden-shelves-29286722/",
+        "photographer": "Novirina",
+        "licence": "Pexels License",
+        "alt": "Handmade ceramic cups on rustic shelves in a pottery workshop"
+    },
+    "handmade/banner-tile-1.jpg": {
+        "source": "https://unsplash.com/photos/cSpfzCB2jFk",
+        "photographer": "Toa Heftiba",
+        "licence": "Unsplash License",
+        "alt": "Handmade decor, vases and plants styled on a sideboard"
+    },
+    "handmade/banner-tile-2.jpg": {
+        "source": "https://www.pexels.com/photo/white-wooden-4-layered-shelf-3190559/",
+        "photographer": "Li Sun",
+        "licence": "Pexels License",
+        "alt": "White shelves styled with potted plants and decor"
+    },
+    "handmade/banner-tile-3.jpg": {
+        "source": "https://unsplash.com/photos/gold-and-silver-rings-on-pink-and-white-striped-textile-oWFPDjxuyUM",
+        "photographer": "Daihana Monares",
+        "licence": "Unsplash License",
+        "alt": "Close-up of gold hoop earrings on a ribbed pink dish"
+    },
+    "handmade/beaded-necklace.jpg": {
+        "source": "https://www.pexels.com/photo/necklace-with-spiral-pendant-9902583/",
+        "photographer": "armağan",
+        "licence": "Pexels License",
+        "alt": "Terracotta and wood bead necklace with a brass spiral pendant"
+    },
+    "handmade/beeswax-candles.jpg": {
+        "source": "https://unsplash.com/photos/vVizq_1y5Jo",
+        "photographer": "Alicia Christin Gerald",
+        "licence": "Unsplash License",
+        "alt": "Tall beeswax taper candles in metal pots"
+    },
+    "handmade/brass-earrings.jpg": {
+        "source": "https://www.pexels.com/photo/gold-leaf-shape-earrings-on-white-background-11655269/",
+        "photographer": "Arif khan",
+        "licence": "Pexels License",
+        "alt": "Brass leaf-shaped drop earrings on a white background"
+    },
+    "handmade/candle-trio.jpg": {
+        "source": "https://unsplash.com/photos/UiUGVMZnOr8",
+        "photographer": "Merve Sehirli Nasir",
+        "licence": "Unsplash License",
+        "alt": "Three lit candles with pinecones on a tray"
+    },
+    "handmade/cat-candles.jpg": {
+        "source": "https://unsplash.com/photos/bdVmIkx_gIs",
+        "photographer": "Sixteen Miles Out",
+        "licence": "Unsplash License",
+        "alt": "Lit pillar candles on a wooden table"
+    },
+    "handmade/cat-ceramics.jpg": {
+        "source": "https://unsplash.com/photos/ypi0l7vP0Vw",
+        "photographer": "khloe arledge",
+        "licence": "Unsplash License",
+        "alt": "Assorted handmade ceramic bowls on a pink surface"
+    },
+    "handmade/cat-jewellery.jpg": {
+        "source": "https://www.pexels.com/photo/assorted-accessories-on-a-white-wooden-table-10029927/",
+        "photographer": "Alexey Demidov",
+        "licence": "Pexels License",
+        "alt": "Handmade beaded necklaces and bracelets on a wooden table"
+    },
+    "handmade/cat-plants.jpg": {
+        "source": "https://unsplash.com/photos/MPfS0DmCFFE",
+        "photographer": "Pawel Czerwinski",
+        "licence": "Unsplash License",
+        "alt": "Young monstera plant in a white pot"
+    },
+    "handmade/ceramic-vase.jpg": {
+        "source": "https://unsplash.com/photos/zeGT9j4ltRA",
+        "photographer": "Yana Hurska",
+        "licence": "Unsplash License",
+        "alt": "Hand-thrown clay vases on a concrete plinth"
+    },
+    "handmade/gift-box.jpg": {
+        "source": "https://unsplash.com/photos/l6A1CggyaS4",
+        "photographer": "Raymond Petrik",
+        "licence": "Unsplash License",
+        "alt": "Kraft gift box tied with twine and greenery"
+    },
+    "handmade/hammered-silver-ring-2.jpg": {
+        "source": "https://unsplash.com/photos/W6s6eJc0CTY",
+        "photographer": "Antonio Uquiche",
+        "licence": "Unsplash License",
+        "alt": "Two brushed silver band rings on a white surface"
+    },
+    "handmade/hammered-silver-ring.jpg": {
+        "source": "https://unsplash.com/photos/UDrb3Bud44Y",
+        "photographer": "Rodri Caruso",
+        "licence": "Unsplash License",
+        "alt": "Textured hammered silver rings on wood"
+    },
+    "handmade/macrame-hanger.jpg": {
+        "source": "https://unsplash.com/photos/macrame-plant-hanger-holds-two-potted-plants-rL64Me0_2CU",
+        "photographer": "Raymond Petrik",
+        "licence": "Unsplash License",
+        "alt": "Macrame plant hanger holding a potted plant"
+    },
+    "handmade/monstera.jpg": {
+        "source": "https://unsplash.com/photos/oViZwzA0qI0",
+        "photographer": "Nasim Keshmiri",
+        "licence": "Unsplash License",
+        "alt": "Hands holding a monstera plant in a terracotta pot"
+    },
+    "handmade/notebook.jpg": {
+        "source": "https://unsplash.com/photos/8rlbmFD27ls",
+        "photographer": "pure julia",
+        "licence": "Unsplash License",
+        "alt": "Kraft paper handmade notebook with a botanical print"
+    },
+    "handmade/plate-set.jpg": {
+        "source": "https://unsplash.com/photos/assorted-color-ceramic-plates-and-saucers-sG-PR0BNwb4",
+        "photographer": "Brooke Lark",
+        "licence": "Unsplash License",
+        "alt": "Stacks of rustic ceramic plates and bowls on a shelf"
+    },
+    "handmade/serving-bowl.jpg": {
+        "source": "https://unsplash.com/photos/zCYO9HxEAjI",
+        "photographer": "TAN Erica",
+        "licence": "Unsplash License",
+        "alt": "Cream glazed ceramic serving bowl"
+    },
+    "handmade/snake-plant.jpg": {
+        "source": "https://unsplash.com/photos/green-snake-plant-on-table-nvo7jmzDDew",
+        "photographer": "Kara Eads",
+        "licence": "Unsplash License",
+        "alt": "Snake plant in a terracotta clay pot"
+    },
+    "handmade/soy-candle-2.jpg": {
+        "source": "https://unsplash.com/photos/2QSsfflO51I",
+        "photographer": "Sixteen Miles Out",
+        "licence": "Unsplash License",
+        "alt": "White soy candle in a glass on a pale background"
+    },
+    "handmade/soy-candle.jpg": {
+        "source": "https://unsplash.com/photos/YasQvzPbGOQ",
+        "photographer": "Hanna Balan",
+        "licence": "Unsplash License",
+        "alt": "Wooden-wick soy candles in ceramic pots on a board"
+    },
+    "handmade/stoneware-mug-2.jpg": {
+        "source": "https://unsplash.com/photos/MS0Hnmy5SC0",
+        "photographer": "Suzanne Boureau",
+        "licence": "Unsplash License",
+        "alt": "Terracotta-glazed stoneware mug, jug and bowl on wood"
+    },
+    "handmade/stoneware-mug.jpg": {
+        "source": "https://unsplash.com/photos/n42ogaQn32o",
+        "photographer": "Annie Spratt",
+        "licence": "Unsplash License",
+        "alt": "Speckled stoneware mug on a wooden table"
+    },
+    "handmade/succulent-set.jpg": {
+        "source": "https://unsplash.com/photos/ncQ2sguVlgo",
+        "photographer": "Annie Spratt",
+        "licence": "Unsplash License",
+        "alt": "Succulents in clay pots, top view"
+    },
+    "handmade/wall-hanging.jpg": {
+        "source": "https://unsplash.com/photos/macrame-wall-hangings-in-earthy-tones-on-green-wall-Z1oJwd3kyu0",
+        "photographer": "Jonathan Borba",
+        "licence": "Unsplash License",
+        "alt": "Woven macrame wall hangings in earthy tones"
+    },
+    "handmade/woven-basket.jpg": {
+        "source": "https://unsplash.com/photos/23AaleTpDz0",
+        "photographer": "Kateryna Hliznitsova",
+        "licence": "Unsplash License",
+        "alt": "Seagrass woven basket with white blossoms"
+    },
+    "classic/aviator-sunglasses.jpg": {
+        "source": "https://unsplash.com/photos/MivM1hirbUI",
+        "photographer": "Habib Dadkhah",
+        "licence": "Unsplash License",
+        "alt": "Gold-frame aviator sunglasses on a pale yellow background"
+    },
+    "classic/backpack.jpg": {
+        "source": "https://unsplash.com/photos/hPYnW6kql20",
+        "photographer": "YF Chen",
+        "licence": "Unsplash License",
+        "alt": "Green canvas backpack with leather straps on a yellow chair"
+    },
+    "classic/banner-men.jpg": {
+        "source": "https://unsplash.com/photos/wKOKidNT14w",
+        "photographer": "Brooke Cagle",
+        "licence": "Unsplash License",
+        "alt": "Man in a brown overshirt and white T-shirt"
+    },
+    "classic/banner-sale-1.jpg": {
+        "source": "https://unsplash.com/photos/_3Q3tsJ01nc",
+        "photographer": "freestocks",
+        "licence": "Unsplash License",
+        "alt": "Fashion model carrying shopping bags"
+    },
+    "classic/banner-sale-2.jpg": {
+        "source": "https://unsplash.com/photos/dlxLGIy-2VU",
+        "photographer": "Priscilla Du Preez",
+        "licence": "Unsplash License",
+        "alt": "Neutral-tone clothes on wooden hangers on a rail"
+    },
+    "classic/banner-shoes.jpg": {
+        "source": "https://unsplash.com/photos/Nv4QHkTVEaI",
+        "photographer": "NordWood Themes",
+        "licence": "Unsplash License",
+        "alt": "Flat lay of leather boots, belt and menswear on white"
+    },
+    "classic/banner-women.jpg": {
+        "source": "https://unsplash.com/photos/4nulm-JUYFo",
+        "photographer": "averie woodard",
+        "licence": "Unsplash License",
+        "alt": "Woman posing against a pale pink wall"
+    },
+    "classic/cat-accessories.jpg": {
+        "source": "https://unsplash.com/photos/brown-knit-hat-and-black-sunglasses-_9x9XzCAkW8",
+        "photographer": "Sepideh Doost",
+        "licence": "Unsplash License",
+        "alt": "Straw hat, sunglasses and pearls flat lay"
+    },
+    "classic/cat-bags.jpg": {
+        "source": "https://unsplash.com/photos/brown-leather-handbag-on-white-surface-tcVH_BwHtrc",
+        "photographer": "Irene Kredenets",
+        "licence": "Unsplash License",
+        "alt": "Woven brown leather handbag with a chain strap"
+    },
+    "classic/cat-men.jpg": {
+        "source": "https://unsplash.com/photos/t3zrEm88ehc",
+        "photographer": "Mubariz Mehdizadeh",
+        "licence": "Unsplash License",
+        "alt": "Man in a waistcoat and shirt on a city street"
+    },
+    "classic/cat-shoes.jpg": {
+        "source": "https://unsplash.com/photos/ugZxwLQuZec",
+        "photographer": "Jaclyn Moy",
+        "licence": "Unsplash License",
+        "alt": "Assorted women's heels and sandals on white"
+    },
+    "classic/cat-women.jpg": {
+        "source": "https://unsplash.com/photos/ssnCzNayHC4",
+        "photographer": "Dominik kielbasa",
+        "licence": "Unsplash License",
+        "alt": "Woman in a black blazer and pearl necklace"
+    },
+    "classic/chelsea-boots.jpg": {
+        "source": "https://unsplash.com/photos/brown-and-white-suede-boots-miNo_SFAcws",
+        "photographer": "Noah Smith",
+        "licence": "Unsplash License",
+        "alt": "Tan suede Chelsea boots"
+    },
+    "classic/chino-trousers.jpg": {
+        "source": "https://www.pexels.com/photo/man-legs-with-elegant-shoes-9464625/",
+        "photographer": "Ron Lach",
+        "licence": "Pexels License",
+        "alt": "Slim khaki chino trousers on a light background"
+    },
+    "classic/crew-tshirt.jpg": {
+        "source": "https://unsplash.com/photos/8ACmRoleM24",
+        "photographer": "Avtar Singh",
+        "licence": "Unsplash License",
+        "alt": "Plain white crew-neck T-shirt on a wooden hanger"
+    },
+    "classic/crossbody.jpg": {
+        "source": "https://unsplash.com/photos/black-sling-bag-on-white-surface-LW2iqpHzr8Y",
+        "photographer": "Maryam Nemati",
+        "licence": "Unsplash License",
+        "alt": "Black mini crossbody bag on a white background"
+    },
+    "classic/denim-jacket-2.jpg": {
+        "source": "https://unsplash.com/photos/man-in-blue-washed-jacket-1QOsJGbNIgk",
+        "photographer": "Adrian Dascal",
+        "licence": "Unsplash License",
+        "alt": "Man wearing a classic blue denim jacket"
+    },
+    "classic/denim-jacket.jpg": {
+        "source": "https://unsplash.com/photos/blue-washed-jacket-hanging-on-white-door-_BDBEP0ePQc",
+        "photographer": "kemal alkan",
+        "licence": "Unsplash License",
+        "alt": "Washed denim jacket hanging on a white door"
+    },
+    "classic/knit-sweater.jpg": {
+        "source": "https://www.pexels.com/photo/a-yellow-flowers-on-a-knitted-cardigan-9323857/",
+        "photographer": "Anastasiya Podkorytova",
+        "licence": "Pexels License",
+        "alt": "Beige cable-knit sweater laid flat with yellow roses"
+    },
+    "classic/leather-belt.jpg": {
+        "source": "https://unsplash.com/photos/rH16wMV8ImM",
+        "photographer": "saeed karimi",
+        "licence": "Unsplash License",
+        "alt": "Brown braided leather belts on white paper"
+    },
+    "classic/leather-tote-2.jpg": {
+        "source": "https://www.pexels.com/photo/woman-holding-brown-leather-bag-26316180/",
+        "photographer": "Gül Işık",
+        "licence": "Pexels License",
+        "alt": "Woman carrying a brown leather tote in a light studio"
+    },
+    "classic/leather-tote.jpg": {
+        "source": "https://unsplash.com/photos/brown-leather-handbag-on-white-table-XwjrPFW7xw0",
+        "photographer": "Ugluk Potroshitel",
+        "licence": "Unsplash License",
+        "alt": "Tan leather tote bag against a white wall"
+    },
+    "classic/linen-blouse.jpg": {
+        "source": "https://unsplash.com/photos/woman-wearing-a-white-linen-shirt-lVmfE2MAJAY",
+        "photographer": "Reistor",
+        "licence": "Unsplash License",
+        "alt": "Woman wearing a white linen blouse"
+    },
+    "classic/oxford-shirt-2.jpg": {
+        "source": "https://www.pexels.com/photo/person-holding-gray-dress-shirt-9594940/",
+        "photographer": "Ron Lach",
+        "licence": "Pexels License",
+        "alt": "Sage button-down shirt held up on a hanger"
+    },
+    "classic/oxford-shirt.jpg": {
+        "source": "https://unsplash.com/photos/az3QxXQ7Fqc",
+        "photographer": "Beatriz Cattel",
+        "licence": "Unsplash License",
+        "alt": "Man in a light blue button-down shirt"
+    },
+    "classic/running-shoes.jpg": {
+        "source": "https://unsplash.com/photos/dwKiHoqqxk8",
+        "photographer": "Irene Kredenets",
+        "licence": "Unsplash License",
+        "alt": "Pair of white and orange running shoes on a white box"
+    },
+    "classic/summer-dress-2.jpg": {
+        "source": "https://unsplash.com/photos/_DvfL5b7Xhk",
+        "photographer": "Tamara Bellis",
+        "licence": "Unsplash License",
+        "alt": "Woman in a white and red floral dress outdoors"
+    },
+    "classic/summer-dress.jpg": {
+        "source": "https://unsplash.com/photos/cRpcTf0VfuE",
+        "photographer": "Sanskrutihomes",
+        "licence": "Unsplash License",
+        "alt": "Woman in a floral summer sundress"
+    },
+    "classic/white-sneakers-2.jpg": {
+        "source": "https://www.pexels.com/photo/white-sneakers-on-brown-suitcase-5865236/",
+        "photographer": "Rachel Claire",
+        "licence": "Pexels License",
+        "alt": "White leather sneakers on a vintage suitcase"
+    },
+    "classic/white-sneakers.jpg": {
+        "source": "https://www.pexels.com/photo/white-shoes-on-white-background-7193626/",
+        "photographer": "Karola G",
+        "licence": "Pexels License",
+        "alt": "Pair of white leather sneakers on a light floor"
+    },
+    "classic/wide-leg-jeans.jpg": {
+        "source": "https://unsplash.com/photos/woman-in-white-tank-top-and-blue-denim-jeans-sitting-on-white-chair-2s3GhhJz2uY",
+        "photographer": "KAi'S PHOTOGRAPHY",
+        "licence": "Unsplash License",
+        "alt": "Woman in light-wash wide-leg jeans"
+    },
+    "classic/wool-scarf.jpg": {
+        "source": "https://www.pexels.com/photo/person-wearing-a-sweater-and-a-scarf-6630873/",
+        "photographer": "Polina Tankilevitch",
+        "licence": "Pexels License",
+        "alt": "Soft grey wool scarf worn with a knitted sweater"
+    },
+    "classic/wrist-watch.jpg": {
+        "source": "https://unsplash.com/photos/xfNeB1stZ_0",
+        "photographer": "Jaelynn Castillo",
+        "licence": "Unsplash License",
+        "alt": "Hand holding a minimal analogue wristwatch"
+    }
+}

@@ -11,6 +11,7 @@ import { orders } from './bn/orders'
 import { promo } from './bn/promo'
 import { reviews } from './bn/reviews'
 import { shell } from './bn/shell'
+import { theme } from './bn/theme'
 import { wishlist } from './bn/wishlist'
 
 /** The Bangla storefront dictionary: every English key (type-checked per namespace and here). */
@@ -27,4 +28,5 @@ export const bn: Translations<typeof en> = {
   ...checkout,
   ...account,
   ...orders,
+  ...theme,
 }

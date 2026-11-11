@@ -7,13 +7,14 @@ import { QuickViewProvider } from '../catalog/quick-view'
 import { LocaleContext, useLocale } from '../i18n/locale'
 import { useLocaleController } from '../i18n/use-locale-controller'
 import { PopupBanner } from '../popup/popup-banner'
-import { applyCssVars, themeToCssVars } from '../theme'
+import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
-import { AnnouncementBar, PreviewRibbon } from './announcement-bar'
+import { PreviewRibbon } from './announcement-bar'
 import { NoticeProvider } from './notice-provider'
 import { SiteFooter } from './site-footer'
 import { SiteHeader } from './site-header'
 import { StoreErrorView, StoreLoadingView, StoreNotFoundView } from './state-views'
+import { TopBar } from './top-bar'
 
 /**
  * Root of every storefront page: resolves the language and loads the bootstrap in it (inline
@@ -57,7 +58,7 @@ function StoreFrame({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
         {t('common.skipToContent')}
       </a>
       {bootstrap.preview && <PreviewRibbon />}
-      {bootstrap.theme.announcement && <AnnouncementBar announcement={bootstrap.theme.announcement} />}
+      <TopBar />
       <SiteHeader />
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         <QuickViewProvider>
@@ -78,6 +79,7 @@ function ThemeEffects({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
   const { theme, store } = bootstrap
 
   useLayoutEffect(() => applyCssVars(document.documentElement, themeToCssVars(theme)), [theme])
+  useLayoutEffect(() => applyDataAttributes(document.documentElement, themeDataAttributes(theme)), [theme])
 
   useEffect(() => {
     if (!document.title || document.title === 'Storefront') document.title = store.name

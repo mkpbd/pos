@@ -20,6 +20,7 @@ class SaveThemeRequest extends FormRequest
         $hex = ['string', 'regex:/^#[0-9a-fA-F]{6}$/'];
 
         $rules = [
+            'preset' => ['sometimes', Rule::in(ThemeSchema::PRESETS)],
             'colors' => ['sometimes', 'array'],
             'typography' => ['sometimes', 'array'],
             'typography.heading_font' => ['sometimes', Rule::in(ThemeSchema::HEADING_FONTS)],
@@ -30,6 +31,12 @@ class SaveThemeRequest extends FormRequest
             'layout' => ['sometimes', 'array'],
             'layout.container_width' => ['sometimes', 'integer', 'between:960,1440'],
             'layout.sticky_header' => ['sometimes', 'boolean'],
+            'layout.header_style' => ['sometimes', Rule::in(ThemeSchema::HEADER_STYLES)],
+            'layout.footer_style' => ['sometimes', Rule::in(ThemeSchema::FOOTER_STYLES)],
+            'layout.card_style' => ['sometimes', Rule::in(ThemeSchema::CARD_STYLES)],
+            'layout.hero_style' => ['sometimes', Rule::in(ThemeSchema::HERO_STYLES)],
+            'layout.heading_case' => ['sometimes', Rule::in(ThemeSchema::HEADING_CASES)],
+            'layout.top_bar' => ['sometimes', Rule::in(ThemeSchema::TOP_BARS)],
             'logo_media_id' => ['sometimes', 'nullable', 'uuid'],
             'favicon_media_id' => ['sometimes', 'nullable', 'uuid'],
             'announcement' => ['sometimes', 'array'],

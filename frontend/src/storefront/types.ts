@@ -23,9 +23,28 @@ export type ThemeColors = {
   border: string
 }
 
-export type HeadingFont = 'baloo' | 'poppins' | 'system'
-export type BodyFont = 'poppins' | 'system'
+export type HeadingFont = 'baloo' | 'poppins' | 'playfair' | 'jost' | 'system'
+export type BodyFont = 'poppins' | 'jost' | 'system'
 export type ButtonStyle = 'pill' | 'rounded' | 'square'
+
+/* Theme presets and layout variants (T1, STOREFRONT_THEMES_PLAN §3.1): presentation only. */
+export type ThemePreset = 'default' | 'vegan' | 'handmade' | 'classic'
+export type HeaderStyle = 'standard' | 'centered' | 'commerce'
+export type FooterStyle = 'columns' | 'showcase' | 'widgets'
+export type CardStyle = 'standard' | 'minimal' | 'commerce'
+export type HeroStyle = 'full' | 'tiles' | 'sale'
+export type HeadingCase = 'normal' | 'lowercase' | 'uppercase'
+export type TopBar = 'none' | 'ticker' | 'utility'
+
+/** The layout variants; absent keys (payloads from before T1) mean today's look. */
+export type LayoutVariants = {
+  header_style: HeaderStyle
+  footer_style: FooterStyle
+  card_style: CardStyle
+  hero_style: HeroStyle
+  heading_case: HeadingCase
+  top_bar: TopBar
+}
 
 export type SocialNetwork = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'x' | 'linkedin'
 
@@ -40,7 +59,9 @@ export type StorefrontTheme = {
   colors: ThemeColors
   typography: { heading_font: HeadingFont; body_font: BodyFont }
   shape: { button_style: ButtonStyle; card_radius: number }
-  layout: { container_width: number; sticky_header: boolean }
+  layout: { container_width: number; sticky_header: boolean } & Partial<LayoutVariants>
+  /** The preset the theme was last set from (absent before T1 = `default`). */
+  preset?: ThemePreset
   logo: MediaRef | null
   favicon: MediaRef | null
   announcement: Announcement | null

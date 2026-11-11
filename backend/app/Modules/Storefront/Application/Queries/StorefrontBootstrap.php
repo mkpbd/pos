@@ -126,6 +126,8 @@ class StorefrontBootstrap
             // E12b: the language of this payload (and of the page the shell serves).
             'locale' => $locale,
             'theme' => [
+                // T1: the look the theme started from; the layout carries the variants.
+                'preset' => $t['preset'],
                 'colors' => $t['colors'],
                 'typography' => $t['typography'],
                 'shape' => $t['shape'],

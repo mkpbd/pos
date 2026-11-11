@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Storefront\Application\Actions\ApplyThemePreset;
 use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontSettings;
@@ -34,7 +35,7 @@ class StorefrontAdminController
      * Opening the storefront (`is_enabled: true`) needs at least one domain (`STOREFRONT_DOMAIN_REQUIRED`).
      * `fulfilment_store_id` must be an active store of the organization (`STORE_NOT_FOUND`); its stock
      * decides online availability (null: stock-tracked products show as out of stock).
-     * `return_window_days` (0–60, default 7; 0 = no online returns): days after delivery a
+     * `return_window_days` (0â€“60, default 7; 0 = no online returns): days after delivery a
      * customer may ask to return goods of a web order (E10b).
      * E12b languages: `bangla_enabled` (default true), `default_locale` `en|bn` (must be
      * enabled: Bangla off + default `bn` -> 422 on `default_locale`), `bangla_digits` (default
@@ -114,6 +115,29 @@ class StorefrontAdminController
     public function updateTheme(SaveThemeRequest $request, SaveTheme $save): JsonResponse
     {
         return ApiResponse::success(StorefrontPresenter::theme($save->settings($request->validated()), $request->user()->can('storefront.custom_css')));
+    }
+
+    /**
+     * Theme presets
+     *
+     * The ready-made looks (`default`, `vegan`, `handmade`, `classic`), each with the complete theme it
+     * produces on a blank theme. Applying one replaces colours, fonts, shape and layout only.
+     */
+    public function themePresets(): JsonResponse
+    {
+        return ApiResponse::success(StorefrontPresenter::themePresets());
+    }
+
+    /**
+     * Apply a theme preset
+     *
+     * Puts the preset's colours, fonts, shape and layout over the current theme and saves it; logo,
+     * favicon, announcement and footer content are kept. Returns the saved theme (as `GET /storefront/theme`).
+     * Unknown preset: 404.
+     */
+    public function applyThemePreset(Request $request, string $preset, ApplyThemePreset $apply): JsonResponse
+    {
+        return ApiResponse::success(StorefrontPresenter::theme($apply($preset), $request->user()->can('storefront.custom_css')));
     }
 
     /**

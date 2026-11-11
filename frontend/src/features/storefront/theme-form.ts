@@ -1,5 +1,19 @@
 import { z } from 'zod'
-import { SOCIAL_NETWORKS, THEME_COLORS, type SocialNetwork, type ThemeColor, type ThemeDocument } from '@/features/storefront/api'
+import {
+  BODY_FONTS,
+  BUTTON_STYLES,
+  HEADING_FONTS,
+  LAYOUT_OPTIONS,
+  LAYOUT_VARIANT_KEYS,
+  SOCIAL_NETWORKS,
+  THEME_COLORS,
+  THEME_PRESETS,
+  type LayoutVariants,
+  type SocialNetwork,
+  type ThemeColor,
+  type ThemeDocument,
+  type ThemePresetKey,
+} from '@/features/storefront/api'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
@@ -20,9 +34,19 @@ const socialLink = z.union([z.url({ protocol: /^https$/, error: 'Use an https://
 export const themeSchema = z
   .object({
     colors: z.object(Object.fromEntries(THEME_COLORS.map((c) => [c, hex])) as Record<ThemeColor, typeof hex>),
-    typography: z.object({ heading_font: z.enum(['baloo', 'poppins', 'system']), body_font: z.enum(['poppins', 'system']) }),
-    shape: z.object({ button_style: z.enum(['pill', 'rounded', 'square']), card_radius: z.number({ error: 'Enter a number.' }).int().min(0).max(24) }),
-    layout: z.object({ container_width: z.number({ error: 'Enter a number.' }).int().min(960).max(1440), sticky_header: z.boolean() }),
+    preset: z.enum(THEME_PRESETS),
+    typography: z.object({ heading_font: z.enum(HEADING_FONTS), body_font: z.enum(BODY_FONTS) }),
+    shape: z.object({ button_style: z.enum(BUTTON_STYLES), card_radius: z.number({ error: 'Enter a number.' }).int().min(0).max(24) }),
+    layout: z.object({
+      container_width: z.number({ error: 'Enter a number.' }).int().min(960).max(1440),
+      sticky_header: z.boolean(),
+      header_style: z.enum(LAYOUT_OPTIONS.header_style),
+      footer_style: z.enum(LAYOUT_OPTIONS.footer_style),
+      card_style: z.enum(LAYOUT_OPTIONS.card_style),
+      hero_style: z.enum(LAYOUT_OPTIONS.hero_style),
+      heading_case: z.enum(LAYOUT_OPTIONS.heading_case),
+      top_bar: z.enum(LAYOUT_OPTIONS.top_bar),
+    }),
     logo_media_id: z.string().nullable(),
     favicon_media_id: z.string().nullable(),
     announcement: z.object({
@@ -52,14 +76,29 @@ export const themeSchema = z
 
 export type ThemeFormValues = z.infer<typeof themeSchema>
 
-export const THEME_FIELDS = ['colors', 'typography', 'shape', 'layout', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as const
+export const THEME_FIELDS = ['colors', 'preset', 'typography', 'shape', 'layout', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as const
+
+/** Today's look: the layout variants of a document from before T1. */
+export const DEFAULT_LAYOUT: LayoutVariants = Object.fromEntries(LAYOUT_VARIANT_KEYS.map((key) => [key, LAYOUT_OPTIONS[key][0]])) as LayoutVariants
+
+/** Every layout key, unknown or missing variants as today's look (the API fills them the same way). */
+export function layoutValues(layout: ThemeDocument['layout']): ThemeFormValues['layout'] {
+  const variants = Object.fromEntries(
+    LAYOUT_VARIANT_KEYS.map((key) => {
+      const value = layout[key]
+      return [key, value !== undefined && (LAYOUT_OPTIONS[key] as readonly string[]).includes(value) ? value : DEFAULT_LAYOUT[key]]
+    }),
+  ) as LayoutVariants
+  return { container_width: layout.container_width, sticky_header: layout.sticky_header, ...variants }
+}
 
 export function toFormValues(doc: ThemeDocument): ThemeFormValues {
   return {
     colors: { ...doc.colors },
+    preset: doc.preset && (THEME_PRESETS as readonly string[]).includes(doc.preset) ? doc.preset : ('default' satisfies ThemePresetKey),
     typography: { ...doc.typography },
     shape: { ...doc.shape },
-    layout: { ...doc.layout },
+    layout: layoutValues(doc.layout),
     logo_media_id: doc.logo_media_id,
     favicon_media_id: doc.favicon_media_id,
     announcement: {
@@ -82,13 +121,17 @@ export function toFormValues(doc: ThemeDocument): ThemeFormValues {
   }
 }
 
-/** The complete document the API expects (PUT replaces the whole theme). */
-/** `before`: the announcement's translations as loaded, so clearing them is still sent. */
+/**
+ * The complete document the API expects (PUT replaces the whole theme: a missing key falls back
+ * to its default, so `preset` and every layout variant are always sent).
+ * `before`: the announcement's translations as loaded, so clearing them is still sent.
+ */
 export function toDocument(v: ThemeFormValues, before?: TranslationsMap): ThemeDocument {
   const blank = (s: string) => s.trim() || null
 
   return {
     colors: { ...v.colors },
+    preset: v.preset,
     typography: { ...v.typography },
     shape: { ...v.shape },
     layout: { ...v.layout },

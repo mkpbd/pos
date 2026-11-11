@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readInlineBootstrap } from './api'
 import { bootstrapFixture } from './test-fixtures'
-import { applyCssVars, isInternalLink, themeToCssVars } from './theme'
+import { applyCssVars, applyDataAttributes, DEFAULT_LAYOUT, isInternalLink, resolveLayout, themeDataAttributes, themeToCssVars } from './theme'
 
 describe('themeToCssVars', () => {
   it('maps colours, fonts, radii and container width to --sf-* variables', () => {
@@ -29,12 +29,49 @@ describe('themeToCssVars', () => {
     expect(themeToCssVars({ ...base, shape: { button_style: 'rounded', card_radius: 8 } })['--sf-radius-button']).toBe('0.5rem')
   })
 
+  it('maps the preset fonts and the heading case (today’s look: no transform)', () => {
+    const base = bootstrapFixture().theme
+    expect(themeToCssVars(base)['--sf-heading-transform']).toBe('none')
+    expect(themeToCssVars(base)['--sf-heading-tracking']).toBe('normal')
+
+    const handmade = themeToCssVars({ ...base, typography: { heading_font: 'playfair', body_font: 'jost' }, layout: { ...base.layout, heading_case: 'lowercase' } })
+    expect(handmade['--sf-font-heading']).toMatch(/^'Playfair Display Variable', Georgia/)
+    expect(handmade['--sf-font-body']).toMatch(/^'Jost Variable'/)
+    expect(handmade['--sf-heading-transform']).toBe('lowercase')
+
+    const classic = themeToCssVars({ ...base, typography: { heading_font: 'jost', body_font: 'jost' }, layout: { ...base.layout, heading_case: 'uppercase' } })
+    expect(classic['--sf-font-heading']).toMatch(/^'Jost Variable'/)
+    expect(classic['--sf-heading-transform']).toBe('uppercase')
+    expect(classic['--sf-heading-tracking']).toBe('0.04em')
+  })
+
   it('applies variables to an element and removes them again', () => {
     const element = document.createElement('div')
     const remove = applyCssVars(element, { '--sf-primary': '#123456' })
     expect(element.style.getPropertyValue('--sf-primary')).toBe('#123456')
     remove()
     expect(element.style.getPropertyValue('--sf-primary')).toBe('')
+  })
+})
+
+describe('layout variants', () => {
+  it('fills missing and unknown variants with today’s look', () => {
+    expect(resolveLayout({ container_width: 1170, sticky_header: true })).toEqual(DEFAULT_LAYOUT)
+    expect(DEFAULT_LAYOUT).toEqual({ header_style: 'standard', footer_style: 'columns', card_style: 'standard', hero_style: 'full', heading_case: 'normal', top_bar: 'none' })
+    expect(resolveLayout({ container_width: 1170, sticky_header: true, header_style: 'floating' as never, card_style: 'minimal' })).toEqual({ ...DEFAULT_LAYOUT, card_style: 'minimal' })
+  })
+
+  it('exposes the preset and variants as data attributes', () => {
+    const base = bootstrapFixture().theme
+    const attributes = themeDataAttributes({ ...base, preset: 'vegan', layout: { ...base.layout, top_bar: 'ticker' } })
+    expect(attributes).toMatchObject({ 'data-sf-preset': 'vegan', 'data-sf-top-bar': 'ticker', 'data-sf-header': 'standard' })
+    expect(themeDataAttributes(base)['data-sf-preset']).toBe('default')
+
+    const element = document.createElement('div')
+    const remove = applyDataAttributes(element, attributes)
+    expect(element).toHaveAttribute('data-sf-top-bar', 'ticker')
+    remove()
+    expect(element).not.toHaveAttribute('data-sf-top-bar')
   })
 })
 

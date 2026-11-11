@@ -11,11 +11,27 @@ namespace App\Modules\Storefront\Domain;
  */
 final class ThemeSchema
 {
-    public const HEADING_FONTS = ['baloo', 'poppins', 'system'];
+    public const HEADING_FONTS = ['baloo', 'poppins', 'playfair', 'jost', 'system'];
 
-    public const BODY_FONTS = ['poppins', 'system'];
+    public const BODY_FONTS = ['poppins', 'jost', 'system'];
 
     public const BUTTON_STYLES = ['pill', 'rounded', 'square'];
+
+    /** T1: the look the theme started from (ThemePresets); every value stays editable. */
+    public const PRESETS = ['default', 'vegan', 'handmade', 'classic'];
+
+    // T1: layout variants. The first of each list is today's look (the default).
+    public const HEADER_STYLES = ['standard', 'centered', 'commerce'];
+
+    public const FOOTER_STYLES = ['columns', 'showcase', 'widgets'];
+
+    public const CARD_STYLES = ['standard', 'minimal', 'commerce'];
+
+    public const HERO_STYLES = ['full', 'tiles', 'sale'];
+
+    public const HEADING_CASES = ['normal', 'lowercase', 'uppercase'];
+
+    public const TOP_BARS = ['none', 'ticker', 'utility'];
 
     public const SOCIAL_NETWORKS = ['facebook', 'instagram', 'youtube', 'tiktok', 'x', 'linkedin'];
 
@@ -29,6 +45,7 @@ final class ThemeSchema
     public static function defaults(): array
     {
         return [
+            'preset' => 'default',
             'colors' => [
                 'primary' => '#f59e0b',
                 'primary_foreground' => '#3b2500',
@@ -44,7 +61,16 @@ final class ThemeSchema
             ],
             'typography' => ['heading_font' => 'baloo', 'body_font' => 'poppins'],
             'shape' => ['button_style' => 'pill', 'card_radius' => 12],
-            'layout' => ['container_width' => 1170, 'sticky_header' => true],
+            'layout' => [
+                'container_width' => 1170,
+                'sticky_header' => true,
+                'header_style' => self::HEADER_STYLES[0],
+                'footer_style' => self::FOOTER_STYLES[0],
+                'card_style' => self::CARD_STYLES[0],
+                'hero_style' => self::HERO_STYLES[0],
+                'heading_case' => self::HEADING_CASES[0],
+                'top_bar' => self::TOP_BARS[0],
+            ],
             'logo_media_id' => null,
             'favicon_media_id' => null,
             'announcement' => [

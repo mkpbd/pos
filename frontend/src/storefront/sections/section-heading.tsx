@@ -7,7 +7,7 @@ export function SectionHeading({ section, className, color }: { section: Pick<St
 
   return (
     <header className={cn('mb-8 text-center', className)} style={color ? { color } : undefined}>
-      {section.title && <h2 className="text-3xl font-extrabold lg:text-4xl" style={color ? { color } : undefined}>{section.title}</h2>}
+      {section.title && <h2 className="sf-heading-case text-3xl font-extrabold lg:text-4xl" style={color ? { color } : undefined}>{section.title}</h2>}
       {section.subtitle && <p className="mx-auto mt-2 max-w-2xl">{section.subtitle}</p>}
     </header>
   )

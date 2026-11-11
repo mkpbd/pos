@@ -89,7 +89,8 @@ describe('theme form', () => {
     colors: { primary: '#f59e0b', primary_foreground: '#3b2500', accent: '#6f55c2', accent_foreground: '#ffffff', highlight: '#2fb79a', sale: '#c2410c', heading: '#3d3d3d', text: '#5f6368', canvas: '#f3f7fa', surface: '#ffffff', border: '#e1e1e1' },
     typography: { heading_font: 'baloo', body_font: 'poppins' },
     shape: { button_style: 'pill', card_radius: 12 },
-    layout: { container_width: 1170, sticky_header: true },
+    layout: { container_width: 1170, sticky_header: true, header_style: 'centered', footer_style: 'showcase', card_style: 'minimal', hero_style: 'tiles', heading_case: 'normal', top_bar: 'utility' },
+    preset: 'handmade',
     logo_media_id: 'm-1',
     favicon_media_id: null,
     announcement: { enabled: false, text: 'Eid sale', link: null, background: '#6f55c2', foreground: '#ffffff', starts_at: null, ends_at: null, translations: { bn: { text: 'ঈদ সেল' } } },
@@ -98,6 +99,18 @@ describe('theme form', () => {
 
   it('turns the document into form values and back without loss', () => {
     expect(toDocument(toFormValues(doc))).toEqual(doc)
+  })
+
+  it('always sends the preset and every layout variant; a document from before T1 reads as today’s look', () => {
+    const legacy: ThemeDocument = { ...doc, layout: { container_width: 1170, sticky_header: true } }
+    delete legacy.preset
+    const sent = toDocument(toFormValues(legacy))
+    expect(sent.preset).toBe('default')
+    expect(sent.layout).toEqual({ container_width: 1170, sticky_header: true, header_style: 'standard', footer_style: 'columns', card_style: 'standard', hero_style: 'full', heading_case: 'normal', top_bar: 'none' })
+    // An unknown value from a newer API falls back instead of failing validation.
+    const odd = toFormValues({ ...doc, layout: { ...doc.layout, header_style: 'floating' as never } })
+    expect(odd.layout.header_style).toBe('standard')
+    expect(themeSchema.safeParse(toFormValues(doc)).success).toBe(true)
   })
 
   it('requires announcement text when enabled and https social links', () => {

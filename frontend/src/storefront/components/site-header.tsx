@@ -1,22 +1,37 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { SearchIcon, XIcon } from 'lucide-react'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
+import { useStoreLayout } from '../theme'
 import { HeaderActions } from './header-actions'
 import { HeaderSearch } from './header-search'
 import { LanguageSwitcher } from './language-switcher'
 import { MainNav } from './main-nav'
 import { MediaImage } from './media-image'
 import { MobileMenu } from './mobile-menu'
+import { useIsDesktop } from './use-media-query'
+
+/**
+ * The header in the theme's `header_style`. The centered and commerce variants are desktop
+ * layouts: below the `lg` breakpoint every store uses the standard header with its drawer.
+ */
+export function SiteHeader() {
+  const { header_style: style } = useStoreLayout()
+  const desktop = useIsDesktop()
+  if (desktop && style === 'centered') return <CenteredHeader />
+  if (desktop && style === 'commerce') return <CommerceHeader />
+  return <StandardHeader />
+}
 
 /**
  * Logo row with the product search over the accent-coloured navigation bar
  * (UI_REFERENCE_ANALYSIS §4). On small screens the search opens below the logo row from a
  * toggle. Account, wishlist and cart (with counts) sit at the right on every screen size.
  */
-export function SiteHeader() {
+function StandardHeader() {
   const { store, theme, menus } = useStorefront()
   const { t } = useLocale()
   const mainItems = menus.main?.items ?? []
@@ -65,5 +80,98 @@ export function SiteHeader() {
       </div>
       <MainNav items={mainItems} />
     </header>
+  )
+}
+
+/** The logo (with its renditions) or the store name in the heading font, linking home. */
+function Brand({ className, logoClassName, nameClassName, sizes }: { className?: string; logoClassName: string; nameClassName: string; sizes: string }) {
+  const { store, theme } = useStorefront()
+  const { t } = useLocale()
+  return (
+    <Link to="/" className={cn('flex min-w-0 items-center', className)} aria-label={t('common.storeHome', { store: store.name })} data-testid="header-brand">
+      {theme.logo ? (
+        <MediaImage media={theme.logo} alt={store.name} sizes={sizes} loading="eager" className={logoClassName} />
+      ) : (
+        <span className={nameClassName}>{store.name}</span>
+      )}
+    </Link>
+  )
+}
+
+/**
+ * Centered brand (handmade): a search icon opening a search panel on the left, the brand in the
+ * middle, account / wishlist / cart on the right, and an airy centred menu row below.
+ */
+function CenteredHeader() {
+  const { menus } = useStorefront()
+  const { sticky_header, top_bar } = useStoreLayout()
+  return (
+    <header className={cn('z-40 bg-sf-surface', sticky_header && 'sticky top-0')} data-testid="site-header" data-header-style="centered">
+      <div className="mx-auto grid max-w-sf grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 py-6">
+        <div className="flex items-center gap-3">
+          <SearchPanel />
+          {top_bar !== 'utility' && <LanguageSwitcher />}
+        </div>
+        <Brand
+          className="justify-center"
+          sizes="260px"
+          logoClassName="h-16 w-auto max-w-64 object-contain"
+          nameClassName="truncate font-heading text-4xl font-semibold tracking-wide text-sf-heading"
+        />
+        <HeaderActions className="justify-self-end" />
+      </div>
+      <MainNav items={menus.main?.items ?? []} appearance="centered" />
+    </header>
+  )
+}
+
+/**
+ * Commerce header (classic): logo left, a wide search field in the centre, account, wishlist and
+ * the cart with its count and total on the right; a full-width menu bar below.
+ */
+function CommerceHeader() {
+  const { menus } = useStorefront()
+  const { sticky_header, top_bar } = useStoreLayout()
+  return (
+    <header className={cn('z-40 bg-sf-surface shadow-sm', sticky_header && 'sticky top-0')} data-testid="site-header" data-header-style="commerce">
+      <div className="mx-auto flex max-w-sf items-center gap-8 px-4 py-5">
+        <Brand
+          className="shrink-0"
+          sizes="220px"
+          logoClassName="h-12 w-auto max-w-56 object-contain"
+          nameClassName="truncate font-heading text-3xl font-extrabold tracking-tight text-sf-heading uppercase"
+        />
+        <HeaderSearch className="max-w-2xl flex-1 [&_input]:text-[0.95rem]" />
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {top_bar !== 'utility' && <LanguageSwitcher className="mr-2" />}
+          <HeaderActions cartTotal />
+        </div>
+      </div>
+      <MainNav items={menus.main?.items ?? []} appearance="commerce" />
+    </header>
+  )
+}
+
+/** A search icon that opens the product search in a panel from the top (focus moves into it; Escape closes). */
+function SearchPanel() {
+  const { t } = useLocale()
+  const [open, setOpen] = useState(false)
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button type="button" className="grid size-10 place-items-center rounded-md text-sf-heading transition hover:bg-sf-canvas hover:text-sf-accent" aria-label={t('common.openSearch')}>
+          <SearchIcon aria-hidden className="size-6" />
+        </button>
+      </SheetTrigger>
+      <SheetContent side="top" className="gap-0 border-b bg-sf-surface pb-10" data-testid="search-panel">
+        <SheetHeader className="mx-auto w-full max-w-3xl px-4 pt-8">
+          <SheetTitle className="font-heading text-2xl font-semibold text-sf-heading">{t('theme.header.searchTitle')}</SheetTitle>
+          <SheetDescription className="sr-only">{t('shell.search.label')}</SheetDescription>
+        </SheetHeader>
+        <div className="mx-auto w-full max-w-3xl px-4 pt-2">
+          <HeaderSearch autoFocus onDone={() => setOpen(false)} />
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }

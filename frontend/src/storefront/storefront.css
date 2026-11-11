@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/baloo-2";
+/* Theme presets (T1): a serif display face and a geometric sans; only fetched when a theme uses them. */
+@import "@fontsource-variable/playfair-display";
+@import "@fontsource-variable/jost";
 @import "@fontsource/poppins/400.css";
 @import "@fontsource/poppins/500.css";
 @import "@fontsource/poppins/600.css";
@@ -78,6 +81,8 @@
     --sf-radius-button: 9999px;
     --sf-radius-card: 12px;
     --sf-container: 1170px;
+    --sf-heading-transform: none;
+    --sf-heading-tracking: normal;
     color-scheme: light;
 }
 
@@ -97,6 +102,32 @@
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+}
+
+/* Section, banner and footer headings follow the theme's heading case (lowercase / UPPERCASE). */
+.sf-heading-case {
+  text-transform: var(--sf-heading-transform);
+  letter-spacing: var(--sf-heading-tracking);
+}
+
+/*
+ * Announcement ticker (top bar `ticker`): the track holds the message twice and moves by half its
+ * width, so the loop is seamless. Paused while hovered or focused; static for reduced motion.
+ */
+@keyframes sf-ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.sf-ticker-track {
+  animation: sf-ticker var(--sf-ticker-duration, 40s) linear infinite;
+}
+.sf-ticker:hover .sf-ticker-track,
+.sf-ticker:focus-within .sf-ticker-track,
+.sf-ticker[data-paused="true"] .sf-ticker-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf-ticker-track { animation: none; }
 }
 
 /* Rich text written in the admin editor (pages, FAQ answers, text sections). */

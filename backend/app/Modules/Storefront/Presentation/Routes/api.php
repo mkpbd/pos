@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
@@ -22,6 +23,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::get('settings', [StorefrontAdminController::class, 'showSettings']);
         Route::get('domains', [StorefrontAdminController::class, 'domains']);
         Route::get('theme', [StorefrontAdminController::class, 'showTheme']);
+        Route::get('theme/presets', [StorefrontAdminController::class, 'themePresets']);
         Route::get('menus', [MenuController::class, 'index']);
         Route::get('menus/{menu}', [MenuController::class, 'show'])->whereUuid('menu');
         Route::get('link-targets', LinkTargetController::class);
@@ -38,6 +40,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::patch('domains/{domain}', [StorefrontAdminController::class, 'updateDomain'])->whereUuid('domain');
         Route::delete('domains/{domain}', [StorefrontAdminController::class, 'destroyDomain'])->whereUuid('domain');
         Route::put('theme', [StorefrontAdminController::class, 'updateTheme']);
+        Route::post('theme/presets/{preset}/apply', [StorefrontAdminController::class, 'applyThemePreset'])->whereIn('preset', ThemePresets::KEYS);
         Route::post('menus', [MenuController::class, 'store']);
         Route::patch('menus/{menu}', [MenuController::class, 'update'])->whereUuid('menu');
         Route::put('menus/{menu}/items', [MenuController::class, 'replaceItems'])->whereUuid('menu');

@@ -68,16 +68,23 @@ export function AddToCartForm({ product, variant, onAdded }: { product: ProductD
   )
 }
 
+const CARD_ACTION_CLASS = {
+  outline:
+    'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent px-4 py-2 text-sm font-bold text-sf-accent transition hover:bg-sf-accent hover:text-sf-accent-foreground disabled:cursor-not-allowed disabled:border-sf-border disabled:text-sf-text disabled:hover:bg-transparent',
+  solid:
+    'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent bg-sf-accent px-4 py-2.5 text-xs font-bold tracking-wider text-sf-accent-foreground uppercase transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-canvas disabled:text-sf-text disabled:hover:brightness-100',
+} as const
+
 /**
  * The card's buy action: "Add to cart" (one unit) for a product with exactly one variant,
- * else a "Choose options" link to the product page.
+ * else a "Choose options" link to the product page. `solid` is the filled button of the commerce card.
  */
-export function CardCartAction({ product }: { product: ProductCard }) {
+export function CardCartAction({ product, appearance = 'outline' }: { product: ProductCard; appearance?: keyof typeof CARD_ACTION_CLASS }) {
   const add = useAddToCartMutation()
   const drawer = useCartDrawer()
   const { t } = useLocale()
   const [error, setError] = useState<string | null>(null)
-  const className = 'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent px-4 py-2 text-sm font-bold text-sf-accent transition hover:bg-sf-accent hover:text-sf-accent-foreground disabled:cursor-not-allowed disabled:border-sf-border disabled:text-sf-text disabled:hover:bg-transparent'
+  const className = CARD_ACTION_CLASS[appearance]
 
   if (product.variant_count !== 1 || !product.default_variant_id) {
     return (

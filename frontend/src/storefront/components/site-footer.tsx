@@ -1,25 +1,22 @@
 import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
-import type { MenuLocation, SocialNetwork } from '../types'
+import { useStoreLayout } from '../theme'
+import { CURRENT_YEAR, FOOTER_MENUS, SOCIAL_LABELS } from './footer-parts'
+import { ShowcaseFooter, WidgetsFooter } from './footer-variants'
+import type { SocialNetwork } from '../types'
 import { MediaImage } from './media-image'
 import { MenuLink } from './menu-link'
 
-/** For the default copyright line; a page load is short enough not to straddle New Year in practice. */
-const CURRENT_YEAR = new Date().getFullYear()
-
-const FOOTER_MENUS: MenuLocation[] = ['footer_1', 'footer_2', 'footer_3']
-
-const SOCIAL_LABELS: Record<SocialNetwork, string> = {
-  facebook: 'Facebook',
-  instagram: 'Instagram',
-  youtube: 'YouTube',
-  tiktok: 'TikTok',
-  x: 'X',
-  linkedin: 'LinkedIn',
+/** The footer in the theme's `footer_style`: link columns (today's), a product showcase, or widget columns. */
+export function SiteFooter() {
+  const { footer_style: style } = useStoreLayout()
+  if (style === 'showcase') return <ShowcaseFooter />
+  if (style === 'widgets') return <WidgetsFooter />
+  return <ColumnsFooter />
 }
 
-export function SiteFooter() {
+function ColumnsFooter() {
   const { store, theme, menus } = useStorefront()
   const { t, digits } = useLocale()
   const { about, contact, social, payment_logos, copyright } = theme.footer

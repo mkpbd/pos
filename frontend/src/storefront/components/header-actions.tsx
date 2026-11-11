@@ -7,6 +7,7 @@ import { useCustomer, useLogoutMutation } from '../account/api'
 import { useCartQuery } from '../cart/api'
 import { useCartDrawer } from '../cart/cart-drawer-context'
 import { displayQuantity } from '../cart/quantity'
+import { usePriceFormat } from '../money'
 import { useNotice } from '../notices'
 import { useWishlist } from '../wishlist/api'
 
@@ -23,13 +24,16 @@ function CountBadge({ count, testId }: { count: string; testId: string }) {
 }
 
 
-/** Account, wishlist and cart in the header row, on every screen size. */
-export function HeaderActions() {
+/**
+ * Account, wishlist and cart in the header row, on every screen size. `cartTotal` (the commerce
+ * header) shows the cart's total next to its icon.
+ */
+export function HeaderActions({ cartTotal = false, className }: { cartTotal?: boolean; className?: string }) {
   return (
-    <div className="flex items-center gap-0.5 sm:gap-1">
+    <div className={cn('flex items-center gap-0.5 sm:gap-1', className)}>
       <AccountMenu />
       <WishlistLink />
-      <CartButton />
+      {cartTotal ? <CartTotalButton /> : <CartButton />}
     </div>
   )
 }
@@ -117,6 +121,35 @@ function CartButton() {
     <button type="button" className={iconButton} aria-label={count === '0' ? t('common.cart') : t('common.cartWithCount', { items: t('common.items', { count: Number(count) }) })} aria-haspopup="dialog" onClick={() => drawer?.open()}>
       <ShoppingBagIcon aria-hidden className="size-6" />
       <CountBadge count={count} testId="cart-count" />
+    </button>
+  )
+}
+
+/** The cart with its item count and total ("Cart, 2 items, ৳900.00"), for the commerce header. */
+function CartTotalButton() {
+  const cart = useCartQuery()
+  const drawer = useCartDrawer()
+  const format = usePriceFormat()
+  const { t } = useLocale()
+  const count = cart.data ? displayQuantity(cart.data.item_count) : '0'
+  const total = format.price(cart.data?.total ?? '0.00')
+  return (
+    <button
+      type="button"
+      className="group/cart flex h-11 items-center gap-3 rounded-md pr-2 pl-1 text-sf-heading transition hover:bg-sf-canvas"
+      aria-label={t('theme.header.cartWithTotal', { items: t('common.items', { count: Number(count) }), total })}
+      aria-haspopup="dialog"
+      onClick={() => drawer?.open()}
+      data-testid="cart-total-button"
+    >
+      <span className="relative grid size-10 place-items-center group-hover/cart:text-sf-accent">
+        <ShoppingBagIcon aria-hidden className="size-6" />
+        <CountBadge count={count} testId="cart-count" />
+      </span>
+      <span aria-hidden className="flex flex-col items-start leading-tight">
+        <span className="text-[0.7rem] font-medium tracking-wide text-sf-text uppercase">{t('common.cart')}</span>
+        <span className="text-sm font-bold tabular-nums" data-testid="cart-total">{total}</span>
+      </span>
     </button>
   )
 }

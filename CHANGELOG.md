@@ -4,6 +4,22 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### T1 — Storefront theme presets and layout variants
+
+The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *Handmade*, *Classic Shop* — over the same catalog, cart, checkout and POS data. Plan: [STOREFRONT_THEMES_PLAN.md](docs/ecommerce/STOREFRONT_THEMES_PLAN.md).
+
+#### Added
+- `ThemeSchema`: top-level `preset`; layout keys `header_style`, `footer_style`, `card_style`, `hero_style`, `heading_case`, `top_bar` (defaults = the existing look; old themes read unchanged); fonts `playfair` (serif) and `jost` (`@fontsource-variable/playfair-display`, `@fontsource-variable/jost` 5.3.0). No migration (theme JSON).
+- `Domain/ThemePresets` + `ApplyThemePreset`; `GET /storefront/theme/presets`, `POST /storefront/theme/presets/{preset}/apply` (keeps logo, announcement, footer, custom CSS; audited). All presets pass WCAG AA (4.5:1) for button, text, heading, sale and accent-as-text pairs (unit-tested).
+- Storefront variants: header *centered* (search panel) and *commerce* (wide search, cart total, dark menu bar); top bar *ticker* (pausable marquee, still under reduced motion) and *utility*; footer *showcase* (popular / new product widgets) and *widgets* (about, latest posts, best selling, top rated, newsletter); product card *minimal* (image-led, no buttons) and *commerce* (hover second image, wishlist + quick view on hover/focus, category, stars, Sale / New / Out of stock, add to cart); hero *tiles* and *sale*; heading case. Mobile keeps the existing header and drawer.
+- Admin *Online store → Theme*: preset picker (miniature preview, confirm, apply) and a Layout card; the form always sends `preset` and the layout keys.
+
+#### Tests
+- Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
+
+### T2 (prepared) — demo images
+- 93 royalty-free photos (Unsplash / Pexels licences) for the three demo stores in `backend/database/seeders/demo-themes/images/` with `manifest.json`; credits in [DEMO_IMAGE_CREDITS.md](docs/ecommerce/DEMO_IMAGE_CREDITS.md).
+
 ### Docs — user manual in Bangla
 
 - `docs/USER_MANUAL.bn.md`: a step-by-step user manual in simple Bangla for owners, managers and cashiers (sign-in, dashboard, POS sale and payment, cash sessions, returns, products, inventory, purchasing, customers, expenses, web orders and COD, promotions, reports and exports, AI insights, online store settings, users and roles, the shopper's view, a daily checklist and troubleshooting), with 37 screenshots from the seeded demo in `docs/manual/images/`.

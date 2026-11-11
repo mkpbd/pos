@@ -30,9 +30,24 @@ export type StorefrontDomain = { id: string; host: string; is_primary: boolean; 
 export const THEME_COLORS = ['primary', 'primary_foreground', 'accent', 'accent_foreground', 'highlight', 'sale', 'heading', 'text', 'canvas', 'surface', 'border'] as const
 export type ThemeColor = (typeof THEME_COLORS)[number]
 
-export const HEADING_FONTS = ['baloo', 'poppins', 'system'] as const
-export const BODY_FONTS = ['poppins', 'system'] as const
+export const HEADING_FONTS = ['baloo', 'poppins', 'playfair', 'jost', 'system'] as const
+export const BODY_FONTS = ['poppins', 'jost', 'system'] as const
 export const BUTTON_STYLES = ['pill', 'rounded', 'square'] as const
+
+/* Theme presets and layout variants (T1); the first value of each list is today's look. */
+export const THEME_PRESETS = ['default', 'vegan', 'handmade', 'classic'] as const
+export type ThemePresetKey = (typeof THEME_PRESETS)[number]
+export const LAYOUT_OPTIONS = {
+  header_style: ['standard', 'centered', 'commerce'],
+  footer_style: ['columns', 'showcase', 'widgets'],
+  card_style: ['standard', 'minimal', 'commerce'],
+  hero_style: ['full', 'tiles', 'sale'],
+  heading_case: ['normal', 'lowercase', 'uppercase'],
+  top_bar: ['none', 'ticker', 'utility'],
+} as const
+export type LayoutVariantKey = keyof typeof LAYOUT_OPTIONS
+export type LayoutVariants = { [K in LayoutVariantKey]: (typeof LAYOUT_OPTIONS)[K][number] }
+export const LAYOUT_VARIANT_KEYS = Object.keys(LAYOUT_OPTIONS) as LayoutVariantKey[]
 export const SOCIAL_NETWORKS = ['facebook', 'instagram', 'youtube', 'tiktok', 'x', 'linkedin'] as const
 export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number]
 export const MAX_PAYMENT_LOGOS = 10
@@ -42,7 +57,10 @@ export type ThemeDocument = {
   colors: Record<ThemeColor, string>
   typography: { heading_font: (typeof HEADING_FONTS)[number]; body_font: (typeof BODY_FONTS)[number] }
   shape: { button_style: (typeof BUTTON_STYLES)[number]; card_radius: number }
-  layout: { container_width: number; sticky_header: boolean }
+  /** Absent only in documents from before T1 (read as today's look). */
+  layout: { container_width: number; sticky_header: boolean } & Partial<LayoutVariants>
+  /** The preset the theme was last set from; absent before T1 (= `default`). */
+  preset?: ThemePresetKey
   logo_media_id: string | null
   favicon_media_id: string | null
   announcement: {
@@ -71,6 +89,14 @@ export type ThemeResponse = {
   custom_css: string | null
   has_custom_css: boolean
   updated_at: string | null
+}
+
+/** GET /storefront/theme/presets: a preset and the full theme it produces on a blank theme. */
+export type ThemePreset = {
+  key: ThemePresetKey
+  name: string
+  description: string
+  theme: Pick<ThemeDocument, 'colors' | 'typography' | 'shape' | 'layout' | 'preset'>
 }
 
 export const MENU_LOCATIONS = ['main', 'mobile', 'footer_1', 'footer_2', 'footer_3'] as const
@@ -264,6 +290,7 @@ export const storefrontKeys = {
   settings: ['storefront', 'settings'] as const,
   domains: ['storefront', 'domains'] as const,
   theme: ['storefront', 'theme'] as const,
+  themePresets: ['storefront', 'theme', 'presets'] as const,
   menus: ['storefront', 'menus'] as const,
   menu: (id: string) => ['storefront', 'menus', id] as const,
   linkTargets: ['storefront', 'link-targets'] as const,
@@ -337,6 +364,24 @@ export function useSaveThemeMutation() {
 
   return useMutation({
     mutationFn: (settings: ThemeDocument) => api.put<ThemeResponse>('/storefront/theme', settings).then((r) => r.data),
+    onSuccess: (data) => queryClient.setQueryData(storefrontKeys.theme, data),
+  })
+}
+
+export function useThemePresetsQuery() {
+  return useQuery({
+    queryKey: storefrontKeys.themePresets,
+    queryFn: ({ signal }) => api.get<ThemePreset[]>('/storefront/theme/presets', { signal }).then((r) => r.data),
+    staleTime: Infinity,
+  })
+}
+
+/** Merges a preset over the theme (colours, fonts, shape, layout; logo, announcement and footer stay) and saves it. */
+export function useApplyThemePresetMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (preset: ThemePresetKey) => api.post<ThemeResponse>(`/storefront/theme/presets/${preset}/apply`).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.theme, data),
   })
 }
