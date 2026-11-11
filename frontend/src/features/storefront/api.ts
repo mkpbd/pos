@@ -156,6 +156,12 @@ export const BANNER_PLACEMENT_LABELS: Record<BannerPlacement, string> = {
   home_promo: 'Homepage promo tiles',
   popup: 'Popup',
 }
+/** Picture size and use of each banner placement, shown on the banner pages. */
+export const BANNER_PLACEMENT_HINTS: Record<BannerPlacement, string> = {
+  hero_slider: 'Wide slides (about 1600×600) for hero slider sections.',
+  home_promo: 'Tiles (about 800×600) for banner grid sections.',
+  popup: 'A window over the store (about 800×800), not on the cart, checkout or account pages. Only the first live popup is shown.',
+}
 /** How often a visitor sees the popup banner (E11). */
 export const POPUP_FREQUENCIES = ['once_per_session', 'once_per_day', 'once_per_week'] as const
 export type PopupFrequency = (typeof POPUP_FREQUENCIES)[number]

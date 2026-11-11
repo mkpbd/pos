@@ -132,6 +132,18 @@ class StorefrontPublicTest extends TestCase
         $this->getJson('http://localhost/api/v1/store/bootstrap')->assertOk()->assertJsonPath('data.store.name', 'Berry Kids');
     }
 
+    public function test_signed_in_staff_see_their_own_store_on_a_local_host(): void
+    {
+        $this->store('Berry Kids', 'berry.test');
+        ['admin' => $admin] = $this->store('Tiny Toes', 'tiny.test');
+        config(['storefront.default_host' => 'berry.test']);
+
+        $this->actingAsUser($admin);
+        $this->getJson('http://localhost/api/v1/store/bootstrap')->assertOk()->assertJsonPath('data.store.name', 'Tiny Toes');
+        // A real host still decides the store, signed in or not.
+        $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertOk()->assertJsonPath('data.store.name', 'Berry Kids');
+    }
+
     public function test_shell_serves_the_storefront_page_with_server_side_metadata(): void
     {
         $shell = tempnam(sys_get_temp_dir(), 'shell');

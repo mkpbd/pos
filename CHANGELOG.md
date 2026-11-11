@@ -14,6 +14,10 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 - Storefront variants: header *centered* (search panel) and *commerce* (wide search, cart total, dark menu bar); top bar *ticker* (pausable marquee, still under reduced motion) and *utility*; footer *showcase* (popular / new product widgets) and *widgets* (about, latest posts, best selling, top rated, newsletter); product card *minimal* (image-led, no buttons) and *commerce* (hover second image, wishlist + quick view on hover/focus, category, stars, Sale / New / Out of stock, add to cart); hero *tiles* and *sale*; heading case. Mobile keeps the existing header and drawer.
 - Admin *Online store → Theme*: preset picker (miniature preview, confirm, apply) and a Layout card; the form always sends `preset` and the layout keys.
 
+#### Fixed / improved
+- Homepage section editor: banner sections can create a banner inline (shared `BannerForm`, also used by *Online store → Banners*), so an empty banner picker is no longer a dead end.
+- Local development: on `localhost` / `127.0.0.1`, signed-in staff see **their own** organization's store (so *View store* shows the theme just saved); anonymous visitors still get `storefront.default_host`, and real hosts always decide the store.
+
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 

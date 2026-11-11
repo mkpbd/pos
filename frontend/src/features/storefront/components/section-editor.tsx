@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -15,6 +15,7 @@ import { useMediaLookup } from '@/features/media/api'
 import { MediaField, MediaThumb } from '@/features/media/components/media-picker'
 import {
   BANNER_GRID_LAYOUTS,
+  BANNER_PLACEMENT_LABELS,
   FEATURE_ICONS,
   useBannersQuery,
   useSaveSectionMutation,
@@ -29,6 +30,7 @@ import {
   type SectionTypeInfo,
   type TestimonialItem,
 } from '@/features/storefront/api'
+import { BannerForm } from '@/features/storefront/components/banner-form'
 import { CatalogSectionFields } from '@/features/storefront/components/catalog-section-fields'
 import { ColorField } from '@/features/storefront/components/color-field'
 import { HotDealsFields } from '@/features/storefront/components/hot-deals-fields'
@@ -91,13 +93,18 @@ function OptionalColor({ label, value, onChange }: { label: string; value: strin
   )
 }
 
-/** Picks banners of one placement and puts them in order. */
+/**
+ * Picks banners of one placement and puts them in order. A new banner can be created right
+ * here (it joins the section at once), so an empty placement is not a dead end.
+ */
 function BannerChooser({ placement, value, onChange, limits, error }: { placement: BannerPlacement; value: string[]; onChange: (ids: string[]) => void; limits: { min: number; max: number }; error?: string }) {
   const banners = useBannersQuery()
+  const [creating, setCreating] = useState(false)
   const available = (banners.data ?? []).filter((b) => b.placement === placement)
   const byId = new Map(available.map((b) => [b.id, b]))
   const media = useMediaLookup(available.map((b) => b.desktop_media_id))
   const rest = available.filter((b) => !value.includes(b.id))
+  const canAdd = value.length < limits.max
 
   return (
     <div className="flex flex-col gap-2">
@@ -118,17 +125,40 @@ function BannerChooser({ placement, value, onChange, limits, error }: { placemen
           })}
         </ol>
       )}
-      {rest.length > 0 && value.length < limits.max ? (
-        <Select value="" onValueChange={(id) => onChange([...value, id])}>
-          <SelectTrigger aria-label="Add a banner" className="w-full sm:w-72"><SelectValue placeholder="Add a banner…" /></SelectTrigger>
-          <SelectContent>
-            {rest.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      ) : (
-        available.length === 0 && !banners.isPending && <p className="text-sm text-muted-foreground">No banners for this placement yet. Create them under Online store → Banners.</p>
+      {available.length === 0 && !banners.isPending && (
+        <p className="text-sm text-muted-foreground">No {BANNER_PLACEMENT_LABELS[placement].toLowerCase()} banners yet. Create one here; it is added to this section.</p>
+      )}
+      {canAdd && (
+        <div className="flex flex-wrap items-center gap-2">
+          {rest.length > 0 && (
+            <Select value="" onValueChange={(id) => onChange([...value, id])}>
+              <SelectTrigger aria-label="Add a banner" className="w-full sm:w-72"><SelectValue placeholder="Add a banner…" /></SelectTrigger>
+              <SelectContent>
+                {rest.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={() => setCreating(true)}>
+            <PlusIcon data-icon="inline-start" /> Create banner
+          </Button>
+        </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <Dialog open={creating} onOpenChange={setCreating}>
+        {/* React events bubble through portals: keep the banner form's submit away from the section form. */}
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl" onSubmit={(e) => e.stopPropagation()}>
+          {creating && (
+            <BannerForm
+              placement={placement}
+              onDone={(saved) => {
+                setCreating(false)
+                if (saved && !value.includes(saved.id)) onChange([...value, saved.id])
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

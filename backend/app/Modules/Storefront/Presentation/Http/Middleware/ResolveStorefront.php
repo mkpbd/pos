@@ -40,12 +40,10 @@ class ResolveStorefront
 
     public function handle(Request $request, Closure $next, string $mode = 'api'): Response
     {
-        $domain = StorefrontDomain::query()
+        $organizationId = $this->localStaffOrganization($request) ?? StorefrontDomain::query()
             ->withoutGlobalScope('organization')
             ->where('host', $this->host($request))
-            ->first();
-
-        $organizationId = $domain?->organization_id;
+            ->value('organization_id');
         if ($organizationId === null || ! $this->organizations->isActive($organizationId)) {
             return $this->notFound($mode);
         }
@@ -103,6 +101,20 @@ class ResolveStorefront
         return is_string($default) && $default !== '' && in_array($host, (array) config('storefront.local_hosts'), true)
             ? mb_strtolower($default)
             : $host;
+    }
+
+    /**
+     * On a local development host, signed-in staff see their own organization's store (so
+     * "View store" in the admin shows the theme just saved) instead of the default store.
+     */
+    private function localStaffOrganization(Request $request): ?string
+    {
+        if (! in_array(mb_strtolower($request->getHost()), (array) config('storefront.local_hosts'), true)) {
+            return null;
+        }
+        $user = $request->user();
+
+        return $user instanceof TenantUser && $user->isActive() ? $user->organizationId() : null;
     }
 
     private function notFound(string $mode): Response

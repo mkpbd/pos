@@ -181,6 +181,54 @@ describe('homepage builder', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('belong to another placement')
   })
 
+  it('creates a banner from the hero slider dialog when there is none, and chooses it', async () => {
+    const user = userEvent.setup()
+    let banners: Banner[] = []
+    let bannerBody: Record<string, unknown> = {}
+    let sectionBody: Record<string, unknown> = {}
+    const image = { id: 'img-1', url: '/img.png', srcset: '', alt: null, original_name: 'slide.png', mime_type: 'image/png', size_bytes: 1, width: 1600, height: 600, created_at: null }
+    mockApi({
+      'GET /auth/me': ok(manager()),
+      'GET /storefront/homepage-sections/types': ok(types),
+      'GET /storefront/homepage-sections': ok([]),
+      'GET /storefront/banners': () => ok(banners),
+      'GET /media': ok([image], { pagination: { current_page: 1, per_page: 100, total: 1, last_page: 1 } }),
+      'POST /storefront/banners': (init) => {
+        bannerBody = JSON.parse(String(init.body))
+        banners = [banner('new-1', { name: 'Eid slide', desktop_media_id: 'img-1' })]
+        return ok(banners[0])
+      },
+      'POST /storefront/homepage-sections': (init) => {
+        sectionBody = JSON.parse(String(init.body))
+        return ok(section('s-1', { type: 'hero_slider', banner_ids: ['new-1'] }))
+      },
+    })
+    renderRoutes(routes, '/storefront/homepage')
+
+    await user.click(await screen.findByRole('button', { name: 'Add section' }))
+    await user.click(await screen.findByRole('button', { name: /Hero slider/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'New hero slider' })
+    expect(await within(dialog).findByText(/No hero slider banners yet/)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Create banner' }))
+    const form = await screen.findByRole('dialog', { name: 'New banner' })
+    await user.type(within(form).getByLabelText(/^Name/), 'Eid slide')
+    await user.click(within(form).getAllByRole('button', { name: 'Choose' })[0]!)
+    const picker = await screen.findByRole('dialog', { name: 'Banner image' })
+    await user.click(await within(picker).findByRole('button', { name: 'slide.png' }))
+    await user.click(within(picker).getByRole('button', { name: 'Use image' }))
+    await user.click(within(form).getByRole('button', { name: 'Add banner' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New banner' })).not.toBeInTheDocument())
+    expect(bannerBody).toMatchObject({ placement: 'hero_slider', name: 'Eid slide', desktop_media_id: 'img-1' })
+    // The new banner joins the section; the section itself was not submitted along the way.
+    expect(sectionBody).toEqual({})
+    expect(within(await within(dialog).findByRole('list', { name: 'Chosen banners' })).getByText('Eid slide')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add section' }))
+    await waitFor(() => expect(sectionBody).toMatchObject({ type: 'hero_slider', banner_ids: ['new-1'] }))
+  })
+
   it('is read-only for viewers', async () => {
     mockApi({
       'GET /auth/me': ok(viewer()),
