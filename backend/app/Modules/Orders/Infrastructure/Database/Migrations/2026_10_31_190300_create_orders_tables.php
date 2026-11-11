@@ -147,7 +147,7 @@ return new class extends Migration
             DB::statement('ALTER TABLE orders ADD CONSTRAINT orders_amounts_check CHECK (subtotal >= 0 AND tax_total >= 0 AND shipping_total >= 0 AND cod_fee >= 0 AND total >= 0 AND paid_total >= 0)');
             DB::statement('ALTER TABLE order_lines ADD CONSTRAINT order_lines_quantity_check CHECK (quantity > 0)');
             DB::unprepared(<<<'SQL'
-                CREATE FUNCTION prevent_order_detail_mutation() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION prevent_order_detail_mutation() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
                 END;

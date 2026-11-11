@@ -61,7 +61,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('organization_id')->constrained()->restrictOnDelete();
             $table->foreignUuid('menu_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('parent_id')->nullable()->constrained('menu_items')->cascadeOnDelete();
+            $table->uuid('parent_id')->nullable();
             $table->string('type', 20);
             $table->string('label', 80);
             $table->string('url', 255)->nullable();
@@ -73,6 +73,11 @@ return new class extends Migration
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestampsTz();
             $table->index(['menu_id', 'parent_id', 'sort_order']);
+        });
+
+        // Self-references are added after the table (and its primary key) exist: PostgreSQL needs the key first.
+        Schema::table('menu_items', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('menu_items')->cascadeOnDelete();
         });
     }
 

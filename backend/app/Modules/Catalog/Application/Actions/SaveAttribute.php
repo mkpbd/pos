@@ -45,7 +45,7 @@ class SaveAttribute
                 $attribute->slug = $slug;
             } elseif ($creating || $attribute->slug === null) {
                 $attribute->slug = Slug::suggest($attribute->name, fn (string $s) => Attribute::query()
-                    ->whereRaw('lower(slug) = ?', [$s])->whereKeyNot($attribute->id ?? '')->exists(), 80, 'attribute');
+                    ->whereRaw('lower(slug) = ?', [$s])->when($attribute->id !== null, fn ($q) => $q->whereKeyNot($attribute->id))->exists(), 80, 'attribute');
             }
             if ($creating && ! array_key_exists('sort_order', $data)) {
                 $attribute->sort_order = (int) Attribute::query()->max('sort_order') + 1;

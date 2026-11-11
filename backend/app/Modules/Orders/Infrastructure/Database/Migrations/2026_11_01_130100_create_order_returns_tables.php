@@ -148,7 +148,7 @@ return new class extends Migration
                     FOR EACH ROW EXECUTE FUNCTION prevent_order_detail_mutation();
 
                 -- Return lines: never deleted; the line they return and the requested quantity never change.
-                CREATE FUNCTION guard_order_return_line() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION guard_order_return_line() RETURNS trigger AS $$
                 BEGIN
                     IF TG_OP = 'DELETE' THEN
                         RAISE EXCEPTION 'order_return_lines rows cannot be deleted';

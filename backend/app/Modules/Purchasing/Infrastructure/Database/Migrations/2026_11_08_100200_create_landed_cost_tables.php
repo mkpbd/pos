@@ -164,7 +164,7 @@ return new class extends Migration
                 CHECK (amount >= 0 AND on_hand_amount >= 0 AND consumed_amount >= 0 AND on_hand_amount + consumed_amount = amount
                     AND on_hand_quantity >= 0 AND on_hand_quantity <= received_quantity);
 
-            CREATE FUNCTION prevent_landed_cost_mutation() RETURNS trigger AS $$
+            CREATE OR REPLACE FUNCTION prevent_landed_cost_mutation() RETURNS trigger AS $$
             BEGIN
                 RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
             END;

@@ -127,7 +127,7 @@ return new class extends Migration
         if (DB::getDriverName() === 'pgsql') {
             // Defence in depth: the ledger cannot be rewritten, even by a buggy query.
             DB::unprepared(<<<'SQL'
-                CREATE FUNCTION prevent_ledger_mutation() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION prevent_ledger_mutation() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
                 END;

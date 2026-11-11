@@ -31,7 +31,7 @@ return new class extends Migration
             // Whether quantities may be fractional (kg, litre) or must be whole (pcs).
             $table->boolean('allow_decimal')->default(false);
             // Derived units: 1 box = 12 pcs → base_unit_id = pcs, conversion_factor = 12.
-            $table->foreignUuid('base_unit_id')->nullable()->constrained('units')->restrictOnDelete();
+            $table->uuid('base_unit_id')->nullable();
             $table->decimal('conversion_factor', 18, 6)->nullable();
             $table->boolean('is_active')->default(true);
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();
@@ -41,10 +41,15 @@ return new class extends Migration
             $table->index(['organization_id', 'is_active']);
         });
 
+        // Self-references are added after the table (and its primary key) exist: PostgreSQL needs the key first.
+        Schema::table('units', function (Blueprint $table) {
+            $table->foreign('base_unit_id')->references('id')->on('units')->restrictOnDelete();
+        });
+
         Schema::create('categories', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('organization_id')->constrained()->restrictOnDelete();
-            $table->foreignUuid('parent_id')->nullable()->constrained('categories')->restrictOnDelete();
+            $table->uuid('parent_id')->nullable();
             $table->string('name', 100);
             $table->string('description')->nullable();
             $table->unsignedInteger('sort_order')->default(0);
@@ -54,6 +59,11 @@ return new class extends Migration
             $table->timestampsTz();
 
             $table->index(['organization_id', 'parent_id']);
+        });
+
+        // Self-references are added after the table (and its primary key) exist: PostgreSQL needs the key first.
+        Schema::table('categories', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('categories')->restrictOnDelete();
         });
 
         Schema::create('brands', function (Blueprint $table) {

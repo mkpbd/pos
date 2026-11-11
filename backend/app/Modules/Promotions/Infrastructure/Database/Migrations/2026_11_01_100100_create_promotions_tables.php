@@ -111,7 +111,7 @@ return new class extends Migration
             DB::statement("ALTER TABLE coupons ADD CONSTRAINT coupons_rules_check CHECK (code ~ '^[A-Z0-9-]{3,40}$' AND used_count >= 0 AND (usage_limit IS NULL OR usage_limit >= 1))");
             DB::statement("ALTER TABLE promotion_redemptions ADD CONSTRAINT promotion_redemptions_rules_check CHECK (amount >= 0 AND kind IN ('product', 'order', 'shipping'))");
             DB::unprepared(<<<'SQL'
-                CREATE FUNCTION prevent_promotion_redemption_mutation() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION prevent_promotion_redemption_mutation() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
                 END;

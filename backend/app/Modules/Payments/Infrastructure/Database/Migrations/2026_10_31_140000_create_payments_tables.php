@@ -90,7 +90,7 @@ return new class extends Migration
             DB::unprepared(<<<'SQL'
                 ALTER TABLE payments ADD CONSTRAINT payments_amount_positive CHECK (amount > 0);
 
-                CREATE FUNCTION prevent_payments_mutation() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION prevent_payments_mutation() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
                 END;

@@ -62,7 +62,7 @@ return new class extends Migration
 
         if (DB::getDriverName() === 'pgsql') {
             DB::unprepared(<<<'SQL'
-                CREATE FUNCTION prevent_loyalty_mutation() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION prevent_loyalty_mutation() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
                 END;

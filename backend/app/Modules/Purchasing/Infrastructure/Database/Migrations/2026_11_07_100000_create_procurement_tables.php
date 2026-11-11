@@ -298,7 +298,7 @@ return new class extends Migration
                     AND (lead_time_days IS NULL OR lead_time_days BETWEEN 0 AND 365));
             ALTER TABLE rfq_awards ADD CONSTRAINT rfq_awards_values_check CHECK (quantity > 0 AND unit_price >= 0);
 
-            CREATE FUNCTION prevent_procurement_history_mutation() RETURNS trigger AS $$
+            CREATE OR REPLACE FUNCTION prevent_procurement_history_mutation() RETURNS trigger AS $$
             BEGIN
                 RAISE EXCEPTION '% is append-only', TG_TABLE_NAME;
             END;
