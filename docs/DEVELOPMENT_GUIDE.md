@@ -160,6 +160,10 @@ Selling needs an open register session (Phase 6). After seeding, the demo cashie
 |---------|-----|
 | `could not find driver (pgsql)` | Enable `pdo_pgsql` in the PHP 8.4 `php.ini`. |
 | `password authentication failed for user "pos_app"` | `DB_PASSWORD` in `backend/.env` does not match the role password. |
+| `fe_sendauth: no password supplied` | `DB_PASSWORD` in `backend/.env` is empty; set it to the `pos_app` password. |
+| A new migration fails on PostgreSQL with SQLSTATE 42830 (`there is no unique constraint matching given keys`) | A self-referencing foreign key declared inside `Schema::create`; add it in a `Schema::table` after the create ([DATABASE_DESIGN.md § Conventions](DATABASE_DESIGN.md)). |
+| A second `migrate:fresh` fails with 42723 (`function … already exists`) | A trigger function created with `CREATE FUNCTION`; use `CREATE OR REPLACE FUNCTION`. |
+| Timestamps stored hours off on PostgreSQL | The session timezone is not UTC; keep `'timezone' => 'UTC'` on the `pgsql` connection in `config/database.php`. |
 | `419 CSRF_TOKEN_MISMATCH` from the SPA | Use the Vite dev URL (`localhost:5173`), not the backend URL; ensure `SANCTUM_STATEFUL_DOMAINS` contains it. |
 | Health page shows "Backend unreachable" | `php artisan serve` not running, or `VITE_BACKEND_ORIGIN` wrong. |
 | `Failed to listen on 127.0.0.1:8000 (… forbidden by its access permissions)` | Windows reserves that port (Hyper-V/WSL excluded range; check `netsh interface ipv4 show excludedportrange protocol=tcp`). Use another port: `php artisan serve --port=8010` and `VITE_BACKEND_ORIGIN=http://127.0.0.1:8010` in `frontend/.env.local`. |

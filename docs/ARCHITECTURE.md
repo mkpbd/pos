@@ -104,7 +104,7 @@ Each module's provider returns its permissions from `permissions()` (e.g. `'user
 - **Variants are the sellable unit.** A product groups variants (simple product = one variant); prices, SKU, barcodes and (from Phase 4) stock belong to the variant.
 - **Prices and amounts are decimal strings end to end:** `NUMERIC` columns, `decimal:N` casts, string JSON, and a frontend formatter that groups digits by string manipulation. The frontend never computes money.
 - **Cost prices are need-to-know:** `purchase_price` is only serialised for `products.view_cost`; the product editor requires it together with `products.manage`.
-- **In-use checks are delegated to the database:** catalog rows are referenced with `ON DELETE RESTRICT`; `ReferentialIntegrity::deleteOrFail()` turns the FK violation into `IN_USE`, so the Catalog module never needs to know who references it.
+- **In-use checks are delegated to the database:** catalog rows are referenced with `ON DELETE RESTRICT`; `ReferentialIntegrity::deleteOrFail()` turns the FK violation into `IN_USE`, so the Catalog module never needs to know who references it. On PostgreSQL it recognises both SQLSTATE 23503 (`foreign_key_violation`) and 23001 (`restrict_violation`, raised for `ON DELETE RESTRICT`); on SQLite the generic 23000 with a "foreign key" message.
 - **Human-readable numbers** come from `SequenceGenerator` (row-locked `document_sequences`), the same mechanism invoices will use.
 - **Races** that slip past validation hit unique indexes and are reported as `409 CONFLICT`.
 

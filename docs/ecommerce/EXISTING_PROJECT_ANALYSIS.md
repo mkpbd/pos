@@ -10,7 +10,7 @@ The goal of this document: record what the application already does, so the stor
 |------|---------|
 | Product | Multi-organization, multi-branch **POS** (back-office + till). No public storefront, no customer self-service, no online orders. |
 | Backend | Laravel 13.17, PHP 8.4 (composer allows `^8.3`), Sanctum 4, Scramble 0.13 (OpenAPI at `/docs/api`), predis 3. No other runtime packages. |
-| Database | PostgreSQL 18 target. UUIDv7 keys, `NUMERIC` money, append-only ledgers with triggers, partial unique indexes. **Phases 1–5 have only been verified on SQLite** — the PostgreSQL run is still pending (DB password not yet set locally; see README roadmap). |
+| Database | PostgreSQL 18 target. UUIDv7 keys, `NUMERIC` money, append-only ledgers with triggers, partial unique indexes. At the time of this analysis Phases 1–5 had only been verified on SQLite; *update 2026-11-11:* the full backend suite now runs and passes on PostgreSQL 18 (see README roadmap and CHANGELOG § PostgreSQL verification). |
 | Frontend | One React 19.3 + TypeScript 7 (strict) SPA, Vite 8, React Router 8 (data router, lazy routes), TanStack Query 5, Zustand 5, React Hook Form 7 + Zod 4, Tailwind 4, shadcn/ui (Radix, pinned 4.21.5), lucide icons, sonner, cmdk. Plus Jakarta Sans self-hosted. |
 | Tests | PHPUnit 12 (module suites in `app/Modules/*/Tests`), Vitest 5 + Testing Library, Playwright 1.64 (smoke + full-stack with `E2E_BACKEND=1`). |
 | Architecture | Modular monolith: `backend/app/Modules/<Module>/{Domain,Application,Infrastructure,Presentation,Tests}`, contracts between modules, events after commit, `ApiResponse` envelope, `/api/v1`. See `docs/ARCHITECTURE.md`. |
@@ -97,6 +97,6 @@ Public storefront API and tenant resolution without login · customer accounts (
 
 ## 6. Gaps in the current baseline to close first
 
-1. **PostgreSQL verification of Phases 1–6.** The storefront leans on PG-only features (`jsonb` containment for facets, `pg_trgm` search, triggers). Tests must run on PG before e-commerce migrations land.
+1. **PostgreSQL verification of Phases 1–6.** The storefront leans on PG-only features (`jsonb` containment for facets, `pg_trgm` search, triggers). Tests must run on PG before e-commerce migrations land. *Closed late, on 2026-11-11:* the full suite now passes on PostgreSQL 18 (CHANGELOG § PostgreSQL verification).
 2. **Commit Phase 6** so the e-commerce branch starts from a clean, reviewed base.
 3. **Redis** is optional locally; storefront caching works with the `database`/`file` cache store in dev, Redis in production.

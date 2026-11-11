@@ -29,8 +29,9 @@ final class ReferentialIntegrity
 
     private static function isForeignKeyViolation(QueryException $e): bool
     {
-        // PostgreSQL: 23503 foreign_key_violation. SQLite/MySQL report the generic 23000.
-        return in_array($e->getCode(), ['23503', '23000'], true)
-            && (str_contains(strtolower($e->getMessage()), 'foreign key') || $e->getCode() === '23503');
+        // PostgreSQL: 23503 foreign_key_violation, or 23001 restrict_violation for ON DELETE RESTRICT.
+        // SQLite/MySQL report the generic 23000.
+        return in_array($e->getCode(), ['23503', '23001', '23000'], true)
+            && (str_contains(strtolower($e->getMessage()), 'foreign key') || in_array($e->getCode(), ['23503', '23001'], true));
     }
 }

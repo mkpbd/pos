@@ -4,6 +4,29 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### PostgreSQL verification
+
+The first run of the whole system on PostgreSQL 18 (local, role `pos_app`, databases `pos` / `pos_test` / `pos_e2e`, 2026-11-11). Until then every backend test had run on SQLite only. The run found the bugs below; all are fixed.
+
+#### Fixed
+- **Self-referencing foreign keys** (`users.created_by` / `updated_by`, `units.base_unit_id`, `categories.parent_id`, `menu_items.parent_id`) were declared inside `Schema::create`, so on PostgreSQL Laravel emitted the FK before the primary key and the migration failed (SQLSTATE 42830). They are now added in a `Schema::table` after the create, with the same names and `ON DELETE` rules. The existing migrations were edited (no production database existed yet).
+- **Trigger functions** used `CREATE FUNCTION`; `migrate:fresh` drops tables but not functions, so a second fresh migrate failed (42723). All 9 migrations now use `CREATE OR REPLACE FUNCTION`.
+- **Session timezone:** the `pgsql` connection pins the session `timezone` to `UTC` (`config/database.php`). The server default was Asia/Dhaka and Laravel writes naive UTC timestamp strings, so every `timestamptz` was stored 6 hours off.
+- **`SaveAttribute`** compared the primary key with `''` when creating (`whereKeyNot($id ?? '')`); PostgreSQL rejects `''` as a uuid (22P02), so creating an attribute answered 500. The exclusion now applies only when the id exists.
+- **`ReferentialIntegrity`** (turns a foreign-key violation on delete into the business "in use" error) recognised SQLSTATE 23503 only. PostgreSQL raises 23001 `restrict_violation` for `ON DELETE RESTRICT`, so deleting an in-use unit, category, customer group, expense category, media item or courier answered 500. 23001 is recognised too.
+- **`OrganizationDirectory::activeIds()`** breaks `created_at` ties by id (stable order for the daily insights job).
+
+#### Changed
+- Tests: new `App\Modules\Shared\Tests\Concerns\TruncatesCommittedData`, used by the three PostgreSQL concurrency tests (`StockLockingTest`, `CheckoutConcurrencyTest`, `PromotionConcurrencyTest`) instead of plain `DatabaseTruncation`: it keeps the migration-seeded geography tables (`geo_divisions`, `geo_districts`) and truncates again after the test, so committed rows no longer leak into later `RefreshDatabase` tests.
+- Tests: the shopper test cookie jar judges cookie expiry against the test clock (`travelTo`), not the wall clock; two assertions on jsonb-stored objects compare order-insensitively (jsonb sorts keys); the daily-insights test pins the clock before provisioning.
+
+#### Verified
+- All 71 migrations run on PostgreSQL 18; `migrate:fresh --seed` and the dev seeder work, and a second `migrate:fresh` works.
+- Backend on PostgreSQL: 747 tests, 746 pass, 1 skipped (the opt-in real PDF render, `PDF_E2E=1`). This includes the 5 PostgreSQL-only tests that skip on SQLite: `StockLockingTest` (2), `CheckoutConcurrencyTest`, `PromotionConcurrencyTest` and `StorefrontIndexesTest`. SQLite: 741 pass, 6 skipped. Pint clean.
+- So the PostgreSQL CHECK constraints, append-only triggers, partial unique indexes, the jsonb Bangla-name search expression, the report SQL (`AT TIME ZONE` grouping, NUMERIC aggregates) and the AI tables have now run on PostgreSQL.
+- Full-stack Playwright (`frontend/e2e/integration.spec.ts`, 24 tests) passes against a PostgreSQL-backed backend (`pos_e2e`).
+- **Still pending:** `EXPLAIN` / performance on production-sized data (no large dataset yet) and a live Anthropic API call (no key).
+
 ### Phase 8 / AI1 — AI assistant, insights and customer segments
 
 An optional AI module for the admin and POS side: questions answered from the report registry, business insights, customer segments and a reorder explanation. It is off by default. Every number comes from deterministic code; the model reads aggregates through read-only tools and writes text. Design as built: [AI_INTEGRATION.md](docs/AI_INTEGRATION.md).

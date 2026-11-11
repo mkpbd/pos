@@ -49,6 +49,10 @@ TRUSTED_PROXIES=10.0.0.0/8
 
 Secrets (`APP_KEY`, `DB_PASSWORD`, `REDIS_PASSWORD`, `AI_API_KEY`) come from the host's secret store or environment, never from the repository.
 
+> **Database session timezone — UTC.** The `pgsql` connection pins the session `timezone` to `UTC` (`config/database.php`, `'timezone' => 'UTC'`); keep it. Laravel writes naive UTC timestamp strings, and PostgreSQL reads a naive string into a `timestamptz` in the *session* timezone, so on a server whose default zone is not UTC every timestamp would be stored off by that zone's offset (the first PostgreSQL run, on a server set to Asia/Dhaka, stored them 6 hours off). This matters on any managed or self-hosted server whose `timezone` setting is not UTC. Do not override it with a connection option or a role/database `ALTER … SET timezone`. Check after deploying: `php artisan tinker --execute="dump(DB::selectOne('SHOW timezone'))"` shows `UTC`.
+
+> **PostgreSQL verification.** The full backend suite ran on PostgreSQL 18 on 2026-11-11 (747 tests, 746 pass, 1 opt-in skip), including every CHECK constraint, append-only trigger, partial unique index, the row-locking concurrency tests, the jsonb Bangla search and the report SQL; `migrate:fresh --seed` works, also repeated. Still pending before production: `EXPLAIN ANALYZE` of the heavy queries (reports, dashboard, storefront listing) on production-sized data.
+
 > **`SESSION_DOMAIN` — leave it unset.** Host-only session cookies are what a multi-domain setup needs: the back office and every storefront host (`shop.example.com`, `www.another-shop.com`, …) each get their own cookie. Setting `SESSION_DOMAIN=pos.example.com` makes browsers drop the session cookie on every storefront host (shopper sign-in, cart and checkout then fail with 419). Set it to a common parent (`.example.com`) only if the back office and *all* storefronts live under that parent. Earlier versions of this guide showed `SESSION_DOMAIN=pos.example.com` in the sample; remove it.
 
 > **`TRUSTED_PROXIES` — required behind a TLS-terminating proxy or load balancer.** `config/trustedproxy.php` reads it at runtime for Laravel's `TrustProxies` middleware (it works with `config:cache`): a comma-separated list of proxy addresses or CIDR ranges, or `*` when the application is reachable *only* through the proxy. Without it Laravel ignores `X-Forwarded-Proto` / `X-Forwarded-For`, so (1) links in e-mails (order confirmation, e-mail verification, password reset, newsletter) say `http://`, (2) the guest `cart_token` cookie loses its `Secure` flag, and (3) every rate limit (`storefront`, `storefront-write`, `customer-auth`, `checkout`, `auth`) counts all visitors as the proxy's single IP. Leave it empty only when PHP is reached directly over HTTPS. Covered by `Shared/Tests/Feature/TrustedProxiesTest`.
@@ -78,14 +82,14 @@ Checkout and orders (E8a):
 - **Before opening checkout:** a fulfilment store must be set (without one checkout answers `CHECKOUT_UNAVAILABLE`); create delivery zones and methods under *Online store → Shipping* (districts without an active zone get no delivery method, so shoppers there cannot order); review *Online store → Payments* (cash on delivery is on by default; bank transfer is off until enabled with instructions — the bank account details — and a hold time); decide *Allow guest checkout* under *Online store → Settings & domains* (on by default).
 - Rate limit: `POS_CHECKOUT_RATE_LIMIT` (default 10) checkout previews and placements per minute per IP and shopper. The checkout page previews 250 ms after each change, so very fast typists on a shared IP may briefly hit it; raise it rather than disabling it.
 - Migrations: the idempotency scope change rewrites the unique key of `idempotency_keys` (backfills `scope` for existing rows — quick, the table is pruned daily); the orders migration creates PostgreSQL triggers that make order lines, allocations and history append-only.
-- The PostgreSQL-only `CheckoutConcurrencyTest` (two checkouts racing for the last unit) has not run yet — run the full suite on PostgreSQL before production.
+- The PostgreSQL-only `CheckoutConcurrencyTest` (two checkouts racing for the last unit) and the order triggers passed on PostgreSQL 18 (2026-11-11).
 
 Promotions and coupons (E8b):
 - Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive `promotions.view` and `promotions.manage` (Organization Admin through `*`; Online Store Manager already lists `promotions.*`, ADR-016). Until then existing databases show no *Promotions* entry in the admin.
 - Rate limit: `POS_COUPON_RATE_LIMIT` (default 10) coupon codes tried per minute per signed-in customer, else per guest cart, else per IP (`config('pos.coupon_rate_limit')`) — against guessing codes. Keep it low in production; behind a proxy `TRUSTED_PROXIES` must be right for the IP fallback.
 - Migrations: new tables `promotions`, `promotion_targets`, `coupons`, `promotion_redemptions`, `order_promotions`; new columns `orders.discount_total`, `shipping_discount`, `coupon_code`, `order_lines.discount_amount` (all default 0 / NULL, so existing orders stay valid) and `carts.coupon_code`. On PostgreSQL they add CHECK constraints and the append-only triggers on `promotion_redemptions` and `order_promotions`.
 - No scheduler job: promotions start and end by their timestamps at request time; flash-sale prices revert on the storefront when `ends_at` passes. Cancelling or expiring an order does **not** give a coupon use back.
-- The PostgreSQL-only `PromotionConcurrencyTest` (two placements racing for a single-use coupon), the CHECK constraints and the triggers have not run yet — run the full suite on PostgreSQL before production.
+- The PostgreSQL-only `PromotionConcurrencyTest` (two placements racing for a single-use coupon), the CHECK constraints and the triggers passed on PostgreSQL 18 (2026-11-11).
 
 Customer account area and reviews (E9):
 - Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive `reviews.view` and `reviews.moderate` (Organization Admin through `*`; Online Store Manager already lists `reviews.*`, ADR-016). Until then existing databases show no *Reviews* entry in the admin, and nobody can approve reviews — new reviews stay pending and invisible on the storefront.
@@ -93,7 +97,7 @@ Customer account area and reviews (E9):
 - **Mail and a queue worker:** a customer's cancellation sends a queued confirmation e-mail (link to `/account/orders/{number}` with the request's scheme and host — `TRUSTED_PROXIES` matters as for E8a); staff with `web_orders.view` get an inbox notification.
 - Migrations: new table `reviews` (foreign keys to organizations, products, customers, order lines and users; on PostgreSQL the CHECK `reviews_rules_check`) and the nullable column `order_status_history.actor_type` (PostgreSQL CHECK; existing history rows stay NULL and are derived when shown — no backfill, the table is append-only). Both are additive; `migrate --force` before switching traffic as usual.
 - No scheduler job and no cache: the rating summary is computed from approved reviews per request.
-- The new PostgreSQL CHECKs have not run yet (the local PostgreSQL run is still blocked) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 Fulfilment: couriers, shipments, printing and COD remittances (E10a):
 - Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive the new `web_orders.remit` (Organization Admin through `*`, Online Store Manager through `web_orders.*`) and the **Accountant** role its two new permissions `web_orders.view` and `web_orders.remit` — accountants then see *Web orders* and *COD remittances* in the admin. Until then existing databases show no *COD remittances* entry in the admin.
@@ -102,7 +106,7 @@ Fulfilment: couriers, shipments, printing and COD remittances (E10a):
 - Remittances book the courier fee in the expense category "Courier fees", created on the first remittance with a fee. Remittances cannot be edited or deleted (a reversal may come with E10b), so check the order list before recording one.
 - Printing is done by the browser (print-ready HTML, "Save as PDF" in the print dialog) — no PDF tool to install. The organization's legal name, address, phone, e-mail and tax/BIN number and the storefront logo appear on packing slips and invoices, so fill them in.
 - No new scheduler job, queue job, environment variable or rate limiter.
-- The new PostgreSQL CHECKs and triggers have not run yet (the local PostgreSQL run is still blocked) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs and triggers ran with the full suite on PostgreSQL 18 (2026-11-11). Deleting a courier still in use now answers the "in use" error instead of 500 (PostgreSQL raises SQLSTATE 23001 for `ON DELETE RESTRICT`).
 
 Online returns and refunds, customer web activity, promotion report, ratings on cards (E10b):
 - Run `php artisan pos:permissions:sync` (as in the release steps) so the built-in roles receive the new `web_orders.refund` (Organization Admin through `*`, Online Store Manager through `web_orders.*`, the **Accountant** explicitly). Until then nobody but platform admins can approve, receive or refund returns, and nobody gets the "return requested" inbox notification; *Web returns* is visible (read-only) to anyone with `web_orders.view`.
@@ -110,7 +114,7 @@ Online returns and refunds, customer web activity, promotion report, ratings on 
 - **Mail and a queue worker:** approved, rejected and refunded returns send a queued e-mail to the order's contact address. Its link to the account order page uses the organization's primary storefront domain (scheme from `APP_URL`); without a domain, or for guest orders, the e-mail has no link. A customer's new request creates a database notification for staff with `web_orders.refund`.
 - **Cash refunds** come out of the refunding user's open register session in the order's branch (`CASH_SESSION_REQUIRED` without one); bank transfer and mobile banking refunds need no session. Refunds appear in the payments ledger as `online_order_refund`.
 - No new scheduler job, environment variable or rate limiter (return writes use the shopper write limit). No cache: card ratings come from one grouped query per listing.
-- The new PostgreSQL CHECKs and triggers have not run yet (the local PostgreSQL run is still pending) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs and triggers ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 Blog, popup banner and refunds for paid cancellations (E11):
 - No new permission. `pos:permissions:sync` only refreshes descriptions. **Cancelling a paid web order needs `web_orders.refund`** (Organization Admin, Online Store Manager, Accountant); `web_orders.manage` alone still cancels unpaid orders only — users without `web_orders.refund` get a 403 on paid orders and see no *Cancel* action for them. The blog uses `cms.manage`.
@@ -120,7 +124,7 @@ Blog, popup banner and refunds for paid cancellations (E11):
 - **Media:** blog covers come from the media library (`php artisan storage:link` as for other images); a cover used by a post cannot be deleted. The shell's `og:image` is made absolute from the request's scheme and host, so set up the storefront domain (and trusted proxies behind TLS termination) for correct share previews.
 - The popup is off until a banner with placement *Popup* is active; at most one shows (the first live by sort order). Visitors' "already seen" state lives in their browser (`localStorage` / `sessionStorage`) — editing the banner shows it again.
 - No new scheduler job, environment variable, rate limiter or cache. Scheduled posts appear by time (`published_at ≤ now` at read time) — no job needed.
-- The new PostgreSQL CHECKs have not run yet (the local PostgreSQL run is still pending) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 SEO and performance (E12a):
 - **Web server routing:** `/robots.txt`, `/sitemap.xml` and `/sitemaps/*.xml` are answered by Laravel per storefront host. `backend/public/robots.txt` was removed — delete any copy left on the server and make sure Nginx neither serves a static `robots.txt` / `sitemap*.xml` (e.g. from `frontend/dist` or a `location = /robots.txt` block) nor answers them from a static-file `location ~* \.(txt|xml)$` rule; `try_files $uri /index.php?$query_string` is fine once no file exists. Check after deploying: `curl -i https://{storefront host}/robots.txt` lists `Sitemap:` for an open store; `/sitemap.xml` returns `application/xml`.
@@ -130,7 +134,7 @@ SEO and performance (E12a):
 - **HTTP caching:** public storefront reads send `Cache-Control: public, max-age=60, stale-while-revalidate=300` and a weak `ETag` for anonymous visitors; answers with a session or cookie are `private`. A CDN or proxy in front must respect `Cache-Control` and must not cache responses that set cookies (no `Vary` header is sent on API answers; public answers carry no personal data; since E12b the HTML shell sends `Vary: Cookie`). Browsers may show a changed page up to 60 s late (plus up to 300 s of stale-while-revalidate, refreshed in the background); the server cache itself is invalidated at commit.
 - Migrations: `storefront_settings.allow_indexing` (default `true` — existing stores stay indexable) and three indexes on `product_listings` / `product_variants` (partial on PostgreSQL; plain `CREATE INDEX`, which locks writes to those tables briefly — run at a quiet time on large catalogs). No permission, environment variable, scheduler job or rate limiter (`robots.txt` and sitemaps use the `storefront` limiter).
 - The frontend build splits the storefront into lazy chunks: deploy the whole `frontend/dist/assets` directory and keep the previous build's assets for a while, so open tabs can still load chunks they have not fetched yet.
-- PostgreSQL `EXPLAIN` of the storefront queries and the index test have not run yet (PostgreSQL run still pending).
+- The index test (`StorefrontIndexesTest`) passed on PostgreSQL 18 (2026-11-11). `EXPLAIN` of the storefront queries on production-sized data is still pending.
 
 Bangla storefront and content translations (E12b):
 - **Migrations** (`2026_11_05_100000`–`100700`): nullable `translations` jsonb on `product_listings`, `category_listings`, `brand_listings`, `cms_pages`, `faq_items`, `blog_categories`, `blog_posts`, `menu_items`, `banners`, `homepage_sections`, `shipping_methods`, `payment_gateways`, `promotions`; `storefront_settings.bangla_enabled` (default `true`), `default_locale` (default `en`), `bangla_digits` (default `false`); `orders.locale` (default `en`); `customer_accounts.preferred_locale` (nullable). Additive, no backfill; on PostgreSQL each adds a CHECK (`{table}_translations_check`, `storefront_settings_default_locale_check`, `orders_locale_check`, `customer_accounts_preferred_locale_check`). `ALTER TABLE … ADD COLUMN` with a constant default does not rewrite tables on PostgreSQL; adding the CHECKs scans each table once — run at a quiet time on large `orders` tables.
@@ -140,7 +144,7 @@ Bangla storefront and content translations (E12b):
 - **Fonts:** new self-hosted Fontsource packages `@fontsource/hind-siliguri` 5.3.0 and `@fontsource-variable/baloo-da-2` 5.3.0 (`npm ci`); the build emits their `woff2` files into `frontend/dist/assets` (8 files, ≈ 450 KB, fetched only on Bangla pages per `unicode-range`). No external font origin. The Bangla dictionary is a separate lazy chunk — deploy the whole `assets` directory as before.
 - **Search engines:** with Bangla on, indexable pages list `hreflang` alternates and sitemaps list `xhtml:link` alternates (`?lang=bn` URLs for an English-default store). Bangla URLs are `?lang=` variants of the same paths — no new routes or rewrite rules.
 - E-mails stay English (localized e-mails: E13). No new permission, environment variable, scheduler job or rate limiter.
-- The new PostgreSQL CHECKs and the jsonb search expression (`lower(translations->'bn'->>'name') LIKE …`) have not run yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs and the jsonb search expression (`lower(translations->'bn'->>'name') LIKE …`) ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 PDF and Excel export on admin lists (X1):
 - **PHP 8.4 is required** (`composer.json` `php` `^8.4`; OpenSpout 5 needs it). `composer install` refuses PHP 8.3.
@@ -158,7 +162,7 @@ PDF and Excel export on admin lists (X1):
 - Licenses: OpenSpout and Browsershot MIT, puppeteer-core Apache-2.0, fonts SIL OFL 1.1 (license files kept beside the fonts).
 - No migration, permission, scheduler job or queue job. Exports are audited (`export.created`).
 - Business dates (GRN invoice and manufacturing dates, supplier payments, expenses) are now checked against today in the organization's timezone; set each organization's timezone correctly. `config/app.php` stays UTC.
-- The PostgreSQL run is still pending — run the full suite on PostgreSQL before production.
+- The export tests ran with the full suite on PostgreSQL 18 (2026-11-11); only the opt-in real PDF render (`PDF_E2E=1`) was skipped.
 
 Supplier catalog, reorder suggestions and replenishment (SC1):
 - **Migrations** (additive, no backfill): Inventory `2026_11_06_100000_create_replenishment_tables` (`stock_reorder_rules`, `replenishment_settings`), Purchasing `2026_11_06_100100_create_supplier_catalog_tables` (`supplier_products` with the partial unique index `supplier_products_preferred_unique`, `reorder_notification_runs`). `php artisan migrate --force` as usual.
@@ -167,7 +171,7 @@ Supplier catalog, reorder suggestions and replenishment (SC1):
 - Recipients are users with `purchases.manage` in the store's branch (database notifications, no e-mail, no queue job).
 - Optional after deploying: choose a source (central) store under *Inventory → Settings → Replenishment* to get transfer suggestions; without one every suggestion is a purchase. Replenishment transfers are dispatched immediately (stock leaves the source at once).
 - No new environment variable, queue job, rate limiter or dependency.
-- The new PostgreSQL CHECKs and the partial unique index have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs and the partial unique index ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 Purchase requisitions, approvals and supplier quotes (SC2):
 - **Migration** (additive, no backfill): Purchasing `2026_11_07_100000_create_procurement_tables` — `purchase_approval_settings`, `purchase_requisitions` + lines + status history, `rfqs`, `rfq_lines`, `rfq_suppliers`, `supplier_quotes` + lines, `rfq_awards`, `rfq_status_history`, `rfq_reminder_runs`, `purchase_order_status_history`, approval columns on `purchase_orders`; on PostgreSQL it rebuilds `purchase_orders_status_check` (adds `pending_approval`) and creates the function `prevent_procurement_history_mutation()` with four append-only triggers. Existing orders keep their status. `php artisan migrate --force` as usual.
@@ -178,14 +182,14 @@ Purchase requisitions, approvals and supplier quotes (SC2):
 - **The scheduler must run:** `purchasing:rfq-reminders` is scheduled **hourly** (`withoutOverlapping`) and reminds each RFQ's creator from 07:00 organization time, once per RFQ and local day, while suppliers have not answered after the reply-by date (claimed in `rfq_reminder_runs`). Manual run: `php artisan purchasing:rfq-reminders --any-hour`.
 - Approval and reminder notifications are database notifications (no e-mail, no queue job).
 - No new environment variable, rate limiter or dependency.
-- The new PostgreSQL CHECKs and triggers have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs and triggers ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 Landed cost and supplier performance (SC3):
 - **Migrations** (additive; run in this order by their timestamps): Inventory `2026_11_08_100000_add_value_to_stock_movements` (nullable `stock_movements.value`; on PostgreSQL the CHECK `stock_movements_value_only_check` — existing rows satisfy it, `value` stays NULL), Expenses `2026_11_08_100100_add_on_account_to_expenses` (`expenses.on_account` default false), Purchasing `2026_11_08_100200_create_landed_cost_tables` (receipt totals and line columns, `goods_receipt_charges`, `landed_cost_vouchers` + charges + receipts, `landed_cost_allocations`; on PostgreSQL the CHECKs, the function `prevent_landed_cost_mutation()` and two append-only triggers). **Backfill inside the migration:** every existing goods receipt gets `landed_total = subtotal` and `payable_total = total`, every existing receipt line `landed_unit_cost = unit_cost` (one `UPDATE` per table — on a large `goods_receipt_lines` table plan for it inside the deploy window). Supplier balances are unchanged by the backfill (`payable_total` = the old `total`). `php artisan migrate --force` as usual.
 - **Run `php artisan pos:permissions:sync`.** New permission `purchases.landed_cost` (create, edit, delete and post landed cost vouchers, and the voucher preview) for Branch Manager, Inventory Manager and Accountant; Organization Admin through `*`. Built-in roles hold expanded permission lists, so until the sync **nobody — the Organization Admin included — holds it**: the *Landed costs* list is readable (`purchases.view`) but vouchers cannot be created or posted. Custom roles need it added by hand. Receipt charges need no new permission (`purchases.receive`); supplier performance reads with `purchases.view`.
 - From this release goods receipts with charges post stock at the landed unit cost, and supplier balances count receipts at `payable_total`. Expenses booked by vouchers are **on account**: they write no payments-ledger row (cash and bank reports do not show them as outflows; the supplier payment does) and cannot be voided.
 - No new environment variable, queue job, scheduled command, rate limiter or dependency.
-- The new PostgreSQL CHECKs and triggers have not run on PostgreSQL yet (PostgreSQL run still pending) — run the full suite on PostgreSQL before production.
+- The new PostgreSQL CHECKs and triggers ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 Reports and dashboard (Phase 7):
 - **Migration** (additive, no data change): Reports `2026_11_09_100000_add_reporting_indexes`. It creates seven indexes with `CREATE INDEX IF NOT EXISTS`:
@@ -209,7 +213,7 @@ Reports and dashboard (Phase 7):
 - **CSV exports:** every export endpoint now accepts `?export=csv` (`text/csv; charset=UTF-8`). It is written to `storage/app/private/exports` like xlsx, so that directory needs the same write permission. Optional `EXPORT_MAX_ROWS_CSV` (default 100000; not in `.env.example`). The export throttle and audit cover CSV.
 - **Dashboard cache:** answers are cached for 60 s in the default cache store per organization × branch scope × range × day × access. No invalidation, no tags, plain arrays: any store works, and Redis is recommended as for the storefront.
 - No new queue job, scheduled command, rate limiter or dependency (charts are hand-written SVG).
-- **The report SQL and the new indexes have not run on PostgreSQL yet** (PostgreSQL run pending). Run the suite on PostgreSQL and `EXPLAIN ANALYZE` the sales, P&L, tax and dashboard queries on production-sized data before production. Summary tables or materialized views are deferred until then.
+- The report SQL (`AT TIME ZONE` grouping, NUMERIC aggregates) and the new indexes ran with the full suite on PostgreSQL 18 (2026-11-11). **Still pending:** `EXPLAIN ANALYZE` of the sales, P&L, tax and dashboard queries on production-sized data before production. Summary tables or materialized views are deferred until then.
 
 AI assistant and insights (Phase 8 / AI1, optional — [AI_INTEGRATION.md](AI_INTEGRATION.md)):
 - **Off by default.** Nothing changes for a deployment that leaves `AI_ENABLED` unset: the assistant answers `503 AI_UNAVAILABLE`, insight pages show their facts without a summary, every other function is unaffected.
@@ -233,7 +237,7 @@ AI assistant and insights (Phase 8 / AI1, optional — [AI_INTEGRATION.md](AI_IN
 - **Enabling per organization:** with `AI_ENABLED=true` and a key, AI is on for every organization (`ai_settings.enabled` defaults to true). An Organization Admin turns it off, sets a monthly token budget (empty = `AI_MONTHLY_TOKEN_BUDGET`, `0` = unlimited) and watches usage under *Organization → AI*. When a month's input + output tokens reach the budget, the assistant answers `429 AI_BUDGET_EXCEEDED` until the next month (organization timezone) or a higher budget; one request may end slightly above it. Usage is in `ai_requests` (no questions, answers or result rows are stored).
 - **Rate limit:** `AI_ASK_RATE_LIMIT` (20) requests per minute per user on `/ai/ask` and `/ai/explain-reorder` (limiter `ai`, cache store). Behind a proxy keep `TRUSTED_PROXIES` right as for the other limiters.
 - **Cache:** insights of running periods 15 min and customer insights 1 h in the default cache store (plain arrays; any store works).
-- **Not yet verified:** no call to the live Anthropic API has been made from this codebase (the adapter is tested against recorded responses); make one test question in staging with a real key before enabling AI in production. The AI tables have not run on PostgreSQL yet.
+- **Not yet verified:** no call to the live Anthropic API has been made from this codebase (the adapter is tested against recorded responses); make one test question in staging with a real key before enabling AI in production. (The AI tables, their CHECKs and the daily insights job ran with the full suite on PostgreSQL 18 on 2026-11-11.)
 - No queue job and no new dependency (the provider is called with Laravel's HTTP client).
 
 ## Release steps

@@ -156,6 +156,9 @@ class BusinessInsightsTest extends TestCase
 
     public function test_the_daily_job_is_idempotent_and_starts_at_07_30_local_time(): void
     {
+        // Pin the clock before provisioning: the job walks organizations oldest first, and the
+        // scripted answers below assume this one is older than "Other Shop".
+        $this->travelTo($this->dhaka('2026-11-07 06:00'));
         ['org' => $org, 'branch' => $branch] = $this->scenario();
         $other = $this->provisionTenant('Other Shop');
         $fake = $this->fakeAi()->answer('Org.')->answer('Branch.')->answer('Other org.')->answer('Other branch.');

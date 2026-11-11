@@ -55,8 +55,8 @@ class CatalogTranslationsTest extends TestCase
     {
         [, $ids] = $this->shop();
 
-        // Trimmed, rich text sanitized, blank fields dropped.
-        $this->assertSame(['bn' => [
+        // Trimmed, rich text sanitized, blank fields dropped (key order is the store's: jsonb sorts keys).
+        $this->assertEquals(['bn' => [
             'description_html' => '<p>আরামদায়ক</p>',
             'name' => 'পোলো শার্ট',
             'short_description' => 'নরম সুতি।',
@@ -67,7 +67,7 @@ class CatalogTranslationsTest extends TestCase
         // Partial: only the sent fields change; a blank one removes its translation.
         $saved = $this->putJson($url, $base + ['translations' => ['bn' => ['seo_description' => 'বাচ্চাদের পোলো', 'short_description' => ' ']]])
             ->assertOk()->json('data.listing.translations.bn');
-        $this->assertSame(['description_html' => '<p>আরামদায়ক</p>', 'name' => 'পোলো শার্ট', 'seo_description' => 'বাচ্চাদের পোলো'], $saved);
+        $this->assertEquals(['description_html' => '<p>আরামদায়ক</p>', 'name' => 'পোলো শার্ট', 'seo_description' => 'বাচ্চাদের পোলো'], $saved);
         // Leaving `translations` out keeps them.
         $this->putJson($url, $base + ['short_description' => 'Soft cotton!'])->assertOk()->assertJsonPath('data.listing.translations.bn.name', 'পোলো শার্ট');
 
@@ -80,7 +80,7 @@ class CatalogTranslationsTest extends TestCase
 
         // Category and brand editors return their translations; `null` clears them.
         $category = $this->getJson("/api/v1/online-catalog/categories/{$ids['clothes']}")->assertOk()->json('data.listing.translations');
-        $this->assertSame(['bn' => ['description_html' => '<p>সব <strong>পোশাক</strong></p>', 'name' => 'জামাকাপড়']], $category);
+        $this->assertEquals(['bn' => ['description_html' => '<p>সব <strong>পোশাক</strong></p>', 'name' => 'জামাকাপড়']], $category);
         $this->assertSame(['name' => 'পোলো ব্র্যান্ড'], $this->getJson("/api/v1/online-catalog/brands/{$ids['polo']}")->json('data.listing.translations.bn'));
         $this->listBrand($ids['polo'], ['translations' => null]);
         $this->assertSame([], $this->getJson("/api/v1/online-catalog/brands/{$ids['polo']}")->json('data.listing.translations.bn'));

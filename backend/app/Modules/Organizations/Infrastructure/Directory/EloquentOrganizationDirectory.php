@@ -15,7 +15,7 @@ class EloquentOrganizationDirectory implements OrganizationDirectory
 
     public function activeIds(): array
     {
-        return Organization::query()->where('status', OrganizationStatus::Active->value)->orderBy('created_at')->pluck('id')->all();
+        return Organization::query()->where('status', OrganizationStatus::Active->value)->orderBy('created_at')->orderBy('id')->pluck('id')->all();
     }
 
     public function summary(string $organizationId): ?array

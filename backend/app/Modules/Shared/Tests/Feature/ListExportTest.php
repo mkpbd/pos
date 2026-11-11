@@ -216,7 +216,7 @@ class ListExportTest extends TestCase
 
         $log = AuditLog::query()->where('action', 'export.created')->sole();
         $this->assertSame($admin->id, $log->user_id);
-        $this->assertSame(['list' => 'customers', 'format' => 'xlsx', 'filters' => ['search' => 'Ri', 'sort' => '-name'], 'rows' => 1], $log->context);
+        $this->assertEquals(['list' => 'customers', 'format' => 'xlsx', 'filters' => ['search' => 'Ri', 'sort' => '-name'], 'rows' => 1], $log->context);
     }
 
     public function test_exports_are_throttled_per_user(): void

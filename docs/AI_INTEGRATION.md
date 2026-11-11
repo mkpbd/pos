@@ -1,6 +1,6 @@
 # AI Integration
 
-> Status: **AI1 built** (Phase 8 part 1: admin / POS assistant, business insights, customer segments, reorder explanation, settings, usage and budget). AI2 (online store) is planned. The Anthropic adapter is tested against recorded HTTP responses only; **no call to the live API has been made yet** (no key on the dev box). PostgreSQL run pending.
+> Status: **AI1 built** (Phase 8 part 1: admin / POS assistant, business insights, customer segments, reorder explanation, settings, usage and budget). AI2 (online store) is planned. The Anthropic adapter is tested against recorded HTTP responses only; **no call to the live API has been made yet** (no key on the dev box). The AI tables and tests ran on PostgreSQL 18 (2026-11-11).
 
 ## Principles
 
@@ -249,7 +249,7 @@ Tests never reach the network: `phpunit.xml` forces `AI_ENABLED=false`, `AI_API_
 - Narratives are English; Ask answers follow the question's language (English or Bangla).
 - One request may overshoot the monthly budget.
 - A cached business insight is shared by every user of its scope; its narrative was written from facts that include shortage risk, which the response hides from users without `purchases.view` (all built-in roles with `ai.insights` have it).
-- The PostgreSQL run of the AI tables, CHECKs and queries is pending.
+- The AI tables, CHECKs and queries ran with the full suite on PostgreSQL 18 (2026-11-11); `EXPLAIN` of the insight queries on production-sized data is still pending.
 
 ## AI2 (planned, online store)
 

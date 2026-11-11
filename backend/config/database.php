@@ -96,6 +96,9 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
+            // Laravel writes timestamps as UTC strings without an offset; pin the session so a
+            // server whose default zone is local (e.g. Asia/Dhaka) does not shift every timestamptz.
+            'timezone' => 'UTC',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 

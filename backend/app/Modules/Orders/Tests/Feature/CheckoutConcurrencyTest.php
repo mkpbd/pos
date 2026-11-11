@@ -9,20 +9,20 @@ use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Tests\Concerns\BuildsCheckout;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Shared\Tests\Concerns\TruncatesCommittedData;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
  * Two checkouts racing for the last unit, with a second database connection standing in
- * for the competing request (committed data, so DatabaseTruncation). Skipped on other
+ * for the competing request (committed data, so TruncatesCommittedData). Skipped on other
  * drivers: SQLite has no row-level locks.
  */
 class CheckoutConcurrencyTest extends TestCase
 {
-    use ActsAsShopper, BuildsCheckout, BuildsOnlineCatalog, DatabaseTruncation, InteractsWithTenancy;
+    use ActsAsShopper, BuildsCheckout, BuildsOnlineCatalog, InteractsWithTenancy, TruncatesCommittedData;
 
     protected function setUp(): void
     {

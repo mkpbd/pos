@@ -20,7 +20,8 @@ See [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) for prerequisites and
 # one-time: create role pos_app and databases pos / pos_test
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h 127.0.0.1 -f backend\database\scripts\create_local_databases.sql
 
-cd backend;  composer install; copy .env.example .env; php artisan key:generate; php artisan migrate; php artisan serve
+cd backend;  composer install; copy .env.example .env; php artisan key:generate   # then set DB_PASSWORD in .env to the pos_app password
+php artisan migrate; php artisan serve
 cd frontend; npm install; npm run dev     # admin http://localhost:5173/admin, storefront http://localhost:5173/
 ```
 
@@ -56,16 +57,18 @@ AI assistant and insights (Phase 8 / AI1, optional, **off by default**): *AI Ins
 
 ## Roadmap
 
+**PostgreSQL verified (2026-11-11):** all migrations, `migrate:fresh --seed` and the full backend suite (747 tests, 746 pass, 1 opt-in skip — including the row-locking, CHECK, trigger and index tests that SQLite skips) run on PostgreSQL 18, and the full-stack Playwright suite (24 tests) passes against a PostgreSQL-backed backend. Every phase below is covered by that run. Still pending: `EXPLAIN` on production-sized data and a live Anthropic API call. Details: [CHANGELOG § PostgreSQL verification](CHANGELOG.md).
+
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 1 | Project setup, architecture, shared kernel, docs | ✅ (PostgreSQL run pending) |
-| 2 | Authentication, RBAC, organizations, branches, audit trail | ✅ (PostgreSQL run pending) |
-| 3 | Products, categories, brands, units, suppliers, customers | ✅ (PostgreSQL run pending) |
-| 4 | Purchasing and inventory | ✅ (PostgreSQL run pending) |
-| 5 | POS terminal and sales processing | ✅ (PostgreSQL run pending) |
-| 6 | Payments, returns, refunds, cash register, expenses, loyalty | ✅ (PostgreSQL run pending) |
-| 7 | Reports and dashboard analytics: registry of 17 whitelisted reports with typed parameters (the basis for AI reporting), one sales definition for POS and web orders, dashboard KPIs and charts, CSV export on every list | ✅ (PostgreSQL run and `EXPLAIN` pending) |
-| 8 / AI1 | AI module (optional, off by default): provider abstraction with a Claude adapter, read-only tools over the report registry, Ask AI (natural-language reporting, sales and inventory assistant, English / Bangla), business insights (KPIs, top movers, z-score anomalies, margin drop, return spike, slow movers, shortage risk) with a daily job, customer RFM segments with loyalty suggestions, reorder explanation, per-organization switch, monthly token budget and usage; 18th report `sales_by_customer` | ✅ (live API call and PostgreSQL run pending) |
+| 1 | Project setup, architecture, shared kernel, docs | ✅ |
+| 2 | Authentication, RBAC, organizations, branches, audit trail | ✅ |
+| 3 | Products, categories, brands, units, suppliers, customers | ✅ |
+| 4 | Purchasing and inventory | ✅ |
+| 5 | POS terminal and sales processing | ✅ |
+| 6 | Payments, returns, refunds, cash register, expenses, loyalty | ✅ |
+| 7 | Reports and dashboard analytics: registry of 17 whitelisted reports with typed parameters (the basis for AI reporting), one sales definition for POS and web orders, dashboard KPIs and charts, CSV export on every list | ✅ (`EXPLAIN` on production-sized data pending) |
+| 8 / AI1 | AI module (optional, off by default): provider abstraction with a Claude adapter, read-only tools over the report registry, Ask AI (natural-language reporting, sales and inventory assistant, English / Bangla), business insights (KPIs, top movers, z-score anomalies, margin drop, return spike, slow movers, shortage risk) with a daily job, customer RFM segments with loyalty suggestions, reorder explanation, per-organization switch, monthly token budget and usage; 18th report `sales_by_customer` | ✅ (live API call pending) |
 | 8 / AI2 | Online store AI: product descriptions and SEO with approval, category suggestions, co-purchase recommendations, support assistant | ☐ |
 | 9 | Test hardening, security review, performance | ☐ |
 | 10 | Production deployment and documentation | ☐ |
@@ -77,31 +80,31 @@ BerryKid-inspired storefront on the same backend; plan, decisions and API in [do
 | Phase | Scope | Status |
 |-------|-------|--------|
 | E1–E3 | Project analysis, reference investigation, architecture and database plan | ✅ |
-| E4 | Storefront shell: host-based storefronts, theme, menus, media library, storefront layout, admin under `/admin` | ✅ (PostgreSQL run pending) |
-| E5 | Content and homepage builder: banners, homepage sections, content pages, FAQ, contact form, newsletter | ✅ (PostgreSQL run pending) |
-| E6 | Online catalog and product pages: web listings, attributes, shop/category/brand/search pages with faceted filters, product page with variants, related products, catalog homepage sections | ✅ (PostgreSQL run pending) |
-| E7 | Customer accounts, cart, wishlist: sign-up/sign-in on a separate shopper guard, e-mail verification, password reset, profile, address book with Bangladesh divisions/districts, guest and customer carts repriced on every read with merge at sign-in, mini-cart and cart page, wishlist | ✅ (PostgreSQL run pending) |
-| E8a | Shipping zones and methods by district, checkout (guest or signed-in) with server preview and idempotent placement, web orders that take stock once from the fulfilment store, cash on delivery and bank transfer, order confirmation page and e-mail, admin web orders with payment confirmation, shipping, delivery, cancellation with restock, expiry of unpaid orders | ✅ (PostgreSQL run pending) |
-| E8b | Promotions (web only): automatic product, category, brand and order discounts, free delivery, coupon codes with usage limits, flash sales with countdown and a hot-deals homepage section, one server pricing path from product card to placed order, admin promotions with coupons and redemptions | ✅ (PostgreSQL run pending) |
+| E4 | Storefront shell: host-based storefronts, theme, menus, media library, storefront layout, admin under `/admin` | ✅ |
+| E5 | Content and homepage builder: banners, homepage sections, content pages, FAQ, contact form, newsletter | ✅ |
+| E6 | Online catalog and product pages: web listings, attributes, shop/category/brand/search pages with faceted filters, product page with variants, related products, catalog homepage sections | ✅ |
+| E7 | Customer accounts, cart, wishlist: sign-up/sign-in on a separate shopper guard, e-mail verification, password reset, profile, address book with Bangladesh divisions/districts, guest and customer carts repriced on every read with merge at sign-in, mini-cart and cart page, wishlist | ✅ |
+| E8a | Shipping zones and methods by district, checkout (guest or signed-in) with server preview and idempotent placement, web orders that take stock once from the fulfilment store, cash on delivery and bank transfer, order confirmation page and e-mail, admin web orders with payment confirmation, shipping, delivery, cancellation with restock, expiry of unpaid orders | ✅ |
+| E8b | Promotions (web only): automatic product, category, brand and order discounts, free delivery, coupon codes with usage limits, flash sales with countdown and a hot-deals homepage section, one server pricing path from product card to placed order, admin promotions with coupons and redemptions | ✅ |
 | E8c | Online payment gateways (SSLCommerz, bKash, Nagad) — needs each provider's sandbox credentials | ☐ |
-| E9 | Customer account area: order history and detail with tracking, cancel unpaid orders, buy again, product reviews from verified (delivered) purchases with staff moderation and a rating summary on the product page | ✅ (PostgreSQL run pending) |
-| E10a | Fulfilment: couriers with tracking links, shipments with tracking updates, orders board with filters, counts and bulk processing, packing slip and invoice printing, returned parcels cancelled with restock, courier COD remittances that pay orders and book the courier fee | ✅ (PostgreSQL run pending) |
-| E10b | Online returns and refunds (customer request within the return window, staff approval, receipt with restock to the original batches, refund through the payments ledger), customers' web activity on the customer card, promotion report, ratings on product cards and the *Top rated* sort | ✅ (PostgreSQL run pending) |
-| E11 | CMS depth: blog with categories, scheduled posts, blog menu links and a homepage blog section; popup banner; cancelling a paid, undelivered web order with stock back and a full refund | ✅ (PostgreSQL run pending) |
-| E12a | SEO and performance: JSON-LD structured data, meta / canonical / noindex rules, `robots.txt` and XML sitemaps served by the app, an *allow indexing* switch for staging stores, ETag and HTTP caching of public storefront reads, a versioned server cache invalidated on content writes, storefront indexes, client-side head tags, image loading priorities and code splitting | ✅ (PostgreSQL run pending) |
-| E12b | Bangla storefront: typed English / Bangla UI dictionary on every storefront screen, language switcher (`?lang=`, `lang` cookie), Bengali fonts and optional Bengali digits, content translations with per-field English fallback for listings, pages, FAQ, blog, menus, banners, homepage sections, announcement, delivery and payment methods and promotions (admin "বাংলা (Bangla)" sections), search over Bangla names, hreflang / canonical per language and sitemap alternates, store language settings | ✅ (PostgreSQL run pending) |
+| E9 | Customer account area: order history and detail with tracking, cancel unpaid orders, buy again, product reviews from verified (delivered) purchases with staff moderation and a rating summary on the product page | ✅ |
+| E10a | Fulfilment: couriers with tracking links, shipments with tracking updates, orders board with filters, counts and bulk processing, packing slip and invoice printing, returned parcels cancelled with restock, courier COD remittances that pay orders and book the courier fee | ✅ |
+| E10b | Online returns and refunds (customer request within the return window, staff approval, receipt with restock to the original batches, refund through the payments ledger), customers' web activity on the customer card, promotion report, ratings on product cards and the *Top rated* sort | ✅ |
+| E11 | CMS depth: blog with categories, scheduled posts, blog menu links and a homepage blog section; popup banner; cancelling a paid, undelivered web order with stock back and a full refund | ✅ |
+| E12a | SEO and performance: JSON-LD structured data, meta / canonical / noindex rules, `robots.txt` and XML sitemaps served by the app, an *allow indexing* switch for staging stores, ETag and HTTP caching of public storefront reads, a versioned server cache invalidated on content writes, storefront indexes, client-side head tags, image loading priorities and code splitting | ✅ (`EXPLAIN` on production-sized data pending) |
+| E12b | Bangla storefront: typed English / Bangla UI dictionary on every storefront screen, language switcher (`?lang=`, `lang` cookie), Bengali fonts and optional Bengali digits, content translations with per-field English fallback for listings, pages, FAQ, blog, menus, banners, homepage sections, announcement, delivery and payment methods and promotions (admin "বাংলা (Bangla)" sections), search over Bangla names, hreflang / canonical per language and sitemap alternates, store language settings | ✅ |
 | E13–E14 | AI, hardening | ☐ |
 
 ### Cross-cutting
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| X1 | PDF and Excel export on every admin list (current filters, search and sort; all rows; row limits, audit, throttle; letterhead and Bangla fonts in PDFs); business dates validated in the organization's timezone | ✅ (PostgreSQL run pending) |
+| X1 | PDF and Excel export on every admin list (current filters, search and sort; all rows; row limits, audit, throttle; letterhead and Bangla fonts in PDFs); business dates validated in the organization's timezone | ✅ |
 
 ### Supply chain
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| SC1 | Supplier catalog (costs, pack sizes, minimum orders, lead times, preferred supplier, last purchase cost from receipts), per-store reorder rules, replenishment settings, reorder suggestions from stock, open orders, transfers and sales velocity → draft purchase orders per supplier and replenishment transfers, daily reorder alert | ✅ (PostgreSQL run pending) |
-| SC2 | Purchase requisitions with amount-based single-step approval (auto / manager / high limits, no self-approval), purchase order approval (`pending_approval`, pre-approval from requisitions), approvals inbox, requests for quotation (PDF per supplier, queued e-mail), staff-entered supplier quotes, comparison and split award into draft purchase orders, daily quotes-overdue reminder | ✅ (PostgreSQL run pending) |
-| SC3 | Landed cost: charges on goods receipts allocated by value or quantity into the stock cost, landed cost vouchers for later bills (on-hand share revalues stock, sold share expensed on the supplier's account), charge payables on the billing supplier's account; supplier performance: on-time, fill, lead time, returns, price change, quote response, 0–100 score, monthly trend and late / short deliveries | ✅ (PostgreSQL run pending) |
+| SC1 | Supplier catalog (costs, pack sizes, minimum orders, lead times, preferred supplier, last purchase cost from receipts), per-store reorder rules, replenishment settings, reorder suggestions from stock, open orders, transfers and sales velocity → draft purchase orders per supplier and replenishment transfers, daily reorder alert | ✅ |
+| SC2 | Purchase requisitions with amount-based single-step approval (auto / manager / high limits, no self-approval), purchase order approval (`pending_approval`, pre-approval from requisitions), approvals inbox, requests for quotation (PDF per supplier, queued e-mail), staff-entered supplier quotes, comparison and split award into draft purchase orders, daily quotes-overdue reminder | ✅ |
+| SC3 | Landed cost: charges on goods receipts allocated by value or quantity into the stock cost, landed cost vouchers for later bills (on-hand share revalues stock, sold share expensed on the supplier's account), charge payables on the billing supplier's account; supplier performance: on-time, fill, lead time, returns, price change, quote response, 0–100 score, monthly trend and late / short deliveries | ✅ |

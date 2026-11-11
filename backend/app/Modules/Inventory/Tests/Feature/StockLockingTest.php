@@ -10,19 +10,19 @@ use App\Modules\Inventory\Tests\Concerns\InteractsWithStock;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Shared\Tests\Concerns\TruncatesCommittedData;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
  * Critical concurrency guarantees of the stock ledger, verified with two real PostgreSQL
- * connections (committed data, so DatabaseTruncation instead of RefreshDatabase).
+ * connections (committed data, so TruncatesCommittedData instead of RefreshDatabase).
  * Skipped on other drivers: SQLite has no row-level locks.
  */
 class StockLockingTest extends TestCase
 {
-    use DatabaseTruncation, InteractsWithStock, InteractsWithTenancy;
+    use InteractsWithStock, InteractsWithTenancy, TruncatesCommittedData;
 
     protected function setUp(): void
     {

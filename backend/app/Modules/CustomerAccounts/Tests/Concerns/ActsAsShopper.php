@@ -29,7 +29,9 @@ trait ActsAsShopper
         $response = $this->json($method, $url, $data, $headers);
 
         foreach ($response->headers->getCookies() as $cookie) {
-            if ($cookie->isCleared() || (string) $cookie->getValue() === '') {
+            // Expiry against the test clock (travelTo), not the wall clock Cookie::isCleared() reads.
+            $expired = $cookie->getExpiresTime() !== 0 && $cookie->getExpiresTime() < now()->getTimestamp();
+            if ($expired || (string) $cookie->getValue() === '') {
                 unset($this->jar[$cookie->getName()]);
             } else {
                 $this->jar[$cookie->getName()] = (string) $cookie->getValue();

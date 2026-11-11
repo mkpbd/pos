@@ -13,11 +13,13 @@ PostgreSQL 18 is the system of record. This document defines conventions (bindin
 | Money | `NUMERIC(18,2)`. Quantities `NUMERIC(18,3)`. Rates/percentages `NUMERIC(9,4)`. Unit costs `NUMERIC(18,4)`. `float`, `double precision` and `real` are forbidden. |
 | Currency | `char(3)` ISO 4217 on documents; one base currency per organization in v1. |
 | Enums | `varchar` + `CHECK` constraint (easier to migrate than native PG enums), mirrored by PHP backed enums. |
-| Timestamps | Always `timestamptz`, stored in UTC; display in branch timezone. |
+| Timestamps | Always `timestamptz`, stored in UTC; display in branch timezone. The `pgsql` connection pins the session `timezone` to `UTC` (`config/database.php`): Laravel writes naive UTC strings, which PostgreSQL would otherwise read in the server's default zone. |
 | Document numbers | Human-readable, per-branch, gap-free sequences (`INV-DHK1-000123`) allocated inside the posting transaction from a `document_sequences` row locked `FOR UPDATE`. |
 | Naming | snake_case, plural table names, `<singular>_id` FKs, indexes `<table>_<cols>_idx`, uniques `<table>_<cols>_unique`. |
 | JSON | `jsonb` only for genuinely schemaless data (settings payloads, audit diffs, AI metadata). |
 | Immutability | Ledger and posted-document tables get a trigger that raises on `UPDATE`/`DELETE`. |
+| Self-referencing FKs | A foreign key to the same table (`users.created_by`, `categories.parent_id`, `units.base_unit_id`, `menu_items.parent_id`) is added in a `Schema::table` **after** the `Schema::create`, never inside it: on PostgreSQL Laravel emits FKs declared inside the create before the primary key, and the migration fails (SQLSTATE 42830). Keep the default constraint name and the intended `ON DELETE` rule. |
+| Trigger functions | Always `CREATE OR REPLACE FUNCTION` (and `DROP TRIGGER IF EXISTS` / `DROP FUNCTION IF EXISTS` in `down()`): `migrate:fresh` drops tables but not functions, so a plain `CREATE FUNCTION` fails on the next fresh migrate (42723). PostgreSQL-only DDL (CHECKs, triggers, partial / expression indexes the SQLite grammar cannot express) is guarded by `DB::getDriverName() === 'pgsql'`. |
 
 ## 2. Entity overview
 
@@ -296,7 +298,7 @@ OnlineCatalog module (`2026_11_01_150100_add_storefront_performance_indexes`, fr
 | `product_listings_unpublish_index` | `(organization_id, unpublished_at) WHERE is_published AND unpublished_at IS NOT NULL` | `(organization_id, unpublished_at)` | `MIN(unpublished_at) > now` (cache expiry) |
 | `product_variants_live_product_index` | `(product_id, sort_order) WHERE deleted_at IS NULL AND is_active` | `(product_id, is_active, sort_order)` | "has an active variant" (`EXISTS`) and the variant load of the candidate set |
 
-Created with `CREATE INDEX IF NOT EXISTS`; `StorefrontIndexesTest` (PostgreSQL only) asserts they exist. Reviewed and left as is: images `(product_id, sort_order)`, stock `(store_id, variant_id)`, reviews `(organization_id, product_id, status, created_at)`, promotions `(organization_id, trigger, is_active)`, blog `(organization_id, status, published_at)`, search on the `lower(name)` trigram index (SKU match is a scan; search results are not cached). Assumed scale: a few thousand products per organization. **`EXPLAIN` on PostgreSQL is pending** (no PostgreSQL access during E12a).
+Created with `CREATE INDEX IF NOT EXISTS`; `StorefrontIndexesTest` (PostgreSQL only) asserts they exist. Reviewed and left as is: images `(product_id, sort_order)`, stock `(store_id, variant_id)`, reviews `(organization_id, product_id, status, created_at)`, promotions `(organization_id, trigger, is_active)`, blog `(organization_id, status, published_at)`, search on the `lower(name)` trigram index (SKU match is a scan; search results are not cached). Assumed scale: a few thousand products per organization. `StorefrontIndexesTest` passed on PostgreSQL 18 (2026-11-11); **`EXPLAIN` on production-sized data is still pending**.
 
 No table for the server cache: entries and the per-organization content version live in the configured cache store (`cache` table with the `database` store).
 
@@ -322,7 +324,7 @@ Language of orders and accounts:
 - `orders.locale` varchar(2) NOT NULL default `'en'` (Orders `100600_add_locale_to_orders`; PostgreSQL `orders_locale_check`: `locale IN ('en','bn')`) — the checkout request's language; existing orders are `en`. Line, delivery, promotion and address snapshots stay English.
 - `customer_accounts.preferred_locale` varchar(2) NULL (CustomerAccounts `100700_add_preferred_locale_to_customer_accounts`; `customer_accounts_preferred_locale_check`: NULL or `en|bn`) — the language of the last sign-up / sign-in.
 
-All additive, no backfill. Geography already had `name_bn` (E7); no change. **The CHECKs and the jsonb search expression have not run on PostgreSQL yet.**
+All additive, no backfill. Geography already had `name_bn` (E7); no change. The CHECKs and the jsonb search expression ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 ### Supply chain SC1 — Supplier catalog, reorder rules and replenishment (implemented)
 
@@ -334,7 +336,7 @@ Purchasing module (`2026_11_06_100100_create_supplier_catalog_tables`):
 - `supplier_products` — organization_id, supplier_id, variant_id → product_variants (all `RESTRICT`), supplier_sku varchar(64) NULL, unit_cost `NUMERIC(18,4)` (per base unit, tax-exclusive, as on purchase orders), pack_size `NUMERIC(18,3)` default 1, min_order_qty `NUMERIC(18,3)` NULL, lead_time_days unsigned smallint default 7, is_preferred boolean default false, last_purchase_cost `NUMERIC(18,4)` NULL and last_purchased_at timestamptz NULL (written only by goods receipts, for existing rows of the receipt's supplier), is_active boolean default true, created_by / updated_by, timestamptz. Hard delete. Unique `(supplier_id, variant_id)`; index `(organization_id, variant_id)`; **partial unique `supplier_products_preferred_unique (organization_id, variant_id) WHERE is_preferred`** — at most one preferred supplier per variant (created on PostgreSQL and SQLite). PostgreSQL CHECKs: `unit_cost >= 0`, `pack_size >= 1`, `min_order_qty IS NULL OR min_order_qty > 0`, `lead_time_days BETWEEN 0 AND 365`, `last_purchase_cost IS NULL OR last_purchase_cost >= 0`, `supplier_products_preferred_active_check` (`NOT is_preferred OR is_active`).
 - `reorder_notification_runs` — organization_id, store_id (`RESTRICT`), run_on date (the organization-local day), items and recipients unsigned int, created_at timestamptz. Unique `(store_id, run_on)` — the claim that makes the daily reorder alert at most once per store and day; index `(organization_id, run_on)`. PostgreSQL CHECK `items > 0`.
 
-Unchanged: `purchase_orders` (reorder drafts are ordinary `draft` orders, notes "Created from reorder suggestions."), `stock_transfers` (replenishment transfers are ordinary `in_transit` transfers; lines of batch-tracked goods are split one per batch taken), `product_variants.reorder_level` (still drives the low-stock alert and is the rule fallback). Inputs are read, not stored: on hand from `stock_levels`, in transit from `in_transit` transfer lines into the store, open orders from `ordered|partially_received` order lines (`quantity − received_quantity`), net units sold from `stock_movements`. All additive. **The CHECKs and the partial unique index have not run on PostgreSQL yet.**
+Unchanged: `purchase_orders` (reorder drafts are ordinary `draft` orders, notes "Created from reorder suggestions."), `stock_transfers` (replenishment transfers are ordinary `in_transit` transfers; lines of batch-tracked goods are split one per batch taken), `product_variants.reorder_level` (still drives the low-stock alert and is the rule fallback). Inputs are read, not stored: on hand from `stock_levels`, in transit from `in_transit` transfer lines into the store, open orders from `ordered|partially_received` order lines (`quantity − received_quantity`), net units sold from `stock_movements`. All additive. The CHECKs and the partial unique index ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 ### Supply chain SC2 — Requisitions, approvals and supplier quotes (implemented)
 
@@ -356,7 +358,7 @@ Purchasing module (`2026_11_07_100000_create_procurement_tables`). Foreign keys 
 
 **Append-only enforcement:** PostgreSQL function `prevent_procurement_history_mutation()` with `BEFORE UPDATE OR DELETE` triggers `purchase_requisition_status_history_append_only`, `purchase_order_status_history_append_only`, `rfq_status_history_append_only`, `rfq_awards_append_only`; the models also use the `AppendOnly` trait (Sales), which refuses Eloquent updates and deletes on every driver.
 
-Existing rows are untouched: orders keep their status, have no history before SC2 and no approval data. **The CHECKs and the triggers have not run on PostgreSQL yet.**
+Existing rows are untouched: orders keep their status, have no history before SC2 and no approval data. The CHECKs and the triggers ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 ### Supply chain SC3 — Landed cost (implemented)
 
@@ -379,7 +381,7 @@ Purchasing (`2026_11_08_100200_create_landed_cost_tables`):
 
 **Append-only enforcement:** PostgreSQL function `prevent_landed_cost_mutation()` with `BEFORE UPDATE OR DELETE` triggers `landed_cost_allocations_append_only` and `goods_receipt_charges_append_only`; both models use the `AppendOnly` trait on every driver. Vouchers have no void, so posted rows are final.
 
-Supplier balance (computed on read) = opening balance + Σ receipts' `payable_total` + Σ receipt charges billed by the supplier (amount + tax) + Σ posted vouchers billed by it (`total`) − Σ returns − Σ payments. Supplier performance (SC3) is a read model over existing tables; it adds no table. All changes are additive. **The CHECKs and the triggers have not run on PostgreSQL yet.**
+Supplier balance (computed on read) = opening balance + Σ receipts' `payable_total` + Σ receipt charges billed by the supplier (amount + tax) + Σ posted vouchers billed by it (`total`) − Σ returns − Σ payments. Supplier performance (SC3) is a read model over existing tables; it adds no table. All changes are additive. The CHECKs and the triggers ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 ### Phase 7 — Reporting (as built)
 
@@ -414,7 +416,7 @@ Stock movements, expiry, expenses and dues use existing indexes:
 - `batches (organization_id, expires_on)`;
 - `expenses (organization_id, type, occurred_on)`.
 
-Daily summary tables or materialized views (the original plan) are deferred until PostgreSQL `EXPLAIN` on production-sized data shows the aggregates need them. **The indexes and the report SQL have not run on PostgreSQL yet.**
+Daily summary tables or materialized views (the original plan) are deferred until PostgreSQL `EXPLAIN` on production-sized data shows the aggregates need them. The indexes and the report SQL ran with the full suite on PostgreSQL 18 (2026-11-11); `EXPLAIN` on production-sized data is still pending.
 
 ### Phase 8 — AI (AI1)
 
@@ -467,7 +469,7 @@ Indexes `(organization_id, created_at)` (monthly budget sum) and `(organization_
 
 Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_date, with_cost)`: the daily job and concurrent first reads insert with `INSERT … ON CONFLICT DO NOTHING` (`insertOrIgnore`), so a scope-day is computed once. Only closed periods are stored; a row with a missing narrative is completed in place once AI is available. Running periods and multi-branch scopes use the cache store (15 min; customer insights 1 h), not the database.
 
-`json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. **The CHECKs and the migration have not run on PostgreSQL yet.**
+`json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
 ## 3. Indexing strategy
 
@@ -483,7 +485,7 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 - COD remittances (E10a): one transaction locks the named `orders` rows `FOR UPDATE` in ascending id order, checks every order under the lock (all or nothing), allocates the `REM-` and `EXP-` numbers from locked `document_sequences` rows, then writes the remittance, its lines and per order the COD payment through the same locked path as *Record COD payment*; a second remittance of the same order waits for the lock and then finds it paid (`already_paid`), and `cod_remittance_lines (organization_id, order_id)` is unique as a backstop. Shipment updates lock the order row, then the `shipments` row. Bulk *Mark processing* takes each order's lock in its own transaction.
 - Online returns (E10b): every step locks the `orders` row `FOR UPDATE`, then the `order_returns` row (one lock order everywhere). A request computes what is still returnable under the order lock, so two parallel requests cannot both take the last unit; approval re-values lines against the other active returns under the same lock; receipt reads `order_return_line_stock` per allocation before posting `online_return` through the stock ledger (which locks `stock_levels` as below); a refund checks `refunded_total + refund_amount ≤ paid_total` under the order lock and, for cash, posts through the register session (row locked). `RTN-WEB-` numbers come from locked `document_sequences` rows.
 - Paid cancellations (E11): one transaction locks the `orders` row `FOR UPDATE`, re-checks status and payment status under the lock, books the refund (cash: the user's `register_sessions` row is locked by the payments ledger), restocks and closes the order; a second cancel finds it `cancelled` (`INVALID_STATUS_TRANSITION`) and the `Idempotency-Key` replays the first response. The e-mail is sent after commit.
-- Promotion usage limits (E8b): inside the placement transaction, after the cart lock and a first pricing, the `promotions` rows that carry a usage limit and the order would use, and the `coupons` row of the code it would redeem, are locked `FOR UPDATE` (promotions in ascending id order, then the coupon); the cart is priced again under the locks (at most three rounds) and the redemptions are appended before commit, so two placements cannot both take the last use. Unlimited promotions are not locked. A limit reached meanwhile reprices without it → `409 TOTAL_CHANGED`. PostgreSQL-only `PromotionConcurrencyTest` covers two placements racing for a single-use coupon (not run yet).
+- Promotion usage limits (E8b): inside the placement transaction, after the cart lock and a first pricing, the `promotions` rows that carry a usage limit and the order would use, and the `coupons` row of the code it would redeem, are locked `FOR UPDATE` (promotions in ascending id order, then the coupon); the cart is priced again under the locks (at most three rounds) and the redemptions are appended before commit, so two placements cannot both take the last use. Unlimited promotions are not locked. A limit reached meanwhile reprices without it → `409 TOTAL_CHANGED`. PostgreSQL-only `PromotionConcurrencyTest` covers two placements racing for a single-use coupon (passed on PostgreSQL 18, 2026-11-11).
 - Every stock posting (adjustment, transfer, receipt, return; checkout from Phase 5; web orders from E8a) locks `stock_levels` rows `FOR UPDATE` in ascending `store|variant|batch` order, creating missing rows first with `INSERT … ON CONFLICT DO NOTHING` so there is always a row to lock.
 - Supplier catalog (SC1): making a row preferred locks the variant's catalog rows `FOR UPDATE`, unsets the previous preferred row and sets the new one in one transaction; the partial unique index `(organization_id, variant_id) WHERE is_preferred` rejects a concurrent second preferred row. Reorder rule upserts lock the store's existing rules for the given variants `FOR UPDATE` before writing; settings saves lock the organization's row. The daily reorder alert claims `(store_id, run_on)` with `INSERT … ON CONFLICT DO NOTHING` (`insertOrIgnore`) before notifying, so overlapping runs never notify twice.
 - Procurement (SC2): every requisition, purchase order and RFQ transition re-reads its row `FOR UPDATE` and checks the status under the lock, so two approvers (or an approve and a cancel) cannot both succeed; the loser gets `INVALID_STATUS_CHANGE`, and the `Idempotency-Key` replays the first answer to a retry. Convert locks the requisition, then its lines; award, close and cancel lock the RFQ, then (to give quantities back) the requisition and its lines; recording a quote locks the RFQ. Approval-settings saves lock the organization's row. The quotes-overdue reminder claims `(rfq_id, run_on)` with `insertOrIgnore` before notifying.
@@ -500,5 +502,6 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 |----------|---------|
 | `pos` | Development |
 | `pos_test` | Automated tests (PHPUnit `RefreshDatabase`) |
+| `pos_e2e` | Full-stack Playwright backend (re-seeded before every run; create once as the superuser, owner `pos_app`) |
 
 Owner role `pos_app` (no superuser). Bootstrap with `backend/database/scripts/create_local_databases.sql` — see [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md).
