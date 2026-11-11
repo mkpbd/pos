@@ -104,8 +104,6 @@ export const checkout = {
   'checkout.summary.linesLabel': 'Items in your order',
   'checkout.summary.quantity': 'Quantity:',
   'checkout.summary.qty': 'Qty',
-  'checkout.summary.lineDiscount': 'Discount: {amount}',
-  'checkout.summary.lineDiscountPromotion': 'Discount ({promotion}): {amount}',
   'checkout.summary.notAvailable': 'Not available — not included',
   'checkout.summary.notEnoughStock': 'Not enough in stock',
 

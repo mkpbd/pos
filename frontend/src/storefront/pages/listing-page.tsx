@@ -344,7 +344,7 @@ function Results({
     return (
       <div className="rounded-sf-card bg-sf-surface px-4 py-12 text-center">
         <p className="font-semibold text-sf-heading">{t('catalog.listing.loadFailed')}</p>
-        <Button className="mt-4 rounded-sf-button" onClick={() => void listing.refetch()}>{t('common.tryAgain')}</Button>
+        <Button className="mt-4 h-11 rounded-sf-button px-6" onClick={() => void listing.refetch()}>{t('common.tryAgain')}</Button>
       </div>
     )
   }
@@ -362,12 +362,12 @@ function Results({
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {filtered && (
-            <Button className="rounded-sf-button" onClick={onClear}>
+            <Button className="h-11 rounded-sf-button px-6" onClick={onClear}>
               {t('catalog.empty.clearFilters')}
             </Button>
           )}
           {scope.kind !== 'shop' && (
-            <Link to="/shop" className="inline-flex h-9 items-center rounded-sf-button border px-4 text-sm font-semibold text-sf-heading hover:border-sf-accent">
+            <Link to="/shop" className="inline-flex h-11 items-center rounded-sf-button border bg-sf-surface px-6 text-sm font-semibold text-sf-heading transition-colors hover:border-sf-accent hover:text-sf-accent">
               {t('catalog.empty.browseAll')}
             </Link>
           )}

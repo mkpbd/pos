@@ -201,6 +201,23 @@ describe('top bar variants', () => {
 })
 
 describe('footer variants', () => {
+  it('columns: three blocks share the row instead of leaving an empty fourth column', async () => {
+    // Brand + the "Help" menu + contact = three blocks.
+    serve(store({}))
+    const { unmount } = renderRoutes(storefrontRoutes)
+    const grid = (await screen.findByTestId('site-footer')).firstElementChild!
+    expect(grid).toHaveClass('lg:grid-cols-3')
+    expect(grid).not.toHaveClass('lg:grid-cols-4')
+    unmount()
+
+    // A second menu makes four: today's layout.
+    const four = store({})
+    four.menus.footer_2 = { ...four.menus.footer_1!, name: 'Shop' }
+    serve(four)
+    renderRoutes(storefrontRoutes)
+    expect((await screen.findByTestId('site-footer')).firstElementChild).toHaveClass('lg:grid-cols-4')
+  })
+
   const rated = (slug: string) => productCard(slug, { rating: { average: '4.5', count: 12 } })
 
   it('showcase: brand column, popular and new product lists, the store links', async () => {
@@ -233,6 +250,21 @@ describe('footer variants', () => {
     expect(within(footer).queryByRole('region', { name: 'Top rated' })).not.toBeInTheDocument()
     expect(within(footer).getByRole('form', { name: 'Newsletter' })).toBeInTheDocument()
     expect(within(footer).getByRole('navigation', { name: 'Help' })).toHaveTextContent('Shipping')
+  })
+
+  it('widgets: stars on the dark footer take the dark-surface colours, even with a primary as dark as the footer', async () => {
+    const dark = bootstrapFixture().theme.colors
+    serve(store({ footer_style: 'widgets' }, { colors: { ...dark, primary: '#111111', heading: '#111111', surface: '#ffffff' } }), { products: { popularity: [rated('best-tee')] } })
+    renderRoutes(storefrontRoutes)
+
+    const footer = await screen.findByTestId('site-footer')
+    expect(footer).toHaveClass('sf-on-dark')
+    const stars = await within(footer).findByRole('img', { name: 'Rated 4.5 out of 5' })
+    const [empty, filled] = Array.from(stars.children) as HTMLElement[]
+    expect(empty).toHaveClass('text-(--sf-star-empty)')
+    expect(filled).toHaveClass('text-(--sf-star)')
+    // `.sf-on-dark` swaps --sf-star for this: the primary (#111) would vanish, so the surface colour is used.
+    await waitFor(() => expect(document.documentElement.style.getPropertyValue('--sf-star-on-dark')).toBe('#ffffff'))
   })
 
   it('subscribes from the newsletter widget', async () => {
@@ -332,5 +364,62 @@ describe('hero variants', () => {
     expect(within(text).getByRole('link', { name: 'Shop men' })).toHaveAttribute('href', '/men')
     expect(within(text).getByRole('link', { name: 'Shop women' })).toHaveAttribute('href', '/women')
     expect(screen.getByRole('button', { name: 'Next slide' })).toBeInTheDocument()
+  })
+
+  it('inverts a button whose theme fill would vanish on the dark backdrop; slides fall back to a matching colour', async () => {
+    const colors = { ...bootstrapFixture().theme.colors, primary: '#111111', primary_foreground: '#ffffff' }
+    serve(store({ hero_style: 'sale' }, { colors }), {
+      sections: [
+        hero([
+          banner('b-1', { title: 'Mega sale', button_label: 'Shop men', link_url: '/men', secondary_button_label: 'Shop women', secondary_link_url: '/women' }),
+          banner('b-2', { title: 'Light slide', text_color: '#1b3a1f', button_label: 'Shop', link_url: '/shop' }),
+        ]),
+      ],
+    })
+    renderRoutes(storefrontRoutes)
+
+    const [dark, light] = await screen.findAllByTestId('sale-banner-text')
+    // #111 on the dark scrim (or the dark fallback): white fill, the primary as the label.
+    const shopMen = within(dark!).getByRole('link', { name: 'Shop men' })
+    expect(shopMen.style.backgroundColor).toBe('rgb(255, 255, 255)')
+    expect(shopMen.style.color).toBe('rgb(17, 17, 17)')
+    // The accent (#6f55c2) stands out on dark: theme classes only.
+    expect(within(dark!).getByRole('link', { name: 'Shop women' }).getAttribute('style')).toBeNull()
+    // #111 on a light backdrop is fine as it is.
+    expect(within(light!).getByRole('link', { name: 'Shop', hidden: true }).getAttribute('style')).toBeNull()
+
+    const slides = screen.getAllByRole('group', { hidden: true }).filter((el) => el.getAttribute('aria-roledescription') === 'slide')
+    expect(slides[0]).toHaveClass('bg-sf-heading')
+    expect(slides[1]).toHaveClass('bg-sf-canvas')
+  })
+
+  it('keeps the theme button colours when they stand out (today’s look)', async () => {
+    serve(store({}), { sections: [hero([banner('b-1', { title: 'Fresh', button_label: 'Shop now', link_url: '/shop' })])] })
+    renderRoutes(storefrontRoutes)
+
+    const link = await screen.findByRole('link', { name: 'Shop now' })
+    expect(link).toHaveClass('bg-sf-primary')
+    expect(link.getAttribute('style')).toBeNull()
+  })
+})
+
+describe('mobile brand', () => {
+  it('a store without a logo keeps its preset’s name style on phones', async () => {
+    viewport({ desktop: false })
+    serve(store({ header_style: 'commerce' }))
+    renderRoutes(storefrontRoutes)
+
+    const header = await screen.findByTestId('site-header')
+    const name = within(header).getByText(bootstrapFixture().store.name)
+    expect(name).toHaveClass('uppercase', 'text-sf-heading')
+  })
+
+  it('the standard header keeps today’s accent-coloured name', async () => {
+    viewport({ desktop: false })
+    serve(store({}))
+    renderRoutes(storefrontRoutes)
+
+    const header = await screen.findByTestId('site-header')
+    expect(within(header).getByText(bootstrapFixture().store.name)).toHaveClass('text-sf-accent', 'font-extrabold')
   })
 })

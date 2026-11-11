@@ -23,15 +23,26 @@ export function SiteHeader() {
   const desktop = useIsDesktop()
   if (desktop && style === 'centered') return <CenteredHeader />
   if (desktop && style === 'commerce') return <CommerceHeader />
-  return <StandardHeader />
+  return <StandardHeader nameClassName={MOBILE_NAME[style]} />
 }
+
+/**
+ * The store name (no logo) on small screens, styled like the desktop variant's brand so a preset keeps
+ * its character on phones: accent-coloured (standard), quiet serif-style (centered), bold UPPERCASE (commerce).
+ */
+const MOBILE_NAME = {
+  standard: 'font-extrabold text-sf-accent',
+  centered: 'font-semibold tracking-wide text-sf-heading',
+  // A notch smaller on phones: capitals run wide, and the name should not be cut off next to five icons.
+  commerce: 'font-extrabold tracking-tight text-sf-heading uppercase max-sm:text-lg',
+} as const
 
 /**
  * Logo row with the product search over the accent-coloured navigation bar
  * (UI_REFERENCE_ANALYSIS §4). On small screens the search opens below the logo row from a
  * toggle. Account, wishlist and cart (with counts) sit at the right on every screen size.
  */
-function StandardHeader() {
+function StandardHeader({ nameClassName = MOBILE_NAME.standard }: { nameClassName?: string }) {
   const { store, theme, menus } = useStorefront()
   const { t } = useLocale()
   const mainItems = menus.main?.items ?? []
@@ -55,7 +66,7 @@ function StandardHeader() {
               className="h-10 w-auto max-w-28 object-contain sm:max-w-40 lg:h-14 lg:max-w-56"
             />
           ) : (
-            <span className="truncate font-heading text-xl font-extrabold text-sf-accent sm:text-2xl lg:text-3xl">{store.name}</span>
+            <span className={cn('truncate font-heading text-xl sm:text-2xl lg:text-3xl', nameClassName)}>{store.name}</span>
           )}
         </Link>
         <HeaderSearch className="hidden max-w-xl flex-1 lg:block" />

@@ -7,6 +7,7 @@ import { catalog } from './bn/catalog'
 import { checkout } from './bn/checkout'
 import { common } from './bn/common'
 import { content } from './bn/content'
+import { demos } from './bn/demos'
 import { orders } from './bn/orders'
 import { promo } from './bn/promo'
 import { reviews } from './bn/reviews'
@@ -29,4 +30,5 @@ export const bn: Translations<typeof en> = {
   ...account,
   ...orders,
   ...theme,
+  ...demos,
 }

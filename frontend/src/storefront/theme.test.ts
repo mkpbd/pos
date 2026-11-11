@@ -45,6 +45,15 @@ describe('themeToCssVars', () => {
     expect(classic['--sf-heading-tracking']).toBe('0.04em')
   })
 
+  it('picks a star colour that stands out on the dark footer (the heading colour)', () => {
+    const base = bootstrapFixture().theme
+    // Today's amber stands out on #3d3d3d: kept.
+    expect(themeToCssVars(base)['--sf-star-on-dark']).toBe('#f59e0b')
+    // Classic: a #111 primary on a #111 footer would vanish — the surface colour instead.
+    const classic = { ...base.colors, primary: '#111111', heading: '#111111', surface: '#ffffff' }
+    expect(themeToCssVars({ ...base, colors: classic })['--sf-star-on-dark']).toBe('#ffffff')
+  })
+
   it('applies variables to an element and removes them again', () => {
     const element = document.createElement('div')
     const remove = applyCssVars(element, { '--sf-primary': '#123456' })

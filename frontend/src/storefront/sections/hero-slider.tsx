@@ -5,7 +5,8 @@ import { MenuLink } from '../components/menu-link'
 import { useLocale } from '../i18n/locale'
 import { useStoreLayout } from '../theme'
 import type { StoreBanner, StoreSection } from '../types'
-import { BannerPicture, BannerText, SaleBannerText } from './banner-content'
+import { bannerFallbackClass } from './banner-colors'
+import { BannerPicture, BannerScrim, BannerText, SaleBannerText } from './banner-content'
 
 type Props = { section: Extract<StoreSection, { type: 'hero_slider' }> }
 
@@ -61,6 +62,7 @@ function HeroCarousel({ section, sale }: Props & { sale: boolean }) {
           const content = (
             <>
               <BannerPicture banner={banner} sizes="100vw" priority={i === 0} className="absolute inset-0" />
+              <BannerScrim banner={banner} from={sale ? 'left' : banner.text_position} />
               <div className={cn('absolute inset-0 flex items-center', sale ? JUSTIFY.left : JUSTIFY[banner.text_position])}>
                 <div className="mx-auto w-full max-w-sf px-6 lg:px-4">
                   {sale ? <SaleBannerText banner={banner} /> : <BannerText banner={banner} size="hero" />}
@@ -77,7 +79,7 @@ function HeroCarousel({ section, sale }: Props & { sale: boolean }) {
               aria-label={banner.title ? t('content.section.slideTitled', { index: i + 1, count, title: banner.title }) : t('content.section.slide', { index: i + 1, count })}
               aria-hidden={i !== current}
               inert={i !== current}
-              className={cn('absolute inset-0 transition-opacity duration-700 motion-reduce:transition-none', i === current ? 'opacity-100' : 'pointer-events-none opacity-0')}
+              className={cn('absolute inset-0 transition-opacity duration-700 motion-reduce:transition-none', bannerFallbackClass(banner), i === current ? 'opacity-100' : 'pointer-events-none opacity-0')}
             >
               {linkWhole ? (
                 <MenuLink url={banner.link_url!} aria-label={banner.title ?? banner.image.alt ?? t('content.section.openOffer')} className="block size-full">
@@ -96,7 +98,8 @@ function HeroCarousel({ section, sale }: Props & { sale: boolean }) {
           <button type="button" aria-label={t('content.section.previousSlide')} onClick={() => go(current - 1)} className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white">
             <ChevronLeftIcon className="size-5" />
           </button>
-          <div className="flex gap-2">
+          {/* 24px tap targets around 12px dots; a faint dark ring keeps white dots visible on light photos. */}
+          <div className="flex gap-0.5">
             {banners.map((b, i) => (
               <button
                 key={b.id}
@@ -104,8 +107,13 @@ function HeroCarousel({ section, sale }: Props & { sale: boolean }) {
                 aria-label={t('content.section.goToSlide', { index: i + 1 })}
                 aria-current={i === current ? 'true' : undefined}
                 onClick={() => go(i)}
-                className={cn('size-3 rounded-full border-2 border-white', i === current ? 'bg-white' : 'bg-white/30')}
-              />
+                className="group/dot grid size-6 place-items-center rounded-full"
+              >
+                <span
+                  aria-hidden
+                  className={cn('size-3 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.25)] transition-colors', i === current ? 'bg-white' : 'bg-white/30 group-hover/dot:bg-white/70')}
+                />
+              </button>
             ))}
           </div>
           <button type="button" aria-label={t('content.section.nextSlide')} onClick={() => go(current + 1)} className="grid size-10 place-items-center rounded-full bg-white/90 text-sf-heading shadow hover:bg-white">

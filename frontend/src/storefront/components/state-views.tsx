@@ -27,7 +27,7 @@ export function StoreErrorView({ onRetry, retrying }: { onRetry: () => void; ret
   return (
     <FullPageMessage title={t('common.store.errorTitle')}>
       <p>{t('common.store.errorText')}</p>
-      <Button onClick={onRetry} disabled={retrying} className="rounded-sf-button">
+      <Button onClick={onRetry} disabled={retrying} className="h-11 rounded-sf-button px-6">
         {retrying ? t('common.retrying') : t('common.tryAgain')}
       </Button>
     </FullPageMessage>

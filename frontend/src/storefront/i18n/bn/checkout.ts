@@ -104,8 +104,6 @@ export const checkout: Translations<typeof en> = {
   'checkout.summary.linesLabel': 'আপনার অর্ডারের পণ্যসমূহ',
   'checkout.summary.quantity': 'পরিমাণ:',
   'checkout.summary.qty': 'পরিমাণ',
-  'checkout.summary.lineDiscount': 'ছাড়: {amount}',
-  'checkout.summary.lineDiscountPromotion': 'ছাড় ({promotion}): {amount}',
   'checkout.summary.notAvailable': 'পাওয়া যাচ্ছে না — মোটে ধরা হয়নি',
   'checkout.summary.notEnoughStock': 'পর্যাপ্ত স্টক নেই',
 

@@ -165,6 +165,8 @@ describe('storefront blog post', () => {
 
     const related = screen.getByRole('region', { name: 'Related posts' })
     expect(within(related).getAllByTestId('blog-card')).toHaveLength(3)
+    // Under the centred heading a short row is centred too (flex wrap, fixed column widths).
+    expect(within(related).getAllByRole('list')[0]).toHaveClass('justify-center')
     expect(within(related).getByRole('heading', { level: 3, name: 'Lychee Cooler' })).toBeInTheDocument()
 
     // Links in the body navigate inside the app.

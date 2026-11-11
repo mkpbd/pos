@@ -105,3 +105,32 @@ test('storefront screens', async ({ page }) => {
   await page.waitForURL(/account/)
   await visit(page, '/account/orders', '37-account-orders')
 })
+
+// Theme presets and the demo stores (T3): needs `php artisan db:seed --class=DemoThemesSeeder` and E2E_DEMOS=1.
+test('theme presets and demo stores', async ({ page }) => {
+  test.skip(!process.env.E2E_DEMOS, 'Set E2E_DEMOS=1 against a backend seeded with the demo stores')
+  const port = Number(process.env.E2E_PORT ?? 5173)
+
+  // The preset picker as the Green Basket owner sees it (vegan preset applied).
+  const vegan = `http://vegan.shop.localhost:${port}`
+  await page.goto(`${vegan}/admin/login`)
+  await page.getByLabel('E-mail').fill('owner@greenbasket.test')
+  await page.getByLabel('Password').fill('password')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'Dashboard' }).first()).toBeVisible()
+  await visit(page, `${vegan}/admin/storefront/theme`, '38-theme-presets')
+
+  await visit(page, '/demos', '39-demo-gallery')
+  for (const [host, name] of [['vegan', '40-demo-vegan'], ['handmade', '41-demo-handmade'], ['classic', '42-demo-classic']] as const) {
+    await page.goto(`http://${host}.shop.localhost:${port}/`)
+    // Load the lazy images below the fold, then shoot the top of the homepage.
+    for (let y = 0; y < 2400; y += 600) {
+      await page.evaluate(`window.scrollTo(0, ${y})`)
+      await page.waitForTimeout(150)
+    }
+    await page.evaluate('window.scrollTo(0, 0)')
+    await page.setViewportSize({ width: 1366, height: 1500 })
+    await shot(page, name)
+    await page.setViewportSize({ width: 1366, height: 800 })
+  }
+})

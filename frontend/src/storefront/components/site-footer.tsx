@@ -1,4 +1,5 @@
 import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
 import { useStoreLayout } from '../theme'
@@ -26,10 +27,12 @@ function ColumnsFooter() {
   })
   const socialLinks = (Object.keys(SOCIAL_LABELS) as SocialNetwork[]).flatMap((network) => (social[network] ? [{ network, url: social[network] }] : []))
   const hasContact = Boolean(contact.email || contact.phone || contact.address)
+  // Brand + menus + contact: fewer than four blocks share the row instead of leaving an empty column.
+  const blocks = 1 + columns.length + (hasContact ? 1 : 0)
 
   return (
     <footer className="mt-auto border-t bg-sf-surface" data-testid="site-footer">
-      <div className="mx-auto grid max-w-sf gap-10 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={cn('mx-auto grid max-w-sf gap-10 px-4 py-12 sm:grid-cols-2', blocks === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4')}>
         <div className="space-y-4">
           <p className="font-heading text-2xl font-extrabold text-sf-accent">{store.name}</p>
           {about && <p className="text-sm leading-relaxed whitespace-pre-line">{about}</p>}

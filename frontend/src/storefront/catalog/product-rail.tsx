@@ -7,9 +7,22 @@ import { useLocale } from '../i18n/locale'
  * A horizontally scrolling row (product and category carousels) inside a labelled section.
  * Native scrolling with snap
  * points, so touch, trackpad and keyboard scrolling work; the arrow buttons page by the
- * visible width and are disabled at either end.
+ * visible width and are disabled at either end. `centerWhenFits` centres a row that needs no
+ * scrolling under its centred heading (category and brand strips) instead of leaving a gap on the right.
  */
-export function Rail({ label, children, itemClassName, count }: { label: string; children: ReactNode[]; itemClassName?: string; count: number }) {
+export function Rail({
+  label,
+  children,
+  itemClassName,
+  count,
+  centerWhenFits = false,
+}: {
+  label: string
+  children: ReactNode[]
+  itemClassName?: string
+  count: number
+  centerWhenFits?: boolean
+}) {
   const { t } = useLocale()
   const trackRef = useRef<HTMLUListElement>(null)
   const [edges, setEdges] = useState({ start: true, end: count <= 1 })
@@ -35,6 +48,7 @@ export function Rail({ label, children, itemClassName, count }: { label: string;
     el.scrollBy?.({ left: direction * el.clientWidth * 0.9, behavior: 'smooth' })
   }
 
+  const centered = centerWhenFits && edges.start && edges.end
   const arrow = 'grid size-10 place-items-center rounded-full border bg-sf-surface text-sf-heading shadow-sm transition hover:bg-sf-accent hover:text-sf-accent-foreground disabled:pointer-events-none disabled:opacity-40'
 
   return (
@@ -42,7 +56,12 @@ export function Rail({ label, children, itemClassName, count }: { label: string;
       <ul
         ref={trackRef}
         onScroll={update}
-        className="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-1 pb-3 [scrollbar-width:thin] motion-reduce:scroll-auto"
+        // scroll-px-1 matches the padding, so the first slide snaps flush with the content edge, not 4px past it.
+        className={cn(
+          '-mx-1 flex snap-x snap-mandatory scroll-px-1 gap-5 overflow-x-auto scroll-smooth px-1 pb-3 [scrollbar-width:thin] motion-reduce:scroll-auto',
+          centered && 'justify-center',
+        )}
+        data-centered={centered || undefined}
       >
         {children.map((child, i) => (
           <li key={i} className={cn('shrink-0 snap-start', itemClassName)} aria-roledescription="slide" aria-label={t('catalog.rail.slide', { index: i + 1, count })}>

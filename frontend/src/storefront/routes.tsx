@@ -42,6 +42,8 @@ const newsletter = () => import('./pages/newsletter-pages')
  * and password pages send signed-in customers on to /account (or a safe `next`).
  */
 export const storefrontRoutes: RouteObject[] = [
+  // The demo gallery belongs to no store: outside the layout, so it works on any host.
+  { path: 'demos', element: lazyPage(() => import('./demos/demo-gallery-page'), 'DemoGalleryPage') },
   {
     element: <StorefrontLayout />,
     children: [

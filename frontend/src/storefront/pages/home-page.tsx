@@ -30,7 +30,8 @@ export function HomePage() {
     return (
       <section className="mx-auto max-w-sf px-4 py-16 text-center">
         <h1 className="text-2xl font-bold">{t('content.loadError')}</h1>
-        <Button className="mt-4 rounded-sf-button" onClick={() => void homepage.refetch()}>{t('common.tryAgain')}</Button>
+        <p className="mt-2">{t('common.store.errorText')}</p>
+        <Button className="mt-4 h-11 rounded-sf-button px-6" onClick={() => void homepage.refetch()}>{t('common.tryAgain')}</Button>
       </section>
     )
   }

@@ -5,6 +5,7 @@ import { catalog } from './en/catalog'
 import { checkout } from './en/checkout'
 import { common } from './en/common'
 import { content } from './en/content'
+import { demos } from './en/demos'
 import { orders } from './en/orders'
 import { promo } from './en/promo'
 import { reviews } from './en/reviews'
@@ -31,6 +32,7 @@ export const en = {
   ...account,
   ...orders,
   ...theme,
+  ...demos,
 }
 
 export type MessageKey = keyof typeof en

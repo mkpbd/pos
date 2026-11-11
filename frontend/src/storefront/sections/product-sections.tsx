@@ -95,7 +95,7 @@ export function CategoryStrip({ section }: { section: Extract<StoreSection, { ty
   return (
     <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={label}>
       <SectionHeading section={section} />
-      <Rail label={label} count={section.categories.length} itemClassName="w-32 sm:w-36">
+      <Rail label={label} count={section.categories.length} itemClassName="w-32 sm:w-36" centerWhenFits>
         {section.categories.map((c) => (
           <MenuLink key={c.slug} url={c.url} className="group flex flex-col items-center gap-3 text-center">
             <span className="block aspect-square w-full overflow-hidden rounded-full border-4 border-sf-surface bg-sf-surface shadow-sm transition group-hover:border-sf-accent">
@@ -125,7 +125,7 @@ export function BrandStrip({ section }: { section: Extract<StoreSection, { type:
   return (
     <section className="mx-auto w-full max-w-sf px-4 py-10" aria-label={label}>
       <SectionHeading section={section} />
-      <Rail label={label} count={section.brands.length} itemClassName="w-36 sm:w-44">
+      <Rail label={label} count={section.brands.length} itemClassName="w-36 sm:w-44" centerWhenFits>
         {section.brands.map((b) => (
           <MenuLink
             key={b.slug}

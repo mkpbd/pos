@@ -83,7 +83,21 @@
     --sf-container: 1170px;
     --sf-heading-transform: none;
     --sf-heading-tracking: normal;
+    /* Rating stars: filled in the primary colour, empty in the border colour. */
+    --sf-star: var(--sf-primary);
+    --sf-star-empty: var(--sf-border);
+    /* themeToCssVars picks the theme colour that stands out on the dark footer (the heading colour). */
+    --sf-star-on-dark: #ffffff;
     color-scheme: light;
+}
+
+/*
+ * A dark surface (the classic widgets footer): stars switch to a colour that stands out on it —
+ * the primary may be as dark as the surface itself — and empty stars to a translucent white.
+ */
+.sf-on-dark {
+    --sf-star: var(--sf-star-on-dark);
+    --sf-star-empty: rgb(255 255 255 / 0.35);
 }
 
 @layer base {
@@ -146,6 +160,8 @@
   & table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
   & th, & td { border: 1px solid var(--sf-border); padding: 0.5em 0.75em; text-align: left; }
   & figcaption { font-size: 0.875rem; text-align: center; margin-top: 0.5em; }
+  /* A heading that opens the text sits at the top of its box, not 1.5em below it. */
+  & > :first-child { margin-top: 0; }
 }
 
 /*

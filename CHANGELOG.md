@@ -21,8 +21,36 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
-### T2 (prepared) — demo images
-- 93 royalty-free photos (Unsplash / Pexels licences) for the three demo stores in `backend/database/seeders/demo-themes/images/` with `manifest.json`; credits in [DEMO_IMAGE_CREDITS.md](docs/ecommerce/DEMO_IMAGE_CREDITS.md).
+### T3 — Theme demos: polish and verification
+
+Visual pass of the three demo stores and Demo Mart at 1366 / 768 / 375 px, full-stack tests per demo, manual and report: [STOREFRONT_THEMES_REPORT.md](docs/ecommerce/STOREFRONT_THEMES_REPORT.md).
+
+#### Fixed / improved (shared storefront code)
+- Star ratings follow the theme and are clearly visible on dark surfaces (`--sf-star`, `.sf-on-dark`; classic widgets footer).
+- Banner buttons that would vanish on the scrim are inverted; slides or tiles without an image get a background that contrasts with their text.
+- Category / brand strips centred when they fit; first rail item aligned; lone last banner tile spans the row; 3 testimonials / posts in one row; 3-block footer without an empty column.
+- Phones: card buttons no longer wrap; store name follows the preset; hero dots get 24 px tap targets.
+- Discount amounts never split across lines (cart, mini cart, checkout); search field follows the button shape; consistent 44 px buttons in empty / error states; no extra gap above rich text that starts with a heading.
+
+#### Tests
+- New full-stack `e2e/demo-stores.spec.ts` (opt-in `E2E_BACKEND=1 E2E_DEMOS=1`): gallery + per demo browse → category → on-sale filter → variant → coupon → guest COD checkout → owner sees the order, variant stock down; Demo Mart sees none of the demo orders — 5/5. Integration suite 24/24 on fresh PostgreSQL with the demo stores (repricing test budget 90 s and checkout confirmations 15 s: `php artisan serve` is single-threaded on Windows; a direct checkout measures 1.7 s). Vitest 933; mocked Playwright 174 passed / 68 skipped; typecheck, lint, build clean.
+
+#### Docs
+- Bangla manual §17.1 (theme presets) and §17.2 (demo stores) with screenshots 38–42 and the demo logins; delivery and testing report with the full file list.
+
+### T2 — Three theme demo stores
+
+Three separate demo organizations, each a complete online store in one T1 preset, built from ordinary POS data. Plan: [STOREFRONT_THEMES_PLAN.md](docs/ecommerce/STOREFRONT_THEMES_PLAN.md); visual store builder (next): [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md).
+
+#### Added
+- `DemoThemesSeeder` (`php artisan db:seed --class=DemoThemesSeeder`; refuses in production; one transaction per store; skips a store whose host or owner exists): *Green Basket* (vegan, `vegan.shop.localhost`), *Mati & Co.* (handmade, `handmade.shop.localhost`), *Classic Shop* (classic, `classic.shop.localhost`). Each: owner login, branch, categories, 18–19 products with variants and photos (Media / product image actions), sale prices as compare-at prices, opening stock through a stock adjustment (one product out of stock), online listings, a countdown flash sale on other products, a coupon (`GREEN10` / `MATI15` / `CLASSIC20`), menus, banners, homepage sections per the reference layouts, About / Contact / FAQ / Privacy / Terms pages, 3 blog posts, 8 verified reviews (from delivered demo orders) and one POS sale so *best sellers* has data; theme preset applied. Data in `database/seeders/demo-themes/{vegan,handmade,classic}.php`; 93 royalty-free photos with credits in [DEMO_IMAGE_CREDITS.md](docs/ecommerce/DEMO_IMAGE_CREDITS.md).
+- Demo gallery: `GET /api/v1/demo-stores` + storefront page `/demos` (cards with photo, preset colours and font, categories, product count, *Open store* / *Open admin*; English / Bangla; no logins shown), behind `STOREFRONT_DEMO_GALLERY` (off by default, always off in production).
+- Banner text scrim: hero slides and banner tiles get a gradient behind their text (dark under light text, light under dark text; even wash on mobile) so text stays readable on any photo.
+- Development: the Vite proxy forwards the browser host (`xfwd`); with `TRUSTED_PROXIES=127.0.0.1` the demo hosts resolve locally (`backend/.env.example`).
+
+#### Tests
+- Backend 775 (PostgreSQL: 774 pass, 1 opt-in skip; SQLite 769 + 6 skip): seeder (counts, stock, prices, promotions, content, preset, isolation of Demo Mart, idempotent re-run, production refusal, a guest COD checkout with coupon on a demo host), gallery API + page. Vitest 924; mocked Playwright gallery 10/10, storefront + themes 36 passed / 2 skipped.
+- Full-stack run on PostgreSQL with the demo stores: every demo host serves its own store and preset, `localhost` still serves Demo Mart, gallery lists the three demos. The full-stack integration suite timed out at varying steps on this run because the machine was under heavy load; the same happened on a baseline without demo stores and without the proxy change, so it is not a T2 regression — re-run in T3.
 
 ### Docs — user manual in Bangla
 

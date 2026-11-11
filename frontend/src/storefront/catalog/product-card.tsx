@@ -97,7 +97,7 @@ function StandardProductCard({
         </div>
       </div>
 
-      <div className={cn('flex flex-1 flex-col gap-1.5 p-4', layout === 'grid' && 'border-t')}>
+      <div className={cn('flex flex-1 flex-col gap-1.5 p-3 sm:p-4', layout === 'grid' && 'border-t')}>
         {product.brand && <p className="text-xs font-semibold tracking-wide text-sf-text uppercase">{product.brand.name}</p>}
         <h3 className="font-heading text-base leading-snug font-bold">
           <Link to={product.url} className="line-clamp-2 transition-colors hover:text-sf-accent focus-visible:text-sf-accent">

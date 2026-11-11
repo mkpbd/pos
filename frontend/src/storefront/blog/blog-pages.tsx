@@ -32,7 +32,7 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <section className="mx-auto max-w-sf px-4 py-16 text-center">
       <h1 className="text-2xl font-bold">{t('blog.loadError')}</h1>
-      <Button className="mt-4 rounded-sf-button" onClick={onRetry}>{t('common.tryAgain')}</Button>
+      <Button className="mt-4 h-11 rounded-sf-button px-6" onClick={onRetry}>{t('common.tryAgain')}</Button>
     </section>
   )
 }
@@ -225,7 +225,7 @@ export function BlogPostPage() {
         <section aria-labelledby="related-posts" className="bg-sf-surface/60">
           <div className="mx-auto max-w-sf px-4 py-12">
             <h2 id="related-posts" className="mb-8 text-center text-3xl font-extrabold">{t('blog.related')}</h2>
-            <BlogGrid posts={related} headingLevel={3} />
+            <BlogGrid posts={related} headingLevel={3} centered />
           </div>
         </section>
       )}

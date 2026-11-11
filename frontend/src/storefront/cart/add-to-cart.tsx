@@ -70,9 +70,9 @@ export function AddToCartForm({ product, variant, onAdded }: { product: ProductD
 
 const CARD_ACTION_CLASS = {
   outline:
-    'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent px-4 py-2 text-sm font-bold text-sf-accent transition hover:bg-sf-accent hover:text-sf-accent-foreground disabled:cursor-not-allowed disabled:border-sf-border disabled:text-sf-text disabled:hover:bg-transparent',
+    'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent px-2 py-2 text-sm leading-tight font-bold text-sf-accent sm:px-4 transition hover:bg-sf-accent hover:text-sf-accent-foreground disabled:cursor-not-allowed disabled:border-sf-border disabled:text-sf-text disabled:hover:bg-transparent',
   solid:
-    'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent bg-sf-accent px-4 py-2.5 text-xs font-bold tracking-wider text-sf-accent-foreground uppercase transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-canvas disabled:text-sf-text disabled:hover:brightness-100',
+    'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent bg-sf-accent px-2 py-2.5 text-xs leading-tight font-bold tracking-wide text-sf-accent-foreground uppercase sm:px-4 sm:tracking-wider transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-canvas disabled:text-sf-text disabled:hover:brightness-100',
 } as const
 
 /**

@@ -158,9 +158,9 @@ export function SummaryLines({ lines, currency }: { lines: CartLine[]; currency:
               </p>
               {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
                 <p className="text-xs font-semibold text-sf-sale" data-testid="summary-line-discount">
-                  {line.promotion
-                    ? t('checkout.summary.lineDiscountPromotion', { promotion: line.promotion.name, amount: formatDiscount(line.discount_amount, currency) })
-                    : t('checkout.summary.lineDiscount', { amount: formatDiscount(line.discount_amount, currency) })}
+                  {/* The amount never breaks between its minus sign and the currency symbol. */}
+                  {line.promotion ? t('cart.line.discountPromotion', { promotion: line.promotion.name }) : t('cart.line.discount')}{' '}
+                  <span className="whitespace-nowrap">{formatDiscount(line.discount_amount, currency)}</span>
                 </p>
               )}
               {excluded ? (

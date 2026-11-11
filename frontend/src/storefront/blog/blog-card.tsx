@@ -76,11 +76,15 @@ export function BlogCard({ post, headingLevel = 2 }: { post: BlogPostRow; headin
 }
 
 /** Cards in a responsive grid (one, two, then three columns). */
-export function BlogGrid({ posts, headingLevel = 2, label }: { posts: BlogPostRow[]; headingLevel?: 2 | 3; label?: string }) {
+/**
+ * Posts in up to three columns (exactly three: one row from md, not two plus an orphan). `centered` (under a centred heading, e.g. related posts) keeps the
+ * column width but centres a short last row instead of leaving a gap on the right.
+ */
+export function BlogGrid({ posts, headingLevel = 2, label, centered = false }: { posts: BlogPostRow[]; headingLevel?: 2 | 3; label?: string; centered?: boolean }) {
   return (
-    <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label={label}>
+    <ul className={centered ? 'flex flex-wrap justify-center gap-6' : cn('grid gap-6', posts.length === 3 ? 'md:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3')} aria-label={label}>
       {posts.map((post) => (
-        <li key={post.slug}>
+        <li key={post.slug} className={centered ? 'w-full sm:w-[calc((100%-1.5rem)/2)] md:w-[calc((100%-3rem)/3)]' : undefined}>
           <BlogCard post={post} headingLevel={headingLevel} />
         </li>
       ))}

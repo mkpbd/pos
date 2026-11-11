@@ -2,6 +2,7 @@
 
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
+use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
 use App\Modules\Storefront\Presentation\Http\Controllers\MenuController;
@@ -16,6 +17,9 @@ Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group
     Route::get('bootstrap', StoreBootstrapController::class)->middleware(['storefront.session', 'storefront.cache'])->name('store.bootstrap');
     Route::get('homepage', StoreHomepageController::class)->middleware('storefront.cache')->name('store.homepage');
 });
+
+// T2: the demo store gallery — any host, no store resolution (404 while the gallery is off).
+Route::middleware('throttle:storefront')->get('demo-stores', [DemoGalleryController::class, 'index'])->name('storefront.demo-stores');
 
 // Storefront administration.
 Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(function () {

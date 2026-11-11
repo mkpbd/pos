@@ -389,6 +389,47 @@ AI ঐচ্ছিক, শুরুতে **বন্ধ** থাকে। AI �
 
 এছাড়া **"CONTENT"**-এ About us, FAQ-এর মতো পাতা আর ব্লগ লেখা যায়, আর **"MEDIA LIBRARY"**-তে ছবি রাখা হয়।
 
+### ১৭.১ এক ক্লিকে দোকানের চেহারা বদলানো (থিম প্রিসেট)
+
+![থিম প্রিসেট](manual/images/38-theme-presets.png)
+
+**ONLINE STORE → Theme** পাতার উপরে চারটি তৈরি চেহারা (প্রিসেট) আছে:
+
+| প্রিসেট | কেমন দেখায় | কোন দোকানে মানায় |
+|---|---|---|
+| **Default** | আগের মতোই | যেকোনো দোকান |
+| **Vegan Store** | সবুজ-হলুদ, গোল বাটন, ছোট হাতের হেডিং, উপরে চলমান অফার-লেখা | সবজি, খাবার, স্বাস্থ্য পণ্য |
+| **Handmade** | মাটির রং, সেরিফ অক্ষর, চৌকো কোণ, ফাঁকা-ফাঁকা সাজানো | হস্তশিল্প, গয়না, ঘর সাজানো |
+| **Classic Shop** | কালো-সাদা আর নীল, বড় হাতের হেডিং, বড় সার্চ বার, কার্টে মোট টাকা | কাপড়, জুতা, ব্যাগ — অনেক পণ্যের দোকান |
+
+১. পছন্দের প্রিসেটে ক্লিক করুন → **Apply preset** চাপুন।
+২. নিশ্চিত করার বার্তায় **Apply** চাপুন। রং, অক্ষর আর লেআউট বদলাবে; **লোগো, ঘোষণা-লেখা আর ফুটারের লেখা যেমন ছিল তেমনই থাকবে।**
+৩. **View store** চেপে দোকান দেখে নিন। পছন্দ না হলে যেকোনো রং বা লেআউট আলাদা করে বদলে **Save theme** চাপুন।
+
+### ১৭.২ তিনটি নমুনা (ডেমো) দোকান
+
+![ডেমো দোকানের তালিকা](manual/images/39-demo-gallery.png)
+
+প্রশিক্ষণ বা ক্রেতাকে দেখানোর জন্য তিনটি সম্পূর্ণ নমুনা দোকান আছে — প্রতিটি **আলাদা প্রতিষ্ঠান**, তাই আপনার আসল দোকানের পণ্য, স্টক বা অর্ডারে কোনো প্রভাব পড়ে না:
+
+| দোকান | চেহারা | ঠিকানা (টেস্ট সার্ভারে) | কুপন |
+|---|---|---|---|
+| **Green Basket** | Vegan Store | `vegan.shop.localhost` | `GREEN10` — ১,০০০ টাকার উপরে ১০ % ছাড় |
+| **Mati & Co.** | Handmade | `handmade.shop.localhost` | `MATI15` — ৩,০০০ টাকার উপরে ১৫ % ছাড় |
+| **Classic Shop** | Classic Shop | `classic.shop.localhost` | `CLASSIC20` — ৫,০০০ টাকার উপরে ২০ % ছাড় |
+
+![Green Basket](manual/images/40-demo-vegan.png)
+
+![Mati & Co.](manual/images/41-demo-handmade.png)
+
+![Classic Shop](manual/images/42-demo-classic.png)
+
+প্রতিটি দোকানে ছবিসহ ১৮–১৯টি পণ্য (সাইজ/রং/ফ্লেভার বেছে নেওয়া যায়), স্টক, ফ্ল্যাশ সেল (সময় গুনতে থাকা ঘড়িসহ), কুপন, মেনু, ব্যানার, ব্লগ, রিভিউ আর About / Contact / FAQ পাতা আছে। সত্যিকারের মতোই অর্ডার দেওয়া যায় — অর্ডার সেই দোকানের মালিকের **WEB ORDERS**-এ আসে আর স্টক কমে।
+
+- সব ডেমো দোকানের তালিকা: `/demos` পাতা (শুধু টেস্ট সার্ভারে চালু থাকলে)।
+- প্রতিটি দোকানের অ্যাডমিনে ঢুকতে নিচের "ডেমো অ্যাকাউন্ট" টেবিল দেখুন।
+- ডেমো দোকান তৈরি করেন ডেভেলপার/আইটি (নিচের ছোট লেখা দেখুন); আসল সার্ভারে এগুলো থাকে না।
+
 ---
 
 ## ১৮. ইউজার, রোল ও প্রতিষ্ঠানের সেটিংস
@@ -494,7 +535,10 @@ AI ঐচ্ছিক, শুরুতে **বন্ধ** থাকে। AI �
 | ম্যানেজার | `manager@demo.test` | `password` |
 | ক্যাশিয়ার | `cashier@demo.test` | `password` |
 | ক্রেতা (অনলাইন) | `shopper@demo.test` | `password` |
+| Green Basket-এর মালিক | `owner@greenbasket.test` | `password` |
+| Mati & Co.-এর মালিক | `owner@mati.test` | `password` |
+| Classic Shop-এর মালিক | `owner@classicshop.test` | `password` |
 
 > **সতর্কতা:** এই অ্যাকাউন্টগুলো শুধু ডেমো ডেটার জন্য। আসল দোকানের সার্ভারে এগুলো থাকবে না, নিজের শক্ত পাসওয়ার্ড ব্যবহার করুন।
 
-<sub>ছবিগুলো আবার তুলতে (ডেভেলপারদের জন্য): seeded backend চালিয়ে `MANUAL_SHOTS=1 npx playwright test e2e/manual-shots.spec.ts --project=desktop-chromium`। ছবি জমা হয় `docs/manual/images/`-এ।</sub>
+<sub>ছবিগুলো আবার তুলতে (ডেভেলপারদের জন্য): seeded backend চালিয়ে `MANUAL_SHOTS=1 npx playwright test e2e/manual-shots.spec.ts --project=desktop-chromium`। ছবি জমা হয় `docs/manual/images/`-এ। ডেমো দোকানের ছবি (৩৮–৪২): backend-এ `php artisan db:seed --class=DemoThemesSeeder` চালিয়ে, `MANUAL_SHOTS=1 E2E_DEMOS=1` দিয়ে একই কমান্ড। ডেমো দোকান তৈরি: `php artisan db:seed --class=DemoThemesSeeder` (`.env`-এ `TRUSTED_PROXIES=127.0.0.1`, `STOREFRONT_DEMO_GALLERY=true`; বিস্তারিত README-তে)।</sub>

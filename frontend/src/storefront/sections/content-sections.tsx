@@ -66,8 +66,9 @@ export function FeaturesStrip({ section }: { section: Extract<StoreSection, { ty
 function Stars({ rating }: { rating: number }) {
   const { t } = useLocale()
   return (
-    <p className="flex gap-0.5 text-sf-primary" aria-label={t('content.section.stars', { rating, max: 5 })}>
-      {Array.from({ length: 5 }, (_, i) => <StarIcon key={i} className={cn('size-4', i < rating ? 'fill-current' : 'opacity-30')} aria-hidden />)}
+    <p className="flex gap-0.5" aria-label={t('content.section.stars', { rating, max: 5 })}>
+      {/* The shared star colours (storefront.css): filled and empty stars as in product ratings. */}
+      {Array.from({ length: 5 }, (_, i) => <StarIcon key={i} className={cn('size-4 fill-current', i < rating ? 'text-(--sf-star)' : 'text-(--sf-star-empty)')} aria-hidden />)}
     </p>
   )
 }
@@ -80,7 +81,8 @@ export function Testimonials({ section }: { section: Extract<StoreSection, { typ
     <section style={config.background ? { backgroundColor: config.background } : undefined} aria-label={section.title ?? t('content.section.customerReviews')}>
       <div className="mx-auto max-w-sf px-4 py-12">
         <SectionHeading section={section} />
-        <ul className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Three quotes sit in one row from md, never two plus an orphan. */}
+        <ul className={cn('grid gap-6', config.items.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-3')}>
           {config.items.map((item, i) => (
             <li key={i}>
               <figure className="flex h-full flex-col gap-4 rounded-sf-card bg-sf-surface p-6 shadow-sm">

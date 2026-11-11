@@ -1,4 +1,5 @@
 import { useStorefront } from './api'
+import { legibleOn } from './color'
 import type { BodyFont, ButtonStyle, HeadingCase, HeadingFont, LayoutVariants, StorefrontTheme } from './types'
 
 const SYSTEM_STACK = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
@@ -15,6 +16,11 @@ const HEADING_STACKS: Record<HeadingFont, string> = {
   playfair: `'Playfair Display Variable', ${SERIF_FALLBACK}`,
   jost: `'Jost Variable', 'Poppins', ${SYSTEM_STACK}`,
   system: SYSTEM_STACK,
+}
+
+/** The font stack for a theme's heading font; an unknown name gets the system stack. */
+export function headingFontStack(font: string): string {
+  return Object.hasOwn(HEADING_STACKS, font) ? HEADING_STACKS[font as HeadingFont] : SYSTEM_STACK
 }
 
 const BODY_STACKS: Record<BodyFont, string> = {
@@ -109,6 +115,9 @@ export function themeToCssVars(theme: StorefrontTheme): Record<string, string> {
   vars['--sf-heading-transform'] = HEADING_TRANSFORMS[headingCase]
   // Capitals read better slightly spaced.
   vars['--sf-heading-tracking'] = headingCase === 'uppercase' ? '0.04em' : 'normal'
+  // Stars on a dark surface (`.sf-on-dark`, painted in the heading colour): the primary when it
+  // stands out there, else the surface colour (classic's primary is as dark as its footer).
+  vars['--sf-star-on-dark'] = legibleOn(theme.colors.heading, [theme.colors.primary, theme.colors.surface, '#ffffff'])
   return vars
 }
 

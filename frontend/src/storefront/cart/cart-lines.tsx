@@ -93,10 +93,13 @@ function CartLineRow({ line, currency, compact, onNavigate }: { line: CartLine; 
 
         {/* The line's product discount plus its share of an order discount; the product promotion is named. */}
         {!excluded && !isZeroDecimal(line.discount_amount ?? '0') && (
-          <p className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-sf-sale" data-testid="line-discount">
-            <TagIcon aria-hidden className="size-3.5 shrink-0" />
-            <span>{line.promotion ? t('cart.line.discountPromotion', { promotion: line.promotion.name }) : t('cart.line.discount')}</span>
-            <span>{formatDiscount(line.discount_amount, currency)}</span>
+          // The tag stays beside the text when it wraps (narrow drawer), and the amount never splits.
+          <p className="flex items-start gap-1.5 text-xs font-semibold text-sf-sale" data-testid="line-discount">
+            <TagIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+            <span>
+              {line.promotion ? t('cart.line.discountPromotion', { promotion: line.promotion.name }) : t('cart.line.discount')}{' '}
+              <span className="whitespace-nowrap">{formatDiscount(line.discount_amount, currency)}</span>
+            </span>
           </p>
         )}
 

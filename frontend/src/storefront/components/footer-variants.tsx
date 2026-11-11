@@ -148,10 +148,8 @@ function FooterProduct({ product, tone }: { product: ProductCard; tone: Tone }) 
         <Link to={product.url} className={cn('line-clamp-2 text-sm leading-snug font-medium', tone === 'dark' ? 'text-sf-surface hover:underline' : 'text-sf-heading hover:text-sf-accent')}>
           {product.name}
         </Link>
-        {/* On the dark footer the stars are light: the theme's primary may be as dark as the footer itself. */}
-        <div className={cn(tone === 'dark' && '[&_[data-testid=stars]>span:first-child]:text-sf-surface/25 [&_[data-testid=stars]>span:last-child]:text-sf-surface')}>
-          <CardRating rating={product.rating} />
-        </div>
+        {/* On the dark footer the star colours come from its `sf-on-dark` class (storefront.css). */}
+        <CardRating rating={product.rating} />
         <CardPrice
           product={product}
           pricing={pricing}
@@ -327,7 +325,7 @@ export function WidgetsFooter() {
   const menuItems = columns.flatMap(({ menu }) => menu.items)
 
   return (
-    <footer className="mt-auto bg-sf-heading text-sf-surface/75" data-testid="site-footer" data-footer-style="widgets">
+    <footer className="sf-on-dark mt-auto bg-sf-heading text-sf-surface/75" data-testid="site-footer" data-footer-style="widgets">
       <div className="mx-auto grid max-w-sf gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
         {(about || hasContact || socialLinks.length > 0) && (
           <Widget title={t('theme.footer.about')} tone="dark" testId="footer-about">

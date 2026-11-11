@@ -1,6 +1,8 @@
 import { cn } from '@/lib/utils'
 import { MenuLink } from '../components/menu-link'
+import { isLightColor } from '../color'
 import type { StoreBanner } from '../types'
+import { useBannerButtonColors } from './banner-colors'
 
 const POSITION = {
   left: 'items-start text-left',
@@ -34,11 +36,39 @@ export function BannerPicture({ banner, sizes, priority = false, className }: { 
   )
 }
 
+const SCRIM_DIRECTION = { left: 'to right', center: 'to right', right: 'to left', bottom: 'to top' } as const
+
+/**
+ * A gradient behind banner text so it stays readable on any photo: dark under light text,
+ * light under dark text, strongest on the text's side. Decorative (aria-hidden); rendered only
+ * when the banner has text.
+ */
+export function BannerScrim({ banner, from }: { banner: StoreBanner; from: keyof typeof SCRIM_DIRECTION }) {
+  const hasText = banner.kicker || banner.title || banner.subtitle || banner.button_label || banner.secondary_button_label
+  if (!hasText) return null
+  const tone = isLightColor(banner.text_color) ? '0 0 0' : '255 255 255'
+  const background =
+    from === 'center'
+      ? `radial-gradient(ellipse at center, rgb(${tone} / 0.55) 0%, rgb(${tone} / 0.25) 55%, rgb(${tone} / 0) 80%)`
+      : `linear-gradient(${SCRIM_DIRECTION[from]}, rgb(${tone} / 0.7) 0%, rgb(${tone} / 0.45) 40%, rgb(${tone} / 0) 75%)`
+
+  if (from === 'bottom') return <div aria-hidden="true" data-testid="banner-scrim" className="pointer-events-none absolute inset-0" style={{ background }} />
+
+  // Below md the text spans the whole slide, so the wash is even instead of one-sided.
+  return (
+    <>
+      <div aria-hidden="true" data-testid="banner-scrim" className="pointer-events-none absolute inset-0 hidden md:block" style={{ background }} />
+      <div aria-hidden="true" data-testid="banner-scrim-mobile" className="pointer-events-none absolute inset-0 md:hidden" style={{ background: `rgb(${tone} / 0.55)` }} />
+    </>
+  )
+}
+
 /** Kicker, headline, text and buttons laid over a banner image. */
 export function BannerText({ banner, size }: { banner: StoreBanner; size: 'hero' | 'tile' }) {
   const hasText = banner.kicker || banner.title || banner.subtitle || banner.button_label || banner.secondary_button_label
-  if (!hasText) return null
   const Heading = size === 'hero' ? 'h2' : 'h3'
+  const buttonColors = useBannerButtonColors(banner)
+  if (!hasText) return null
 
   return (
     <div className={cn('flex flex-col gap-3', POSITION[banner.text_position])} style={{ color: banner.text_color }}>
@@ -52,12 +82,12 @@ export function BannerText({ banner, size }: { banner: StoreBanner; size: 'hero'
       {(banner.button_label || banner.secondary_button_label) && (
         <div className="flex flex-wrap gap-3 pt-2">
           {banner.button_label && banner.link_url && (
-            <MenuLink url={banner.link_url} className="inline-flex items-center rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-semibold text-sf-primary-foreground uppercase transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2">
+            <MenuLink url={banner.link_url} style={buttonColors.primary} className="inline-flex items-center rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-semibold text-sf-primary-foreground uppercase transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2">
               {banner.button_label}
             </MenuLink>
           )}
           {banner.secondary_button_label && banner.secondary_link_url && (
-            <MenuLink url={banner.secondary_link_url} className="inline-flex items-center rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-semibold text-sf-accent-foreground uppercase transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2">
+            <MenuLink url={banner.secondary_link_url} style={buttonColors.secondary} className="inline-flex items-center rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-semibold text-sf-accent-foreground uppercase transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2">
               {banner.secondary_button_label}
             </MenuLink>
           )}
@@ -73,6 +103,7 @@ export function BannerText({ banner, size }: { banner: StoreBanner; size: 'hero'
  */
 export function SaleBannerText({ banner }: { banner: StoreBanner }) {
   const hasText = banner.kicker || banner.title || banner.subtitle || banner.button_label || banner.secondary_button_label
+  const buttonColors = useBannerButtonColors(banner)
   if (!hasText) return null
   const button = 'inline-flex items-center rounded-sf-button px-7 py-3.5 text-sm font-bold tracking-wider uppercase transition focus-visible:outline-2 focus-visible:outline-offset-2'
 
@@ -88,12 +119,12 @@ export function SaleBannerText({ banner }: { banner: StoreBanner }) {
       {(banner.button_label || banner.secondary_button_label) && (
         <div className="flex flex-wrap gap-3 pt-3">
           {banner.button_label && banner.link_url && (
-            <MenuLink url={banner.link_url} className={cn(button, 'bg-sf-primary text-sf-primary-foreground hover:brightness-95')}>
+            <MenuLink url={banner.link_url} style={buttonColors.primary} className={cn(button, 'bg-sf-primary text-sf-primary-foreground hover:brightness-95')}>
               {banner.button_label}
             </MenuLink>
           )}
           {banner.secondary_button_label && banner.secondary_link_url && (
-            <MenuLink url={banner.secondary_link_url} className={cn(button, 'bg-sf-accent text-sf-accent-foreground hover:brightness-110')}>
+            <MenuLink url={banner.secondary_link_url} style={buttonColors.secondary} className={cn(button, 'bg-sf-accent text-sf-accent-foreground hover:brightness-110')}>
               {banner.secondary_button_label}
             </MenuLink>
           )}

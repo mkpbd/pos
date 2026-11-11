@@ -121,7 +121,8 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
   return (
     <form role="search" onSubmit={submit} className={cn('relative', className)} aria-label={t('shell.search.form')}>
       <label htmlFor={`${id}-input`} className="sr-only">{t('shell.search.label')}</label>
-      <div className="flex h-11 items-center rounded-full border-2 border-sf-border bg-sf-surface pl-5 focus-within:border-sf-accent">
+      {/* The field follows the theme's button shape (pill, rounded or square), like the buttons beside it. */}
+      <div className="flex h-11 items-center rounded-sf-button border-2 border-sf-border bg-sf-surface pl-5 focus-within:border-sf-accent">
         <input
           ref={inputRef}
           id={`${id}-input`}
@@ -147,7 +148,7 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
           onKeyDown={onKeyDown}
           className="h-full min-w-0 flex-1 bg-transparent text-sm text-sf-heading outline-none placeholder:text-sf-text [&::-webkit-search-cancel-button]:hidden"
         />
-        <button type="submit" aria-label={t('shell.search.submit')} className="m-1 grid size-8 shrink-0 place-items-center rounded-full bg-sf-accent text-sf-accent-foreground transition hover:brightness-110">
+        <button type="submit" aria-label={t('shell.search.submit')} className="m-1 grid size-8 shrink-0 place-items-center rounded-sf-button bg-sf-accent text-sf-accent-foreground transition hover:brightness-110">
           <SearchIcon aria-hidden className="size-4" />
         </button>
       </div>

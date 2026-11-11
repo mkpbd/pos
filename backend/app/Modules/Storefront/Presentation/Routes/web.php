@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontSeoController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontShellController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -20,6 +21,9 @@ Route::withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, Pr
         Route::get('sitemap.xml', [StorefrontSeoController::class, 'sitemap'])->name('storefront.sitemap');
         Route::get('sitemaps/{name}.xml', [StorefrontSeoController::class, 'sitemap'])->where('name', '[a-z0-9-]{1,40}');
     });
+
+    // T2: the demo gallery page answers every host (a store is not needed); 404 while off.
+    Route::middleware('throttle:storefront')->get('demos', [DemoGalleryController::class, 'page'])->name('storefront.demos');
 });
 
 // Every storefront page is served by the shell. Paths owned by the API, auth, files,

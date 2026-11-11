@@ -1,6 +1,6 @@
 # Storefront theme demos — analysis and plan (T1–T3)
 
-Status: **approved 2026-11-11** — decisions in §5; T1 in progress. Goal: three visually distinct storefront demos — *Vegan Store*, *Handmade Store*, *Classic Shop* — on the existing online store, sharing one e-commerce engine and the existing POS backend.
+Status: **approved 2026-11-11** — decisions in §5; T1–T3 done ([report](STOREFRONT_THEMES_REPORT.md)); next: the visual store builder, [STORE_BUILDER_PLAN.md](STORE_BUILDER_PLAN.md). Goal: three visually distinct storefront demos — *Vegan Store*, *Handmade Store*, *Classic Shop* — on the existing online store, sharing one e-commerce engine and the existing POS backend.
 
 ## 1. What the project already has (reused, not rebuilt)
 

@@ -309,6 +309,8 @@ test('a banner edited and a section added in the admin show on the storefront in
 
 test('a product created and repriced in the admin shows its current price everywhere on the storefront', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile-chromium', 'The admin product editor flow runs on desktop')
+  // Ten brief checks across the admin and the store in one flow: more than the default 30 s on a cold dev server.
+  test.setTimeout(90_000)
   const name = `E2E Kettle ${Date.now()}`
 
   await page.goto('/admin/login')
@@ -448,7 +450,8 @@ test('a guest places a cash-on-delivery order; the admin sees it and stock goes 
   await checkout.getByRole('radio', { name: /Cash on delivery/ }).check()
   await checkout.getByRole('button', { name: 'Place order' }).click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Thank you, Rahim!' })).toBeVisible()
+  // `php artisan serve` handles one request at a time on Windows: the order waits behind the page's image requests.
+  await expect(page.getByRole('heading', { level: 1, name: 'Thank you, Rahim!' })).toBeVisible({ timeout: 15_000 })
   const number = (await page.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
   // Reloading the confirmation page shows the order again and never places a second one.
   await page.reload()
@@ -530,7 +533,7 @@ test('a flash sale and the WELCOME50 coupon lower the price from card to placed 
   await expect(page.getByTestId('summary-coupon').first()).toContainText('WELCOME50')
   await checkout.getByRole('button', { name: 'Place order' }).click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Thank you, Karim!' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Thank you, Karim!' })).toBeVisible({ timeout: 15_000 })
   const number = (await page.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
   await expect(page.getByTestId('summary-discount').first()).toContainText('100.00')
 

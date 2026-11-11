@@ -236,6 +236,14 @@ describe('homepage product sections', () => {
     expect(within(rendered[3]!).getByRole('link', { name: /Juices/ })).toHaveAttribute('href', '/category/juices')
     expect(within(rendered[3]!).getByText('12 products')).toBeInTheDocument()
     expect(within(rendered[4]!).getByRole('link', { name: 'Sunny' })).toHaveAttribute('href', '/brand/sunny')
+
+    // Strips that need no scrolling sit centred under their centred heading; product rails stay left-aligned.
+    expect(within(rendered[3]!).getByRole('list')).toHaveAttribute('data-centered', 'true')
+    expect(within(rendered[3]!).getByRole('list')).toHaveClass('justify-center')
+    expect(within(rendered[4]!).getByRole('list')).toHaveAttribute('data-centered', 'true')
+    expect(within(carousel).getAllByRole('list')[0]!).not.toHaveAttribute('data-centered')
+    // The first slide snaps flush with the content edge (scroll padding = the track's padding).
+    expect(within(carousel).getAllByRole('list')[0]!).toHaveClass('scroll-px-1')
   })
 
   it('marks empty product sections in a preview and never draws them otherwise', async () => {

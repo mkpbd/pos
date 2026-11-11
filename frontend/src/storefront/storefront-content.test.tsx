@@ -62,6 +62,12 @@ describe('storefront homepage', () => {
     expect(within(carousel).queryByRole('group', { name: '2 of 2: New arrivals' })).not.toBeInTheDocument()
     await user.click(within(carousel).getByRole('button', { name: 'Next slide' }))
     expect(within(carousel).getByRole('group', { name: '2 of 2: New arrivals' })).toHaveAttribute('aria-hidden', 'false')
+    // Dots: 24px tap targets around the visible 12px dot; the current one is marked.
+    const dot = within(carousel).getByRole('button', { name: 'Go to slide 2' })
+    expect(dot).toHaveClass('size-6')
+    expect(dot).toHaveAttribute('aria-current', 'true')
+    await user.click(within(carousel).getByRole('button', { name: 'Go to slide 1' }))
+    expect(first).toHaveAttribute('aria-hidden', 'false')
     // No autoplay configured: no stop button.
     expect(within(carousel).queryByRole('button', { name: /automatic slides/ })).not.toBeInTheDocument()
 

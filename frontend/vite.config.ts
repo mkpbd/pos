@@ -48,8 +48,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      // Same-origin proxy so Sanctum SPA cookie auth works in development.
-      proxy: Object.fromEntries(BACKEND_PATHS.map((p) => [p, { target: backend, changeOrigin: true }])),
+      // Same-origin proxy so Sanctum SPA cookie auth works in development. `xfwd` passes the
+      // browser's host (X-Forwarded-Host) so a backend with TRUSTED_PROXIES=127.0.0.1 resolves
+      // the storefront by it — e.g. the demo stores at vegan.shop.localhost:5173.
+      proxy: Object.fromEntries(BACKEND_PATHS.map((p) => [p, { target: backend, changeOrigin: true, xfwd: true }])),
     },
     test: {
       environment: 'jsdom',

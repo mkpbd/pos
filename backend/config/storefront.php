@@ -21,4 +21,13 @@ return [
     */
     'sitemap_products_per_file' => 5000,
 
+    /*
+    | T2: the public demo gallery (GET /api/v1/demo-stores and the /demos page) listing the
+    | demo stores of DemoThemesSeeder, in this order. Off by default and always off in
+    | production.
+    */
+    'demo_gallery' => env('APP_ENV') !== 'production' && filter_var(env('STOREFRONT_DEMO_GALLERY', false), FILTER_VALIDATE_BOOL),
+
+    'demo_hosts' => ['vegan.shop.localhost', 'handmade.shop.localhost', 'classic.shop.localhost'],
+
 ];
