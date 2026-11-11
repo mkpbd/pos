@@ -8,6 +8,7 @@ use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Localization\FixedText;
 use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use App\Modules\Storefront\Presentation\Http\Support\StructuredData;
@@ -56,7 +57,7 @@ class StorefrontShellController
 
     public const ROBOTS_NOINDEX = 'noindex, follow';
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder): Response
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
@@ -85,6 +86,16 @@ class StorefrontShellController
                 'description' => $page['seo_description'] ?? $data['store']['description'],
             ];
             $documents[] = $ld->breadcrumbs([['name' => $t('Home'), 'url' => '/'], ['name' => $page['title'], 'url' => '/pages/'.$page['slug']]]);
+        }
+        // B1: store builder landing pages (/p/{slug}); staff may preview a draft (?preview=draft).
+        $builderPreview = false;
+        if (preg_match('#^/p/([a-z0-9-]{2,60})$#', $path, $m) === 1) {
+            $builderPreview = $request->query('preview') === 'draft' && $this->canViewStorefront($request);
+            $title = $builder->landingTitle($m[1], $builderPreview);
+            if ($title !== null) {
+                $status = 200;
+                $meta['title'] = $title.' | '.$store;
+            }
         }
         // The blog (E11): index, category pages and posts (staff may preview unpublished posts).
         if ($path === '/blog') {
@@ -179,7 +190,7 @@ class StorefrontShellController
             }
         }
 
-        $noindex = $data['preview'] || $blogPreview || $status === 404 || $orderPage || $filtered
+        $noindex = $data['preview'] || $blogPreview || $builderPreview || $status === 404 || $orderPage || $filtered
             || in_array($path, self::NOINDEX_PATHS, true)
             || ! ($data['store']['allow_indexing'] ?? true);
 
@@ -202,7 +213,7 @@ class StorefrontShellController
 
         return response($html, $status, ['Content-Type' => 'text/html; charset=UTF-8', 'Vary' => 'Cookie'])
             // Previews of a closed store must never be cached or indexed.
-            ->header('Cache-Control', $data['preview'] || $blogPreview ? 'no-store' : 'no-cache')
+            ->header('Cache-Control', $data['preview'] || $blogPreview || $builderPreview ? 'no-store' : 'no-cache')
             ->header('X-Robots-Tag', $noindex ? 'noindex' : 'all');
     }
 
@@ -234,6 +245,19 @@ class StorefrontShellController
             && $user->isActive()
             && $user->organizationId() === $request->attributes->get(ResolveStorefront::ATTRIBUTE)['organization_id']
             && $user->can('cms.manage');
+    }
+
+    /**
+     * A signed-in staff member of this store who may view the storefront settings (builder draft previews).
+     */
+    private function canViewStorefront(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user instanceof TenantUser
+            && $user->isActive()
+            && $user->organizationId() === $request->attributes->get(ResolveStorefront::ATTRIBUTE)['organization_id']
+            && $user->can('storefront.view');
     }
 
     /**

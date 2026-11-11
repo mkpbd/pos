@@ -114,6 +114,8 @@ export type StorefrontBootstrap = {
   menus: Partial<Record<MenuLocation, StorefrontMenu>>
   /** The live popup banner (E11); absent from older payloads. */
   popup?: StorePopup | null
+  /** Store builder (B1): `home` = a published builder front page replaces the homepage sections; absent = false. */
+  builder?: { home: boolean }
 }
 
 /** GET /api/v1/store/homepage — see backend Storefront\Application\Queries\StorefrontHomepage. */

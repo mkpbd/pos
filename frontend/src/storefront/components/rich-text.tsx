@@ -5,9 +5,10 @@ import { isInternalLink } from '../theme'
 
 /**
  * HTML written in the admin's rich text editor. The server sanitized it on save (ADR-009),
- * so it is rendered as is. Clicks on site links navigate inside the app.
+ * so it is rendered as is. Clicks on site links navigate inside the app. `data-*` attributes
+ * are passed on (the store builder targets its text elements with `data-b`).
  */
-export function RichText({ html, className }: { html: string; className?: string }) {
+export function RichText({ html, className, ...data }: { html: string; className?: string } & { [attribute: `data-${string}`]: string | undefined }) {
   const navigate = useNavigate()
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -18,5 +19,5 @@ export function RichText({ html, className }: { html: string; className?: string
     void navigate(href)
   }
 
-  return <div className={cn('sf-rich-text', className)} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+  return <div {...data} className={cn('sf-rich-text', className)} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
 }

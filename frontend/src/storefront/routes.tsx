@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
 import { GuestOnly, RequireCustomer } from './account/guards'
+import { LandingPage } from './builder/builder-page'
 import { StorefrontLayout } from './components/storefront-layout'
 import { PageLoadingView } from './components/state-views'
 import { HomePage } from './pages/home-page'
@@ -54,6 +55,8 @@ export const storefrontRoutes: RouteObject[] = [
       { path: 'brand/:slug', element: <BrandPage /> },
       { path: 'product/:slug', element: <ProductPage /> },
       { path: 'pages/:slug', element: lazyPage(() => import('./pages/content-page'), 'ContentPage') },
+      // Store builder landing pages (B1); the renderer is in the entry bundle for the front page anyway.
+      { path: 'p/:slug', element: <LandingPage /> },
       { path: 'blog', element: lazyPage(blog, 'BlogIndexPage') },
       { path: 'blog/category/:slug', element: lazyPage(blog, 'BlogIndexPage') },
       { path: 'blog/:slug', element: lazyPage(blog, 'BlogPostPage') },

@@ -187,3 +187,55 @@ test("Demo Mart's owner sees none of the demo stores' orders", async ({ page }, 
   await page.goto('/')
   await expect(page.locator('html')).toHaveAttribute('data-sf-preset', 'default')
 })
+
+test('B1: Classic Shop converts its homepage into a builder page; once published the store looks the same', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(120_000)
+  const base = origin('classic.shop.localhost')
+
+  // What shoppers see today: the section headings, product cards and banners of the homepage.
+  const snapshot = async () => {
+    await page.goto(`${base}/`)
+    await expect(page.locator('main').getByTestId('product-card').first()).toBeVisible({ timeout: 15_000 })
+    for (let y = 0; y < 6000; y += 800) await page.evaluate(`window.scrollTo(0, ${y})`)
+    await page.waitForLoadState('networkidle')
+    return {
+      headings: await page.locator('main h2').allInnerTexts(),
+      products: await page.locator('main').getByTestId('product-card').count(),
+      links: (await page.locator('main a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href')))).filter(Boolean),
+    }
+  }
+  const before = await snapshot()
+  expect(before.headings.length).toBeGreaterThan(3)
+  await expect(page.locator('main [data-b]')).toHaveCount(0)
+
+  // The owner imports the homepage into a builder document and publishes it (API only in B1).
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@classicshop.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json()) as { data: { id: string; published: unknown } } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const created = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'home', title: 'Home', from: 'homepage' })
+  expect(created.status).toBe(201)
+  // Not live before publishing.
+  await page.goto(`${base}/`)
+  await expect(page.locator('main [data-b]')).toHaveCount(0)
+  const published = await call('POST', `/api/v1/storefront/builder/documents/${created.body.data.id}/publish`, { note: 'Imported homepage' })
+  expect(published.status).toBe(200)
+  await adminContext.close()
+
+  // The builder page renders the same sections, products and links.
+  const after = await snapshot()
+  await expect(page.locator('main [data-b]').first()).toBeAttached()
+  expect(after.headings).toEqual(before.headings)
+  expect(after.products).toBe(before.products)
+  expect(after.links).toEqual(before.links)
+})

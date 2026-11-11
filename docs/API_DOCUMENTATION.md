@@ -2362,6 +2362,34 @@ Optional module ([AI_INTEGRATION.md](AI_INTEGRATION.md)). It is off unless `AI_E
 
 `budget_source`: `default` | `organization`. With an unlimited budget `remaining_tokens` and `used_pct` are `null`. Features: `ask`, `explain_reorder`, `insights`, `daily_insights`, `customer_insights`. Failed requests count with the tokens they used. Requests refused because AI is off are not recorded.
 
+### Visual store builder — engine (B1)
+
+Plan and as-built notes: [STORE_BUILDER_PLAN.md](ecommerce/STORE_BUILDER_PLAN.md) (§4 document format, §11). Documents are validated JSON trees: section → columns → elements, with sparse per-breakpoint styles. They are never stored as HTML.
+
+Admin endpoints are under `/storefront/builder` and tenant-scoped; another organization's id returns 404. Read needs `storefront.view`; edits need `storefront.manage`; publishing needs `storefront.publish`.
+
+| Method & path | Permission | Notes |
+|---|---|---|
+| GET `/storefront/builder/documents` | view | `[{id, kind, key, title, schema_version, draft_revision, has_unpublished_changes, draft_updated_at, published: null\|{version_id, number, published_at}}]` |
+| POST `/storefront/builder/documents` | manage | `{kind: "page", key: "home"\|"landing:<slug>", title, from: "blank"\|"homepage"}` → 201 with `content`. `from: homepage` imports the current homepage. `409 DOCUMENT_EXISTS`; `landing:home` → 422. |
+| GET `/storefront/builder/documents/{id}` | view | Document + draft `content` |
+| PUT `/storefront/builder/documents/{id}/draft` | manage | `{revision, content}` → normalized, sanitized and reference-checked; `draft_revision + 1`. `409 DRAFT_CONFLICT` (`details.revision`); `422 DOCUMENT_INVALID` (`details.errors[] {path, node_id, message, code?, ids?}`). |
+| POST `/storefront/builder/documents/{id}/publish` | publish | `{note?}` → new version, live, audited (`storefront.builder_published`), cache bust. `422 DOCUMENT_EMPTY` |
+| POST `/storefront/builder/documents/{id}/discard` | manage | Draft = published content; `409 NOTHING_PUBLISHED` |
+| GET `/storefront/builder/documents/{id}/versions` | view | `[{id, number, note, published_at, created_by, created_at}]`, newest first |
+| POST `/storefront/builder/documents/{id}/versions/{version}/restore` | manage | Copies the version into the draft; not live until published |
+| DELETE `/storefront/builder/documents/{id}` | manage | Landing pages only (`422 CANNOT_DELETE_HOME`) → 204 |
+| GET `/storefront/builder/documents/{id}/render?source=draft\|published` | view | Render payload (below); unpublished `published` → `409 NOTHING_PUBLISHED` |
+| GET `/storefront/builder/elements` | view | Element registry: `{types: [{type, group, label, translatable, props, children}], limits, enums}` |
+| GET `/store/builder/pages/home`, `/store/builder/pages/{slug}` | public | Published render payload. `404 PAGE_NOT_FOUND`. `?preview=draft` for signed-in staff with `storefront.view` → the draft with `state` on non-live nodes, `no-store`. Otherwise ETag / 304 like `/store/homepage`. |
+
+**Render payload:** `{document: {id, key, title, version, source}, sections: <tree>, media: {<media_id>: {url, srcset, width, height, alt}}, data: {<element_id>: <homepage section object>}}`.
+- Texts are resolved to the request language.
+- Hidden and out-of-schedule nodes are removed, along with wrapped elements without content and any section left with no elements.
+- `data` holds exactly what `/store/homepage` returns for a section of that type.
+- Bootstrap includes `builder: {home: bool}`.
+- The storefront serves landing pages at `/p/{slug}`.
+
 ### Planned (by phase)
 
 | Phase | Resource paths |

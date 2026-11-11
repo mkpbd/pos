@@ -91,26 +91,35 @@ function Section({ section }: { section: StoreSection }) {
   }
 }
 
+/**
+ * One homepage section in its frame. In a preview, a section visitors do not see is marked (and an
+ * empty one keeps a placeholder); outside previews an empty section draws nothing. The store
+ * builder renders its wrapped-section elements through this too (`testId` tells them apart).
+ */
+export function SectionItem({ section, testId = 'homepage-section' }: { section: StoreSection; testId?: string }) {
+  const { t } = useLocale()
+  const empty = isEmpty(section)
+  const state = section.state && section.state !== 'live' ? section.state : null
+  // Outside previews the API never sends empty sections; never draw one regardless.
+  if (empty && !state) return null
+
+  return (
+    <div data-section-type={section.type} data-testid={testId} className={state ? 'relative opacity-60 outline-2 outline-offset-[-2px] outline-dashed outline-sf-sale' : undefined}>
+      {state && (
+        <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{t(state === 'empty' ? emptyLabel(section) : PREVIEW_LABELS[state])}</p>
+      )}
+      {empty ? <div className="h-24" aria-hidden /> : <Section section={section} />}
+    </div>
+  )
+}
+
 /** The homepage sections in order. In a preview, sections visitors do not see are marked. */
 export function SectionList({ sections }: { sections: StoreSection[] }) {
-  const { t } = useLocale()
   return (
     <>
-      {sections.map((section) => {
-        const empty = isEmpty(section)
-        const state = section.state && section.state !== 'live' ? section.state : null
-        // Outside previews the API never sends empty sections; never draw one regardless.
-        if (empty && !state) return null
-
-        return (
-          <div key={section.id} data-section-type={section.type} data-testid="homepage-section" className={state ? 'relative opacity-60 outline-2 outline-offset-[-2px] outline-dashed outline-sf-sale' : undefined}>
-            {state && (
-              <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{t(state === 'empty' ? emptyLabel(section) : PREVIEW_LABELS[state])}</p>
-            )}
-            {empty ? <div className="h-24" aria-hidden /> : <Section section={section} />}
-          </div>
-        )
-      })}
+      {sections.map((section) => (
+        <SectionItem key={section.id} section={section} />
+      ))}
     </>
   )
 }

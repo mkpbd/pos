@@ -2,11 +2,13 @@
 
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
 use App\Modules\Storefront\Presentation\Http\Controllers\MenuController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBootstrapController;
+use App\Modules\Storefront\Presentation\Http\Controllers\StoreBuilderPageController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontAdminController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreHomepageController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +18,9 @@ Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group
     // The session cookies (and XSRF-TOKEN) start here so the SPA's first unsafe request passes CSRF.
     Route::get('bootstrap', StoreBootstrapController::class)->middleware(['storefront.session', 'storefront.cache'])->name('store.bootstrap');
     Route::get('homepage', StoreHomepageController::class)->middleware('storefront.cache')->name('store.homepage');
+    // B1: published store builder pages — `home` or a landing page slug (`?preview=draft` for staff).
+    Route::get('builder/pages/{slug}', StoreBuilderPageController::class)->middleware('storefront.cache')
+        ->where('slug', '[a-z0-9-]{2,60}')->name('store.builder-page');
 });
 
 // T2: the demo store gallery — any host, no store resolution (404 while the gallery is off).
@@ -61,4 +66,25 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
     });
 
     Route::put('theme/custom-css', [StorefrontAdminController::class, 'updateCustomCss'])->middleware('can:storefront.custom_css');
+});
+
+// B1: the visual store builder — documents with draft / publish / versions.
+Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->group(function () {
+    Route::middleware('can:storefront.view')->group(function () {
+        Route::get('elements', [BuilderDocumentController::class, 'elements']);
+        Route::get('documents', [BuilderDocumentController::class, 'index']);
+        Route::get('documents/{document}', [BuilderDocumentController::class, 'show'])->whereUuid('document');
+        Route::get('documents/{document}/versions', [BuilderDocumentController::class, 'versions'])->whereUuid('document');
+        Route::get('documents/{document}/render', [BuilderDocumentController::class, 'render'])->whereUuid('document');
+    });
+
+    Route::middleware('can:storefront.manage')->group(function () {
+        Route::post('documents', [BuilderDocumentController::class, 'store']);
+        Route::put('documents/{document}/draft', [BuilderDocumentController::class, 'saveDraft'])->whereUuid('document');
+        Route::post('documents/{document}/publish', [BuilderDocumentController::class, 'publish'])->whereUuid('document')->middleware('can:storefront.publish');
+        Route::post('documents/{document}/discard', [BuilderDocumentController::class, 'discard'])->whereUuid('document');
+        Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
+            ->whereUuid(['document', 'version'])->scopeBindings();
+        Route::delete('documents/{document}', [BuilderDocumentController::class, 'destroy'])->whereUuid('document');
+    });
 });

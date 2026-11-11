@@ -12,6 +12,8 @@ use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
+use App\Modules\Storefront\Infrastructure\BuilderBlogReferences;
+use App\Modules\Storefront\Infrastructure\BuilderMediaReferences;
 use App\Modules\Storefront\Infrastructure\Caching\CacheStorefrontContentVersion;
 use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
@@ -35,13 +37,13 @@ class StorefrontServiceProvider extends ModuleServiceProvider
     {
         // E12: storefront content version counters in the default cache store.
         $this->app->bind(StorefrontContentVersion::class, fn ($app) => new CacheStorefrontContentVersion($app->make('cache.store'), $app->make(LocaleContext::class)));
-        $this->app->tag([ThemeMediaReferences::class, SectionMediaReferences::class], MediaReferences::TAG);
+        $this->app->tag([ThemeMediaReferences::class, SectionMediaReferences::class, BuilderMediaReferences::class], MediaReferences::TAG);
         // X1: the theme logo heads exported PDFs.
         $this->app->extend(DocumentLetterhead::class, fn (DocumentLetterhead $inner, $app) => new ThemeLogoLetterhead(
             $inner, $app->make(StorefrontConfig::class), $app->make(MediaLibrary::class), $app->make(TenantContext::class),
         ));
         $this->app->tag([MenuPageReferences::class], PageReferences::TAG);
-        $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class], BlogReferences::TAG);
+        $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class, BuilderBlogReferences::class], BlogReferences::TAG);
     }
 
     public function boot(): void
@@ -65,6 +67,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
             'storefront.view' => 'View online store settings, theme, menus, banners and homepage; preview the storefront',
             'storefront.manage' => 'Change online store settings, domains, theme, menus, banners and homepage sections',
             'storefront.custom_css' => 'Edit the online store\'s custom CSS',
+            // B1: making store builder pages live (editing their drafts is storefront.manage).
+            'storefront.publish' => 'Publish store builder pages to the online store',
         ];
     }
 }

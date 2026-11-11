@@ -92,7 +92,8 @@ enum SystemRole: string
             ],
             // Custom CSS and payment gateway credentials stay with the Organization Admin (ADR-016).
             self::OnlineStoreManager => [
-                'storefront.view', 'storefront.manage', 'media.*', 'cms.*', 'online_catalog.*', 'attributes.manage',
+                // B1: publishes store builder pages.
+                'storefront.view', 'storefront.manage', 'storefront.publish', 'media.*', 'cms.*', 'online_catalog.*', 'attributes.manage',
                 'promotions.*', 'shipping.*', 'web_orders.*', 'reviews.*',
                 'branches.view', 'products.view', 'inventory.view', 'customers.view',
             ],

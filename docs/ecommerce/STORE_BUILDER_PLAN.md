@@ -1,6 +1,6 @@
 # Visual Store Builder — analysis and architecture (B1–B5)
 
-Status: **approved 2026-11-11** (decisions in §10); starts after T2. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
+Status: **approved 2026-11-11** (decisions in §10). **B1 done** (engine; see §11); B2 (editor) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
 
 ## 1. What already exists (reused)
 
@@ -64,10 +64,10 @@ CREATE TABLE builder_documents (
   schema_version smallint NOT NULL DEFAULT 1,
   draft jsonb NOT NULL DEFAULT '{}'::jsonb,
   draft_revision integer NOT NULL DEFAULT 0,
-  draft_updated_at timestamp NULL,
+  draft_updated_at timestamptz NULL,
   draft_updated_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
   published_version_id uuid NULL,
-  created_at timestamp NULL, updated_at timestamp NULL,
+  created_at timestamptz NULL, updated_at timestamptz NULL,
   CONSTRAINT builder_documents_org_key_unique UNIQUE (organization_id, key)
 );
 CREATE TABLE builder_versions (
@@ -78,9 +78,9 @@ CREATE TABLE builder_versions (
   schema_version smallint NOT NULL DEFAULT 1,
   content jsonb NOT NULL,
   note varchar(160) NULL,
-  published_at timestamp NULL,
+  published_at timestamptz NULL,
   created_by uuid NULL REFERENCES users(id) ON DELETE SET NULL,
-  created_at timestamp NULL,
+  created_at timestamptz NULL,
   CONSTRAINT builder_versions_doc_number_unique UNIQUE (document_id, number)
 );
 ALTER TABLE builder_documents ADD CONSTRAINT builder_documents_published_fk
@@ -92,7 +92,7 @@ CREATE TABLE builder_templates (
   scope varchar(20) NOT NULL, preset varchar(20) NULL,
   name varchar(120) NOT NULL, thumbnail_media_id uuid NULL,
   content jsonb NOT NULL,
-  created_at timestamp NULL, updated_at timestamp NULL
+  created_at timestamptz NULL, updated_at timestamptz NULL
 );
 CREATE INDEX builder_templates_org_scope_idx ON builder_templates (organization_id, scope);
 ```
@@ -165,7 +165,7 @@ Admin routes (`storefront.view` to read; `storefront.manage` to edit; publishing
 | POST | `/storefront/builder/start-from-demo/{preset}` | Copies a demo site template (theme + home + header + footer + sample pages) into **drafts**; uses the client's own products |
 | POST | `/storefront/builder/preview-data` | Resolves product, category and brand data for elements in an unsaved draft (canvas) |
 
-Public storefront: `GET /store/pages/home` and `/store/pages/{slug}` return the **published** document plus resolved data. The header, footer and theme come in `/store/bootstrap`. With no published builder home, the existing `/store/homepage` keeps serving, so existing stores look identical.
+Public storefront: `GET /store/builder/pages/home` and `/store/builder/pages/{slug}` (`/store/pages/{slug}` stays the CMS; landing slug `home` reserved) return the **published** document plus resolved data. The header, footer and theme come in `/store/bootstrap`. With no published builder home, the existing `/store/homepage` keeps serving, so existing stores look identical.
 
 ## 7. Frontend architecture
 
@@ -211,3 +211,31 @@ Original questions:
 2. **Dependency:** may we add `@dnd-kit/core`, `@dnd-kit/sortable` and `@dnd-kit/utilities` (admin only)?
 3. **Schema:** may we add three new tables via a Laravel migration (§3; manual SQL provided; additive only)?
 4. **Theme saves:** after B3, should the existing *Theme* page also save as a draft (one consistent publish flow), or keep saving straight to live as a "quick settings" page?
+
+## 11. As built — B1 (2026-11-11)
+
+- **Placement:** a sub-area of the Storefront module (`Domain/Builder`, `Application/Builder`, `Infrastructure/Models/Builder*`). It shares `SectionType`, the section content resolver, `ResolveStorefront`, the cache version, bootstrap and the HTML shell; a separate module would need contracts both ways.
+- **Shared resolver:** `Application/Queries/SectionContentResolver` builds each section object for both `/store/homepage` and builder pages. The homepage output is unchanged, and a test pins `data[<element>]` to the homepage object in English and Bangla. The section config rules are extracted to `Domain/SectionConfigRules` and used by both APIs.
+- **Schema:**
+  - `BuilderDocumentSchema::normalize` is pure, with `StyleSchema` and `ElementRegistry`.
+  - `PrepareBuilderContent` sanitizes and checks references.
+  - Errors are `422 DOCUMENT_INVALID` with `details.errors[] {path, node_id, message, code?, ids?}`.
+  - The shared fixture `frontend/src/storefront/builder/__fixtures__/sample-document.v1.json` round-trips unchanged on both sides.
+  - Wrapped-section elements must satisfy the homepage rules (e.g. a hero slider needs ≥ 1 banner).
+- **API:** the admin API is `/storefront/builder/*`; the public endpoints are `/store/builder/pages/{home|slug}` (published; `?preview=draft` for staff). Rules:
+  - publishing needs `storefront.publish`; Online Store Manager has it by default
+  - an empty page can't be published (`422 DOCUMENT_EMPTY`)
+  - `409 DRAFT_CONFLICT` on a stale revision
+  - draft saves are not audited (autosave noise); publish, discard, restore and delete are
+- **Public render:**
+  - hidden or out-of-schedule nodes are removed
+  - wrapped elements without content are dropped, and a section whose elements all dropped out is removed (no empty band)
+  - a section left empty on purpose stays
+  - draft preview keeps everything with `state`
+- **Storefront:**
+  - `builder/` holds the types, registry, TS validator mirror, `compileStyles` and `PageRenderer`
+  - the home page switches when bootstrap `builder.home` is true, otherwise renders exactly as before
+  - landing pages are served at `/p/:slug` and by the HTML shell
+  - `compileStyles` re-validates every value; selectors are `[data-b]` / `[data-b-row]`; breakpoints are 1023 / 639 px; `prefers-reduced-motion` is respected
+- **Importer** (`from: homepage`): one `full-bleed` section per homepage section (the section components draw their own container). Disabled sections become `hidden`; schedules go on the section node. A full-stack test converts Classic Shop's homepage and publishes it: same headings, product cards and links.
+- **For B2:** drafts are strictly validated, so the editor must collect a wrapped element's required content (e.g. banners) before inserting it. Built-in templates (`organization_id` null) need `withoutGlobalScope` in B5.

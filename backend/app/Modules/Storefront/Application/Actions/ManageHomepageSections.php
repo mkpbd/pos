@@ -31,9 +31,6 @@ class ManageHomepageSections
 {
     public const MAX_SECTIONS = 40;
 
-    /** Banners a banner-grid layout needs at least (the split layout exactly). */
-    private const GRID_MINIMUM = ['2-col' => 2, '3-col' => 3, '3-col-split' => 4, '4-col' => 4];
-
     public function __construct(
         private readonly MediaLibrary $media,
         private readonly HtmlSanitizer $sanitizer,
@@ -217,11 +214,7 @@ class ManageHomepageSections
      */
     private function checkBanners(SectionType $type, array $config, array $bannerIds): void
     {
-        ['min' => $min, 'max' => $max] = $type->itemLimits();
-        if ($type === SectionType::BannerGrid) {
-            $min = self::GRID_MINIMUM[$config['layout']] ?? $min;
-            $max = $config['layout'] === '3-col-split' ? 4 : $max;
-        }
+        ['min' => $min, 'max' => $max] = $type->bannerLimits($config);
         if (count($bannerIds) < $min || count($bannerIds) > $max) {
             throw new BusinessRuleViolation('SECTION_ITEMS_INVALID', $min === $max
                 ? "This layout needs exactly {$min} banners."

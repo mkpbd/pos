@@ -11,6 +11,7 @@ use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Translations;
+use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use App\Modules\Storefront\Domain\MenuItemType;
 use App\Modules\Storefront\Domain\MenuLocation;
@@ -29,7 +30,7 @@ use Illuminate\Support\Collection;
  * E12b: texts in the request's language (menu labels, announcement, popup; per-field
  * fallback to the base text) and the store's languages: `store.locales` (`["en"]` or
  * `["en","bn"]`), `store.default_locale`, `store.bangla_digits` and the resolved `locale`.
- * Cached per language.
+ * Cached per language. B1: `builder.home` — a published store builder home page exists.
  */
 class StorefrontBootstrap
 {
@@ -44,6 +45,7 @@ class StorefrontBootstrap
         private readonly StorefrontContentVersion $version,
         private readonly ContentSchedule $schedule,
         private readonly LocaleContext $locale,
+        private readonly BuilderPages $builder,
     ) {}
 
     /**
@@ -163,6 +165,9 @@ class StorefrontBootstrap
                 'frequency' => $popup->popup_frequency ?? BannerPlacement::POPUP_DEFAULTS['popup_frequency'],
                 'updated_at' => $popup->updated_at?->toIso8601String(),
             ],
+            // B1: true once a builder home page is published (the SPA then renders it instead of
+            // the legacy homepage sections).
+            'builder' => ['home' => $this->builder->hasPublishedHome()],
         ];
     }
 

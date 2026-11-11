@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_hero",
+      "type": "section",
+      "props": { "layout": "full-bleed", "anchor": null },
+      "style": {},
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_hero",
+          "type": "column",
+          "width": { "base": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_slider",
+              "type": "hero_slider",
+              "props": {
+                "title": null,
+                "subtitle": null,
+                "config": { "autoplay_seconds": 6, "height": "large" },
+                "items": [{ "item_type": "banner", "item_id": "01a1c9d9-0000-7000-8000-000000000001" }]
+              },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_story",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": "our-story" },
+      "style": {
+        "base": {
+          "background": {
+            "type": "gradient",
+            "gradient": { "type": "linear", "angle": 135, "stops": [{ "color": "theme:canvas", "position": 0 }, { "color": "#fef3c7", "position": 100 }] }
+          },
+          "spacing": { "padding": { "top": "64px", "right": "0px", "bottom": "64px", "left": "0px" } },
+          "layout": { "gap": "32px", "align": "center" }
+        },
+        "mobile": { "spacing": { "padding": { "top": "32px", "bottom": "32px" } }, "layout": { "gap": "16px" } }
+      },
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_story_text",
+          "type": "column",
+          "width": { "base": 50, "tablet": 50, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_heading",
+              "type": "heading",
+              "props": { "text": "Made fresh every morning", "level": 2, "link": null },
+              "style": {
+                "base": { "color": "theme:heading", "typography": { "font": "theme:heading", "size": "40px", "weight": 800, "line_height": 1.1, "letter_spacing": "0em", "align": "left", "transform": "none" } },
+                "mobile": { "typography": { "size": "28px", "align": "center" } }
+              },
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "text": "প্রতিদিন সকালে তাজা তৈরি" } }
+            },
+            {
+              "id": "e_text",
+              "type": "text",
+              "props": { "html": "<p>Small batches, local farms and <strong>no shortcuts</strong>.</p>" },
+              "style": { "base": { "color": "theme:text", "typography": { "size": "18px", "line_height": 1.6 } } },
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "html": "<p>ছোট ব্যাচ, স্থানীয় খামার, <strong>কোনো শর্টকাট নেই</strong>।</p>" } }
+            },
+            {
+              "id": "e_button",
+              "type": "button",
+              "props": { "label": "Shop now", "link": { "url": "/shop" }, "variant": "primary", "size": "lg", "full_width": false },
+              "style": {
+                "base": {
+                  "border": { "width": "0px", "style": "none", "color": "theme:border", "radius": { "tl": "999px", "tr": "999px", "br": "999px", "bl": "999px" } },
+                  "effects": { "shadow": [{ "x": 0, "y": 8, "blur": 24, "spread": 0, "color": "#0000001f", "inset": false }], "opacity": 1, "hover": { "transform": "lift", "background_color": "theme:accent", "color": "theme:accent_foreground" } }
+                },
+                "mobile": { "size": { "width": "100%" } }
+              },
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "label": "এখনই কিনুন" } }
+            }
+          ]
+        },
+        {
+          "id": "c_story_media",
+          "type": "column",
+          "width": { "base": 50, "tablet": 50, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_image",
+              "type": "image",
+              "props": { "media_id": "01a1c9d9-0000-7000-8000-000000000002", "alt": "Fresh vegetables on a table", "link": null, "aspect": "4:3", "fit": "cover" },
+              "style": { "base": { "border": { "radius": { "tl": "16px", "tr": "16px", "br": "16px", "bl": "16px" } } } },
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "alt": "টেবিলে তাজা সবজি" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_features",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": null },
+      "style": { "base": { "spacing": { "padding": { "top": "48px", "bottom": "48px" } } } },
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_features",
+          "type": "column",
+          "width": { "base": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_row",
+              "type": "inner_row",
+              "props": {},
+              "style": { "base": { "layout": { "gap": "24px", "align": "stretch", "justify": "between", "wrap": true } } },
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {},
+              "columns": [
+                {
+                  "id": "c_feat_a",
+                  "type": "column",
+                  "width": { "base": 33.33, "tablet": 50, "mobile": 100 },
+                  "style": { "base": { "background": { "type": "color", "color": "theme:surface" }, "spacing": { "padding": { "top": "24px", "right": "24px", "bottom": "24px", "left": "24px" } }, "border": { "radius": { "tl": "12px", "tr": "12px", "br": "12px", "bl": "12px" } } } },
+                  "elements": [
+                    {
+                      "id": "e_feat_a",
+                      "type": "heading",
+                      "props": { "text": "Free delivery", "level": 3, "link": null },
+                      "style": {},
+                      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+                      "hidden": false,
+                      "schedule": null,
+                      "translations": {}
+                    }
+                  ]
+                },
+                {
+                  "id": "c_feat_b",
+                  "type": "column",
+                  "width": { "base": 33.33, "tablet": 50, "mobile": 100 },
+                  "style": {},
+                  "elements": [
+                    {
+                      "id": "e_spacer",
+                      "type": "spacer",
+                      "props": {},
+                      "style": { "base": { "size": { "height": "48px" } }, "mobile": { "size": { "height": "16px" } } },
+                      "visibility": { "desktop": true, "tablet": true, "mobile": false },
+                      "hidden": false,
+                      "schedule": null,
+                      "translations": {}
+                    },
+                    {
+                      "id": "e_divider",
+                      "type": "divider",
+                      "props": { "line": "dashed", "thickness": 2, "width": 60, "color": "theme:border", "align": "center" },
+                      "style": {},
+                      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+                      "hidden": false,
+                      "schedule": null,
+                      "translations": {}
+                    }
+                  ]
+                },
+                {
+                  "id": "c_feat_c",
+                  "type": "column",
+                  "width": { "base": 33.33, "tablet": 100, "mobile": 100 },
+                  "style": {},
+                  "elements": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_products",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": null },
+      "style": {},
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": { "starts_at": "2026-01-01T00:00:00Z", "ends_at": null },
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_products",
+          "type": "column",
+          "width": { "base": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_grid",
+              "type": "product_grid",
+              "props": {
+                "title": "Best sellers",
+                "subtitle": "What everyone is buying",
+                "config": { "source": "best_sellers", "category_id": null, "limit": 8, "columns": 4, "view_all_url": "/shop?sort=popularity" },
+                "items": []
+              },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "title": "সবচেয়ে বেশি বিক্রি" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_hidden",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": null },
+      "style": {},
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": true,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_hidden",
+          "type": "column",
+          "width": { "base": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_hidden_text",
+              "type": "text",
+              "props": { "html": "<p>Draft note, hidden from shoppers.</p>" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

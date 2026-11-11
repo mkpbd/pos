@@ -1,15 +1,29 @@
 import { useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useHomepageQuery, useStorefront } from '../api'
+import { useDraftPreview } from '../builder/api'
+import { BuilderHomePage } from '../builder/builder-page'
 import { useLocale } from '../i18n/locale'
 import { SectionList } from '../sections/section-renderer'
 import { useDocumentMeta } from '../use-document-meta'
 
 /**
- * The store's front page: the homepage sections configured in the admin, in order.
- * `?preview=1` shows staff the hidden and scheduled sections in place.
+ * The store's front page. With a published store-builder front page (bootstrap `builder.home`)
+ * that page; `?preview=draft` shows staff the builder draft (the sections again when there is
+ * none). Otherwise the homepage sections.
  */
 export function HomePage() {
+  const { builder } = useStorefront()
+  const draft = useDraftPreview()
+  if (builder?.home === true || draft) return <BuilderHomePage fallback={<SectionsHomePage />} />
+  return <SectionsHomePage />
+}
+
+/**
+ * The homepage sections configured in the admin, in order.
+ * `?preview=1` shows staff the hidden and scheduled sections in place.
+ */
+function SectionsHomePage() {
   const { store } = useStorefront()
   const { t } = useLocale()
   const [params] = useSearchParams()

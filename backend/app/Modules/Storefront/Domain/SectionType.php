@@ -29,6 +29,9 @@ enum SectionType: string
 
     public const BANNER_GRID_LAYOUTS = ['2-col', '3-col', '3-col-split', '4-col'];
 
+    /** Banners a banner-grid layout needs at least (the split layout exactly). */
+    public const BANNER_GRID_MINIMUM = ['2-col' => 2, '3-col' => 3, '3-col-split' => 4, '4-col' => 4];
+
     /** Icons a features strip can use (rendered from the storefront's icon set). */
     public const FEATURE_ICONS = ['truck', 'shield-check', 'credit-card', 'headset', 'gift', 'rotate-ccw', 'badge-percent', 'clock', 'leaf', 'heart', 'star', 'store'];
 
@@ -185,6 +188,28 @@ enum SectionType: string
             self::BannerGrid => ['min' => 2, 'max' => 8],
             default => null,
         };
+    }
+
+    /**
+     * Banners a section of this type needs for a (normalized) config: a banner grid needs at
+     * least as many as its layout has tiles (the split layout exactly four). Null when the
+     * type shows no banners. Shared by the homepage API and the store builder (B1).
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{min: int, max: int}|null
+     */
+    public function bannerLimits(array $config): ?array
+    {
+        $limits = $this->itemLimits();
+        if ($limits === null || $this !== self::BannerGrid) {
+            return $limits;
+        }
+        $layout = $config['layout'] ?? null;
+
+        return [
+            'min' => self::BANNER_GRID_MINIMUM[$layout] ?? $limits['min'],
+            'max' => $layout === '3-col-split' ? 4 : $limits['max'],
+        ];
     }
 
     /**

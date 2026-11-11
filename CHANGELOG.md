@@ -21,6 +21,27 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B1 — Visual store builder: engine
+
+The engine of the no-code store builder: validated JSON page documents, draft / publish / version history, and builder-rendered storefront pages. Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built). There is no admin UI yet; the drag-and-drop editor is B2.
+
+#### Added
+- Migration `create_builder_tables` (additive): `builder_documents`, `builder_versions`, `builder_templates`.
+- Schema v1: section → columns (1–6, widths per device) → elements (heading, text, image, button, spacer, divider, inner row and the 13 existing section types). Styles are sparse per device and covered by a whitelist: colours, theme tokens, gradients, background images with overlay, typography, spacing, size, layout, border, shadows and hover. Limits apply; references must belong to the organization.
+- Admin API `/storefront/builder/*`: documents, draft with revision conflict (409), publish (new permission `storefront.publish`), discard, versions, restore, delete, element registry, render. A homepage importer converts today's homepage into a builder page.
+- Public pages `/store/builder/pages/{home|slug}` with staff draft preview; bootstrap `builder.home`; landing pages at `/p/{slug}` (storefront route and HTML shell).
+- Storefront: `compileStyles` (re-validates every value; breakpoints at 1023 / 639 px; respects reduced motion) and `PageRenderer`. The existing section components draw wrapped elements. The home page switches to the builder page only when one is published.
+
+#### Changed
+- Homepage section data is built by a shared `SectionContentResolver`, with the section config rules shared through `SectionConfigRules`. Homepage output is unchanged; all existing tests pass unchanged.
+
+#### Tests
+- Backend 792 tests (PostgreSQL: 791 pass, 1 opt-in skip; SQLite: 786 pass, 6 skip). They cover the fixture round-trip, invalid values, CRUD, conflicts, publish / restore, importer equals homepage, Bangla, schedules, preview, permissions, tenant isolation on every endpoint, and the landing shell.
+- Vitest 962. Mocked Playwright: 176 passed, 72 skipped; the builder page is checked at 1366 and 375 px.
+- Full-stack:
+  - New test: Classic Shop's homepage, imported and published, renders with the same headings, products and links.
+  - Integration suite 24/24; demo stores 6/6.
+
 ### T3 — Theme demos: polish and verification
 
 Visual pass of the three demo stores and Demo Mart at 1366 / 768 / 375 px, full-stack tests per demo, manual and report: [STOREFRONT_THEMES_REPORT.md](docs/ecommerce/STOREFRONT_THEMES_REPORT.md).
