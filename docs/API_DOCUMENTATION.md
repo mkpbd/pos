@@ -2403,15 +2403,37 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
 - **`POST /builder/resolve`** also covers `category_card`, `product_spotlight` and `shop_the_look`. A spotlight product with no online listing → `PRODUCT_UNAVAILABLE`.
 - **Templates:** the `requires` value `products` (shop-the-look templates pick products by source).
 
+**Selling, people and data blocks (B8a).**
+- **New element types:**
+  - commerce: `pricing_table`, `comparison_table`, `bundle`
+  - marketing: `flash_sale_bar`, `review_wall`
+  - media: `before_after`, `photo_grid`
+  - content: `team`, `store_hours` (also footer), `progress_bars`
+  - Limits and enums in `GET /storefront/builder/elements` (`limits.lists`, `limits.b8a_text`, `limits.nested_list_translatable`, `data_when`).
+- **Chart:** kinds `stacked-column` / `stacked-bar` (2–6 series, values ≥ 0); `data_source` `manual` (default) \| `store.products_per_category` \| `store.rating_breakdown` and `source_product_id` (rating breakdown only; null otherwise). Normalize always fills both keys. A store source cannot be stacked. `data_when.chart = "data_source!=manual"`.
+- **Money:** pricing plan `price` is a NUMERIC string (`/^\d{1,12}(\.\d{1,2})?$/`) or null (then `price_text` is required); stored as given.
+- **Translations:** two-level list keys, e.g. `plans.<plan_id>.features.<feature_id>.text`, `rows.<row_id>.cells.<column_id>.text`, `plans.<id>.button.label`; keys of removed items are dropped on save.
+- **`data[id]`:**
+  - comparison_table `{products: {<id>: card}}`; drafts add `columns.<column_id>.state = unavailable`
+  - flash_sale_bar `{promotion {id, name, ends_at, state}, products: [card], claimed: null|{used, limit}}` — `claimed` only when the promotion has a usage limit (real redemptions, capped). `promotion_id: null` = the active countdown promotion that ends soonest; published only while active with an end date
+  - bundle `{products: {<id>: product detail}}`; published `props.items` are filtered to available products and the element is dropped below 2; drafts add `items.<item_id>.state` and `state`
+  - review_wall `{summary {average, count}|null, reviews: [{id, author, rating, title|null, body ≤600, created_at, product|null}]}` — approved reviews of products on sale only; `author` is first name + last initial
+  - store_hours `{timezone}` (the organization's)
+  - chart with a store source `{labels, series: [{id: "s1", name, values}]}`; only public counts (never sales, orders or customers)
+  - An element without data is dropped publicly and gets `state: empty` in the draft.
+- **`POST /builder/resolve`** also covers the five data elements and `chart`.
+- **Contracts added:** `Reviews\ReviewShowcase` (approved reviews + star counts), `StorefrontCatalog::liveProductIds()`, `PromotionShowcase::claimed()`.
+- **Templates:** 10 neutral sections (pricing, before/after, comparison, flash sale bar, bundle, team, review wall, photo grid, store hours + map, ratings). A template containing a flash sale bar `requires: promotions`; bundle items may use `product_ref`. 76 built-in templates.
+
 **Templates and start from demo (B5).** Under `/storefront/builder`:
 
 | Method & path | Permission | Notes |
 |---|---|---|
-| GET `/templates?scope=&preset=&context=&source=` | view | Built-ins (files) plus the organization's saved templates: `[{id, scope, preset, category, name, description, thumbnail_url\|null, allowed_in, requires, source: builtin\|mine, created_at}]`. No content. |
+| GET `/templates?scope=&preset=&context=&source=` | view | Built-ins (files; B7: sites listed kids, default, vegan, handmade, classic) plus the organization's saved templates: `[{id, scope, preset, category, name, description, thumbnail_url\|null, preview_url\|null, allowed_in, requires, source: builtin\|mine, created_at}]`. No content. | B7: `preview_url` is a tall full-page image (`/builder-templates/<id>-full.jpg`) for the five site templates, null otherwise.
 | POST `/templates/{id}/instantiate` | manage (throttled) | `{context}` → `{template, context, nodes: Section[], imported: {media, banners, banners_reused}}`. Imports photos into the media library (deduplicated), creates or reuses banners, resolves menus. Nothing is written into a document. 422 `TEMPLATE_NOT_ALLOWED`; 404 for an unknown template or another organization's. Audited. |
 | POST `/templates` | manage | `{name ≤ 120, description? ≤ 300, scope: 'section', context, section}` → 201. Errors: 422 `DOCUMENT_INVALID`, `TEMPLATE_LIMIT_REACHED` (100), `TEMPLATE_TOO_LARGE` (256 KB). |
 | DELETE `/templates/{uuid}` | manage | Own templates only → 204 |
-| POST `/start-from-demo/{vegan\|handmade\|classic}` | manage | `{include?: {theme, home, header, footer, listing_top}}` → `{preset, documents, theme, imported}`. **Drafts only**; published versions are kept. Audited. |
+| POST `/start-from-demo/{kids\|default\|vegan\|handmade\|classic}` | manage | `{include?: {theme, home, header, footer, listing_top}}` → `{preset, documents, theme, imported}`. **Drafts only**; published versions are kept. Audited. |
 | POST `/publish-all` | manage + publish | `{documents: uuid[] ≤ 50, theme?, note?}` → one transaction. Errors: 422 `DOCUMENTS_NOT_FOUND`, `NOTHING_TO_PUBLISH`. |
 
 **Content pages, header, footer, zones and more elements (B4).**

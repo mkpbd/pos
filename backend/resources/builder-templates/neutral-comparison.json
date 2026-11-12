@@ -1,0 +1,84 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Why shop with us", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "কেন আমাদের কাছ থেকে কিনবেন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "comparison_table",
+                            "props": {
+                                "columns": [
+                                    { "id": "c1", "title": "Our shop", "product_id": null, "highlighted": true },
+                                    { "id": "c2", "title": "A typical shop", "product_id": null, "highlighted": false }
+                                ],
+                                "rows": [
+                                    {
+                                        "id": "r1",
+                                        "label": "Delivery inside Dhaka",
+                                        "cells": { "c1": { "kind": "text", "text": "Next day" }, "c2": { "kind": "text", "text": "3 to 5 days" } }
+                                    },
+                                    {
+                                        "id": "r2",
+                                        "label": "Cash on delivery",
+                                        "cells": { "c1": { "kind": "yes", "text": "" }, "c2": { "kind": "yes", "text": "" } }
+                                    },
+                                    {
+                                        "id": "r3",
+                                        "label": "Easy 7-day returns",
+                                        "cells": { "c1": { "kind": "yes", "text": "" }, "c2": { "kind": "no", "text": "" } }
+                                    },
+                                    {
+                                        "id": "r4",
+                                        "label": "Quality checked by hand",
+                                        "cells": { "c1": { "kind": "yes", "text": "" }, "c2": { "kind": "no", "text": "" } }
+                                    },
+                                    {
+                                        "id": "r5",
+                                        "label": "Help on the phone",
+                                        "cells": { "c1": { "kind": "text", "text": "Every day" }, "c2": { "kind": "text", "text": "Office hours" } }
+                                    }
+                                ],
+                                "show_prices": false,
+                                "show_buttons": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "columns.c1.title": "আমাদের দোকান",
+                                    "columns.c2.title": "সাধারণ দোকান",
+                                    "rows.r1.label": "ঢাকার ভেতরে ডেলিভারি",
+                                    "rows.r1.cells.c1.text": "পরের দিন",
+                                    "rows.r1.cells.c2.text": "৩ থেকে ৫ দিন",
+                                    "rows.r2.label": "ক্যাশ অন ডেলিভারি",
+                                    "rows.r3.label": "সহজ ৭ দিনের রিটার্ন",
+                                    "rows.r4.label": "হাতে মান যাচাই",
+                                    "rows.r5.label": "ফোনে সাহায্য",
+                                    "rows.r5.cells.c1.text": "প্রতিদিন",
+                                    "rows.r5.cells.c2.text": "অফিস সময়ে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

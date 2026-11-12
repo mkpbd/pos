@@ -1,0 +1,92 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": {
+                    "spacing": { "padding": { "top": "64px", "bottom": "64px" } },
+                    "layout": { "align": "center", "gap": "40px" }
+                },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 55, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "chart",
+                            "props": {
+                                "kind": "bar",
+                                "title": "Our customers rate us",
+                                "description": "Approved reviews of the products in our shop, by stars.",
+                                "labels": ["5 stars", "4 stars", "3 stars", "2 stars", "1 star"],
+                                "series": [{ "id": "s1", "name": "Reviews", "values": [0, 0, 0, 0, 0] }],
+                                "unit": "",
+                                "unit_position": "after",
+                                "y_starts_at_zero": true,
+                                "show_values": "all-small",
+                                "show_legend": false,
+                                "show_table": false,
+                                "height": 280,
+                                "data_source": "store.rating_breakdown",
+                                "source_product_id": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "গ্রাহকেরা আমাদের যে রেটিং দেন",
+                                    "description": "আমাদের দোকানের পণ্যের অনুমোদিত রিভিউ, তারকা অনুযায়ী।"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": { "base": 45, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": { "text": "Why customers come back", "level": 3, "link": null },
+                            "translations": { "bn": { "text": "গ্রাহকেরা কেন ফিরে আসেন" } }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "progress_bars",
+                            "props": {
+                                "items": [
+                                    { "id": "i1", "label": "Would buy again", "value": 96 },
+                                    { "id": "i2", "label": "Arrived on time", "value": 93 },
+                                    { "id": "i3", "label": "Matched the photos", "value": 98 }
+                                ],
+                                "style": "bar",
+                                "show_value": true,
+                                "animate": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.i1.label": "আবার কিনবেন",
+                                    "items.i2.label": "সময়মতো পৌঁছেছে",
+                                    "items.i3.label": "ছবির সাথে মিলেছে"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "text",
+                            "props": { "html": "<p>Sample numbers from a customer survey. Replace them with your own.</p>" },
+                            "translations": { "bn": { "html": "<p>গ্রাহক জরিপের নমুনা সংখ্যা। আপনার নিজের সংখ্যা দিন।</p>" } }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

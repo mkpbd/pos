@@ -1,0 +1,43 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "32px", "bottom": "32px" } } },
+                "mobile": { "spacing": { "padding": { "top": "24px", "bottom": "24px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "flash_sale_bar",
+                            "props": {
+                                "promotion_id": null,
+                                "title": "Flash sale",
+                                "text": "Prices drop for a few hours only. When the timer ends, the deal is gone.",
+                                "show_products": true,
+                                "product_limit": 4,
+                                "style": "card",
+                                "button": { "label": "Shop the sale", "url": "/shop" }
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ফ্ল্যাশ সেল",
+                                    "text": "মাত্র কয়েক ঘণ্টার জন্য দাম কম। সময় শেষ হলে অফারও শেষ।",
+                                    "button.label": "সেলে কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

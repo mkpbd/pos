@@ -24,8 +24,9 @@ export function ChartTooltip({ id, stop, layout }: { id: string; stop: Stop; lay
       <p className="mb-1 truncate text-[var(--viz-ink-2)]">{stop.title}</p>
       <ul className="flex flex-col gap-1">
         {stop.rows.map((row) => (
-          <li key={`${row.slot}-${row.name}`} className="flex min-w-0 items-center gap-2">
-            <span aria-hidden="true" className="h-0.5 w-3 shrink-0 rounded-full" style={{ background: seriesVar(row.slot) }} />
+          <li key={`${row.slot}-${row.name}`} className={row.total ? 'mt-0.5 flex min-w-0 items-center gap-2 border-t border-sf-border pt-1' : 'flex min-w-0 items-center gap-2'} data-total={row.total ? 'true' : undefined}>
+            {/* A stack's total has no series, so no key — an empty slot keeps the values aligned. */}
+            <span aria-hidden="true" className="h-0.5 w-3 shrink-0 rounded-full" style={row.total ? undefined : { background: seriesVar(row.slot) }} />
             <strong className="text-sm font-bold text-[var(--viz-ink)] tabular-nums">{digits(row.value)}</strong>
             {row.share && <span className="text-[var(--viz-ink-2)] tabular-nums">{digits(row.share)}</span>}
             {row.name && <span className="min-w-0 truncate text-[var(--viz-ink-2)]">{row.name}</span>}

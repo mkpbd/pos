@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { storefrontKeys } from '@/features/storefront/api'
 import { api } from '@/lib/api/client'
+import type { DemoStore } from '@/storefront/demos/api'
 import type { DocumentContext, Section } from '@/storefront/builder/types'
 import { builderAdminKeys, type DocumentSummary } from '../api'
 
@@ -20,15 +21,26 @@ export function isTemplatePreset(value: string | null | undefined): value is Tem
   return (TEMPLATE_PRESETS as readonly (string | null | undefined)[]).includes(value)
 }
 
+/** The looks "start from a demo look" accepts (B7): the demo presets and the store's original look (`default`). */
+export const SITE_PRESETS = [...TEMPLATE_PRESETS, 'default'] as const
+export type SitePreset = (typeof SITE_PRESETS)[number]
+
+export function isSitePreset(value: string | null | undefined): value is SitePreset {
+  return (SITE_PRESETS as readonly (string | null | undefined)[]).includes(value)
+}
+
 /** GET /storefront/builder/templates: one entry (no content). */
 export type BuilderTemplate = {
   id: string
   scope: TemplateScope
-  preset: TemplatePreset | null
+  /** A site template may also be the original look (`default`, B7). */
+  preset: TemplatePreset | 'default' | null
   category: string | null
   name: string
   description: string | null
   thumbnail_url: string | null
+  /** B7: a tall picture of the look's whole home page (site templates; null when there is none yet). */
+  preview_url?: string | null
   allowed_in: DocumentContext[]
   source: 'builtin' | 'mine'
   created_at?: string | null
@@ -111,12 +123,29 @@ function normalizeStart(data: unknown): StartFromDemoResult {
 export function useStartFromDemoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ preset, include }: { preset: TemplatePreset; include: DemoParts }) =>
+    mutationFn: ({ preset, include }: { preset: SitePreset; include: DemoParts }) =>
       api.post<unknown>(`${BASE}/start-from-demo/${encodeURIComponent(preset)}`, { include }).then((r) => normalizeStart(r.data)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: builderAdminKeys.documents })
       void queryClient.invalidateQueries({ queryKey: storefrontKeys.themeDraft })
     },
+  })
+}
+
+/**
+ * The demo stores this server offers (GET /api/v1/demo-stores, B7), for "See live demo". The
+ * endpoint answers 404 when the demo gallery is off (production): then, or on any error, none.
+ */
+export function useLiveDemosQuery(enabled = true) {
+  return useQuery({
+    queryKey: ['store-builder', 'demo-stores'] as const,
+    queryFn: ({ signal }) =>
+      api
+        .get<DemoStore[]>('/demo-stores', { signal })
+        .then((r) => (Array.isArray(r.data) ? r.data : []))
+        .catch(() => [] as DemoStore[]),
+    enabled,
+    staleTime: 5 * 60_000,
   })
 }
 

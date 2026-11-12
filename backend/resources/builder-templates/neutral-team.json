@@ -1,0 +1,74 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Meet the team", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "আমাদের দলের সাথে পরিচিত হোন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "team",
+                            "props": {
+                                "members": [
+                                    {
+                                        "id": "m1",
+                                        "media_id": { "asset": "classic/cat-women.jpg" },
+                                        "name": "Nadia Rahman",
+                                        "role": "Founder",
+                                        "bio": "Started the shop to bring well-made things to more homes.",
+                                        "links": [{ "id": "l1", "kind": "instagram", "url": "https://www.instagram.com/" }]
+                                    },
+                                    {
+                                        "id": "m2",
+                                        "media_id": { "asset": "classic/cat-men.jpg" },
+                                        "name": "Tanvir Ahmed",
+                                        "role": "Buying and quality",
+                                        "bio": "Visits our makers and checks every new product himself.",
+                                        "links": [{ "id": "l1", "kind": "linkedin", "url": "https://www.linkedin.com/" }]
+                                    },
+                                    {
+                                        "id": "m3",
+                                        "media_id": { "asset": "classic/banner-women.jpg" },
+                                        "name": "Sadia Islam",
+                                        "role": "Customer care",
+                                        "bio": "Answers your calls and makes sure every order arrives right.",
+                                        "links": [{ "id": "l1", "kind": "email", "url": "mailto:hello@example.com" }]
+                                    }
+                                ],
+                                "columns": { "base": 3, "tablet": 3, "mobile": 1 },
+                                "style": "card"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "members.m1.role": "প্রতিষ্ঠাতা",
+                                    "members.m1.bio": "ভালোভাবে তৈরি জিনিস আরও বেশি ঘরে পৌঁছাতে দোকানটি শুরু করেছেন।",
+                                    "members.m2.role": "ক্রয় ও মান",
+                                    "members.m2.bio": "নির্মাতাদের কাছে যান এবং প্রতিটি নতুন পণ্য নিজে যাচাই করেন।",
+                                    "members.m3.role": "গ্রাহক সেবা",
+                                    "members.m3.bio": "আপনার ফোনের উত্তর দেন এবং প্রতিটি অর্ডার ঠিকঠাক পৌঁছানো নিশ্চিত করেন।"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

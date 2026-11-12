@@ -6,30 +6,21 @@
  * (`<list>.<item_id>.<field>`), which move along when items are removed or duplicated.
  */
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { ExternalLinkIcon, ImagePlusIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ExternalLinkIcon } from 'lucide-react'
 import { FormField } from '@/components/common/form-field'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { flattenCategoryTree, useCatalogList } from '@/features/catalog/api'
-import { RichTextEditor } from '@/features/content/components/rich-text-editor'
-import { mediaKeys, useMediaLookup, type MediaItem } from '@/features/media/api'
-import { MediaPicker } from '@/features/media/components/media-picker'
-import type { TranslationFieldKind } from '@/features/translations/translations'
-import { api, toPaginated } from '@/lib/api/client'
 import { ICON_NAMES } from '@/storefront/builder/icons'
 import type {
   AccordionElement,
   AccordionItem,
   CarouselImage,
   CategoryCardElement,
+  ChartDataSource,
   ChartElementNode,
   CounterElement,
   CounterItem,
-  DocumentContext,
   Element,
   GalleryAspect,
   GalleryElement,
@@ -56,113 +47,24 @@ import type {
   TrustBadgesElement,
 } from '@/storefront/builder/types'
 import { B6_LIMITS, B6_TEXT_LIMITS } from '@/storefront/builder/validate'
-import type { MediaRef } from '@/storefront/types'
 import { BuilderIcon } from '@/storefront/builder/icons'
-import type { FormProps } from './content-forms'
-import { chartLabelTranslations, mapsUrl, moveItemTranslations, newItemId, type ItemListChange } from './b6-model'
+import { chartLabelTranslations, mapsUrl } from './b6-model'
 import { ChartDataEditor, ChartKindPicker } from './chart-data-editor'
-import { type ChartData, type ChartDataChange } from './chart-data'
-import { FieldError, ImageChooser, LinkField, NodeBangla, type Errors } from './fields'
-import { counter } from './format-text'
+import { DataSourceField, StoreChartPreview } from './chart-source'
+import { OptionalProductPicker } from './b8a-forms'
+import { isStackedKind, type ChartData, type ChartDataChange } from './chart-data'
+import { FieldError, ImageChooser, LinkField } from './fields'
+import { Bangla, ImageListBangla, ImageListField, ItemBangla, Note, NumberField, RichField } from './form-kit'
+import { itemErrors, limitIn, patch, setList, type ElementFormProps } from './form-model'
 import { HotspotEditor } from './hotspot-editor'
 import { ItemList } from './item-list'
 import { ChoiceField, IconPicker, PixelField, SingleProductPicker, TextField, ToggleField } from './pickers'
-import { translationLimit } from './validate'
-import type { InspectorChangeOptions } from './types'
 
-export type B6FormProps<N> = FormProps<N> & {
-  context?: DocumentContext
-  /** Icon names the server accepts (GET /elements `enums.icons`). */
-  icons?: readonly string[]
-  /** Shown in the setup dialog (insert): the same form, without the Bangla fields. */
-  setup?: boolean
-}
-
-type AnyB6 = Element & { props: Record<string, unknown> }
+export type B6FormProps<N> = ElementFormProps<N>
 
 const TEXT = B6_TEXT_LIMITS as Record<string, Record<string, number>>
 /** The text limit of a prop (`title`, `items.*.title`). */
-const limit = (type: string, field: string) => TEXT[type]?.[field] ?? 255
-
-function patch<N extends AnyB6>(node: N, onChange: FormProps<N>['onChange'], values: Partial<N['props']>, key?: string, media?: Record<string, MediaRef>) {
-  const opts: InspectorChangeOptions = { ...(key ? { coalesceKey: `${node.id}:${key}` } : {}), ...(media ? { media } : {}) }
-  onChange({ ...node, props: { ...node.props, ...values } }, Object.keys(opts).length > 0 ? opts : undefined)
-}
-
-/** Writes a list prop, moving the items' Bangla texts along and coalescing typing. */
-function setList<N extends AnyB6>(node: N, onChange: FormProps<N>['onChange'], list: string, items: unknown[], change?: ItemListChange, media?: Record<string, MediaRef>) {
-  const opts: InspectorChangeOptions = { ...(change?.typing ? { coalesceKey: `${node.id}:${list}:${change.typing}` } : {}), ...(media ? { media } : {}) }
-  onChange({ ...node, props: { ...node.props, [list]: items }, translations: moveItemTranslations(node.translations, list, change) }, Object.keys(opts).length > 0 ? opts : undefined)
-}
-
-type BanglaField = { name: string; label: string; base: string; kind?: TranslationFieldKind }
-
-/** The Bangla fields of a node's own props (not in the setup dialog). */
-function Bangla<N extends AnyB6>({ node, onChange, errors, bangla, setup, fields }: B6FormProps<N> & { fields: BanglaField[] }) {
-  if (!bangla || setup) return null
-  return (
-    <NodeBangla
-      fields={fields.map((f) => ({ ...f, max: translationLimit(node.type, f.name) }))}
-      translations={node.translations}
-      errors={errors}
-      onChange={(translations) => onChange({ ...node, translations }, { coalesceKey: `${node.id}:bn` })}
-    />
-  )
-}
-
-/** The Bangla fields of one list item (`<list>.<item_id>.<field>`). */
-function ItemBangla<N extends AnyB6>(props: B6FormProps<N> & { list: string; itemId: string; fields: BanglaField[] }) {
-  const { list, itemId, fields } = props
-  return <Bangla {...props} fields={fields.map((f) => ({ ...f, name: `${list}.${itemId}.${f.name}` }))} />
-}
-
-/** Errors of one list item, keyed by its field (`items.2.title` → `title`). */
-function itemErrors(errors: Errors, list: string, index: number): Errors {
-  const prefix = `${list}.${index}.`
-  return Object.fromEntries(Object.entries(errors).filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k.slice(prefix.length), v]))
-}
-
-function Note({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground">{children}</p>
-}
-
-/** A rich text field for a list item (accordion panel, tab). */
-function RichField({ id, label, value, max, error, onChange }: { id: string; label: string; value: string; max: number; error?: string; onChange: (html: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <RichTextEditor key={id} id={id} label={label} value={value} invalid={!!error} onChange={onChange} />
-      {error ? <FieldError message={error} /> : <p className="text-xs text-muted-foreground">{counter(value, max)} characters of HTML</p>}
-    </div>
-  )
-}
-
-/** A whole number with a range; `step` for decimals (counter values). */
-function NumberField({ label, value, min, max, step = 1, onChange, error, hint }: { label: string; value: number; min: number; max: number; step?: number; onChange: (n: number) => void; error?: string; hint?: string }) {
-  const [text, setText] = useState(String(value))
-  const [seen, setSeen] = useState(value)
-  if (seen !== value) {
-    setSeen(value)
-    setText(String(value))
-  }
-  return (
-    <FormField label={label} error={error} hint={hint}>
-      <Input
-        type="number"
-        inputMode={step < 1 ? 'decimal' : 'numeric'}
-        min={min}
-        max={max}
-        step={step}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value)
-          const n = Number(e.target.value)
-          if (e.target.value !== '' && Number.isFinite(n)) onChange(step < 1 ? Math.round(n * 100) / 100 : Math.round(n))
-        }}
-      />
-    </FormField>
-  )
-}
+const limit = (type: string, field: string) => limitIn(TEXT, type, field)
 
 const ICON_STYLE_OPTIONS = [
   { value: 'plain', label: 'Plain' },
@@ -453,9 +355,36 @@ export function ChartForm(props: B6FormProps<ChartElementNode>) {
       { ...node, props: { ...node.props, labels: next.labels, series: next.series }, translations: chartLabelTranslations(node.translations, p.labels, next.labels, change, next.series) },
       change?.typing ? { coalesceKey: `${node.id}:data:${change.typing}` } : undefined,
     )
+  // B8a: the numbers may come from the store (counted by the server; one series, so not stacked).
+  const source = p.data_source ?? 'manual'
+  const fromStore = source !== 'manual'
+  const setSource = (data_source: ChartDataSource) =>
+    patch(node, onChange, {
+      data_source,
+      source_product_id: data_source === 'store.rating_breakdown' ? (p.source_product_id ?? null) : null,
+      ...(data_source !== 'manual' && isStackedKind(p.kind) ? { kind: p.kind === 'stacked-bar' ? ('bar' as const) : ('column' as const) } : {}),
+    })
   return (
     <div className="flex flex-col gap-4">
-      <ChartKindPicker kind={p.kind} data={data} onChange={(kind) => patch(node, onChange, { kind })} />
+      <DataSourceField value={source} error={errors.data_source} onChange={setSource} />
+      {source === 'store.rating_breakdown' && (
+        <OptionalProductPicker
+          label="Reviews of"
+          hint="No product chosen: the reviews of all your products."
+          value={p.source_product_id ?? null}
+          error={errors.source_product_id}
+          onChange={(source_product_id) => patch(node, onChange, { source_product_id })}
+        />
+      )}
+      <ChartKindPicker
+        kind={p.kind}
+        data={data}
+        onChange={(kind) => patch(node, onChange, { kind })}
+        disabled={fromStore ? ['stacked-column', 'stacked-bar'] : []}
+        disabledReason={fromStore ? 'Numbers from your store make one series, so they can’t be stacked.' : undefined}
+        hideHint={fromStore}
+      />
+      {errors.kind && <FieldError message={errors.kind} />}
       <TextField label="Title" hint="Says what the chart shows, e.g. “Orders per month”." value={p.title} max={limit('chart', 'title')} error={errors.title} onChange={(title) => patch(node, onChange, { title }, 'title')} />
       <TextField
         label="Description"
@@ -466,7 +395,7 @@ export function ChartForm(props: B6FormProps<ChartElementNode>) {
         error={errors.description}
         onChange={(description) => patch(node, onChange, { description }, 'description')}
       />
-      <ChartDataEditor kind={p.kind} data={data} onChange={setData} errors={errors} />
+      {fromStore ? <StoreChartPreview node={node} /> : <ChartDataEditor kind={p.kind} data={data} onChange={setData} errors={errors} />}
       <div className="grid grid-cols-2 gap-2">
         <TextField label="Unit" placeholder="৳, %, pcs" value={p.unit} max={limit('chart', 'unit')} error={errors.unit} onChange={(unit) => patch(node, onChange, { unit }, 'unit')} />
         <ChoiceField label="Unit goes" value={p.unit_position} error={errors.unit_position} options={[{ value: 'before', label: 'Before (৳ 50)' }, { value: 'after', label: 'After (50 %)' }]} onChange={(unit_position) => patch(node, onChange, { unit_position })} />
@@ -510,8 +439,9 @@ export function ChartForm(props: B6FormProps<ChartElementNode>) {
         fields={[
           { name: 'title', label: 'Title', base: p.title },
           { name: 'description', label: 'Description', base: p.description, kind: 'textarea' },
-          ...p.labels.map((label, i) => ({ name: `labels.${i}`, label: `Label ${i + 1}`, base: label })),
-          ...p.series.map((s, i) => ({ name: `series.${s.id}.name`, label: `Series ${i + 1} name`, base: s.name })),
+          // Store numbers come with their own Bangla labels.
+          ...(fromStore ? [] : p.labels.map((label, i) => ({ name: `labels.${i}`, label: `Label ${i + 1}`, base: label }))),
+          ...(fromStore ? [] : p.series.map((s, i) => ({ name: `series.${s.id}.name`, label: `Series ${i + 1} name`, base: s.name }))),
         ]}
       />
     </div>
@@ -521,117 +451,6 @@ export function ChartForm(props: B6FormProps<ChartElementNode>) {
 /* ----------------------------------------------------------------------------------------------
  * Media
  * -------------------------------------------------------------------------------------------- */
-
-const toRef = (m: MediaItem): MediaRef => ({ id: m.id, url: m.url, srcset: m.srcset, width: m.width, height: m.height, alt: m.alt })
-
-/** Looks up chosen media (the picker's cached pages first, then the API) so the canvas can draw them at once. */
-function useMediaRefs() {
-  const queryClient = useQueryClient()
-  return async (ids: string[]): Promise<{ refs: Record<string, MediaRef>; items: Record<string, MediaItem> }> => {
-    const items: Record<string, MediaItem> = {}
-    for (const [, data] of queryClient.getQueriesData<{ items?: MediaItem[] }>({ queryKey: mediaKeys.all })) {
-      for (const m of data?.items ?? []) if (ids.includes(m.id)) items[m.id] = m
-    }
-    const missing = ids.filter((id) => !items[id])
-    if (missing.length > 0) {
-      try {
-        for (const m of (await api.get<MediaItem[]>('/media', { query: { ids: missing.join(','), per_page: 100 } }).then(toPaginated)).items) items[m.id] = m
-      } catch {
-        // The canvas resolves them later.
-      }
-    }
-    return { refs: Object.fromEntries(Object.values(items).map((m) => [m.id, toRef(m)])), items }
-  }
-}
-
-type ImageItem = { id: string; media_id: string; alt: string }
-
-function ImageThumb({ id, byId }: { id: string; byId: Map<string, MediaItem> }) {
-  const item = byId.get(id)
-  return (
-    <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded border bg-muted">
-      {item ? <img src={item.url} alt="" className="size-full object-cover" /> : null}
-    </span>
-  )
-}
-
-/**
- * The image list of a gallery, carousel or logo strip: "Add images" opens the media library for
- * several at once (their alt texts start from the library's); each card has its own fields.
- */
-function ImageListField<T extends ImageItem>(props: {
-  label: string
-  noun: string
-  list: string
-  items: T[]
-  range: { min: number; max: number }
-  errors: Errors
-  make: (id: string, media: MediaItem | undefined, mediaId: string) => T
-  onChange: (items: T[], change?: ItemListChange, media?: Record<string, MediaRef>) => void
-  children: (item: T, index: number, update: (patch: Partial<T>, coalesce?: string) => void) => ReactNode
-}) {
-  const { label, noun, list, items, range, errors, make, onChange, children } = props
-  const [open, setOpen] = useState(false)
-  const lookup = useMediaRefs()
-  const { byId } = useMediaLookup(items.map((i) => i.media_id).filter(Boolean))
-  const room = range.max - items.length
-  const add = async (ids: string[]) => {
-    const fresh = ids.slice(0, room)
-    if (fresh.length === 0) return
-    const { refs, items: found } = await lookup(fresh)
-    const next = [...items]
-    for (const mediaId of fresh) next.push(make(newItemId(next), found[mediaId], mediaId))
-    onChange(next, undefined, refs)
-  }
-  return (
-    <div className="flex flex-col gap-2">
-      <ItemList<T>
-        label={label}
-        noun={noun}
-        items={items}
-        min={range.min}
-        max={range.max}
-        errors={errors}
-        errorPrefix={list}
-        openNew={false}
-        create={(id) => make(id, undefined, '')}
-        summary={(item, i) => item.alt || `${noun[0]!.toUpperCase()}${noun.slice(1)} ${i + 1}`}
-        lead={(item) => <ImageThumb id={item.media_id} byId={byId} />}
-        onChange={(next, change) => onChange(next, change)}
-      >
-        {(item, i, update) => (
-          <>
-            <ImageChooser
-              title={`Choose the ${noun}`}
-              value={item.media_id || null}
-              error={itemErrors(errors, list, i).media_id}
-              onChange={(media_id, ref) => {
-                if (!media_id) return
-                onChange(items.map((x) => (x.id === item.id ? { ...x, media_id } : x)), undefined, ref ? { [ref.id]: ref } : undefined)
-              }}
-            />
-            {children(item, i, update)}
-          </>
-        )}
-      </ItemList>
-      <Button type="button" size="sm" className="self-start" disabled={room <= 0} onClick={() => setOpen(true)}>
-        <ImagePlusIcon data-icon="inline-start" /> {items.length === 0 ? `Choose ${noun}s` : `Add ${noun}s`}
-      </Button>
-      <MediaPicker open={open} onOpenChange={setOpen} title={`Add ${noun}s`} multiple max={Math.max(room, 1)} selected={[]} onConfirm={(ids) => void add(ids)} />
-    </div>
-  )
-}
-
-function ImageListBangla<N extends AnyB6>(props: B6FormProps<N> & { list: string; item: { id: string; alt: string; caption?: string }; captions?: boolean }) {
-  const { item, captions = true } = props
-  return (
-    <ItemBangla
-      {...props}
-      itemId={item.id}
-      fields={[{ name: 'alt', label: 'Description (alt text)', base: item.alt }, ...(captions ? [{ name: 'caption', label: 'Caption', base: item.caption ?? '' }] : [])]}
-    />
-  )
-}
 
 const COLUMN_CHOICES = [2, 3, 4, 5, 6]
 const INHERIT = 'inherit'

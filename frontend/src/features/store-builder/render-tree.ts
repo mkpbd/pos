@@ -15,31 +15,48 @@ import type { ResolveDataElement, ResolveElement } from './api'
 type AnyNode = Section | Element
 
 function translated(node: AnyNode, locale: string): Record<string, unknown> {
-  const props = structuredClone(node.props) as Record<string, unknown>
+  let props = structuredClone(node.props) as Record<string, unknown>
   const texts = node.translations?.[locale] ?? {}
   for (const [field, value] of Object.entries(texts)) {
     if (!isTranslatableKey(node.type, field) || typeof value !== 'string' || value === '') continue
     const parts = field.split('.')
     if (isWrappedSectionType(node.type) && field !== 'title' && field !== 'subtitle') {
       props.config = { ...(props.config as Record<string, unknown>), [field]: value }
-    } else if (parts.length === 3 && Array.isArray(props[parts[0]!])) {
-      // B6: a list item's field (`items.<item_id>.title`, `series.<id>.name`).
-      const [list, id, child] = parts as [string, string, string]
-      props[list] = (props[list] as Record<string, unknown>[]).map((item) => (item && item.id === id ? { ...item, [child]: value } : item))
-    } else if (parts.length === 2 && parts[0] === 'labels' && Array.isArray(props.labels)) {
-      // B6: a chart label by position (`labels.<index>`).
-      const index = Number(parts[1])
-      props.labels = (props.labels as unknown[]).map((label, i) => (i === index ? value : label))
-    } else if (field.includes('.')) {
-      // B4: a nested prop (`primary.label` of a call to action); an absent parent (no secondary button) stays absent.
-      const [parent, child] = field.split('.', 2) as [string, string]
-      const holder = props[parent]
-      if (holder && typeof holder === 'object') props[parent] = { ...(holder as Record<string, unknown>), [child]: value }
     } else {
-      props[field] = value
+      props = withText(props, parts, value)
     }
   }
   return props
+}
+
+/**
+ * Lays a translated text over a prop path: a list item is found by its id (`items.<item_id>.title`,
+ * B8a nested lists `plans.<plan_id>.features.<feature_id>.text`), a chart label by its position
+ * (`labels.<index>`), an object by its key (`primary.label`, `rows.<id>.cells.<column_id>.text`).
+ * A missing parent (no secondary button, a removed item) leaves the props unchanged.
+ */
+function withText(holder: Record<string, unknown>, parts: readonly string[], value: string): Record<string, unknown> {
+  const [head, ...rest] = parts as [string, ...string[]]
+  if (rest.length === 0) return { ...holder, [head]: value }
+  const child = holder[head]
+  if (Array.isArray(child)) {
+    const key = rest[0]!
+    if (rest.length === 1 && /^\d+$/.test(key)) {
+      // B6: a chart label by position.
+      const index = Number(key)
+      return index < child.length ? { ...holder, [head]: child.map((item, i) => (i === index ? value : item)) } : holder
+    }
+    if (rest.length < 2) return holder
+    let found = false
+    const items = child.map((item) => {
+      if (!item || typeof item !== 'object' || (item as { id?: unknown }).id !== key) return item
+      found = true
+      return withText(item as Record<string, unknown>, rest.slice(1), value)
+    })
+    return found ? { ...holder, [head]: items } : holder
+  }
+  if (child && typeof child === 'object') return { ...holder, [head]: withText(child as Record<string, unknown>, rest, value) }
+  return holder
 }
 
 export function scheduleState(schedule: Schedule, now: number): NodeState | null {
@@ -81,8 +98,19 @@ export function toRenderTree(content: BuilderContent, options: RenderTreeOptions
  * Wrapped elements and media for /builder/resolve
  * -------------------------------------------------------------------------------------------- */
 
-/** B4 / B6 elements whose `data[id]` comes from the server (the resolve takes their props). */
-export const DATA_ELEMENT_TYPES: ReadonlySet<string> = new Set(['countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'contact_form', 'category_card', 'product_spotlight', 'shop_the_look'])
+/** B4 / B6 / B8a elements whose `data[id]` comes from the server (the resolve takes their props). */
+export const DATA_ELEMENT_TYPES: ReadonlySet<string> = new Set([
+  'countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'contact_form', 'category_card', 'product_spotlight', 'shop_the_look',
+  'comparison_table', 'flash_sale_bar', 'bundle', 'review_wall', 'store_hours',
+])
+
+/** B8a: a chart whose numbers come from the store (`data_source` other than manual) is a data element too. */
+export function isStoreChart(element: { type: string; props?: unknown }): boolean {
+  const source = (element.props as { data_source?: unknown } | undefined)?.data_source
+  return element.type === 'chart' && typeof source === 'string' && source !== 'manual'
+}
+
+const isDataElement = (element: Element) => DATA_ELEMENT_TYPES.has(element.type) || isStoreChart(element)
 
 /** Elements the canvas needs server data for: wrapped homepage sections and the B4 data elements. */
 export function wrappedElements(content: BuilderContent): Element[] {
@@ -90,7 +118,7 @@ export function wrappedElements(content: BuilderContent): Element[] {
   const visit = (columns: Column[]) => {
     for (const column of columns) {
       for (const element of column.elements) {
-        if (isWrappedSectionType(element.type) || DATA_ELEMENT_TYPES.has(element.type)) result.push(element)
+        if (isWrappedSectionType(element.type) || isDataElement(element)) result.push(element)
         if ('columns' in element) visit(element.columns as Column[])
       }
     }
@@ -101,7 +129,7 @@ export function wrappedElements(content: BuilderContent): Element[] {
 
 /** What /builder/resolve needs of a wrapped element (B4 data elements: their props). */
 export function resolveInput(element: Element): ResolveElement | ResolveDataElement {
-  if (DATA_ELEMENT_TYPES.has(element.type)) return { id: element.id, type: element.type, props: element.props as Record<string, unknown>, translations: element.translations ?? {} }
+  if (isDataElement(element)) return { id: element.id, type: element.type, props: element.props as Record<string, unknown>, translations: element.translations ?? {} }
   const props = element.props as { title?: string | null; subtitle?: string | null; config?: Record<string, unknown>; items?: { item_type: string; item_id: string }[] }
   return {
     id: element.id,
@@ -121,11 +149,27 @@ export function resolveKey(element: Element): string {
     const { media_id, hotspots } = element.props
     return JSON.stringify({ id: element.id, type: element.type, media_id, products: [...new Set(hotspots.map((h) => h.product_id))].sort() })
   }
+  // B8a: only what the server reads; typing a title or a row label doesn't need a new resolve.
+  if (element.type === 'comparison_table') return JSON.stringify({ id: element.id, type: element.type, products: element.props.columns.map((c) => c.product_id) })
+  if (element.type === 'bundle') return JSON.stringify({ id: element.id, type: element.type, products: element.props.items.map((i) => i.product_id) })
+  if (element.type === 'store_hours') return JSON.stringify({ id: element.id, type: element.type })
+  if (element.type === 'flash_sale_bar') {
+    const { promotion_id, show_products, product_limit } = element.props
+    return JSON.stringify({ id: element.id, type: element.type, promotion_id, show_products, product_limit })
+  }
+  if (element.type === 'review_wall') {
+    const { source, product_id, min_rating, limit } = element.props
+    return JSON.stringify({ id: element.id, type: element.type, source, product_id, min_rating, limit })
+  }
+  if (element.type === 'chart') {
+    const { data_source, source_product_id } = element.props
+    return JSON.stringify({ id: element.id, type: element.type, data_source, source_product_id: source_product_id ?? null })
+  }
   return JSON.stringify(resolveInput(element))
 }
 
-/** B6 list props whose items carry a `media_id`. */
-const MEDIA_LISTS: Record<string, string> = { gallery: 'images', image_carousel: 'images', logo_carousel: 'logos' }
+/** B6 / B8a list props whose items carry a `media_id`. */
+const MEDIA_LISTS: Record<string, string> = { gallery: 'images', image_carousel: 'images', logo_carousel: 'logos', photo_grid: 'images', team: 'members' }
 /** Element types with a `media_id` prop (B6: category card override, shop-the-look photo). */
 const MEDIA_PROP_TYPES = new Set(['image', 'category_card', 'shop_the_look'])
 
@@ -147,6 +191,7 @@ export function mediaIds(content: BuilderContent): string[] {
     style(node.style)
     const props = (node.props ?? {}) as Record<string, unknown>
     if (MEDIA_PROP_TYPES.has(node.type)) add(props.media_id)
+    if (node.type === 'before_after') for (const side of ['before', 'after']) add((props[side] as { media_id?: unknown } | undefined)?.media_id)
     const list = MEDIA_LISTS[node.type]
     if (list && Array.isArray(props[list])) for (const item of props[list] as { media_id?: unknown }[]) add(item?.media_id)
     if (Array.isArray(node.columns)) (node.columns as Column[]).forEach((column) => visit(column as never))

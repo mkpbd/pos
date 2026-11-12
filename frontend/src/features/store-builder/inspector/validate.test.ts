@@ -23,9 +23,11 @@ describe('validateNode: builder elements', () => {
   it('accepts every registry default except the elements that need content first', () => {
     // B4: a video needs its link, a promoted product its product, a countdown its end, a discount its promotion, a menu its menu.
     // B6: images, logos, a map address, a category, a product and the shop-the-look photo.
+    // B8a: the before / after photos, the bundle's products and the photo grid's photos.
     const needContent = [
       'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'product_tabs', 'video', 'promo_card', 'countdown', 'discount', 'menu',
       'gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look',
+      'before_after', 'bundle', 'photo_grid',
     ]
     for (const meta of ELEMENT_REGISTRY) {
       const node = buildElement(meta.type, registry, new Set())!
@@ -273,5 +275,62 @@ describe('validateNode: B4 elements', () => {
     expect(formKey(b4('video'), 'props.video_id')).toBe('url')
     expect(isInlineProblem(b4('video'), { path: 'props.provider', message: 'x' }, false)).toBe(true)
     expect(isInlineProblem(b4('custom_html'), { path: '', message: 'Not allowed' }, false)).toBe(false)
+  })
+})
+
+describe('validateNode: B8a elements', () => {
+  const b8 = (type: string, props: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => {
+    const base = buildElement(type, registry, new Set())!
+    return { ...base, id: 'e_test01', props: { ...base.props, ...props }, ...extra } as unknown as Element
+  }
+  const message = (node: Element, path: string) => validateNode(node).find((p) => p.path === path)?.message
+
+  it('pricing: a price is a money string; a word is needed instead of no price; plans and features have limits', () => {
+    const plan = (over: Record<string, unknown>) => ({ id: 'p_a', name: 'Basic', price: '10', price_text: '', period: '', description: '', features: [], button: null, highlighted: false, badge: '', ...over })
+    expect(paths(b8('pricing_table', { plans: [plan({ price: '-1' })] }))).toEqual(['props.plans.0.price'])
+    expect(message(b8('pricing_table', { plans: [plan({ price: '1.234' })] }), 'props.plans.0.price')).toMatch(/1250 or 99.50/)
+    expect(message(b8('pricing_table', { plans: [plan({ price: null })] }), 'props.plans.0.price_text')).toMatch(/instead of a price/)
+    expect(message(b8('pricing_table', { plans: [] }), 'props.plans')).toBe('Add at least 1 plan.')
+    const features = Array.from({ length: 13 }, (_, i) => ({ id: `f_${i}x`, text: 'F', included: true }))
+    expect(message(b8('pricing_table', { plans: [plan({ features })] }), 'props.plans.0.features')).toBe('At most 12 features.')
+    expect(message(b8('pricing_table', { plans: [plan({ button: { label: 'Go', url: 'javascript:alert(1)' } })] }), 'props.plans.0.button.url')).toMatch(/site path/)
+  })
+
+  it('comparison: the same product twice and an empty text cell are reported', () => {
+    const columns = [
+      { id: 'c_a', title: 'A', product_id: UUID, highlighted: false },
+      { id: 'c_b', title: 'B', product_id: UUID, highlighted: false },
+    ]
+    const rows = [{ id: 'r_a', label: 'Warranty', cells: { c_a: { kind: 'text', text: ' ' }, c_b: { kind: 'yes', text: '' } } }]
+    const node = b8('comparison_table', { columns, rows })
+    expect(message(node, 'props.columns.1.product_id')).toMatch(/already in another column/)
+    expect(message(node, 'props.rows.0.cells.c_a.text')).toMatch(/Enter the text for this cell/)
+  })
+
+  it('team: a name is needed (not translated); links by kind; store hours times; progress values', () => {
+    const member = (links: unknown[]) => ({ id: 'm_a', media_id: null, name: 'Rina', role: '', bio: '', links })
+    expect(paths(b8('team', { members: [member([{ id: 'l_a', kind: 'email', url: 'mailto:rina@shop.com' }, { id: 'l_b', kind: 'website', url: 'https://shop.com' }])] }))).toEqual([])
+    expect(message(b8('team', { members: [member([{ id: 'l_a', kind: 'facebook', url: 'http://fb.com/x' }])] }), 'props.members.0.links.0.url')).toMatch(/https/)
+    expect(message(b8('team', { members: [{ ...member([]), name: '' }] }), 'props.members.0.name')).toBe('Enter a name.')
+    expect(paths({ ...b8('team'), translations: { bn: { 'members.member-1.name': 'রিনা', 'members.member-1.role': 'x'.repeat(81) } } })).toEqual(['translations.bn.members.member-1.role'])
+    const days = (b8('store_hours').props as { days: { open: string }[] }).days.map((d, i) => (i === 2 ? { ...d, open: '25:00' } : d))
+    expect(message(b8('store_hours', { days }), 'props.days.2.open')).toBe('Enter a time such as 10:00.')
+    expect(message(b8('progress_bars', { items: [{ id: 'i_a', label: 'Happy', value: 100.5 }] }), 'props.items.0.value')).toMatch(/0 to 100/)
+  })
+
+  it('chart: stacked kinds need 2 series and can’t be stacked from store numbers', () => {
+    expect(message(b8('chart', { kind: 'stacked-column' }), 'props.series')).toMatch(/at least 2 series/)
+    expect(message(b8('chart', { kind: 'stacked-column', data_source: 'store.products_per_category' }), 'props.kind')).toMatch(/can’t be stacked/)
+    expect(paths(b8('chart', { data_source: 'store.rating_breakdown', source_product_id: UUID }))).toEqual([])
+    expect(message(b8('chart', { data_source: 'store.products_per_category', source_product_id: UUID }), 'props.source_product_id')).toMatch(/all products/)
+  })
+
+  it('maps B8a paths to their form fields and shows them inline', () => {
+    const node = b8('photo_grid')
+    expect(formKey(node, 'sections.0.columns.0.elements.0.props.images.2.link.url')).toBe('images.2.link')
+    expect(formKey(node, 'props.profile.url')).toBe('profile.url')
+    expect(isInlineProblem(node, { path: 'props.images', message: 'x' }, false)).toBe(true)
+    expect(needsSetup(b8('before_after'))).toBe(true)
+    expect(needsSetup(b8('pricing_table'))).toBe(false)
   })
 })

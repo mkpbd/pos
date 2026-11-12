@@ -7,6 +7,7 @@ use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Domain\PromotionType;
 use App\Modules\Promotions\Infrastructure\Models\Coupon;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
+use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\Translations;
 use Illuminate\Database\Eloquent\Builder;
@@ -60,6 +61,23 @@ class EloquentPromotionShowcase implements PromotionShowcase
                 'ends_at' => $promotion->ends_at?->toIso8601String(),
                 'state' => $promotion->state()->value,
             ];
+        }
+
+        return $result;
+    }
+
+    public function claimed(array $ids): array
+    {
+        $limits = $this->query($ids)?->whereNotNull('usage_limit')->pluck('usage_limit', 'id')->all() ?? [];
+        if ($limits === []) {
+            return [];
+        }
+        $used = PromotionRedemption::query()->whereIn('promotion_id', array_keys($limits))
+            ->groupBy('promotion_id')->selectRaw('promotion_id, count(*) as n')->pluck('n', 'promotion_id')->all();
+
+        $result = [];
+        foreach ($limits as $id => $limit) {
+            $result[$id] = ['used' => min((int) $limit, (int) ($used[$id] ?? 0)), 'limit' => (int) $limit];
         }
 
         return $result;

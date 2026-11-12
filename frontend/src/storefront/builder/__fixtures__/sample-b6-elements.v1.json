@@ -370,7 +370,9 @@
                 "show_values": "last",
                 "show_legend": true,
                 "show_table": true,
-                "height": 360
+                "height": 360,
+                "data_source": "manual",
+                "source_product_id": null
               },
               "style": {},
               "visibility": {
@@ -809,7 +811,9 @@
                         "show_values": "all-small",
                         "show_legend": true,
                         "show_table": false,
-                        "height": 280
+                        "height": 280,
+                        "data_source": "manual",
+                        "source_product_id": null
                       },
                       "style": {},
                       "visibility": {

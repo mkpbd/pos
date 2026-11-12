@@ -1,0 +1,38 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "review_wall",
+                            "props": {
+                                "source": "latest",
+                                "product_id": null,
+                                "min_rating": 4,
+                                "limit": 6,
+                                "layout": "grid",
+                                "show_product": true,
+                                "show_summary": true,
+                                "title": "What our customers say"
+                            },
+                            "translations": { "bn": { "title": "আমাদের গ্রাহকেরা যা বলেন" } }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

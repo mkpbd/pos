@@ -62,6 +62,8 @@ class ManageBuilderTemplates
             'name' => $t['name'],
             'description' => $t['description'],
             'thumbnail_url' => $t['thumbnail'],
+            // B7: the tall full-page preview of a site template (null for the others).
+            'preview_url' => $t['preview'],
             'allowed_in' => $t['allowed_in'],
             'requires' => $t['requires'],
             'source' => 'builtin',
@@ -204,6 +206,7 @@ class ManageBuilderTemplates
             'name' => $template->name,
             'description' => $template->content['description'] ?? null,
             'thumbnail_url' => null,
+            'preview_url' => null,
             'allowed_in' => $template->content['allowed_in'] ?? [$template->content['context'] ?? 'page'],
             'requires' => [],
             'source' => 'mine',

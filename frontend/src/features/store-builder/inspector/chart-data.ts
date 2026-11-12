@@ -4,7 +4,7 @@
  * which chart kind fits the data.
  */
 
-export type ChartKind = 'bar' | 'column' | 'line' | 'area' | 'pie' | 'donut'
+export type ChartKind = 'bar' | 'column' | 'line' | 'area' | 'pie' | 'donut' | 'stacked-column' | 'stacked-bar'
 export type ChartSeriesData = { id: string; name: string; values: number[] }
 export type ChartData = { labels: string[]; series: ChartSeriesData[] }
 
@@ -16,6 +16,8 @@ export const CHART_LIMITS = {
   labels: { min: 1, max: 24 },
   labelLength: 40,
   series: { min: 1, max: 6 },
+  /** B8a: a stacked chart compares 2–6 parts of each total. */
+  stackedSeries: { min: 2, max: 6 },
   seriesName: 40,
   pieLabels: 8,
   /** The store draws a pie / donut with more parts (or any negative value) as bars. */
@@ -26,9 +28,12 @@ export const CHART_LIMITS = {
   height: { min: 200, max: 600 },
 } as const
 
-export const CHART_KINDS: readonly ChartKind[] = ['column', 'bar', 'line', 'area', 'pie', 'donut']
+export const CHART_KINDS: readonly ChartKind[] = ['column', 'bar', 'stacked-column', 'stacked-bar', 'line', 'area', 'pie', 'donut']
 
 export const isPieKind = (kind: string) => kind === 'pie' || kind === 'donut'
+
+/** B8a: stacked columns / bars (each bar split into its series). */
+export const isStackedKind = (kind: string) => kind === 'stacked-column' || kind === 'stacked-bar'
 
 /* ----------------------------------------------------------------------------------------------
  * Numbers
@@ -240,6 +245,14 @@ export function chartDataProblems(kind: string, data: ChartData): ChartProblem[]
     if (labels.length > CHART_LIMITS.pieLabels) out.push({ key: 'labels', message: `A pie or donut chart shows at most ${CHART_LIMITS.pieLabels} slices.` })
     if (series[0]?.values.some((v) => v < 0)) out.push({ key: 'series', message: 'A pie or donut chart can’t show negative numbers.' })
   }
+  if (isStackedKind(kind)) {
+    if (series.length < CHART_LIMITS.stackedSeries.min) out.push({ key: 'series', message: 'A stacked chart needs at least 2 series: add a column of numbers, or pick another kind.' })
+    series.forEach((s, i) =>
+      s.values.forEach((v, j) => {
+        if (v < 0) out.push({ key: `series.${i}.values.${j}`, message: `Row ${j + 1} of ${s.name || `series ${i + 1}`}: a stacked chart can’t show negative numbers.` })
+      }),
+    )
+  }
   return out
 }
 
@@ -265,6 +278,13 @@ export function kindHint(kind: ChartKind, data: ChartData): KindHint {
   const asBars = labels.length > CHART_LIMITS.pieParts
   const suggested: ChartKind = time ? (series.length === 1 ? 'area' : 'line') : longLabels || labels.length > 8 ? 'bar' : 'column'
 
+  if (isStackedKind(kind)) {
+    const horizontal = kind === 'stacked-bar'
+    if (series.length < 2) return { suggested, text: 'A stacked chart splits each bar into parts, so it needs at least 2 series.', tone: 'problem' }
+    if (!allPositive) return { suggested, text: 'Parts of a stack can’t be negative. Use columns or lines.', tone: 'problem' }
+    if (!horizontal && (longLabels || labels.length > 8)) return { suggested: 'stacked-bar', text: 'Long or many labels fit better on horizontal stacked bars.', tone: 'tip' }
+    return { suggested: kind, text: 'Good for showing what each total is made of; the tooltip shows every part and the total.', tone: 'ok' }
+  }
   if (isPieKind(kind)) {
     if (series.length !== 1) return { suggested, text: 'A pie or donut shows one series only. With several series, columns or lines compare them better.', tone: 'problem' }
     if (labels.length > CHART_LIMITS.pieLabels) return { suggested, text: `A pie or donut shows at most ${CHART_LIMITS.pieLabels} slices; bars read better with this many.`, tone: 'problem' }
@@ -291,4 +311,6 @@ export const KIND_LABELS: Record<ChartKind, string> = {
   area: 'Area',
   pie: 'Pie',
   donut: 'Donut',
+  'stacked-column': 'Stacked',
+  'stacked-bar': 'Stacked bars',
 }

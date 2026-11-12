@@ -26,13 +26,14 @@ import { elementContext, kindInfo } from '../document-kind'
 import { AdvancedTab } from './advanced-tab'
 import { B4Form, type B4FormProps } from './b4-forms'
 import { B6Form } from './b6-forms'
+import { B8aForm } from './b8a-forms'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
 import { ElementSetupHost } from './setup-dialog'
 import { StyleTab } from './style-tab'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
-import { B4_TYPES, B6_TYPES, validateNode } from './validate'
+import { B4_TYPES, B6_TYPES, B8A_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
 const ICONS: Record<string, typeof HeadingIcon> = {
@@ -75,6 +76,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   const common = { onChange, errors, bangla } as const
   if (B4_TYPES.has(node.type)) return <B4Form key={node.id} node={node as Element} {...common} {...b4} />
   if (B6_TYPES.has(node.type)) return <B6Form key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
+  if (B8A_TYPES.has(node.type)) return <B8aForm key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
   switch (node.type) {
     case 'section':
       return (

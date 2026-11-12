@@ -343,3 +343,46 @@ Original questions:
 
 - **Endpoint:** `EditBuilderBanner` + `BuilderBannerUsage`. A banner referenced outside this document's draft is copied: homepage section items, other documents' drafts (including the theme), any version's content, and the organization's saved templates. On PostgreSQL the check is `jsonb_path_exists`; on other databases it is a text match. The banner rules are shared with the Banners API (`BannerRules`).
 - **Editor:** a `banner-edited` command swaps a copied id across the draft as one undo step, and `usePreviewData.refresh(ids)` forces a re-resolve even when the element's own input is unchanged.
+
+### As built — B7 easier start screen (2026-11-12)
+
+- **Looks:** site templates are listed `site-kids` ("BerryKid Kids Store", the kids preset's new display name), `site-default`
+  ("Original look", new: preset `default`, a general-store home of 10 sections, its header, footer and shop top; 5 photos, 4
+  banners), then vegan, handmade, classic. `start-from-demo/default` is accepted. 66 built-in templates.
+- **Previews:** manifest `preview` → `preview_url` in the template list; only the five sites have one
+  (`/builder-templates/<id>-full.jpg`, full-page screenshots at 640 px wide, ~120–260 KB). The Original look's images were
+  taken with it applied to the Classic demo store (real product photos).
+- **Start screen (`/admin/storefront/pages`):**
+  - an English / বাংলা toggle for this screen only (`pages/messages.ts`, `screen-language.ts`; localStorage
+    `pos.storeBuilder.pagesLang`, `lang` on the screen root and on its dialogs). The editor stays English;
+  - a state-aware 3-step guide (choose a look → edit your pages → publish, with "N unpublished changes" and *Publish all
+    changes* through publish-all), hideable;
+  - looks in API order, the first one featured; each card has *Preview* (the tall image, falling back to the thumbnail),
+    *See live demo* (only when `GET /demo-stores` lists the preset — never for `default`) and *Use this look*;
+  - the Use dialog offers *Save as draft* (the B5 flow) or *Use and publish now* (needs `storefront.publish`; confirm →
+    start-from-demo → publish-all → "… is live on your shop");
+  - plain grouping: *Your pages* (home, other pages, campaign pages), *Header & footer*, *Shop pages*.
+- **Not translated:** the Original look's features-strip items and testimonial quotes stay English (those section configs
+  have no translations).
+
+### As built — B8a selling, people and data blocks (2026-11-12)
+
+- **Elements (10):** `pricing_table`, `comparison_table`, `bundle` (commerce); `flash_sale_bar`, `review_wall` (marketing);
+  `before_after`, `photo_grid` (media); `team`, `store_hours` (+ footer), `progress_bars` (content). Normalizers in
+  `B8ElementProps`; shared helpers moved to an `ElementProps` base class (B6 unchanged).
+- **Two-level translation keys** (`plans.<id>.features.<id>.text`, `rows.<id>.cells.<column id>.text`), listed in
+  `limits.nested_list_translatable`; the storefront/editor translation resolvers walk keys of any depth.
+- **Data through contracts only:** `ReviewShowcase` (approved reviews, public author name, star counts),
+  `StorefrontCatalog::liveProductIds()`, `PromotionShowcase::claimed()` (real redemptions, only with a usage limit),
+  `OrganizationDirectory` timezone. A flash sale bar without a chosen promotion also expires the page cache at the next automatic
+  promotion start/end.
+- **Chart:** stacked kinds (d3 `stack()`, one value axis, totals in tooltip/table, legend always on); `data_source` store sources
+  render from `data[id]` (public counts only; a store source is never stacked). Progress bars use the theme primary only when it
+  passes the palette checks (lightness, chroma, 3:1), else palette slot 1.
+- **Storefront:** before/after is a `role="slider"` (keyboard + pointer capture); the comparison table is a real table in a focusable
+  scroll region with a sticky first column; bundle adds items one by one through the cart mutation with a polite live region and a
+  per-item failure list; store hours status renders after mount (no hydration mismatch) and refreshes each minute; Bengali digits
+  follow the store's `bangla_digits` setting.
+- **Editor:** setup dialogs for before/after, bundle and photo grid; comparison grid; store-hours week editor (Saturday first, copy to
+  all, after-midnight and 24-hour hints); chart "Numbers come from" with a read-only store preview; prices accept "১,২৫০" / "৳ 99.50".
+- **Templates:** 10 neutral sections with thumbnails (76 built-ins).

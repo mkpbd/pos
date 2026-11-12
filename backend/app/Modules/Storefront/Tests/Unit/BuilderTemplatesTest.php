@@ -112,9 +112,21 @@ class BuilderTemplatesTest extends TestCase
 
         foreach ($manifest as $t) {
             $this->assertMatchesRegularExpression('/^[a-z0-9-]{2,80}$/', $t['id']);
-            $this->assertSame(['id', 'scope', 'preset', 'category', 'name', 'description', 'thumbnail', 'allowed_in', 'requires'], array_keys($t), $t['id']);
+            // B7: `preview` (after the thumbnail) is optional.
+            $keys = ['id', 'scope', 'preset', 'category', 'name', 'description', 'thumbnail', ...(array_key_exists('preview', $t) ? ['preview'] : []), 'allowed_in', 'requires'];
+            $this->assertSame($keys, array_keys($t), $t['id']);
             $this->assertContains($t['scope'], ['section', 'page', 'site'], $t['id']);
-            $this->assertContains($t['preset'], [null, 'vegan', 'handmade', 'classic', 'kids'], $t['id']);
+            $this->assertContains($t['preset'], [null, 'default', 'vegan', 'handmade', 'classic', 'kids'], $t['id']);
+            if ($t['preset'] === 'default') {
+                $this->assertSame('site', $t['scope'], "{$t['id']}: the original look has a site template only");
+            }
+            // B7: a tall full-page JPEG for the site templates, null (or absent) for the others.
+            $preview = $t['preview'] ?? null;
+            if ($t['scope'] === 'site') {
+                $this->assertTrue($preview === null || preg_match('#^/builder-templates/'.preg_quote($t['id'], '#').'-full\.jpg$#', $preview) === 1, "{$t['id']} preview");
+            } else {
+                $this->assertNull($preview, $t['id']);
+            }
             $this->assertMatchesRegularExpression('/^[a-z]{3,20}$/', $t['category'], $t['id']);
             $this->assertNotSame('', trim($t['name']));
             $this->assertLessThanOrEqual(120, mb_strlen($t['name']));
@@ -144,10 +156,16 @@ class BuilderTemplatesTest extends TestCase
         $pages = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'page'));
         $this->assertEqualsCanonicalizing(['about', 'contact', 'faq', 'sale', 'collection'], array_column($pages, 'category'));
         $sites = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'site'));
-        $this->assertEqualsCanonicalizing(['vegan', 'handmade', 'classic', 'kids'], array_column($sites, 'preset'));
+        // B7: one site per preset, the original look included, in the order the demo looks are shown.
+        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($sites, 'id'));
+        $this->assertSame(['kids', 'default', 'vegan', 'handmade', 'classic'], array_column($sites, 'preset'));
+        $this->assertEqualsCanonicalizing(ThemePresets::KEYS, array_column($sites, 'preset'));
         foreach ($sites as $site) {
             $this->assertSame(['page', 'header', 'footer', 'zone'], $site['allowed_in']);
         }
+        $this->assertSame('BerryKid Kids Store', $sites[0]['name']);
+        $this->assertSame(ThemePresets::name('kids'), $sites[0]['name']);
+        $this->assertSame('Original look', $sites[1]['name']);
         // Categories the editor groups by.
         foreach (['hero', 'features', 'categories', 'products', 'promo', 'testimonials', 'story', 'cta', 'newsletter', 'faq', 'countdown', 'brands', 'video'] as $category) {
             $this->assertNotEmpty(array_filter($sections, fn (array $t) => $t['category'] === $category), $category);
@@ -236,7 +254,8 @@ class BuilderTemplatesTest extends TestCase
         $json = json_encode($content);
         $this->assertSame(str_contains($json, '"banner":{'), in_array('banners', $meta['requires'], true), "{$id} banners");
         $this->assertSame(str_contains($json, '"menu_ref"'), in_array('menus', $meta['requires'], true), "{$id} menus");
-        $this->assertSame(str_contains($json, '"type":"hot_deals"'), in_array('promotions', $meta['requires'], true), "{$id} promotions");
+        // B8a: a flash sale bar needs a running flash sale too.
+        $this->assertSame(str_contains($json, '"type":"hot_deals"') || str_contains($json, '"type":"flash_sale_bar"'), in_array('promotions', $meta['requires'], true), "{$id} promotions");
         $this->assertSame(str_contains($json, '"type":"blog_posts"'), in_array('blog', $meta['requires'], true), "{$id} blog");
         $this->assertSame(str_contains($json, '"product_ref"'), in_array('products', $meta['requires'], true), "{$id} products");
     }
@@ -261,6 +280,44 @@ class BuilderTemplatesTest extends TestCase
         $header = $library->sections('site-classic', 'header');
         $this->assertCount(2, PortableTemplate::concrete($header, $this->resolver(true), $this->newId()));
         $this->assertCount(1, PortableTemplate::concrete($header, $this->resolver(false), $this->newId()));
+    }
+
+    /**
+     * B7: the original look — a general-purpose home on the default preset, photos from several
+     * demo sets, every heading and banner with Bangla.
+     */
+    public function test_the_original_look_site_template(): void
+    {
+        $library = app(BuilderTemplateLibrary::class);
+        $this->assertSame('site-default', $library->site('default')['id']);
+        $content = $library->content('site-default');
+        $this->assertSame(['preset' => 'default'], $content['theme']);
+        $theme = ThemePresets::theme('default');
+        $this->assertSame(['standard', 'columns', 'standard'], [$theme['layout']['header_style'], $theme['layout']['footer_style'], $theme['layout']['card_style']]);
+
+        $home = $library->sections('site-default', 'page');
+        $this->assertSame(
+            ['hero_slider', 'features_strip', 'category_strip', 'product_grid', 'banner_grid', 'product_carousel', 'hot_deals', 'testimonials', 'blog_posts', 'newsletter'],
+            array_map(fn (array $s) => $s['columns'][0]['elements'][0]['type'], $home),
+        );
+        // Photos from more than one demo set; no shop-specific (grocery, kids-only) wording.
+        $sets = array_unique(array_map(fn (string $a) => explode('/', $a)[0], PortableTemplate::assets($home)));
+        $this->assertGreaterThanOrEqual(3, count($sets));
+        $copy = preg_replace('/"asset":"[^"]*"/', '', (string) json_encode($content['parts']));
+        $this->assertDoesNotMatchRegularExpression('/vegan|organic|farm|grocer|plant-based|vegetable|baby|nursery/i', $copy);
+
+        // Bangla for every titled wrapped element and every banner.
+        foreach (PortableTemplate::banners($home) as $banner) {
+            $this->assertNotEmpty($banner['translations']['bn']['title'] ?? null, $banner['name']);
+        }
+        BuilderDocumentSchema::walk(['sections' => $home], function (array $node, string $path, string $kind) {
+            if ($kind === 'element' && is_string($node['props']['title'] ?? null)) {
+                $this->assertNotEmpty($node['translations']['bn']['title'] ?? null, $node['type']);
+            }
+        });
+        foreach (['header', 'footer', 'zone'] as $context) {
+            $this->assertStringContainsString('"bn"', (string) json_encode($library->sections('site-default', $context)), $context);
+        }
     }
 
     /**

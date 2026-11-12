@@ -5,9 +5,11 @@ namespace App\Modules\Reviews;
 use App\Modules\Customers\Application\Contracts\CustomerReviewStats;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
+use App\Modules\Reviews\Application\Contracts\ReviewShowcase;
 use App\Modules\Reviews\Infrastructure\EloquentCustomerReviewStats;
 use App\Modules\Reviews\Infrastructure\EloquentOrderLineReviews;
 use App\Modules\Reviews\Infrastructure\EloquentProductRatings;
+use App\Modules\Reviews\Infrastructure\EloquentReviewShowcase;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,6 +30,8 @@ class ReviewsServiceProvider extends ModuleServiceProvider
         $this->app->bind(OrderLineReviews::class, EloquentOrderLineReviews::class);
         // E10b: review counts on the admin customer card.
         $this->app->bind(CustomerReviewStats::class, EloquentCustomerReviewStats::class);
+        // B8a: the store builder's review wall and ratings chart.
+        $this->app->bind(ReviewShowcase::class, EloquentReviewShowcase::class);
     }
 
     public function boot(): void

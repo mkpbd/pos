@@ -187,7 +187,8 @@ final class ThemePresets
             'vegan' => 'Vegan Store',
             'handmade' => 'Handmade',
             'classic' => 'Classic Shop',
-            'kids' => 'Kids Store',
+            // B7: named after the demo it follows.
+            'kids' => 'BerryKid Kids Store',
         };
     }
 
@@ -198,7 +199,7 @@ final class ThemePresets
             'vegan' => 'Organic and modern: fresh greens with a warm yellow accent on cream, lowercase headings and a scrolling announcement.',
             'handmade' => 'Premium and minimal: terracotta and dark brown on off-white, serif headings, a centred header and image-led product cards.',
             'classic' => 'Traditional, dense shop: black and blue on white, uppercase headings, a wide search bar and detailed product cards.',
-            'kids' => 'Playful baby and kids store: warm amber and lavender on a light canvas, rounded headings, a menu bar under a wide search and product cards with an arched label.',
+            'kids' => 'BerryKid-style kids look: warm amber and soft purple on a light background, rounded headings, a menu bar under a wide search box and product cards with an arched label.',
         };
     }
 

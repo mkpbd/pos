@@ -1,0 +1,65 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": {
+                    "spacing": { "padding": { "top": "64px", "bottom": "64px" } },
+                    "layout": { "align": "center", "gap": "40px" }
+                },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 40, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "store_hours",
+                            "props": {
+                                "days": [
+                                    { "day": "mon", "closed": false, "open": "10:00", "close": "21:00" },
+                                    { "day": "tue", "closed": false, "open": "10:00", "close": "21:00" },
+                                    { "day": "wed", "closed": false, "open": "10:00", "close": "21:00" },
+                                    { "day": "thu", "closed": false, "open": "10:00", "close": "21:00" },
+                                    { "day": "fri", "closed": false, "open": "15:00", "close": "21:00" },
+                                    { "day": "sat", "closed": false, "open": "10:00", "close": "21:00" },
+                                    { "day": "sun", "closed": false, "open": "10:00", "close": "21:00" }
+                                ],
+                                "title": "Opening hours",
+                                "note": "We may close early on public holidays. Call us before you come.",
+                                "show_open_now": true,
+                                "highlight_today": true,
+                                "week_starts": "sat"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "খোলার সময়",
+                                    "note": "সরকারি ছুটির দিনে আগে বন্ধ হতে পারে। আসার আগে ফোন করুন।"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": { "base": 60, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "map",
+                            "props": { "query": "Dhanmondi, Dhaka, Bangladesh", "title": "Map of our store", "height": 380, "zoom": 15 },
+                            "translations": { "bn": { "title": "আমাদের দোকানের মানচিত্র" } }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

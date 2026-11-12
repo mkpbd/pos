@@ -10,6 +10,8 @@ import { B4ElementContent } from './elements'
 import { isB4Type } from './elements/b4-types'
 import { B6ElementContent } from './elements/b6'
 import { isB6Type } from './elements/b6-types'
+import { B8aElementContent } from './elements/b8a'
+import { isB8aType } from './elements/b8a-types'
 import { useMotionRuntime } from './motion'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
 import { BackgroundVideoLayer, ShapeDivider } from './section-layers'
@@ -136,6 +138,7 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
     default:
       if (isB4Type(element.type)) return <B4ElementContent element={element} />
       if (isB6Type(element.type)) return <B6ElementContent element={element} />
+      if (isB8aType(element.type)) return <B8aElementContent element={element} />
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
   }

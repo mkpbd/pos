@@ -61,6 +61,16 @@ import {
   ShieldCheckIcon,
   HistoryIcon,
   TextQuoteIcon,
+  BadgeDollarSignIcon,
+  SquareSplitHorizontalIcon,
+  TableIcon,
+  ZapIcon,
+  PackagePlusIcon,
+  UsersIcon,
+  MessageSquareHeartIcon,
+  Grid3x3Icon,
+  ClockIcon,
+  ChartBarIcon,
   type LucideIcon,
 } from 'lucide-react'
 import type { ElementGroup } from '@/storefront/builder/registry'
@@ -130,6 +140,17 @@ export const ELEMENT_ICONS: Record<string, LucideIcon> = {
   trust_badges: ShieldCheckIcon,
   recently_viewed: HistoryIcon,
   marquee: TextQuoteIcon,
+  // B8a (TagsIcon, the backend's suggestion for the pricing table, is the brand strip's already).
+  pricing_table: BadgeDollarSignIcon,
+  before_after: SquareSplitHorizontalIcon,
+  comparison_table: TableIcon,
+  flash_sale_bar: ZapIcon,
+  bundle: PackagePlusIcon,
+  team: UsersIcon,
+  review_wall: MessageSquareHeartIcon,
+  photo_grid: Grid3x3Icon,
+  store_hours: ClockIcon,
+  progress_bars: ChartBarIcon,
 }
 
 export function elementIcon(type: string): LucideIcon {
@@ -187,7 +208,7 @@ export const ELEMENT_HINTS: Record<string, string> = {
   notice: 'A coloured box for information, a warning or a promotion.',
   counter: 'Big numbers that count up (customers, years, orders).',
   steps: 'How it works, in numbered steps.',
-  chart: 'A bar, line or pie chart from numbers you type or paste.',
+  chart: 'A bar, line or pie chart from numbers you type, or from your shop’s own counts.',
   gallery: 'Photos in a grid that open larger when clicked.',
   image_carousel: 'Photos that slide one after another.',
   logo_carousel: 'Partner or brand logos scrolling by.',
@@ -198,6 +219,16 @@ export const ELEMENT_HINTS: Record<string, string> = {
   trust_badges: 'Reasons to buy with confidence (secure payment, returns …).',
   recently_viewed: 'Products this shopper looked at recently.',
   marquee: 'A line of short texts scrolling across the page.',
+  pricing_table: 'Plans side by side with prices and what each includes.',
+  before_after: 'Two photos with a slider to compare before and after.',
+  comparison_table: 'A table comparing products or plans, feature by feature.',
+  flash_sale_bar: 'Your running flash sale with its countdown and products.',
+  bundle: 'Products bought together, added to the cart in one click.',
+  team: 'The people behind your shop, with photos and links.',
+  review_wall: 'Real reviews from your customers, with stars.',
+  photo_grid: 'Your photos in a square grid, Instagram style.',
+  store_hours: 'Your opening hours, with “Open now” for shoppers.',
+  progress_bars: 'Bars or rings that show percentages.',
 }
 
 /** B4: the server may group the header / footer parts as `site`. */

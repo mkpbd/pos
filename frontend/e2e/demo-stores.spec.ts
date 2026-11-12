@@ -411,3 +411,67 @@ test('B6: Green Basket publishes a page built from the new element templates; sh
   await page.getByRole('button', { name: 'Show map' }).click()
   await expect(page.locator('iframe[src*="google.com/maps"]')).toHaveCount(1)
 })
+
+test('B8a: Little Sprouts publishes a page of selling, people and data blocks; shoppers use them with the store’s real data', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('kids.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@littlesprouts.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: Record<string, unknown> & { id: string; nodes: unknown[]; draft_revision: number } } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const sections: unknown[] = []
+  const ids = ['pricing-plans', 'before-after', 'comparison', 'flash-sale-bar', 'bundle', 'team', 'review-wall', 'photo-grid', 'store-hours-map', 'ratings']
+  for (const id of ids.map((s) => `neutral-${s}`)) {
+    const made = await call('POST', `/api/v1/storefront/builder/templates/${id}/instantiate`, { context: 'page' })
+    expect(made.status, id).toBe(200)
+    sections.push(...made.body.data.nodes)
+  }
+  const doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b8a-showcase', title: 'B8a showcase', from: 'blank' })
+  expect(doc.status).toBe(201)
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${doc.body.data.id}/draft`, { revision: doc.body.data.draft_revision, content: { schema_version: 1, sections } })
+  expect(saved.status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${doc.body.data.id}/publish`, { note: 'B8a showcase' })).status).toBe(200)
+  await adminContext.close()
+
+  await page.goto(`${base}/p/b8a-showcase`)
+  await expect(page.getByTestId('builder-pricing').getByTestId('pricing-plan')).not.toHaveCount(0)
+
+  // Before / after: a keyboard slider.
+  const handle = page.getByTestId('before-after-handle').first()
+  const start = await handle.getAttribute('aria-valuenow')
+  await handle.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(handle).not.toHaveAttribute('aria-valuenow', start ?? '')
+
+  await expect(page.getByTestId('builder-comparison').getByRole('table')).toBeVisible()
+  // The store's live flash sale, real approved reviews and the ratings chart.
+  await expect(page.getByTestId('builder-flash-sale')).toBeVisible()
+  const wall = page.getByTestId('builder-review-wall')
+  await wall.scrollIntoViewIfNeeded()
+  await expect(wall.getByTestId('review-card')).not.toHaveCount(0)
+  await expect(page.getByTestId('builder-chart').first().locator('svg[role="img"]')).toBeVisible()
+  await expect(page.getByTestId('builder-team').getByTestId('team-member')).not.toHaveCount(0)
+  await expect(page.getByTestId('builder-photo-grid')).toBeVisible()
+  await expect(page.getByTestId('builder-progress').getByTestId('progress-item')).not.toHaveCount(0)
+  const hours = page.getByTestId('builder-store-hours')
+  await hours.scrollIntoViewIfNeeded()
+  await expect(hours.getByTestId('hours-status')).toHaveText(/open|closed/i)
+
+  // Bundle: one button puts the chosen products in the cart.
+  const bundle = page.getByTestId('builder-bundle')
+  await bundle.scrollIntoViewIfNeeded()
+  await expect(bundle.getByTestId('bundle-item')).not.toHaveCount(0)
+  await bundle.getByTestId('bundle-add').click()
+  await expect(bundle.getByTestId('bundle-status')).toHaveText(/added/i, { timeout: 30_000 })
+})

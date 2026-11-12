@@ -84,7 +84,7 @@ class ResolveBuilderElements
                 continue;
             }
             if (! is_string($type) || ElementRegistry::sectionType($type) === null) {
-                $errors[$id] = [['path' => 'type', 'message' => 'Only section elements (product grids, banners, newsletters, …) and data elements (countdown, discount, promoted product, menu, FAQ list, contact form, category card, product spotlight, shop the look) need resolving.']];
+                $errors[$id] = [['path' => 'type', 'message' => 'Only section elements (product grids, banners, newsletters, …) and data elements (countdown, discount, promoted product, menu, FAQ list, contact form, category card, product spotlight, shop the look, comparison table, flash sale bar, bundle, review wall, store hours, chart) need resolving.']];
 
                 continue;
             }
@@ -150,7 +150,7 @@ class ResolveBuilderElements
             'id' => $element['id'],
             'type' => $element['type'],
             'props' => BuilderPageRenderer::localizedProps($element['type'], $element['props'], $element['translations'], $locale),
-        ], array_filter($b4, fn (array $element) => BuilderElementData::handles($element['type'])))), true);
+        ], array_filter($b4, fn (array $element) => BuilderElementData::handles($element['type'], $element['props'])))), true);
         foreach ($b4 as $id => $element) {
             // B6: a spotlight on a product that is not listed online at all has nothing to show
             // (a listed but unpublished one resolves with `state: unavailable`).

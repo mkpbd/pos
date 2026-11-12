@@ -2,7 +2,6 @@
 
 namespace App\Modules\Storefront\Domain\Builder;
 
-use App\Modules\Storefront\Domain\LinkTarget;
 use Closure;
 
 /**
@@ -16,30 +15,19 @@ use Closure;
  * (BuilderDocumentSchema::ID_PATTERN, unique within the list) that translations refer to:
  * `<list>.<item id>.<field>`. Ownership of referenced ids (media, categories, products) is
  * checked by Application\Builder\BuilderReferences; rich text is sanitized on save.
+ *
+ * B8a: the chart takes the stacked kinds (2–6 series of values ≥ 0) and a `data_source`
+ * (`manual`, or a store source rendered from `data[id]`) with `source_product_id`.
  */
-final class B6ElementProps
+final class B6ElementProps extends ElementProps
 {
-    private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
-
-    /** @var array<string, mixed> */
-    private array $defaults = [];
-
-    /** @var array<string, mixed> */
-    private array $props = [];
-
-    /**
-     * @param  Closure(string, string): void  $error  path relative to the props, message
-     */
-    public function __construct(private readonly Closure $error) {}
-
     /**
      * @param  array<string, mixed>  $props
      * @return array<string, mixed>
      */
     public function normalize(string $type, array $props): array
     {
-        $this->defaults = ElementRegistry::defaults($type);
-        $this->props = $props;
+        $this->start($type, $props);
         $limit = fn (string $key) => ElementRegistry::LIST_LIMITS["{$type}.{$key}"];
         $max = fn (string $key) => ElementRegistry::B6_TEXT_LIMITS["{$type}.{$key}"] ?? ElementRegistry::TRANSLATABLE[$type][$key];
 
@@ -108,7 +96,7 @@ final class B6ElementProps
                     'alt' => $this->text($item['alt'] ?? null, "{$path}.alt", 0, $max('images.alt')),
                     'caption' => $this->text($item['caption'] ?? null, "{$path}.caption", 0, $max('images.caption')),
                 ]),
-                'columns' => $this->columns(),
+                'columns' => $this->columns(ElementRegistry::GALLERY_COLUMNS),
                 'aspect' => $this->enum('aspect', ElementRegistry::GALLERY_ASPECTS),
                 'lightbox' => $this->bool('lightbox'),
                 'gap' => $this->enum('gap', ElementRegistry::GALLERY_GAPS),
@@ -225,16 +213,30 @@ final class B6ElementProps
         }
 
         $pie = in_array($kind, ['pie', 'donut'], true);
+        // B8a: stacked columns / bars add up 2–6 series of non-negative values.
+        $stacked = in_array($kind, ElementRegistry::CHART_STACKED_KINDS, true);
         if ($pie && count($labels) > ElementRegistry::CHART_PIE_LABELS) {
             ($this->error)('labels', 'A pie or donut chart shows at most '.ElementRegistry::CHART_PIE_LABELS.' slices.');
         }
         $series = $this->list('series', ElementRegistry::LIST_LIMITS['chart.series'], fn (array $item, string $path) => [
             'name' => $this->text($item['name'] ?? null, "{$path}.name", 1, $max('series.name')),
-            'values' => $this->values($item['values'] ?? null, "{$path}.values", count($labels), $pie),
+            'values' => $this->values($item['values'] ?? null, "{$path}.values", count($labels), $pie, $stacked),
         ]);
         if ($pie && count($series) > 1) {
             ($this->error)('series', 'A pie or donut chart shows exactly one series.');
         }
+        if ($stacked && count($series) < ElementRegistry::CHART_STACKED_SERIES[0]) {
+            ($this->error)('series', 'A stacked chart needs '.ElementRegistry::CHART_STACKED_SERIES[0].' to '.ElementRegistry::CHART_STACKED_SERIES[1].' series.');
+        }
+
+        // B8a: where the numbers come from — typed in, or counts from the store.
+        $source = $this->enum('data_source', ElementRegistry::CHART_DATA_SOURCES);
+        if ($source !== 'manual' && $stacked) {
+            ($this->error)('data_source', 'A stacked chart needs your own numbers (2 to 6 series); store data has one series.');
+        }
+        $sourceProductId = $source === 'store.rating_breakdown'
+            ? $this->nullableUuid($this->raw('source_product_id'), 'source_product_id', 'Choose a product, or none for all products.')
+            : null;
 
         return [
             'kind' => $kind,
@@ -249,15 +251,18 @@ final class B6ElementProps
             'show_legend' => $this->bool('show_legend'),
             'show_table' => $this->bool('show_table'),
             'height' => $this->int('height', ElementRegistry::CHART_HEIGHT),
+            'data_source' => $source,
+            'source_product_id' => $sourceProductId,
         ];
     }
 
     /**
-     * One number per label (|value| ≤ 10^12); pie / donut values are ≥ 0 and not all zero.
+     * One number per label (|value| ≤ 10^12); pie / donut values are ≥ 0 and not all zero;
+     * stacked values are ≥ 0.
      *
      * @return list<int|float>
      */
-    private function values(mixed $values, string $path, int $count, bool $pie): array
+    private function values(mixed $values, string $path, int $count, bool $pie, bool $stacked = false): array
     {
         if (! is_array($values) || ! array_is_list($values)) {
             ($this->error)($path, 'The values must be a list of numbers.');
@@ -277,6 +282,9 @@ final class B6ElementProps
             }
             if ($pie && $value < 0) {
                 ($this->error)("{$path}.{$i}", 'A pie or donut chart cannot show negative values.');
+            }
+            if ($stacked && $value < 0) {
+                ($this->error)("{$path}.{$i}", 'A stacked chart cannot show negative values.');
             }
             $result[] = $value;
         }
@@ -319,217 +327,5 @@ final class B6ElementProps
             'title' => $this->text($this->raw('title'), 'title', 0, $max('title')),
             'hotspots' => $hotspots,
         ];
-    }
-
-    /**
-     * Gallery columns `{base, tablet?, mobile?}` (tablet and mobile left out when not set).
-     *
-     * @return array<string, int>
-     */
-    private function columns(): array
-    {
-        $raw = $this->raw('columns');
-        if (! is_array($raw)) {
-            ($this->error)('columns', 'The columns are {base, tablet, mobile}.');
-
-            return $this->defaults['columns'];
-        }
-        $result = [];
-        foreach (ElementRegistry::GALLERY_COLUMNS as $breakpoint => [$min, $max]) {
-            $value = $raw[$breakpoint] ?? null;
-            if ($value === null && $breakpoint !== 'base') {
-                continue;
-            }
-            if (! is_int($value) || $value < $min || $value > $max) {
-                ($this->error)("columns.{$breakpoint}", "Enter a whole number from {$min} to {$max}.");
-                $value = $this->defaults['columns'][$breakpoint];
-            }
-            $result[$breakpoint] = $value;
-        }
-
-        return $result;
-    }
-
-    /**
-     * A list of objects with unique ids: each normalized by `$item(item, path)` and prefixed
-     * with its id.
-     *
-     * @param  array{0: int, 1: int}  $limit
-     * @param  Closure(array<string, mixed>, string): array<string, mixed>  $item
-     * @return list<array<string, mixed>>
-     */
-    private function list(string $key, array $limit, Closure $item): array
-    {
-        $raw = $this->raw($key);
-        if (! is_array($raw) || ! array_is_list($raw)) {
-            ($this->error)($key, 'This must be a list.');
-
-            return [];
-        }
-        [$min, $max] = $limit;
-        if (count($raw) < $min || count($raw) > $max) {
-            ($this->error)($key, $min === $max ? "Add exactly {$min}." : "Add {$min} to {$max}.");
-        }
-
-        $result = [];
-        $ids = [];
-        foreach ($raw as $i => $value) {
-            if (! is_array($value)) {
-                ($this->error)("{$key}.{$i}", 'Each entry must be an object.');
-
-                continue;
-            }
-            $id = $value['id'] ?? null;
-            if (! is_string($id) || preg_match('/'.BuilderDocumentSchema::ID_PATTERN.'/', $id) !== 1) {
-                ($this->error)("{$key}.{$i}.id", 'An id is 2–32 lower-case letters, digits, "_" or "-", starting with a letter.');
-                $id = is_string($id) ? $id : '';
-            } elseif (isset($ids[$id])) {
-                ($this->error)("{$key}.{$i}.id", "The id \"{$id}\" is used more than once in this list.");
-            }
-            $ids[$id] = true;
-            $result[] = ['id' => $id, ...$item($value, "{$key}.{$i}")];
-        }
-
-        return $result;
-    }
-
-    private function raw(string $key): mixed
-    {
-        return array_key_exists($key, $this->props) ? $this->props[$key] : $this->defaults[$key];
-    }
-
-    /**
-     * Text of `$min`–`$max` characters (`$min` counts non-blank characters); null is '' when
-     * the text is optional.
-     */
-    private function text(mixed $value, string $path, int $min, int $max, ?string $message = null, string $fallback = ''): string
-    {
-        if ($value === null && $min === 0) {
-            return '';
-        }
-        if (is_string($value) && mb_strlen(trim($value)) >= $min && mb_strlen($value) <= $max) {
-            return $value;
-        }
-        ($this->error)($path, $message ?? ($min > 0 ? "Enter {$min} to {$max} characters." : "At most {$max} characters."));
-
-        return $fallback;
-    }
-
-    /**
-     * Optional text where null means "use the default" (blank is null).
-     */
-    private function nullableText(mixed $value, string $path, int $max): ?string
-    {
-        if ($value === null || (is_string($value) && trim($value) === '')) {
-            return null;
-        }
-        if (is_string($value) && mb_strlen($value) <= $max) {
-            return $value;
-        }
-        ($this->error)($path, "At most {$max} characters.");
-
-        return null;
-    }
-
-    /**
-     * @param  list<string>  $allowed
-     */
-    private function enum(string $key, array $allowed): string
-    {
-        $value = $this->raw($key);
-        if (in_array($value, $allowed, true)) {
-            return $value;
-        }
-        ($this->error)($key, 'Choose one of: '.implode(', ', $allowed).'.');
-
-        return $this->defaults[$key];
-    }
-
-    /**
-     * @param  array{0: int, 1: int}  $range
-     */
-    private function int(string $key, array $range): int
-    {
-        $value = $this->raw($key);
-        if (is_int($value) && $value >= $range[0] && $value <= $range[1]) {
-            return $value;
-        }
-        ($this->error)($key, "Enter a whole number from {$range[0]} to {$range[1]}.");
-
-        return $this->defaults[$key];
-    }
-
-    private function bool(string $key): bool
-    {
-        $value = $this->raw($key);
-        if (is_bool($value)) {
-            return $value;
-        }
-        ($this->error)($key, 'This setting is true or false.');
-
-        return $this->defaults[$key];
-    }
-
-    private function icon(mixed $value, string $path, bool $nullable): ?string
-    {
-        if ($value === null && $nullable) {
-            return null;
-        }
-        if (is_string($value) && in_array($value, ElementRegistry::ICONS, true)) {
-            return $value;
-        }
-        ($this->error)($path, 'Choose an icon of the store icon set.');
-
-        return $nullable ? null : 'star';
-    }
-
-    /**
-     * A number from `$range[0]` to `$range[1]` with at most `$decimals` decimals (whole numbers
-     * stored as integers).
-     *
-     * @param  array{0: int|float, 1: int|float}  $range
-     */
-    private function decimal(mixed $value, string $path, array $range, int $decimals): int|float
-    {
-        if ((is_int($value) || is_float($value)) && is_finite((float) $value) && $value >= $range[0] && $value <= $range[1]
-            && abs(round((float) $value, $decimals) - (float) $value) < 1e-9) {
-            $rounded = round((float) $value, $decimals);
-
-            return $rounded === floor($rounded) ? (int) $rounded : $rounded;
-        }
-        ($this->error)($path, "Enter a number from {$range[0]} to {$range[1]} with at most {$decimals} decimals.");
-
-        return $range[0];
-    }
-
-    /**
-     * An organization record id (lower-cased), or null with an error.
-     */
-    private function uuid(mixed $value, string $path, string $message): ?string
-    {
-        if (is_string($value) && preg_match(self::UUID, strtolower($value)) === 1) {
-            return strtolower($value);
-        }
-        ($this->error)($path, $message);
-
-        return null;
-    }
-
-    /**
-     * @return array{url: string}|null
-     */
-    private function link(mixed $value, string $path): ?array
-    {
-        if ($value === null) {
-            return null;
-        }
-        $url = is_array($value) ? ($value['url'] ?? null) : null;
-        if (! is_string($url) || ! LinkTarget::isSafe($url)) {
-            ($this->error)(is_array($value) ? "{$path}.url" : $path, 'The link must be a site path such as /sale or an http(s) URL.');
-
-            return null;
-        }
-
-        return ['url' => $url];
     }
 }

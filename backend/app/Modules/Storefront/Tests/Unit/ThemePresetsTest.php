@@ -150,7 +150,7 @@ class ThemePresetsTest extends TestCase
     public function test_the_kids_preset(): void
     {
         $kids = ThemePresets::theme('kids');
-        $this->assertSame('Kids Store', ThemePresets::name('kids'));
+        $this->assertSame('BerryKid Kids Store', ThemePresets::name('kids'));
         $this->assertSame(['heading_font' => 'baloo', 'body_font' => 'poppins'] + ThemeSchema::defaults()['typography'], $kids['typography']);
         $this->assertSame(['pill', 16], [$kids['shape']['button_style'], $kids['shape']['card_radius']]);
         $this->assertSame([1170, 'commerce', 'columns', 'arched', 'full', 'normal', 'none'], [

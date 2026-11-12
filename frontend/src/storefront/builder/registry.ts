@@ -290,6 +290,8 @@ const B6: BaseMeta[] = [
       show_legend: true,
       show_table: false,
       height: 320,
+      data_source: 'manual',
+      source_product_id: null,
     },
     children: null,
   },
@@ -354,6 +356,132 @@ const B6: BaseMeta[] = [
   },
 ]
 
+/**
+ * B8a elements (contract §1): selling blocks, trust & people, progress bars. Elements that need a
+ * reference or an upload (before / after images, bundle products, photo grid images, a review
+ * wall's product) are invalid until set up; the others hold sample content. Nested list fields
+ * are spelled with one `*` per list (`plans.*.features.*.text`).
+ */
+const SAMPLE_WEEK = (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).map((day) => ({ day, closed: false, open: '10:00', close: '21:00' }))
+
+const B8A: BaseMeta[] = [
+  {
+    type: 'pricing_table',
+    group: 'commerce',
+    label: 'Pricing table',
+    translatable: ['plans.*.name', 'plans.*.price_text', 'plans.*.period', 'plans.*.description', 'plans.*.features.*.text', 'plans.*.button.label', 'plans.*.badge'],
+    props: {
+      plans: [
+        {
+          id: 'plan-1',
+          name: 'Basic',
+          price: null,
+          price_text: 'Free',
+          period: '',
+          description: '',
+          features: [{ id: 'feature-1', text: 'Feature', included: true }],
+          button: null,
+          highlighted: false,
+          badge: '',
+        },
+        {
+          id: 'plan-2',
+          name: 'Plus',
+          price: '500.00',
+          price_text: '',
+          period: '/month',
+          description: '',
+          features: [{ id: 'feature-1', text: 'Feature', included: true }],
+          button: { label: 'Choose', url: '/shop' },
+          highlighted: true,
+          badge: 'Popular',
+        },
+      ],
+    },
+    children: null,
+  },
+  {
+    type: 'before_after',
+    group: 'media',
+    label: 'Before / after',
+    translatable: ['before.alt', 'after.alt', 'before_label', 'after_label'],
+    props: { before: { media_id: null, alt: '' }, after: { media_id: null, alt: '' }, before_label: 'Before', after_label: 'After', start: 50, orientation: 'horizontal', aspect: '4:3' },
+    children: null,
+  },
+  {
+    type: 'comparison_table',
+    group: 'commerce',
+    label: 'Comparison table',
+    translatable: ['columns.*.title', 'rows.*.label', 'rows.*.cells.*.text'],
+    props: {
+      columns: [
+        { id: 'col-1', title: 'Ours', product_id: null, highlighted: true },
+        { id: 'col-2', title: 'Others', product_id: null, highlighted: false },
+      ],
+      rows: [{ id: 'row-1', label: 'Free delivery', cells: { 'col-1': { kind: 'yes', text: '' }, 'col-2': { kind: 'no', text: '' } } }],
+      show_prices: true,
+      show_buttons: true,
+    },
+    children: null,
+  },
+  {
+    type: 'flash_sale_bar',
+    group: 'marketing',
+    label: 'Flash sale bar',
+    translatable: ['title', 'text', 'button.label'],
+    props: { promotion_id: null, title: 'Flash sale', text: '', show_products: true, product_limit: 4, style: 'bar', button: null },
+    children: null,
+  },
+  {
+    type: 'bundle',
+    group: 'commerce',
+    label: 'Bundle',
+    translatable: ['title', 'text', 'button_label'],
+    props: { items: [], title: 'Frequently bought together', text: '', button_label: 'Add all to cart' },
+    children: null,
+  },
+  {
+    type: 'team',
+    group: 'content',
+    label: 'Team',
+    translatable: ['members.*.role', 'members.*.bio'],
+    props: { members: [{ id: 'member-1', media_id: null, name: 'Name', role: '', bio: '', links: [] }], columns: { base: 3 }, style: 'card' },
+    children: null,
+  },
+  {
+    type: 'review_wall',
+    group: 'marketing',
+    label: 'Review wall',
+    translatable: ['title'],
+    props: { source: 'latest', product_id: null, min_rating: 4, limit: 6, layout: 'grid', show_product: true, show_summary: true, title: 'What our customers say' },
+    children: null,
+  },
+  {
+    type: 'photo_grid',
+    group: 'media',
+    label: 'Photo grid',
+    translatable: ['images.*.alt', 'profile.label'],
+    props: { images: [], columns: { base: 4 }, gap: 'sm', profile: null, hover: 'overlay' },
+    children: null,
+  },
+  {
+    type: 'store_hours',
+    group: 'content',
+    label: 'Store hours',
+    translatable: ['title', 'note'],
+    props: { days: SAMPLE_WEEK, title: 'Opening hours', note: '', show_open_now: true, highlight_today: true, week_starts: 'sat' },
+    children: null,
+  },
+  {
+    type: 'progress_bars',
+    group: 'content',
+    label: 'Progress bars',
+    translatable: ['items.*.label'],
+    props: { items: [{ id: 'item-1', label: 'Happy customers', value: 90 }], style: 'bar', show_value: true, animate: true },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] = ['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 
@@ -408,6 +536,16 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   trust_badges: ['page', 'cms', 'zone', 'footer'],
   recently_viewed: PAGES,
   marquee: ALL,
+  pricing_table: PAGES,
+  before_after: PAGES,
+  comparison_table: PAGES,
+  flash_sale_bar: PAGES,
+  bundle: PAGES,
+  team: PAGES,
+  review_wall: PAGES,
+  photo_grid: PAGES,
+  store_hours: ['page', 'cms', 'zone', 'footer'],
+  progress_bars: PAGES,
 }
 
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
@@ -423,6 +561,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ),
   ...B4,
   ...B6,
+  ...B8A,
 ].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */

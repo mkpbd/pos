@@ -1,0 +1,112 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Pick the box that suits you", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "আপনার উপযোগী বাক্সটি বেছে নিন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "pricing_table",
+                            "props": {
+                                "plans": [
+                                    {
+                                        "id": "p1",
+                                        "name": "Taster",
+                                        "price": null,
+                                        "price_text": "Free",
+                                        "period": "",
+                                        "description": "A small sample with your first order.",
+                                        "features": [
+                                            { "id": "f1", "text": "Three bestsellers to try", "included": true },
+                                            { "id": "f2", "text": "Free delivery", "included": false },
+                                            { "id": "f3", "text": "Gift wrapping", "included": false }
+                                        ],
+                                        "button": { "label": "Start shopping", "url": "/shop" },
+                                        "highlighted": false,
+                                        "badge": ""
+                                    },
+                                    {
+                                        "id": "p2",
+                                        "name": "Monthly box",
+                                        "price": "990",
+                                        "price_text": "",
+                                        "period": "/month",
+                                        "description": "A fresh selection at your door every month.",
+                                        "features": [
+                                            { "id": "f1", "text": "Six hand-picked products", "included": true },
+                                            { "id": "f2", "text": "Free delivery", "included": true },
+                                            { "id": "f3", "text": "Gift wrapping", "included": false }
+                                        ],
+                                        "button": { "label": "Choose monthly", "url": "/shop" },
+                                        "highlighted": true,
+                                        "badge": "Most popular"
+                                    },
+                                    {
+                                        "id": "p3",
+                                        "name": "Gift box",
+                                        "price": "1490",
+                                        "price_text": "",
+                                        "period": "one time",
+                                        "description": "A wrapped box with a handwritten card.",
+                                        "features": [
+                                            { "id": "f1", "text": "Eight hand-picked products", "included": true },
+                                            { "id": "f2", "text": "Free delivery", "included": true },
+                                            { "id": "f3", "text": "Gift wrapping", "included": true }
+                                        ],
+                                        "button": { "label": "Send a gift", "url": "/shop" },
+                                        "highlighted": false,
+                                        "badge": ""
+                                    }
+                                ]
+                            },
+                            "translations": {
+                                "bn": {
+                                    "plans.p1.name": "স্বাদ নিন",
+                                    "plans.p1.price_text": "ফ্রি",
+                                    "plans.p1.description": "প্রথম অর্ডারের সাথে একটি ছোট নমুনা।",
+                                    "plans.p1.features.f1.text": "চেখে দেখার জন্য তিনটি জনপ্রিয় পণ্য",
+                                    "plans.p1.features.f2.text": "ফ্রি ডেলিভারি",
+                                    "plans.p1.features.f3.text": "উপহারের মোড়ক",
+                                    "plans.p1.button.label": "কেনাকাটা শুরু করুন",
+                                    "plans.p2.name": "মাসিক বাক্স",
+                                    "plans.p2.period": "/মাস",
+                                    "plans.p2.description": "প্রতি মাসে আপনার দরজায় নতুন বাছাই।",
+                                    "plans.p2.features.f1.text": "ছয়টি বাছাই করা পণ্য",
+                                    "plans.p2.features.f2.text": "ফ্রি ডেলিভারি",
+                                    "plans.p2.features.f3.text": "উপহারের মোড়ক",
+                                    "plans.p2.button.label": "মাসিক বেছে নিন",
+                                    "plans.p2.badge": "সবচেয়ে জনপ্রিয়",
+                                    "plans.p3.name": "উপহার বাক্স",
+                                    "plans.p3.period": "একবার",
+                                    "plans.p3.description": "হাতে লেখা কার্ডসহ মোড়ানো বাক্স।",
+                                    "plans.p3.features.f1.text": "আটটি বাছাই করা পণ্য",
+                                    "plans.p3.features.f2.text": "ফ্রি ডেলিভারি",
+                                    "plans.p3.features.f3.text": "উপহারের মোড়ক",
+                                    "plans.p3.button.label": "উপহার পাঠান"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -291,3 +291,40 @@ describe('chart markers', () => {
     expect(cart(model({ kind: 'line' })).lines[0]?.markers).toHaveLength(6)
   })
 })
+
+describe('whole-number value axes', () => {
+  const small = { labels: ['5 stars', '4 stars', '3 stars'], series: [{ id: 's1', name: 'Reviews', values: [4, 3, 1] }] }
+  const ticksOf = (kind: string, width = 640, extra: Record<string, unknown> = {}) => cart(model({ kind, ...small, ...extra }), width).ticks.map((t) => t.value)
+
+  it('ticks in whole numbers only when every value is an integer, on every cartesian kind', () => {
+    for (const kind of ['bar', 'column', 'line', 'area']) {
+      for (const width of [1366, 375]) {
+        const ticks = ticksOf(kind, width)
+        expect(ticks.every((t) => Number.isInteger(t)), `${kind} @${width}: ${ticks.join(' ')}`).toBe(true)
+        expect(ticks[0]).toBe(0)
+        expect(Math.max(...ticks)).toBeGreaterThanOrEqual(4)
+        expect(ticks.length).toBeLessThanOrEqual(5)
+      }
+    }
+    expect(ticksOf('bar', 1366)).toEqual([0, 1, 2, 3, 4])
+    expect(ticksOf('column')).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('stacked kinds and store-source ratings too', () => {
+    const stacked = { labels: ['A', 'B'], series: [{ id: 'a', name: 'A', values: [1, 2] }, { id: 'b', name: 'B', values: [1, 0] }] }
+    for (const kind of ['stacked-column', 'stacked-bar']) {
+      const ticks = cart(model({ kind, ...stacked }), 800).ticks.map((t) => t.value)
+      expect(ticks, kind).toEqual([0, 1, 2])
+    }
+    const ratings = chartModel(props({ kind: 'bar', data_source: 'store.rating_breakdown' }), { labels: ['5 stars', '4 stars', '3 stars', '2 stars', '1 star'], series: [{ id: 's1', name: 'Reviews', values: [4, 3, 1, 0, 0] }] }) as ChartModel
+    expect(cart(ratings, 1366).ticks.map((t) => t.value)).toEqual([0, 1, 2, 3, 4])
+    // A single review: 0 and 1, nothing in between.
+    const one = chartModel(props({ kind: 'bar', data_source: 'store.rating_breakdown' }), { labels: ['5 stars'], series: [{ id: 's1', name: 'Reviews', values: [1] }] }) as ChartModel
+    expect(cart(one, 375).ticks.map((t) => t.value)).toEqual([0, 1])
+  })
+
+  it('keeps fractional ticks when the data has fractions', () => {
+    const ticks = ticksOf('column', 640, { series: [{ id: 's1', name: 'Rating', values: [1.5, 0.5, 1] }] })
+    expect(ticks.some((t) => !Number.isInteger(t))).toBe(true)
+  })
+})

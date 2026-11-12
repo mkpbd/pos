@@ -873,6 +873,160 @@
       "requires": []
     },
     {
+      "id": "neutral-pricing-plans",
+      "scope": "section",
+      "preset": null,
+      "category": "pricing",
+      "name": "Pricing plans",
+      "description": "Three plans side by side with prices, what each includes and a button; the middle one is highlighted as the most popular.",
+      "thumbnail": "/builder-templates/neutral-pricing-plans.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-before-after",
+      "scope": "section",
+      "preset": null,
+      "category": "showcase",
+      "name": "Before and after",
+      "description": "A short text beside two photos with a handle shoppers drag to compare before and after.",
+      "thumbnail": "/builder-templates/neutral-before-after.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-comparison",
+      "scope": "section",
+      "preset": null,
+      "category": "comparison",
+      "name": "Why shop with us",
+      "description": "A comparison table of your shop against a typical shop: delivery, cash on delivery, returns and help.",
+      "thumbnail": "/builder-templates/neutral-comparison.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-flash-sale-bar",
+      "scope": "section",
+      "preset": null,
+      "category": "countdown",
+      "name": "Flash sale bar",
+      "description": "A bar with a countdown to the end of your flash sale and its products. Shows only while a flash sale runs.",
+      "thumbnail": "/builder-templates/neutral-flash-sale-bar.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "neutral-bundle",
+      "scope": "section",
+      "preset": null,
+      "category": "bundle",
+      "name": "Bought together",
+      "description": "Three of your newest products joined with plus signs, a total and one button that adds them all to the cart. Swap in the products you want.",
+      "thumbnail": "/builder-templates/neutral-bundle.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "products"
+      ]
+    },
+    {
+      "id": "neutral-team",
+      "scope": "section",
+      "preset": null,
+      "category": "team",
+      "name": "Meet the team",
+      "description": "Three team members with a photo, their role, a short bio and a link.",
+      "thumbnail": "/builder-templates/neutral-team.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-review-wall",
+      "scope": "section",
+      "preset": null,
+      "category": "testimonials",
+      "name": "Review wall",
+      "description": "Your latest approved reviews with stars, the product and your average rating. Shows only when there are reviews.",
+      "thumbnail": "/builder-templates/neutral-review-wall.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-photo-grid",
+      "scope": "section",
+      "preset": null,
+      "category": "social",
+      "name": "Follow us photo grid",
+      "description": "Six square photos in a row with a link to your Instagram profile. Choose your own photos; nothing is loaded from Instagram.",
+      "thumbnail": "/builder-templates/neutral-photo-grid.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-store-hours-map",
+      "scope": "section",
+      "preset": null,
+      "category": "location",
+      "name": "Store hours and map",
+      "description": "Your opening hours with today highlighted and whether you are open now, beside a map that loads when asked.",
+      "thumbnail": "/builder-templates/neutral-store-hours-map.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-ratings",
+      "scope": "section",
+      "preset": null,
+      "category": "chart",
+      "name": "Our customers rate us",
+      "description": "A chart of your approved reviews by stars, with progress bars of sample survey results beside it.",
+      "thumbnail": "/builder-templates/neutral-ratings.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "page-about",
       "scope": "page",
       "preset": null,
@@ -943,6 +1097,49 @@
       "requires": []
     },
     {
+      "id": "site-kids",
+      "scope": "site",
+      "preset": "kids",
+      "category": "site",
+      "name": "BerryKid Kids Store",
+      "description": "BerryKid-style kids look: warm amber and lavender, rounded headings, a nursery slider, promo tiles, product tabs, a deal of the week and arched product cards.",
+      "thumbnail": "/builder-templates/site-kids.png",
+      "preview": "/builder-templates/site-kids-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions"
+      ]
+    },
+    {
+      "id": "site-default",
+      "scope": "site",
+      "preset": "default",
+      "category": "site",
+      "name": "Original look",
+      "description": "The store's original look: amber and violet on a light background, for any kind of shop. A photo slider, categories, new arrivals, best sellers, deals, reviews, blog posts and a newsletter.",
+      "thumbnail": "/builder-templates/site-default.png",
+      "preview": "/builder-templates/site-default-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
       "id": "site-vegan",
       "scope": "site",
       "preset": "vegan",
@@ -950,6 +1147,7 @@
       "name": "Vegan Store",
       "description": "Green Basket's look: fresh greens and warm yellow on cream, a farm-fresh slider, features, categories, products, deals and a green newsletter band.",
       "thumbnail": "/builder-templates/site-vegan.png",
+      "preview": "/builder-templates/site-vegan-full.jpg",
       "allowed_in": [
         "page",
         "header",
@@ -971,6 +1169,7 @@
       "name": "Handmade",
       "description": "Mati & Co.'s look: terracotta and dark brown on off-white with serif headings, a studio slider, a maker's note, editor's picks and a journal.",
       "thumbnail": "/builder-templates/site-handmade.png",
+      "preview": "/builder-templates/site-handmade-full.jpg",
       "allowed_in": [
         "page",
         "header",
@@ -991,6 +1190,7 @@
       "name": "Classic Shop",
       "description": "Classic Shop's look: black and blue on white with uppercase headings, a season-sale slider, department tiles, product tabs and a flash sale.",
       "thumbnail": "/builder-templates/site-classic.png",
+      "preview": "/builder-templates/site-classic-full.jpg",
       "allowed_in": [
         "page",
         "header",
@@ -1002,26 +1202,6 @@
         "menus",
         "promotions",
         "blog"
-      ]
-    },
-    {
-      "id": "site-kids",
-      "scope": "site",
-      "preset": "kids",
-      "category": "site",
-      "name": "Kids Store",
-      "description": "Little Sprouts' look: warm amber and lavender on a light canvas with rounded headings, a nursery slider, split promo tiles, product tabs, a deal of the week and arched product cards.",
-      "thumbnail": "/builder-templates/site-kids.png",
-      "allowed_in": [
-        "page",
-        "header",
-        "footer",
-        "zone"
-      ],
-      "requires": [
-        "banners",
-        "menus",
-        "promotions"
       ]
     }
   ]

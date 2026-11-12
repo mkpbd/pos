@@ -4,7 +4,7 @@
  * BuilderDocumentSchema::normalize is the source of truth; ./validate.ts mirrors its value rules.
  */
 
-import type { FaqGroup, MediaRef, ProductCard, ProductDetail, StoreSection, StorefrontMenu, ThemeColors } from '../types'
+import type { CatalogImage, FaqGroup, MediaRef, ProductCard, ProductDetail, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
 export type Device = 'desktop' | 'tablet' | 'mobile'
@@ -256,7 +256,14 @@ export type StepItem = { id: string; title: string; text: string; icon: string |
 export type StepsElement = ElementOf<'steps', { items: StepItem[]; layout: 'horizontal' | 'vertical'; numbered: boolean }>
 
 /* Chart (contract §3; drawn by ./elements/chart). */
-export type ChartKind = 'bar' | 'column' | 'line' | 'area' | 'pie' | 'donut'
+/** B8a: `stacked-column` / `stacked-bar` (2–6 series, every value ≥ 0). */
+export type ChartKind = 'bar' | 'column' | 'line' | 'area' | 'pie' | 'donut' | 'stacked-column' | 'stacked-bar'
+/**
+ * B8a chart data source: `manual` (the authored labels / series) or a store count the server
+ * resolves into `data[id]` (ChartStoreData): top-level categories' product counts, or approved
+ * reviews per star (all products, or `source_product_id`).
+ */
+export type ChartDataSource = 'manual' | 'store.products_per_category' | 'store.rating_breakdown'
 export type ChartSeries = { id: string; name: string; values: number[] }
 export type ChartUnitPosition = 'before' | 'after'
 export type ChartShowValues = 'none' | 'last' | 'all-small'
@@ -278,6 +285,10 @@ export type ChartProps = {
   show_table: boolean
   /** px, 200–600. */
   height: number
+  /** B8a: normalize always fills it (`manual` for older documents). A store source is never stacked. */
+  data_source: ChartDataSource
+  /** B8a: `store.rating_breakdown` only — one product's reviews (null = all products); null for every other source. */
+  source_product_id: string | null
 }
 /** The chart element node (the renderer component is elements/chart's `ChartElement`). */
 export type ChartElementNode = ElementOf<'chart', ChartProps>
@@ -320,6 +331,141 @@ export type MarqueeItem = { id: string; text: string }
 export type MarqueeSeparator = 'dot' | 'star' | 'leaf' | 'none'
 export type MarqueeElement = ElementOf<'marquee', { items: MarqueeItem[]; speed: MotionSpeed; direction: 'left' | 'right'; separator: MarqueeSeparator }>
 
+/* ----------------------------------------------------------------------------------------------
+ * B8a elements (contract §1): selling blocks, trust & people, progress bars. ✱ text props are
+ * translatable (`<list>.<item_id>.<field>` for list items; nested lists
+ * `plans.<plan_id>.features.<feature_id>.text`). Money values are NUMERIC strings ("1250.00").
+ * -------------------------------------------------------------------------------------------- */
+
+/** B8a buttons: a label and a link target (site path or http(s) URL), flat — unlike the B4 `CtaButton`. */
+export type B8aButton = { label: string; url: string }
+/** A feature row of a plan: shown with an icon and "Included" / "Not included" text, never colour alone. */
+export type PricingFeature = { id: string; text: string; included: boolean }
+/** `price` null = show `price_text` ("Free", "Ask us"); money as a NUMERIC string (≥ 0, ≤ 2 decimals). */
+export type PricingPlan = {
+  id: string
+  name: string
+  price: string | null
+  price_text: string
+  period: string
+  description: string
+  features: PricingFeature[]
+  button: B8aButton | null
+  highlighted: boolean
+  badge: string
+}
+export type PricingTableElement = ElementOf<'pricing_table', { plans: PricingPlan[] }>
+
+export type BeforeAfterImage = { media_id: string | null; alt: string }
+export type BeforeAfterAspect = '1:1' | '4:3' | '3:2' | '16:9'
+export type BeforeAfterElement = ElementOf<
+  'before_after',
+  {
+    before: BeforeAfterImage
+    after: BeforeAfterImage
+    before_label: string
+    after_label: string
+    /** Handle position in percent (0–100). */
+    start: number
+    orientation: 'horizontal' | 'vertical'
+    aspect: BeforeAfterAspect
+  }
+>
+
+export type ComparisonColumn = { id: string; title: string; product_id: string | null; highlighted: boolean }
+export type ComparisonCellKind = 'yes' | 'no' | 'text'
+export type ComparisonCell = { kind: ComparisonCellKind; text: string }
+/** `cells` has one entry per column id (normalize fills a missing one with `{kind: 'no', text: ''}`). */
+export type ComparisonRow = { id: string; label: string; cells: Record<string, ComparisonCell> }
+export type ComparisonTableElement = ElementOf<'comparison_table', { columns: ComparisonColumn[]; rows: ComparisonRow[]; show_prices: boolean; show_buttons: boolean }>
+
+export type FlashSaleBarElement = ElementOf<
+  'flash_sale_bar',
+  {
+    /** null = the active countdown promotion that ends soonest. */
+    promotion_id: string | null
+    title: string
+    text: string
+    show_products: boolean
+    /** 2–8. */
+    product_limit: number
+    style: 'bar' | 'card'
+    button: B8aButton | null
+  }
+>
+
+export type BundleItem = { id: string; product_id: string }
+export type BundleElement = ElementOf<'bundle', { items: BundleItem[]; title: string; text: string; button_label: string }>
+
+export type TeamLinkKind = 'facebook' | 'instagram' | 'linkedin' | 'x' | 'youtube' | 'tiktok' | 'website' | 'email'
+/** `email` links are `mailto:<address>` (no query); `website` an absolute http(s) URL; social kinds https only; ≤ 255 characters. */
+export type TeamLink = { id: string; kind: TeamLinkKind; url: string }
+/** `name` is not translated (a person's name); `role` ✱ and `bio` ✱ are. */
+export type TeamMember = { id: string; media_id: string | null; name: string; role: string; bio: string; links: TeamLink[] }
+/** `columns.base` 2–4; tablet / mobile fall back to the wider breakpoint. */
+export type TeamColumns = { base: number; tablet?: number; mobile?: number }
+export type TeamStyle = 'card' | 'plain' | 'circle'
+export type TeamElement = ElementOf<'team', { members: TeamMember[]; columns: TeamColumns; style: TeamStyle }>
+
+export type ReviewWallSource = 'latest' | 'top_rated' | 'product'
+export type ReviewWallElement = ElementOf<
+  'review_wall',
+  {
+    source: ReviewWallSource
+    /** Required for `source: product`. */
+    product_id: string | null
+    /** 1–5 (default 4). */
+    min_rating: number
+    /** 3–12. */
+    limit: number
+    layout: 'grid' | 'carousel'
+    show_product: boolean
+    show_summary: boolean
+    title: string
+  }
+>
+
+export type PhotoGridImage = { id: string; media_id: string; alt: string; link: Link }
+/** `columns.base` 3–6. */
+export type PhotoGridColumns = { base: number; tablet?: number; mobile?: number }
+export type PhotoGridElement = ElementOf<
+  'photo_grid',
+  { images: PhotoGridImage[]; columns: PhotoGridColumns; gap: 'none' | 'sm' | 'md'; profile: { label: string; url: string } | null; hover: 'none' | 'zoom' | 'overlay' }
+>
+
+export type WeekDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+/** `open` / `close` "HH:MM" (24 h); `close` before `open` = closes after midnight. */
+export type StoreHoursDay = { day: WeekDay; closed: boolean; open: string; close: string }
+export type StoreHoursElement = ElementOf<
+  'store_hours',
+  {
+    /** Exactly 7, Monday first (week order); `week_starts` only changes the display order. */
+    days: StoreHoursDay[]
+    title: string
+    note: string
+    show_open_now: boolean
+    highlight_today: boolean
+    week_starts: 'sat' | 'sun' | 'mon'
+  }
+>
+
+/** `value` 0–100 with at most one decimal. */
+export type ProgressItem = { id: string; label: string; value: number }
+export type ProgressBarsProps = { items: ProgressItem[]; style: 'bar' | 'ring'; show_value: boolean; animate: boolean }
+export type ProgressBarsElement = ElementOf<'progress_bars', ProgressBarsProps>
+
+export type B8aElement =
+  | PricingTableElement
+  | BeforeAfterElement
+  | ComparisonTableElement
+  | FlashSaleBarElement
+  | BundleElement
+  | TeamElement
+  | ReviewWallElement
+  | PhotoGridElement
+  | StoreHoursElement
+  | ProgressBarsElement
+
 export type B6Element =
   | AccordionElement
   | TabsElement
@@ -341,7 +487,7 @@ export type B6Element =
   | RecentlyViewedElement
   | MarqueeElement
 
-export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement | B4Element | B6Element
+export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement | B4Element | B6Element | B8aElement
 
 export type ElementType = Element['type']
 
@@ -390,7 +536,7 @@ export type RenderSection = Rendered<Omit<Section, 'columns'>> & { columns: Rend
 export type BuilderMedia = Omit<MediaRef, 'id'>
 
 /** Draft preview only: why a data element would not show to visitors (public payloads drop the element instead). */
-export type ElementDataState = 'expired' | 'inactive' | 'unavailable'
+export type ElementDataState = 'expired' | 'inactive' | 'unavailable' | 'scheduled' | 'empty'
 
 /** `data[id]` of a countdown: the end (the date, or the promotion's end) and the promotion when it is one. */
 export type CountdownData = { ends_at: string | null; title?: string | null; promotion: { id: string; name: string } | null; state?: ElementDataState }
@@ -420,7 +566,68 @@ export type ProductSpotlightData = ProductDetail & { state?: ElementDataState }
 // The server sends an empty list (`[]`) when no product is live; lookups by id still miss safely.
 export type ShopTheLookData = { products: Record<string, ProductCard> | []; state?: ElementDataState }
 
-export type ElementData = CountdownData | DiscountData | PromoCardData | MenuData | FaqListData | CategoryCardData | ProductSpotlightData | ShopTheLookData
+/* B8a element data (`data[id]`). */
+
+/**
+ * B8a comparison table: product cards by product id (publicly, unavailable products are absent:
+ * their column keeps its title but loses price and button). Draft previews mark the columns whose
+ * product is unavailable in `columns` (`{<column_id>: {state: 'unavailable'}}`).
+ */
+export type ComparisonTableData = {
+  products: Record<string, ProductCard> | []
+  columns?: Record<string, { state: ElementDataState }> | []
+  state?: ElementDataState
+}
+
+/** The promotion a flash sale bar counts down to (`state` in draft previews only). */
+export type FlashSalePromotion = { id: string; name: string; ends_at: string | null; state?: ElementDataState }
+/**
+ * B8a flash sale bar: the promotion, its products on sale (≤ product_limit) and, only when the
+ * promotion has a real usage limit, how much of it is used.
+ */
+export type FlashSaleBarData = { promotion: FlashSalePromotion; products: ProductCard[]; claimed: { used: number; limit: number } | null; state?: ElementDataState }
+
+/**
+ * B8a bundle: product details by product id. Published props.items are already filtered to the
+ * available items; a draft keeps every item and marks the unavailable ones in `items`
+ * (`{<item_id>: {state: 'unavailable'}}`), plus `state: 'unavailable'` when fewer than 2 are left.
+ */
+export type BundleData = { products: Record<string, ProductDetail> | []; items?: Record<string, { state: ElementDataState }> | []; state?: ElementDataState }
+
+/** One approved review of a product on sale. `author` is the public name only; `body` plain text (≤ 600). */
+export type ReviewWallItem = {
+  id: string
+  author: string
+  rating: number
+  title: string | null
+  body: string
+  created_at: string
+  product: { name: string; url: string; image: MediaRef | CatalogImage | null } | null
+}
+/** B8a review wall. `summary.average` is a one-decimal string ("4.6") like product ratings. */
+export type ReviewWallData = { summary: { average: string; count: number } | null; reviews: ReviewWallItem[]; state?: ElementDataState }
+
+/** B8a store hours: the organization's IANA timezone (e.g. Asia/Dhaka). */
+export type StoreHoursData = { timezone: string; state?: ElementDataState }
+
+/** B8a store-source chart: what the server counted (one series; name translated "Products" / "Reviews"). */
+export type ChartStoreData = { labels: string[]; series: ChartSeries[]; state?: ElementDataState }
+
+export type ElementData =
+  | CountdownData
+  | DiscountData
+  | PromoCardData
+  | MenuData
+  | FaqListData
+  | CategoryCardData
+  | ProductSpotlightData
+  | ShopTheLookData
+  | ComparisonTableData
+  | FlashSaleBarData
+  | BundleData
+  | ReviewWallData
+  | StoreHoursData
+  | ChartStoreData
 
 /** One entry of a payload's `data` map. */
 export type BuilderData = StoreSection | ElementData

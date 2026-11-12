@@ -136,3 +136,62 @@ describe('B6 resolve keys', () => {
     expect(resolveKey(look(10, 'p1'))).not.toBe(resolveKey(look(10, 'p2')))
   })
 })
+
+describe('B8a in the canvas render tree', () => {
+  const common = { style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null }
+  const UUID = '0b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+  const UUID2 = '1b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+  const UUID3 = '2b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+  const doc = (elements: Element[]): BuilderContent => ({
+    schema_version: 1,
+    sections: [{ id: 's_b8', type: 'section', props: { layout: 'boxed', anchor: null }, ...common, translations: {}, columns: [{ id: 'c_b8', type: 'column', width: { base: 100 }, style: {}, elements }] }],
+  })
+  const el = (id: string, type: string, props: Record<string, unknown>, translations: Record<string, Record<string, string>> = {}) => ({ id, type, ...common, props, translations }) as unknown as Element
+
+  it('applies nested list translations: plan features, plan buttons, comparison cells; a missing button stays missing', () => {
+    const pricing = el(
+      'e_price',
+      'pricing_table',
+      {
+        plans: [
+          { id: 'p_a', name: 'Basic', price: null, price_text: 'Free', period: '', description: '', features: [{ id: 'f_a', text: 'Delivery', included: true }], button: null, highlighted: false, badge: '' },
+          { id: 'p_b', name: 'Plus', price: '500', price_text: '', period: '/month', description: '', features: [], button: { label: 'Choose', url: '/shop' }, highlighted: true, badge: '' },
+        ],
+      },
+      { bn: { 'plans.p_a.features.f_a.text': 'ডেলিভারি', 'plans.p_a.button.label': 'ignored', 'plans.p_b.button.label': 'বেছে নিন', 'plans.p_b.name': 'প্লাস' } },
+    )
+    const comparison = el(
+      'e_cmp',
+      'comparison_table',
+      { columns: [{ id: 'c_a', title: 'Ours', product_id: null, highlighted: true }], rows: [{ id: 'r_a', label: 'Warranty', cells: { c_a: { kind: 'text', text: '2 years' } } }], show_prices: true, show_buttons: true },
+      { bn: { 'rows.r_a.cells.c_a.text': '২ বছর', 'rows.r_a.label': 'ওয়ারেন্টি' } },
+    )
+    const tree = toRenderTree(doc([pricing, comparison]), { locale: 'bn', now: NOW })
+    const plans = (element(tree, 'e_price')!.props as { plans: { name: string; features: { text: string }[]; button: { label: string } | null }[] }).plans
+    expect(plans[0]!.features[0]!.text).toBe('ডেলিভারি')
+    expect(plans[0]!.button).toBeNull()
+    expect(plans[1]).toMatchObject({ name: 'প্লাস', button: { label: 'বেছে নিন', url: '/shop' } })
+    expect(element(tree, 'e_cmp')!.props).toMatchObject({ rows: [{ label: 'ওয়ারেন্টি', cells: { c_a: { kind: 'text', text: '২ বছর' } } }] })
+  })
+
+  it('B8a data elements and store-source charts go to /builder/resolve; typing doesn’t re-resolve them', async () => {
+    const { resolveKey } = await import('./render-tree')
+    const manual = el('e_c1', 'chart', { kind: 'column', labels: ['a'], series: [] })
+    const ratings = el('e_c2', 'chart', { kind: 'bar', title: 'Ratings', data_source: 'store.rating_breakdown', source_product_id: null })
+    const hours = el('e_hours', 'store_hours', { title: 'Hours' })
+    const bundle = el('e_bun', 'bundle', { items: [{ id: 'i_a', product_id: UUID }], title: 'Together', text: '', button_label: 'Add' })
+    expect(wrappedElements(doc([manual, ratings, hours, bundle])).map((e) => e.id)).toEqual(['e_c2', 'e_hours', 'e_bun'])
+    expect(['comparison_table', 'flash_sale_bar', 'bundle', 'review_wall', 'store_hours'].every((t) => DATA_ELEMENT_TYPES.has(t))).toBe(true)
+    const retitled = (n: Element, title: string) => ({ ...n, props: { ...n.props, title } }) as Element
+    expect(resolveKey(retitled(ratings, 'Stars'))).toBe(resolveKey(ratings))
+    expect(resolveKey(retitled(bundle, 'Better together'))).toBe(resolveKey(bundle))
+    expect(resolveKey({ ...ratings, props: { ...ratings.props, source_product_id: UUID } } as Element)).not.toBe(resolveKey(ratings))
+  })
+
+  it('collects media ids of before / after, team photos and the photo grid', () => {
+    const ba = el('e_ba', 'before_after', { before: { media_id: UUID, alt: '' }, after: { media_id: UUID2, alt: '' } })
+    const team = el('e_team', 'team', { members: [{ id: 'm_a', media_id: UUID3, name: 'Rina', role: '', bio: '', links: [] }, { id: 'm_b', media_id: null, name: 'Sam', role: '', bio: '', links: [] }] })
+    const grid = el('e_grid', 'photo_grid', { images: [{ id: 'i_a', media_id: 'ffffffff-1a2b-4c3d-8e9f-0123456789ab', alt: '', link: null }] })
+    expect(mediaIds(doc([ba, team, grid])).sort()).toEqual([UUID, UUID2, UUID3, 'ffffffff-1a2b-4c3d-8e9f-0123456789ab'].sort())
+  })
+})

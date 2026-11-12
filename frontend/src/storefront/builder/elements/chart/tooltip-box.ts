@@ -12,7 +12,7 @@ export function tooltipBox(stop: Stop, layout: ChartLayout): { left: number; top
     ...stop.rows.map((r) => 20 + textWidth(r.value, 14) + 8 + textWidth(r.name, 12) + (r.share ? 8 + textWidth(r.share, 12) : 0)),
   )
   const width = Math.min(Math.max(120, Math.ceil(contentW) + PAD * 2), Math.max(120, layout.width - 8), 280)
-  const height = PAD * 2 + 16 + stop.rows.length * ROW
+  const height = PAD * 2 + 16 + stop.rows.length * ROW + (stop.rows.some((r) => r.total) ? 6 : 0)
   const left = Math.max(0, Math.min(layout.width - width, stop.anchor.x - width / 2))
   const above = stop.anchor.y - height - 10
   const top = above >= 0 ? above : Math.min(stop.anchor.y + 16, Math.max(0, layout.height - height))

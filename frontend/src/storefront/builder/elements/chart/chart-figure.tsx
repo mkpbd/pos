@@ -232,7 +232,7 @@ function CartesianDrawing({ layout, uid, current }: { layout: CartesianLayout; u
           d={bar.d}
           data-viz-mark="bar"
           data-fill=""
-          data-active={bar.key === activeKey ? 'true' : undefined}
+          data-active={(bar.stopKey ?? bar.key) === activeKey ? 'true' : undefined}
           style={{ fill: seriesVar(bar.slot), ['--viz-tex' as string]: textureVar(uid, bar.slot) }}
         />
       ))}

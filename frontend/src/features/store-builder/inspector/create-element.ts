@@ -8,7 +8,7 @@ import { elementMeta, isWrappedSectionType, type ElementMeta } from '@/storefron
 import type { Column, DocumentContext, Element, InnerRowElement, WrappedElement } from '@/storefront/builder/types'
 import { requestSetup } from './setup-store'
 import type { BuilderNode, ElementsMetadata } from './types'
-import { B4_TYPES, B6_TYPES, validateNode } from './validate'
+import { B4_TYPES, B6_TYPES, B8A_TYPES, validateNode } from './validate'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -67,10 +67,11 @@ export function buildElement(type: string, registry: ElementsMetadata, existingI
  * Elements whose default content isn't valid yet: wrapped sections (a hero slider without
  * banners) and B4 elements that need something chosen first (a video's link, a promoted
  * product, a countdown's end, a discount's promotion, a menu) and B6 elements that need content
- * (gallery / carousel images, logos, a map address, a category, a product, the shop-the-look photo).
+ * (gallery / carousel images, logos, a map address, a category, a product, the shop-the-look photo)
+ * and B8a elements that need it (before / after photos, bundle products, photo grid images).
  */
 export function needsSetup(node: Element): node is WrappedElement | Element {
-  return (isWrappedSectionType(node.type) || B4_TYPES.has(node.type) || B6_TYPES.has(node.type)) && validateNode(node).length > 0
+  return (isWrappedSectionType(node.type) || B4_TYPES.has(node.type) || B6_TYPES.has(node.type) || B8A_TYPES.has(node.type)) && validateNode(node).length > 0
 }
 
 /** A new element of the type with fresh ids, or null when the user cancels its setup dialog. */

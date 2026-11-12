@@ -118,9 +118,22 @@ class BuilderTemplatesApiTest extends TestCase
         $manifest = $this->library()->all();
         $list = $this->getJson(self::API.'/templates')->assertOk()->json('data');
         $this->assertCount(count($manifest), $list);
-        $this->assertSame(['id', 'scope', 'preset', 'category', 'name', 'description', 'thumbnail_url', 'allowed_in', 'requires', 'source', 'created_at'], array_keys($list[0]));
+        $this->assertSame(['id', 'scope', 'preset', 'category', 'name', 'description', 'thumbnail_url', 'preview_url', 'allowed_in', 'requires', 'source', 'created_at'], array_keys($list[0]));
         $this->assertSame(array_column($manifest, 'id'), array_column($list, 'id'));
         $this->assertSame(['builtin'], array_values(array_unique(array_column($list, 'source'))));
+        // B7: a tall full-page preview for the site templates only (null until one is made).
+        foreach ($list as $template) {
+            if ($template['scope'] === 'site') {
+                $this->assertTrue($template['preview_url'] === null || preg_match('#^/builder-templates/'.preg_quote($template['id'], '#').'-full\.jpg$#', $template['preview_url']) === 1, $template['id']);
+            } else {
+                $this->assertNull($template['preview_url'], $template['id']);
+            }
+        }
+        // B7: the demo looks in the order they are shown — the kids look first, then the original look.
+        $sites = $this->getJson(self::API.'/templates?scope=site')->assertOk()->json('data');
+        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($sites, 'id'));
+        $this->assertSame(['BerryKid Kids Store', 'Original look'], [$sites[0]['name'], $sites[1]['name']]);
+        $this->assertSame(['site-default'], array_column($this->getJson(self::API.'/templates?preset=default')->assertOk()->json('data'), 'id'));
 
         $sections = $this->getJson(self::API.'/templates?scope=section')->assertOk()->json('data');
         $this->assertGreaterThanOrEqual(24, count($sections));
@@ -140,7 +153,7 @@ class BuilderTemplatesApiTest extends TestCase
         $this->assertNotContains('page-contact', $landing);
         $this->assertContains('page-sale-landing', $landing);
         $header = $this->getJson(self::API.'/templates?context=header')->assertOk()->json('data');
-        $this->assertSame(['site-vegan', 'site-handmade', 'site-classic', 'site-kids'], array_column($header, 'id'));
+        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($header, 'id'));
         // K1: the kids look's templates.
         $kids = $this->getJson(self::API.'/templates?preset=kids')->assertOk()->json('data');
         $this->assertSame(['kids'], array_values(array_unique(array_column($kids, 'preset'))));
@@ -474,6 +487,65 @@ class BuilderTemplatesApiTest extends TestCase
         $this->assertSame(10, $this->mediaCount($org));
     }
 
+    /**
+     * B7: the original look (preset `default`) — a store on another look gets the default theme and
+     * the general-purpose home as drafts only; the live store changes when they are published.
+     */
+    public function test_start_from_demo_default_restores_the_original_look_as_drafts(): void
+    {
+        $org = $this->t['organization']->id;
+        $this->postJson('/api/v1/storefront/menus', ['name' => 'Main', 'location' => 'main'])->assertCreated();
+        // The live store is on the vegan look.
+        $this->postJson('/api/v1/storefront/theme/presets/vegan/apply')->assertOk();
+        $this->postJson('/api/v1/storefront/theme/publish')->assertOk();
+
+        $result = $this->postJson(self::API.'/start-from-demo/default')->assertOk()->json('data');
+        $this->assertSame('default', $result['preset']);
+        $this->assertSame(['home', 'header', 'footer', 'zone:listing.top'], array_column($result['documents'], 'key'));
+        $this->assertSame([null, null, null, null], array_column($result['documents'], 'published'));
+        $this->assertSame('default', $result['theme']['preset']);
+        $this->assertTrue($result['theme']['has_unpublished_changes']);
+        // 2 hero + 2 promo banners; their photos and the newsletter photo.
+        $this->assertSame(['media' => 5, 'banners' => 4, 'banners_reused' => 0], $result['imported']);
+        $this->assertSame(4, $this->bannerCount($org));
+        $this->assertSame(5, $this->mediaCount($org));
+
+        $theme = $this->getJson('/api/v1/storefront/theme/draft')->assertOk()->json('data.settings');
+        $this->assertSame(['default', 'standard', 'columns', 'standard'], [$theme['preset'], $theme['layout']['header_style'], $theme['layout']['footer_style'], $theme['layout']['card_style']]);
+        $this->assertSame(ThemePresets::all()['default']['colors'], $theme['colors']);
+
+        $home = BuilderDocument::query()->withoutGlobalScopes()->findOrFail($result['documents'][0]['id']);
+        $this->assertSame(
+            ['hero_slider', 'features_strip', 'category_strip', 'product_grid', 'banner_grid', 'product_carousel', 'hot_deals', 'testimonials', 'blog_posts', 'newsletter'],
+            array_map(fn (array $s) => $s['columns'][0]['elements'][0]['type'], $home->draft['sections']),
+        );
+        $slider = $this->elementsOf($home->draft['sections'], 'hero_slider')[0];
+        $banner = Banner::query()->withoutGlobalScopes()->findOrFail($slider['props']['items'][0]['item_id']);
+        $this->assertSame([$org, 'আপনার পছন্দের সবকিছু, এক জায়গায়'], [$banner->organization_id, $banner->translations['bn']['title']]);
+        $grid = $this->elementsOf($home->draft['sections'], 'product_grid')[0];
+        $this->assertSame('নতুন পণ্য', $grid['translations']['bn']['title']);
+        $header = BuilderDocument::query()->withoutGlobalScopes()->findOrFail($result['documents'][1]['id']);
+        $this->assertNotEmpty($this->elementsOf($header->draft['sections'], 'menu'));
+
+        // Nothing is live yet.
+        $this->app['auth']->forgetGuards();
+        $bootstrap = $this->getJson(self::STORE.'/bootstrap')->assertOk()->json('data');
+        $this->assertSame('vegan', $bootstrap['theme']['preset']);
+        $this->assertFalse($bootstrap['builder']['home']);
+        $this->assertNull($bootstrap['builder']['header']);
+
+        // Publish all: the original look goes live.
+        $this->actingAsUser($this->t['admin']);
+        $this->postJson(self::API.'/publish-all', ['documents' => array_column($result['documents'], 'id'), 'theme' => true])->assertOk();
+        $this->app['auth']->forgetGuards();
+        $bootstrap = $this->getJson(self::STORE.'/bootstrap')->assertOk()->json('data');
+        $this->assertSame('default', $bootstrap['theme']['preset']);
+        $this->assertTrue($bootstrap['builder']['home']);
+        $this->assertNotNull($bootstrap['builder']['header']);
+        $live = $this->getJson(self::STORE.'/builder/pages/home')->assertOk()->json('data');
+        $this->assertContains('hero_slider', array_column($this->elementsOf($live['sections']), 'type'));
+    }
+
     public function test_start_from_demo_can_leave_parts_out_and_runs_again_without_duplicates(): void
     {
         $org = $this->t['organization']->id;
@@ -490,7 +562,7 @@ class BuilderTemplatesApiTest extends TestCase
         $this->assertSame([$media, $banners], [$this->mediaCount($org), $this->bannerCount($org)]);
         $this->assertSame(1, BuilderDocument::query()->withoutGlobalScopes()->where('organization_id', $org)->where('key', 'home')->count());
 
-        $this->postJson(self::API.'/start-from-demo/default')->assertNotFound();
+        $this->postJson(self::API.'/start-from-demo/nope')->assertNotFound();
         $this->postJson(self::API.'/start-from-demo/vegan', ['include' => ['logo' => true]])->assertUnprocessable();
     }
 

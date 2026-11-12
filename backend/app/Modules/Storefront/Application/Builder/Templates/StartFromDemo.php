@@ -16,7 +16,8 @@ use Illuminate\Support\Str;
 
 /**
  * B5: "start from a demo look" — applies a site template (Vegan, Handmade, Classic, Kids; derived from
- * the T2 demo stores) to **drafts only**, in one transaction:
+ * the T2 demo stores; B7: and the store's original look, preset `default`) to **drafts only**, in
+ * one transaction:
  *
  * - theme: the preset over the theme draft (the theme draft flow: logo, palette, announcement and
  *   footer content are kept);

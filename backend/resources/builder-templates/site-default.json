@@ -1,0 +1,1009 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "default"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "autoplay_seconds": 6,
+                                            "height": "large"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Everything you love",
+                                                    "kicker": "Welcome",
+                                                    "title": "Everything you love, in one easy shop",
+                                                    "subtitle": "Everyday essentials, thoughtful gifts and new favourites, delivered to your door.",
+                                                    "button_label": "Shop now",
+                                                    "link_url": "/shop",
+                                                    "secondary_button_label": "New arrivals",
+                                                    "secondary_link_url": "/shop?sort=newest",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "classic/banner-sale-1.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "স্বাগতম",
+                                                            "title": "আপনার পছন্দের সবকিছু, এক জায়গায়",
+                                                            "subtitle": "প্রতিদিনের দরকারি জিনিস, মনের মতো উপহার আর নতুন পছন্দ — পৌঁছে যাবে আপনার দরজায়।",
+                                                            "button_label": "এখনই কিনুন",
+                                                            "secondary_button_label": "নতুন পণ্য"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Fresh finds",
+                                                    "kicker": "Just in",
+                                                    "title": "Fresh finds for home and family",
+                                                    "subtitle": "New arrivals every week. Come and see what is new.",
+                                                    "button_label": "See what's new",
+                                                    "link_url": "/shop?sort=newest",
+                                                    "secondary_button_label": "Our story",
+                                                    "secondary_link_url": "/pages/about-us",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "center",
+                                                    "image": {
+                                                        "asset": "handmade/banner-tile-1.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "সদ্য এসেছে",
+                                                            "title": "ঘর আর পরিবারের জন্য নতুন সংগ্রহ",
+                                                            "subtitle": "প্রতি সপ্তাহে নতুন পণ্য আসে। দেখে নিন কী এল।",
+                                                            "button_label": "নতুন যা এসেছে",
+                                                            "secondary_button_label": "আমাদের গল্প"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Fast delivery",
+                                                    "text": "To your door, across the country"
+                                                },
+                                                {
+                                                    "icon": "rotate-ccw",
+                                                    "title": "Easy returns",
+                                                    "text": "Change your mind within 7 days"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Pay your way",
+                                                    "text": "Cash on delivery or online"
+                                                },
+                                                {
+                                                    "icon": "headset",
+                                                    "title": "Friendly help",
+                                                    "text": "Call or message us any day"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Shop by category",
+                                        "subtitle": "Find what you need in a few taps",
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 6
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ক্যাটাগরি অনুযায়ী কিনুন",
+                                            "subtitle": "কয়েক ট্যাপেই খুঁজে নিন দরকারি জিনিস"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "product_grid",
+                                    "props": {
+                                        "title": "New arrivals",
+                                        "subtitle": "Just added to the shop",
+                                        "config": {
+                                            "source": "new_arrivals",
+                                            "limit": 8,
+                                            "columns": 4,
+                                            "view_all_url": "/shop?sort=newest"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "নতুন পণ্য",
+                                            "subtitle": "সদ্য দোকানে যোগ হয়েছে"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "2-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Style for every day",
+                                                    "kicker": "New season",
+                                                    "title": "Style for every day",
+                                                    "subtitle": "Easy pieces you will reach for again and again.",
+                                                    "button_label": "Shop now",
+                                                    "link_url": "/shop",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "classic/banner-women.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "নতুন মৌসুম",
+                                                            "title": "প্রতিদিনের স্টাইল",
+                                                            "subtitle": "আরামের পোশাক, বারবার পরতে ইচ্ছে করবে।",
+                                                            "button_label": "এখনই কিনুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Little ones, big smiles",
+                                                    "kicker": "For kids",
+                                                    "title": "Little ones, big smiles",
+                                                    "subtitle": "Toys and gifts that make every day brighter.",
+                                                    "button_label": "Shop now",
+                                                    "link_url": "/shop",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "kids/banner-kids.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "শিশুদের জন্য",
+                                                            "title": "ছোট্ট মুখে বড় হাসি",
+                                                            "subtitle": "খেলনা আর উপহার, প্রতিটি দিন হোক আরও রঙিন।",
+                                                            "button_label": "এখনই কিনুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "product_carousel",
+                                    "props": {
+                                        "title": "Best sellers",
+                                        "subtitle": "Our customers' favourites this week",
+                                        "config": {
+                                            "source": "best_sellers",
+                                            "limit": 8,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সবচেয়ে বেশি বিক্রি",
+                                            "subtitle": "এই সপ্তাহে ক্রেতাদের প্রিয়"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "hot_deals",
+                                    "props": {
+                                        "title": "Hot deals",
+                                        "subtitle": "Limited-time offers. Grab them before they are gone.",
+                                        "config": {
+                                            "limit": 8,
+                                            "view_all_url": "/shop",
+                                            "promotion_id": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "হট ডিল",
+                                            "subtitle": "সীমিত সময়ের অফার। শেষ হওয়ার আগেই নিয়ে নিন।"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "testimonials",
+                                    "props": {
+                                        "title": "What our customers say",
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "quote": "Ordering was simple and the parcel arrived a day early. Everything was packed with care.",
+                                                    "name": "Farhana R.",
+                                                    "role": "Dhaka",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Fair prices and honest photos. What I got looked exactly like the website.",
+                                                    "name": "Imran H.",
+                                                    "role": "Sylhet",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "I needed a different size and it took one phone call. I will be back.",
+                                                    "name": "Sadia K.",
+                                                    "role": "Chattogram",
+                                                    "rating": 4
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ক্রেতারা যা বলছেন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "blog_posts",
+                                    "props": {
+                                        "title": "From our blog",
+                                        "subtitle": "Tips, guides and shop news",
+                                        "config": {
+                                            "limit": 3,
+                                            "view_all_url": "/blog"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "আমাদের ব্লগ থেকে",
+                                            "subtitle": "টিপস, গাইড আর দোকানের খবর"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "newsletter",
+                                    "props": {
+                                        "title": "Be the first to know",
+                                        "subtitle": null,
+                                        "config": {
+                                            "text": "New arrivals and members-only offers, twice a month. Unsubscribe any time.",
+                                            "button_label": "Subscribe",
+                                            "image_media_id": {
+                                                "asset": "vegan/tote-bag.jpg"
+                                            }
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সবার আগে খবর পান",
+                                            "text": "নতুন পণ্য আর সদস্যদের জন্য বিশেষ অফার, মাসে দুবার। যেকোনো সময় বন্ধ করা যায়।",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "16px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 48,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 44
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search for products…",
+                                        "button_label": ""
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "পণ্য খুঁজুন…"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "links"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": false
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "4px",
+                                    "bottom": "8px"
+                                }
+                            }
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_17",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "56px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "32px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "40px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_18",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 40,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_19",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Everyday essentials, gifts and new favourites, chosen with care and delivered to your door.</p>"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "html": "<p>প্রতিদিনের দরকারি জিনিস, উপহার আর নতুন পছন্দ, যত্ন করে বাছাই করা আর পৌঁছে দেওয়া হয় আপনার দরজায়।</p>"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_20",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 24
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 22,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_21",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Information",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "তথ্য"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_22",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 24,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_23",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Help",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "সহায়তা"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_24",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p><a href=\"/pages/faq\">Questions and answers</a><br><a href=\"/account/orders\">Track your order</a><br><a href=\"/pages/contact\">Contact us</a></p>"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "html": "<p><a href=\"/pages/faq\">প্রশ্ন ও উত্তর</a><br><a href=\"/account/orders\">অর্ডার ট্র্যাক করুন</a><br><a href=\"/pages/contact\">যোগাযোগ করুন</a></p>"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 24,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_25",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Contact us",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "যোগাযোগ"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_26",
+                                    "type": "contact_block",
+                                    "props": {
+                                        "show_phone": true,
+                                        "show_email": true,
+                                        "show_address": true,
+                                        "layout": "stacked"
+                                    }
+                                },
+                                {
+                                    "id": "e_27",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 24,
+                                        "style": "circle",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "0px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_28",
+                                    "type": "divider",
+                                    "props": {
+                                        "line": "solid",
+                                        "thickness": 1,
+                                        "width": 100,
+                                        "color": "theme:border",
+                                        "align": "center"
+                                    }
+                                },
+                                {
+                                    "id": "e_29",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "28px",
+                                    "bottom": "28px"
+                                },
+                                "margin": {
+                                    "bottom": "24px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:surface"
+                            },
+                            "border": {
+                                "radius": {
+                                    "tl": "16px",
+                                    "tr": "16px",
+                                    "br": "16px",
+                                    "bl": "16px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_30",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Find something you'll love",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "আপনার পছন্দের জিনিসটি খুঁজে নিন"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_31",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>New products arrive every week. Use the filters to find exactly what you need.</p>"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "html": "<p>প্রতি সপ্তাহে নতুন পণ্য আসে। ফিল্টার ব্যবহার করে ঠিক যা দরকার তা খুঁজে নিন।</p>"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

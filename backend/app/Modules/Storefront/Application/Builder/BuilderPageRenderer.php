@@ -37,6 +37,10 @@ use stdClass;
  *   `<list>.<item id>.<field>`, chart labels `labels.<index>`); `media` also holds gallery,
  *   carousel and logo images, category card and shop-the-look photos and background-video
  *   posters. Published shop-the-look elements keep only the hotspots of products on sale.
+ * - B8a: comparison_table, flash_sale_bar, bundle, review_wall, store_hours and charts with a
+ *   store `data_source` have `data[id]` (BuilderElementData); nested list texts are in the
+ *   request's language; `media` also holds before / after photos, team portraits and photo
+ *   grid images. Published bundles keep only the items of products on sale.
  */
 class BuilderPageRenderer
 {
@@ -156,8 +160,18 @@ class BuilderPageRenderer
                     }
                     break;
                 default:
-                    [$list, $index, $key] = $target;
-                    $props[$list][$index][$key] = Translations::value($translations, $field, $locale, $props[$list][$index][$key] ?? null);
+                    // B6 `[list, index, field]`; B8a deeper paths (`plans.<id>.features.<id>.text`).
+                    $value = &$props;
+                    foreach ($target as $segment) {
+                        if (! is_array($value)) {
+                            unset($value);
+
+                            continue 3;
+                        }
+                        $value = &$value[$segment];
+                    }
+                    $value = Translations::value($translations, $field, $locale, $value);
+                    unset($value);
             }
         }
 
@@ -204,7 +218,7 @@ class BuilderPageRenderer
             $sectionType = ElementRegistry::sectionType($node['type']);
             if ($sectionType === null) {
                 $node['props'] = self::localizedProps($node['type'], $node['props'], $translations, $locale);
-                if (BuilderElementData::handles($node['type'])) {
+                if (BuilderElementData::handles($node['type'], $node['props'])) {
                     $dataElements[] = ['id' => $node['id'], 'type' => $node['type'], 'props' => $node['props']];
                 }
             } else {
@@ -285,7 +299,7 @@ class BuilderPageRenderer
                     if ($preview && ($data[$element['id']]['state'] ?? null) === 'empty') {
                         $element['state'] = 'empty';
                     }
-                } elseif (BuilderElementData::handles($element['type']) && ! isset($data[$element['id']])) {
+                } elseif (BuilderElementData::handles($element['type'], $element['props']) && ! isset($data[$element['id']])) {
                     // B4: the record is gone or not shown (published: left out; draft: kept as empty).
                     if (! $preview) {
                         continue;
@@ -296,6 +310,11 @@ class BuilderPageRenderer
                     // B6: visitors only see the spots of products on sale.
                     $products = $data[$element['id']]['products'];
                     $element['props']['hotspots'] = array_values(array_filter($element['props']['hotspots'], fn (array $spot) => isset($products[$spot['product_id']])));
+                }
+                if ($element['type'] === 'bundle' && ! $preview && isset($data[$element['id']])) {
+                    // B8a: visitors only see the bundle's products on sale (at least two, or no bundle).
+                    $products = $data[$element['id']]['products'];
+                    $element['props']['items'] = array_values(array_filter($element['props']['items'], fn (array $item) => isset($products[$item['product_id']])));
                 }
                 $elements[] = $this->withData($element, $data, $preview);
             }

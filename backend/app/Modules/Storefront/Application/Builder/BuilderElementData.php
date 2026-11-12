@@ -4,7 +4,13 @@ namespace App\Modules\Storefront\Application\Builder;
 
 use App\Modules\Cms\Application\Contracts\PageContent;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Promotions\Application\Contracts\PromotionShowcase;
+use App\Modules\Reviews\Application\Contracts\ReviewShowcase;
+use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Storefront\Application\Queries\MenuTrees;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
@@ -35,16 +41,44 @@ use Carbon\CarbonImmutable;
  * - B6 shop_the_look: `{products: {<product id>: product card}}` of the hotspots' live
  *   products (always present; published payloads also drop the other hotspots).
  *
+ * - B8a comparison_table: `{products: {<product id>: product card}}` of the columns' products
+ *   on sale (draft: `columns: {<column id>: {state: unavailable}}` for the others).
+ * - B8a bundle: `{products: {<product id>: product page object}}` of the items' products on
+ *   sale; fewer than two is `unavailable` (draft: `items: {<item id>: {state: unavailable}}`).
+ * - B8a flash_sale_bar: `{promotion: {id, name, ends_at, state}, products: [card], claimed:
+ *   {used, limit}|null}` of the chosen countdown promotion or the live one ending first;
+ *   published only while it runs with an end (draft: `state: scheduled | expired | inactive |
+ *   unavailable`).
+ * - B8a review_wall: `{summary: {average, count}|null, reviews: [{id, author, rating, title,
+ *   body, created_at, product: {name, url, image}|null}]}` — approved reviews of products on
+ *   sale only (ReviewShowcase); none → no data.
+ * - B8a store_hours: `{timezone}` of the organization.
+ * - B8a chart with a store `data_source`: `{labels, series: [{id, name, values}]}` — products
+ *   per top-level category or approved reviews per star rating; nothing to show → no data.
+ *
  * In a draft (preview) an element that would be left out publicly keeps its data with
  * `state: expired | inactive | unavailable`; an element whose record is gone has no data.
  */
 class BuilderElementData
 {
+    /** B8a: ids of the live products (keys), loaded once per instance when a review needs them. */
+    private ?array $live = null;
+
+    /** @var array<string, array<string, int>> B8a: approved review counts per star, by scope */
+    private array $ratingCounts = [];
+
+    private ?string $timezone = null;
+
     public function __construct(
         private readonly PromotionShowcase $promotions,
         private readonly StorefrontCatalog $catalog,
         private readonly MenuTrees $menus,
         private readonly PageContent $content,
+        private readonly CatalogPromotions $catalogPromotions,
+        private readonly ReviewShowcase $reviews,
+        private readonly OrganizationDirectory $organizations,
+        private readonly TenantContext $tenant,
+        private readonly LocaleContext $locale,
     ) {}
 
     /**
@@ -53,6 +87,11 @@ class BuilderElementData
      */
     public function resolve(array $elements, bool $preview): array
     {
+        // B8a: per-render lookups (live products, review counts, the time zone).
+        $this->live = null;
+        $this->ratingCounts = [];
+        $this->timezone = null;
+
         $ids = fn (string $type, string $prop, ?callable $when = null) => array_values(array_unique(array_filter(array_map(
             fn (array $e) => $e['type'] === $type && ($when === null || $when($e)) ? ($e['props'][$prop] ?? null) : null,
             $elements,
@@ -84,6 +123,19 @@ class BuilderElementData
         }
         $lookIds = array_values(array_unique($lookIds));
         $lookCards = $lookIds === [] ? [] : array_column($this->catalog->productCards($lookIds), null, 'id');
+
+        // B8a: comparison products (cards) and bundle products (product pages), one query each.
+        $compareIds = [];
+        $bundleIds = [];
+        foreach ($elements as $element) {
+            if ($element['type'] === 'comparison_table') {
+                array_push($compareIds, ...array_filter(array_column($element['props']['columns'] ?? [], 'product_id'), 'is_string'));
+            } elseif ($element['type'] === 'bundle') {
+                array_push($bundleIds, ...array_filter(array_column($element['props']['items'] ?? [], 'product_id'), 'is_string'));
+            }
+        }
+        $compareCards = $compareIds === [] ? [] : array_column($this->catalog->productCards(array_values(array_unique($compareIds))), null, 'id');
+        $bundleDetails = $bundleIds === [] ? [] : $this->catalog->productDetails(array_values(array_unique($bundleIds)));
 
         $now = CarbonImmutable::now();
         $result = [];
@@ -148,6 +200,24 @@ class BuilderElementData
                     }
                     $data = ['products' => $products];
                     break;
+                case 'comparison_table':
+                    [$data, $state] = $this->comparison($props, $compareCards, $preview);
+                    break;
+                case 'bundle':
+                    [$data, $state] = $this->bundle($props, $bundleDetails, $preview);
+                    break;
+                case 'flash_sale_bar':
+                    [$data, $state] = $this->flashSale($props);
+                    break;
+                case 'review_wall':
+                    $data = $this->reviewWall($props);
+                    break;
+                case 'store_hours':
+                    $data = ['timezone' => $this->timezone()];
+                    break;
+                case 'chart':
+                    $data = ElementRegistry::needsData('chart', $props) ? $this->storeChart($props) : null;
+                    break;
             }
 
             if ($data === null) {
@@ -175,11 +245,20 @@ class BuilderElementData
         $instants = [];
         $countdownIds = [];
         $discountIds = [];
-        BuilderDocumentSchema::walk($content, function (array $node, string $path, string $kind) use (&$instants, &$countdownIds, &$discountIds) {
+        $anyFlashSale = false;
+        BuilderDocumentSchema::walk($content, function (array $node, string $path, string $kind) use (&$instants, &$countdownIds, &$discountIds, &$anyFlashSale) {
             if ($kind !== 'element') {
                 return;
             }
-            if ($node['type'] === 'countdown') {
+            if ($node['type'] === 'flash_sale_bar') {
+                // B8a: a chosen flash sale starting or ending; "the one ending first" changes
+                // whenever any automatic promotion starts or ends.
+                if (is_string($node['props']['promotion_id'] ?? null)) {
+                    $countdownIds[] = $node['props']['promotion_id'];
+                } else {
+                    $anyFlashSale = true;
+                }
+            } elseif ($node['type'] === 'countdown') {
                 if ($node['props']['source'] === 'date' && is_string($node['props']['ends_at'])) {
                     $instants[] = $node['props']['ends_at'];
                 } elseif (is_string($node['props']['promotion_id'])) {
@@ -195,6 +274,9 @@ class BuilderElementData
         ];
         foreach ($promotions as $promotion) {
             array_push($instants, ...array_filter([$promotion['starts_at'], $promotion['ends_at']]));
+        }
+        if ($anyFlashSale && ($next = $this->catalogPromotions->nextChangeAt()) !== null) {
+            $instants[] = $next->toIso8601String();
         }
 
         $now = CarbonImmutable::now();
@@ -279,10 +361,220 @@ class BuilderElementData
     }
 
     /**
-     * Whether an element type gets data here.
+     * B8a: comparison data — the cards of the columns' products on sale; in a draft also
+     * `columns: {<column id>: {state: unavailable}}` for product columns whose product is not.
+     *
+     * @param  array<string, mixed>  $props
+     * @param  array<string, array<string, mixed>>  $cards
+     * @return array{0: array<string, mixed>, 1: null}
      */
-    public static function handles(string $type): bool
+    private function comparison(array $props, array $cards, bool $preview): array
     {
-        return in_array($type, ElementRegistry::DATA_TYPES, true);
+        $products = [];
+        $columns = [];
+        foreach ($props['columns'] as $column) {
+            if (! is_string($column['product_id'])) {
+                continue;
+            }
+            if (isset($cards[$column['product_id']])) {
+                $products[$column['product_id']] = $cards[$column['product_id']];
+            } else {
+                $columns[$column['id']] = ['state' => 'unavailable'];
+            }
+        }
+        $data = ['products' => $products];
+        if ($preview && $columns !== []) {
+            $data['columns'] = $columns;
+        }
+
+        return [$data, null];
+    }
+
+    /**
+     * B8a: bundle data — the product pages of the items' products on sale; fewer than two
+     * is `unavailable` (left out publicly). A draft also gets `items: {<item id>: {state:
+     * unavailable}}` for the others.
+     *
+     * @param  array<string, mixed>  $props
+     * @param  array<string, array<string, mixed>>  $details
+     * @return array{0: array<string, mixed>, 1: ?string}
+     */
+    private function bundle(array $props, array $details, bool $preview): array
+    {
+        $products = [];
+        $items = [];
+        foreach ($props['items'] as $item) {
+            if (isset($details[$item['product_id']])) {
+                $products[$item['product_id']] = $details[$item['product_id']];
+            } else {
+                $items[$item['id']] = ['state' => 'unavailable'];
+            }
+        }
+        $data = ['products' => $products];
+        if ($preview && $items !== []) {
+            $data['items'] = $items;
+        }
+
+        return [$data, count($products) < 2 ? 'unavailable' : null];
+    }
+
+    /**
+     * B8a: flash sale bar data — the chosen countdown promotion, or the live one ending first;
+     * its products on sale (at most `product_limit`), and `claimed` only when the promotion has
+     * a usage limit. Shown only while the promotion runs and has an end.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array{0: array<string, mixed>|null, 1: ?string}
+     */
+    private function flashSale(array $props): array
+    {
+        $id = $props['promotion_id'] ?? ($this->catalogPromotions->countdownPromotions(null)[0]['id'] ?? null);
+        $promotion = is_string($id) ? ($this->promotions->countdowns([$id])[$id] ?? null) : null;
+        if ($promotion === null) {
+            return [null, null];
+        }
+        $state = match (true) {
+            $promotion['state'] !== 'active' => $promotion['state'],
+            $promotion['ends_at'] === null => 'unavailable',
+            default => null,
+        };
+
+        return [[
+            'promotion' => ['id' => $promotion['id'], 'name' => $promotion['name'], 'ends_at' => $promotion['ends_at'], 'state' => $promotion['state']],
+            'products' => $state === null && $props['show_products'] ? $this->catalog->hotDealCards($promotion['id'], $props['product_limit']) : [],
+            'claimed' => $this->promotions->claimed([$promotion['id']])[$promotion['id']] ?? null,
+        ], $state];
+    }
+
+    /**
+     * B8a: review wall data — approved reviews of products on sale (one product's for source
+     * `product`), at least `min_rating` stars; null when there are none.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array<string, mixed>|null
+     */
+    private function reviewWall(array $props): ?array
+    {
+        $scope = $this->scope($props['source'] === 'product' ? $props['product_id'] : null);
+        if ($scope === []) {
+            return null;
+        }
+        $reviews = $this->reviews->approved($scope, $props['min_rating'], $props['source'] === 'top_rated' ? 'top_rated' : 'latest', $props['limit'], ElementRegistry::REVIEW_BODY_MAX);
+        if ($reviews === []) {
+            return null;
+        }
+
+        $cards = $props['show_product']
+            ? array_column($this->catalog->productCards(array_values(array_unique(array_column($reviews, 'product_id')))), null, 'id')
+            : [];
+        $summary = null;
+        if ($props['show_summary']) {
+            $counts = $this->ratingCounts($scope, $props['source'] === 'product' ? (string) $props['product_id'] : '*');
+            $count = array_sum($counts);
+            $sum = 0;
+            foreach ($counts as $stars => $n) {
+                $sum += (int) $stars * $n;
+            }
+            $summary = $count === 0 ? null : ['average' => Decimal::div((string) $sum, (string) $count, 1), 'count' => $count];
+        }
+
+        return [
+            'summary' => $summary,
+            'reviews' => array_map(function (array $review) use ($cards, $props) {
+                $card = $cards[$review['product_id']] ?? null;
+
+                return [
+                    'id' => $review['id'],
+                    'author' => $review['author'],
+                    'rating' => $review['rating'],
+                    'title' => $review['title'],
+                    'body' => $review['body'],
+                    'created_at' => $review['created_at'],
+                    'product' => $props['show_product'] && $card !== null ? ['name' => $card['name'], 'url' => $card['url'], 'image' => $card['image']] : null,
+                ];
+            }, $reviews),
+        ];
+    }
+
+    /**
+     * B8a: a chart's store data `{labels, series: [{id, name, values}]}` — only public-safe
+     * counts (products per category, approved reviews per star rating), never sales, revenue,
+     * order or customer numbers; null when there is nothing to show.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array<string, mixed>|null
+     */
+    private function storeChart(array $props): ?array
+    {
+        $bangla = $this->locale->current() === LocaleContext::BN;
+        if ($props['data_source'] === 'store.products_per_category') {
+            $categories = array_values(array_filter($this->catalog->categoryStrip(null, 1000), fn (array $c) => $c['product_count'] > 0));
+            usort($categories, fn (array $a, array $b) => $b['product_count'] <=> $a['product_count'] ?: strcmp($a['name'], $b['name']));
+            $categories = array_slice($categories, 0, in_array($props['kind'], ['pie', 'donut'], true) ? ElementRegistry::CHART_PIE_LABELS : ElementRegistry::CHART_STORE_CATEGORIES);
+            if ($categories === []) {
+                return null;
+            }
+
+            return [
+                'labels' => array_column($categories, 'name'),
+                'series' => [['id' => 's1', 'name' => $bangla ? 'পণ্য' : 'Products', 'values' => array_map(fn (array $c) => (int) $c['product_count'], $categories)]],
+            ];
+        }
+
+        $productId = $props['source_product_id'] ?? null;
+        $scope = $this->scope(is_string($productId) ? $productId : null);
+        $counts = $scope === [] ? [] : $this->ratingCounts($scope, is_string($productId) ? $productId : '*');
+        if (array_sum($counts) === 0) {
+            return null;
+        }
+        $digits = fn (int $n) => $bangla ? strtr((string) $n, ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯']) : (string) $n;
+
+        return [
+            'labels' => array_map(fn (int $stars) => $bangla ? $digits($stars).' তারকা' : $stars.' '.($stars === 1 ? 'star' : 'stars'), [5, 4, 3, 2, 1]),
+            'series' => [['id' => 's1', 'name' => $bangla ? 'রিভিউ' : 'Reviews', 'values' => array_map(fn (int $stars) => (int) ($counts[(string) $stars] ?? 0), [5, 4, 3, 2, 1])]],
+        ];
+    }
+
+    /**
+     * B8a: the products whose reviews may show — one product (when it is on sale) or every
+     * product on sale.
+     *
+     * @return list<string>
+     */
+    private function scope(?string $productId): array
+    {
+        $this->live ??= array_fill_keys($this->catalog->liveProductIds(), true);
+        if ($productId !== null) {
+            return isset($this->live[$productId]) ? [$productId] : [];
+        }
+
+        return array_map('strval', array_keys($this->live));
+    }
+
+    /**
+     * @param  list<string>  $scope
+     * @return array<string, int>
+     */
+    private function ratingCounts(array $scope, string $key): array
+    {
+        return $this->ratingCounts[$key] ??= $this->reviews->ratingCounts($scope);
+    }
+
+    /**
+     * B8a: the organization's time zone (store hours' "open now").
+     */
+    private function timezone(): string
+    {
+        return $this->timezone ??= (string) ($this->organizations->summary($this->tenant->requireOrganization())['timezone'] ?? config('app.timezone'));
+    }
+
+    /**
+     * Whether an element gets data here (B8a: a chart only with a store data source).
+     *
+     * @param  array<string, mixed>  $props  normalized
+     */
+    public static function handles(string $type, array $props = []): bool
+    {
+        return ElementRegistry::needsData($type, $props);
     }
 }

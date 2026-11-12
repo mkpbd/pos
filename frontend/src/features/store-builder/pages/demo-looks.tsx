@@ -1,201 +1,104 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { CircleCheckIcon, ExternalLinkIcon, Loader2Icon, PaletteIcon, PencilIcon, SendIcon, SparklesIcon, TriangleAlertIcon } from 'lucide-react'
+import { CircleCheckIcon, ExternalLinkIcon, EyeIcon, Loader2Icon, PaletteIcon, PencilIcon, SendIcon, SparklesIcon, StarIcon } from 'lucide-react'
 import { toast } from 'sonner'
-import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 import { useThemeDraftQuery, useThemePresetsQuery } from '@/features/storefront/api'
-import { ApiError } from '@/lib/api/client'
+import { cn } from '@/lib/utils'
+import { demoStoreUrl } from '@/storefront/demos/links'
 import type { DocumentSummary } from '../api'
-import { isTemplatePreset, usePublishAllMutation, useSiteTemplatesQuery, useStartFromDemoMutation, type BuilderTemplate, type DemoParts, type StartFromDemoResult } from '../templates/api'
+import { isSitePreset, useLiveDemosQuery, usePublishAllMutation, useSiteTemplatesQuery, type BuilderTemplate } from '../templates/api'
 import { TemplateThumbnail } from '../templates/template-thumbnail'
-import { liveUrl } from './page-helpers'
+import { PreviewDialog, Swatches, UseLookDialog, type UseOutcome, type UseRequest } from './look-dialogs'
+import { liveUrl, LOOKS_ANCHOR } from './page-helpers'
+import { useScreenText } from './screen-language'
+import { ScreenConfirm } from './screen-ui'
 
 /*
- * "Start from a demo look" on the pages list (B5): the demo stores' looks (site templates),
- * a dialog choosing what is replaced — always as drafts — then a review panel with preview links
- * and Publish all. The live store changes only on publish.
+ * "Choose a look" on the pages list (B5, B7): the shop looks (site templates) in the API's order,
+ * the first one featured. Each look: Preview (a dialog with its whole home page), See live demo
+ * (its demo store, when this server lists one) and Use this look (drafts → review → publish all,
+ * or use and publish now). The live store changes only on publish.
  */
 
-type PartKey = keyof DemoParts
-
-const PARTS: { key: PartKey; label: string; detail: string }[] = [
-  { key: 'theme', label: 'Site styles', detail: 'Colours, fonts, buttons and layout. Your logo, palette and contact details stay.' },
-  { key: 'home', label: 'Home page', detail: 'The front page of your store.' },
-  { key: 'header', label: 'Header', detail: 'The top of every page.' },
-  { key: 'footer', label: 'Footer', detail: 'The bottom of every page.' },
-  { key: 'listing_top', label: 'Shop pages', detail: 'The area above the product grid on shop, category, brand and search pages.' },
-]
-
-const ALL_PARTS: DemoParts = { theme: true, home: true, header: true, footer: true, listing_top: true }
-
-/** The document a part replaces the draft of. */
-function existingDocument(documents: DocumentSummary[], part: PartKey): DocumentSummary | undefined {
-  switch (part) {
-    case 'home':
-      return documents.find((d) => d.kind === 'page' && d.key === 'home')
-    case 'header':
-    case 'footer':
-      return documents.find((d) => d.kind === part)
-    case 'listing_top':
-      return documents.find((d) => d.key === 'zone:listing.top')
-    default:
-      return undefined
-  }
+/** Grid columns for the looks after the featured one, so no row ends with a lone card. */
+function gridColumns(count: number): string {
+  if (count >= 4 && count % 4 === 0) return 'sm:grid-cols-2 xl:grid-cols-4'
+  if (count % 3 === 0) return 'md:grid-cols-3'
+  if (count % 2 === 0) return 'sm:grid-cols-2'
+  return count === 1 ? '' : 'sm:grid-cols-2 xl:grid-cols-3'
 }
 
-const KIND_LABELS: Record<string, string> = { page: 'Page', header: 'Header', footer: 'Footer', zone: 'Shop pages' }
-
-function Swatches({ colors }: { colors: string[] }) {
-  if (colors.length === 0) return null
-  return (
-    <span className="flex items-center gap-1" aria-hidden data-testid="demo-swatches">
-      {colors.map((hex, i) => (
-        <span key={`${hex}-${i}`} title={hex} className="size-4 rounded-full border border-black/10" style={{ backgroundColor: hex }} />
-      ))}
-    </span>
-  )
+/** The store's URL from a draft preview link (`https://shop.test/?preview=draft` → `https://shop.test/`). */
+function storeRoot(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    return `${new URL(url).origin}/`
+  } catch {
+    return null
+  }
 }
 
 /* ---------------------------------------------------------------------------------------------- */
 
-function DemoLookDialog({ look, documents, themeHasChanges, onClose, onApplied }: { look: BuilderTemplate | null; documents: DocumentSummary[]; themeHasChanges: boolean; onClose: () => void; onApplied: (result: StartFromDemoResult, include: DemoParts, look: BuilderTemplate) => void }) {
-  const start = useStartFromDemoMutation()
-  const [include, setInclude] = useState<DemoParts>(ALL_PARTS)
-  const chosen = PARTS.filter((part) => include[part.key])
-  const close = () => {
-    setInclude(ALL_PARTS)
-    start.reset()
-    onClose()
-  }
-  const replaced = (part: PartKey) => (part === 'theme' ? themeHasChanges : existingDocument(documents, part)?.has_unpublished_changes === true)
-  const error = start.error instanceof ApiError ? start.error.message : start.error ? 'The look couldn’t be applied. Try again.' : null
-
-  return (
-    <Dialog open={look !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Use the {look?.name} look?</DialogTitle>
-          <DialogDescription>These parts of your store get the demo’s design as drafts. Your live store doesn’t change until you publish.</DialogDescription>
-        </DialogHeader>
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-medium">Replace the drafts of</legend>
-          {PARTS.map((part) => (
-            <div key={part.key} className="flex items-start gap-3">
-              <Checkbox id={`demo-part-${part.key}`} checked={include[part.key]} onCheckedChange={(checked) => setInclude((current) => ({ ...current, [part.key]: checked === true }))} className="mt-0.5" />
-              <div className="flex flex-col gap-0.5">
-                <Label htmlFor={`demo-part-${part.key}`}>{part.label}</Label>
-                <span className="text-xs text-muted-foreground">{part.detail}</span>
-                {include[part.key] && replaced(part.key) && (
-                  <span className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400" data-testid={`demo-warning-${part.key}`}>
-                    <TriangleAlertIcon className="size-3.5 shrink-0" aria-hidden /> Your unpublished changes here will be replaced.
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </fieldset>
-        <p className="rounded-md bg-muted px-3 py-2 text-sm">Your live store doesn’t change until you publish. Published versions stay in each page’s history.</p>
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={close}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={chosen.length === 0 || start.isPending || !look || !isTemplatePreset(look.preset)}
-            onClick={() => {
-              if (!look || !isTemplatePreset(look.preset)) return
-              const applied = { ...include }
-              start.mutate(
-                { preset: look.preset, include: applied },
-                {
-                  onSuccess: (result) => {
-                    onApplied(result, applied, look)
-                    close()
-                  },
-                },
-              )
-            }}
-          >
-            {start.isPending && <Loader2Icon className="animate-spin" aria-hidden />}
-            Create drafts
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/* ---------------------------------------------------------------------------------------------- */
-
-type Review = { look: BuilderTemplate; result: StartFromDemoResult; include: DemoParts; published: boolean }
+type Review = UseOutcome
 
 function ReviewPanel({ review, canPublish, onPublished, onClose }: { review: Review; canPublish: boolean; onPublished: () => void; onClose: () => void }) {
+  const { t, tc } = useScreenText()
   const publishAll = usePublishAllMutation()
   const [confirming, setConfirming] = useState(false)
   const { documents } = review.result
   const home = documents.find((d) => d.kind === 'page' && d.key === 'home')
   const themePreview = review.result.theme?.preview_url ?? home?.preview_url ?? documents.find((d) => d.preview_url)?.preview_url ?? null
   const count = documents.length + (review.include.theme ? 1 : 0)
-  const storeUrl = home ? liveUrl(home) : null
-  const error = publishAll.error ? (publishAll.error instanceof Error ? publishAll.error.message : 'Publishing failed.') : null
+  const storeUrl = (home ? liveUrl(home) : null) ?? storeRoot(themePreview)
+  const failure = publishAll.error ? (publishAll.error instanceof Error ? publishAll.error.message : t('review.failed')) : review.error ? t('review.publishFailed', { message: review.error }) : null
 
   const publish = () =>
     publishAll.mutate(
       { documents: documents.map((d) => d.id), theme: review.include.theme, note: `${review.look.name} demo look` },
       {
         onSuccess: () => {
-          toast.success(`The ${review.look.name} look is live.`)
+          toast.success(t('use.live', { name: review.look.name }))
           onPublished()
         },
       },
     )
 
+  const name = review.look.name
   return (
-    <Card data-testid="demo-review" role="region" aria-labelledby="demo-review-title">
+    <Card data-testid="demo-review" role="region" aria-labelledby="demo-review-title" id={LOOKS_ANCHOR}>
       <CardHeader>
         <CardTitle id="demo-review-title" role="heading" aria-level={2} aria-live="polite" className="flex items-center gap-2">
           {review.published ? <CircleCheckIcon className="size-5 text-emerald-600" aria-hidden /> : <SparklesIcon className="size-5" aria-hidden />}
-          {review.published ? `The ${review.look.name} look is live` : `Review your ${review.look.name} look`}
+          {review.published ? t('review.liveTitle', { name }) : t('review.title', { name })}
         </CardTitle>
-        <CardDescription>
-          {review.published
-            ? 'Every part below is published. Earlier versions stay in each page’s history.'
-            : 'These drafts are ready. Preview each one on your store, change anything in the builder, then publish them together. Your live store doesn’t change until you publish.'}
-        </CardDescription>
+        <CardDescription>{review.published ? t('review.liveText') : t('review.text')}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <ul className="divide-y" aria-label="Drafts of the new look">
+        <ul className="divide-y" aria-label={t('review.listLabel')}>
           {review.include.theme && (
             <li className="flex flex-wrap items-center gap-3 py-3" data-testid="demo-review-theme">
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 font-medium">
-                  <PaletteIcon className="size-4 text-muted-foreground" aria-hidden /> Site styles
+                  <PaletteIcon className="size-4 text-muted-foreground" aria-hidden /> {t('review.theme')}
                 </p>
-                <p className="text-sm text-muted-foreground">Colours, fonts, buttons and layout</p>
+                <p className="text-sm text-muted-foreground">{t('review.themeDetail')}</p>
               </div>
-              <Badge variant={review.published ? 'success' : 'soft'}>{review.published ? 'Published' : 'Draft'}</Badge>
+              <Badge variant={review.published ? 'success' : 'soft'}>{review.published ? t('review.published') : t('review.draft')}</Badge>
               <div className="flex flex-wrap items-center gap-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/storefront/theme" aria-label="Edit the site styles">
-                    <PencilIcon aria-hidden /> Edit
+                  <Link to="/storefront/theme" aria-label={t('review.editTheme')}>
+                    <PencilIcon aria-hidden /> {t('common.edit')}
                   </Link>
                 </Button>
                 {themePreview && !review.published && (
                   <Button variant="ghost" size="sm" asChild>
-                    <a href={themePreview} target="_blank" rel="noopener noreferrer" aria-label="Preview the site styles (opens in a new tab)">
-                      <ExternalLinkIcon aria-hidden /> Preview
+                    <a href={themePreview} target="_blank" rel="noopener noreferrer" aria-label={t('review.previewTheme')}>
+                      <ExternalLinkIcon aria-hidden /> {t('common.preview')}
                     </a>
                   </Button>
                 )}
@@ -206,19 +109,19 @@ function ReviewPanel({ review, canPublish, onPublished, onClose }: { review: Rev
             <li key={doc.id} className="flex flex-wrap items-center gap-3 py-3" data-testid={`demo-review-${doc.key}`}>
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{doc.title}</p>
-                <p className="text-sm text-muted-foreground">{KIND_LABELS[doc.kind] ?? 'Page'}</p>
+                <p className="text-sm text-muted-foreground">{t(doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'zone' ? (`review.kind.${doc.kind}` as const) : 'review.kind.page')}</p>
               </div>
-              <Badge variant={review.published ? 'success' : 'soft'}>{review.published ? 'Published' : 'Draft'}</Badge>
+              <Badge variant={review.published ? 'success' : 'soft'}>{review.published ? t('review.published') : t('review.draft')}</Badge>
               <div className="flex flex-wrap items-center gap-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link to={`/storefront/builder/${doc.id}`} aria-label={`Edit ${doc.title}`}>
-                    <PencilIcon aria-hidden /> Edit
+                  <Link to={`/storefront/builder/${doc.id}`} aria-label={t('review.editDoc', { name: doc.title })}>
+                    <PencilIcon aria-hidden /> {t('common.edit')}
                   </Link>
                 </Button>
                 {doc.preview_url && !review.published && (
                   <Button variant="ghost" size="sm" asChild>
-                    <a href={doc.preview_url} target="_blank" rel="noopener noreferrer" aria-label={`Preview ${doc.title} (opens in a new tab)`}>
-                      <ExternalLinkIcon aria-hidden /> Preview
+                    <a href={doc.preview_url} target="_blank" rel="noopener noreferrer" aria-label={t('review.previewDoc', { name: doc.title })}>
+                      <ExternalLinkIcon aria-hidden /> {t('common.preview')}
                     </a>
                   </Button>
                 )}
@@ -226,45 +129,45 @@ function ReviewPanel({ review, canPublish, onPublished, onClose }: { review: Rev
             </li>
           ))}
         </ul>
-        {error && (
+        {failure && !review.published && (
           <p role="alert" className="text-sm text-destructive">
-            {error}
+            {failure}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">
           {review.published ? (
             <>
               {storeUrl && (
-                <Button variant="outline" asChild>
+                <Button asChild>
                   <a href={storeUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLinkIcon aria-hidden /> View your store
+                    <ExternalLinkIcon aria-hidden /> {t('review.viewStore')}
                   </a>
                 </Button>
               )}
               <Button variant="ghost" onClick={onClose}>
-                Close
+                {t('common.close')}
               </Button>
             </>
           ) : (
             <>
               <Button disabled={!canPublish || publishAll.isPending || count === 0} onClick={() => setConfirming(true)}>
                 {publishAll.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : <SendIcon aria-hidden />}
-                Publish all
+                {t('review.publishAll')}
               </Button>
               <Button variant="ghost" onClick={onClose}>
-                Done for now
+                {t('review.later')}
               </Button>
-              {!canPublish && <p className="text-sm text-muted-foreground">Someone with permission to publish makes these drafts live.</p>}
+              {!canPublish && <p className="text-sm text-muted-foreground">{t('review.noPermission')}</p>}
             </>
           )}
         </div>
       </CardContent>
-      <ConfirmDialog
+      <ScreenConfirm
         open={confirming}
         onOpenChange={setConfirming}
-        title="Publish your new look?"
-        description={`${count === 1 ? 'This part goes' : `These ${count} parts go`} live for shoppers right away. Earlier versions stay in each page’s history, so you can go back.`}
-        confirmLabel="Publish all"
+        title={t('review.confirmTitle')}
+        description={tc('review.confirmText', count)}
+        confirmLabel={t('review.publishAll')}
         destructive={false}
         onConfirm={() => {
           setConfirming(false)
@@ -277,70 +180,156 @@ function ReviewPanel({ review, canPublish, onPublished, onClose }: { review: Rev
 
 /* ---------------------------------------------------------------------------------------------- */
 
-/** The "Start from a demo look" card (people who manage the store), or the review of the drafts it made. */
+function LookCard({
+  look,
+  featured,
+  colors,
+  demoUrl,
+  onPreview,
+  onUse,
+}: {
+  look: BuilderTemplate
+  featured: boolean
+  colors: string[]
+  demoUrl: string | null
+  onPreview: () => void
+  onUse: () => void
+}) {
+  const { t } = useScreenText()
+  return (
+    <li
+      className={cn('flex flex-col gap-3 rounded-lg border bg-background p-3', featured && 'col-span-full gap-4 border-primary/40 bg-primary/[0.03] p-4 md:grid md:grid-cols-2 md:items-center md:gap-6')}
+      data-testid={`demo-look-${look.preset}`}
+      data-featured={featured || undefined}
+    >
+      {/* The picture opens the preview too (the Preview button is the keyboard way in). */}
+      <button type="button" tabIndex={-1} aria-hidden className="block cursor-zoom-in rounded-md focus:outline-none" onClick={onPreview}>
+        <TemplateThumbnail template={look} className={featured ? 'shadow-sm' : undefined} />
+      </button>
+      <div className="flex flex-1 flex-col gap-3">
+        <div className="flex flex-1 flex-col gap-1.5">
+          {featured && (
+            <Badge variant="soft" className="h-auto gap-1 py-1 whitespace-normal" data-testid="demo-featured-badge">
+              <StarIcon aria-hidden /> {look.preset === 'kids' ? t('looks.recommendedKids') : t('looks.recommended')}
+            </Badge>
+          )}
+          <p className={cn('flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-medium', featured && 'text-xl font-semibold')}>
+            {look.name}
+            <Swatches colors={colors} label={t('looks.colours')} size={featured ? 'md' : 'sm'} />
+          </p>
+          {look.description && <p className={cn('text-sm text-muted-foreground', featured && 'text-base')}>{look.description}</p>}
+        </div>
+        <div className={cn('flex flex-wrap gap-2', !featured && 'flex-col')}>
+          <Button size={featured ? 'default' : 'sm'} aria-label={t('looks.useAria', { name: look.name })} onClick={onUse}>
+            {t('looks.use')}
+          </Button>
+          <Button variant="outline" size={featured ? 'default' : 'sm'} aria-label={t('looks.previewAria', { name: look.name })} onClick={onPreview}>
+            <EyeIcon aria-hidden /> {t('looks.preview')}
+          </Button>
+          {demoUrl && (
+            <Button variant="ghost" size={featured ? 'default' : 'sm'} asChild>
+              <a href={demoUrl} target="_blank" rel="noopener noreferrer" aria-label={t('looks.liveDemoAria', { name: look.name })}>
+                <ExternalLinkIcon aria-hidden /> {t('looks.liveDemo')}
+              </a>
+            </Button>
+          )}
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/** The "Choose a look" card (people who manage the store), or the review of the drafts it made. */
 export function DemoLooksCard({ documents, canManage, canPublish }: { documents: DocumentSummary[]; canManage: boolean; canPublish: boolean }) {
+  const { t, tc } = useScreenText()
   const looks = useSiteTemplatesQuery(canManage)
   const presets = useThemePresetsQuery()
   const themeDraft = useThemeDraftQuery()
-  const [chosen, setChosen] = useState<BuilderTemplate | null>(null)
+  const demos = useLiveDemosQuery(canManage)
+  const [previewing, setPreviewing] = useState<BuilderTemplate | null>(null)
+  const [using, setUsing] = useState<UseRequest | null>(null)
   const [review, setReview] = useState<Review | null>(null)
 
   if (!canManage) return null
   if (review) {
-    return <ReviewPanel review={review} canPublish={canPublish} onPublished={() => setReview({ ...review, published: true })} onClose={() => setReview(null)} />
+    return <ReviewPanel review={review} canPublish={canPublish} onPublished={() => setReview({ ...review, published: true, error: undefined })} onClose={() => setReview(null)} />
   }
 
-  const sites = (looks.data ?? []).filter((t) => t.scope === 'site' && isTemplatePreset(t.preset))
+  const sites = (looks.data ?? []).filter((t) => t.scope === 'site' && isSitePreset(t.preset))
   if (looks.isSuccess && sites.length === 0) return null
   const colorsOf = (preset: string | null) => {
     const colors = presets.data?.find((p) => p.key === preset)?.theme.colors as Record<string, string | null | undefined> | undefined
     if (!colors) return []
     return ['primary', 'accent', 'highlight', 'heading', 'canvas'].map((key) => colors[key]).filter((hex): hex is string => typeof hex === 'string')
   }
+  // The original look has no demo store; the others link to theirs when this server lists it.
+  const demoUrlOf = (look: BuilderTemplate) => {
+    if (!look.preset || look.preset === 'default') return null
+    const demo = demos.data?.find((d) => d.preset === look.preset)
+    return demo ? demoStoreUrl(demo.host) : null
+  }
+  const rest = Math.max(0, sites.length - 1)
 
   return (
-    <Card data-testid="demo-looks">
+    <Card data-testid="demo-looks" id={LOOKS_ANCHOR} className="scroll-mt-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <SparklesIcon className="size-5" aria-hidden /> Start from a demo look
+          <SparklesIcon className="size-5" aria-hidden /> {t('looks.title')}
         </CardTitle>
-        <CardDescription>Give your store a complete design in one go: site styles, home page, header, footer and shop pages. Everything is created as drafts you can review and change first.</CardDescription>
+        <CardDescription>{t('looks.text')}</CardDescription>
       </CardHeader>
       <CardContent>
         {looks.isPending ? (
-          <LoadingState rows={2} label="Loading demo looks" />
+          <LoadingState rows={2} label={t('looks.loading')} />
         ) : looks.error ? (
-          <ErrorState title="The demo looks couldn’t be loaded" error={looks.error} onRetry={() => void looks.refetch()} />
+          <ErrorState title={t('looks.error')} error={looks.error} onRetry={() => void looks.refetch()} />
         ) : (
-          // One, two or four per row (never a lone card on a row of three): 1 → 2 × 2 → 4 across.
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Demo looks">
-            {sites.map((look) => (
-              <li key={look.id} className="flex flex-col gap-3 rounded-lg border p-3" data-testid={`demo-look-${look.preset}`}>
-                <TemplateThumbnail template={look} />
-                <div className="flex flex-1 flex-col gap-1">
-                  <p className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-medium">
-                    {look.name}
-                    <Swatches colors={colorsOf(look.preset)} />
-                  </p>
-                  {look.description && <p className="text-sm text-muted-foreground">{look.description}</p>}
-                </div>
-                <Button variant="outline" size="sm" aria-label={`Use the ${look.name} look`} onClick={() => setChosen(look)}>
-                  Use this look
-                </Button>
-              </li>
+          <ul className={cn('grid gap-4', gridColumns(rest))} aria-label={t('looks.listLabel')}>
+            {sites.map((look, index) => (
+              <LookCard
+                key={look.id}
+                look={look}
+                featured={index === 0}
+                colors={colorsOf(look.preset)}
+                demoUrl={demoUrlOf(look)}
+                onPreview={() => setPreviewing(look)}
+                onUse={() => setUsing({ look, publishNow: false })}
+              />
             ))}
           </ul>
         )}
       </CardContent>
-      <DemoLookDialog
-        look={chosen}
+      <PreviewDialog
+        look={previewing}
+        colors={previewing ? colorsOf(previewing.preset) : []}
+        demoUrl={previewing ? demoUrlOf(previewing) : null}
+        canPublish={canPublish}
+        onClose={() => setPreviewing(null)}
+        onUse={(look, publishNow) => {
+          setPreviewing(null)
+          setUsing({ look, publishNow })
+        }}
+      />
+      <UseLookDialog
+        request={using}
         documents={documents}
         themeHasChanges={themeDraft.data?.has_unpublished_changes === true}
-        onClose={() => setChosen(null)}
-        onApplied={(result, include, look) => {
-          const media = result.imported?.media ?? 0
-          toast.success(`The ${look.name} look is ready as drafts.${media ? ` ${media} ${media === 1 ? 'image was' : 'images were'} added to your media library.` : ''} Review it, then publish.`)
-          setReview({ look, result, include, published: false })
+        canPublish={canPublish}
+        onClose={() => setUsing(null)}
+        onDone={(outcome) => {
+          setUsing(null)
+          setReview(outcome)
+          const name = outcome.look.name
+          if (outcome.published) {
+            toast.success(t('use.live', { name }))
+            return
+          }
+          if (outcome.error) {
+            toast.error(t('review.publishFailed', { message: outcome.error }))
+            return
+          }
+          const media = outcome.result.imported?.media ?? 0
+          toast.success(`${t('use.ready', { name })}${media ? ` ${tc('use.media', media)}` : ''}`)
         }}
       />
     </Card>

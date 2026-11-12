@@ -2,7 +2,7 @@
 
 import { isWrappedSectionType } from '@/storefront/builder/registry'
 import type { BuilderNode } from './types'
-import { B6_TYPES } from './validate'
+import { B6_TYPES, B8A_TYPES } from './validate'
 
 export type GroupId = 'background' | 'button-colors' | 'color' | 'typography' | 'spacing' | 'size' | 'layout' | 'border' | 'shadow' | 'effects' | 'text-effects' | 'hover' | 'motion' | 'background-video'
 
@@ -34,6 +34,8 @@ export const GROUP_TIPS: Partial<Record<GroupId, string>> = {
 }
 
 const B6_MEDIA = new Set(['gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look'])
+/** B8a elements drawn mostly from pictures / product cards (no text styles of their own). */
+const B8A_MEDIA = new Set(['before_after', 'photo_grid', 'bundle', 'comparison_table'])
 
 /** The style groups of a node type, most used first (open); B6: every node ends with Animation. */
 export function groupsFor(node: BuilderNode): GroupSpec[] {
@@ -41,6 +43,11 @@ export function groupsFor(node: BuilderNode): GroupSpec[] {
 }
 
 function baseGroups(node: BuilderNode): GroupSpec[] {
+  if (B8A_TYPES.has(node.type)) {
+    if (B8A_MEDIA.has(node.type)) return [{ id: 'spacing', open: true }, { id: 'size' }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]
+    if (node.type === 'progress_bars') return [{ id: 'spacing', open: true }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]
+    return [{ id: 'typography', open: true }, { id: 'color' }, { id: 'spacing', open: true }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]
+  }
   if (B6_TYPES.has(node.type)) {
     if (node.type === 'chart') return [{ id: 'spacing', open: true }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]
     if (B6_MEDIA.has(node.type)) return [{ id: 'spacing', open: true }, { id: 'size' }, { id: 'border' }, { id: 'effects' }]

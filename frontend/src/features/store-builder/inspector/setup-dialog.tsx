@@ -6,7 +6,8 @@ import { B4Form } from './b4-forms'
 import { errorMap } from './errors'
 import { finishSetup, getSetupSnapshot, newSetupHostId, registerSetupHost, subscribeSetup, type SetupRequest } from './setup-store'
 import { B6Form } from './b6-forms'
-import { B4_TYPES, B6_TYPES, validateNode } from './validate'
+import { B8aForm } from './b8a-forms'
+import { B4_TYPES, B6_TYPES, B8A_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
 function SetupForm({ request, canCustomHtml, documentId }: { request: SetupRequest; canCustomHtml: boolean; documentId?: string }) {
@@ -16,6 +17,7 @@ function SetupForm({ request, canCustomHtml, documentId }: { request: SetupReque
   const errors = errorMap(node, problems, [])
   const b4 = B4_TYPES.has(node.type)
   const b6 = B6_TYPES.has(node.type)
+  const b8a = B8A_TYPES.has(node.type)
 
   return (
     <>
@@ -23,7 +25,9 @@ function SetupForm({ request, canCustomHtml, documentId }: { request: SetupReque
         <DialogTitle>Add {label}</DialogTitle>
         <DialogDescription>Choose what the {label} shows. You can change everything later in the panel on the right.</DialogDescription>
       </DialogHeader>
-      {b6 ? (
+      {b8a ? (
+        <B8aForm node={node} onChange={(next) => setNode(next as Element)} errors={errors} bangla={false} context={request.context} setup />
+      ) : b6 ? (
         <B6Form node={node} onChange={(next) => setNode(next as Element)} errors={errors} bangla={false} context={request.context} setup />
       ) : b4 ? (
         // Only the fields still missing are marked; everything else can be changed later too.

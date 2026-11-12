@@ -5,7 +5,7 @@ import { expect as baseExpect, test, type Browser, type Page } from '@playwright
  * Demo Mart as "the client": it starts from the Classic demo look, edits its home page in the
  * builder (drag, duplicate, delete, reorder, gradient, per-device text size), publishes, restores a
  * previous version — and another store never sees any of it. Criterion 11 (POS unchanged) is the
- * integration suite. Run on a fresh backend seeded with the demo stores:
+ * integration suite. B7: the start screen's demo looks (order, preview, live demo, use and publish now). Run on a fresh backend seeded with the demo stores:
  *   E2E_BACKEND=1 E2E_DEMOS=1 npx playwright test e2e/builder-acceptance.spec.ts --project=desktop-chromium
  */
 test.skip(!process.env.E2E_BACKEND || !process.env.E2E_DEMOS, 'Set E2E_BACKEND=1 E2E_DEMOS=1 and VITE_BACKEND_ORIGIN to a backend seeded with the demo stores')
@@ -39,12 +39,12 @@ test('§L1, §L7, §L8 — the client starts from the Classic demo look; drafts 
   await page.goto('/admin/storefront/pages')
 
   const card = page.getByTestId('demo-looks')
-  await card.getByRole('button', { name: /^Use the .*Classic.* look$/ }).click()
-  const dialog = page.getByRole('dialog', { name: /^Use the .*Classic.* look\?$/ })
-  await expect(dialog).toContainText('Your live store doesn’t change until you publish')
-  await dialog.getByRole('button', { name: 'Create drafts' }).click()
+  await card.getByRole('button', { name: /^Use .*Classic/ }).click()
+  const dialog = page.getByRole('dialog', { name: /^Use .*Classic.*\?$/ })
+  await expect(dialog).toContainText('Your live shop stays the same until you publish')
+  await dialog.getByRole('button', { name: 'Save as draft' }).click()
   const review = page.getByTestId('demo-review')
-  await expect(review.getByRole('heading', { name: /^Review your .*Classic.* look$/ })).toBeVisible({ timeout: 60_000 })
+  await expect(review.getByRole('heading', { name: /^Your new look: .*Classic/ })).toBeVisible({ timeout: 60_000 })
 
   // Drafts only: shoppers still see Demo Mart's own look.
   const visitor = await shopper(browser)
@@ -54,7 +54,7 @@ test('§L1, §L7, §L8 — the client starts from the Classic demo look; drafts 
 
   await review.getByRole('button', { name: 'Publish all' }).click()
   await page.getByRole('alertdialog', { name: 'Publish your new look?' }).getByRole('button', { name: 'Publish all' }).click()
-  await expect(review.getByRole('heading', { name: /look is live$/ })).toBeVisible({ timeout: 30_000 })
+  await expect(review.getByRole('heading', { name: /is live on your shop$/ })).toBeVisible({ timeout: 30_000 })
 
   // Live: the Classic look with the builder home page, header and footer.
   await visitor.page.goto('/')
@@ -189,5 +189,39 @@ test('§L9 — a previous version comes back: restore to the draft, publish, the
   await visitor.page.goto('/')
   await expect(visitor.page.locator('[data-b-scope="page"]')).toBeAttached()
   await expect(visitor.page.getByRole('heading', { name: WELCOME })).toHaveCount(0)
+  await visitor.context.close()
+})
+
+test('B7 — BerryKid comes first with a real preview and live demo; the Original look goes live in one click', async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await signIn(page, '', 'owner@demo.test')
+  await page.goto('/admin/storefront/pages')
+
+  const looks = page.getByTestId('demo-looks')
+  await expect(looks.locator('[data-testid^="demo-look-"]').first()).toHaveAttribute('data-testid', 'demo-look-kids')
+  await expect(looks.getByTestId('demo-look-kids')).toContainText('BerryKid Kids Store')
+  await expect(looks.getByTestId('demo-featured-badge')).toHaveText(/Recommended for baby & kids shops/)
+  // The demo gallery is on in this run: the kids look links to its demo store; the Original look has none.
+  await expect(looks.getByTestId('demo-look-kids').getByRole('link', { name: /live demo/ })).toHaveAttribute('href', /kids\.shop\.localhost/)
+  await expect(looks.getByTestId('demo-look-default').getByRole('link', { name: /live demo/ })).toHaveCount(0)
+
+  // The tall preview image of the whole home page loads.
+  await looks.getByRole('button', { name: 'Preview BerryKid Kids Store' }).click()
+  const image = page.getByTestId('look-preview-image')
+  await expect(image).toHaveAttribute('src', /site-kids-full\.jpg$/)
+  await expect.poll(() => image.evaluate((el) => { const img = el as unknown as { complete: boolean; naturalHeight: number; naturalWidth: number }; return img.complete && img.naturalHeight > img.naturalWidth })).toBe(true)
+  await page.keyboard.press('Escape')
+
+  await looks.getByRole('button', { name: 'Use Original look' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Use Original look?' })
+  await dialog.getByRole('button', { name: 'Use and publish now' }).click()
+  await page.getByRole('alertdialog', { name: 'Change your live shop now?' }).getByRole('button', { name: 'Yes, publish now' }).click()
+  await expect(page.getByRole('heading', { name: 'Original look is live on your shop' })).toBeVisible({ timeout: 60_000 })
+
+  const visitor = await shopper(browser)
+  await visitor.page.goto('/')
+  await expect(visitor.page.locator('html')).toHaveAttribute('data-sf-preset', 'default')
+  await expect(visitor.page.locator('[data-b-scope="page"]')).toBeAttached()
+  await expect(visitor.page.getByText('Everything you love, in one easy shop').first()).toBeVisible()
   await visitor.context.close()
 })

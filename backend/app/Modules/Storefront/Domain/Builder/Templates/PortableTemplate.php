@@ -26,7 +26,9 @@ use Illuminate\Validation\Rule;
  *   categories, all brands; hot deals of every countdown promotion), never from hand-picked ids;
  * - B6: a shop-the-look hotspot has `product_ref: {source, index}` (the index-th product of a
  *   source) instead of `product_id`; spots the store has no product for are left out, and so is
- *   a look left without spots.
+ *   a look left without spots;
+ * - B8a: a bundle item has `product_ref` too; a bundle left with fewer than two items is left
+ *   out.
  *
  * concrete() turns such sections into ordinary ones through a TemplateReferenceResolver and
  * gives every node a fresh id; the caller then validates them like any draft content.
@@ -239,6 +241,26 @@ final class PortableTemplate
                 }
                 $props['hotspots'] = $spots;
             }
+            if (($node['type'] ?? null) === 'bundle' && is_array($props['items'] ?? null)) {
+                // B8a: bundle items name products by source position too; a bundle left with
+                // fewer than two products is left out.
+                $items = [];
+                foreach ($props['items'] as $item) {
+                    if (is_array($item) && array_key_exists('product_ref', $item)) {
+                        $productId = self::productRef($item['product_ref'], $resolver);
+                        if ($productId === null) {
+                            continue;
+                        }
+                        unset($item['product_ref']);
+                        $item['product_id'] = $productId;
+                    }
+                    $items[] = $item;
+                }
+                if (count($items) < 2) {
+                    return null;
+                }
+                $props['items'] = $items;
+            }
             if (isset($node['props'])) {
                 $node['props'] = self::assetsToMedia($props, $resolver);
             }
@@ -269,6 +291,17 @@ final class PortableTemplate
         }
 
         return $node;
+    }
+
+    /**
+     * B8a: the product of a `product_ref: {source, index}`, or null.
+     */
+    private static function productRef(mixed $ref, TemplateReferenceResolver $resolver): ?string
+    {
+        return is_array($ref) && in_array($ref['source'] ?? null, self::PRODUCT_SOURCES, true) && is_int($ref['index'] ?? null)
+            && $ref['index'] >= 0 && $ref['index'] < self::PRODUCT_REF_MAX
+            ? $resolver->product($ref['source'], $ref['index'])
+            : null;
     }
 
     /**

@@ -8,6 +8,7 @@ import { usePublishThemeMutation, useSaveThemeDraftMutation, useThemeDraftQuery,
 import { ApiError } from '@/lib/api/client'
 import { DEFAULT_LISTING_COLUMNS, LISTING_COLUMN_OPTIONS, normalizeListingColumns } from '@/storefront/builder/validate'
 import type { ListingColumns } from '@/storefront/types'
+import { useScreenText } from './screen-language'
 
 /*
  * Products per row on the shop, category, brand and search pages (B4): the theme's
@@ -16,10 +17,10 @@ import type { ListingColumns } from '@/storefront/types'
  */
 
 type Device = keyof ListingColumns
-const DEVICES: { device: Device; label: string; icon: typeof MonitorIcon }[] = [
-  { device: 'desktop', label: 'Computers', icon: MonitorIcon },
-  { device: 'tablet', label: 'Tablets', icon: TabletIcon },
-  { device: 'mobile', label: 'Phones', icon: SmartphoneIcon },
+const DEVICES: { device: Device; icon: typeof MonitorIcon }[] = [
+  { device: 'desktop', icon: MonitorIcon },
+  { device: 'tablet', icon: TabletIcon },
+  { device: 'mobile', icon: SmartphoneIcon },
 ]
 
 type WithColumns = ThemeDocument & { layout: ThemeDocument['layout'] & { listing_columns?: Partial<ListingColumns> } }
@@ -30,6 +31,7 @@ function listingColumnsOf(settings: ThemeDocument | undefined): ListingColumns {
 }
 
 export function ListingColumnsCard({ canManage, canPublish }: { canManage: boolean; canPublish: boolean }) {
+  const { t, tc } = useScreenText()
   const draft = useThemeDraftQuery()
   const save = useSaveThemeDraftMutation()
   const publish = usePublishThemeMutation()
@@ -47,11 +49,11 @@ export function ListingColumnsCard({ canManage, canPublish }: { canManage: boole
       await save.mutateAsync({ revision: draft.data.draft_revision, settings: { ...settings, layout: { ...settings.layout, listing_columns: edited } } as ThemeDocument })
       if (canPublish) {
         await publish.mutateAsync(null)
-        toast.success('Products per row saved and published.')
-      } else toast.success('Saved to the theme draft. Someone with permission to publish makes it live.')
+        toast.success(t('columns.saved'))
+      } else toast.success(t('columns.savedDraft'))
       setEdited(null)
     } catch (error) {
-      toast.error(error instanceof ApiError && error.status === 409 ? 'The theme was changed somewhere else. Its latest version is loaded; try again.' : error instanceof Error ? error.message : 'Could not save.')
+      toast.error(error instanceof ApiError && error.status === 409 ? t('columns.conflict') : error instanceof Error ? error.message : t('columns.saveFailed'))
       if (error instanceof ApiError && error.status === 409) void draft.refetch()
     }
   }
@@ -59,49 +61,52 @@ export function ListingColumnsCard({ canManage, canPublish }: { canManage: boole
   return (
     <section aria-labelledby="listing-columns-title" className="flex flex-col gap-3 rounded-md border p-4" data-testid="listing-columns">
       <div>
-        <h3 id="listing-columns-title" className="font-medium">Products per row</h3>
-        <p className="text-sm text-muted-foreground">How many products sit side by side in the shop, category, brand and search results.</p>
+        <h3 id="listing-columns-title" className="font-medium">{t('columns.title')}</h3>
+        <p className="text-sm text-muted-foreground">{t('columns.text')}</p>
       </div>
       {draft.isPending ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : draft.error ? (
-        <p className="text-sm text-destructive">The setting couldn’t be loaded. Try again later.</p>
+        <p className="text-sm text-destructive">{t('columns.error')}</p>
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            {DEVICES.map(({ device, label, icon: Icon }) => (
+            {DEVICES.map(({ device, icon: Icon }) => {
+              const label = t(`columns.device.${device}` as const)
+              return (
               <div key={device} className="flex flex-col gap-1.5">
                 <Label htmlFor={`listing-columns-${device}`} className="flex items-center gap-1.5">
                   <Icon className="size-4 text-muted-foreground" aria-hidden /> {label}
                 </Label>
                 <Select value={String(value[device])} disabled={!canManage || busy} onValueChange={(v) => setEdited({ ...value, [device]: Number(v) } as ListingColumns)}>
-                  <SelectTrigger id={`listing-columns-${device}`} className="w-full" aria-label={`Products per row on ${label.toLowerCase()}`}>
+                  <SelectTrigger id={`listing-columns-${device}`} className="w-full" aria-label={t('columns.aria', { device: label.toLowerCase() })}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {LISTING_COLUMN_OPTIONS[device].map((n) => (
                       <SelectItem key={n} value={String(n)}>
-                        {n} {n === 1 ? 'product' : 'products'}
-                        {n === DEFAULT_LISTING_COLUMNS[device] ? ' (standard)' : ''}
+                        {tc('columns.option', n)}
+                        {n === DEFAULT_LISTING_COLUMNS[device] ? ` ${t('columns.standard')}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            ))}
+              )
+            })}
           </div>
           {canManage && (
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" size="sm" disabled={!changed || busy} onClick={() => void submit()}>
                 {busy && <Loader2Icon className="animate-spin" aria-hidden />}
-                {canPublish ? 'Save and publish' : 'Save to draft'}
+                {canPublish ? t('columns.savePublish') : t('columns.saveDraft')}
               </Button>
               {changed && (
                 <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEdited(null)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               )}
-              {canPublish && otherChanges && <p className="text-xs text-muted-foreground">Publishing also makes your other unpublished site style changes live.</p>}
+              {canPublish && otherChanges && <p className="text-xs text-muted-foreground">{t('columns.otherChanges')}</p>}
             </div>
           )}
         </>

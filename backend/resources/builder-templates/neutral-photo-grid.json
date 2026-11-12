@@ -1,0 +1,58 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Follow us", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "আমাদের অনুসরণ করুন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "photo_grid",
+                            "props": {
+                                "images": [
+                                    { "id": "g1", "media_id": { "asset": "handmade/stoneware-mug.jpg" }, "alt": "Speckled stoneware mug on a wooden table", "link": null },
+                                    { "id": "g2", "media_id": { "asset": "handmade/succulent-set.jpg" }, "alt": "Succulents in clay pots, top view", "link": null },
+                                    { "id": "g3", "media_id": { "asset": "handmade/candle-trio.jpg" }, "alt": "Three lit candles with pinecones on a tray", "link": null },
+                                    { "id": "g4", "media_id": { "asset": "handmade/woven-basket.jpg" }, "alt": "Seagrass woven basket with white blossoms", "link": null },
+                                    { "id": "g5", "media_id": { "asset": "handmade/ceramic-vase.jpg" }, "alt": "Hand-thrown clay vases on a concrete plinth", "link": null },
+                                    { "id": "g6", "media_id": { "asset": "handmade/gift-box.jpg" }, "alt": "Kraft gift box tied with twine and greenery", "link": null }
+                                ],
+                                "columns": { "base": 6, "tablet": 3, "mobile": 3 },
+                                "gap": "sm",
+                                "profile": { "label": "@yourshop", "url": "https://www.instagram.com/" },
+                                "hover": "zoom"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "images.g1.alt": "কাঠের টেবিলে ছিটছিটে স্টোনওয়্যার মগ",
+                                    "images.g2.alt": "মাটির টবে সাকুলেন্ট, ওপর থেকে",
+                                    "images.g3.alt": "ট্রেতে পাইনকোনসহ তিনটি জ্বলন্ত মোমবাতি",
+                                    "images.g4.alt": "সাদা ফুলসহ বোনা ঝুড়ি",
+                                    "images.g5.alt": "কংক্রিটের বেদিতে হাতে গড়া মাটির ফুলদানি",
+                                    "images.g6.alt": "সুতলি ও সবুজ পাতায় বাঁধা উপহারের বাক্স"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,44 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "bundle",
+                            "props": {
+                                "items": [
+                                    { "id": "b1", "product_ref": { "source": "new_arrivals", "index": 0 } },
+                                    { "id": "b2", "product_ref": { "source": "new_arrivals", "index": 1 } },
+                                    { "id": "b3", "product_ref": { "source": "new_arrivals", "index": 2 } }
+                                ],
+                                "title": "Bought together",
+                                "text": "Customers who buy one of these often take the others too. Pick the ones you want and add them in one click.",
+                                "button_label": "Add all to cart"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "একসাথে কেনা হয়",
+                                    "text": "এগুলোর একটি যাঁরা কেনেন, তাঁরা প্রায়ই বাকিগুলোও নেন। পছন্দেরগুলো বেছে এক ক্লিকে যোগ করুন।",
+                                    "button_label": "সবগুলো কার্টে যোগ করুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

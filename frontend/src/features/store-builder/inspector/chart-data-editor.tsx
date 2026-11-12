@@ -7,7 +7,7 @@
  */
 
 import { useId, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { ChartAreaIcon, ChartBarIcon, ChartColumnIcon, ChartLineIcon, ChartPieIcon, ClipboardPasteIcon, DonutIcon, LightbulbIcon, PlusIcon, TriangleAlertIcon, XIcon } from 'lucide-react'
+import { ChartAreaIcon, ChartBarIcon, ChartBarStackedIcon, ChartColumnIcon, ChartColumnStackedIcon, ChartLineIcon, ChartPieIcon, ClipboardPasteIcon, DonutIcon, LightbulbIcon, PlusIcon, TriangleAlertIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -38,6 +38,8 @@ const KIND_ICONS: Record<ChartKind, typeof ChartBarIcon> = {
   area: ChartAreaIcon,
   pie: ChartPieIcon,
   donut: DonutIcon,
+  'stacked-column': ChartColumnStackedIcon,
+  'stacked-bar': ChartBarStackedIcon,
 }
 
 const KIND_TIPS: Record<ChartKind, string> = {
@@ -47,30 +49,47 @@ const KIND_TIPS: Record<ChartKind, string> = {
   area: 'Show one total changing over time.',
   pie: 'Parts of a whole (one series, a few slices).',
   donut: 'Parts of a whole, with room in the middle.',
+  'stacked-column': 'What each total is made of (2 or more series).',
+  'stacked-bar': 'What each total is made of; fits long names.',
 }
 
 /** The chart kind as a row of pressed buttons with icons, and a hint whether it fits the data. */
-export function ChartKindPicker({ kind, data, onChange }: { kind: ChartKind; data: ChartData; onChange: (kind: ChartKind) => void }) {
-  const hint = kindHint(kind, data)
+export function ChartKindPicker({ kind, data, onChange, disabled = [], disabledReason, hideHint = false }: {
+  kind: ChartKind
+  data: ChartData
+  onChange: (kind: ChartKind) => void
+  /** Kinds that can't be chosen now (B8a: stacked kinds for store numbers), with the reason as their tooltip. */
+  disabled?: readonly ChartKind[]
+  disabledReason?: string
+  /** B8a: no hint about the data (store numbers are not typed here). */
+  hideHint?: boolean
+}) {
+  const fit = kindHint(kind, data)
+  // Store numbers aren't typed here, so the hint is about the kind only.
+  const hint = hideHint ? { suggested: kind, text: disabledReason ?? KIND_TIPS[kind], tone: 'tip' as const } : fit
   const id = useId()
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-1.5 text-sm font-medium">Chart kind</legend>
-      <div role="radiogroup" aria-label="Chart kind" aria-describedby={`${id}-hint`} className="grid grid-cols-3 gap-1.5">
+      <div role="radiogroup" aria-label="Chart kind" aria-describedby={`${id}-hint`} className="grid grid-cols-4 gap-1.5">
         {CHART_KINDS.map((k) => {
           const Icon = KIND_ICONS[k]
           const active = k === kind
+          const off = disabled.includes(k)
           return (
             <button
               key={k}
               type="button"
               role="radio"
               aria-checked={active}
-              title={KIND_TIPS[k]}
-              onClick={() => onChange(k)}
+              aria-disabled={off || undefined}
+              title={off ? disabledReason : KIND_TIPS[k]}
+              data-kind={k}
+              onClick={() => !off && onChange(k)}
               className={cn(
                 'flex flex-col items-center gap-1 rounded-md border px-1 py-2 text-xs outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
                 active && 'border-primary bg-primary/10 font-medium',
+                off && 'cursor-not-allowed opacity-40 hover:bg-transparent',
               )}
             >
               <Icon className={cn('size-5', active ? 'text-primary' : 'text-muted-foreground')} aria-hidden />

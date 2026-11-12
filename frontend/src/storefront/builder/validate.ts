@@ -492,7 +492,8 @@ export const B6_ENUMS = {
   quoteStyle: ['plain', 'card', 'large'],
   noticeTone: ['info', 'success', 'warning', 'promo'],
   stepsLayout: ['horizontal', 'vertical'],
-  chartKind: ['bar', 'column', 'line', 'area', 'pie', 'donut'],
+  /** B8a adds the stacked kinds. */
+  chartKind: ['bar', 'column', 'line', 'area', 'pie', 'donut', 'stacked-column', 'stacked-bar'],
   chartUnitPosition: ['before', 'after'],
   chartShowValues: ['none', 'last', 'all-small'],
   galleryAspect: ['square', '4:3', '3:4', '16:9', 'auto'],
@@ -689,6 +690,26 @@ export function chartProblems(p: Obj): Problems {
       })
     }
   })
+  const stacked = p.kind === 'stacked-column' || p.kind === 'stacked-bar'
+  // B8a: a store source draws one series, so it is never stacked.
+  if (stacked && isStoreSource(p.data_source)) problems.push({ path: 'kind', code: 'invalid' })
+  if (stacked && !isStoreSource(p.data_source)) {
+    // B8a: stacked kinds compare 2–6 parts of a whole; a negative part has no place in a stack.
+    if (Array.isArray(p.series) && p.series.length < B8A_LIMITS.stackedSeries.min) problems.push({ path: 'series', code: 'too_few' })
+    if (Array.isArray(p.series))
+      p.series.forEach((series: unknown, s: number) => {
+        if (isObject(series) && Array.isArray(series.values))
+          series.values.forEach((v, i) => {
+            if (isNumber(v) && v < 0) problems.push({ path: `series.${s}.values.${i}`, code: 'out_of_range' })
+          })
+      })
+  }
+  // B8a: absent on older documents (= manual).
+  if (p.data_source !== undefined) enumOf(problems, 'data_source', p.data_source, B8A_ENUMS.chartDataSource)
+  if (p.source_product_id !== undefined && p.source_product_id !== null) {
+    // One product's reviews: a rating-breakdown chart only.
+    if (!isUuid(p.source_product_id) || p.data_source !== 'store.rating_breakdown') problems.push({ path: 'source_product_id', code: 'invalid' })
+  }
   if (p.kind === 'pie' || p.kind === 'donut') {
     if (Array.isArray(p.series) && p.series.length !== 1) problems.push({ path: 'series', code: 'too_many' })
     if (labels && labels.length > B6_LIMITS.chartPieLabels) problems.push({ path: 'labels', code: 'too_many' })
@@ -873,7 +894,343 @@ export function b6PropProblems(type: string, props: unknown): PropProblem[] {
       enumOf(problems, 'separator', p.separator, B6_ENUMS.marqueeSeparator)
       break
     default:
+      // B8a types (and [] for every other type), so callers of this function check them too.
+      return b8aPropProblems(type, props)
+  }
+  return problems
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B8a elements (contract §1): selling blocks, trust & people, progress bars, chart additions
+ * -------------------------------------------------------------------------------------------- */
+
+export const B8A_ENUMS = {
+  chartDataSource: ['manual', 'store.products_per_category', 'store.rating_breakdown'],
+  beforeAfterOrientation: ['horizontal', 'vertical'],
+  beforeAfterAspect: ['1:1', '4:3', '3:2', '16:9'],
+  comparisonCell: ['yes', 'no', 'text'],
+  flashSaleStyle: ['bar', 'card'],
+  teamLinkKind: ['facebook', 'instagram', 'linkedin', 'x', 'youtube', 'tiktok', 'website', 'email'],
+  teamStyle: ['card', 'plain', 'circle'],
+  reviewSource: ['latest', 'top_rated', 'product'],
+  reviewLayout: ['grid', 'carousel'],
+  photoGap: ['none', 'sm', 'md'],
+  photoHover: ['none', 'zoom', 'overlay'],
+  weekDay: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+  weekStarts: ['sat', 'sun', 'mon'],
+  progressStyle: ['bar', 'ring'],
+} as const
+
+/** Item counts and numeric bounds of the B8a props (min / max inclusive). */
+export const B8A_LIMITS = {
+  plans: { min: 1, max: 4 },
+  planFeatures: { min: 0, max: 12 },
+  beforeAfterStart: { min: 0, max: 100 },
+  comparisonColumns: { min: 2, max: 4 },
+  comparisonRows: { min: 1, max: 20 },
+  flashSaleProducts: { min: 2, max: 8 },
+  bundleItems: { min: 2, max: 4 },
+  teamMembers: { min: 1, max: 12 },
+  teamLinks: { min: 0, max: 5 },
+  teamColumns: { min: 2, max: 4 },
+  reviewMinRating: { min: 1, max: 5 },
+  reviewLimit: { min: 3, max: 12 },
+  photoImages: { min: 3, max: 24 },
+  photoColumns: { min: 3, max: 6 },
+  progressItems: { min: 1, max: 10 },
+  progressValue: { min: 0, max: 100 },
+  stackedSeries: { min: 2, max: 6 },
+  /** Store-source charts: at most this many categories. */
+  storeChartLabels: 12,
+} as const
+
+/** Maximum length of each B8a text prop (✱ = translatable; nested list fields with `*`). Team `members.*.name` is not translated. */
+export const B8A_TEXT_LIMITS = {
+  pricing_table: {
+    'plans.*.name': 60,
+    'plans.*.price_text': 24,
+    'plans.*.period': 24,
+    'plans.*.description': 200,
+    'plans.*.features.*.text': 120,
+    'plans.*.button.label': 30,
+    'plans.*.badge': 24,
+  },
+  before_after: { 'before.alt': 200, 'after.alt': 200, before_label: 24, after_label: 24 },
+  comparison_table: { 'columns.*.title': 60, 'rows.*.label': 80, 'rows.*.cells.*.text': 60 },
+  flash_sale_bar: { title: 80, text: 160, 'button.label': 30 },
+  bundle: { title: 80, text: 200, button_label: 30 },
+  team: { 'members.*.name': 80, 'members.*.role': 80, 'members.*.bio': 300 },
+  review_wall: { title: 120 },
+  photo_grid: { 'images.*.alt': 200, 'profile.label': 60 },
+  store_hours: { title: 80, note: 200 },
+  progress_bars: { 'items.*.label': 60 },
+} as const
+
+/** A NUMERIC money string: ≥ 0, at most two decimals ("0", "1250", "99.5", "99.50"). */
+const MONEY = /^\d{1,12}(\.\d{1,2})?$/
+
+export function isMoneyString(value: unknown): value is string {
+  return typeof value === 'string' && MONEY.test(value)
+}
+
+/** "HH:MM", 00:00–23:59. */
+const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+export function isTime(value: unknown): value is string {
+  return typeof value === 'string' && TIME.test(value)
+}
+
+/** Minutes since midnight of a valid "HH:MM", else null. */
+export function timeMinutes(value: unknown): number | null {
+  if (!isTime(value)) return null
+  return Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5))
+}
+
+const EMAIL_LINK = /^mailto:[^\s@<>"'\\/?#]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/
+const HTTPS_URL = /^https:\/\/[^/\s\\<>"]/
+const HTTP_URL = /^https?:\/\/[^/\s\\<>"]/i
+
+/** Longest team link (backend rule). */
+export const TEAM_LINK_MAX = 255
+
+/**
+ * A team member's link by kind: `email` → `mailto:<address>` (a plain address, no query),
+ * `website` an absolute http(s) URL, the social kinds https only; at most 255 characters.
+ * Anything else is null.
+ */
+export function teamLinkUrl(kind: unknown, url: unknown): string | null {
+  if (typeof url !== 'string' || url.length > TEAM_LINK_MAX || /[\s<>"\\]/.test(url)) return null
+  if (kind === 'email') return EMAIL_LINK.test(url) ? url : null
+  if (kind === 'website') return HTTP_URL.test(url) ? url : null
+  if (!oneOf(kind, B8A_ENUMS.teamLinkKind)) return null
+  return HTTPS_URL.test(url) ? url : null
+}
+
+/** Whether a chart's `data_source` is one of the store counts (resolved into `data[id]`). */
+export function isStoreSource(value: unknown): value is 'store.products_per_category' | 'store.rating_breakdown' {
+  return value === 'store.products_per_category' || value === 'store.rating_breakdown'
+}
+
+/** A number with at most one decimal (progress values). */
+export function hasOneDecimal(value: unknown): value is number {
+  return isNumber(value) && Math.abs(Math.round(value * 10) - value * 10) < 1e-6
+}
+
+/** `columns` of team (base 2–4) and photo grid (base 3–6): base in range (else `fallback`); tablet / mobile 1…max when valid. */
+export function normalizeColumns(value: unknown, range: { min: number; max: number }, fallback: number): { base: number; tablet?: number; mobile?: number } {
+  const source = isObject(value) ? value : {}
+  const out: { base: number; tablet?: number; mobile?: number } = { base: isInt(source.base, range.min, range.max) ? source.base : fallback }
+  if (isInt(source.tablet, 1, range.max)) out.tablet = source.tablet
+  if (isInt(source.mobile, 1, range.max)) out.mobile = source.mobile
+  return out
+}
+
+function columnsProblems(problems: Problems, value: unknown, range: { min: number; max: number }) {
+  if (!isObject(value) || !isInt(value.base, range.min, range.max)) {
+    problems.push({ path: 'columns.base', code: isObject(value) && isNumber(value.base) ? 'out_of_range' : 'invalid' })
+    return
+  }
+  for (const device of ['tablet', 'mobile'] as const) {
+    const v = value[device]
+    if (v !== undefined && !isInt(v, 1, range.max)) problems.push({ path: `columns.${device}`, code: 'invalid' })
+  }
+}
+
+/** `null | {label, url}` with a safe url (B8a buttons). */
+function button(problems: Problems, path: string, value: unknown, max: number) {
+  if (value === null) return
+  if (!isObject(value)) {
+    problems.push({ path, code: 'invalid' })
+    return
+  }
+  text(problems, `${path}.label`, value.label, max, true)
+  if (!safeUrl(value.url)) problems.push({ path: `${path}.url`, code: 'invalid' })
+}
+
+function nullableUuid(problems: Problems, path: string, value: unknown) {
+  if (value !== null && !isUuid(value)) problems.push({ path, code: 'invalid' })
+}
+
+const WEEK = B8A_ENUMS.weekDay
+
+/**
+ * The client mirror of the server's B8a prop rules (empty = valid). Types this function does not
+ * know return []. `b6PropProblems` falls through to it, so existing callers check B8a types too.
+ */
+export function b8aPropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const T = B8A_TEXT_LIMITS
+  switch (type) {
+    case 'pricing_table':
+      list(problems, 'plans', p.plans, B8A_LIMITS.plans, (plan, at) => {
+        const L = T.pricing_table
+        text(problems, `${at}.name`, plan.name, L['plans.*.name'], true)
+        if (plan.price !== null && !isMoneyString(plan.price)) problems.push({ path: `${at}.price`, code: 'invalid' })
+        text(problems, `${at}.price_text`, plan.price_text, L['plans.*.price_text'])
+        text(problems, `${at}.period`, plan.period, L['plans.*.period'])
+        text(problems, `${at}.description`, plan.description, L['plans.*.description'])
+        list(problems, `${at}.features`, plan.features, B8A_LIMITS.planFeatures, (feature, f) => {
+          text(problems, `${f}.text`, feature.text, L['plans.*.features.*.text'], true)
+          flag(problems, `${f}.included`, feature.included)
+        })
+        button(problems, `${at}.button`, plan.button, L['plans.*.button.label'])
+        flag(problems, `${at}.highlighted`, plan.highlighted)
+        text(problems, `${at}.badge`, plan.badge, L['plans.*.badge'])
+      })
+      break
+    case 'before_after': {
+      const L = T.before_after
+      for (const side of ['before', 'after'] as const) {
+        const image = p[side]
+        if (!isObject(image)) problems.push({ path: side, code: 'invalid' })
+        else {
+          uuid(problems, `${side}.media_id`, image.media_id)
+          text(problems, `${side}.alt`, image.alt, L[`${side}.alt`])
+        }
+      }
+      text(problems, 'before_label', p.before_label, L.before_label)
+      text(problems, 'after_label', p.after_label, L.after_label)
+      int(problems, 'start', p.start, B8A_LIMITS.beforeAfterStart)
+      enumOf(problems, 'orientation', p.orientation, B8A_ENUMS.beforeAfterOrientation)
+      enumOf(problems, 'aspect', p.aspect, B8A_ENUMS.beforeAfterAspect)
+      break
+    }
+    case 'comparison_table': {
+      const L = T.comparison_table
+      const columnIds: string[] = []
+      list(problems, 'columns', p.columns, B8A_LIMITS.comparisonColumns, (column, at) => {
+        if (typeof column.id === 'string') columnIds.push(column.id)
+        text(problems, `${at}.title`, column.title, L['columns.*.title'], true)
+        nullableUuid(problems, `${at}.product_id`, column.product_id)
+        flag(problems, `${at}.highlighted`, column.highlighted)
+      })
+      list(problems, 'rows', p.rows, B8A_LIMITS.comparisonRows, (row, at) => {
+        text(problems, `${at}.label`, row.label, L['rows.*.label'], true)
+        if (!isObject(row.cells)) {
+          problems.push({ path: `${at}.cells`, code: 'invalid' })
+          return
+        }
+        const cells = row.cells
+        for (const key of Object.keys(cells)) if (!columnIds.includes(key)) problems.push({ path: `${at}.cells.${key}`, code: 'invalid' })
+        for (const id of columnIds) {
+          const cell = cells[id]
+          if (!isObject(cell)) {
+            problems.push({ path: `${at}.cells.${id}`, code: 'required' })
+            continue
+          }
+          enumOf(problems, `${at}.cells.${id}.kind`, cell.kind, B8A_ENUMS.comparisonCell)
+          text(problems, `${at}.cells.${id}.text`, cell.text, L['rows.*.cells.*.text'])
+        }
+      })
+      flag(problems, 'show_prices', p.show_prices)
+      flag(problems, 'show_buttons', p.show_buttons)
+      break
+    }
+    case 'flash_sale_bar':
+      nullableUuid(problems, 'promotion_id', p.promotion_id)
+      text(problems, 'title', p.title, T.flash_sale_bar.title)
+      text(problems, 'text', p.text, T.flash_sale_bar.text)
+      flag(problems, 'show_products', p.show_products)
+      int(problems, 'product_limit', p.product_limit, B8A_LIMITS.flashSaleProducts)
+      enumOf(problems, 'style', p.style, B8A_ENUMS.flashSaleStyle)
+      button(problems, 'button', p.button, T.flash_sale_bar['button.label'])
+      break
+    case 'bundle': {
+      const products = new Set<string>()
+      list(problems, 'items', p.items, B8A_LIMITS.bundleItems, (item, at) => {
+        uuid(problems, `${at}.product_id`, item.product_id)
+        if (isUuid(item.product_id)) {
+          if (products.has(item.product_id)) problems.push({ path: `${at}.product_id`, code: 'duplicate' })
+          products.add(item.product_id)
+        }
+      })
+      text(problems, 'title', p.title, T.bundle.title)
+      text(problems, 'text', p.text, T.bundle.text)
+      text(problems, 'button_label', p.button_label, T.bundle.button_label)
+      break
+    }
+    case 'team':
+      list(problems, 'members', p.members, B8A_LIMITS.teamMembers, (member, at) => {
+        const L = T.team
+        nullableUuid(problems, `${at}.media_id`, member.media_id)
+        text(problems, `${at}.name`, member.name, L['members.*.name'], true)
+        text(problems, `${at}.role`, member.role, L['members.*.role'])
+        text(problems, `${at}.bio`, member.bio, L['members.*.bio'])
+        list(problems, `${at}.links`, member.links, B8A_LIMITS.teamLinks, (item, l) => {
+          enumOf(problems, `${l}.kind`, item.kind, B8A_ENUMS.teamLinkKind)
+          if (oneOf(item.kind, B8A_ENUMS.teamLinkKind) && !teamLinkUrl(item.kind, item.url)) problems.push({ path: `${l}.url`, code: 'invalid' })
+        })
+      })
+      columnsProblems(problems, p.columns, B8A_LIMITS.teamColumns)
+      enumOf(problems, 'style', p.style, B8A_ENUMS.teamStyle)
+      break
+    case 'review_wall':
+      enumOf(problems, 'source', p.source, B8A_ENUMS.reviewSource)
+      if (p.source === 'product') uuid(problems, 'product_id', p.product_id)
+      else nullableUuid(problems, 'product_id', p.product_id)
+      int(problems, 'min_rating', p.min_rating, B8A_LIMITS.reviewMinRating)
+      int(problems, 'limit', p.limit, B8A_LIMITS.reviewLimit)
+      enumOf(problems, 'layout', p.layout, B8A_ENUMS.reviewLayout)
+      flag(problems, 'show_product', p.show_product)
+      flag(problems, 'show_summary', p.show_summary)
+      text(problems, 'title', p.title, T.review_wall.title)
+      break
+    case 'photo_grid':
+      list(problems, 'images', p.images, B8A_LIMITS.photoImages, (image, at) => {
+        uuid(problems, `${at}.media_id`, image.media_id)
+        text(problems, `${at}.alt`, image.alt, T.photo_grid['images.*.alt'])
+        link(problems, `${at}.link`, image.link)
+      })
+      columnsProblems(problems, p.columns, B8A_LIMITS.photoColumns)
+      enumOf(problems, 'gap', p.gap, B8A_ENUMS.photoGap)
+      if (p.profile !== null) {
+        if (!isObject(p.profile)) problems.push({ path: 'profile', code: 'invalid' })
+        else {
+          text(problems, 'profile.label', p.profile.label, T.photo_grid['profile.label'], true)
+          if (!safeUrl(p.profile.url)) problems.push({ path: 'profile.url', code: 'invalid' })
+        }
+      }
+      enumOf(problems, 'hover', p.hover, B8A_ENUMS.photoHover)
+      break
+    case 'store_hours':
+      if (!Array.isArray(p.days)) problems.push({ path: 'days', code: 'invalid' })
+      else if (p.days.length !== WEEK.length) problems.push({ path: 'days', code: p.days.length < WEEK.length ? 'too_few' : 'too_many' })
+      else
+        p.days.forEach((day: unknown, i: number) => {
+          const at = `days.${i}`
+          if (!isObject(day)) {
+            problems.push({ path: at, code: 'invalid' })
+            return
+          }
+          if (day.day !== WEEK[i]) problems.push({ path: `${at}.day`, code: 'invalid' })
+          flag(problems, `${at}.closed`, day.closed)
+          if (!isTime(day.open)) problems.push({ path: `${at}.open`, code: 'invalid' })
+          if (!isTime(day.close)) problems.push({ path: `${at}.close`, code: 'invalid' })
+        })
+      text(problems, 'title', p.title, T.store_hours.title)
+      text(problems, 'note', p.note, T.store_hours.note)
+      flag(problems, 'show_open_now', p.show_open_now)
+      flag(problems, 'highlight_today', p.highlight_today)
+      enumOf(problems, 'week_starts', p.week_starts, B8A_ENUMS.weekStarts)
+      break
+    case 'progress_bars':
+      list(problems, 'items', p.items, B8A_LIMITS.progressItems, (item, at) => {
+        text(problems, `${at}.label`, item.label, T.progress_bars['items.*.label'], true)
+        if (!hasOneDecimal(item.value) || item.value < B8A_LIMITS.progressValue.min || item.value > B8A_LIMITS.progressValue.max)
+          problems.push({ path: `${at}.value`, code: isNumber(item.value) ? 'out_of_range' : 'invalid' })
+      })
+      enumOf(problems, 'style', p.style, B8A_ENUMS.progressStyle)
+      flag(problems, 'show_value', p.show_value)
+      flag(problems, 'animate', p.animate)
+      break
+    default:
       return []
   }
   return problems
+}
+
+/** Every problem with an element's props, B6 and B8a rules (empty = valid; unknown types []). */
+export function elementPropProblems(type: string, props: unknown): PropProblem[] {
+  return b6PropProblems(type, props)
 }

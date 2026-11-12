@@ -22,6 +22,9 @@ use Illuminate\Support\Facades\Validator;
  * sections may set `sticky` (at most one per document; pages, CMS pages and zones) and
  * `shape_top` / `shape_bottom` dividers — kept only when set, so older documents normalize
  * unchanged; sections and inner rows may have a `background.video` (StyleSchema).
+ *
+ * B8a: the B8a elements' props (B8ElementProps) with nested list translations
+ * (`plans.<plan id>.features.<feature id>.text`, `rows.<row id>.cells.<column id>.text`).
  */
 final class BuilderDocumentSchema
 {
@@ -597,6 +600,9 @@ final class BuilderDocumentSchema
         }
         if (in_array($type, ElementRegistry::B6, true)) {
             return (new B6ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
+        }
+        if (in_array($type, ElementRegistry::B8A, true)) {
+            return (new B8ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
         }
 
         // Optional texts (alt, html) may arrive as null (empty strings become null on input).

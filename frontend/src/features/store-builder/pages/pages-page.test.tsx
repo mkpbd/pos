@@ -18,6 +18,8 @@ const landing: DocumentSummary = {
   ...home, id: 'd-eid', key: 'landing:eid-sale', title: 'Eid sale', has_unpublished_changes: true, published: null, path: '/p/eid-sale', preview_url: 'https://shop.test/p/eid-sale?preview=draft',
 }
 
+beforeEach(() => window.localStorage.clear())
+
 describe('page builder: pages list', () => {
   it('shows the home page and landing pages with their status, edit and view links', async () => {
     mockApi({ 'GET /auth/me': ok(manager()), 'GET /storefront/builder/documents': ok([home, landing]) })
@@ -68,8 +70,8 @@ describe('page builder: pages list', () => {
       },
     })
     renderRoutes(routes, '/storefront/pages')
-    await user.click(await screen.findByRole('button', { name: 'New landing page' }))
-    const dialog = await screen.findByRole('dialog', { name: 'New landing page' })
+    await user.click(await screen.findByRole('button', { name: 'New campaign page' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New campaign page' })
     await user.type(within(dialog).getByLabelText('Title'), 'Eid Sale 2026!')
     expect(within(dialog).getByText('/p/eid-sale-2026')).toBeInTheDocument()
 
@@ -106,7 +108,7 @@ describe('page builder: pages list', () => {
     mockApi({ 'GET /auth/me': ok(viewer()), 'GET /storefront/builder/documents': ok([landing]) })
     renderRoutes(routes, '/storefront/pages')
     expect(await screen.findByText('Eid sale')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'New landing page' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New campaign page' })).toBeNull()
     expect(screen.queryByRole('link', { name: /^Edit/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Copy my current homepage' })).toBeNull()
   })
@@ -161,9 +163,9 @@ describe('page builder: B4 groups', () => {
     })
     renderRoutes(routes, '/storefront/pages')
 
-    expect(await screen.findByRole('heading', { name: 'Pages', level: 2 })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Site parts', level: 2 })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Shop and product pages', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your pages', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Header & footer', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Shop pages', level: 2 })).toBeInTheDocument()
 
     const about = await screen.findByTestId(`page-row-cms:${ABOUT}`)
     expect(within(about).getByText(/Designed with the builder/)).toBeInTheDocument()
@@ -176,16 +178,17 @@ describe('page builder: B4 groups', () => {
     expect(within(faq).getByRole('button', { name: 'Design Questions with the builder' })).toBeInTheDocument()
 
     const header = screen.getByTestId('page-row-header')
-    expect(within(header).getByText(/Using the theme’s header/)).toBeInTheDocument()
+    expect(within(header).getByText(/Using the standard header/)).toBeInTheDocument()
     expect(within(header).getByRole('button', { name: 'Design the header' })).toBeInTheDocument()
     const footer = screen.getByTestId('page-row-footer')
     expect(within(footer).getByText(/Published v3/)).toBeInTheDocument()
     expect(within(footer).getByRole('link', { name: 'Edit the footer' })).toBeInTheDocument()
-    expect(within(footer).getByRole('button', { name: 'Use the theme’s footer' })).toBeInTheDocument()
+    expect(within(footer).getByRole('button', { name: 'Use the standard footer' })).toBeInTheDocument()
 
     expect(within(screen.getByTestId('page-row-zone:listing.top')).getByText('Not published')).toBeInTheDocument()
-    expect(within(screen.getByTestId('page-row-zone:listing.bottom')).getByRole('button', { name: 'Create Listing bottom' })).toBeInTheDocument()
-    expect(within(screen.getByTestId('page-row-zone:product.after')).getByRole('button', { name: 'Create Product page' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-row-zone:listing.top')).getByText('Top of shop pages')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-row-zone:listing.bottom')).getByRole('button', { name: 'Add content: Bottom of shop pages' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-row-zone:product.after')).getByRole('button', { name: 'Add content: Under product details' })).toBeInTheDocument()
   })
 
   it('designs a CMS page with the builder (from: cms) and the header from the current one', async () => {
@@ -241,12 +244,12 @@ describe('page builder: B4 groups', () => {
     await user.click(within(confirm).getByRole('button', { name: 'Use the classic page' }))
     await waitFor(() => expect(within(screen.getByTestId(`page-row-cms:${ABOUT}`)).getByRole('button', { name: 'Design About us with the builder' })).toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: 'Use the theme’s footer' }))
-    await user.click(within(await screen.findByRole('alertdialog', { name: 'Use the theme’s footer?' })).getByRole('button', { name: 'Use the theme’s footer' }))
+    await user.click(screen.getByRole('button', { name: 'Use the standard footer' }))
+    await user.click(within(await screen.findByRole('alertdialog', { name: 'Use the standard footer?' })).getByRole('button', { name: 'Use the standard footer' }))
     await waitFor(() => expect(within(screen.getByTestId('page-row-footer')).getByRole('button', { name: 'Design the footer' })).toBeInTheDocument())
     expect(deleted).toEqual(['d-about', 'd-footer'])
 
-    await user.click(screen.getByRole('button', { name: 'Create Listing bottom' }))
+    await user.click(screen.getByRole('button', { name: 'Add content: Bottom of shop pages' }))
     await waitFor(() => expect(created).toEqual({ kind: 'zone', key: 'zone:listing.bottom', title: 'Listing bottom', from: 'blank' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/storefront/builder/d-bottom'))
   })
@@ -262,8 +265,8 @@ describe('page builder: B4 groups', () => {
     expect(await screen.findByTestId(`page-row-cms:${ABOUT}`)).toHaveTextContent('/pages/about')
     expect(screen.queryByRole('link', { name: 'Manage pages' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Design/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /theme’s footer/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /^Create/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /standard footer/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Add content/ })).toBeNull()
   })
 
   it('products per row: shows today’s grid by default, saves to the theme draft and publishes', async () => {

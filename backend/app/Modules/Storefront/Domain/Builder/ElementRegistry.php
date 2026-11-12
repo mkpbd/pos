@@ -36,6 +36,13 @@ final class ElementRegistry
         'marquee',
     ];
 
+    /** B8a elements (selling blocks, trust & people, visualization), defined by the builder too. */
+    public const B8A = [
+        'pricing_table', 'before_after', 'comparison_table', 'flash_sale_bar', 'bundle',
+        'team', 'review_wall', 'photo_grid', 'store_hours',
+        'progress_bars',
+    ];
+
     /**
      * B4: the document contexts an element can be placed in: home / landing pages, CMS pages
      * (`cms:<uuid>`), the store header and footer, and the shop / product zones.
@@ -46,10 +53,17 @@ final class ElementRegistry
      * B4: elements whose render payload carries `data[id]` (besides the wrapped sections); in a
      * published payload such an element without data is left out.
      */
-    public const DATA_TYPES = ['countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'category_card', 'product_spotlight', 'shop_the_look'];
+    public const DATA_TYPES = [
+        'countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'category_card', 'product_spotlight', 'shop_the_look',
+        // B8a.
+        'comparison_table', 'flash_sale_bar', 'bundle', 'review_wall', 'store_hours',
+    ];
 
-    /** B4: elements the canvas resolver accepts besides wrapped sections (contact_form resolves to no data). */
-    public const RESOLVABLE = [...self::DATA_TYPES, 'contact_form'];
+    /**
+     * B4: elements the canvas resolver accepts besides wrapped sections (contact_form resolves
+     * to no data; B8a: a chart has data only with a store `data_source`).
+     */
+    public const RESOLVABLE = [...self::DATA_TYPES, 'contact_form', 'chart'];
 
     /**
      * B4: the storefront icon set (icon element `name`): the features-strip icons plus contact and
@@ -115,6 +129,44 @@ final class ElementRegistry
         'shop_the_look.hotspots' => [1, 8],
         'trust_badges.items' => [1, 6],
         'marquee.items' => [1, 10],
+        // B8a (nested lists: `<element>.<list>.<nested list>`).
+        'pricing_table.plans' => [1, 4],
+        'pricing_table.plans.features' => [0, 12],
+        'comparison_table.columns' => [2, 4],
+        'comparison_table.rows' => [1, 20],
+        'bundle.items' => [2, 4],
+        'team.members' => [1, 12],
+        'team.members.links' => [0, 5],
+        'photo_grid.images' => [3, 24],
+        'store_hours.days' => [7, 7],
+        'progress_bars.items' => [1, 10],
+    ];
+
+    /**
+     * B8a: text limits of the B8a elements' list item fields and nested props
+     * (`<element>.<path>`, characters; translatable ones are in TRANSLATABLE /
+     * LIST_TRANSLATABLE / NESTED_LIST_TRANSLATABLE too).
+     */
+    public const B8A_TEXT_LIMITS = [
+        'pricing_table.plans.name' => 60, 'pricing_table.plans.price_text' => 24, 'pricing_table.plans.period' => 24,
+        'pricing_table.plans.description' => 200, 'pricing_table.plans.badge' => 24, 'pricing_table.plans.button.label' => 30,
+        'pricing_table.plans.features.text' => 120,
+        'before_after.before.alt' => 200, 'before_after.after.alt' => 200,
+        'comparison_table.columns.title' => 60, 'comparison_table.rows.label' => 80, 'comparison_table.rows.cells.text' => 60,
+        'flash_sale_bar.button.label' => 30,
+        'team.members.name' => 80, 'team.members.role' => 80, 'team.members.bio' => 300, 'team.members.links.url' => 255,
+        'photo_grid.images.alt' => 200, 'photo_grid.profile.label' => 60,
+        'progress_bars.items.label' => 60,
+    ];
+
+    /**
+     * B8a: translatable fields in nested lists or in objects inside list items, as patterns
+     * where `*` stands for an item id (or, in `cells`, a column id): the stored key replaces it
+     * (`plans.p1.features.f2.text`, `rows.r1.cells.c2.text`, `plans.p1.button.label`).
+     */
+    public const NESTED_LIST_TRANSLATABLE = [
+        'pricing_table' => ['plans.*.button.label' => 30, 'plans.*.features.*.text' => 120],
+        'comparison_table' => ['rows.*.cells.*.text' => 60],
     ];
 
     /**
@@ -152,6 +204,12 @@ final class ElementRegistry
         'logo_carousel' => ['logos' => ['alt' => 200]],
         'trust_badges' => ['items' => ['title' => 60, 'text' => 120]],
         'marquee' => ['items' => ['text' => 120]],
+        // B8a.
+        'pricing_table' => ['plans' => ['name' => 60, 'price_text' => 24, 'period' => 24, 'description' => 200, 'badge' => 24]],
+        'comparison_table' => ['columns' => ['title' => 60], 'rows' => ['label' => 80]],
+        'team' => ['members' => ['role' => 80, 'bio' => 300]],
+        'photo_grid' => ['images' => ['alt' => 200]],
+        'progress_bars' => ['items' => ['label' => 60]],
     ];
 
     /**
@@ -182,7 +240,22 @@ final class ElementRegistry
 
     public const STEPS_LAYOUTS = ['horizontal', 'vertical'];
 
-    public const CHART_KINDS = ['bar', 'column', 'line', 'area', 'pie', 'donut'];
+    /** B8a: `stacked-column` and `stacked-bar` added. */
+    public const CHART_KINDS = ['bar', 'column', 'line', 'area', 'pie', 'donut', 'stacked-column', 'stacked-bar'];
+
+    /** B8a: stacked kinds take 2–6 series of non-negative values. */
+    public const CHART_STACKED_KINDS = ['stacked-column', 'stacked-bar'];
+
+    public const CHART_STACKED_SERIES = [2, 6];
+
+    /**
+     * B8a: where a chart's numbers come from — typed in (`manual`), or public-safe counts from
+     * the store (rendered from `data[id]`, never sales, revenue, order or customer numbers).
+     */
+    public const CHART_DATA_SOURCES = ['manual', 'store.products_per_category', 'store.rating_breakdown'];
+
+    /** B8a: a products-per-category chart shows at most this many categories (pie / donut: CHART_PIE_LABELS). */
+    public const CHART_STORE_CATEGORIES = 12;
 
     /** Pie and donut charts: exactly one series and at most this many labels. */
     public const CHART_PIE_LABELS = 8;
@@ -223,6 +296,56 @@ final class ElementRegistry
 
     public const MARQUEE_SEPARATORS = ['dot', 'star', 'leaf', 'none'];
 
+    /** B8a: a price (NUMERIC string, ≥ 0, at most 12 digits and 2 decimals). */
+    public const MONEY_PATTERN = '^\d{1,12}(\.\d{1,2})?$';
+
+    public const BEFORE_AFTER_ORIENTATIONS = ['horizontal', 'vertical'];
+
+    public const BEFORE_AFTER_ASPECTS = ['1:1', '4:3', '3:2', '16:9'];
+
+    /** B8a: the before / after handle's start position, percent. */
+    public const BEFORE_AFTER_START = [0, 100];
+
+    public const COMPARISON_CELL_KINDS = ['yes', 'no', 'text'];
+
+    public const FLASH_SALE_STYLES = ['bar', 'card'];
+
+    public const FLASH_SALE_PRODUCT_LIMIT = [2, 8];
+
+    public const TEAM_COLUMNS = ['base' => [2, 4], 'tablet' => [1, 4], 'mobile' => [1, 4]];
+
+    public const TEAM_STYLES = ['card', 'plain', 'circle'];
+
+    /** B8a: a team member's links (email: `mailto:`; website: http(s); the others: https only). */
+    public const TEAM_LINK_KINDS = ['facebook', 'instagram', 'linkedin', 'x', 'youtube', 'tiktok', 'website', 'email'];
+
+    public const REVIEW_SOURCES = ['latest', 'top_rated', 'product'];
+
+    public const REVIEW_LAYOUTS = ['grid', 'carousel'];
+
+    public const REVIEW_MIN_RATING = [1, 5];
+
+    public const REVIEW_LIMIT = [3, 12];
+
+    /** B8a: a review's body in a review wall, characters (cut with an ellipsis). */
+    public const REVIEW_BODY_MAX = 600;
+
+    public const PHOTO_GRID_COLUMNS = ['base' => [3, 6], 'tablet' => [1, 6], 'mobile' => [1, 6]];
+
+    public const PHOTO_GRID_GAPS = ['none', 'sm', 'md'];
+
+    public const PHOTO_GRID_HOVERS = ['none', 'zoom', 'overlay'];
+
+    /** B8a: store hours days, always stored in this order. */
+    public const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+    public const WEEK_STARTS = ['sat', 'sun', 'mon'];
+
+    /** B8a: an opening or closing time. */
+    public const TIME_PATTERN = '^([01]\d|2[0-3]):[0-5]\d$';
+
+    public const PROGRESS_STYLES = ['bar', 'ring'];
+
     /**
      * B4: translatable props of the B4 elements with their maximum length (the base prop has the
      * same limit). `cta`'s button labels are nested props (see TRANSLATION_PATHS).
@@ -249,11 +372,22 @@ final class ElementRegistry
         'product_spotlight' => ['badge' => 24],
         'shop_the_look' => ['alt' => 200, 'title' => 120],
         'recently_viewed' => ['title' => 120],
+        // B8a (list items: LIST_TRANSLATABLE / NESTED_LIST_TRANSLATABLE; nested props: TRANSLATION_PATHS).
+        'before_after' => ['before_label' => 24, 'after_label' => 24, 'before.alt' => 200, 'after.alt' => 200],
+        'flash_sale_bar' => ['title' => 80, 'text' => 160, 'button.label' => 30],
+        'bundle' => ['title' => 80, 'text' => 200, 'button_label' => 30],
+        'review_wall' => ['title' => 120],
+        'photo_grid' => ['profile.label' => 60],
+        'store_hours' => ['title' => 80, 'note' => 200],
     ];
 
     /** Translatable fields stored in a nested prop (dot keys in `translations`): field => [prop, key]. */
     public const TRANSLATION_PATHS = [
         'cta' => ['primary.label' => ['primary', 'label'], 'secondary.label' => ['secondary', 'label']],
+        // B8a.
+        'before_after' => ['before.alt' => ['before', 'alt'], 'after.alt' => ['after', 'alt']],
+        'flash_sale_bar' => ['button.label' => ['button', 'label']],
+        'photo_grid' => ['profile.label' => ['profile', 'label']],
     ];
 
     public const HEADING_LEVELS = [1, 6];
@@ -285,7 +419,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A];
     }
 
     public static function exists(mixed $type): bool
@@ -298,7 +432,9 @@ final class ElementRegistry
      */
     public static function sectionType(string $type): ?SectionType
     {
-        return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) ? null : SectionType::tryFrom($type);
+        return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true)
+            ? null
+            : SectionType::tryFrom($type);
     }
 
     /**
@@ -307,6 +443,18 @@ final class ElementRegistry
     public static function hasData(string $type): bool
     {
         return in_array($type, self::DATA_TYPES, true) || self::sectionType($type) !== null;
+    }
+
+    /**
+     * B8a: whether an element with these (normalized) props gets `data[id]` from
+     * BuilderElementData: the DATA_TYPES, and a chart with a store `data_source`.
+     *
+     * @param  array<string, mixed>  $props
+     */
+    public static function needsData(string $type, array $props): bool
+    {
+        return in_array($type, self::DATA_TYPES, true)
+            || ($type === 'chart' && ($props['data_source'] ?? 'manual') !== 'manual');
     }
 
     /**
@@ -322,7 +470,7 @@ final class ElementRegistry
             'social_icons', 'contact_block', 'custom_html', 'icon_list', 'marquee' => self::CONTEXTS,
             'search_box' => ['page', 'cms', 'zone', 'header'],
             'payment_icons', 'newsletter_form',
-            'accordion', 'icon_box', 'logo_carousel', 'map', 'trust_badges' => ['page', 'cms', 'zone', 'footer'],
+            'accordion', 'icon_box', 'logo_carousel', 'map', 'trust_badges', 'store_hours' => ['page', 'cms', 'zone', 'footer'],
             'logo', 'menu', 'language_switch' => ['header', 'footer'],
             'account_link', 'wishlist_link', 'cart_icon', 'announcement' => ['header'],
             'copyright' => ['footer'],
@@ -338,10 +486,12 @@ final class ElementRegistry
             'spacer', 'divider', 'inner_row' => 'layout',
             'heading', 'text', 'image', 'button', 'rich_text', 'blog_posts',
             'video', 'icon', 'cta', 'custom_html', 'faq_list', 'contact_form',
-            'accordion', 'tabs', 'icon_box', 'icon_list', 'quote', 'notice', 'counter', 'steps', 'chart' => 'content',
-            'gallery', 'image_carousel', 'logo_carousel', 'map' => 'media',
+            'accordion', 'tabs', 'icon_box', 'icon_list', 'quote', 'notice', 'counter', 'steps', 'chart',
+            'team', 'store_hours', 'progress_bars' => 'content',
+            'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
-            'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed' => 'commerce',
+            'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
+            'pricing_table', 'comparison_table', 'bundle' => 'commerce',
             'logo', 'menu', 'account_link', 'wishlist_link', 'cart_icon', 'language_switch', 'announcement',
             'social_icons', 'payment_icons', 'contact_block', 'copyright' => 'site',
             default => 'marketing',
@@ -399,6 +549,16 @@ final class ElementRegistry
             'trust_badges' => 'Trust badges',
             'recently_viewed' => 'Recently viewed',
             'marquee' => 'Scrolling text',
+            'pricing_table' => 'Pricing table',
+            'before_after' => 'Before / after',
+            'comparison_table' => 'Comparison table',
+            'flash_sale_bar' => 'Flash sale bar',
+            'bundle' => 'Bundle',
+            'team' => 'Team',
+            'review_wall' => 'Review wall',
+            'photo_grid' => 'Photo grid',
+            'store_hours' => 'Store hours',
+            'progress_bars' => 'Progress bars',
             default => SectionType::from($type)->label(),
         };
     }
@@ -506,8 +666,60 @@ final class ElementRegistry
                 $fields["{$list}.{$index}"] = $max;
             }
         }
+        // B8a: nested lists and objects inside list items.
+        foreach (self::nestedTargets($type, $props) as $key => ['max' => $max]) {
+            $fields[$key] = $max;
+        }
 
         return $fields;
+    }
+
+    /**
+     * B8a: the stored keys of NESTED_LIST_TRANSLATABLE fields that exist in these props, with
+     * where each points (`[list, index, …, field]`) and its maximum length.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array<string, array{path: list<string|int>, max: int}>
+     */
+    public static function nestedTargets(string $type, array $props): array
+    {
+        $result = [];
+        foreach (self::NESTED_LIST_TRANSLATABLE[$type] ?? [] as $pattern => $max) {
+            $expand = function (array $segments, mixed $value, array $key, array $path) use (&$expand, &$result, $max): void {
+                if ($segments === []) {
+                    return;
+                }
+                $segment = array_shift($segments);
+                if (! is_array($value)) {
+                    return;
+                }
+                if ($segment !== '*') {
+                    if (! array_key_exists($segment, $value)) {
+                        return;
+                    }
+                    if ($segments === []) {
+                        if (is_string($value[$segment])) {
+                            $result[implode('.', [...$key, $segment])] = ['path' => [...$path, $segment], 'max' => $max];
+                        }
+
+                        return;
+                    }
+                    $expand($segments, $value[$segment], [...$key, $segment], [...$path, $segment]);
+
+                    return;
+                }
+                // A list of items with ids, or a map keyed by id (comparison cells).
+                foreach ($value as $index => $item) {
+                    $id = array_is_list($value) ? (is_array($item) && is_string($item['id'] ?? null) ? $item['id'] : null) : (string) $index;
+                    if ($id !== null && $id !== '') {
+                        $expand($segments, $item, [...$key, $id], [...$path, $index]);
+                    }
+                }
+            };
+            $expand(explode('.', $pattern), $props, [], []);
+        }
+
+        return $result;
     }
 
     /**
@@ -527,6 +739,8 @@ final class ElementRegistry
         foreach (array_keys(self::STRING_LIST_TRANSLATABLE[$type] ?? []) as $list) {
             $patterns[] = "{$list}.*";
         }
+        // B8a.
+        array_push($patterns, ...array_keys(self::NESTED_LIST_TRANSLATABLE[$type] ?? []));
 
         return $patterns;
     }
@@ -561,6 +775,9 @@ final class ElementRegistry
         if (count($parts) === 2 && isset(self::STRING_LIST_TRANSLATABLE[$type][$list]) && ctype_digit($parts[1]) && array_key_exists((int) $parts[1], is_array($props[$list] ?? null) ? $props[$list] : [])) {
             return [$list, (int) $parts[1]];
         }
+        if (isset(self::NESTED_LIST_TRANSLATABLE[$type])) {
+            return self::nestedTargets($type, $props)[$field]['path'] ?? null;
+        }
 
         return null;
     }
@@ -578,6 +795,10 @@ final class ElementRegistry
             'image', 'category_card', 'shop_the_look' => [$props['media_id'] ?? null],
             'gallery', 'image_carousel' => array_column(is_array($props['images'] ?? null) ? $props['images'] : [], 'media_id'),
             'logo_carousel' => array_column(is_array($props['logos'] ?? null) ? $props['logos'] : [], 'media_id'),
+            // B8a: before / after photos, team portraits and the photo grid.
+            'before_after' => [$props['before']['media_id'] ?? null, $props['after']['media_id'] ?? null],
+            'team' => array_column(is_array($props['members'] ?? null) ? $props['members'] : [], 'media_id'),
+            'photo_grid' => array_column(is_array($props['images'] ?? null) ? $props['images'] : [], 'media_id'),
             default => [],
         };
 
@@ -686,6 +907,9 @@ final class ElementRegistry
                 'show_legend' => true,
                 'show_table' => false,
                 'height' => 320,
+                // B8a.
+                'data_source' => 'manual',
+                'source_product_id' => null,
             ],
             'gallery' => ['images' => [], 'columns' => ['base' => 3, 'tablet' => 3, 'mobile' => 2], 'aspect' => 'square', 'lightbox' => true, 'gap' => 'md'],
             'image_carousel' => ['images' => [], 'autoplay' => 0, 'show_dots' => true, 'show_arrows' => true, 'aspect' => '16:9'],
@@ -711,6 +935,108 @@ final class ElementRegistry
                 'speed' => 'normal',
                 'direction' => 'left',
                 'separator' => 'dot',
+            ],
+            // B8a. Before / after, comparison products (optional), bundle, review wall from a
+            // product and the photo grid need content before they are valid (setup dialogs).
+            'pricing_table' => [
+                'plans' => [
+                    [
+                        'id' => 'p1', 'name' => 'Basic', 'price' => null, 'price_text' => 'Free', 'period' => '',
+                        'description' => 'Everything you need to start.',
+                        'features' => [
+                            ['id' => 'f1', 'text' => 'Delivery inside Dhaka', 'included' => true],
+                            ['id' => 'f2', 'text' => 'Gift wrapping', 'included' => false],
+                        ],
+                        'button' => ['label' => 'Get started', 'url' => '/shop'],
+                        'highlighted' => false,
+                        'badge' => '',
+                    ],
+                    [
+                        'id' => 'p2', 'name' => 'Plus', 'price' => '499.00', 'price_text' => '', 'period' => '/month',
+                        'description' => 'For regular shoppers.',
+                        'features' => [
+                            ['id' => 'f1', 'text' => 'Free delivery everywhere', 'included' => true],
+                            ['id' => 'f2', 'text' => 'Gift wrapping', 'included' => true],
+                        ],
+                        'button' => ['label' => 'Choose Plus', 'url' => '/shop'],
+                        'highlighted' => true,
+                        'badge' => 'Popular',
+                    ],
+                ],
+            ],
+            'before_after' => [
+                'before' => ['media_id' => null, 'alt' => ''],
+                'after' => ['media_id' => null, 'alt' => ''],
+                'before_label' => 'Before',
+                'after_label' => 'After',
+                'start' => 50,
+                'orientation' => 'horizontal',
+                'aspect' => '4:3',
+            ],
+            'comparison_table' => [
+                'columns' => [
+                    ['id' => 'c1', 'title' => 'Standard', 'product_id' => null, 'highlighted' => false],
+                    ['id' => 'c2', 'title' => 'Premium', 'product_id' => null, 'highlighted' => true],
+                ],
+                'rows' => [
+                    ['id' => 'r1', 'label' => 'Free delivery', 'cells' => ['c1' => ['kind' => 'no', 'text' => ''], 'c2' => ['kind' => 'yes', 'text' => '']]],
+                    ['id' => 'r2', 'label' => 'Warranty', 'cells' => ['c1' => ['kind' => 'text', 'text' => '6 months'], 'c2' => ['kind' => 'text', 'text' => '1 year']]],
+                ],
+                'show_prices' => true,
+                'show_buttons' => true,
+            ],
+            'flash_sale_bar' => [
+                'promotion_id' => null,
+                'title' => 'Flash sale',
+                'text' => '',
+                'show_products' => true,
+                'product_limit' => 4,
+                'style' => 'bar',
+                'button' => ['label' => 'Shop the sale', 'url' => '/shop'],
+            ],
+            'bundle' => ['items' => [], 'title' => 'Frequently bought together', 'text' => '', 'button_label' => 'Add all to cart'],
+            'team' => [
+                'members' => [
+                    ['id' => 'm1', 'media_id' => null, 'name' => 'Your name', 'role' => 'Founder', 'bio' => '', 'links' => []],
+                    ['id' => 'm2', 'media_id' => null, 'name' => 'A team member', 'role' => 'Customer care', 'bio' => '', 'links' => []],
+                ],
+                'columns' => ['base' => 3, 'tablet' => 2, 'mobile' => 1],
+                'style' => 'card',
+            ],
+            'review_wall' => [
+                'source' => 'latest',
+                'product_id' => null,
+                'min_rating' => 4,
+                'limit' => 6,
+                'layout' => 'grid',
+                'show_product' => true,
+                'show_summary' => true,
+                'title' => 'What our customers say',
+            ],
+            'photo_grid' => [
+                'images' => [],
+                'columns' => ['base' => 6, 'tablet' => 3, 'mobile' => 3],
+                'gap' => 'sm',
+                'profile' => null,
+                'hover' => 'zoom',
+            ],
+            'store_hours' => [
+                'days' => array_map(fn (string $day) => ['day' => $day, 'closed' => false, 'open' => $day === 'fri' ? '15:00' : '10:00', 'close' => '21:00'], self::WEEKDAYS),
+                'title' => 'Opening hours',
+                'note' => '',
+                'show_open_now' => true,
+                'highlight_today' => true,
+                'week_starts' => 'sat',
+            ],
+            'progress_bars' => [
+                'items' => [
+                    ['id' => 'i1', 'label' => 'Happy customers', 'value' => 98],
+                    ['id' => 'i2', 'label' => 'Orders delivered on time', 'value' => 95],
+                    ['id' => 'i3', 'label' => 'Products made locally', 'value' => 80],
+                ],
+                'style' => 'bar',
+                'show_value' => true,
+                'animate' => true,
             ],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
@@ -792,7 +1118,24 @@ final class ElementRegistry
                 'motion_delay' => ['min' => StyleSchema::MOTION_DELAY[0], 'max' => StyleSchema::MOTION_DELAY[1]],
                 'shape_height' => ['min' => BuilderDocumentSchema::SHAPE_HEIGHT[0], 'max' => BuilderDocumentSchema::SHAPE_HEIGHT[1]],
                 'sticky_sections' => 1,
+                // B8a.
+                'b8a_text' => self::B8A_TEXT_LIMITS,
+                'nested_list_translatable' => self::NESTED_LIST_TRANSLATABLE,
+                'money_pattern' => self::MONEY_PATTERN,
+                'time_pattern' => self::TIME_PATTERN,
+                'before_after_start' => ['min' => self::BEFORE_AFTER_START[0], 'max' => self::BEFORE_AFTER_START[1]],
+                'flash_sale_product_limit' => ['min' => self::FLASH_SALE_PRODUCT_LIMIT[0], 'max' => self::FLASH_SALE_PRODUCT_LIMIT[1]],
+                'team_columns' => array_map(fn (array $r) => ['min' => $r[0], 'max' => $r[1]], self::TEAM_COLUMNS),
+                'review_min_rating' => ['min' => self::REVIEW_MIN_RATING[0], 'max' => self::REVIEW_MIN_RATING[1]],
+                'review_limit' => ['min' => self::REVIEW_LIMIT[0], 'max' => self::REVIEW_LIMIT[1]],
+                'review_body' => self::REVIEW_BODY_MAX,
+                'photo_grid_columns' => array_map(fn (array $r) => ['min' => $r[0], 'max' => $r[1]], self::PHOTO_GRID_COLUMNS),
+                'progress_value' => ['min' => 0, 'max' => 100, 'decimals' => 1],
+                'chart_stacked_series' => ['min' => self::CHART_STACKED_SERIES[0], 'max' => self::CHART_STACKED_SERIES[1]],
+                'chart_store_categories' => self::CHART_STORE_CATEGORIES,
             ],
+            // B8a: elements whose data depends on their props (a chart has data only with a store source).
+            'data_when' => ['chart' => 'data_source!=manual'],
             'enums' => [
                 'section_layouts' => BuilderDocumentSchema::SECTION_LAYOUTS,
                 'breakpoints' => StyleSchema::BREAKPOINTS,
@@ -861,6 +1204,22 @@ final class ElementRegistry
                 'marquee_separators' => self::MARQUEE_SEPARATORS,
                 'motion_entrances' => StyleSchema::MOTION_ENTRANCES,
                 'section_shapes' => BuilderDocumentSchema::SHAPES,
+                // B8a.
+                'chart_stacked_kinds' => self::CHART_STACKED_KINDS,
+                'chart_data_sources' => self::CHART_DATA_SOURCES,
+                'before_after_orientations' => self::BEFORE_AFTER_ORIENTATIONS,
+                'before_after_aspects' => self::BEFORE_AFTER_ASPECTS,
+                'comparison_cell_kinds' => self::COMPARISON_CELL_KINDS,
+                'flash_sale_styles' => self::FLASH_SALE_STYLES,
+                'team_styles' => self::TEAM_STYLES,
+                'team_link_kinds' => self::TEAM_LINK_KINDS,
+                'review_sources' => self::REVIEW_SOURCES,
+                'review_layouts' => self::REVIEW_LAYOUTS,
+                'photo_grid_gaps' => self::PHOTO_GRID_GAPS,
+                'photo_grid_hovers' => self::PHOTO_GRID_HOVERS,
+                'weekdays' => self::WEEKDAYS,
+                'week_starts' => self::WEEK_STARTS,
+                'progress_styles' => self::PROGRESS_STYLES,
             ],
         ];
     }

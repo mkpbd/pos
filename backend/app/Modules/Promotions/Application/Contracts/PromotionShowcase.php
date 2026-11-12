@@ -26,4 +26,14 @@ interface PromotionShowcase
      * @return array<string, array{id: string, name: string, kind: string, value: string, coupon_code: ?string, min_subtotal: ?string, starts_at: ?string, ends_at: ?string, state: string}>
      */
     public function discounts(array $ids): array;
+
+    /**
+     * B8a: how much of a usage-limited promotion is taken — `{used, limit}` (redemptions,
+     * capped at the limit) for the promotions among the ids that have a usage limit; others
+     * are absent.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{used: int, limit: int}>
+     */
+    public function claimed(array $ids): array;
 }

@@ -1,0 +1,72 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": {
+                    "spacing": { "padding": { "top": "64px", "bottom": "64px" } },
+                    "layout": { "align": "center", "gap": "40px" }
+                },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 40, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "See the difference", "level": 2, "link": null },
+                            "translations": { "bn": { "text": "পার্থক্যটা দেখুন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": { "html": "<p>Plain shelves on the left, the same shelves styled with a few of our pieces on the right. Drag the handle to compare.</p>" },
+                            "translations": { "bn": { "html": "<p>বাঁয়ে সাধারণ তাক, ডানে আমাদের কয়েকটি জিনিস দিয়ে সাজানো একই তাক। তুলনা করতে হাতলটি টানুন।</p>" } }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "button",
+                            "props": { "label": "Shop the pieces", "link": { "url": "/shop" }, "variant": "primary", "size": "md", "full_width": false },
+                            "translations": { "bn": { "label": "জিনিসগুলো কিনুন" } }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": { "base": 60, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "before_after",
+                            "props": {
+                                "before": { "media_id": { "asset": "handmade/banner-tile-2.jpg" }, "alt": "White shelves with a few potted plants" },
+                                "after": { "media_id": { "asset": "handmade/banner-tile-1.jpg" }, "alt": "The same corner styled with vases, plants and decor" },
+                                "before_label": "Before",
+                                "after_label": "After",
+                                "start": 50,
+                                "orientation": "horizontal",
+                                "aspect": "4:3"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "before_label": "আগে",
+                                    "after_label": "পরে",
+                                    "before.alt": "কয়েকটি টবের গাছসহ সাদা তাক",
+                                    "after.alt": "ফুলদানি, গাছ ও সাজসজ্জায় সাজানো একই কোণ"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

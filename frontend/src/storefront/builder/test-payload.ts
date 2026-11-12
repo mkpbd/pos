@@ -65,23 +65,21 @@ function resolveNode(node: AnyNode, locale: string, draft: boolean): AnyNode | n
   for (const [key, value] of Object.entries(texts)) {
     if (!isTranslatableKey(node.type, key)) continue
     if (isWrappedSectionType(node.type) && key !== 'title' && key !== 'subtitle') (props.config as Record<string, unknown>)[key] = value
-    else if (key.split('.').length === 3 || (key.split('.').length === 2 && Array.isArray(props[key.split('.')[0]!]))) {
-      // B6: an item field (`items.<item_id>.title`) or a chart label (`labels.<index>`).
-      const [list, at, field] = key.split('.') as [string, string, string | undefined]
-      const items = props[list]
-      if (!Array.isArray(items)) continue
-      if (field === undefined) {
-        const index = Number(at)
-        if (Number.isInteger(index) && index >= 0 && index < items.length) items[index] = value
-      } else {
-        const item = items.find((entry) => entry && typeof entry === 'object' && (entry as Record<string, unknown>).id === at) as Record<string, unknown> | undefined
-        if (item) item[field] = value
+    else if (key.includes('.')) {
+      // A nested prop (`primary.label`), a list item field by item id (`items.<item_id>.title`,
+      // B8a nested `plans.<plan_id>.features.<feature_id>.text`, `rows.<row_id>.cells.<column_id>.text`)
+      // or a chart label by index (`labels.<index>`).
+      const path = key.split('.')
+      let target: unknown = props
+      for (const segment of path.slice(0, -1)) {
+        if (Array.isArray(target)) target = target.find((entry) => entry && typeof entry === 'object' && (entry as Record<string, unknown>).id === segment)
+        else target = target && typeof target === 'object' ? (target as Record<string, unknown>)[segment] : undefined
       }
-    } else if (key.includes('.')) {
-      // A nested prop (`primary.label` of a call to action).
-      const [outer, inner] = key.split('.') as [string, string]
-      const target = props[outer]
-      if (target && typeof target === 'object') (target as Record<string, unknown>)[inner] = value
+      const last = path[path.length - 1]!
+      if (Array.isArray(target)) {
+        const index = Number(last)
+        if (Number.isInteger(index) && index >= 0 && index < target.length) target[index] = value
+      } else if (target && typeof target === 'object') (target as Record<string, unknown>)[last] = value
     } else props[key] = value
   }
   const out: AnyNode = { ...rest, props }

@@ -171,4 +171,12 @@ interface StorefrontCatalog
      * @return array<string, array<string, mixed>>
      */
     public function productDetails(array $productIds, bool $preview = false): array;
+
+    /**
+     * B8a: ids of the live products (on sale online now), for restricting other modules'
+     * records (reviews) to products the storefront shows.
+     *
+     * @return list<string>
+     */
+    public function liveProductIds(): array;
 }

@@ -21,6 +21,33 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B8a — Page builder: selling, people and data blocks
+
+#### Added
+- **10 elements:** `pricing_table`, `comparison_table`, `bundle` (commerce); `flash_sale_bar`, `review_wall` (marketing); `before_after`, `photo_grid` (media); `team`, `store_hours` (also in the footer), `progress_bars` (content). Normalizers in `B8ElementProps` on a shared `ElementProps` base; two-level translation keys (`limits.nested_list_translatable`).
+- **Real store data through contracts only:** `ReviewShowcase` (approved reviews, public author name, star counts), `StorefrontCatalog::liveProductIds()`, `PromotionShowcase::claimed()`, organization timezone for store hours. A flash sale bar without a chosen promotion expires the page cache at the next promotion start/end.
+- **Charts:** stacked kinds (d3 `stack()`, totals in tooltip and table); "Numbers come from" store sources (public counts only); progress bars use the theme primary only when it passes the palette checks.
+- **Storefront:** keyboard/pointer before-after slider, scrollable comparison table with a sticky first column, bundle add-to-cart with per-item failures, live store-hours status; Bangla digits follow the store setting.
+- **Editor:** setup dialogs (before/after, bundle, photo grid), comparison grid, store-hours week editor, prices accept Bangla digits and `৳`.
+- **Templates:** 10 neutral sections with thumbnails (76 built-ins).
+
+#### Tests
+- Backend 1035 on PostgreSQL (1034 pass, 1 opt-in skip), Pint clean; vitest 1496; tsc and oxlint clean; mocked Playwright `storefront-builder-b8a.spec.ts`.
+
+### B7 — Page builder start screen: easier, BerryKid first, original look
+
+The *Online store → Page builder* screen is now a guided start for non-technical shop owners, in English or Bangla.
+
+#### Added
+- **5 demo looks, BerryKid first:** the kids look is renamed **BerryKid Kids Store** (preset and site template) and leads the list as a featured card. New portable site template **`site-default` "Original look"** (the store's own amber/violet design for any kind of shop: 10-section home, header, footer, shop top; 5 photos, 4 banners, Bangla). `POST /storefront/builder/start-from-demo/default`. 66 built-in templates.
+- **Preview before using:** `preview_url` on `GET /storefront/builder/templates` (tall full-page images for the five sites, `/builder-templates/<id>-full.jpg`); a Preview dialog with the whole home page and what changes; **See live demo** opens the matching demo store when the demo gallery lists it.
+- **One click — Use and publish now** (needs `storefront.publish`, with a confirm): applies the look and publishes it; *Save as draft* keeps the review-then-publish flow.
+- **3-step guide** (Choose a look → Edit your pages → Publish) that knows what is done, shows unpublished changes and publishes them all; can be hidden.
+- **English / বাংলা** toggle for this screen (remembered per browser); plain wording and groups *Your pages*, *Header & footer*, *Shop pages*.
+
+#### Tests
+- Backend 979 on PostgreSQL (978 pass, 1 opt-in skip), Pint clean; vitest 1414; mocked Playwright 218 (+2 B7); full-stack integration 24 + demo stores 10 + builder acceptance 5 (+1 B7: order, real preview image, live demo link, Original look live in one click).
+
 ### B6.1 — Edit banners from the page builder
 
 #### Added

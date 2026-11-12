@@ -8,9 +8,11 @@ use RuntimeException;
 /**
  * B5: the built-in store builder templates — files that ship with the code in
  * `resources/builder-templates/`: `manifest.json` lists every template `{id, scope (section |
- * page | site), preset (vegan | handmade | classic | kids | null), category, name, description,
- * thumbnail (a path the admin app serves, or null), allowed_in (document contexts), requires
- * (banners | menus | promotions | blog — what it needs to show fully)}` and `<id>.json` holds its
+ * page | site), preset (default | vegan | handmade | classic | kids | null), category, name,
+ * description, thumbnail (a path the admin app serves, or null), preview? (B7: a tall full-page
+ * image the admin app serves, `/builder-templates/<id>-full.jpg`; site templates only, null when
+ * absent), allowed_in (document contexts), requires (banners | menus | promotions | blog | products
+ * — what it needs to show fully)}` and `<id>.json` holds its
  * content in the portable format (PortableTemplate): `{schema_version: 1, sections: [...]}`, or
  * for a site template `{schema_version: 1, theme: {preset}, parts: {home, header, footer,
  * listing_top: {sections}}}`. The images come from the demo store photos
@@ -38,7 +40,8 @@ class BuilderTemplateLibrary
     }
 
     /**
-     * Every built-in template's metadata, in manifest order.
+     * Every built-in template's metadata, in manifest order (B7: the site templates in the order
+     * the admin's demo looks show them, the kids look first).
      *
      * @return list<array<string, mixed>>
      */
@@ -46,7 +49,7 @@ class BuilderTemplateLibrary
     {
         if ($this->manifest === null) {
             $manifest = $this->json(self::directory().'/manifest.json');
-            $this->manifest = array_values(array_map(fn (array $t) => $t + ['thumbnail' => null, 'requires' => []], $manifest['templates'] ?? []));
+            $this->manifest = array_values(array_map(fn (array $t) => $t + ['thumbnail' => null, 'preview' => null, 'requires' => []], $manifest['templates'] ?? []));
         }
 
         return $this->manifest;

@@ -6,145 +6,51 @@
  * their marks. No DOM access: unit-tested directly.
  */
 
-import { extent, max } from 'd3-array'
+import { max } from 'd3-array'
 import { scaleBand, scaleLinear, scalePoint } from 'd3-scale'
-import { allValues, isPieKind, pieParts, pieTotal, type ChartModel } from './model'
-import { axisUnitCaption, formatShare, formatValue, textWidth, tickFormatter, truncateToWidth, type NumberFormatter } from './format'
+import { isPieKind, pieParts, pieTotal, type ChartModel } from './model'
+import { axisUnitCaption, formatShare, formatValue, textWidth, tickFormatter, truncateToWidth } from './format'
 import { areaPath, barPath, columnPath, linePath, pieSlices, SURFACE_GAP, type XY } from './paths'
+import {
+  ariaOf,
+  bottomLabels,
+  END_LABEL_MIN_WIDTH,
+  FONT,
+  LINE_HEIGHT,
+  MAX_BAR,
+  MIN_BAR,
+  num,
+  rowsAt,
+  niceCount,
+  tickCountFor,
+  valueDomain,
+  valueTicks,
+  wholeNumbers,
+  type BarMark,
+  type CartesianLayout,
+  type ChartLayout,
+  type EndLabel,
+  type LayoutOptions,
+  type LineMark,
+  type PieLayout,
+  type SliceMark,
+  type Stop,
+  type Tick,
+  type CategoryLabel,
+  type ValueLabel,
+} from './layout-common'
+import { layoutStackedBars, layoutStackedColumns } from './stack-layout'
 
-export const FONT = 12
-const LINE_HEIGHT = 16
-const ROTATED_MAX = 96
-const MAX_BAR = 24
-const MIN_BAR = 6
-/** Minimum horizontal distance between two 45°-rotated labels (12 px text: 12 / sin 45° ≈ 17). */
-const ROTATED_STEP = 18
-/** Direct end labels need this much width; below it identity falls back to the legend. */
-export const END_LABEL_MIN_WIDTH = 480
-
-export type Rect = { x: number; y: number; w: number; h: number }
-export type TooltipRow = { slot: number; name: string; value: string; share?: string }
-/** A hover / keyboard stop: one bar, one slice, or one x position of a line/area chart (every series). */
-export type Stop = {
-  key: string
-  labelIndex: number
-  /** The series of a bar (bar charts); null on line/area (the stop covers every series) and pie. */
-  seriesIndex: number | null
-  title: string
-  rows: TooltipRow[]
-  /** Accessible name of the focus target: "Mar: Sales ৳1,200; Costs ৳900". */
-  ariaLabel: string
-  hit: Rect | { d: string }
-  /** Where the tooltip points (chart coordinates). */
-  anchor: { x: number; y: number }
-  /** Line/area: the crosshair x. */
-  crosshairX?: number
-  /** The drawn mark (focus ring around it). */
-  focus: Rect | { d: string } | { cx: number; cy: number; r: number }[]
-}
-export type Tick = { value: number; pos: number; text: string }
-export type CategoryLabel = { index: number; text: string; full: string; x: number; y: number; anchor: 'start' | 'middle' | 'end'; rotate: number }
-export type ValueLabel = { key: string; x: number; y: number; text: string; anchor: 'start' | 'middle' | 'end'; inside?: { slot: number } }
-export type EndLabel = { seriesIndex: number; slot: number; x: number; y: number; name: string; full: string; value: string | null }
-export type BarMark = { key: string; seriesIndex: number; labelIndex: number; slot: number; d: string; rect: Rect }
-export type LineMark = { seriesIndex: number; slot: number; d: string; areaD: string | null; points: { labelIndex: number; x: number; y: number }[]; markers: { labelIndex: number; x: number; y: number }[] }
-export type SliceMark = { key: string; labelIndex: number; slot: number; d: string }
-
-export type CartesianLayout = {
-  type: 'cartesian'
-  orientation: 'vertical' | 'horizontal'
-  width: number
-  height: number
-  plot: Rect
-  ticks: Tick[]
-  /** The zero line (or the axis line when the axis does not reach zero). */
-  baseline: number
-  unitCaption: string
-  categories: CategoryLabel[]
-  bars: BarMark[]
-  lines: LineMark[]
-  valueLabels: ValueLabel[]
-  endLabels: EndLabel[]
-  stops: Stop[]
-  /** Whether series identity is carried by direct labels (the legend may then be hidden by the owner). */
-  directIdentity: boolean
-}
-
-export type PieLayout = {
-  type: 'pie'
-  width: number
-  height: number
-  cx: number
-  cy: number
-  outer: number
-  inner: number
-  slices: SliceMark[]
-  valueLabels: ValueLabel[]
-  center: { value: string; label: string } | null
-  stops: Stop[]
-  directIdentity: false
-}
-
-export type ChartLayout = CartesianLayout | PieLayout
-
-export type LayoutOptions = { width: number; fmt?: NumberFormatter; totalLabel?: string }
+export { END_LABEL_MIN_WIDTH, FONT }
+export type { BarMark, CartesianLayout, CategoryLabel, ChartLayout, EndLabel, LayoutOptions, LineMark, PieLayout, Rect, SliceMark, Stop, Tick, TooltipRow, ValueLabel } from './layout-common'
 
 export function layoutChart(model: ChartModel, options: LayoutOptions): ChartLayout {
   const width = Math.max(240, Math.floor(options.width))
   if (isPieKind(model.kind)) return layoutPie(model, width, options)
+  if (model.kind === 'stacked-column') return layoutStackedColumns(model, width, options)
+  if (model.kind === 'stacked-bar') return layoutStackedBars(model, width, options)
   if (model.kind === 'bar') return layoutBars(model, width, options)
   return layoutVertical(model, width, options)
-}
-
-/* ---------------------------------------------------------------------------------------------- */
-
-function valueDomain(model: ChartModel): [number, number] {
-  const values = allValues(model)
-  const [lo = 0, hi = 0] = extent(values)
-  if (model.yStartsAtZero) return [Math.min(0, lo), Math.max(0, hi, lo === hi && hi === 0 ? 1 : 0)]
-  if (lo === hi) return [lo - Math.abs(lo || 1) * 0.1, hi + Math.abs(hi || 1) * 0.1]
-  const pad = (hi - lo) * 0.05
-  return [lo - pad, hi + pad]
-}
-
-function rowsAt(model: ChartModel, labelIndex: number, fmt: NumberFormatter | undefined): TooltipRow[] {
-  return model.series
-    .filter((s) => (s.values[labelIndex] ?? null) !== null)
-    .map((s) => ({ slot: s.slot, name: s.name, value: formatValue((s.values[labelIndex] ?? null) as number, model.unit, model.unitPosition, fmt) }))
-}
-
-function ariaOf(title: string, rows: TooltipRow[]): string {
-  return `${title}: ${rows.map((r) => (r.name ? `${r.name} ${r.value}` : r.value) + (r.share ? ` (${r.share})` : '')).join('; ')}`
-}
-
-/** Category labels along a horizontal axis: horizontal if they fit, else rotated 45° (truncated), thinned when even that collides. */
-function bottomLabels(labels: string[], positions: number[], step: number, y: number): { labels: CategoryLabel[]; band: number } {
-  const widest = max(labels, (l) => textWidth(l, FONT)) ?? 0
-  if (widest <= step - 6) {
-    return { labels: labels.map((full, index) => ({ index, text: full, full, x: num(positions, index), y: y + 8, anchor: 'middle', rotate: 0 })), band: 8 + LINE_HEIGHT + 2 }
-  }
-  const every = Math.max(1, Math.ceil(ROTATED_STEP / Math.max(step, 1)))
-  const drawn: CategoryLabel[] = []
-  let longest = 0
-  labels.forEach((full, index) => {
-    if (index % every !== 0) return
-    // Rotated -45° with its end at the tick: it reaches left by width·cos45 — keep it inside the chart.
-    const room = Math.min(ROTATED_MAX, (num(positions, index) - 2) / Math.SQRT1_2)
-    const text = truncateToWidth(full, room, FONT)
-    if (!text) return
-    longest = Math.max(longest, textWidth(text, FONT))
-    drawn.push({ index, text, full, x: num(positions, index), y: y + 6, anchor: 'end', rotate: -45 })
-  })
-  return { labels: drawn, band: Math.ceil((longest + FONT) * Math.SQRT1_2) + 10 }
-}
-
-/** `arr[i]`, or 0 past the end (indexes here always come from the same label list). */
-function num(arr: readonly number[], i: number): number {
-  return arr[i] ?? 0
-}
-
-function tickCountFor(length: number, spacing: number): number {
-  return Math.max(2, Math.floor(length / spacing))
 }
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -162,9 +68,10 @@ function layoutVertical(model: ChartModel, width: number, options: LayoutOptions
 
   // Ticks first (their width sets the left margin): roughly one per 48 px of plot height.
   const tickCount = tickCountFor(model.height - 60, 48)
-  const provisional = scaleLinear().domain(domain).nice(tickCount)
+  const whole = wholeNumbers(model)
+  const provisional = scaleLinear().domain(domain).nice(niceCount(tickCount, domain, whole))
   const niceDomain = provisional.domain() as [number, number]
-  const tickValues = provisional.ticks(tickCount)
+  const tickValues = valueTicks(provisional, tickCount, whole)
   const tickTexts = tickValues.map(tickText)
   const left = Math.ceil(Math.max(...tickTexts.map((t) => textWidth(t, FONT)), unitCaption ? textWidth(unitCaption, FONT) : 0)) + 10
 
@@ -416,14 +323,15 @@ function layoutBars(model: ChartModel, width: number, options: LayoutOptions): C
     .range([top, top + plotH])
     .paddingInner(0.3)
     .paddingOuter(0.15)
-  const x = scaleLinear().domain(domain).nice(tickCountFor(plotW, 80))
+  const whole = wholeNumbers(model)
+  const x = scaleLinear().domain(domain).nice(niceCount(tickCountFor(plotW, 80), domain, whole))
   const niceDomain = x.domain() as [number, number]
   x.range([plotX, plotX + plotW])
   // Ticks along x must not collide: fewer ticks until the widest fits its spacing.
   let count = tickCountFor(plotW, 80)
   let ticks: Tick[] = []
   for (; count >= 2; count--) {
-    ticks = x.ticks(count).map((value) => ({ value, pos: x(value), text: tickText(value) }))
+    ticks = valueTicks(x, count, whole).map((value) => ({ value, pos: x(value), text: tickText(value) }))
     const [t0, t1] = ticks
     const spacing = t0 && t1 ? Math.abs(t1.pos - t0.pos) : plotW
     if ((max(ticks, (t) => textWidth(t.text, FONT)) ?? 0) + 8 <= spacing) break

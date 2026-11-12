@@ -10,11 +10,15 @@ import { validateSectionDraft } from '@/features/storefront/components/section-d
 import { isWrappedSectionType, matchesTranslatable, NODE_ID } from '@/storefront/builder/registry'
 import type { Column, Element, Section, WrappedElement, WrappedSectionType } from '@/storefront/builder/types'
 import { ICON_NAMES } from '@/storefront/builder/icons'
+import { B8A_TYPES as B8A_TYPE_LIST } from '@/storefront/builder/elements/b8a-types'
 import {
   B4_ENUMS,
   B6_LIMITS,
   B6_TEXT_LIMITS,
+  B8A_LIMITS,
+  B8A_TEXT_LIMITS,
   b6PropProblems,
+  b8aPropProblems,
   ENUMS,
   isUuid,
   normalizeColor,
@@ -74,10 +78,13 @@ export const B6_TYPES: ReadonlySet<string> = new Set([
   'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed', 'marquee',
 ])
 
-/** B6 props that are not translated although they have a text limit. */
-const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'] }
+/** B8a element types (contract §1). */
+export const B8A_TYPES: ReadonlySet<string> = new Set(B8A_TYPE_LIST)
 
-const B6_TEXTS = B6_TEXT_LIMITS as Record<string, Record<string, number>>
+/** B6 / B8a props that are not translated although they have a text limit (a person's name isn't). */
+const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'], team: ['members.*.name'] }
+
+const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS } as Record<string, Record<string, number>>
 
 /**
  * Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable).
@@ -343,6 +350,14 @@ const B6_LISTS: Record<string, Record<string, Range & { noun: string; plural: st
   shop_the_look: { hotspots: { ...B6_LIMITS.hotspots, noun: 'hotspot', plural: 'hotspots' } },
   trust_badges: { items: { ...B6_LIMITS.trustBadges, noun: 'badge', plural: 'badges' } },
   marquee: { items: { ...B6_LIMITS.marqueeItems, noun: 'text', plural: 'texts' } },
+  // B8a (nested lists by pattern: `plans.*.features`).
+  pricing_table: { plans: { ...B8A_LIMITS.plans, noun: 'plan', plural: 'plans' }, 'plans.*.features': { ...B8A_LIMITS.planFeatures, noun: 'feature', plural: 'features' } },
+  comparison_table: { columns: { ...B8A_LIMITS.comparisonColumns, noun: 'column', plural: 'columns' }, rows: { ...B8A_LIMITS.comparisonRows, noun: 'row', plural: 'rows' } },
+  bundle: { items: { ...B8A_LIMITS.bundleItems, noun: 'product', plural: 'products' } },
+  team: { members: { ...B8A_LIMITS.teamMembers, noun: 'person', plural: 'people' }, 'members.*.links': { ...B8A_LIMITS.teamLinks, noun: 'link', plural: 'links' } },
+  photo_grid: { images: { ...B8A_LIMITS.photoImages, noun: 'photo', plural: 'photos' } },
+  progress_bars: { items: { ...B8A_LIMITS.progressItems, noun: 'bar', plural: 'bars' } },
+  store_hours: { days: { min: 7, max: 7, noun: 'day', plural: 'days' } },
 }
 
 /** Whole-number props and their ranges. */
@@ -352,6 +367,11 @@ const B6_NUMBERS: Record<string, Record<string, Range & { unit?: string }>> = {
   image_carousel: { autoplay: { ...B6_LIMITS.carouselAutoplay, unit: 's' } },
   recently_viewed: { limit: B6_LIMITS.recentlyViewed },
   gallery: { 'columns.base': B6_LIMITS.galleryColumns, 'columns.tablet': { min: 1, max: 6 }, 'columns.mobile': { min: 1, max: 6 } },
+  before_after: { start: { ...B8A_LIMITS.beforeAfterStart, unit: '%' } },
+  flash_sale_bar: { product_limit: B8A_LIMITS.flashSaleProducts },
+  review_wall: { min_rating: B8A_LIMITS.reviewMinRating, limit: B8A_LIMITS.reviewLimit },
+  team: { 'columns.base': B8A_LIMITS.teamColumns, 'columns.tablet': { min: 1, max: B8A_LIMITS.teamColumns.max }, 'columns.mobile': { min: 1, max: B8A_LIMITS.teamColumns.max } },
+  photo_grid: { 'columns.base': B8A_LIMITS.photoColumns, 'columns.tablet': { min: 1, max: B8A_LIMITS.photoColumns.max }, 'columns.mobile': { min: 1, max: B8A_LIMITS.photoColumns.max } },
 }
 
 const REQUIRED_MESSAGES: Record<string, string> = {
@@ -362,6 +382,8 @@ const REQUIRED_MESSAGES: Record<string, string> = {
   title: 'Enter a title.',
   text: 'Enter the text.',
   labels: 'Enter a label.',
+  name: 'Enter a name.',
+  label: 'Enter a label.',
 }
 
 /** `items.2.title` → `items.*.title`. */
@@ -373,7 +395,7 @@ export function b6Message(type: string, problem: PropProblem): string {
   const parts = path.split('.')
   const last = parts[parts.length - 1] ?? ''
   const field = /^\d+$/.test(last) ? (parts[parts.length - 2] ?? '') : last
-  const list = B6_LISTS[type]?.[path]
+  const list = B6_LISTS[type]?.[toPattern(path)]
   switch (code) {
     case 'required':
       return REQUIRED_MESSAGES[field] ?? 'This can’t be empty.'
@@ -382,22 +404,33 @@ export function b6Message(type: string, problem: PropProblem): string {
       return max ? `At most ${max} characters.` : 'This is too long.'
     }
     case 'too_few':
+      if (type === 'chart' && path === 'series') return 'A stacked chart needs at least 2 series (columns of numbers).'
       return list ? `Add at least ${list.min} ${list.min === 1 ? list.noun : list.plural}.` : 'Add more.'
     case 'too_many':
       if (type === 'chart' && path === 'series') return 'A pie or donut chart shows exactly one series.'
       if (type === 'chart' && path === 'labels') return 'Too many rows for this chart (pie and donut: at most 8; others: at most 24).'
       return list ? `At most ${list.max} ${list.plural}.` : 'Too many.'
     case 'duplicate':
+      if (field === 'product_id') return 'This product is already in the list; choose another one.'
       return 'Two items share the same id; remove one and add it again.'
     case 'out_of_range': {
       if (type === 'counter' && field === 'value') return 'Use a number from 0 to 1,000,000,000 with at most 2 decimals.'
       if (field === 'x' || field === 'y') return 'Use a position from 0 to 100 %.'
-      if (type === 'chart' && field === 'values') return 'A pie or donut chart can’t show negative numbers.'
+      if (type === 'progress_bars' && field === 'value') return 'Use a number from 0 to 100 with at most 1 decimal.'
+      if (type === 'chart' && field === 'values') return 'Pie, donut and stacked charts can’t show negative numbers.'
       const range = B6_NUMBERS[type]?.[path]
       return range ? `Use ${range.min} to ${range.max}${range.unit ? ` ${range.unit}` : ''}.` : 'This number is out of range.'
     }
     default: {
       if (field === 'link') return 'Use a site path such as /sale or an http(s) URL.'
+      // B8a
+      if (field === 'price') return 'Use a price such as 1250 or 99.50 (no minus, at most 2 decimals).'
+      if (type === 'team' && field === 'url') return 'Use a full https:// address (email: an address such as hello@myshop.com).'
+      if (field === 'url') return 'Use a site path such as /sale or an http(s) URL.'
+      if (field === 'open' || field === 'close') return 'Enter a time such as 10:00.'
+      if (field === 'data_source') return 'Choose where the numbers come from.'
+      if (field === 'source_product_id') return 'Choose a product, or show the ratings of all products.'
+      if (field === 'promotion_id') return 'Choose a sale.'
       if (field === 'icon') return 'Choose an icon.'
       if (field === 'media_id') return 'Choose an image from the media library.'
       if (field === 'product_id') return 'Choose a product.'
@@ -412,12 +445,44 @@ export function b6Message(type: string, problem: PropProblem): string {
 }
 
 function validateB6(node: Element, add: (path: string, message: string) => void) {
+  if (node.type === 'chart') {
+    // B8a: the server's extra chart rule (first, so its message wins for `kind`).
+    const p = node.props
+    const stacked = p.kind === 'stacked-column' || p.kind === 'stacked-bar'
+    if (stacked && p.data_source !== undefined && p.data_source !== 'manual') add('props.kind', 'Numbers from your store make one series, which can’t be stacked. Choose another chart kind.')
+  }
   for (const problem of b6PropProblems(node.type, node.props)) add(`props.${problem.path}`, b6Message(node.type, problem))
+}
+
+/** B8a: the storefront's prop rules plus the server's extra ones (contract §1, backend registry notes). */
+function validateB8a(node: Element, add: (path: string, message: string) => void) {
+  for (const problem of b8aPropProblems(node.type, node.props)) add(`props.${problem.path}`, b6Message(node.type, problem))
+  const p = node.props as Record<string, unknown>
+  if (node.type === 'pricing_table' && Array.isArray(p.plans)) {
+    ;(p.plans as { price?: unknown; price_text?: unknown }[]).forEach((plan, i) => {
+      if (plan && plan.price === null && (typeof plan.price_text !== 'string' || plan.price_text.trim() === '')) add(`props.plans.${i}.price_text`, 'Enter what to show instead of a price, e.g. “Free”.')
+    })
+  }
+  if (node.type === 'comparison_table') {
+    const seen = new Set<string>()
+    ;((p.columns as { product_id?: unknown }[] | undefined) ?? []).forEach((column, i) => {
+      const id = column?.product_id
+      if (typeof id !== 'string') return
+      if (seen.has(id)) add(`props.columns.${i}.product_id`, 'This product is already in another column; choose another one.')
+      seen.add(id)
+    })
+    ;((p.rows as { cells?: Record<string, { kind?: unknown; text?: unknown }> }[] | undefined) ?? []).forEach((row, r) => {
+      for (const [columnId, cell] of Object.entries(row?.cells ?? {})) {
+        if (cell?.kind === 'text' && (typeof cell.text !== 'string' || cell.text.trim() === '')) add(`props.rows.${r}.cells.${columnId}.text`, 'Enter the text for this cell, or choose Yes or No.')
+      }
+    })
+  }
 }
 
 function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[]) {
   if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)
   if (B6_TYPES.has(node.type)) return validateB6(node, add)
+  if (B8A_TYPES.has(node.type)) return validateB8a(node, add)
   switch (node.type) {
     case 'heading':
       textRule(node.props.text, 1, TEXT_LIMITS.heading, 'props.text', add, 'Enter the heading text.')

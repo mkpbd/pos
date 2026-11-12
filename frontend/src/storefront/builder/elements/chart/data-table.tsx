@@ -1,6 +1,6 @@
 import { useLocale } from '../../../i18n/locale'
 import { formatShare, formatValue } from './format'
-import { isPieKind, pieParts, type ChartModel } from './model'
+import { isPieKind, pieParts, stackTotal, type ChartModel } from './model'
 import { useChartMessages } from './messages'
 
 /*
@@ -34,6 +34,11 @@ export function ChartDataTable({ id, model, visible }: { id: string; model: Char
                 {m.share}
               </th>
             )}
+            {model.stacked && (
+              <th scope="col" className="py-2 pr-4 text-right font-semibold">
+                {m.total}
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -48,6 +53,7 @@ export function ChartDataTable({ id, model, visible }: { id: string; model: Char
                 </td>
               ))}
               {shares && <td className="py-2 pr-4 text-right">{shares.has(li) ? digits(formatShare(shares.get(li) as number, formatNumber)) : '—'}</td>}
+              {model.stacked && <td className="py-2 pr-4 text-right font-semibold">{digits(value(stackTotal(model, li)))}</td>}
             </tr>
           ))}
         </tbody>

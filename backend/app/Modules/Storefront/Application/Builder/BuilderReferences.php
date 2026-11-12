@@ -24,7 +24,9 @@ use App\Modules\Storefront\Infrastructure\Models\Menu;
  * promotion (a countdown promotion), the discount's promotion (percent / fixed), the promoted
  * product and the menu of a menu element; B6: gallery / carousel / logo images, the category
  * card's category and image, the spotlight product, the shop-the-look photo and hotspot
- * products, and background-video posters (style media). Another
+ * products, and background-video posters (style media); B8a: before / after photos, team
+ * portraits and photo grid images, comparison and bundle products, the flash sale bar's
+ * countdown promotion, the review wall's product and a ratings chart's product. Another
  * organization's id is reported exactly like a missing one: 422 DOCUMENT_INVALID with the
  * node id, path, a code and the ids.
  */
@@ -76,10 +78,15 @@ class BuilderReferences
             // Image elements; B6: gallery, carousel and logo images, the category card's own image
             // and the shop-the-look photo.
             $mediaIds = ElementRegistry::mediaIds($node['type'], $props);
-            if ($mediaIds !== []) {
+            if ($node['type'] === 'before_after') {
+                // B8a: the two photos, each with its own path.
+                $use('MEDIA_NOT_FOUND', "{$path}.props.before.media_id", $node['id'], [$props['before']['media_id']]);
+                $use('MEDIA_NOT_FOUND', "{$path}.props.after.media_id", $node['id'], [$props['after']['media_id']]);
+            } elseif ($mediaIds !== []) {
                 $prop = match ($node['type']) {
-                    'gallery', 'image_carousel' => 'images',
+                    'gallery', 'image_carousel', 'photo_grid' => 'images',
                     'logo_carousel' => 'logos',
+                    'team' => 'members',
                     default => 'media_id',
                 };
                 $use('MEDIA_NOT_FOUND', "{$path}.props.{$prop}", $node['id'], $mediaIds);
@@ -92,6 +99,12 @@ class BuilderReferences
                 'menu' => $use('MENU_NOT_FOUND', "{$path}.props.menu_id", $node['id'], [$props['menu_id']]),
                 'category_card' => $use('CATEGORY_NOT_FOUND', "{$path}.props.category_id", $node['id'], [$props['category_id']]),
                 'shop_the_look' => $use('PRODUCT_NOT_FOUND', "{$path}.props.hotspots", $node['id'], array_column($props['hotspots'], 'product_id')),
+                // B8a.
+                'comparison_table' => $use('PRODUCT_NOT_FOUND', "{$path}.props.columns", $node['id'], array_column($props['columns'], 'product_id')),
+                'bundle' => $use('PRODUCT_NOT_FOUND', "{$path}.props.items", $node['id'], array_column($props['items'], 'product_id')),
+                'flash_sale_bar' => $use('PROMOTION_NOT_FOUND', "{$path}.props.promotion_id", $node['id'], [$props['promotion_id']]),
+                'review_wall' => $use('PRODUCT_NOT_FOUND', "{$path}.props.product_id", $node['id'], $props['source'] === 'product' ? [$props['product_id']] : []),
+                'chart' => $use('PRODUCT_NOT_FOUND', "{$path}.props.source_product_id", $node['id'], [$props['source_product_id'] ?? null]),
                 default => null,
             };
             $type = ElementRegistry::sectionType($node['type']);

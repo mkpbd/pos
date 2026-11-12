@@ -35,6 +35,11 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         return $this->productPage->details($productIds, $preview);
     }
 
+    public function liveProductIds(): array
+    {
+        return array_values(array_map(fn (array $record) => (string) $record['id'], $this->catalog->products()));
+    }
+
     public function sourceProductCards(string $source, ?string $categoryId, int $limit): array
     {
         return $this->browse->sourceCards($source, $categoryId, $limit);

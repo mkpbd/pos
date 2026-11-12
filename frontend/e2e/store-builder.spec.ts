@@ -665,7 +665,7 @@ test('creates the listing-top area with a call to action', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 })
   const b = await mockB4Backend(page)
   await page.goto('/admin/storefront/pages')
-  await page.getByRole('button', { name: 'Create Listing top' }).click()
+  await page.getByRole('button', { name: 'Add content: Top of shop pages' }).click()
   await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
   expect(b.creates[0]).toEqual({ kind: 'zone', key: 'zone:listing.top', title: 'Listing top', from: 'blank' })
 
@@ -789,26 +789,120 @@ test('starts from a demo look: drafts, review with previews, publish all', async
 
   await page.goto('/admin/storefront/pages')
   const card = page.getByTestId('demo-looks')
-  await expect(card.getByRole('button', { name: /^Use the .* look$/ })).toHaveCount(3)
-  await card.getByRole('button', { name: 'Use the Handmade Atelier look' }).click()
+  await expect(card.getByRole('button', { name: /^Use (?!and)/ })).toHaveCount(3)
+  await card.getByRole('button', { name: 'Use Handmade Atelier' }).click()
 
-  const dialog = page.getByRole('dialog', { name: 'Use the Handmade Atelier look?' })
-  await expect(dialog).toContainText('Your live store doesn’t change until you publish')
+  const dialog = page.getByRole('dialog', { name: 'Use Handmade Atelier?' })
+  await expect(dialog).toContainText('Your live shop stays the same until you publish')
   // The home page has unpublished changes: a warning that its draft will be replaced.
   await expect(dialog.getByTestId('demo-warning-home')).toBeVisible()
   await dialog.getByRole('checkbox', { name: 'Shop pages' }).click()
-  await dialog.getByRole('button', { name: 'Create drafts' }).click()
+  await dialog.getByRole('button', { name: 'Save as draft' }).click()
   await expect.poll(() => starts.length).toBe(1)
   expect(starts[0]).toEqual({ url: '/api/v1/storefront/builder/start-from-demo/handmade', body: { include: { theme: true, home: true, header: true, footer: true, listing_top: false } } })
 
   const review = page.getByTestId('demo-review')
-  await expect(review.getByRole('heading', { name: 'Review your Handmade Atelier look' })).toBeVisible()
+  await expect(review.getByRole('heading', { name: 'Your new look: Handmade Atelier' })).toBeVisible()
   await expect(review.getByRole('link', { name: 'Preview Home (opens in a new tab)' })).toHaveAttribute('href', 'http://shop.test/?preview=draft')
   await expect(review.getByRole('link', { name: 'Edit Footer' })).toHaveAttribute('href', '/admin/storefront/builder/d-footer')
   await review.getByRole('button', { name: 'Publish all' }).click()
   await page.getByRole('alertdialog', { name: 'Publish your new look?' }).getByRole('button', { name: 'Publish all' }).click()
-  await expect(review.getByRole('heading', { name: 'The Handmade Atelier look is live' })).toBeVisible()
+  await expect(review.getByRole('heading', { name: 'Handmade Atelier is live on your shop' })).toBeVisible()
   expect(publishAll).toEqual([{ documents: [DOC_ID, 'd-header', 'd-footer', 'd-zone'], theme: true, note: 'Handmade Atelier demo look' }])
+})
+
+/* ------------------------------------------------------------------------------------------------
+ * B7: the start screen — BerryKid first, preview, use and publish in one click, English / বাংলা
+ * ---------------------------------------------------------------------------------------------- */
+
+const B7_SITES = [
+  { id: 'site-kids', scope: 'site', preset: 'kids', category: null, name: 'BerryKid Kids Store', description: 'A bright, playful look for baby and kids shops.', thumbnail_url: null, preview_url: '/favicon.svg', allowed_in: ['page'], source: 'builtin' },
+  { id: 'site-default', scope: 'site', preset: 'default', category: null, name: 'Original look', description: 'Your store’s own look, for any kind of shop.', thumbnail_url: null, preview_url: null, allowed_in: ['page'], source: 'builtin' },
+  ...SITE_TEMPLATES.map((t) => ({ ...t, preview_url: null })),
+]
+
+async function mockB7(page: Page) {
+  const b = await mockBackend(page, { exists: true })
+  await mockTemplates(page)
+  const calls: string[] = []
+  const publishAll: unknown[] = []
+  const drafts = [
+    { ...summary(b), title: 'Home' },
+    { ...summary(b), id: 'd-header', kind: 'header', key: 'header', title: 'Header', path: null, preview_url: null },
+  ]
+  // Registered later, so it wins over mockTemplates for the site looks.
+  await page.route((url) => url.pathname.endsWith('/api/v1/storefront/builder/templates') && url.searchParams.get('scope') === 'site', (route) => route.fulfill({ json: envelope(B7_SITES) }))
+  await page.route('**/api/v1/demo-stores', (route) =>
+    route.fulfill({ json: envelope([{ host: 'kids.shop.localhost', name: 'BerryKid', preset: 'kids', tagline: null, colors: { primary: '#ff6f61', accent: '#4bb4de', canvas: '#ffffff' }, heading_font: 'baloo', image_url: null, product_count: 20, category_names: [] }]) }),
+  )
+  await page.route('**/api/v1/storefront/builder/start-from-demo/*', (route) => {
+    calls.push(new URL(route.request().url()).pathname)
+    return route.fulfill({ json: envelope({ documents: drafts, theme: { preview_url: 'http://shop.test/?preview=draft' }, imported: { media: 4 } }) })
+  })
+  await page.route('**/api/v1/storefront/builder/publish-all', (route) => {
+    calls.push('publish-all')
+    publishAll.push(route.request().postDataJSON())
+    return route.fulfill({ json: envelope({ documents: drafts, theme: null }) })
+  })
+  return { calls, publishAll }
+}
+
+test('B7: the BerryKid look comes first; preview it, then use and publish it in one click', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const { calls, publishAll } = await mockB7(page)
+  await page.goto('/admin/storefront/pages')
+
+  // The guide: a look is chosen (documents exist), the home page has a draft, publishing is next.
+  const guide = page.getByTestId('start-guide')
+  await expect(guide.getByRole('heading', { name: 'Get your shop ready in 3 steps' })).toBeVisible()
+  await expect(guide.getByTestId('guide-step-3')).toHaveAttribute('data-state', 'current')
+
+  const card = page.getByTestId('demo-looks')
+  const featured = card.getByTestId('demo-look-kids')
+  await expect(featured).toHaveAttribute('data-featured', 'true')
+  await expect(featured.getByTestId('demo-featured-badge')).toHaveText('Recommended for baby & kids shops')
+  await expect(card.getByRole('listitem').first()).toHaveAttribute('data-testid', 'demo-look-kids')
+  // The four after the featured one sit in one row on a wide screen.
+  const rest = ['demo-look-default', 'demo-look-vegan', 'demo-look-handmade', 'demo-look-classic']
+  const tops = await Promise.all(rest.map(async (id) => (await card.getByTestId(id).boundingBox())!.y))
+  expect(new Set(tops.map((y) => Math.round(y))).size).toBe(1)
+  await expect(featured.getByRole('link', { name: 'See a live demo of BerryKid Kids Store (opens in a new tab)' })).toHaveAttribute('href', /^http:\/\/kids\.shop\.localhost(:\d+)?\/$/)
+  await expect(card.getByTestId('demo-look-default').getByRole('link', { name: /live demo/ })).toHaveCount(0)
+
+  await featured.getByRole('button', { name: 'Preview BerryKid Kids Store' }).click()
+  const preview = page.getByRole('dialog', { name: 'BerryKid Kids Store' })
+  await expect(preview.getByRole('img', { name: 'The whole home page of BerryKid Kids Store' })).toBeVisible()
+  await expect(preview).toContainText('What you get')
+  await preview.getByRole('button', { name: 'Use and publish now' }).click()
+
+  const confirm = page.getByRole('alertdialog', { name: 'Change your live shop now?' })
+  await expect(confirm).toContainText('Your live store will change to this look now. You can go back with Version history.')
+  expect(calls).toEqual([])
+  await confirm.getByRole('button', { name: 'Yes, publish now' }).click()
+
+  const review = page.getByTestId('demo-review')
+  await expect(review.getByRole('heading', { name: 'BerryKid Kids Store is live on your shop' })).toBeVisible()
+  await expect(review.getByRole('link', { name: 'View your store' })).toHaveAttribute('href', 'http://shop.test/')
+  expect(calls).toEqual(['/api/v1/storefront/builder/start-from-demo/kids', 'publish-all'])
+  expect(publishAll).toEqual([{ documents: [DOC_ID, 'd-header'], theme: true, note: 'BerryKid Kids Store demo look' }])
+})
+
+test('B7: switches the start screen to Bangla and keeps it after a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await mockB7(page)
+  await page.goto('/admin/storefront/pages')
+  const screenRoot = page.getByTestId('pages-screen')
+  await expect(screenRoot).toHaveAttribute('lang', 'en')
+  await screenRoot.getByRole('button', { name: 'বাংলা' }).click()
+  await expect(screenRoot).toHaveAttribute('lang', 'bn')
+  await expect(screenRoot.getByRole('heading', { name: '৩টি ধাপে আপনার দোকান সাজিয়ে ফেলুন' })).toBeVisible()
+  await expect(screenRoot.getByRole('heading', { name: 'আপনার পেজ', level: 2 })).toBeVisible()
+  await expect(screenRoot.getByTestId('demo-featured-badge')).toHaveText('বেবি ও কিডস দোকানের জন্য সেরা')
+
+  await page.reload()
+  await expect(page.getByTestId('pages-screen')).toHaveAttribute('lang', 'bn')
+  await page.getByRole('button', { name: 'BerryKid Kids Store ডিজাইনের প্রিভিউ দেখুন' }).click()
+  await expect(page.getByRole('dialog', { name: 'BerryKid Kids Store' }).getByRole('button', { name: 'এই ডিজাইন নিন' })).toBeVisible()
 })
 
 /* ------------------------------------------------------------------------------------------------
@@ -853,7 +947,7 @@ async function mockB6Backend(page: Page): Promise<B4Backend> {
 
 async function openListingTop(page: Page) {
   await page.goto('/admin/storefront/pages')
-  await page.getByRole('button', { name: 'Create Listing top' }).click()
+  await page.getByRole('button', { name: 'Add content: Top of shop pages' }).click()
   await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
   await expect(canvas(page).getByTestId('canvas-empty')).toBeVisible()
 }
@@ -1025,4 +1119,104 @@ test('edits a banner of the hero slider from the inspector: the canvas shows the
   expect(edits[0]).toMatchObject({ title: 'Summer boxes are here', name: 'Farm boxes', link_url: '/shop' })
   await expect(frame.getByText('Summer boxes are here')).toBeVisible()
   await expect(frame.getByText('Farm boxes are back')).toHaveCount(0)
+})
+
+/* ------------------------------------------------------------------------------------------------
+ * B8a: selling blocks, trust & people, chart store numbers (pricing table, store hours, ratings chart)
+ * ---------------------------------------------------------------------------------------------- */
+
+const B8A_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => ({ day, closed: false, open: '10:00', close: '21:00' }))
+/** GET /storefront/builder/elements: the B8a types these tests add (as the registry declares them). */
+const B8A_ELEMENTS = [
+  b4Meta('pricing_table', 'commerce', 'Pricing table', ['plans.*.name', 'plans.*.price_text', 'plans.*.period', 'plans.*.description', 'plans.*.features.*.text', 'plans.*.button.label', 'plans.*.badge'], {
+    plans: [
+      { id: 'plan-1', name: 'Basic', price: null, price_text: 'Free', period: '', description: '', features: [{ id: 'feature-1', text: 'Feature', included: true }], button: null, highlighted: false, badge: '' },
+      { id: 'plan-2', name: 'Plus', price: '500.00', price_text: '', period: '/month', description: '', features: [{ id: 'feature-1', text: 'Feature', included: true }], button: { label: 'Choose', url: '/shop' }, highlighted: true, badge: 'Popular' },
+    ],
+  }, PAGES),
+  b4Meta('store_hours', 'content', 'Store hours', ['title', 'note'], { days: B8A_WEEK, title: 'Opening hours', note: '', show_open_now: true, highlight_today: true, week_starts: 'sat' }, ['page', 'cms', 'zone', 'footer']),
+]
+
+/** The B6 backend plus the B8a types; resolve answers store hours (timezone) and store-source charts (ratings). */
+async function mockB8aBackend(page: Page): Promise<B4Backend> {
+  const b = await mockB6Backend(page)
+  await page.route('**/api/v1/storefront/builder/elements', (route) => route.fulfill({ json: envelope({ types: [...B4_ELEMENTS, ...B6_ELEMENTS, ...B8A_ELEMENTS], limits: {}, enums: {} }) }))
+  await page.route('**/api/v1/storefront/builder/resolve', (route) => {
+    const body = route.request().postDataJSON() as { elements: { id: string; type: string; props?: { data_source?: string } }[] }
+    const data: Record<string, unknown> = {}
+    for (const e of body.elements) {
+      if (e.type === 'store_hours') data[e.id] = { timezone: 'Asia/Dhaka' }
+      if (e.type === 'chart' && e.props?.data_source === 'store.rating_breakdown') data[e.id] = { labels: ['5 ★', '4 ★', '3 ★', '2 ★', '1 ★'], series: [{ id: 's1', name: 'Reviews', values: [12, 5, 1, 0, 0] }] }
+    }
+    return route.fulfill({ json: envelope({ data, media: {}, errors: {} }) })
+  })
+  return b
+}
+
+test('B8a: builds a pricing table: a price typed in the plan, a new feature; the canvas updates before the autosave', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB8aBackend(page)
+  await openListingTop(page)
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+
+  await page.getByTestId('add-pricing_table').click()
+  const pricing = canvas(page).getByTestId('builder-pricing')
+  await expect(pricing.getByTestId('pricing-plan')).toHaveCount(2)
+
+  await inspector.getByRole('button', { name: /^Plus · 500\.00/ }).click()
+  const plan = inspector.getByRole('group', { name: 'plan 2' })
+  await plan.getByLabel('Plan name', { exact: true }).fill('Family box')
+  await plan.getByLabel('Price', { exact: true }).fill('1250')
+  await plan.getByRole('button', { name: 'Add feature' }).click()
+  await plan.getByRole('group', { name: 'feature 2' }).getByLabel('Feature', { exact: true }).fill('Free delivery in Dhaka')
+  await expect(pricing).toContainText('Family box')
+  await expect(pricing).toContainText('Free delivery in Dhaka')
+
+  await expect.poll(() => (savedOf(b, 'pricing_table')?.props.plans as { name: string; price: string | null; features: { text: string }[] }[] | undefined)?.[1], { timeout: 6000 }).toMatchObject({
+    name: 'Family box',
+    price: '1250',
+    features: [{ text: 'Feature' }, { text: 'Free delivery in Dhaka' }],
+  })
+})
+
+test('B8a: edits store hours: Friday closed, Saturday open past midnight', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB8aBackend(page)
+  await openListingTop(page)
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+
+  await page.getByTestId('add-store_hours').click()
+  const hours = canvas(page).getByTestId('builder-store-hours')
+  await expect(hours).toContainText('Opening hours')
+  const editor = inspector.getByTestId('store-hours-editor')
+  // The week starts on Saturday, as many shops in Bangladesh list it.
+  await expect(editor.getByRole('listitem').first()).toHaveAttribute('data-testid', 'hours-sat')
+  await editor.getByRole('switch', { name: 'Open on Friday' }).click()
+  await editor.getByLabel('Saturday: closes at').fill('01:30')
+  await expect(editor.getByTestId('hours-sat')).toContainText('Closes after midnight')
+  await expect(hours).toContainText('Closed')
+
+  await expect.poll(() => (savedOf(b, 'store_hours')?.props.days as { day: string; closed: boolean; close: string }[] | undefined)?.filter((d) => d.day === 'fri' || d.day === 'sat'), { timeout: 6000 }).toEqual([
+    { day: 'fri', closed: true, open: '10:00', close: '21:00' },
+    { day: 'sat', closed: false, open: '10:00', close: '01:30' },
+  ])
+})
+
+test('B8a: switches a chart to customer ratings: the grid gives way to the store’s numbers', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB8aBackend(page)
+  await openListingTop(page)
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+
+  await page.getByTestId('add-chart').click()
+  await expect(canvas(page).getByTestId('builder-chart')).toBeVisible()
+  await inspector.getByRole('combobox', { name: 'Numbers come from' }).click()
+  await page.getByRole('option', { name: 'Customer ratings' }).click()
+  await expect(inspector.getByTestId('chart-data-editor')).toHaveCount(0)
+  const preview = inspector.getByTestId('chart-store-preview')
+  await expect(preview.getByRole('rowheader', { name: '5 ★' })).toBeVisible()
+  await expect(preview.getByRole('cell', { name: '12', exact: true })).toBeVisible()
+  await expect(canvas(page).getByTestId('chart-table')).toContainText('5 ★')
+
+  await expect.poll(() => savedOf(b, 'chart')?.props.data_source, { timeout: 6000 }).toBe('store.rating_breakdown')
 })

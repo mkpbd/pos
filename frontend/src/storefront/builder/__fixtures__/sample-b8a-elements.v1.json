@@ -1,0 +1,779 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_b8a",
+      "type": "section",
+      "props": {
+        "layout": "boxed",
+        "anchor": "b8a-elements"
+      },
+      "style": {},
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_b8a",
+          "type": "column",
+          "width": {
+            "base": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_pricing",
+              "type": "pricing_table",
+              "props": {
+                "plans": [
+                  {
+                    "id": "p1",
+                    "name": "Starter box",
+                    "price": null,
+                    "price_text": "Free",
+                    "period": "",
+                    "description": "Try our snacks once.",
+                    "features": [
+                      {
+                        "id": "f1",
+                        "text": "Delivery inside Dhaka",
+                        "included": true
+                      },
+                      {
+                        "id": "f2",
+                        "text": "Gift wrapping",
+                        "included": false
+                      }
+                    ],
+                    "button": {
+                      "label": "Start free",
+                      "url": "/shop"
+                    },
+                    "highlighted": false,
+                    "badge": ""
+                  },
+                  {
+                    "id": "p2",
+                    "name": "Monthly box",
+                    "price": "499.00",
+                    "price_text": "",
+                    "period": "/month",
+                    "description": "A fresh box every month.",
+                    "features": [
+                      {
+                        "id": "f1",
+                        "text": "Free delivery everywhere",
+                        "included": true
+                      },
+                      {
+                        "id": "f2",
+                        "text": "Gift wrapping",
+                        "included": true
+                      }
+                    ],
+                    "button": {
+                      "label": "Subscribe",
+                      "url": "https://example.com/subscribe"
+                    },
+                    "highlighted": true,
+                    "badge": "Popular"
+                  },
+                  {
+                    "id": "p3",
+                    "name": "Office pack",
+                    "price": "1250.5",
+                    "price_text": "",
+                    "period": "one time",
+                    "description": "",
+                    "features": [],
+                    "button": null,
+                    "highlighted": false,
+                    "badge": ""
+                  }
+                ]
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "plans.p1.name": "শুরুর বাক্স",
+                  "plans.p1.price_text": "ফ্রি",
+                  "plans.p2.period": "/মাস",
+                  "plans.p2.badge": "জনপ্রিয়",
+                  "plans.p2.button.label": "সাবস্ক্রাইব",
+                  "plans.p1.features.f2.text": "উপহারের মোড়ক"
+                }
+              }
+            },
+            {
+              "id": "e_before_after",
+              "type": "before_after",
+              "props": {
+                "before": {
+                  "media_id": "0199a5c1-0000-7000-8000-0000000b8a01",
+                  "alt": "The room before"
+                },
+                "after": {
+                  "media_id": "0199a5c1-0000-7000-8000-0000000b8a02",
+                  "alt": "The room after"
+                },
+                "before_label": "Before",
+                "after_label": "After",
+                "start": 40,
+                "orientation": "vertical",
+                "aspect": "3:2"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "before_label": "আগে",
+                  "after_label": "পরে",
+                  "before.alt": "আগের ঘর",
+                  "after.alt": "পরের ঘর"
+                }
+              }
+            },
+            {
+              "id": "e_compare",
+              "type": "comparison_table",
+              "props": {
+                "columns": [
+                  {
+                    "id": "c1",
+                    "title": "Basic kettle",
+                    "product_id": "0199a5c1-0000-7000-8000-0000000b8b01",
+                    "highlighted": false
+                  },
+                  {
+                    "id": "c2",
+                    "title": "Smart kettle",
+                    "product_id": "0199a5c1-0000-7000-8000-0000000b8b02",
+                    "highlighted": true
+                  },
+                  {
+                    "id": "c3",
+                    "title": "Other shops",
+                    "product_id": null,
+                    "highlighted": false
+                  }
+                ],
+                "rows": [
+                  {
+                    "id": "r1",
+                    "label": "Auto shut-off",
+                    "cells": {
+                      "c1": {
+                        "kind": "yes",
+                        "text": ""
+                      },
+                      "c2": {
+                        "kind": "yes",
+                        "text": ""
+                      },
+                      "c3": {
+                        "kind": "no",
+                        "text": ""
+                      }
+                    }
+                  },
+                  {
+                    "id": "r2",
+                    "label": "Warranty",
+                    "cells": {
+                      "c1": {
+                        "kind": "text",
+                        "text": "6 months"
+                      },
+                      "c2": {
+                        "kind": "text",
+                        "text": "2 years"
+                      },
+                      "c3": {
+                        "kind": "no",
+                        "text": ""
+                      }
+                    }
+                  }
+                ],
+                "show_prices": true,
+                "show_buttons": true
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "columns.c3.title": "অন্য দোকান",
+                  "rows.r2.label": "ওয়ারেন্টি",
+                  "rows.r2.cells.c1.text": "৬ মাস",
+                  "rows.r2.cells.c2.text": "২ বছর"
+                }
+              }
+            },
+            {
+              "id": "e_flash",
+              "type": "flash_sale_bar",
+              "props": {
+                "promotion_id": null,
+                "title": "Flash sale",
+                "text": "Big savings for a few hours only.",
+                "show_products": true,
+                "product_limit": 4,
+                "style": "card",
+                "button": {
+                  "label": "Shop the sale",
+                  "url": "/shop?on_sale=1"
+                }
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "ফ্ল্যাশ সেল",
+                  "button.label": "সেলে কিনুন"
+                }
+              }
+            },
+            {
+              "id": "e_bundle",
+              "type": "bundle",
+              "props": {
+                "items": [
+                  {
+                    "id": "b1",
+                    "product_id": "0199a5c1-0000-7000-8000-0000000b8b03"
+                  },
+                  {
+                    "id": "b2",
+                    "product_id": "0199a5c1-0000-7000-8000-0000000b8b04"
+                  },
+                  {
+                    "id": "b3",
+                    "product_id": "0199a5c1-0000-7000-8000-0000000b8b05"
+                  }
+                ],
+                "title": "Frequently bought together",
+                "text": "Everything for a cosy tea time.",
+                "button_label": "Add all to cart"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "প্রায়ই একসাথে কেনা হয়",
+                  "button_label": "সবগুলো কার্টে যোগ করুন"
+                }
+              }
+            },
+            {
+              "id": "e_team",
+              "type": "team",
+              "props": {
+                "members": [
+                  {
+                    "id": "m1",
+                    "media_id": "0199a5c1-0000-7000-8000-0000000b8a03",
+                    "name": "Rina Akter",
+                    "role": "Founder",
+                    "bio": "Started the shop in her kitchen.",
+                    "links": [
+                      {
+                        "id": "l1",
+                        "kind": "instagram",
+                        "url": "https://www.instagram.com/example"
+                      },
+                      {
+                        "id": "l2",
+                        "kind": "email",
+                        "url": "mailto:rina@example.com"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "m2",
+                    "media_id": null,
+                    "name": "Karim Hasan",
+                    "role": "Delivery lead",
+                    "bio": "",
+                    "links": [
+                      {
+                        "id": "l1",
+                        "kind": "website",
+                        "url": "http://karim.example.com"
+                      }
+                    ]
+                  }
+                ],
+                "columns": {
+                  "base": 3,
+                  "mobile": 1
+                },
+                "style": "circle"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "members.m1.role": "প্রতিষ্ঠাতা",
+                  "members.m1.bio": "নিজের রান্নাঘরে দোকান শুরু করেছিলেন।",
+                  "members.m2.role": "ডেলিভারি প্রধান"
+                }
+              }
+            },
+            {
+              "id": "e_reviews",
+              "type": "review_wall",
+              "props": {
+                "source": "top_rated",
+                "product_id": null,
+                "min_rating": 4,
+                "limit": 6,
+                "layout": "carousel",
+                "show_product": true,
+                "show_summary": true,
+                "title": "What our customers say"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "গ্রাহকেরা যা বলেন"
+                }
+              }
+            },
+            {
+              "id": "e_photos",
+              "type": "photo_grid",
+              "props": {
+                "images": [
+                  {
+                    "id": "g1",
+                    "media_id": "0199a5c1-0000-7000-8000-0000000b8a04",
+                    "alt": "Tea on a table",
+                    "link": null
+                  },
+                  {
+                    "id": "g2",
+                    "media_id": "0199a5c1-0000-7000-8000-0000000b8a05",
+                    "alt": "Our shop front",
+                    "link": {
+                      "url": "/pages/about"
+                    }
+                  },
+                  {
+                    "id": "g3",
+                    "media_id": "0199a5c1-0000-7000-8000-0000000b8a06",
+                    "alt": "New mugs",
+                    "link": {
+                      "url": "https://www.instagram.com/p/example"
+                    }
+                  }
+                ],
+                "columns": {
+                  "base": 6,
+                  "tablet": 3,
+                  "mobile": 3
+                },
+                "gap": "sm",
+                "profile": {
+                  "label": "@littlesprouts",
+                  "url": "https://www.instagram.com/littlesprouts"
+                },
+                "hover": "overlay"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "profile.label": "@লিটলস্প্রাউটস",
+                  "images.g1.alt": "টেবিলে চা"
+                }
+              }
+            },
+            {
+              "id": "e_hours",
+              "type": "store_hours",
+              "props": {
+                "days": [
+                  {
+                    "day": "mon",
+                    "closed": false,
+                    "open": "10:00",
+                    "close": "21:00"
+                  },
+                  {
+                    "day": "tue",
+                    "closed": false,
+                    "open": "10:00",
+                    "close": "21:00"
+                  },
+                  {
+                    "day": "wed",
+                    "closed": false,
+                    "open": "10:00",
+                    "close": "21:00"
+                  },
+                  {
+                    "day": "thu",
+                    "closed": false,
+                    "open": "10:00",
+                    "close": "23:30"
+                  },
+                  {
+                    "day": "fri",
+                    "closed": true,
+                    "open": "10:00",
+                    "close": "21:00"
+                  },
+                  {
+                    "day": "sat",
+                    "closed": false,
+                    "open": "18:00",
+                    "close": "02:00"
+                  },
+                  {
+                    "day": "sun",
+                    "closed": false,
+                    "open": "00:00",
+                    "close": "00:00"
+                  }
+                ],
+                "title": "Opening hours",
+                "note": "Closed on public holidays.",
+                "show_open_now": true,
+                "highlight_today": true,
+                "week_starts": "sat"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "খোলার সময়",
+                  "note": "সরকারি ছুটির দিনে বন্ধ।"
+                }
+              }
+            },
+            {
+              "id": "e_progress",
+              "type": "progress_bars",
+              "props": {
+                "items": [
+                  {
+                    "id": "i1",
+                    "label": "Happy customers",
+                    "value": 98.5
+                  },
+                  {
+                    "id": "i2",
+                    "label": "On-time delivery",
+                    "value": 95
+                  }
+                ],
+                "style": "ring",
+                "show_value": true,
+                "animate": false
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.i1.label": "সন্তুষ্ট গ্রাহক"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_b8a_charts",
+      "type": "section",
+      "props": {
+        "layout": "boxed",
+        "anchor": null
+      },
+      "style": {},
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_b8a_charts",
+          "type": "column",
+          "width": {
+            "base": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_stacked_col",
+              "type": "chart",
+              "props": {
+                "kind": "stacked-column",
+                "title": "Orders by channel",
+                "description": "Online and in-store orders per quarter.",
+                "labels": [
+                  "Q1",
+                  "Q2",
+                  "Q3"
+                ],
+                "series": [
+                  {
+                    "id": "s1",
+                    "name": "Online",
+                    "values": [
+                      120,
+                      180,
+                      240
+                    ]
+                  },
+                  {
+                    "id": "s2",
+                    "name": "In store",
+                    "values": [
+                      300,
+                      280,
+                      310
+                    ]
+                  }
+                ],
+                "unit": "",
+                "unit_position": "after",
+                "y_starts_at_zero": true,
+                "show_values": "none",
+                "show_legend": true,
+                "show_table": false,
+                "height": 320,
+                "data_source": "manual",
+                "source_product_id": null
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "series.s1.name": "অনলাইন",
+                  "labels.0": "প্রথম প্রান্তিক"
+                }
+              }
+            },
+            {
+              "id": "e_stacked_bar",
+              "type": "chart",
+              "props": {
+                "kind": "stacked-bar",
+                "title": "Stock by colour",
+                "description": "",
+                "labels": [
+                  "Mugs",
+                  "Plates"
+                ],
+                "series": [
+                  {
+                    "id": "s1",
+                    "name": "Blue",
+                    "values": [
+                      10,
+                      4.5
+                    ]
+                  },
+                  {
+                    "id": "s2",
+                    "name": "Green",
+                    "values": [
+                      0,
+                      8
+                    ]
+                  },
+                  {
+                    "id": "s3",
+                    "name": "Red",
+                    "values": [
+                      3,
+                      2
+                    ]
+                  }
+                ],
+                "unit": "pcs",
+                "unit_position": "after",
+                "y_starts_at_zero": true,
+                "show_values": "all-small",
+                "show_legend": true,
+                "show_table": true,
+                "height": 280,
+                "data_source": "manual",
+                "source_product_id": null
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_ratings",
+              "type": "chart",
+              "props": {
+                "kind": "bar",
+                "title": "Our customers rate us",
+                "description": "Approved reviews by stars.",
+                "labels": [
+                  "5"
+                ],
+                "series": [
+                  {
+                    "id": "s1",
+                    "name": "Reviews",
+                    "values": [
+                      0
+                    ]
+                  }
+                ],
+                "unit": "",
+                "unit_position": "after",
+                "y_starts_at_zero": true,
+                "show_values": "all-small",
+                "show_legend": false,
+                "show_table": false,
+                "height": 260,
+                "data_source": "store.rating_breakdown",
+                "source_product_id": "0199a5c1-0000-7000-8000-0000000b8b02"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "গ্রাহকেরা আমাদের যে রেটিং দেন"
+                }
+              }
+            },
+            {
+              "id": "e_per_category",
+              "type": "chart",
+              "props": {
+                "kind": "column",
+                "title": "Products per category",
+                "description": "",
+                "labels": [
+                  "Sample"
+                ],
+                "series": [
+                  {
+                    "id": "s1",
+                    "name": "Products",
+                    "values": [
+                      1
+                    ]
+                  }
+                ],
+                "unit": "",
+                "unit_position": "after",
+                "y_starts_at_zero": true,
+                "show_values": "none",
+                "show_legend": false,
+                "show_table": false,
+                "height": 300,
+                "data_source": "store.products_per_category",
+                "source_product_id": null
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
