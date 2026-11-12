@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "background": null,
+                                    "items": [
+                                        {
+                                            "icon": "shield-check",
+                                            "title": "Safety guarantee",
+                                            "text": "Tested for little hands"
+                                        },
+                                        {
+                                            "icon": "truck",
+                                            "title": "Free delivery",
+                                            "text": "On larger orders in the city"
+                                        },
+                                        {
+                                            "icon": "credit-card",
+                                            "title": "Easy payment",
+                                            "text": "Cash on delivery or transfer"
+                                        },
+                                        {
+                                            "icon": "headset",
+                                            "title": "Talk to us",
+                                            "text": "Every day, 10 am to 8 pm"
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

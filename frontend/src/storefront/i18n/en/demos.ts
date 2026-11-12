@@ -17,6 +17,7 @@ export const demos = {
   'demos.preset.vegan': 'Vegan',
   'demos.preset.handmade': 'Handmade',
   'demos.preset.classic': 'Classic',
+  'demos.preset.kids': 'Kids',
 
   'demos.colors': 'Theme colours',
   'demos.color.primary': 'Primary {value}',

@@ -17,6 +17,7 @@ export const demos: Translations<typeof en> = {
   'demos.preset.vegan': 'ভিগান',
   'demos.preset.handmade': 'হ্যান্ডমেড',
   'demos.preset.classic': 'ক্লাসিক',
+  'demos.preset.kids': 'কিডস',
 
   'demos.colors': 'থিমের রং',
   'demos.color.primary': 'প্রধান রং {value}',

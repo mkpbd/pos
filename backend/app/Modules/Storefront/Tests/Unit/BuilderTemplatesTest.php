@@ -106,7 +106,7 @@ class BuilderTemplatesTest extends TestCase
             $this->assertMatchesRegularExpression('/^[a-z0-9-]{2,80}$/', $t['id']);
             $this->assertSame(['id', 'scope', 'preset', 'category', 'name', 'description', 'thumbnail', 'allowed_in', 'requires'], array_keys($t), $t['id']);
             $this->assertContains($t['scope'], ['section', 'page', 'site'], $t['id']);
-            $this->assertContains($t['preset'], [null, 'vegan', 'handmade', 'classic'], $t['id']);
+            $this->assertContains($t['preset'], [null, 'vegan', 'handmade', 'classic', 'kids'], $t['id']);
             $this->assertMatchesRegularExpression('/^[a-z]{3,20}$/', $t['category'], $t['id']);
             $this->assertNotSame('', trim($t['name']));
             $this->assertLessThanOrEqual(120, mb_strlen($t['name']));
@@ -123,13 +123,19 @@ class BuilderTemplatesTest extends TestCase
         // The library: ≥ 24 section templates, 6+ per preset and neutral ones; the five pages; one site per preset.
         $sections = array_filter($manifest, fn (array $t) => $t['scope'] === 'section');
         $this->assertGreaterThanOrEqual(24, count($sections));
-        foreach (['vegan', 'handmade', 'classic', null] as $preset) {
+        foreach (['vegan', 'handmade', 'classic', 'kids', null] as $preset) {
             $this->assertGreaterThanOrEqual(6, count(array_filter($sections, fn (array $t) => $t['preset'] === $preset)), (string) $preset);
+        }
+        // K1: the kids look's sections, one per block of its homepage.
+        $kids = array_column(array_filter($sections, fn (array $t) => $t['preset'] === 'kids'), 'category', 'id');
+        $this->assertGreaterThanOrEqual(8, count($kids));
+        foreach (['hero', 'promo', 'products', 'countdown', 'newsletter', 'categories', 'testimonials', 'features'] as $category) {
+            $this->assertContains($category, $kids, "kids {$category}");
         }
         $pages = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'page'));
         $this->assertEqualsCanonicalizing(['about', 'contact', 'faq', 'sale', 'collection'], array_column($pages, 'category'));
         $sites = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'site'));
-        $this->assertEqualsCanonicalizing(['vegan', 'handmade', 'classic'], array_column($sites, 'preset'));
+        $this->assertEqualsCanonicalizing(['vegan', 'handmade', 'classic', 'kids'], array_column($sites, 'preset'));
         foreach ($sites as $site) {
             $this->assertSame(['page', 'header', 'footer', 'zone'], $site['allowed_in']);
         }

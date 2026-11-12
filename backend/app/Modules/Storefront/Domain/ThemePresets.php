@@ -136,6 +136,42 @@ final class ThemePresets
                     'top_bar' => 'utility',
                 ],
             ],
+            // K1: playful baby and kids store: warm amber and lavender with a mint-teal highlight on a light
+            // canvas, rounded headings, pill buttons and arched product cards. The amber carries dark text
+            // (white on it fails AA); the lavender (also the commerce menu bar) is dark enough for white
+            // text and as a text colour; the coral sale colour carries white text (the card's ribbon).
+            'kids' => [
+                'preset' => 'kids',
+                'colors' => [
+                    'primary' => '#ffb020',
+                    'primary_foreground' => '#3d2800',
+                    'accent' => '#7a5cc8',
+                    'accent_foreground' => '#ffffff',
+                    'highlight' => '#1f7a63',
+                    'sale' => '#c24626',
+                    'heading' => '#444444',
+                    'text' => '#5c6166',
+                    'canvas' => '#f3f7fa',
+                    'surface' => '#ffffff',
+                    'border' => '#e1e1e1',
+                    'button' => '#ffb020',
+                    'button_foreground' => '#3d2800',
+                    'link' => '#7a5cc8',
+                    'button_hover' => null,
+                ],
+                'typography' => self::typography('baloo', 'poppins'),
+                'shape' => ['button_style' => 'pill', 'card_radius' => 16],
+                'layout' => [
+                    'container_width' => 1170,
+                    'sticky_header' => false,
+                    'header_style' => 'commerce',
+                    'footer_style' => 'columns',
+                    'card_style' => 'arched',
+                    'hero_style' => 'full',
+                    'heading_case' => 'normal',
+                    'top_bar' => 'none',
+                ],
+            ],
         ];
     }
 
@@ -151,6 +187,7 @@ final class ThemePresets
             'vegan' => 'Vegan Store',
             'handmade' => 'Handmade',
             'classic' => 'Classic Shop',
+            'kids' => 'Kids Store',
         };
     }
 
@@ -161,6 +198,7 @@ final class ThemePresets
             'vegan' => 'Organic and modern: fresh greens with a warm yellow accent on cream, lowercase headings and a scrolling announcement.',
             'handmade' => 'Premium and minimal: terracotta and dark brown on off-white, serif headings, a centred header and image-led product cards.',
             'classic' => 'Traditional, dense shop: black and blue on white, uppercase headings, a wide search bar and detailed product cards.',
+            'kids' => 'Playful baby and kids store: warm amber and lavender on a light canvas, rounded headings, a menu bar under a wide search and product cards with an arched label.',
         };
     }
 

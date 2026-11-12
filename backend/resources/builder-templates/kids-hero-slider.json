@@ -1,0 +1,92 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Soft starts",
+                                            "kicker": "New season",
+                                            "title": "Soft starts for little sprouts",
+                                            "subtitle": "Organic cotton, wooden toys and calm nursery pieces, picked with care.",
+                                            "button_label": "Discover",
+                                            "link_url": "/shop",
+                                            "secondary_button_label": "Shop now",
+                                            "secondary_link_url": "/shop",
+                                            "text_color": "#444444",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "kids/banner-hero-1.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "নতুন মৌসুম",
+                                                    "title": "ছোট্ট সোনামণিদের কোমল শুরু",
+                                                    "subtitle": "অর্গানিক সুতি, কাঠের খেলনা আর শান্ত নার্সারি, যত্ন করে বাছাই।",
+                                                    "button_label": "দেখুন",
+                                                    "secondary_button_label": "এখনই কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Little outfits",
+                                            "kicker": "This week only",
+                                            "title": "Up to 20 % off little outfits",
+                                            "subtitle": "Dresses, bodysuits and cardigans from newborn to five years.",
+                                            "button_label": "Discover",
+                                            "link_url": "/shop",
+                                            "secondary_button_label": "Shop now",
+                                            "secondary_link_url": "/shop",
+                                            "text_color": "#444444",
+                                            "text_position": "center",
+                                            "image": {
+                                                "asset": "kids/banner-hero-2.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "শুধু এই সপ্তাহে",
+                                                    "title": "ছোটদের পোশাকে ২০ % পর্যন্ত ছাড়",
+                                                    "button_label": "দেখুন",
+                                                    "secondary_button_label": "এখনই কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

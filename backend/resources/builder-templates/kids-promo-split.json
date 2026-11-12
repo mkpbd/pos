@@ -1,0 +1,124 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "3-col-split"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Shop by look",
+                                            "kicker": "0–24 months",
+                                            "title": "Shop by look",
+                                            "button_label": "See outfits",
+                                            "link_url": "/shop",
+                                            "text_color": "#444444",
+                                            "image": {
+                                                "asset": "kids/banner-look.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "০–২৪ মাস",
+                                                    "title": "লুক দেখে কিনুন",
+                                                    "button_label": "পোশাক দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Little feet",
+                                            "kicker": "Shoes & socks",
+                                            "title": "Ready for little feet",
+                                            "button_label": "Shop shoes",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "kids/banner-socks.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "জুতা ও মোজা",
+                                                    "title": "ছোট্ট পায়ের জন্য তৈরি",
+                                                    "button_label": "জুতা কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Toy sale",
+                                            "kicker": "Up to 20 % off",
+                                            "title": "Wooden toys with free delivery on larger orders",
+                                            "button_label": "Shop toys",
+                                            "link_url": "/shop",
+                                            "text_color": "#3d2800",
+                                            "image": {
+                                                "asset": "kids/banner-toys-sale.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "২০ % পর্যন্ত ছাড়",
+                                                    "title": "কাঠের খেলনা, বড় অর্ডারে ফ্রি ডেলিভারি",
+                                                    "button_label": "খেলনা কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Sweet dreams",
+                                            "kicker": "Nursery",
+                                            "title": "Sweet dreams start here",
+                                            "button_label": "Shop nursery",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "kids/banner-dreams.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "নার্সারি",
+                                                    "title": "মিষ্টি ঘুমের শুরু এখানে",
+                                                    "button_label": "নার্সারি দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

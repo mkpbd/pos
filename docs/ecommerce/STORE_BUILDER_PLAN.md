@@ -312,3 +312,11 @@ Original questions:
   - the result is validated in the target context and returned. Nothing is written into a document; the editor inserts it as one undo step.
 - **Start from demo** writes drafts only: the theme draft gets the preset, and home, header, footer and listing top are created or have their draft replaced (published versions are kept). **Publish all** publishes the chosen drafts and the theme in one transaction.
 - **Editor:** a Templates tab (All / this look / Mine, categories, search, insert by click or drag), Save as template, and a "Start from a demo look" card with a review panel and Publish all.
+
+### As built — K1 Kids demo look (2026-11-12)
+
+- **Preset and card:** preset `kids` and card style `arched`; existing presets and their output are unchanged. The lavender commerce menu bar is a kids-only CSS rule keyed on `data-sf-preset`.
+- **Demo store:** Little Sprouts is the fourth demo organization (`DemoThemesSeeder`, data in `demo-themes/kids.php`, photos in `images/kids/`).
+- **Templates:**
+  - `site-kids` plus 10 kids section templates, with thumbnails.
+  - The kids "Deal of the week" template puts the photo next to hot deals in two columns on a mint panel, because `hot_deals` has no image field.

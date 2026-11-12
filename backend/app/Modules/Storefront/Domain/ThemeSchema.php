@@ -18,14 +18,15 @@ final class ThemeSchema
     public const BUTTON_STYLES = ['pill', 'rounded', 'square'];
 
     /** T1: the look the theme started from (ThemePresets); every value stays editable. */
-    public const PRESETS = ['default', 'vegan', 'handmade', 'classic'];
+    public const PRESETS = ['default', 'vegan', 'handmade', 'classic', 'kids'];
 
     // T1: layout variants. The first of each list is today's look (the default).
     public const HEADER_STYLES = ['standard', 'centered', 'commerce'];
 
     public const FOOTER_STYLES = ['columns', 'showcase', 'widgets'];
 
-    public const CARD_STYLES = ['standard', 'minimal', 'commerce'];
+    /** K1: `arched` — white image area over a primary-coloured caption block with an arched top edge (kids). */
+    public const CARD_STYLES = ['standard', 'minimal', 'commerce', 'arched'];
 
     public const HERO_STYLES = ['full', 'tiles', 'sale'];
 

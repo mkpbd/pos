@@ -456,6 +456,164 @@
       "requires": []
     },
     {
+      "id": "kids-hero-slider",
+      "scope": "section",
+      "preset": "kids",
+      "category": "hero",
+      "name": "Little sprouts hero slider",
+      "description": "Two full-width slides with a small kicker, a big headline and two round buttons, on a bright nursery and a rail of baby clothes.",
+      "thumbnail": "/builder-templates/kids-hero-slider.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "kids-promo-split",
+      "scope": "section",
+      "preset": "kids",
+      "category": "promo",
+      "name": "Split promo tiles",
+      "description": "Four photo tiles: two tall ones at the sides and a stacked pair in the middle — outfits, little feet, a toy offer and the nursery.",
+      "thumbnail": "/builder-templates/kids-promo-split.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "kids-collection-tabs",
+      "scope": "section",
+      "preset": "kids",
+      "category": "products",
+      "name": "New collection tabs",
+      "description": "Round tabs of products — popular, new arrivals and best sellers — under one heading.",
+      "thumbnail": "/builder-templates/kids-collection-tabs.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "kids-deal-of-the-week",
+      "scope": "section",
+      "preset": "kids",
+      "category": "countdown",
+      "name": "Deal of the week",
+      "description": "A mint panel with a teddy-bear photo beside the countdown and products of your running flash sales. Hidden while no flash sale is running.",
+      "thumbnail": "/builder-templates/kids-deal-of-the-week.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "kids-hot-products",
+      "scope": "section",
+      "preset": "kids",
+      "category": "products",
+      "name": "Hot products grid",
+      "description": "A four-column grid of your products on sale, with a link to the shop.",
+      "thumbnail": "/builder-templates/kids-hot-products.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "kids-newsletter-band",
+      "scope": "section",
+      "preset": "kids",
+      "category": "newsletter",
+      "name": "Coral newsletter band",
+      "description": "A coral band with a sign-up form for new arrivals and parent tips, beside a flat lay of little clothes.",
+      "thumbnail": "/builder-templates/kids-newsletter-band.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "kids-categories-carousel",
+      "scope": "section",
+      "preset": "kids",
+      "category": "categories",
+      "name": "Categories and best sellers",
+      "description": "Your top-level categories as round photo tiles, followed by a sliding row of best sellers.",
+      "thumbnail": "/builder-templates/kids-categories-carousel.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "kids-testimonials",
+      "scope": "section",
+      "preset": "kids",
+      "category": "testimonials",
+      "name": "Happy parents",
+      "description": "Three short quotes from parents with star ratings on a soft mint panel.",
+      "thumbnail": "/builder-templates/kids-testimonials.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "kids-collection-trio",
+      "scope": "section",
+      "preset": "kids",
+      "category": "promo",
+      "name": "Girls, play time and boys",
+      "description": "Three photo tiles side by side: the girls collection, toys for play time and the boys collection.",
+      "thumbnail": "/builder-templates/kids-collection-trio.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "kids-features",
+      "scope": "section",
+      "preset": "kids",
+      "category": "features",
+      "name": "Parent promises",
+      "description": "Four icons with short promises: safety, delivery, payment and a phone line.",
+      "thumbnail": "/builder-templates/kids-features.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "neutral-cta-band",
       "scope": "section",
       "preset": null,
@@ -722,6 +880,26 @@
         "menus",
         "promotions",
         "blog"
+      ]
+    },
+    {
+      "id": "site-kids",
+      "scope": "site",
+      "preset": "kids",
+      "category": "site",
+      "name": "Kids Store",
+      "description": "Little Sprouts' look: warm amber and lavender on a light canvas with rounded headings, a nursery slider, split promo tiles, product tabs, a deal of the week and arched product cards.",
+      "thumbnail": "/builder-templates/site-kids.png",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions"
       ]
     }
   ]

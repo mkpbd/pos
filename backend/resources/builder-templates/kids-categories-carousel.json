@@ -1,0 +1,81 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "category_strip",
+                            "props": {
+                                "title": "Categories",
+                                "subtitle": "Clothes, toys, nursery and more",
+                                "config": {
+                                    "source": "top_level",
+                                    "limit": 6
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ক্যাটাগরি",
+                                    "subtitle": "পোশাক, খেলনা, নার্সারি আরও অনেক কিছু"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "product_carousel",
+                            "props": {
+                                "title": "Best sellers",
+                                "subtitle": "What parents are buying this week",
+                                "config": {
+                                    "source": "best_sellers",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সবচেয়ে বেশি বিক্রি",
+                                    "subtitle": "এই সপ্তাহে মা-বাবারা যা কিনছেন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

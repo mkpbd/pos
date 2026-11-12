@@ -1,0 +1,115 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#e3f5ee"
+                    },
+                    "border": {
+                        "radius": {
+                            "tl": "24px",
+                            "tr": "24px",
+                            "br": "24px",
+                            "bl": "24px"
+                        }
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "24px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 34,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "kids/banner-deal.jpg"
+                                },
+                                "alt": "Teddy bear beside a wicker basket with a cream knitted blanket",
+                                "link": null,
+                                "aspect": "3:4",
+                                "fit": "cover"
+                            },
+                            "style": {
+                                "base": {
+                                    "border": {
+                                        "radius": {
+                                            "tl": "24px",
+                                            "tr": "24px",
+                                            "br": "24px",
+                                            "bl": "24px"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 66,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "hot_deals",
+                            "props": {
+                                "title": "Deal of the week",
+                                "subtitle": "Special offer — while the timer runs",
+                                "config": {
+                                    "promotion_id": null,
+                                    "limit": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সপ্তাহের সেরা অফার",
+                                    "subtitle": "বিশেষ অফার — টাইমার চলা পর্যন্ত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

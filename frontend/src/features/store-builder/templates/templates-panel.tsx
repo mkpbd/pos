@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { DocumentContext } from '@/storefront/builder/types'
 import type { Dragged } from '../drop-targets'
-import { useDeleteTemplateMutation, useTemplatesQuery, type BuilderTemplate } from './api'
+import { isTemplatePreset, useDeleteTemplateMutation, useTemplatesQuery, type BuilderTemplate } from './api'
 import { categoryLabel, filterTemplates, PRESET_LABELS, templateCategories, usableIn, type TemplateFilter } from './model'
 import { TemplateThumbnail } from './template-thumbnail'
 import type { TemplateInserter } from './use-insert-template'
@@ -22,7 +22,6 @@ import type { TemplateInserter } from './use-insert-template'
  * canvas like an element. Own templates can be deleted here.
  */
 
-const isPreset = (value: string | null | undefined): value is keyof typeof PRESET_LABELS => value === 'vegan' || value === 'handmade' || value === 'classic'
 
 function TemplateCard({ template, pending, disabled, onInsert, onDelete }: { template: BuilderTemplate; pending: boolean; disabled: boolean; onInsert: () => void; onDelete?: () => void }) {
   const dragged: Dragged = { kind: 'template', id: template.id, type: 'section', name: template.name }
@@ -85,7 +84,7 @@ export function TemplatesPanel({ context, currentPreset, inserter, enabled = tru
   const [deleting, setDeleting] = useState<BuilderTemplate | null>(null)
 
   const usable = useMemo(() => usableIn(query.data ?? [], context), [query.data, context])
-  const preset = isPreset(currentPreset) ? currentPreset : null
+  const preset = isTemplatePreset(currentPreset) ? currentPreset : null
   const hasLook = preset !== null && usable.some((t) => t.preset === preset)
   const effectiveFilter: TemplateFilter = filter === 'look' && !hasLook ? 'all' : filter
   const scoped = useMemo(() => filterTemplates(usable, { filter: effectiveFilter, preset, category: null, search: '' }), [usable, effectiveFilter, preset])

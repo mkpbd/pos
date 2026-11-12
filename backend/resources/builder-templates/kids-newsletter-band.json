@@ -1,0 +1,48 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "newsletter",
+                            "props": {
+                                "title": "Join the Little Sprouts club",
+                                "subtitle": null,
+                                "config": {
+                                    "text": "New arrivals, parent tips and members-only offers, twice a month. Unsubscribe any time.",
+                                    "button_label": "Subscribe",
+                                    "image_media_id": {
+                                        "asset": "kids/newsletter.jpg"
+                                    },
+                                    "background": "#c24626",
+                                    "foreground": "#ffffff"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "লিটল স্প্রাউটস ক্লাবে যোগ দিন",
+                                    "text": "নতুন পণ্য, মা-বাবার জন্য টিপস আর সদস্যদের অফার, মাসে দুবার। যেকোনো সময় বন্ধ করা যায়।",
+                                    "button_label": "সাবস্ক্রাইব"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

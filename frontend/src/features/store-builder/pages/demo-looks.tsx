@@ -13,12 +13,12 @@ import { Label } from '@/components/ui/label'
 import { useThemeDraftQuery, useThemePresetsQuery } from '@/features/storefront/api'
 import { ApiError } from '@/lib/api/client'
 import type { DocumentSummary } from '../api'
-import { usePublishAllMutation, useSiteTemplatesQuery, useStartFromDemoMutation, type BuilderTemplate, type DemoParts, type StartFromDemoResult, type TemplatePreset } from '../templates/api'
+import { isTemplatePreset, usePublishAllMutation, useSiteTemplatesQuery, useStartFromDemoMutation, type BuilderTemplate, type DemoParts, type StartFromDemoResult } from '../templates/api'
 import { TemplateThumbnail } from '../templates/template-thumbnail'
 import { liveUrl } from './page-helpers'
 
 /*
- * "Start from a demo look" on the pages list (B5): the three demo stores' looks (site templates),
+ * "Start from a demo look" on the pages list (B5): the demo stores' looks (site templates),
  * a dialog choosing what is replaced — always as drafts — then a review panel with preview links
  * and Publish all. The live store changes only on publish.
  */
@@ -51,10 +51,6 @@ function existingDocument(documents: DocumentSummary[], part: PartKey): Document
 }
 
 const KIND_LABELS: Record<string, string> = { page: 'Page', header: 'Header', footer: 'Footer', zone: 'Shop pages' }
-
-function isPreset(value: string | null): value is TemplatePreset {
-  return value === 'vegan' || value === 'handmade' || value === 'classic'
-}
 
 function Swatches({ colors }: { colors: string[] }) {
   if (colors.length === 0) return null
@@ -117,9 +113,9 @@ function DemoLookDialog({ look, documents, themeHasChanges, onClose, onApplied }
           </Button>
           <Button
             type="button"
-            disabled={chosen.length === 0 || start.isPending || !look || !isPreset(look.preset)}
+            disabled={chosen.length === 0 || start.isPending || !look || !isTemplatePreset(look.preset)}
             onClick={() => {
-              if (!look || !isPreset(look.preset)) return
+              if (!look || !isTemplatePreset(look.preset)) return
               const applied = { ...include }
               start.mutate(
                 { preset: look.preset, include: applied },
@@ -294,7 +290,7 @@ export function DemoLooksCard({ documents, canManage, canPublish }: { documents:
     return <ReviewPanel review={review} canPublish={canPublish} onPublished={() => setReview({ ...review, published: true })} onClose={() => setReview(null)} />
   }
 
-  const sites = (looks.data ?? []).filter((t) => t.scope === 'site' && isPreset(t.preset))
+  const sites = (looks.data ?? []).filter((t) => t.scope === 'site' && isTemplatePreset(t.preset))
   if (looks.isSuccess && sites.length === 0) return null
   const colorsOf = (preset: string | null) => {
     const colors = presets.data?.find((p) => p.key === preset)?.theme.colors as Record<string, string | null | undefined> | undefined
@@ -316,12 +312,13 @@ export function DemoLooksCard({ documents, canManage, canPublish }: { documents:
         ) : looks.error ? (
           <ErrorState title="The demo looks couldn’t be loaded" error={looks.error} onRetry={() => void looks.refetch()} />
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Demo looks">
+          // One, two or four per row (never a lone card on a row of three): 1 → 2 × 2 → 4 across.
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Demo looks">
             {sites.map((look) => (
               <li key={look.id} className="flex flex-col gap-3 rounded-lg border p-3" data-testid={`demo-look-${look.preset}`}>
                 <TemplateThumbnail template={look} />
                 <div className="flex flex-1 flex-col gap-1">
-                  <p className="flex items-center justify-between gap-2 font-medium">
+                  <p className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-medium">
                     {look.name}
                     <Swatches colors={colorsOf(look.preset)} />
                   </p>

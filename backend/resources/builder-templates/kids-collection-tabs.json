@@ -1,0 +1,58 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "product_tabs",
+                            "props": {
+                                "title": "New collection",
+                                "subtitle": "Fresh picks for the little ones",
+                                "config": {
+                                    "limit": 8,
+                                    "tabs": [
+                                        {
+                                            "label": "Popular",
+                                            "source": "featured",
+                                            "category_id": null
+                                        },
+                                        {
+                                            "label": "New arrivals",
+                                            "source": "new_arrivals",
+                                            "category_id": null
+                                        },
+                                        {
+                                            "label": "Best sellers",
+                                            "source": "best_sellers",
+                                            "category_id": null
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "নতুন সংগ্রহ",
+                                    "subtitle": "ছোট্টদের জন্য নতুন বাছাই"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

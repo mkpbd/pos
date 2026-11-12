@@ -37,7 +37,7 @@ function store(layout: Partial<LayoutVariants>, overrides: Partial<StorefrontBoo
 
 const post = (slug: string): BlogPostRow => ({ slug, title: `Post ${slug}`, excerpt: null, cover: null, category: null, author: null, published_at: '2026-10-01T10:00:00Z', reading_minutes: 3 })
 
-function serve(bootstrap: StorefrontBootstrap, options: { sections?: StoreSection[]; products?: Partial<Record<string, ProductCard[]>>; posts?: BlogPostRow[] } = {}) {
+function serve(bootstrap: StorefrontBootstrap, options: { sections?: StoreSection[]; products?: Partial<Record<string, ProductCard[]>>; posts?: BlogPostRow[]; routes?: Parameters<typeof mockApi>[0] } = {}) {
   return mockApi({
     'GET /store/bootstrap': ok(bootstrap),
     'GET /store/homepage': ok({ sections: options.sections ?? [], preview: false }),
@@ -46,6 +46,7 @@ function serve(bootstrap: StorefrontBootstrap, options: { sections?: StoreSectio
     'GET /store/wishlist': ok({ items: [] }),
     'GET /store/products': (_init, url) => ({ body: listingBody(options.products?.[url.searchParams.get('sort') ?? ''] ?? []) }),
     'GET /store/blog': ok(options.posts ?? [], { current_page: 1, per_page: 9, total: (options.posts ?? []).length, last_page: 1 }),
+    ...options.routes,
   })
 }
 
@@ -334,6 +335,114 @@ describe('product card variants', () => {
 
     const card = await screen.findByTestId('product-card')
     expect(card).not.toHaveAttribute('data-card-style')
+  })
+})
+
+describe('arched product card (K1)', () => {
+  const romper = productCard('cotton-romper', { on_sale: true, discount_percent: 20, compare_at_price: '150.00', is_new: true, category: { name: 'Baby girls', slug: 'baby-girls' } })
+  const bunny = productCard('plush-bunny')
+  const dress = productCard('party-dress', { price: '80.00', price_max: '140.00', variant_count: 3, default_variant_id: null })
+  const boots = productCard('rain-boots', { in_stock: false })
+  const kids = (routes?: Parameters<typeof mockApi>[0]) => serve(store({ card_style: 'arched', header_style: 'commerce' }, { preset: 'kids' }), { sections: [grid([romper, bunny, dress, boots])], routes })
+
+  it('a white image, a corner ribbon on sale and an arched caption block with name, category and struck price', async () => {
+    kids()
+    renderRoutes(storefrontRoutes)
+
+    const [card, plain] = await screen.findAllByTestId('product-card')
+    expect(card).toHaveAttribute('data-card-style', 'arched')
+    const labels = within(card!).getByRole('list', { name: 'Product labels' })
+    expect(within(labels).getByTestId('sale-ribbon')).toHaveTextContent('−20 %')
+    expect(within(labels).getByText('New')).toBeInTheDocument()
+    expect(within(plain!).queryByTestId('sale-ribbon')).not.toBeInTheDocument()
+    expect(within(plain!).queryByRole('list', { name: 'Product labels' })).not.toBeInTheDocument()
+
+    const caption = within(card!).getByTestId('arched-caption')
+    expect(within(caption).getByTestId('card-arch')).toHaveAttribute('aria-hidden', 'true')
+    const name = within(caption).getByRole('heading', { name: 'Cotton Romper' })
+    expect(name).toHaveClass('font-heading', 'text-inherit')
+    expect(within(name).getByRole('link')).toHaveAttribute('href', '/product/cotton-romper')
+    expect(within(caption).getByText('Baby girls')).toBeInTheDocument()
+    expect(within(caption).getByTestId('compare-price')).toHaveTextContent('৳150.00')
+    expect(within(caption).getByTestId('price')).toHaveTextContent('৳120.00')
+  })
+
+  it('text on the block uses the primary pair at rest and the accent pair on hover or focus (AA by the theme check)', async () => {
+    kids()
+    renderRoutes(storefrontRoutes)
+
+    const caption = within((await screen.findAllByTestId('product-card'))[0]!).getByTestId('arched-caption')
+    expect(caption).toHaveClass(
+      'bg-sf-primary',
+      'text-sf-primary-foreground',
+      'group-hover:bg-sf-accent',
+      'group-hover:text-sf-accent-foreground',
+      'group-focus-within:bg-sf-accent',
+      'group-focus-within:text-sf-accent-foreground',
+    )
+    expect(within(caption).getByTestId('card-arch')).toHaveClass('text-sf-primary', 'group-hover:text-sf-accent', 'group-focus-within:text-sf-accent')
+    // The price line drops its own colours and takes the block's foreground.
+    const price = within(caption).getByTestId('price').parentElement!
+    expect(price).toHaveClass('[&_[data-testid=price]]:text-current', '[&_[data-testid=compare-price]]:text-current')
+  })
+
+  it('round cart on the arch, wishlist and quick view at the image’s right: shown on hover or keyboard focus, a row on touch', async () => {
+    kids()
+    renderRoutes(storefrontRoutes)
+    const user = userEvent.setup()
+
+    const [card, , dress, boots] = await screen.findAllByTestId('product-card')
+    const actions = within(card!).getByTestId('card-actions')
+    // Touch screens: a visible row; hover screens: the row dissolves and the buttons float.
+    expect(actions).toHaveClass('flex', '[@media(hover:hover)]:contents')
+    const cart = within(actions).getByRole('button', { name: 'Add Cotton Romper to the cart' })
+    expect(cart.parentElement).toHaveClass('[@media(hover:hover)]:absolute', '[@media(hover:hover)]:-top-6', 'group-hover:opacity-100', '[@media(hover:hover)]:group-focus-within:opacity-100')
+    const side = within(card!).getByTestId('card-hover-actions')
+    expect(side).toHaveClass('[@media(hover:hover)]:right-3', 'group-hover:opacity-100', '[@media(hover:hover)]:group-focus-within:opacity-100')
+    const wishlist = within(side).getByRole('button', { name: 'Add Cotton Romper to the wishlist' })
+    const quickView = within(side).getByRole('button', { name: 'Quick view: Cotton Romper' })
+
+    // Keyboard: the name, then the cart, wishlist and quick view.
+    await waitFor(() => expect(wishlist).toBeEnabled())
+    within(card!).getByRole('link', { name: 'Cotton Romper' }).focus()
+    await user.tab()
+    expect(cart).toHaveFocus()
+    await user.tab()
+    expect(wishlist).toHaveFocus()
+    await user.tab()
+    expect(quickView).toHaveFocus()
+
+    // Several variants: a round link to choose options; sold out: a disabled button and the label.
+    expect(within(dress!).getByRole('link', { name: 'Choose options: Party Dress' })).toHaveAttribute('href', '/product/party-dress')
+    expect(within(boots!).getByRole('button', { name: 'Rain Boots is out of stock' })).toBeDisabled()
+    expect(within(boots!).getByRole('list', { name: 'Product labels' })).toHaveTextContent('Out of stock')
+  })
+
+  it('the round cart button adds one unit', async () => {
+    const posts: unknown[] = []
+    kids({
+      'POST /store/cart/items': (init) => {
+        posts.push(JSON.parse(String(init.body)))
+        return ok(cartFixture([cartLine('l-1')]))
+      },
+    })
+    renderRoutes(storefrontRoutes)
+    const user = userEvent.setup()
+
+    const [card] = await screen.findAllByTestId('product-card')
+    await user.click(within(card!).getByRole('button', { name: 'Add Cotton Romper to the cart' }))
+    await waitFor(() => expect(posts).toEqual([{ variant_id: 'v-cotton-romper', quantity: '1' }]))
+  })
+
+  it('kids: the commerce header keeps its menu bar (coloured by the kids rule in storefront.css)', async () => {
+    viewport({ desktop: true })
+    kids()
+    renderRoutes(storefrontRoutes)
+
+    await screen.findByTestId('site-header')
+    expect(document.documentElement).toHaveAttribute('data-sf-preset', 'kids')
+    expect(document.documentElement).toHaveAttribute('data-sf-card', 'arched')
+    expect(screen.getByRole('navigation', { name: 'Main' })).toHaveAttribute('data-appearance', 'commerce')
   })
 })
 

@@ -29,7 +29,7 @@ class BuilderTemplateController
      * List templates
      *
      * The built-in templates then the organization's own (another organization's are never
-     * listed), without content: `[{id, scope: section|page|site, preset: vegan|handmade|classic|null,
+     * listed), without content: `[{id, scope: section|page|site, preset: vegan|handmade|classic|kids|null,
      * category, name, description, thumbnail_url|null, allowed_in: context[], requires: (banners |
      * menus | promotions | blog)[], source: builtin|mine, created_at|null}]`. Filters: `scope`,
      * `preset` (a preset key, or `none` for templates of no preset), `context` (page | cms |
@@ -99,7 +99,7 @@ class BuilderTemplateController
      * Start from a demo look
      *
      * `{include?: {theme, home, header, footer, listing_top}}` (each true by default) applies the
-     * preset's site template (vegan, handmade, classic) to **drafts only**: the theme draft gets
+     * preset's site template (vegan, handmade, classic, kids) to **drafts only**: the theme draft gets
      * the preset (logo, palette and content kept), and the home page, header, footer and the
      * listing-top zone get the template's design as their draft — created, or the existing draft
      * replaced (published versions untouched; open editors get 409 DRAFT_CONFLICT). Photos are

@@ -11,7 +11,7 @@ import type { BuilderTemplate, TemplatePreset } from './api'
 
 export type TemplateFilter = 'all' | 'look' | 'mine'
 
-export const PRESET_LABELS: Record<TemplatePreset, string> = { vegan: 'Vegan', handmade: 'Handmade', classic: 'Classic' }
+export const PRESET_LABELS: Record<TemplatePreset, string> = { vegan: 'Vegan', handmade: 'Handmade', classic: 'Classic', kids: 'Kids' }
 
 /** Known categories with nicer names; others are humanized ("feature-strip" → "Feature strip"). */
 const CATEGORY_LABELS: Record<string, string> = {

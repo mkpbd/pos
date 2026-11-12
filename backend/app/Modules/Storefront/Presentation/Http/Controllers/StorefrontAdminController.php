@@ -126,7 +126,7 @@ class StorefrontAdminController
     /**
      * Theme presets
      *
-     * The ready-made looks (`default`, `vegan`, `handmade`, `classic`), each with the complete theme it
+     * The ready-made looks (`default`, `vegan`, `handmade`, `classic`, `kids`), each with the complete theme it
      * produces on a blank theme. Applying one (to the draft, B3) replaces colours, fonts, shape and layout only.
      */
     public function themePresets(): JsonResponse

@@ -71,6 +71,12 @@ describe('layout variants', () => {
     expect(resolveLayout({ container_width: 1170, sticky_header: true, header_style: 'floating' as never, card_style: 'minimal' })).toEqual({ ...DEFAULT_LAYOUT, card_style: 'minimal' })
   })
 
+  it('K1: accepts the arched card and marks the kids preset', () => {
+    const base = bootstrapFixture().theme
+    expect(resolveLayout({ ...base.layout, card_style: 'arched', header_style: 'commerce' })).toEqual({ ...DEFAULT_LAYOUT, card_style: 'arched', header_style: 'commerce' })
+    expect(themeDataAttributes({ ...base, preset: 'kids', layout: { ...base.layout, card_style: 'arched' } })).toMatchObject({ 'data-sf-preset': 'kids', 'data-sf-card': 'arched' })
+  })
+
   it('exposes the preset and variants as data attributes', () => {
     const base = bootstrapFixture().theme
     const attributes = themeDataAttributes({ ...base, preset: 'vegan', layout: { ...base.layout, top_bar: 'ticker' } })

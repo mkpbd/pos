@@ -111,7 +111,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::delete('templates/{template}', [BuilderTemplateController::class, 'destroy'])->whereUuid('template');
         // B5: a demo look into drafts only (no storefront.publish needed), then publish them together.
         Route::post('start-from-demo/{preset}', [BuilderTemplateController::class, 'startFromDemo'])
-            ->whereIn('preset', ['vegan', 'handmade', 'classic'])->middleware('throttle:builder-templates');
+            ->whereIn('preset', ['vegan', 'handmade', 'classic', 'kids'])->middleware('throttle:builder-templates');
         Route::post('publish-all', [BuilderTemplateController::class, 'publishAll'])->middleware('can:storefront.publish');
     });
 });

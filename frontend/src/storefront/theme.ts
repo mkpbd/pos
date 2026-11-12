@@ -43,7 +43,7 @@ export const DEFAULT_LAYOUT: LayoutVariants = {
 const LAYOUT_OPTIONS: { [K in keyof LayoutVariants]: readonly LayoutVariants[K][] } = {
   header_style: ['standard', 'centered', 'commerce'],
   footer_style: ['columns', 'showcase', 'widgets'],
-  card_style: ['standard', 'minimal', 'commerce'],
+  card_style: ['standard', 'minimal', 'commerce', 'arched'],
   hero_style: ['full', 'tiles', 'sale'],
   heading_case: ['normal', 'lowercase', 'uppercase'],
   top_bar: ['none', 'ticker', 'utility'],

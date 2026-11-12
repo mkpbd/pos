@@ -3,8 +3,8 @@ import { cloneSample } from '@/storefront/builder/test-payload'
 import type { BuilderContent, Section } from '@/storefront/builder/types'
 import { checkDocument } from '../check'
 import { collectIds } from '../tree'
-import type { BuilderTemplate } from './api'
-import { categoryLabel, filterTemplates, insertionIndex, insertSections, prepareSections, templateCategories, usableIn } from './model'
+import { isTemplatePreset, type BuilderTemplate } from './api'
+import { PRESET_LABELS, categoryLabel, filterTemplates, insertionIndex, insertSections, prepareSections, templateCategories, usableIn } from './model'
 import { insertedMessage } from './use-insert-template'
 
 const template = (over: Partial<BuilderTemplate>): BuilderTemplate => ({
@@ -89,5 +89,13 @@ describe('templates model', () => {
     expect(insertedMessage('Fresh hero', {})).toBe('“Fresh hero” added.')
     expect(insertedMessage('Fresh hero', { imported: { media: 3, banners: 1, banners_reused: 0 } })).toBe('“Fresh hero” added. 3 images were added to your media library and 1 banner was created.')
     expect(insertedMessage('Fresh hero', { imported: { media: 1 } })).toBe('“Fresh hero” added. 1 image was added to your media library.')
+  })
+})
+
+describe('template presets (K1)', () => {
+  it('knows the four demo looks, kids included; the default theme and unknown keys have no templates', () => {
+    for (const preset of ['vegan', 'handmade', 'classic', 'kids']) expect(isTemplatePreset(preset)).toBe(true)
+    for (const other of ['default', 'toys', '', null, undefined]) expect(isTemplatePreset(other)).toBe(false)
+    expect(PRESET_LABELS.kids).toBe('Kids')
   })
 })

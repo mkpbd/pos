@@ -64,7 +64,7 @@ const LAYOUT_FIELDS: { key: LayoutVariantKey; label: string; hint: string; optio
   { key: 'top_bar', label: 'Top bar', hint: 'Above the header on wide screens.', options: { none: 'Announcement bar', ticker: 'Scrolling announcement', utility: 'Contact & account links' } },
   { key: 'header_style', label: 'Header', hint: 'Phones always get the compact header.', options: { standard: 'Standard — search beside the logo', centered: 'Centered brand, search icon', commerce: 'Shop — wide search, cart total' } },
   { key: 'hero_style', label: 'Hero slider', hint: 'How the hero slider section is shown.', options: { full: 'Full-width slides', tiles: 'Up to three editorial tiles', sale: 'Sale slides — bold uppercase' } },
-  { key: 'card_style', label: 'Product cards', hint: 'Grids and carousels; list view stays standard.', options: { standard: 'Standard', minimal: 'Minimal — image-led, no buttons', commerce: 'Shop — hover actions, ratings' } },
+  { key: 'card_style', label: 'Product cards', hint: 'Grids and carousels; list view stays standard.', options: { standard: 'Standard', minimal: 'Minimal — image-led, no buttons', commerce: 'Shop — hover actions, ratings', arched: 'Arched — coloured caption, round buttons' } },
   { key: 'footer_style', label: 'Footer', hint: 'Product lists use your best sellers, newest and top-rated products.', options: { columns: 'Link columns', showcase: 'Brand & product showcase', widgets: 'Widgets — posts, products, newsletter' } },
   { key: 'heading_case', label: 'Section headings', hint: 'Letter case of section and banner headings.', options: { normal: 'As written', lowercase: 'lowercase', uppercase: 'UPPERCASE' } },
 ]
@@ -574,7 +574,7 @@ function PresetCard({ draft, canManage }: { draft: ThemeDraft; canManage: boolea
         ) : presets.error ? (
           <ErrorState error={presets.error} onRetry={() => presets.refetch()} />
         ) : (
-          <div role="radiogroup" aria-label="Theme presets" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div role="radiogroup" aria-label="Theme presets" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
             {presets.data.map((preset) => (
               <PresetOption key={preset.key} preset={preset} checked={selected === preset.key} current={current === preset.key} disabled={!canManage || apply.isPending} onSelect={() => setSelected(preset.key)} />
             ))}

@@ -1,6 +1,6 @@
 # Demo image credits
 
-The photos in `backend/database/seeders/demo-themes/images/` exist only to dress the three **demo storefronts** (Green Basket, Mati & Co. and Classic Shop). They are not product photos of anything we sell and must not be reused as real catalogue imagery.
+The photos in `backend/database/seeders/demo-themes/images/` exist only to dress the four **demo storefronts** (Green Basket, Mati & Co., Classic Shop and Little Sprouts). They are not product photos of anything we sell and must not be reused as real catalogue imagery.
 
 Every image comes from Unsplash or Pexels and is used under that site's licence, both of which allow free commercial use and modification without permission:
 
@@ -116,3 +116,47 @@ Attribution is not required by either licence, but we credit every photographer 
 | `wide-leg-jeans.jpg` | Woman in light-wash wide-leg jeans | KAi'S PHOTOGRAPHY | Unsplash | [link](https://unsplash.com/photos/woman-in-white-tank-top-and-blue-denim-jeans-sitting-on-white-chair-2s3GhhJz2uY) |
 | `wool-scarf.jpg` | Soft grey wool scarf worn with a knitted sweater | Polina Tankilevitch | Pexels | [link](https://www.pexels.com/photo/person-wearing-a-sweater-and-a-scarf-6630873/) |
 | `wrist-watch.jpg` | Hand holding a minimal analogue wristwatch | Jaelynn Castillo | Unsplash | [link](https://unsplash.com/photos/xfNeB1stZ_0) |
+
+## Little Sprouts — kids preset (`kids/`)
+
+Products and category tiles 900×900, the two hero banners 1600×700, promo tiles 1200×900 (the tall split tiles 1000×1200).
+
+| File | Alt text | Photographer | Licence | Source |
+|---|---|---|---|---|
+| `banner-boys.jpg` | White kids T-shirt with a teddy bear, knitted hat and toy camera on pink | Mediamodifier | Unsplash | [link](https://unsplash.com/photos/VoXqvbLAPjM) |
+| `banner-deal.jpg` | Teddy bear beside a wicker basket with a cream knitted blanket | kids&me Germany | Unsplash | [link](https://unsplash.com/photos/Zzgmde4_lYU) |
+| `banner-dreams.jpg` | Glowing moon lamp on a dark blue nursery wall | Kailun Zhang | Unsplash | [link](https://unsplash.com/photos/yIh-_bxBlgs) |
+| `banner-girls.jpg` | Colourful little dresses on hangers in a children's shop | Baby Natur | Unsplash | [link](https://unsplash.com/photos/aNGHqUAITYc) |
+| `banner-hero-1.jpg` | Bright nursery with a white crib and a tufted rocking chair | Franco Debartolo | Unsplash | [link](https://unsplash.com/photos/QYwo037ITqk) |
+| `banner-hero-2.jpg` | Pastel baby clothes on wooden hangers above small shoes | jackson kondili | Unsplash | [link](https://unsplash.com/photos/x5VhI538fII) |
+| `banner-kids.jpg` | Shelves of colourful wooden alphabet letters on toy train wheels | Geoffrey Moffett | Unsplash | [link](https://unsplash.com/photos/ijSX7T_JDwQ) |
+| `banner-look.jpg` | Pink arched wardrobe of baby clothes framed by roses | jackson kondili | Unsplash | [link](https://unsplash.com/photos/02FoZhgcCDg) |
+| `banner-socks.jpg` | Little striped socks pegged on a washing line in a garden | Christian Fickinger | Unsplash | [link](https://unsplash.com/photos/MDIGo4Ez-0g) |
+| `banner-toys-sale.jpg` | Wooden toy shapes on a bright yellow background | Geoff Oliver | Unsplash | [link](https://unsplash.com/photos/YW9ZuaImMR8) |
+| `bath-towel.jpg` | Cream waffle-knit towel draped over a wicker basket | Sohail Asim | Unsplash | [link](https://unsplash.com/photos/ftj5cJbA2UY) |
+| `cat-boys.jpg` | Folded knit sweaters in mustard, cream and caramel | Kateryna Hliznitsova | Unsplash | [link](https://unsplash.com/photos/tRknQ2W_0zQ) |
+| `cat-feeding.jpg` | Pastel bowls with a wooden spoon, top view | Melina Bronca | Unsplash | [link](https://unsplash.com/photos/bDL5_f3a8oU) |
+| `cat-girls.jpg` | Pink, cream and mint baby clothes on wooden hangers | jackson kondili | Unsplash | [link](https://unsplash.com/photos/5juo633uIEc) |
+| `cat-nursery.jpg` | White crib with pink bedding in a sunny room | Alexander Mass | Unsplash | [link](https://unsplash.com/photos/iQhjvXqpZHQ) |
+| `cat-shoes.jpg` | Pair of pink baby shoes on a wooden bench | Mon Petit Chou Photography | Unsplash | [link](https://unsplash.com/photos/b2ADHvvhC5Y) |
+| `cat-toys.jpg` | Basket of colourful wooden building blocks and toy cars | Jason Leung | Unsplash | [link](https://unsplash.com/photos/DJSJVSTOHp0) |
+| `chunky-jumper.jpg` | Small oatmeal knit jumper on a hanger | Toa Heftiba | Unsplash | [link](https://unsplash.com/photos/mavrg7cLwbA) |
+| `collar-shirt.jpg` | Pale blue children's top with a round eyelet collar on a hanger | Adriana Chionetti | Unsplash | [link](https://unsplash.com/photos/0u0TCUp1Vk8) |
+| `cotton-bodysuit.jpg` | White short-sleeved baby bodysuit with socks and small toys, flat lay | Mediamodifier | Unsplash | [link](https://unsplash.com/photos/fdPlZXc-ZwU) |
+| `crib-mobile.jpg` | Crib mobile of felt sheep hanging from a wooden cross | charlesdeluvio | Unsplash | [link](https://unsplash.com/photos/2vfwTakDTIo) |
+| `dino-night-light.jpg` | Small white dinosaur-shaped night light | Seiar Chapukh | Unsplash | [link](https://unsplash.com/photos/xwvlXfIhdIw) |
+| `feeding-bottles.jpg` | Two clear baby feeding bottles on a table | Jaye Haych | Unsplash | [link](https://unsplash.com/photos/vaozLvtSHok) |
+| `floral-party-dress.jpg` | Floral toddler dress on a hanger by a window | Adriana Chionetti | Unsplash | [link](https://unsplash.com/photos/Usy9CKYq7us) |
+| `knitted-booties.jpg` | Grey knitted baby booties beside a white plush toy | Elsa Lilja | Unsplash | [link](https://unsplash.com/photos/xlkuA0VQshU) |
+| `knitted-cardigan.jpg` | Pink hand-knitted cardigan with a ball of yarn | la crafter | Unsplash | [link](https://unsplash.com/photos/Ls7yE8NpNqk) |
+| `muslin-set.jpg` | Basket of folded muslin cloths and baby clothes | CARMELA LUSTRE | Unsplash | [link](https://unsplash.com/photos/AkPas1rErdE) |
+| `newsletter.jpg` | Flat lay of a child's sweater, check jacket, boots and hat | Zoe | Unsplash | [link](https://unsplash.com/photos/DOYASc77qmw) |
+| `patchwork-blanket.jpg` | Colourful patchwork knitted blanket | Giulia Bertelli | Unsplash | [link](https://unsplash.com/photos/7j737kkSoBs) |
+| `plush-bunny.jpg` | Dusty pink plush bunny sitting by a window | Andrej Bajusic | Unsplash | [link](https://unsplash.com/photos/qRrQLZ5-Rp0) |
+| `puzzle-play-mat.jpg` | Colourful foam puzzle mat tiles with a small toy bear | Matias Megapixel | Unsplash | [link](https://unsplash.com/photos/1Vzx1J4bVpE) |
+| `rain-boots.jpg` | Yellow rubber rain boots standing in a puddle | Joe Lee | Unsplash | [link](https://unsplash.com/photos/u9CCF4MYZLE) |
+| `rainbow-stacker.jpg` | Rainbow stacking rings on a wooden base | Erwan B | Unsplash | [link](https://unsplash.com/photos/EyfesEMlKuk) |
+| `sailboat-toys.jpg` | Wooden toy sailboats on wheels with peg dolls | Baby Natur | Unsplash | [link](https://unsplash.com/photos/Hld-gd-WN7k) |
+| `shape-sorter.jpg` | Wooden shape sorter board with colourful blocks | Angie Dutton | Unsplash | [link](https://unsplash.com/photos/E1shiIGT8Oo) |
+| `strawberry-dress.jpg` | Strawberry print children's dress on a hanger | Adriana Chionetti | Unsplash | [link](https://unsplash.com/photos/3lFz3TD68QA) |
+| `walker-sneakers.jpg` | Pair of red canvas baby sneakers with white laces | Steve O'Reilly | Unsplash | [link](https://unsplash.com/photos/HwfuoxlAOls) |

@@ -230,6 +230,16 @@
   opacity: 1;
 }
 
+/*
+ * Kids preset (K1): the commerce header's full-width menu bar takes the accent pair (lavender with
+ * its foreground) instead of the dark heading colour. Only this preset; unlayered, so it wins over
+ * the bar's utilities. The links' translucent hover keeps working on either colour.
+ */
+[data-sf-preset="kids"] nav[data-appearance="commerce"] {
+  background-color: var(--sf-accent);
+  color: var(--sf-accent-foreground);
+}
+
 /* Rich text written in the admin editor (pages, FAQ answers, text sections). */
 .sf-rich-text {
   line-height: calc(1.7 * var(--sf-leading-factor));

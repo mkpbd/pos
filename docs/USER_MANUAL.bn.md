@@ -406,7 +406,7 @@ AI ঐচ্ছিক, শুরুতে **বন্ধ** থাকে। AI �
 ২. নিশ্চিত করার বার্তায় **Apply** চাপুন। রং, অক্ষর আর লেআউট বদলাবে; **লোগো, ঘোষণা-লেখা আর ফুটারের লেখা যেমন ছিল তেমনই থাকবে।**
 ৩. **View store** চেপে দোকান দেখে নিন। পছন্দ না হলে যেকোনো রং বা লেআউট আলাদা করে বদলে **Save theme** চাপুন।
 
-### ১৭.২ তিনটি নমুনা (ডেমো) দোকান
+### ১৭.২ চারটি নমুনা (ডেমো) দোকান
 
 ![ডেমো দোকানের তালিকা](manual/images/39-demo-gallery.png)
 
@@ -417,6 +417,7 @@ AI ঐচ্ছিক, শুরুতে **বন্ধ** থাকে। AI �
 | **Green Basket** | Vegan Store | `vegan.shop.localhost` | `GREEN10` — ১,০০০ টাকার উপরে ১০ % ছাড় |
 | **Mati & Co.** | Handmade | `handmade.shop.localhost` | `MATI15` — ৩,০০০ টাকার উপরে ১৫ % ছাড় |
 | **Classic Shop** | Classic Shop | `classic.shop.localhost` | `CLASSIC20` — ৫,০০০ টাকার উপরে ২০ % ছাড় |
+| **Little Sprouts** | Kids Store (শিশুদের দোকান) | `kids.shop.localhost` | `SPROUT10` — ১,৫০০ টাকার উপরে ১০ % ছাড় |
 
 ![Green Basket](manual/images/40-demo-vegan.png)
 
@@ -520,7 +521,7 @@ AI ঐচ্ছিক, শুরুতে **বন্ধ** থাকে। AI �
 
 ![ডেমো চেহারা বাছাই](manual/images/49-demo-looks.png)
 
-**এক ক্লিকে পুরো দোকান সাজানো — "Start from a demo look":** **ONLINE STORE → Page builder**-এর উপরে তিনটি তৈরি চেহারা — **Vegan Store**, **Handmade**, **Classic Shop**।
+**এক ক্লিকে পুরো দোকান সাজানো — "Start from a demo look":** **ONLINE STORE → Page builder**-এর উপরে চারটি তৈরি চেহারা — **Vegan Store**, **Handmade**, **Classic Shop** আর **Kids Store** (শিশুদের পোশাক-খেলনার দোকানের জন্য: কমলা আর ল্যাভেন্ডার রং, গোল বোতাম, বাঁকা-মাথার পণ্য-কার্ড)।
 1. পছন্দের চেহারায় **Use this look** চাপুন।
 2. কোন কোন অংশ নেবেন বেছে নিন (রং-ফন্ট, হোমপেজ, হেডার, ফুটার, শপ পাতার উপরের অংশ) → **Create drafts**।
 3. সব কিছু **খসড়া** হিসেবে তৈরি হয় — ক্রেতারা এখনো আগের দোকানই দেখেন। প্রতিটির **Preview** দেখে নিন, চাইলে **Edit** চেপে বদলান।
@@ -644,6 +645,7 @@ AI ঐচ্ছিক, শুরুতে **বন্ধ** থাকে। AI �
 | Green Basket-এর মালিক | `owner@greenbasket.test` | `password` |
 | Mati & Co.-এর মালিক | `owner@mati.test` | `password` |
 | Classic Shop-এর মালিক | `owner@classicshop.test` | `password` |
+| Little Sprouts-এর মালিক | `owner@littlesprouts.test` | `password` |
 
 > **সতর্কতা:** এই অ্যাকাউন্টগুলো শুধু ডেমো ডেটার জন্য। আসল দোকানের সার্ভারে এগুলো থাকবে না, নিজের শক্ত পাসওয়ার্ড ব্যবহার করুন।
 

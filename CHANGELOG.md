@@ -21,6 +21,35 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### K1 — Kids demo look (BerryKid-inspired) for the store builder
+
+The BerryKid baby-store design (the storefront's original reference, [UI_REFERENCE_ANALYSIS.md](docs/ecommerce/UI_REFERENCE_ANALYSIS.md)) is now a fourth demo look. It reuses layout and interaction patterns only, with original names, copy and photos.
+
+#### Added
+- **Theme preset `kids` ("Kids Store")** with a contrast-checked palette: amber `#ffb020` with dark text, lavender `#7a5cc8`, mint-teal `#1f7a63`, coral sale `#c24626`.
+  - Fonts Baloo and Poppins, pill buttons, radius 16.
+  - Commerce header with a lavender menu bar; columns footer.
+- **Product card style `arched`:**
+  - A coral diagonal sale ribbon and an amber caption block with an arched top.
+  - On hover or focus the block turns lavender, a round add-to-cart button sits on the arch, and wishlist / quick view buttons slide in.
+  - Touch screens get a visible action row.
+  - Text stays AA in both states.
+  - Admin *Layout → Arched*.
+- **Demo store *Little Sprouts*** (`kids.shop.localhost`, `owner@littlesprouts.test`, coupon `SPROUT10`):
+  - 20 baby and kids products across girls, boys, toys, nursery, feeding & bath and shoes.
+  - 37 Unsplash photos (no identifiable children's faces), credited in [DEMO_IMAGE_CREDITS.md](docs/ecommerce/DEMO_IMAGE_CREDITS.md).
+  - Homepage in the reference's order: slider, promo split, tabbed collection, deal of the week, hot products, newsletter band, categories, best sellers, reviews, girls / kids / boys trio, service strip.
+  - Plus pages, blog, reviews, a flash sale and stock.
+- **Builder:**
+  - `site-kids` plus 10 kids section templates (57 templates in total, 55 with thumbnails).
+  - "Start from a demo look" offers 4 looks (`start-from-demo/kids`).
+  - The demo gallery lists 4 stores (up to 4 across).
+
+#### Tests
+- Backend 907 (PostgreSQL 906 + 1 skip; SQLite 901 + 6 skip), including the kids contrast pairs, the seeder (Little Sprouts and an unchanged Demo Mart), the templates and start-from-demo kids.
+- Vitest 1270. Mocked Playwright 205 passed, 103 skipped: the kids preset at desktop and mobile, the arched card, ribbon, hover cart, touch row.
+- Full-stack: integration 24/24; demo stores 9/9, including a Little Sprouts browse → filter → variant → coupon → checkout → stock down; acceptance 4/4.
+
 ### B5 — Visual store builder: templates, start from a demo look, acceptance
 
 Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11). Delivery report: [STORE_BUILDER_REPORT.md](docs/ecommerce/STORE_BUILDER_REPORT.md).

@@ -71,14 +71,15 @@ use Illuminate\Support\Facades\Event;
 use RuntimeException;
 
 /**
- * T2: three demo online stores, each its own organization with its own host and theme preset
- * (development only; refuses in production). Run after `migrate:fresh --seed`:
+ * T2: four demo online stores (K1 added the fourth), each its own organization with its own host
+ * and theme preset (development only; refuses in production). Run after `migrate:fresh --seed`:
  *
  *   php artisan db:seed --class=DemoThemesSeeder
  *
- *   Green Basket  vegan.shop.localhost     owner@greenbasket.test / password  coupon GREEN10
- *   Mati & Co.    handmade.shop.localhost  owner@mati.test        / password  coupon MATI15
- *   Classic Shop  classic.shop.localhost   owner@classicshop.test / password  coupon CLASSIC20
+ *   Green Basket    vegan.shop.localhost     owner@greenbasket.test    / password  coupon GREEN10
+ *   Mati & Co.      handmade.shop.localhost  owner@mati.test           / password  coupon MATI15
+ *   Classic Shop    classic.shop.localhost   owner@classicshop.test    / password  coupon CLASSIC20
+ *   Little Sprouts  kids.shop.localhost      owner@littlesprouts.test  / password  coupon SPROUT10
  *
  * Store content lives in database/seeders/demo-themes/<store>.php, photos (with credits in
  * manifest.json) in demo-themes/images/<store>/. Everything is created through the same
@@ -96,7 +97,7 @@ use RuntimeException;
  */
 class DemoThemesSeeder extends Seeder
 {
-    public const STORES = ['vegan', 'handmade', 'classic'];
+    public const STORES = ['vegan', 'handmade', 'classic', 'kids'];
 
     private const PASSWORD = 'password';
 
@@ -495,7 +496,9 @@ class DemoThemesSeeder extends Seeder
                 'testimonials' => ['items' => $this->data['testimonials']],
                 'hot_deals' => $config + ['promotion_id' => $flashSale->id],
                 'rich_text' => ['alignment' => 'center', 'body_html' => $this->data['rich_text']['body']],
-                'newsletter' => $config + $this->data['newsletter'],
+                // K1: an optional photo beside the sign-up form (`image`: a demo photo name).
+                'newsletter' => $config + array_diff_key($this->data['newsletter'], ['image' => true])
+                    + (isset($this->data['newsletter']['image']) ? ['image_media_id' => $this->image($this->data['newsletter']['image'])] : []),
                 default => $config,
             };
             if ($type === 'rich_text') {

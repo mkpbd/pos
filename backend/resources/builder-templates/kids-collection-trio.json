@@ -1,0 +1,108 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "3-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Girls collection",
+                                            "kicker": "Up to 20 % off",
+                                            "title": "Girls collection",
+                                            "subtitle": "6 months to 5 years",
+                                            "button_label": "Shop girls",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "kids/banner-girls.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "২০ % পর্যন্ত ছাড়",
+                                                    "title": "মেয়েদের সংগ্রহ",
+                                                    "subtitle": "৬ মাস থেকে ৫ বছর",
+                                                    "button_label": "মেয়েদের"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Play time",
+                                            "kicker": "Toys",
+                                            "title": "Play time",
+                                            "subtitle": "Wooden toys and soft friends",
+                                            "button_label": "Shop toys",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "kids/banner-kids.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "খেলনা",
+                                                    "title": "খেলার সময়",
+                                                    "subtitle": "কাঠের খেলনা আর নরম বন্ধু",
+                                                    "button_label": "খেলনা কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Boys collection",
+                                            "kicker": "Up to 20 % off",
+                                            "title": "Boys collection",
+                                            "subtitle": "Newborn to 4 years",
+                                            "button_label": "Shop boys",
+                                            "link_url": "/shop",
+                                            "text_color": "#444444",
+                                            "image": {
+                                                "asset": "kids/banner-boys.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "২০ % পর্যন্ত ছাড়",
+                                                    "title": "ছেলেদের সংগ্রহ",
+                                                    "subtitle": "নবজাতক থেকে ৪ বছর",
+                                                    "button_label": "ছেলেদের"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

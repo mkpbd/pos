@@ -13,6 +13,7 @@ import { ProductImage } from './product-image'
 import { useQuickView } from './quick-view-context'
 import { CardRating, ProductBadges } from './card-parts'
 import { useCardPricing } from './card-pricing'
+import { ArchedProductCard } from './arched-product-card'
 import { CommerceProductCard, MinimalProductCard } from './product-card-variants'
 
 export { CardRating, ProductBadges } from './card-parts'
@@ -28,12 +29,14 @@ export type ProductCardProps = {
 
 /**
  * A product in a grid, carousel or list, in the theme's `card_style`: `minimal` (image-led, no
- * buttons) and `commerce` (dense, hover actions) for grids; the list view always uses the standard card.
+ * buttons), `commerce` (dense, hover actions) and `arched` (coloured arched caption, round hover
+ * actions) for grids; the list view always uses the standard card.
  */
 export function ProductCard(props: ProductCardProps) {
   const { card_style: style } = useStoreLayout()
   if (props.layout !== 'list' && style === 'minimal') return <MinimalProductCard {...props} />
   if (props.layout !== 'list' && style === 'commerce') return <CommerceProductCard {...props} />
+  if (props.layout !== 'list' && style === 'arched') return <ArchedProductCard {...props} />
   return <StandardProductCard {...props} />
 }
 

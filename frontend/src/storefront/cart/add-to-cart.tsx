@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { Loader2Icon, ShoppingCartIcon } from 'lucide-react'
+import { Loader2Icon, ShoppingCartIcon, SlidersHorizontalIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { primaryButtonClass } from '../account/form-controls'
 import { useLocale } from '../i18n/locale'
@@ -73,30 +73,37 @@ const CARD_ACTION_CLASS = {
     'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent px-2 py-2 text-sm leading-tight font-bold text-sf-accent sm:px-4 transition hover:bg-sf-accent hover:text-sf-accent-foreground disabled:cursor-not-allowed disabled:border-sf-border disabled:text-sf-text disabled:hover:bg-transparent',
   solid:
     'inline-flex w-full items-center justify-center gap-2 rounded-sf-button border border-sf-accent bg-sf-accent px-2 py-2.5 text-xs leading-tight font-bold tracking-wide text-sf-accent-foreground uppercase sm:px-4 sm:tracking-wider transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-canvas disabled:text-sf-text disabled:hover:brightness-100',
+  /** Icon only (arched card): a round surface button; its name comes from aria-label. */
+  round:
+    'grid size-10 place-items-center rounded-full bg-sf-surface text-sf-heading shadow-md transition hover:bg-sf-primary hover:text-sf-primary-foreground focus-visible:bg-sf-primary focus-visible:text-sf-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-surface disabled:cursor-not-allowed disabled:text-sf-text disabled:hover:bg-sf-surface [@media(hover:hover)]:size-11',
 } as const
 
 /**
  * The card's buy action: "Add to cart" (one unit) for a product with exactly one variant,
- * else a "Choose options" link to the product page. `solid` is the filled button of the commerce card.
+ * else a "Choose options" link to the product page. `solid` is the filled button of the commerce card,
+ * `round` the icon-only button of the arched card (`className` positions it).
  */
-export function CardCartAction({ product, appearance = 'outline' }: { product: ProductCard; appearance?: keyof typeof CARD_ACTION_CLASS }) {
+export function CardCartAction({ product, appearance = 'outline', className: rootClassName }: { product: ProductCard; appearance?: keyof typeof CARD_ACTION_CLASS; className?: string }) {
   const add = useAddToCartMutation()
   const drawer = useCartDrawer()
   const { t } = useLocale()
   const [error, setError] = useState<string | null>(null)
   const className = CARD_ACTION_CLASS[appearance]
+  const round = appearance === 'round'
 
   if (product.variant_count !== 1 || !product.default_variant_id) {
     return (
-      <Link to={product.url} className={className} aria-label={t('cart.card.chooseOptionsLabel', { name: product.name })}>
-        {t('cart.card.chooseOptions')}
+      <Link to={product.url} className={cn(className, rootClassName)} aria-label={t('cart.card.chooseOptionsLabel', { name: product.name })}>
+        {round ? <SlidersHorizontalIcon aria-hidden className="size-5" /> : t('cart.card.chooseOptions')}
       </Link>
     )
   }
 
   const variantId = product.default_variant_id
+  const icon = add.isPending ? <Loader2Icon aria-hidden className={cn(round ? 'size-5' : 'size-4', 'animate-spin')} /> : <ShoppingCartIcon aria-hidden className={round ? 'size-5' : 'size-4'} />
   return (
-    <div className="flex flex-col gap-1">
+    // The round button's error floats under it, so the arched card's layout stays put.
+    <div className={round ? cn('relative', rootClassName) : 'flex flex-col gap-1'}>
       <button
         type="button"
         className={className}
@@ -110,11 +117,14 @@ export function CardCartAction({ product, appearance = 'outline' }: { product: P
           add.mutate({ variant_id: variantId, quantity: '1' }, { onSuccess: () => drawer?.open(button), onError: (e) => setError(cartErrorMessage(e, t)) })
         }}
       >
-        {add.isPending ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
-        {product.in_stock ? (add.isPending ? t('cart.add.adding') : t('cart.add.button')) : t('cart.card.outOfStock')}
+        {icon}
+        {!round && (product.in_stock ? (add.isPending ? t('cart.add.adding') : t('cart.add.button')) : t('cart.card.outOfStock'))}
       </button>
       {error && (
-        <p role="alert" className="text-xs text-sf-sale">
+        <p
+          role="alert"
+          className={round ? 'absolute top-full left-1/2 z-10 mt-2 w-44 -translate-x-1/2 rounded-md bg-sf-surface px-2 py-1 text-center text-xs font-medium text-sf-sale shadow-md' : 'text-xs text-sf-sale'}
+        >
           {error}
         </p>
       )}

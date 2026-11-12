@@ -131,6 +131,41 @@ describe('theme presets', () => {
     expect(saved?.layout).toEqual({ ...handmadeLook.layout, heading_case: 'uppercase' })
   })
 
+  it('K1: a kids theme keeps its preset and the arched card; "Arched" is a product card choice', async () => {
+    const user = userEvent.setup()
+    let saved: ThemeDocument | undefined
+    const kidsLook: ThemePreset['theme'] = {
+      preset: 'kids',
+      colors: { primary: '#ffb020', primary_foreground: '#3d2800', accent: '#7a5cc8', accent_foreground: '#ffffff', highlight: '#1f7a63', sale: '#c24626', heading: '#444444', text: '#5c6166', canvas: '#f3f7fa', surface: '#ffffff', border: '#e1e1e1' },
+      typography: { heading_font: 'baloo', body_font: 'poppins' },
+      shape: { button_style: 'pill', card_radius: 16 },
+      layout: { container_width: 1170, sticky_header: true, header_style: 'commerce', footer_style: 'columns', card_style: 'commerce', hero_style: 'full', heading_case: 'normal', top_bar: 'none' },
+    }
+    const kids: ThemeDraft = { ...theme, settings: { ...settings, ...kidsLook, layout: kidsLook.layout } }
+    mockApi({
+      'GET /auth/me': ok(manager()),
+      'GET /storefront/theme/draft': ok(kids),
+      'GET /storefront/theme/presets': ok([...presets, { key: 'kids', name: 'Kids Store', description: 'Playful and bright.', theme: kidsLook }]),
+      'GET /media': emptyMedia,
+      'PUT /storefront/theme/draft': (init) => {
+        saved = (JSON.parse(String(init.body)) as { settings: ThemeDocument }).settings
+        return ok({ ...kids, settings: saved })
+      },
+    })
+    renderRoutes(routes, '/storefront/theme')
+
+    const group = await screen.findByRole('radiogroup', { name: 'Theme presets' })
+    expect(within(group).getAllByRole('radio')).toHaveLength(5)
+    expect(within(group).getByRole('radio', { name: 'Kids Store' })).toBeChecked()
+    await user.click(screen.getByRole('combobox', { name: 'Product cards' }))
+    await user.click(await screen.findByRole('option', { name: 'Arched — coloured caption, round buttons' }))
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+
+    await waitFor(() => expect(saved).toBeDefined())
+    expect(saved?.preset).toBe('kids')
+    expect(saved?.layout).toEqual({ ...kidsLook.layout, card_style: 'arched' })
+  })
+
   it('shows the presets read-only without storefront.manage', async () => {
     mockApi({
       'GET /auth/me': ok(viewer()),

@@ -8,7 +8,7 @@ use RuntimeException;
 /**
  * B5: the built-in store builder templates — files that ship with the code in
  * `resources/builder-templates/`: `manifest.json` lists every template `{id, scope (section |
- * page | site), preset (vegan | handmade | classic | null), category, name, description,
+ * page | site), preset (vegan | handmade | classic | kids | null), category, name, description,
  * thumbnail (a path the admin app serves, or null), allowed_in (document contexts), requires
  * (banners | menus | promotions | blog — what it needs to show fully)}` and `<id>.json` holds its
  * content in the portable format (PortableTemplate): `{schema_version: 1, sections: [...]}`, or

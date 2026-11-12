@@ -32,6 +32,13 @@ const PRESETS = {
     shape: { button_style: 'rounded', card_radius: 4 },
     layout: { container_width: 1170, sticky_header: true, header_style: 'commerce', footer_style: 'widgets', card_style: 'commerce', hero_style: 'sale', heading_case: 'uppercase', top_bar: 'utility' },
   },
+  // K1: the backend's `kids` preset decides the real colours; these follow the spec (amber + dark text, lavender + white).
+  kids: {
+    colors: { primary: '#ffb020', primary_foreground: '#3d2800', accent: '#7a5cc8', accent_foreground: '#ffffff', highlight: '#1f7a63', sale: '#c24626', heading: '#444444', text: '#5c6166', canvas: '#f3f7fa', surface: '#ffffff', border: '#e1e1e1' },
+    typography: { heading_font: 'baloo', body_font: 'poppins' },
+    shape: { button_style: 'pill', card_radius: 16 },
+    layout: { container_width: 1170, sticky_header: true, header_style: 'commerce', footer_style: 'columns', card_style: 'arched', hero_style: 'full', heading_case: 'normal', top_bar: 'none' },
+  },
 } as const
 
 type Preset = keyof typeof PRESETS
@@ -188,6 +195,74 @@ test('classic: wide header search with cart total, sale hero, commerce cards and
   await quickView.focus()
   await expect(quickView).toBeVisible()
   await expect(card.getByTestId('card-hover-actions')).toHaveCSS('opacity', '1')
+})
+
+test('kids: arched cards with a sale ribbon and hover actions, the commerce header with a lavender menu bar', async ({ page, isMobile }) => {
+  // The first product is plain, the second on sale.
+  const plain = { ...product('teether', 'Wooden Teether'), on_sale: false, compare_at_price: null, discount_percent: null, is_new: false }
+  const grid = { ...sections[1], products: [plain, ...products] }
+  await serveStore(page, 'kids', { sections: [sections[0], grid] })
+  await page.goto('/')
+
+  await expect(page.locator('html')).toHaveAttribute('data-sf-preset', 'kids')
+  const cards = page.getByTestId('product-card')
+  const card = cards.nth(1)
+  await expect(card).toHaveAttribute('data-card-style', 'arched')
+  await expect(card).toBeVisible()
+  // The corner ribbon on the sale product only.
+  await expect(card.getByTestId('sale-ribbon')).toHaveText('−20 %')
+  await expect(card.getByTestId('sale-ribbon')).toBeVisible()
+  await expect(cards.first().getByTestId('sale-ribbon')).toHaveCount(0)
+  // The caption block: primary with its dark text at rest.
+  const caption = card.getByTestId('arched-caption')
+  await expect(caption).toHaveCSS('background-color', 'rgb(255, 176, 32)')
+  await expect(caption.getByRole('heading', { name: 'Fresh Spinach' })).toHaveCSS('color', 'rgb(61, 40, 0)')
+  const cart = card.getByRole('button', { name: 'Add Fresh Spinach to the cart' })
+
+  if (isMobile) {
+    // Touch: the actions are a row under the price, visible without hovering.
+    await expect(cart).toBeVisible()
+    await expect(cart).toHaveCSS('opacity', '1')
+    await expect(card.getByTestId('card-actions')).toHaveCSS('display', 'flex')
+    await expect(card.getByRole('button', { name: 'Quick view: Fresh Spinach' })).toBeVisible()
+    return
+  }
+
+  await expect(page.getByTestId('site-header')).toHaveAttribute('data-header-style', 'commerce')
+  // The commerce menu bar follows the accent for this preset (classic keeps the dark bar).
+  const nav = page.getByRole('navigation', { name: 'Main' })
+  await expect(nav).toHaveAttribute('data-appearance', 'commerce')
+  await expect(nav).toHaveCSS('background-color', 'rgb(122, 92, 200)')
+  await expect(nav.getByRole('link', { name: 'Vegetables' })).toHaveCSS('color', 'rgb(255, 255, 255)')
+
+  // Hidden at rest; hovering turns the block lavender and brings the cart button onto the arch.
+  const floating = card.getByTestId('card-actions').locator('> div').first()
+  await expect(floating).toHaveCSS('opacity', '0')
+  await card.hover()
+  await expect(floating).toHaveCSS('opacity', '1')
+  await expect(cart).toBeVisible()
+  await expect(caption).toHaveCSS('background-color', 'rgb(122, 92, 200)')
+  await expect(caption.getByRole('heading', { name: 'Fresh Spinach' })).toHaveCSS('color', 'rgb(255, 255, 255)')
+  await expect(card.getByTestId('card-hover-actions')).toHaveCSS('opacity', '1')
+  // The cart sits on the arch: centred over the top edge of the caption block.
+  const [cartBox, captionBox] = [await cart.boundingBox(), await caption.boundingBox()]
+  expect(Math.abs(cartBox!.x + cartBox!.width / 2 - (captionBox!.x + captionBox!.width / 2))).toBeLessThan(2)
+  expect(cartBox!.y).toBeLessThan(captionBox!.y)
+
+  // Keyboard: focusing a card's action reveals them on another card too.
+  await page.mouse.move(0, 0)
+  const other = cards.nth(2)
+  const otherCart = other.getByRole('button', { name: 'Add Organic Carrots to the cart' })
+  await otherCart.focus()
+  await expect(other.getByTestId('card-actions').locator('> div').first()).toHaveCSS('opacity', '1')
+  await expect(other.getByTestId('arched-caption')).toHaveCSS('background-color', 'rgb(122, 92, 200)')
+})
+
+test('classic keeps the dark commerce menu bar', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The menu bar is desktop-only.')
+  await serveStore(page, 'classic')
+  await page.goto('/')
+  await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCSS('background-color', 'rgb(17, 17, 17)')
 })
 
 /* B3: the theme's colour roles and type scale. */

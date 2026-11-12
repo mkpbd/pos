@@ -93,7 +93,7 @@ function GalleryBody() {
   }
 
   return (
-    <ul aria-label={t('demos.list')} className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" data-testid="demo-grid">
+    <ul aria-label={t('demos.list')} className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="demo-grid">
       {query.data.map((demo) => (
         <li key={demo.host} className="flex">
           <DemoCard demo={demo} />
@@ -116,7 +116,7 @@ function GallerySkeleton() {
   return (
     <div role="status" aria-live="polite" data-testid="demo-loading">
       <span className="sr-only">{t('demos.loading')}</span>
-      <div aria-hidden className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div aria-hidden className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2].map((index) => (
           <div key={index} className="overflow-hidden rounded-sf-card border bg-sf-surface">
             <Skeleton className="aspect-video rounded-none" />

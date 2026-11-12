@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 /*
  * The demo store gallery (/demos, T2) on a mocked list: it renders outside any store (no
- * bootstrap), lays the cards out in 3 columns on desktop and 1 on a phone, links each demo to
+ * bootstrap), lays the cards out side by side on desktop (up to 4 across) and 1 on a phone, links each demo to
  * its own host on this port, and shows the disabled, empty and error states.
  */
 
@@ -60,7 +60,7 @@ test('lists the demo stores with links to each store and the admin', async ({ pa
   await expect(mati.getByRole('heading', { level: 2, name: 'Mati & Co.' })).toHaveCSS('font-family', /Playfair Display/)
   await expect(page.getByRole('article', { name: 'Classic Shop' }).getByRole('heading', { level: 2 })).toHaveCSS('font-family', /Jost/)
 
-  // Desktop: three cards side by side; a phone: one column.
+  // Desktop: the cards side by side (up to 4 across); a phone: one column.
   const boxes = await Promise.all([0, 1, 2].map(async (index) => (await cards.nth(index).boundingBox())!))
   if (isMobile) {
     expect(new Set(boxes.map((box) => Math.round(box.x))).size).toBe(1)

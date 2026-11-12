@@ -142,6 +142,39 @@ class ThemePresetsTest extends TestCase
         ]);
     }
 
+    /**
+     * K1: the kids look (BerryKid-inspired) — amber with dark text, lavender for white text and the
+     * menu bar, arched product cards whose caption block is the primary pair at rest and the accent
+     * pair on hover, a coral ribbon and a teal "New" badge with white text.
+     */
+    public function test_the_kids_preset(): void
+    {
+        $kids = ThemePresets::theme('kids');
+        $this->assertSame('Kids Store', ThemePresets::name('kids'));
+        $this->assertSame(['heading_font' => 'baloo', 'body_font' => 'poppins'] + ThemeSchema::defaults()['typography'], $kids['typography']);
+        $this->assertSame(['pill', 16], [$kids['shape']['button_style'], $kids['shape']['card_radius']]);
+        $this->assertSame([1170, 'commerce', 'columns', 'arched', 'full', 'normal', 'none'], [
+            $kids['layout']['container_width'], $kids['layout']['header_style'], $kids['layout']['footer_style'],
+            $kids['layout']['card_style'], $kids['layout']['hero_style'], $kids['layout']['heading_case'], $kids['layout']['top_bar'],
+        ]);
+        $c = $kids['colors'];
+        $this->assertSame(['#ffb020', '#3d2800', '#7a5cc8', '#ffffff', '#1f7a63', '#c24626', '#444444', '#5c6166', '#f3f7fa', '#ffffff', '#e1e1e1'], [
+            $c['primary'], $c['primary_foreground'], $c['accent'], $c['accent_foreground'], $c['highlight'], $c['sale'],
+            $c['heading'], $c['text'], $c['canvas'], $c['surface'], $c['border'],
+        ]);
+        foreach ([
+            'white on the sale ribbon' => ['#ffffff', $c['sale']],
+            'white on the highlight badge' => ['#ffffff', $c['highlight']],
+            'menu bar text' => [$c['accent_foreground'], $c['accent']],
+            'heading on the primary card block' => [$c['primary_foreground'], $c['primary']],
+        ] as $label => [$fg, $bg]) {
+            $this->assertGreaterThanOrEqual(4.5, self::contrast($fg, $bg), "kids: {$label} ({$fg} on {$bg})");
+        }
+        // The arched card is new; the other presets keep their cards.
+        $this->assertSame(['standard', 'minimal', 'commerce', 'arched'], ThemeSchema::CARD_STYLES);
+        $this->assertSame('standard', ThemeSchema::defaults()['layout']['card_style']);
+    }
+
     public function test_applying_keeps_the_content(): void
     {
         $current = ThemeSchema::normalize([

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * B5: "start from a demo look" — applies a site template (Vegan, Handmade, Classic; derived from
+ * B5: "start from a demo look" — applies a site template (Vegan, Handmade, Classic, Kids; derived from
  * the T2 demo stores) to **drafts only**, in one transaction:
  *
  * - theme: the preset over the theme draft (the theme draft flow: logo, palette, announcement and

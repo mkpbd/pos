@@ -48,12 +48,12 @@ export const BODY_FONTS = ['poppins', 'jost', 'system'] as const
 export const BUTTON_STYLES = ['pill', 'rounded', 'square'] as const
 
 /* Theme presets and layout variants (T1); the first value of each list is today's look. */
-export const THEME_PRESETS = ['default', 'vegan', 'handmade', 'classic'] as const
+export const THEME_PRESETS = ['default', 'vegan', 'handmade', 'classic', 'kids'] as const
 export type ThemePresetKey = (typeof THEME_PRESETS)[number]
 export const LAYOUT_OPTIONS = {
   header_style: ['standard', 'centered', 'commerce'],
   footer_style: ['columns', 'showcase', 'widgets'],
-  card_style: ['standard', 'minimal', 'commerce'],
+  card_style: ['standard', 'minimal', 'commerce', 'arched'],
   hero_style: ['full', 'tiles', 'sale'],
   heading_case: ['normal', 'lowercase', 'uppercase'],
   top_bar: ['none', 'ticker', 'utility'],

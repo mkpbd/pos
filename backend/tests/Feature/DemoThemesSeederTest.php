@@ -23,7 +23,7 @@ use RuntimeException;
 use Tests\TestCase;
 
 /**
- * T2: DemoThemesSeeder builds three complete demo stores in their own organizations, leaves
+ * T2: DemoThemesSeeder builds four complete demo stores (K1 added Little Sprouts) in their own organizations, leaves
  * other organizations alone, runs only once per store and never in production; the demo
  * gallery lists them; a demo store takes a real order through the public API.
  */
@@ -46,7 +46,7 @@ class DemoThemesSeederTest extends TestCase
         config(['pos.checkout_rate_limit' => 1000]);
     }
 
-    public function test_it_builds_three_demo_stores_and_leaves_other_organizations_alone(): void
+    public function test_it_builds_the_demo_stores_and_leaves_other_organizations_alone(): void
     {
         $demoMart = $this->demoMart();
         $before = $this->tenantCounts($demoMart->id);
@@ -69,12 +69,16 @@ class DemoThemesSeederTest extends TestCase
         $this->seed(DemoThemesSeeder::class);
         $this->assertSame($totals, $this->totals());
 
-        // The gallery lists the three stores in configured order.
+        // The gallery lists the four stores in configured order.
         config(['storefront.demo_gallery' => true]);
         $demos = $this->getJson('http://platform.test/api/v1/demo-stores')->assertOk()->json('data');
-        $this->assertSame(['vegan.shop.localhost', 'handmade.shop.localhost', 'classic.shop.localhost'], array_column($demos, 'host'));
-        $this->assertSame(['Green Basket', 'Mati & Co.', 'Classic Shop'], array_column($demos, 'name'));
-        $this->assertSame(['vegan', 'handmade', 'classic'], array_column($demos, 'preset'));
+        $this->assertSame(['vegan.shop.localhost', 'handmade.shop.localhost', 'classic.shop.localhost', 'kids.shop.localhost'], array_column($demos, 'host'));
+        $this->assertSame(['Green Basket', 'Mati & Co.', 'Classic Shop', 'Little Sprouts'], array_column($demos, 'name'));
+        $this->assertSame(['vegan', 'handmade', 'classic', 'kids'], array_column($demos, 'preset'));
+        $this->assertSame(['primary' => '#ffb020', 'accent' => '#7a5cc8', 'canvas' => '#f3f7fa'], $demos[3]['colors']);
+        $this->assertSame(20, $demos[3]['product_count']);
+        $this->assertSame(['Baby girls', 'Baby boys', 'Toys', 'Nursery', 'Feeding & bath', 'Shoes'], $demos[3]['category_names']);
+        $this->assertStringContainsString('/storage/media/', (string) $demos[3]['image_url']);
         $vegan = $demos[0];
         $this->assertSame(['host', 'name', 'preset', 'tagline', 'colors', 'heading_font', 'image_url', 'product_count', 'category_names'], array_keys($vegan));
         $this->assertSame('free delivery over ৳1,500 · 100 % plant-based · order by phone 01700-000000', $vegan['tagline']);
@@ -87,6 +91,45 @@ class DemoThemesSeederTest extends TestCase
         $this->assertCount(5, $demos[2]['category_names']);
 
         $this->checkoutOnTheVeganStore();
+        $this->littleSprouts();
+    }
+
+    /**
+     * K1: Little Sprouts — the kids preset with arched cards, the homepage in the reference order
+     * (split promo grid of four, deal of the week, the girls / kids / boys trio), the newsletter
+     * photo, eight verified reviews, SPROUT10 and a four-product countdown sale on products that
+     * are not on sale already.
+     */
+    private function littleSprouts(): void
+    {
+        $data = require DemoThemesSeeder::path('kids.php');
+        $org = Organization::query()->where('name', 'Little Sprouts')->firstOrFail();
+        $this->assertSame('kids.shop.localhost', $data['host']);
+
+        $bootstrap = $this->getJson('http://kids.shop.localhost/api/v1/store/bootstrap')->assertOk()->json('data');
+        $this->assertSame(['kids', 'arched', 'commerce', '#7a5cc8'], [
+            $bootstrap['theme']['preset'], $bootstrap['theme']['layout']['card_style'], $bootstrap['theme']['layout']['header_style'], $bootstrap['theme']['colors']['accent'],
+        ]);
+
+        $sections = $this->getJson('http://kids.shop.localhost/api/v1/store/homepage')->assertOk()->json('data.sections');
+        $this->assertSame(['hero_slider', 'banner_grid', 'product_tabs', 'hot_deals', 'product_grid', 'newsletter', 'category_strip', 'product_carousel', 'testimonials', 'banner_grid', 'features_strip'], array_column($sections, 'type'));
+        $this->assertSame('3-col-split', $sections[1]['config']['layout']);
+        $this->assertCount(4, $sections[1]['banners']);
+        $this->assertSame('Deal of the week', $sections[3]['title']);
+        $this->assertCount(3, $sections[9]['banners']);
+        $this->assertNotNull($sections[5]['config']['image']);
+
+        // Eight approved reviews from verified orders.
+        $this->assertSame(8, DB::table('reviews')->where('organization_id', $org->id)->where('status', 'approved')->count());
+        // SPROUT10: 10 % off over ৳1,500.
+        $coupon = DB::table('promotions')->where('organization_id', $org->id)->where('trigger', 'coupon')->first();
+        $this->assertSame(['10.00', '1500.00'], [bcadd((string) $coupon->value, '0', 2), bcadd((string) $coupon->min_subtotal, '0', 2)]);
+        // The countdown sale's products are not on sale already.
+        foreach ($data['flash_sale']['products'] as $slug) {
+            $this->assertArrayNotHasKey('sale', $data['products'][$slug], $slug);
+        }
+        // The best sellers come from the counter sale.
+        $this->assertSame(1, DB::table('sales')->where('organization_id', $org->id)->count());
     }
 
     public function test_it_refuses_to_run_in_production(): void

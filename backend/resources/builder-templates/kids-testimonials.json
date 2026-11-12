@@ -1,0 +1,64 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "testimonials",
+                            "props": {
+                                "title": "Happy parents",
+                                "subtitle": "Kind words from families we deliver to",
+                                "config": {
+                                    "background": "#e3f5ee",
+                                    "items": [
+                                        {
+                                            "quote": "Soft fabrics that still look new after many washes. We have bought every size.",
+                                            "name": "Tasnim A.",
+                                            "role": "Mother of two",
+                                            "rating": 5,
+                                            "avatar_media_id": null
+                                        },
+                                        {
+                                            "quote": "The felt mobile is beautiful and arrived wrapped like a present.",
+                                            "name": "Rashed K.",
+                                            "role": "New dad",
+                                            "rating": 5,
+                                            "avatar_media_id": null
+                                        },
+                                        {
+                                            "quote": "Quick delivery and an easy size exchange. The rain boots are a hit.",
+                                            "name": "Nabila H.",
+                                            "role": "Mother",
+                                            "rating": 4,
+                                            "avatar_media_id": null
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "খুশি মা-বাবা",
+                                    "subtitle": "যেসব পরিবারে আমরা পৌঁছে দিই, তাদের কথা"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

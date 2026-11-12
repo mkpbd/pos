@@ -28,6 +28,6 @@ return [
     */
     'demo_gallery' => env('APP_ENV') !== 'production' && filter_var(env('STOREFRONT_DEMO_GALLERY', false), FILTER_VALIDATE_BOOL),
 
-    'demo_hosts' => ['vegan.shop.localhost', 'handmade.shop.localhost', 'classic.shop.localhost'],
+    'demo_hosts' => ['vegan.shop.localhost', 'handmade.shop.localhost', 'classic.shop.localhost', 'kids.shop.localhost'],
 
 ];

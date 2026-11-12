@@ -1,0 +1,1046 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "kids"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {},
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Soft starts",
+                                                    "kicker": "New season",
+                                                    "title": "Soft starts for little sprouts",
+                                                    "subtitle": "Organic cotton, wooden toys and calm nursery pieces, picked with care.",
+                                                    "button_label": "Discover",
+                                                    "link_url": "/category/nursery",
+                                                    "secondary_button_label": "Shop now",
+                                                    "secondary_link_url": "/shop",
+                                                    "text_color": "#444444",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "kids/banner-hero-1.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Up to 20 % off",
+                                                    "kicker": "This week only",
+                                                    "title": "Up to 20 % off little outfits",
+                                                    "subtitle": "Dresses, bodysuits and cardigans from newborn to five years.",
+                                                    "button_label": "Discover",
+                                                    "link_url": "/category/baby-girls",
+                                                    "secondary_button_label": "Shop now",
+                                                    "secondary_link_url": "/shop",
+                                                    "text_color": "#444444",
+                                                    "text_position": "center",
+                                                    "image": {
+                                                        "asset": "kids/banner-hero-2.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "3-col-split"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Shop by look",
+                                                    "kicker": "0–24 months",
+                                                    "title": "Shop by look",
+                                                    "button_label": "See outfits",
+                                                    "link_url": "/category/baby-girls",
+                                                    "text_color": "#444444",
+                                                    "image": {
+                                                        "asset": "kids/banner-look.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Little feet",
+                                                    "kicker": "Shoes & socks",
+                                                    "title": "Ready for little feet",
+                                                    "button_label": "Shop shoes",
+                                                    "link_url": "/category/shoes",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "kids/banner-socks.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Toy sale",
+                                                    "kicker": "Up to 20 % off",
+                                                    "title": "Wooden toys, free delivery over ৳2,000",
+                                                    "button_label": "Shop toys",
+                                                    "link_url": "/category/toys",
+                                                    "text_color": "#3d2800",
+                                                    "image": {
+                                                        "asset": "kids/banner-toys-sale.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Sweet dreams",
+                                                    "kicker": "Nursery",
+                                                    "title": "Sweet dreams start here",
+                                                    "button_label": "Shop nursery",
+                                                    "link_url": "/category/nursery",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "kids/banner-dreams.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "product_tabs",
+                                    "props": {
+                                        "title": "New collection",
+                                        "subtitle": "Fresh picks for the little ones",
+                                        "config": {
+                                            "limit": 8,
+                                            "tabs": [
+                                                {
+                                                    "label": "Popular",
+                                                    "source": "featured"
+                                                },
+                                                {
+                                                    "label": "New arrivals",
+                                                    "source": "new_arrivals"
+                                                },
+                                                {
+                                                    "label": "Best sellers",
+                                                    "source": "best_sellers"
+                                                }
+                                            ]
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "hot_deals",
+                                    "props": {
+                                        "title": "Deal of the week",
+                                        "subtitle": "15 % off four little favourites",
+                                        "config": {
+                                            "limit": 4,
+                                            "view_all_url": "/shop",
+                                            "promotion_id": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "product_grid",
+                                    "props": {
+                                        "title": "Hot products",
+                                        "subtitle": "Little prices on family favourites",
+                                        "config": {
+                                            "source": "on_sale",
+                                            "limit": 8,
+                                            "columns": 4,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "newsletter",
+                                    "props": {
+                                        "title": "Join the Little Sprouts club",
+                                        "subtitle": null,
+                                        "config": {
+                                            "text": "New arrivals, parent tips and members-only offers, twice a month. Unsubscribe any time.",
+                                            "button_label": "Subscribe",
+                                            "background": "#c24626",
+                                            "foreground": "#ffffff",
+                                            "image_media_id": {
+                                                "asset": "kids/newsletter.jpg"
+                                            }
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Categories",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 6
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "product_carousel",
+                                    "props": {
+                                        "title": "Best sellers",
+                                        "subtitle": "What parents are buying this week",
+                                        "config": {
+                                            "source": "best_sellers",
+                                            "limit": 8,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "testimonials",
+                                    "props": {
+                                        "title": "Happy parents",
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "quote": "The bodysuits are so soft and still look new after many washes. We have bought them in every size.",
+                                                    "name": "Tasnim A.",
+                                                    "role": "Mother of two, Uttara",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "The lamb mobile is beautiful and our daughter watches it every evening. Lovely gift wrapping too.",
+                                                    "name": "Rashed K.",
+                                                    "role": "New dad, Mirpur",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Delivery was quick and exchanging a size was easy. The rain boots are a hit.",
+                                                    "name": "Nabila H.",
+                                                    "role": "Mother, Chattogram",
+                                                    "rating": 4
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "3-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Girls collection",
+                                                    "kicker": "Up to 20 % off",
+                                                    "title": "Girls collection",
+                                                    "subtitle": "6 months to 5 years",
+                                                    "button_label": "Shop girls",
+                                                    "link_url": "/category/baby-girls",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "kids/banner-girls.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Play time",
+                                                    "kicker": "Toys",
+                                                    "title": "Play time",
+                                                    "subtitle": "Wooden toys and soft friends",
+                                                    "button_label": "Shop toys",
+                                                    "link_url": "/category/toys",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "kids/banner-kids.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Boys collection",
+                                                    "kicker": "Up to 20 % off",
+                                                    "title": "Boys collection",
+                                                    "subtitle": "Newborn to 4 years",
+                                                    "button_label": "Shop boys",
+                                                    "link_url": "/category/baby-boys",
+                                                    "text_color": "#444444",
+                                                    "image": {
+                                                        "asset": "kids/banner-boys.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "shield-check",
+                                                    "title": "Safety guarantee",
+                                                    "text": "Tested for little hands"
+                                                },
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Free delivery",
+                                                    "text": "Inside Dhaka over ৳2,000"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Easy payment",
+                                                    "text": "Cash on delivery or transfer"
+                                                },
+                                                {
+                                                    "icon": "headset",
+                                                    "title": "Talk to us",
+                                                    "text": "01700-000004, 10 am to 8 pm"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "20px",
+                                    "bottom": "20px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 18
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 48,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 46
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search dresses, toys, nursery…",
+                                        "button_label": ""
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "ড্রেস, খেলনা, নার্সারি খুঁজুন…"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 12
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": true
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": true
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "8px",
+                                    "bottom": "8px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:accent"
+                            },
+                            "color": "theme:accent_foreground"
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 85
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_17",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 15
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_18",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "select"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "56px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "32px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "40px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_19",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 44,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_20",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Soft clothes, safe toys and calm nursery pieces for babies and little ones.</p>"
+                                    }
+                                },
+                                {
+                                    "id": "e_21",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 24
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 22,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_22",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Questions",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "প্রশ্ন"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_23",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 24,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_24",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Help",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "সহায়তা"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_25",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p><a href=\"/pages/faq\">Sizes and FAQ</a><br><a href=\"/account/orders\">Track your order</a><br><a href=\"/pages/contact\">Contact us</a></p>"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 24,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_26",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Contact us",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "যোগাযোগ"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_27",
+                                    "type": "contact_block",
+                                    "props": {
+                                        "show_phone": true,
+                                        "show_email": true,
+                                        "show_address": true,
+                                        "layout": "stacked"
+                                    }
+                                },
+                                {
+                                    "id": "e_28",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 24,
+                                        "style": "circle",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "14px",
+                                    "bottom": "14px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:accent"
+                            },
+                            "color": "theme:accent_foreground"
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_29",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_16",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "28px",
+                                    "bottom": "28px"
+                                },
+                                "margin": {
+                                    "bottom": "24px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "#fff4dc"
+                            },
+                            "border": {
+                                "radius": {
+                                    "tl": "24px",
+                                    "tr": "24px",
+                                    "br": "24px",
+                                    "bl": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_24",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_30",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Little clothes, big adventures",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "ছোট্ট পোশাক, বড় অভিযান"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_31",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Sized by age from newborn to five years. Not sure? Choose the next size up — they grow fast.</p>"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

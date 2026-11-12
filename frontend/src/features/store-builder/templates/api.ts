@@ -12,7 +12,13 @@ import { builderAdminKeys, type DocumentSummary } from '../api'
  */
 
 export type TemplateScope = 'section' | 'page' | 'site'
-export type TemplatePreset = 'vegan' | 'handmade' | 'classic'
+/** The demo looks with built-in templates (site, page and section); `default` has none. */
+export const TEMPLATE_PRESETS = ['vegan', 'handmade', 'classic', 'kids'] as const
+export type TemplatePreset = (typeof TEMPLATE_PRESETS)[number]
+
+export function isTemplatePreset(value: string | null | undefined): value is TemplatePreset {
+  return (TEMPLATE_PRESETS as readonly (string | null | undefined)[]).includes(value)
+}
 
 /** GET /storefront/builder/templates: one entry (no content). */
 export type BuilderTemplate = {

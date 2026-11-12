@@ -30,7 +30,7 @@ use Illuminate\Validation\Rule;
  */
 final class PortableTemplate
 {
-    public const ASSET_PATTERN = '/^(vegan|handmade|classic)\/[a-z0-9][a-z0-9-]*\.(jpg|jpeg|png|webp)$/';
+    public const ASSET_PATTERN = '/^(vegan|handmade|classic|kids)\/[a-z0-9][a-z0-9-]*\.(jpg|jpeg|png|webp)$/';
 
     /** Menu references: a menu location; `footer` = the first footer column that has a menu. */
     public const MENU_REFS = ['main', 'footer', 'footer_1', 'footer_2', 'footer_3'];

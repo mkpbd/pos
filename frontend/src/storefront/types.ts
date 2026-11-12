@@ -61,10 +61,10 @@ export type BodyFont = 'poppins' | 'jost' | 'system'
 export type ButtonStyle = 'pill' | 'rounded' | 'square'
 
 /* Theme presets and layout variants (T1, STOREFRONT_THEMES_PLAN §3.1): presentation only. */
-export type ThemePreset = 'default' | 'vegan' | 'handmade' | 'classic'
+export type ThemePreset = 'default' | 'vegan' | 'handmade' | 'classic' | 'kids'
 export type HeaderStyle = 'standard' | 'centered' | 'commerce'
 export type FooterStyle = 'columns' | 'showcase' | 'widgets'
-export type CardStyle = 'standard' | 'minimal' | 'commerce'
+export type CardStyle = 'standard' | 'minimal' | 'commerce' | 'arched'
 export type HeroStyle = 'full' | 'tiles' | 'sale'
 export type HeadingCase = 'normal' | 'lowercase' | 'uppercase'
 export type TopBar = 'none' | 'ticker' | 'utility'

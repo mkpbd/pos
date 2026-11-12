@@ -102,8 +102,10 @@ class ThemePresetsTest extends TestCase
         $this->actingAsUser($admin);
 
         $response = $this->getJson('/api/v1/storefront/theme/presets')->assertOk()
-            ->assertJsonCount(4, 'data')
-            ->assertJsonPath('data.*.key', ['default', 'vegan', 'handmade', 'classic'])
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('data.*.key', ['default', 'vegan', 'handmade', 'classic', 'kids'])
+            ->assertJsonPath('data.4.name', 'Kids Store')
+            ->assertJsonPath('data.4.theme.layout.card_style', 'arched')
             ->assertJsonPath('data.0.theme', ThemeSchema::defaults())
             ->assertJsonPath('data.1.name', 'Vegan Store')
             ->assertJsonPath('data.1.theme.layout.heading_case', 'lowercase')

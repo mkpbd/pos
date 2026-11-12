@@ -11,10 +11,10 @@ import type { BuilderTemplate } from '../templates/api'
 const MANAGE = ['storefront.view', 'storefront.manage']
 const PUBLISH = [...MANAGE, 'storefront.publish']
 
-const site = (preset: 'vegan' | 'handmade' | 'classic', name: string, thumbnail: string | null = null): BuilderTemplate => ({
+const site = (preset: 'vegan' | 'handmade' | 'classic' | 'kids', name: string, thumbnail: string | null = null): BuilderTemplate => ({
   id: `site-${preset}`, scope: 'site', preset, category: null, name, description: `${name} demo store look.`, thumbnail_url: thumbnail, allowed_in: ['page'], source: 'builtin',
 })
-const SITES = [site('vegan', 'Vegan Market', '/builder-templates/site-vegan.webp'), site('handmade', 'Handmade Atelier'), site('classic', 'Classic Shop')]
+const SITES = [site('vegan', 'Vegan Market', '/builder-templates/site-vegan.webp'), site('handmade', 'Handmade Atelier'), site('classic', 'Classic Shop'), site('kids', 'Little Sprouts')]
 
 const presets = [
   { key: 'vegan', name: 'Vegan', description: '', theme: { colors: { primary: '#2f7d32', accent: '#f4a259', highlight: '#8bc34a', heading: '#1b3a1d', canvas: '#f6fbf2' }, typography: {}, shape: {}, layout: {} } },
@@ -52,6 +52,10 @@ function mock(permissions: string[], options: { publishFails?: boolean; themeCha
       calls.starts.push({ preset: 'vegan', body: JSON.parse(String(init.body)) })
       return ok({ documents: drafts, theme: { preview_url: 'https://shop.test/?preview=draft' } })
     },
+    'POST /storefront/builder/start-from-demo/kids': (init) => {
+      calls.starts.push({ preset: 'kids', body: JSON.parse(String(init.body)) })
+      return ok({ documents: drafts, theme: { preview_url: 'https://shop.test/?preview=draft' } })
+    },
     'POST /storefront/builder/publish-all': (init) => {
       calls.publishes.push(JSON.parse(String(init.body)))
       return options.publishFails ? fail(422, 'DOCUMENT_EMPTY', 'The footer is empty.') : ok({ documents: drafts })
@@ -61,11 +65,15 @@ function mock(permissions: string[], options: { publishFails?: boolean; themeCha
 }
 
 describe('page builder: start from a demo look (B5)', () => {
-  it('shows the three demo looks with a picture, description and colours', async () => {
+  it('shows the four demo looks with a picture, description and colours', async () => {
     mock(MANAGE)
     renderRoutes(routes, '/storefront/pages')
     const card = await screen.findByTestId('demo-looks')
-    await waitFor(() => expect(within(card).getAllByRole('button', { name: /^Use the .* look$/ })).toHaveLength(3))
+    await waitFor(() => expect(within(card).getAllByRole('button', { name: /^Use the .* look$/ })).toHaveLength(4))
+    // Four looks: one per row, 2 × 2, then four across (never three and a lone card).
+    expect(within(card).getByRole('list', { name: 'Demo looks' })).toHaveClass('sm:grid-cols-2', 'xl:grid-cols-4')
+    expect(within(card).getByRole('list', { name: 'Demo looks' })).not.toHaveClass('lg:grid-cols-3')
+    expect(within(card).getByTestId('demo-look-kids')).toHaveTextContent('Little Sprouts demo store look.')
     const vegan = within(card).getByTestId('demo-look-vegan')
     expect(vegan.querySelector('img')).toHaveAttribute('src', '/builder-templates/site-vegan.webp')
     expect(vegan).toHaveTextContent('Vegan Market demo store look.')
@@ -112,6 +120,17 @@ describe('page builder: start from a demo look (B5)', () => {
     await waitFor(() => expect(calls.publishes).toEqual([{ documents: ['d-home', 'd-header', 'd-footer', 'd-zone'], theme: true, note: 'Vegan Market demo look' }]))
     expect(await within(review).findByRole('heading', { name: 'The Vegan Market look is live' })).toBeInTheDocument()
     expect(within(review).getByRole('link', { name: /View your store/ })).toHaveAttribute('href', 'https://shop.test/')
+  })
+
+  it('K1: the kids look starts from its demo like the others', async () => {
+    const user = userEvent.setup()
+    const calls = mock(PUBLISH)
+    renderRoutes(routes, '/storefront/pages')
+    await user.click(await screen.findByRole('button', { name: 'Use the Little Sprouts look' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Use the Little Sprouts look?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Create drafts' }))
+    await waitFor(() => expect(calls.starts).toEqual([{ preset: 'kids', body: { include: { theme: true, home: true, header: true, footer: true, listing_top: true } } }]))
+    expect(await screen.findByRole('heading', { name: 'Review your Little Sprouts look' })).toBeInTheDocument()
   })
 
   it('without the publish permission the drafts are made but Publish all is unavailable', async () => {

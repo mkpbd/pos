@@ -140,7 +140,12 @@ class BuilderTemplatesApiTest extends TestCase
         $this->assertNotContains('page-contact', $landing);
         $this->assertContains('page-sale-landing', $landing);
         $header = $this->getJson(self::API.'/templates?context=header')->assertOk()->json('data');
-        $this->assertSame(['site-vegan', 'site-handmade', 'site-classic'], array_column($header, 'id'));
+        $this->assertSame(['site-vegan', 'site-handmade', 'site-classic', 'site-kids'], array_column($header, 'id'));
+        // K1: the kids look's templates.
+        $kids = $this->getJson(self::API.'/templates?preset=kids')->assertOk()->json('data');
+        $this->assertSame(['kids'], array_values(array_unique(array_column($kids, 'preset'))));
+        $this->assertContains('site-kids', array_column($kids, 'id'));
+        $this->assertGreaterThanOrEqual(8, count(array_filter($kids, fn (array $t) => $t['scope'] === 'section')));
         foreach ($this->getJson(self::API.'/templates?context=footer')->assertOk()->json('data') as $template) {
             $this->assertContains('footer', $template['allowed_in']);
         }
@@ -356,7 +361,7 @@ class BuilderTemplatesApiTest extends TestCase
      */
     public static function presets(): array
     {
-        return ['vegan' => ['vegan'], 'handmade' => ['handmade'], 'classic' => ['classic']];
+        return ['vegan' => ['vegan'], 'handmade' => ['handmade'], 'classic' => ['classic'], 'kids' => ['kids']];
     }
 
     #[DataProvider('presets')]
@@ -430,6 +435,43 @@ class BuilderTemplatesApiTest extends TestCase
         // The previous live version is still in the history.
         $this->actingAsUser($this->t['admin']);
         $this->assertSame([2, 1], array_column($this->getJson(self::DOCS."/{$home}/versions")->json('data'), 'number'));
+    }
+
+    /**
+     * K1: the kids look — the theme draft gets the arched cards and the commerce header, the home
+     * draft follows Little Sprouts' homepage (split promo tiles, deal of the week, the trio) with its
+     * photos imported into this organization, and the header's menu bar is the accent colour.
+     */
+    public function test_start_from_demo_kids(): void
+    {
+        $org = $this->t['organization']->id;
+        $this->postJson('/api/v1/storefront/menus', ['name' => 'Main', 'location' => 'main'])->assertCreated();
+
+        $result = $this->postJson(self::API.'/start-from-demo/kids')->assertOk()->json('data');
+        $this->assertSame('kids', $result['preset']);
+        $this->assertSame(['home', 'header', 'footer', 'zone:listing.top'], array_column($result['documents'], 'key'));
+
+        $theme = $this->getJson('/api/v1/storefront/theme/draft')->assertOk()->json('data.settings');
+        $this->assertSame(['kids', 'arched', 'commerce'], [$theme['preset'], $theme['layout']['card_style'], $theme['layout']['header_style']]);
+
+        $home = BuilderDocument::query()->withoutGlobalScopes()->findOrFail($result['documents'][0]['id']);
+        $types = array_map(fn (array $s) => $s['columns'][0]['elements'][0]['type'], $home->draft['sections']);
+        $this->assertSame(['hero_slider', 'banner_grid', 'product_tabs', 'hot_deals', 'product_grid', 'newsletter', 'category_strip', 'product_carousel', 'testimonials', 'banner_grid', 'features_strip'], $types);
+        $grids = $this->elementsOf($home->draft['sections'], 'banner_grid');
+        $this->assertSame(['3-col-split', '3-col'], array_map(fn (array $g) => $g['props']['config']['layout'], $grids));
+        $this->assertCount(4, $grids[0]['props']['items']);
+        $newsletter = $this->elementsOf($home->draft['sections'], 'newsletter')[0];
+        $this->assertSame($org, Media::query()->withoutGlobalScopes()->findOrFail($newsletter['props']['config']['image_media_id'])->organization_id);
+        $this->assertSame('#c24626', $newsletter['props']['config']['background']);
+
+        $header = BuilderDocument::query()->withoutGlobalScopes()->findOrFail($result['documents'][1]['id']);
+        $this->assertSame('theme:accent', $header->draft['sections'][1]['style']['base']['background']['color']);
+        $this->assertSame('theme:accent_foreground', $header->draft['sections'][1]['style']['base']['color']);
+
+        // 2 hero + 4 split + 3 trio banners; their photos and the newsletter photo, all this organization's.
+        $this->assertSame(['media' => 10, 'banners' => 9, 'banners_reused' => 0], $result['imported']);
+        $this->assertSame(9, $this->bannerCount($org));
+        $this->assertSame(10, $this->mediaCount($org));
     }
 
     public function test_start_from_demo_can_leave_parts_out_and_runs_again_without_duplicates(): void
