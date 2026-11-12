@@ -8,9 +8,11 @@ import { parseLocale, setLocaleRuntime, type Locale } from '../../i18n/runtime'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../../theme'
 import type { StorefrontBootstrap } from '../../types'
 import { PageRenderer } from '../page-renderer'
+import { PopupFrame } from '../popups/popup-frame'
 import { playMotion } from '../motion'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
+import { normalizeStorePopupSettings } from '../validate'
 import { CANVAS_SURROUNDINGS, envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type CanvasSurroundings, type ParentMessage, type Rect } from './protocol'
 import { sanitizeHtml } from './sanitize'
 import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
@@ -120,6 +122,20 @@ function GridSample() {
         ))}
       </div>
     </Sample>
+  )
+}
+
+/** B8b: the store page a popup opens over (dimmed by the popup's overlay, or faded). */
+function PopupPageSample() {
+  return (
+    <div aria-hidden="true" data-testid="canvas-sample" className="pointer-events-none min-h-screen select-none bg-neutral-50 opacity-60">
+      <div className="h-16 border-b border-neutral-200 bg-white" />
+      <div className="mx-auto max-w-sf px-4 py-8">
+        <div className={`${block} mb-6 h-56 w-full`} />
+        <div className="mb-6 grid grid-cols-3 gap-4">{[0, 1, 2].map((i) => <div key={i} className={`${block} h-32`} />)}</div>
+        <div className="space-y-2"><div className={`${block} h-4 w-2/3`} /><div className={`${block} h-4 w-1/2`} /></div>
+      </div>
+    </div>
   )
 }
 
@@ -324,6 +340,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const surroundings: CanvasSurroundings = frame?.surroundings && CANVAS_SURROUNDINGS.includes(frame.surroundings) ? frame.surroundings : 'page'
   const samples = useMemo(() => surroundingSamples(surroundings), [surroundings])
   const placeholder = useCallback((element: RenderElement) => (pending.has(element.id) ? <Skeleton element={element} /> : null), [pending])
+  const popupSettings = useMemo(() => (surroundings === 'popup' ? normalizeStorePopupSettings(frame?.popup) : null), [surroundings, frame?.popup])
 
   // Report positions after every drawn frame.
   useLayoutEffect(() => {
@@ -352,7 +369,18 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
               </p>
             )}
             {samples.before}
-            {page.sections.length === 0 ? (
+            {popupSettings ? (
+              // B8b: the popup in its layout over a faded store page; nothing runs (no trigger, close or submit).
+              <div className="relative min-h-screen" data-canvas-part="popup">
+                <PopupPageSample />
+                <PopupFrame id="canvas" settings={popupSettings} page={page} mode="canvas" />
+                {page.sections.length === 0 && (
+                  <p data-testid="canvas-empty" className="absolute inset-x-0 top-4 z-[70] mx-auto max-w-sm rounded bg-white/90 p-3 text-center text-sm text-neutral-600 shadow">
+                    {typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT}
+                  </p>
+                )}
+              </div>
+            ) : page.sections.length === 0 ? (
               <div data-testid="canvas-empty" className={`grid place-items-center p-8 text-center text-neutral-500 ${surroundings === 'page' ? 'min-h-[60vh]' : 'min-h-40 border-y border-dashed border-neutral-300'}`}>
                 <p className="max-w-sm text-sm">{typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT}</p>
               </div>

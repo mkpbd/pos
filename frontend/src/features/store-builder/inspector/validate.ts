@@ -8,7 +8,7 @@
 import type { SectionConfigs, SectionType, SectionTypeInfo } from '@/features/storefront/api'
 import { validateSectionDraft } from '@/features/storefront/components/section-draft'
 import { isWrappedSectionType, matchesTranslatable, NODE_ID } from '@/storefront/builder/registry'
-import type { Column, Element, Section, WrappedElement, WrappedSectionType } from '@/storefront/builder/types'
+import type { Column, DocumentContext, Element, Section, WrappedElement, WrappedSectionType } from '@/storefront/builder/types'
 import { ICON_NAMES } from '@/storefront/builder/icons'
 import { B8A_TYPES as B8A_TYPE_LIST } from '@/storefront/builder/elements/b8a-types'
 import {
@@ -17,6 +17,9 @@ import {
   B6_TEXT_LIMITS,
   B8A_LIMITS,
   B8A_TEXT_LIMITS,
+  B8B_LIMITS,
+  B8B_TEXT_LIMITS,
+  b8bPropProblems,
   b6PropProblems,
   b8aPropProblems,
   ENUMS,
@@ -81,10 +84,13 @@ export const B6_TYPES: ReadonlySet<string> = new Set([
 /** B8a element types (contract §1). */
 export const B8A_TYPES: ReadonlySet<string> = new Set(B8A_TYPE_LIST)
 
+/** B8b element types (contract §2). */
+export const B8B_TYPES: ReadonlySet<string> = new Set(['form'])
+
 /** B6 / B8a props that are not translated although they have a text limit (a person's name isn't). */
 const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'], team: ['members.*.name'] }
 
-const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS } as Record<string, Record<string, number>>
+const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form } as Record<string, Record<string, number>>
 
 /**
  * Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable).
@@ -358,6 +364,8 @@ const B6_LISTS: Record<string, Record<string, Range & { noun: string; plural: st
   photo_grid: { images: { ...B8A_LIMITS.photoImages, noun: 'photo', plural: 'photos' } },
   progress_bars: { items: { ...B8A_LIMITS.progressItems, noun: 'bar', plural: 'bars' } },
   store_hours: { days: { min: 7, max: 7, noun: 'day', plural: 'days' } },
+  // B8b
+  form: { fields: { ...B8B_LIMITS.formFields, noun: 'field', plural: 'fields' }, 'fields.*.options': { ...B8B_LIMITS.formOptions, noun: 'choice', plural: 'choices' } },
 }
 
 /** Whole-number props and their ranges. */
@@ -479,7 +487,30 @@ function validateB8a(node: Element, add: (path: string, message: string) => void
   }
 }
 
-function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[]) {
+/** B8b messages the shared ones don't cover (the form and a button's action). */
+function b8bMessage(type: string, problem: PropProblem): string {
+  const { path, code } = problem
+  const last = path.split('.').pop() ?? ''
+  if (type === 'button' && path === 'action') return 'Closing the popup works only inside a popup. Choose “Open a page”.'
+  if (last === 'reply_to') return code === 'duplicate' ? 'Only one e-mail field can be the reply-to address.' : 'Only an e-mail field can be the reply-to address.'
+  if (path === 'notify_email') return 'Enter an e-mail address such as orders@myshop.com.'
+  if (last === 'min' || last === 'max') return code === 'out_of_range' && last === 'max' ? 'The largest number must not be below the smallest (at most 2 decimals).' : 'Use a number up to 1,000,000,000 with at most 2 decimals.'
+  if (last === 'max_length') return `Use ${B8B_LIMITS.formMaxLength.min}–${B8B_LIMITS.formMaxLength.max} characters, or leave it empty.`
+  if (code === 'required') {
+    if (path === 'submit_label') return 'Enter the button text.'
+    if (path === 'success_message') return 'Enter the thank-you message.'
+    if (path === 'consent.text') return 'Enter what the shopper agrees to.'
+  }
+  if (path === 'consent.link') return 'Use a site path such as /pages/privacy-policy or an http(s) URL.'
+  return b6Message(type, problem)
+}
+
+function validateB8b(node: Element, add: (path: string, message: string) => void, context?: DocumentContext) {
+  for (const problem of b8bPropProblems(node.type, node.props, context)) add(`props.${problem.path}`, b8bMessage(node.type, problem))
+}
+
+function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[], context?: DocumentContext) {
+  if (B8B_TYPES.has(node.type)) return validateB8b(node, add, context)
   if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)
   if (B6_TYPES.has(node.type)) return validateB6(node, add)
   if (B8A_TYPES.has(node.type)) return validateB8a(node, add)
@@ -505,6 +536,7 @@ function validateElement(node: Element, add: (path: string, message: string) => 
       enumRule(node.props.variant, ENUMS.buttonVariant, 'props.variant', add)
       enumRule(node.props.size, ENUMS.buttonSize, 'props.size', add)
       if (typeof node.props.full_width !== 'boolean') add('props.full_width', 'Full width is on or off.')
+      validateB8b(node, add, context)
       return
     case 'divider':
       enumRule(node.props.line, ENUMS.dividerLine, 'props.line', add)
@@ -553,8 +585,8 @@ function validateColumn(node: Column, add: (path: string, message: string) => vo
   }
 }
 
-/** Client-side checks of one node; empty = valid. `icons`: the icon names the server accepts (default: the storefront's). */
-export function validateNode(node: BuilderNode, options: { icons?: readonly string[] } = {}): Problem[] {
+/** Client-side checks of one node; empty = valid. `icons`: the icon names the server accepts (default: the storefront's). B8b `context`: a button's "close the popup" is for popups only. */
+export function validateNode(node: BuilderNode, options: { icons?: readonly string[]; context?: DocumentContext } = {}): Problem[] {
   const problems: Problem[] = []
   const add = (path: string, message: string) => {
     if (!problems.some((p) => p.path === path)) problems.push({ path, message })
@@ -577,7 +609,7 @@ export function validateNode(node: BuilderNode, options: { icons?: readonly stri
       if (shape != null && normalizeSectionShape(shape) === null) add(`props.${edge}`, `Choose a shape, a colour and a height from ${B6_LIMITS.shapeHeight.min} to ${B6_LIMITS.shapeHeight.max} px.`)
     }
   } else {
-    validateElement(node, add, options.icons ?? ICON_NAMES)
+    validateElement(node, add, options.icons ?? ICON_NAMES, options.context)
   }
   validateSchedule(node, add)
   validateTranslations(node, add)

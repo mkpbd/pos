@@ -9,6 +9,7 @@ use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\BuilderJson;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
+use App\Modules\Storefront\Domain\Builder\PopupSettings;
 use App\Modules\Storefront\Domain\Builder\Templates\PortableTemplate;
 use App\Modules\Storefront\Infrastructure\Models\BuilderTemplate;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -108,7 +109,9 @@ class ManageBuilderTemplates
             $references = app(TemplateReferences::class);
             $portable = $own ? [$template->content['section'] ?? []] : $this->library->sections($meta['id'], $context);
             $sections = PortableTemplate::concrete($portable, $references, $this->idGenerator());
-            $document = ($this->prepare)(['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'sections' => $sections], $context);
+            // B8b: a popup template brings its settings.
+            $settings = $own ? null : $this->library->popupSettings($meta['id']);
+            $document = ($this->prepare)(['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, ...($settings === null ? [] : ['popup' => $settings]), 'sections' => $sections], $context);
             $imported = $references->summary();
 
             $this->audit->record('storefront.builder_template_used', $own ? $template : null, [], [
@@ -123,8 +126,33 @@ class ManageBuilderTemplates
                 'context' => $context,
                 'nodes' => BuilderJson::present($document)['sections'],
                 'imported' => $imported,
+                // B8b: the settings of a popup template (null for the others).
+                'popup' => $settings === null ? null : PopupSettings::present($document['popup']),
             ];
         });
+    }
+
+    /**
+     * B8b: a built-in popup template as the content of a new popup document (`{schema_version,
+     * popup, sections}`, references resolved, fresh ids — not yet validated) and what was
+     * imported. Unknown or non-popup template: 422 TEMPLATE_NOT_ALLOWED.
+     *
+     * @return array{content: array<string, mixed>, imported: array{media: int, banners: int, banners_reused: int}}
+     */
+    public function popupContent(string $id): array
+    {
+        $settings = $this->library->popupSettings($id);
+        if ($settings === null) {
+            throw new BusinessRuleViolation('TEMPLATE_NOT_ALLOWED', 'This template is not a popup template.', ['template' => $id]);
+        }
+        /** @var TemplateReferences $references */
+        $references = app(TemplateReferences::class);
+        $sections = PortableTemplate::concrete($this->library->sections($id, 'popup'), $references, $this->idGenerator());
+
+        return [
+            'content' => ['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'popup' => $settings, 'sections' => $sections],
+            'imported' => $references->summary(),
+        ];
     }
 
     /**

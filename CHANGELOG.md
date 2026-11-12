@@ -21,18 +21,19 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
-### B8a — Page builder: selling, people and data blocks
+### B8a — Store builder: selling blocks, trust & people, more visualization
+
+Ten new page-builder elements and store-data charts. Popups/bars and forms follow in B8b.
 
 #### Added
-- **10 elements:** `pricing_table`, `comparison_table`, `bundle` (commerce); `flash_sale_bar`, `review_wall` (marketing); `before_after`, `photo_grid` (media); `team`, `store_hours` (also in the footer), `progress_bars` (content). Normalizers in `B8ElementProps` on a shared `ElementProps` base; two-level translation keys (`limits.nested_list_translatable`).
-- **Real store data through contracts only:** `ReviewShowcase` (approved reviews, public author name, star counts), `StorefrontCatalog::liveProductIds()`, `PromotionShowcase::claimed()`, organization timezone for store hours. A flash sale bar without a chosen promotion expires the page cache at the next promotion start/end.
-- **Charts:** stacked kinds (d3 `stack()`, totals in tooltip and table); "Numbers come from" store sources (public counts only); progress bars use the theme primary only when it passes the palette checks.
-- **Storefront:** keyboard/pointer before-after slider, scrollable comparison table with a sticky first column, bundle add-to-cart with per-item failures, live store-hours status; Bangla digits follow the store setting.
-- **Editor:** setup dialogs (before/after, bundle, photo grid), comparison grid, store-hours week editor, prices accept Bangla digits and `৳`.
-- **Templates:** 10 neutral sections with thumbnails (76 built-ins).
+- **Selling:** `pricing_table` (1–4 plans, NUMERIC-string prices or a word, ✓/✗ features), `before_after` (keyboard slider), `comparison_table` (✓/✗/text cells, optional product columns with price and add to cart), `flash_sale_bar` (the live countdown promotion, its products, "N of M claimed" only with a real usage limit), `bundle` (2–4 products, variant choice, "Total today", add all to cart with per-item failures).
+- **Trust & people:** `team`, `review_wall` (approved reviews of products on sale; first name + last initial only), `photo_grid` (Instagram-style, own photos), `store_hours` (Saturday-first week, "Open now · closes …" in the store's time zone, after-midnight and 24-hour rules).
+- **Visualization:** chart kinds `stacked-column` / `stacked-bar`; chart `data_source` from the store — products per category, customer ratings (public counts only); `progress_bars` (bar / ring); integer data gets whole-number axis ticks.
+- Two-level Bangla keys for nested lists; contracts `ReviewShowcase`, `StorefrontCatalog::liveProductIds()`, `PromotionShowcase::claimed()`.
+- 10 neutral section templates with thumbnails (76 built-ins).
 
 #### Tests
-- Backend 1035 on PostgreSQL (1034 pass, 1 opt-in skip), Pint clean; vitest 1496; tsc and oxlint clean; mocked Playwright `storefront-builder-b8a.spec.ts`.
+- Backend 1035 on PostgreSQL (1034 pass, 1 opt-in skip), Pint clean; vitest 1496; mocked Playwright store-builder + `storefront-builder-b8a.spec.ts`; full-stack integration 24 + demo stores 11 (+1 B8a on Little Sprouts with real reviews, flash sale and add-all-to-cart) + builder acceptance 5.
 
 ### B7 — Page builder start screen: easier, BerryKid first, original look
 

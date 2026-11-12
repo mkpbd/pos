@@ -296,6 +296,17 @@ html:lang(bn) body {
  * gallery grid, moving strips (logo carousel, marquee) and the entrance keyframes. Only nodes that
  * use these features get the classes, so pre-B6 pages render exactly as before.
  */
+/*
+ * Store builder B8b: popups and bars. A popup's sections get room inside the panel (a bar stays
+ * slim); a top bar pushes a sticky store header down by its height (--sf-popup-bar-top, set while
+ * the bar is open) so neither covers the other.
+ */
+.b-popup .b-section { padding-block: 1.5rem; }
+.b-popup:not(.b-popup-bar) .b-section:first-child { padding-top: 2.75rem; }
+.b-popup-bar .b-section { padding-block: 0.5rem; }
+.b-popup .b-boxed { max-width: none; }
+header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
+
 .b-layered { position: relative; isolation: isolate; }
 .b-layered > .b-container, .b-layered > .b-row { position: relative; z-index: 1; }
 .b-sticky { position: sticky; top: var(--b-sticky-top, 0px); z-index: 30; }

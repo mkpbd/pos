@@ -35,4 +35,11 @@ interface TemplateReferenceResolver
      * hotspot is then left out).
      */
     public function product(string $source, int $index): ?string;
+
+    /**
+     * B8b: the id of the organization's promotion for a reference (`coupon`: the running
+     * percent / fixed coupon promotion with a usable code that ends first), or null (a discount
+     * element is then left out).
+     */
+    public function promotion(string $ref): ?string;
 }

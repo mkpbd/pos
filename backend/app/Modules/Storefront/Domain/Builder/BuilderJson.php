@@ -18,6 +18,10 @@ final class BuilderJson
     public static function present(array $document): array
     {
         $document['sections'] = array_map(fn (array $s) => self::node($s), $document['sections'] ?? []);
+        // B8b: a popup's settings.
+        if (is_array($document['popup'] ?? null)) {
+            $document['popup'] = PopupSettings::present($document['popup']);
+        }
 
         return $document;
     }

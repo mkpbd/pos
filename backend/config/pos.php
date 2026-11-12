@@ -38,4 +38,7 @@ return [
     // New product reviews per hour per customer (E9).
     'review_rate_limit' => (int) env('POS_REVIEW_RATE_LIMIT', 5),
 
+    // Store builder form submissions per hour per visitor IP (B8b).
+    'form_rate_limit' => (int) env('POS_FORM_RATE_LIMIT', 10),
+
 ];

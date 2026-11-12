@@ -1,5 +1,5 @@
 import type { StorefrontBootstrap } from '../../types'
-import type { BuilderData, BuilderMedia, Device, RenderSection } from '../types'
+import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderSection } from '../types'
 import type { CanvasThemeSettings } from './theme-override'
 
 /*
@@ -19,9 +19,9 @@ export type Rect = { x: number; y: number; w: number; h: number }
  * header, footer or zone is drawn where it sits on the store, next to a faded sample of the page
  * around it. Absent = `page`.
  */
-export type CanvasSurroundings = 'page' | 'header' | 'footer' | 'zone:listing.top' | 'zone:listing.bottom' | 'zone:product.after'
+export type CanvasSurroundings = 'page' | 'header' | 'footer' | 'zone:listing.top' | 'zone:listing.bottom' | 'zone:product.after' | 'popup'
 
-export const CANVAS_SURROUNDINGS: readonly CanvasSurroundings[] = ['page', 'header', 'footer', 'zone:listing.top', 'zone:listing.bottom', 'zone:product.after']
+export const CANVAS_SURROUNDINGS: readonly CanvasSurroundings[] = ['page', 'header', 'footer', 'zone:listing.top', 'zone:listing.bottom', 'zone:product.after', 'popup']
 
 /** Parent → canvas. */
 export type ParentMessage =
@@ -42,6 +42,11 @@ export type ParentMessage =
       surroundings?: CanvasSurroundings
       /** B4: what the canvas says while the document is empty. */
       emptyText?: string
+      /**
+       * B8b (additive): with `surroundings: 'popup'`, the popup's settings; the canvas draws the
+       * document inside that layout over a dimmed sample page (no triggers; forms don't submit).
+       */
+      popup?: PopupSettings
     }
   | { type: 'scroll-to'; id: string }
   /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */

@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\Validator;
  *
  * B8a: the B8a elements' props (B8ElementProps) with nested list translations
  * (`plans.<plan id>.features.<feature id>.text`, `rows.<row id>.cells.<column id>.text`).
+ *
+ * B8b: context `popup` (popup documents) — the document gains a `popup` settings object
+ * (PopupSettings; `{schema_version, popup, sections}`), buttons there may have `action: dismiss`;
+ * the `form` element (B8ElementFormProps).
  */
 final class BuilderDocumentSchema
 {
@@ -110,6 +114,8 @@ final class BuilderDocumentSchema
             str_starts_with($key, 'cms:') => 'cms',
             $key === 'header', $key === 'footer' => $key,
             str_starts_with($key, 'zone:') => 'zone',
+            // B8b.
+            str_starts_with($key, 'popup:') => 'popup',
             default => 'page',
         };
     }
@@ -122,6 +128,16 @@ final class BuilderDocumentSchema
     public static function blank(): array
     {
         return ['schema_version' => self::SCHEMA_VERSION, 'sections' => []];
+    }
+
+    /**
+     * B8b: a popup without content, with the default settings.
+     *
+     * @return array{schema_version: int, popup: array<string, mixed>, sections: list<array<string, mixed>>}
+     */
+    public static function blankPopup(): array
+    {
+        return ['schema_version' => self::SCHEMA_VERSION, 'popup' => PopupSettings::defaults(), 'sections' => []];
     }
 
     /**
@@ -189,11 +205,17 @@ final class BuilderDocumentSchema
         if ($this->nodes > self::MAX_NODES) {
             $this->error('sections', null, 'A page can have at most '.self::MAX_NODES.' sections, columns and elements in all ('.$this->nodes.' given).');
         }
+        // B8b: a popup's settings (other documents have none; the key is dropped).
+        $popup = $this->context === 'popup'
+            ? PopupSettings::normalize($document['popup'] ?? null, fn (string $path, string $message, ?string $code = null) => $this->error($path === '' ? 'popup' : "popup.{$path}", null, $message, $code))
+            : null;
         if ($this->errors !== []) {
             throw new InvalidBuilderDocument($this->errors);
         }
 
-        return ['schema_version' => self::SCHEMA_VERSION, 'sections' => $sections];
+        return $popup === null
+            ? ['schema_version' => self::SCHEMA_VERSION, 'sections' => $sections]
+            : ['schema_version' => self::SCHEMA_VERSION, 'popup' => $popup, 'sections' => $sections];
     }
 
     /**
@@ -408,7 +430,7 @@ final class BuilderDocumentSchema
             return null;
         }
         if (! in_array($this->context, ElementRegistry::allowedIn($type), true)) {
-            $noun = ['page' => 'this page', 'cms' => 'a content page', 'header' => 'the header', 'footer' => 'the footer', 'zone' => 'a shop area'][$this->context];
+            $noun = ['page' => 'this page', 'cms' => 'a content page', 'header' => 'the header', 'footer' => 'the footer', 'zone' => 'a shop area', 'popup' => 'a popup'][$this->context];
             $this->error("{$path}.type", $id, 'The '.ElementRegistry::label($type).' element cannot be used in '.$noun.'.', 'ELEMENT_NOT_ALLOWED');
 
             return null;
@@ -604,6 +626,9 @@ final class BuilderDocumentSchema
         if (in_array($type, ElementRegistry::B8A, true)) {
             return (new B8ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
         }
+        if (in_array($type, ElementRegistry::B8B, true)) {
+            return (new B8ElementFormProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
+        }
 
         // Optional texts (alt, html) may arrive as null (empty strings become null on input).
         $value = fn (string $key) => array_key_exists($key, $props)
@@ -641,6 +666,7 @@ final class BuilderDocumentSchema
                 'variant' => $enum('variant', ElementRegistry::BUTTON_VARIANTS),
                 'size' => $enum('size', ElementRegistry::BUTTON_SIZES),
                 'full_width' => $check('full_width', is_bool($value('full_width')), 'Full width is true or false.'),
+                ...$this->buttonAction($props['action'] ?? null, "{$path}.action", $id),
             ],
             'divider' => [
                 'line' => $enum('line', ElementRegistry::DIVIDER_LINES),
@@ -651,6 +677,31 @@ final class BuilderDocumentSchema
             ],
             default => [],
         };
+    }
+
+    /**
+     * B8b: a button's `action` — kept only when it is `dismiss` (closes the popup; popups only);
+     * `link` (the default) is not stored, so older documents normalize unchanged.
+     *
+     * @return array{action?: string}
+     */
+    private function buttonAction(mixed $action, string $path, ?string $id): array
+    {
+        if ($action === null || $action === 'link') {
+            return [];
+        }
+        if (! in_array($action, ElementRegistry::BUTTON_ACTIONS, true)) {
+            $this->error($path, $id, 'Choose one of: '.implode(', ', ElementRegistry::BUTTON_ACTIONS).'.');
+
+            return [];
+        }
+        if ($this->context !== 'popup') {
+            $this->error($path, $id, 'Only a button inside a popup can close it.');
+
+            return [];
+        }
+
+        return ['action' => $action];
     }
 
     /**

@@ -149,14 +149,31 @@ export function ImageForm({ node, onChange, errors, bangla }: FormProps<ImageEle
   )
 }
 
-export function ButtonForm({ node, onChange, errors, bangla }: FormProps<ButtonElement>) {
+export function ButtonForm({ node, onChange, errors, bangla, context }: FormProps<ButtonElement> & { context?: DocumentContext }) {
   const p = node.props
+  // B8b: inside a popup a button may close it instead (`action: 'dismiss'`; absent = open the link, which stays stored).
+  const dismiss = p.action === 'dismiss'
+  const setAction = (action: 'link' | 'dismiss') => {
+    const { action: _drop, ...rest } = p
+    onChange({ ...node, props: action === 'dismiss' ? { ...rest, action: 'dismiss' } : rest })
+  }
   return (
     <div className="flex flex-col gap-4">
       <FormField label="Button text" error={errors.label} hint={counter(p.label, TEXT_LIMITS.buttonLabel)}>
         <Input maxLength={TEXT_LIMITS.buttonLabel} value={p.label} onChange={(e) => setProps(node, onChange, { label: e.target.value }, 'label')} />
       </FormField>
-      <LinkField key={node.id} required label="Opens" value={p.link?.url ?? ''} onChange={(url) => setProps(node, onChange, { link: { url: url ?? '' } }, 'link')} error={errors.link} />
+      {(context === 'popup' || dismiss) && (
+        <FormField label="When clicked" error={errors.action} hint={dismiss ? 'Closes the popup. With “Stop showing it after the shopper uses it” on, it won’t come back.' : undefined}>
+          <Select value={dismiss ? 'dismiss' : 'link'} onValueChange={(v) => setAction(v as 'link' | 'dismiss')}>
+            <SelectTrigger className="w-full" aria-label="When clicked"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="link">Open a page</SelectItem>
+              <SelectItem value="dismiss">Close the popup</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
+      )}
+      {!dismiss && <LinkField key={node.id} required label="Opens" value={p.link?.url ?? ''} onChange={(url) => setProps(node, onChange, { link: { url: url ?? '' } }, 'link')} error={errors.link} />}
       <FormField label="Look" error={errors.variant}>
         <Select value={p.variant} onValueChange={(v) => setProps(node, onChange, { variant: v as ButtonElement['props']['variant'] })}>
           <SelectTrigger className="w-full" aria-label="Look"><SelectValue /></SelectTrigger>

@@ -1,0 +1,115 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "bar_top",
+        "position": "bottom_right",
+        "width": "md",
+        "overlay": false,
+        "close_on_overlay": false,
+        "label": "Free delivery",
+        "trigger": {
+            "kind": "on_load",
+            "delay_seconds": 0,
+            "scroll_percent": 50
+        },
+        "frequency": {
+            "kind": "every_page_view",
+            "days": 7
+        },
+        "stop_after_action": false,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "all",
+        "priority": 40,
+        "starts_at": null,
+        "ends_at": null,
+        "translations": {
+            "bn": {
+                "label": "ফ্রি ডেলিভারি"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "8px",
+                            "bottom": "8px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:primary"
+                    },
+                    "color": "theme:primary_foreground",
+                    "layout": {
+                        "align": "center",
+                        "gap": "16px"
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 70,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "text",
+                            "props": {
+                                "html": "<p><strong>Free delivery</strong> on orders over ৳1,500 — this week only.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>৳১,৫০০-এর বেশি অর্ডারে <strong>ফ্রি ডেলিভারি</strong> — শুধু এই সপ্তাহে।</p>"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 30,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "button",
+                            "props": {
+                                "label": "Shop now",
+                                "link": {
+                                    "url": "/shop"
+                                },
+                                "variant": "accent",
+                                "size": "sm",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "এখনই কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

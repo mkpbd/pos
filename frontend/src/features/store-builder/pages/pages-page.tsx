@@ -16,6 +16,7 @@ import { documentPath, useCreateDocumentMutation, useDeleteDocumentMutation, use
 import { CmsPagesCard, SitePartsCard, ZonesCard, type RemoveRequest } from './builder-parts'
 import { DemoLooksCard } from './demo-looks'
 import { ListingColumnsCard } from './listing-columns-card'
+import { PopupsCard } from './popups-card'
 import type { ScreenLang } from './messages'
 import { lastEdited, slugify, slugProblemKey } from './page-helpers'
 import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
@@ -33,6 +34,7 @@ import { StartGuide } from './start-guide'
  * groups, the demo looks (drafts → review → publish all).
  * B7: English / বাংলা for this screen (remembered in the browser), a state-aware 3-step guide on
  * top, the looks with a preview, live demos and "use and publish now", and plain wording.
+ * B8b: Popups & bars (list, on / off, new from a template, delete).
  */
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
@@ -245,6 +247,7 @@ function PagesScreen() {
   const cmsDocs = pages.filter((d) => d.key.startsWith('cms:'))
   const parts = all.filter((d) => d.kind === 'header' || d.kind === 'footer')
   const zones = all.filter((d) => d.kind === 'zone')
+  const popups = all.filter((d) => d.kind === 'popup')
 
   const deleteLanding = (summary: DocumentSummary) =>
     setRemoving({
@@ -315,6 +318,10 @@ function PagesScreen() {
               <ZonesCard documents={zones} canManage={canManage} onRemove={setRemoving}>
                 <ListingColumnsCard canManage={canManage} canPublish={canPublish} />
               </ZonesCard>
+            </section>
+            <section aria-labelledby="group-popups" className="flex flex-col gap-4">
+              <GroupHeading id="group-popups" title={t('group.popups.title')} description={t('group.popups.text')} />
+              <PopupsCard documents={popups} canManage={canManage} canPublish={canPublish} onRemove={setRemoving} />
             </section>
           </>
         )}

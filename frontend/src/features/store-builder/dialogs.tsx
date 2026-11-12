@@ -21,7 +21,7 @@ import { useVersionsQuery, type VersionSummary } from './api'
 import { formatDateTime } from './format'
 
 /** Publish with an optional note; `error` explains why it cannot (problems, empty page). */
-export function PublishDialog({ open, onOpenChange, pending, error, onPublish }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string | null; onPublish: (note: string | null) => void }) {
+export function PublishDialog({ open, onOpenChange, pending, error, onPublish, popup = false }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string | null; onPublish: (note: string | null) => void; popup?: boolean }) {
   const [note, setNote] = useState('')
   return (
     <Dialog
@@ -33,8 +33,12 @@ export function PublishDialog({ open, onOpenChange, pending, error, onPublish }:
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Publish this page?</DialogTitle>
-          <DialogDescription>Shoppers will see this version of the page right away. Earlier versions stay in the version history.</DialogDescription>
+          <DialogTitle>{popup ? 'Publish this popup?' : 'Publish this page?'}</DialogTitle>
+          <DialogDescription>
+            {popup
+              ? 'Shoppers see this version while the popup is switched on. Earlier versions stay in the version history.'
+              : 'Shoppers will see this version of the page right away. Earlier versions stay in the version history.'}
+          </DialogDescription>
         </DialogHeader>
         <form
           id="publish-form"

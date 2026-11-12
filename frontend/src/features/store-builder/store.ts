@@ -26,6 +26,8 @@ export type EditorDocument = {
   cms_page: CmsPageRef | null
   preview_url: string | null
   published: PublishedRef | null
+  /** B8b popups: switched on on the store (not versioned). */
+  active: boolean
 }
 
 export type Snapshot = { content: BuilderContent; selection: string | null }
@@ -86,7 +88,7 @@ export type EditorActions = {
 
 export type EditorStore = StoreApi<EditorState & EditorActions>
 
-export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page'>>): EditorDocument {
+export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page' | 'active'>>): EditorDocument {
   const kind = detail.kind ?? 'page'
   return {
     id: detail.id,
@@ -97,6 +99,7 @@ export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | '
     cms_page: detail.cms_page ?? null,
     preview_url: detail.preview_url ?? null,
     published: detail.published,
+    active: detail.active === true,
   }
 }
 

@@ -1027,6 +1027,21 @@
       "requires": []
     },
     {
+      "id": "neutral-contact-form",
+      "scope": "section",
+      "preset": null,
+      "category": "contact",
+      "name": "Contact form",
+      "description": "A heading and a short promise beside a form for name, e-mail, phone, topic and message; replies go to the visitor’s e-mail.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "page-about",
       "scope": "page",
       "preset": null,
@@ -1203,6 +1218,86 @@
         "promotions",
         "blog"
       ]
+    },
+    {
+      "id": "popup-newsletter",
+      "scope": "popup",
+      "preset": null,
+      "category": "newsletter",
+      "name": "Newsletter popup",
+      "description": "A centred window asking new visitors to join the newsletter, 8 seconds after a page opens, at most once a week.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "popup-exit-offer",
+      "scope": "popup",
+      "preset": null,
+      "category": "offer",
+      "name": "Exit offer with coupon",
+      "description": "Shows your running coupon when a visitor is about to leave (on phones after 20 seconds), with a “No, thanks” button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "popup-free-delivery-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "bar",
+      "name": "Free delivery bar",
+      "description": "A coloured bar at the top of every page announcing free delivery, with a Shop now button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "popup-eid-sale",
+      "scope": "popup",
+      "preset": null,
+      "category": "sale",
+      "name": "Eid sale slide-in",
+      "description": "A small card that slides in at the bottom corner when a visitor scrolls 40% down a page, once per visit.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "popup-cookie-notice",
+      "scope": "popup",
+      "preset": null,
+      "category": "cookie",
+      "name": "Cookie notice",
+      "description": "A bar at the bottom explaining the shop’s cookies with a link to the privacy policy and an OK button; shown until the visitor clicks OK.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "popup-contact-form",
+      "scope": "popup",
+      "preset": null,
+      "category": "contact",
+      "name": "Contact form popup",
+      "description": "A window with a short question form on shop and product pages, shown once a month when a visitor scrolls down.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
     }
   ]
 }

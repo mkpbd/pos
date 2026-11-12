@@ -50,6 +50,8 @@ export const EXPORTABLE_LISTS = {
   customerStatement: { label: 'Customer statement', endpoint: '/customers/:id/statement', route: null, screen: 'Customers → Account sheet' },
   suppliers: { label: 'Suppliers', endpoint: '/suppliers', route: '/suppliers' },
   contactMessages: { label: 'Contact messages', endpoint: '/cms/contact-messages', route: '/content/messages' },
+  // With `form`: one column per field label of that form; without: an "Answers" summary column (B8b).
+  formSubmissions: { label: 'Form submissions', endpoint: '/forms/submissions', route: '/content/forms' },
   newsletterSubscribers: { label: 'Newsletter subscribers', endpoint: '/cms/newsletter-subscribers', route: '/content/newsletter' },
   users: { label: 'Users', endpoint: '/users', route: '/users' },
   auditLog: { label: 'Audit log', endpoint: '/audit-logs', route: '/audit-log' },

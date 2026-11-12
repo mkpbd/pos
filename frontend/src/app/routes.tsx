@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
-import { Navigate, type RouteObject } from 'react-router'
+import type { RouteObject } from 'react-router'
 import { HomeRedirect } from '@/app/home-redirect'
+import { ContentRedirect } from '@/app/content-redirect'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { NotFoundPage, RouteError } from '@/app/route-error'
 import { LoadingState } from '@/components/common/state-views'
@@ -95,6 +96,7 @@ const pages = {
   contentFaq: page(() => import('@/features/content/pages/faq-page'), 'FaqPage'),
   contentMessages: page(() => import('@/features/content/pages/messages-page'), 'MessagesPage'),
   contentNewsletter: page(() => import('@/features/content/pages/newsletter-page'), 'NewsletterPage'),
+  contentForms: page(() => import('@/features/content/pages/form-submissions-page'), 'FormSubmissionsPage'),
   newReturn: page(() => import('@/features/returns/pages/return-pages'), 'NewReturnPage'),
   returns: page(() => import('@/features/returns/pages/return-pages'), 'ReturnsPage'),
   saleReturn: page(() => import('@/features/returns/pages/return-pages'), 'ReturnPage'),
@@ -255,7 +257,7 @@ export const routes: RouteObject[] = [
               guarded('payment_gateways.manage', 'storefront/payments', pages.storefrontPayments),
               guarded('online_catalog.view', 'storefront/categories', pages.webCategories),
               guarded('online_catalog.view', 'storefront/brands', pages.webBrands),
-              { path: 'content', element: <Navigate to="/content/pages" replace /> },
+              { path: 'content', element: <ContentRedirect /> },
               guarded('cms.manage', 'content/pages', pages.contentPages),
               guarded('cms.manage', 'content/pages/new', pages.contentPage),
               guarded('cms.manage', 'content/pages/:pageId', pages.contentPage),
@@ -265,6 +267,8 @@ export const routes: RouteObject[] = [
               guarded('cms.manage', 'content/faq', pages.contentFaq),
               guarded('cms.manage', 'content/messages', pages.contentMessages),
               guarded('cms.manage', 'content/newsletter', pages.contentNewsletter),
+              // B8b: one route for the list and the opened submission (bell links point at /content/forms/{id}).
+              guarded('forms.view', 'content/forms/:submissionId?', pages.contentForms),
               guarded('media.manage', 'media', pages.mediaLibrary),
               guarded('branches.view', 'branches', pages.branches),
               guarded('users.view', 'users', pages.users),

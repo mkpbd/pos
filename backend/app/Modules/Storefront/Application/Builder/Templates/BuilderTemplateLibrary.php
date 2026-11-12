@@ -15,7 +15,8 @@ use RuntimeException;
  * — what it needs to show fully)}` and `<id>.json` holds its
  * content in the portable format (PortableTemplate): `{schema_version: 1, sections: [...]}`, or
  * for a site template `{schema_version: 1, theme: {preset}, parts: {home, header, footer,
- * listing_top: {sections}}}`. The images come from the demo store photos
+ * listing_top: {sections}}}`; B8b: scope `popup` (allowed_in `[popup]`) holds `{schema_version: 1,
+ * popup: <PopupSettings>, sections}` and is applied as a new popup document. The images come from the demo store photos
  * (`database/seeders/demo-themes/images/`, alt text from its manifest).
  */
 class BuilderTemplateLibrary
@@ -116,6 +117,23 @@ class BuilderTemplateLibrary
         $part = array_search($context, self::SITE_PARTS, true);
 
         return $part === false ? [] : ($content['parts'][$part]['sections'] ?? []);
+    }
+
+    /**
+     * B8b: the `popup` settings of a popup template (scope `popup`, content `{schema_version: 1,
+     * popup: {...}, sections}`), or null for other templates.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function popupSettings(string $id): ?array
+    {
+        $template = $this->find($id);
+        if ($template === null || $template['scope'] !== 'popup') {
+            return null;
+        }
+        $settings = $this->content($id)['popup'] ?? null;
+
+        return is_array($settings) ? $settings : [];
     }
 
     /**

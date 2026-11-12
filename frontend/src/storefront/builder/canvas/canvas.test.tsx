@@ -7,6 +7,7 @@ import { CanvasApp } from './canvas-app'
 import { BUILDER_SOURCE, envelope, isEditorShortcut, PROTOCOL_VERSION, readCanvasMessage, readParentMessage, type ParentMessage } from './protocol'
 import { createCanvasQueryClient } from './query-client'
 import { sanitizeHtml } from './sanitize'
+import { POPUP_DEFAULTS } from '../validate'
 
 const ORIGIN = window.location.origin
 
@@ -187,6 +188,32 @@ describe('builder canvas: headers, footers and zones (B4)', () => {
     send(render$({ surroundings: 'evil' as never }))
     await waitFor(() => expect(screen.getByRole('main')).toHaveAttribute('data-surroundings', 'page'))
     expect(screen.queryByTestId('canvas-sample')).toBeNull()
+  })
+
+  it('B8b: draws a popup in its layout over a faded page, without any of its behaviour', async () => {
+    const send = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    const popup = { ...POPUP_DEFAULTS, layout: 'slide_in' as const, position: 'bottom_left' as const, width: 'sm' as const }
+    send(render$({ surroundings: 'popup', popup }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveAttribute('data-surroundings', 'popup')
+    expect(screen.getByTestId('canvas-sample')).toBeInTheDocument()
+    const frame = screen.getByTestId('builder-popup')
+    expect(frame).toHaveAttribute('data-layout', 'slide_in')
+    expect(frame).toHaveClass('absolute', 'left-4', 'max-w-sm')
+    expect(screen.getByTestId('popup-close')).toBeInTheDocument()
+    // Nothing runs: no portal, focus or scroll lock.
+    expect(document.activeElement).toBe(document.body)
+
+    send(render$({ surroundings: 'popup', popup: { ...POPUP_DEFAULTS, layout: 'modal' } }))
+    await waitFor(() => expect(screen.getByTestId('builder-popup')).toHaveAttribute('data-layout', 'modal'))
+    expect(screen.getByTestId('builder-popup')).toHaveAttribute('aria-modal', 'false')
+    expect(document.body.style.overflow).toBe('')
+
+    send(render$({ surroundings: 'popup', popup: { ...POPUP_DEFAULTS, layout: 'bar_top' }, sections: [], emptyText: 'This popup is empty.' }))
+    expect(await screen.findByTestId('canvas-empty')).toHaveTextContent('This popup is empty.')
+    expect(screen.getByTestId('builder-popup')).toHaveAttribute('role', 'region')
+    expect(document.body.style.paddingTop).toBe('')
   })
 
   it('cleans custom HTML like the server: no scripts, iframes, handlers, classes or ids', () => {

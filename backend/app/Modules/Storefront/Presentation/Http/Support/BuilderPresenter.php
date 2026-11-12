@@ -49,6 +49,12 @@ final class BuilderPresenter
             BuilderDocument::ZONE_PREFIX.'product.after' => $storeUrl === null ? null : self::latestProductPath(),
             default => null,
         };
+        $previewUrl = $storeUrl === null || $previewPath === null ? null : $storeUrl.$previewPath.'?preview=draft';
+        // B8b: a popup's draft shows over the home page.
+        $settings = $document->isPopup() ? ($document->draft['popup'] ?? null) : null;
+        if ($document->isPopup()) {
+            $previewUrl = $storeUrl === null ? null : $storeUrl.'/?preview=draft&popup='.$document->id;
+        }
 
         return [
             'id' => $document->id,
@@ -57,7 +63,16 @@ final class BuilderPresenter
             'title' => $document->title,
             'path' => $path,
             'cms_page' => $cmsPage,
-            'preview_url' => $storeUrl === null || $previewPath === null ? null : $storeUrl.$previewPath.'?preview=draft',
+            'preview_url' => $previewUrl,
+            // B8b: popups' on / off switch, status (draft | off | scheduled | expired | live) and draft settings summary.
+            'active' => $document->isPopup() ? $document->active : null,
+            'status' => $document->popupStatus(),
+            'popup' => $document->isPopup() ? [
+                'layout' => $settings['layout'] ?? 'modal',
+                'trigger' => $settings['trigger']['kind'] ?? 'on_load',
+                'starts_at' => $settings['starts_at'] ?? null,
+                'ends_at' => $settings['ends_at'] ?? null,
+            ] : null,
             'schema_version' => $document->schema_version,
             'draft_revision' => $document->draft_revision,
             'has_unpublished_changes' => $published === null || self::canonical($published->content) !== self::canonical($document->draft),

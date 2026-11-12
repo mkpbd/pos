@@ -1,0 +1,126 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "slide_in",
+        "position": "bottom_right",
+        "width": "sm",
+        "overlay": false,
+        "close_on_overlay": false,
+        "label": "Eid sale",
+        "trigger": {
+            "kind": "on_scroll",
+            "delay_seconds": 5,
+            "scroll_percent": 40
+        },
+        "frequency": {
+            "kind": "once_per_session",
+            "days": 7
+        },
+        "stop_after_action": true,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "all",
+        "priority": 50,
+        "starts_at": null,
+        "ends_at": null,
+        "translations": {
+            "bn": {
+                "label": "ঈদ সেল"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "24px",
+                            "bottom": "24px",
+                            "left": "20px",
+                            "right": "20px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "icon",
+                            "props": {
+                                "name": "sparkles",
+                                "size": 32,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Eid sale is on",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ঈদ সেল চলছে"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Gifts for the whole family at festive prices, while stocks last.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>পুরো পরিবারের জন্য উৎসবের দামে উপহার, স্টক থাকা পর্যন্ত।</p>"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "Shop the sale",
+                                "link": {
+                                    "url": "/shop"
+                                },
+                                "variant": "primary",
+                                "size": "md",
+                                "full_width": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "সেলের পণ্য দেখুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

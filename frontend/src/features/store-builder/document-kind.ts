@@ -15,7 +15,7 @@ export const ZONE_DOCUMENT_KEYS: readonly ZoneKey[] = ['zone:listing.top', 'zone
 
 /** The element context of a document: CMS pages (`cms:<uuid>`) have their own (FAQ list, contact form). */
 export function elementContext(doc: { kind: DocumentKind; key: string }): ElementContext {
-  if (doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'zone') return doc.kind
+  if (doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'zone' || doc.kind === 'popup') return doc.kind
   return documentContext(doc.key)
 }
 
@@ -34,8 +34,8 @@ export type KindInfo = {
   placement: string | null
   /** The canvas text while it is empty. */
   empty: string
-  /** Where the faded sample page sits on the canvas, around the document. */
-  sample: 'none' | 'below' | 'above'
+  /** Where the faded sample page sits on the canvas, around the document (B8b: a popup sits over it). */
+  sample: 'none' | 'below' | 'above' | 'behind'
 }
 
 export const ZONE_TITLES: Record<ZoneKey, string> = {
@@ -75,6 +75,13 @@ export function kindInfo(doc: { kind: DocumentKind; key: string }): KindInfo {
         sample: key === 'zone:listing.top' ? 'below' : 'above',
       }
     }
+    case 'popup':
+      return {
+        noun: 'popup',
+        placement: 'Shown on your shop as set in Popup settings, once it is published and switched on. Never on the cart, checkout, account or order pages.',
+        empty: 'This popup is empty. Drag a heading, a text, a button or a form from the Add panel into it.',
+        sample: 'behind',
+      }
     default:
       return { noun: 'page', placement: null, empty: 'This page is empty. Drag an element from the Add panel onto this area, or click one to add it.', sample: 'none' }
   }

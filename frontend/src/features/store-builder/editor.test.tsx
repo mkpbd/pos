@@ -92,8 +92,9 @@ describe('store builder editor', () => {
  * B4: per-kind editor
  * ---------------------------------------------------------------------------------------------- */
 
-function mockKind(doc: Partial<ReturnType<typeof detail>>, permissions = ['storefront.view', 'storefront.manage', 'storefront.publish']) {
+function mockKind(doc: Partial<ReturnType<typeof detail>>, permissions = ['storefront.view', 'storefront.manage', 'storefront.publish'], extra: Parameters<typeof mockApi>[0] = {}) {
   mockApi({
+    ...extra,
     'GET /auth/me': ok(makeCurrentUser({ permissions })),
     'GET /storefront/builder/documents/doc-1': ok({ ...detail({ schema_version: 1, sections: [] }, 1), ...doc }),
     'GET /storefront/builder/elements': ok({ types: ELEMENT_REGISTRY, limits: {}, enums: {} }),
@@ -166,5 +167,44 @@ describe('store builder editor: document kinds (B4)', () => {
     mockKind({}, ['storefront.view', 'storefront.manage', 'storefront.custom_html'])
     renderRoutes(routes, '/storefront/builder/doc-1')
     expect(await screen.findByTestId('add-custom_html')).not.toHaveAttribute('aria-disabled')
+  })
+})
+
+describe('store builder editor: popups (B8b)', () => {
+  const popupDoc = { kind: 'popup' as const, key: 'popup:0b6f2e3c-1a2b-4c3d-8e9f-0123456789ab', title: 'Newsletter', path: null, preview_url: 'https://shop.test/?preview=draft&popup=doc-1', active: false }
+
+  it('offers popup elements only, shows the Popup settings and previews on the store', async () => {
+    const user = userEvent.setup()
+    mockKind(popupDoc)
+    renderRoutes(routes, '/storefront/builder/doc-1')
+    expect(await screen.findByTestId('document-placement')).toHaveTextContent('once it is published and switched on')
+    const types = addable()
+    expect(types).toEqual(expect.arrayContaining(['add-heading', 'add-button', 'add-form', 'add-newsletter_form', 'add-discount', 'add-countdown']))
+    expect(types).not.toContain('add-product_grid')
+    expect(types).not.toContain('add-hero_slider')
+    expect(types).not.toContain('add-chart')
+    expect(types).not.toContain('add-logo')
+    expect(screen.getByTestId('popup-settings')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Preview on store' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Popup settings' }))
+    expect(screen.getByRole('heading', { name: 'Popup settings' })).toBeInTheDocument()
+  })
+
+  it('changing the trigger is one undoable edit that autosaves `popup`', async () => {
+    const user = userEvent.setup()
+    const puts: { content: { popup?: { trigger: { kind: string } } } }[] = []
+    mockKind(popupDoc, undefined, {
+      'PUT /storefront/builder/documents/doc-1/draft': (init) => {
+        const body = JSON.parse(String(init.body)) as { revision: number; content: { popup?: { trigger: { kind: string } } } }
+        puts.push(body)
+        return ok({ ...detail({ schema_version: 1, sections: [] }, body.revision + 1), ...popupDoc, content: body.content })
+      },
+    })
+    renderRoutes(routes, '/storefront/builder/doc-1')
+    await user.click(await screen.findByRole('combobox', { name: 'Show it when' }))
+    await user.click(await screen.findByRole('option', { name: 'When the shopper is about to leave' }))
+    await waitFor(() => expect(puts.at(-1)?.content.popup?.trigger.kind).toBe('on_exit'), { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByRole('combobox', { name: 'Show it when' })).toHaveTextContent('When a page opens')
   })
 })

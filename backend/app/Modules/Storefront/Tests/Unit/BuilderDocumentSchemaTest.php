@@ -265,7 +265,7 @@ class BuilderDocumentSchemaTest extends TestCase
     public function test_the_registry_describes_every_element_type(): void
     {
         $meta = ElementRegistry::metadata();
-        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6) + count(ElementRegistry::B8A), $meta['types']);
+        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6) + count(ElementRegistry::B8A) + count(ElementRegistry::B8B), $meta['types']);
         $byType = array_column($meta['types'], null, 'type');
         $this->assertSame('columns', $byType['inner_row']['children']);
         $this->assertSame(['text'], $byType['heading']['translatable']);

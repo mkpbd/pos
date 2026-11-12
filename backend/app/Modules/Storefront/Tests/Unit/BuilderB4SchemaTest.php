@@ -124,14 +124,14 @@ class BuilderB4SchemaTest extends TestCase
 
         $cases = [
             // type, allowed contexts, refused contexts
-            ['hero_slider', ['page', 'cms', 'zone'], ['header', 'footer']],
-            ['heading', ['page', 'cms', 'zone', 'header', 'footer'], []],
+            ['hero_slider', ['page', 'cms', 'zone'], ['header', 'footer', 'popup']],
+            ['heading', ['page', 'cms', 'zone', 'header', 'footer', 'popup'], []],
             ['search_box', ['page', 'cms', 'zone', 'header'], ['footer']],
-            ['newsletter_form', ['page', 'cms', 'zone', 'footer'], ['header']],
+            ['newsletter_form', ['page', 'cms', 'zone', 'footer', 'popup'], ['header']],
             ['cart_icon', ['header'], ['page', 'cms', 'zone', 'footer']],
             ['copyright', ['footer'], ['page', 'cms', 'zone', 'header']],
             ['faq_list', ['cms'], ['page', 'zone', 'header', 'footer']],
-            ['custom_html', ['page', 'cms', 'zone', 'header', 'footer'], []],
+            ['custom_html', ['page', 'cms', 'zone', 'header', 'footer', 'popup'], []],
         ];
         foreach ($cases as [$type, $allowed, $refused]) {
             $this->assertEqualsCanonicalizing($allowed, ElementRegistry::allowedIn($type), $type);

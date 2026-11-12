@@ -1,0 +1,220 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "layout": {
+                        "gap": "40px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 40,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Write to us",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আমাদের লিখুন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Questions about an order, a product or a custom request? Send us a message and we will answer by e-mail, usually within one working day.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>অর্ডার, পণ্য বা বিশেষ অনুরোধ নিয়ে প্রশ্ন? আমাদের বার্তা পাঠান, সাধারণত এক কর্মদিবসের মধ্যে ই-মেইলে উত্তর দিই।</p>"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "icon_list",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "i1",
+                                        "icon": "check",
+                                        "text": "A real person reads every message",
+                                        "link": null
+                                    },
+                                    {
+                                        "id": "i2",
+                                        "icon": "check",
+                                        "text": "We never share your details",
+                                        "link": null
+                                    }
+                                ],
+                                "layout": "vertical"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.i1.text": "প্রতিটি বার্তা একজন মানুষ পড়েন",
+                                    "items.i2.text": "আপনার তথ্য আমরা কারও সাথে শেয়ার করি না"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 60,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "form",
+                            "props": {
+                                "title": "",
+                                "text": "",
+                                "fields": [
+                                    {
+                                        "id": "f_name",
+                                        "kind": "text",
+                                        "label": "Your name",
+                                        "placeholder": "",
+                                        "help": "",
+                                        "required": true,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": 120,
+                                        "reply_to": false
+                                    },
+                                    {
+                                        "id": "f_email",
+                                        "kind": "email",
+                                        "label": "E-mail",
+                                        "placeholder": "you@example.com",
+                                        "help": "We reply to this address.",
+                                        "required": true,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": null,
+                                        "reply_to": true
+                                    },
+                                    {
+                                        "id": "f_phone",
+                                        "kind": "phone",
+                                        "label": "Phone",
+                                        "placeholder": "01XXXXXXXXX",
+                                        "help": "Optional — if a call is easier.",
+                                        "required": false,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": null,
+                                        "reply_to": false
+                                    },
+                                    {
+                                        "id": "f_topic",
+                                        "kind": "select",
+                                        "label": "Topic",
+                                        "placeholder": "Choose a topic",
+                                        "help": "",
+                                        "required": true,
+                                        "options": [
+                                            {
+                                                "id": "o_order",
+                                                "label": "An order"
+                                            },
+                                            {
+                                                "id": "o_product",
+                                                "label": "A product"
+                                            },
+                                            {
+                                                "id": "o_other",
+                                                "label": "Something else"
+                                            }
+                                        ],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": null,
+                                        "reply_to": false
+                                    },
+                                    {
+                                        "id": "f_message",
+                                        "kind": "textarea",
+                                        "label": "Message",
+                                        "placeholder": "",
+                                        "help": "",
+                                        "required": true,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": 2000,
+                                        "reply_to": false
+                                    }
+                                ],
+                                "submit_label": "Send message",
+                                "success_message": "Thank you! Your message is on its way — we will reply by e-mail soon.",
+                                "consent": null,
+                                "notify_email": null,
+                                "layout": "two_columns"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "submit_label": "বার্তা পাঠান",
+                                    "success_message": "ধন্যবাদ! আপনার বার্তা পৌঁছে গেছে — শিগগিরই ই-মেইলে উত্তর দেব।",
+                                    "fields.f_name.label": "আপনার নাম",
+                                    "fields.f_email.label": "ই-মেইল",
+                                    "fields.f_email.help": "আমরা এই ঠিকানায় উত্তর দেব।",
+                                    "fields.f_phone.label": "ফোন",
+                                    "fields.f_phone.help": "ঐচ্ছিক — ফোনে কথা বলা সহজ হলে।",
+                                    "fields.f_topic.label": "বিষয়",
+                                    "fields.f_topic.placeholder": "একটি বিষয় বেছে নিন",
+                                    "fields.f_topic.options.o_order.label": "একটি অর্ডার",
+                                    "fields.f_topic.options.o_product.label": "একটি পণ্য",
+                                    "fields.f_topic.options.o_other.label": "অন্য কিছু",
+                                    "fields.f_message.label": "বার্তা"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

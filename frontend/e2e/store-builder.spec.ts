@@ -1220,3 +1220,183 @@ test('B8a: switches a chart to customer ratings: the grid gives way to the store
 
   await expect.poll(() => savedOf(b, 'chart')?.props.data_source, { timeout: 6000 }).toBe('store.rating_breakdown')
 })
+
+/* ------------------------------------------------------------------------------------------------
+ * B8b: popups & bars, the form builder
+ * ---------------------------------------------------------------------------------------------- */
+
+const IN_POPUP = [...PAGES, 'popup']
+/** GET /storefront/builder/elements with the popup context and the form element. */
+const B8B_ELEMENTS = [
+  ...B4_ELEMENTS.map((m) => ({ ...m, allowed_in: ['heading', 'text', 'image', 'button', 'spacer', 'divider', 'inner_row', 'cta', 'video', 'social_icons'].includes(m.type) ? [...m.allowed_in, 'popup'] : m.allowed_in })),
+  b4Meta('newsletter_form', 'marketing', 'Newsletter sign-up', ['title', 'text', 'button_label'], { title: 'Join our newsletter', text: '', button_label: 'Subscribe', layout: 'stacked' }, ['page', 'cms', 'zone', 'footer', 'popup']),
+  b4Meta(
+    'form',
+    'content',
+    'Form',
+    ['title', 'text', 'submit_label', 'success_message', 'consent.text', 'fields.*.label', 'fields.*.placeholder', 'fields.*.help', 'fields.*.options.*.label'],
+    {
+      title: 'Get in touch',
+      text: '',
+      fields: [
+        { id: 'f_name', kind: 'text', label: 'Your name', placeholder: '', help: '', required: true, options: [], min: null, max: null, max_length: null, reply_to: false },
+        { id: 'f_email', kind: 'email', label: 'E-mail', placeholder: '', help: '', required: true, options: [], min: null, max: null, max_length: null, reply_to: true },
+        { id: 'f_message', kind: 'textarea', label: 'Message', placeholder: '', help: '', required: true, options: [], min: null, max: null, max_length: null, reply_to: false },
+      ],
+      submit_label: 'Send',
+      success_message: 'Thank you! We will get back to you soon.',
+      consent: null,
+      notify_email: null,
+      layout: 'stacked',
+    },
+    IN_POPUP,
+  ),
+]
+
+const POPUP_SETTINGS = {
+  layout: 'modal', position: 'bottom_right', width: 'md', overlay: true, close_on_overlay: true, label: '',
+  trigger: { kind: 'on_load', delay_seconds: 8, scroll_percent: 50 }, frequency: { kind: 'once_every_days', days: 7 }, stop_after_action: true,
+  pages: { kind: 'all', paths: [] }, devices: 'all', audience: 'all', priority: 50, starts_at: null, ends_at: null, translations: {},
+}
+
+type PopupState = { active: boolean; patches: { active: boolean }[] }
+
+/** The B4 backend plus popup documents (template create, on / off) and the B8b element registry. */
+async function mockB8bBackend(page: Page): Promise<B4Backend & { popups: Map<string, PopupState> }> {
+  const b = Object.assign(await mockB4Backend(page), { popups: new Map<string, PopupState>() })
+  const summary = (d: B4Doc) => {
+    const popup = b.popups.get(d.id)
+    const settings = (d.content as { popup?: typeof POPUP_SETTINGS }).popup
+    return {
+      id: d.id, kind: d.kind, key: d.key, title: d.title, schema_version: 1, draft_revision: d.revision, has_unpublished_changes: true,
+      draft_updated_at: '2026-11-12T08:00:00+00:00', published: d.published, path: d.path,
+      preview_url: popup ? `http://shop.test/?preview=draft&popup=${d.id}` : d.path ? `http://shop.test${d.path}?preview=draft` : null,
+      cms_page: null,
+      active: popup ? popup.active : null,
+      status: popup ? (!d.published ? 'draft' : popup.active ? 'live' : 'off') : null,
+      popup: popup && settings ? { layout: settings.layout, trigger: settings.trigger.kind, starts_at: null, ends_at: null } : null,
+    }
+  }
+  await page.route('**/api/v1/storefront/builder/elements', (route) => route.fulfill({ json: envelope({ types: B8B_ELEMENTS, limits: {}, enums: {} }) }))
+  await page.route('**/api/v1/storefront/builder/templates*', (route) =>
+    route.fulfill({
+      json: envelope([
+        { id: 'popup-newsletter', scope: 'popup', preset: null, category: 'popup', name: 'Newsletter popup', description: 'Asks for an e-mail address.', thumbnail_url: null, allowed_in: ['popup'], source: 'builtin' },
+        { id: 'popup-free-delivery-bar', scope: 'popup', preset: null, category: 'popup', name: 'Free delivery bar', description: null, thumbnail_url: null, allowed_in: ['popup'], source: 'builtin' },
+      ]),
+    }),
+  )
+  await page.route('**/api/v1/storefront/builder/documents', (route) => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: envelope([...b.docs.values()].map(summary)) })
+    const input = route.request().postDataJSON() as { kind: string; title: string; template?: string | null }
+    if (input.kind !== 'popup') return route.fallback()
+    b.creates.push(input)
+    const id = `01a1c9d9-0000-7000-8000-00000000b8${String(b.docs.size).padStart(2, '0')}`
+    const sections =
+      input.template === 'popup-newsletter'
+        ? [
+            section('s_news', [
+              [heading('e_news_title', 'Get 10 % off your first order'), { id: 'e_news_form', type: 'newsletter_form', props: { title: 'Join our newsletter', text: '', button_label: 'Subscribe', layout: 'stacked' }, ...nodeCommon }],
+            ]) as unknown as AnyNode,
+          ]
+        : []
+    const doc: B4Doc = { id, kind: 'popup', key: `popup:${id}`, title: input.title, path: null, revision: 1, content: { schema_version: 1, sections, popup: POPUP_SETTINGS } as B4Doc['content'], published: null }
+    b.docs.set(id, doc)
+    b.popups.set(id, { active: false, patches: [] })
+    return route.fulfill({ status: 201, json: envelope({ ...summary(doc), content: doc.content }) })
+  })
+  const docOf = (url: string) => b.docs.get(new URL(url).pathname.split('/documents/')[1]!.split('/')[0]!)
+  await page.route('**/api/v1/storefront/builder/documents/*', (route) => {
+    const doc = docOf(route.request().url())
+    if (!doc) return route.fallback()
+    const popup = b.popups.get(doc.id)
+    if (route.request().method() === 'PATCH' && popup) {
+      const body = route.request().postDataJSON() as { active: boolean }
+      popup.patches.push(body)
+      if (body.active && !doc.published) return route.fulfill(failure(422, 'POPUP_NOT_PUBLISHED', 'Publish this popup before switching it on.'))
+      popup.active = body.active
+    }
+    return route.fulfill({ json: envelope({ ...summary(doc), content: doc.content }) })
+  })
+  return b
+}
+
+test('B8b: creates a newsletter popup from its template, changes when it shows, publishes it and switches it on', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB8bBackend(page)
+  await page.goto('/admin/storefront/pages')
+  const group = page.getByRole('region', { name: 'Popups & bars' })
+  await expect(group.getByText(/No popups or bars yet/)).toBeVisible()
+  await group.getByRole('button', { name: 'New popup or bar' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New popup or bar' })
+  await dialog.getByText('Newsletter popup', { exact: true }).click()
+  await expect(dialog.getByLabel('Name')).toHaveValue('Newsletter popup')
+  await dialog.getByRole('button', { name: 'Create and edit' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates[0]).toEqual({ kind: 'popup', title: 'Newsletter popup', template: 'popup-newsletter' })
+
+  // The popup is drawn in its layout over the faded store page; only popup elements can be added.
+  const frame = canvas(page)
+  await expect(frame.getByRole('heading', { name: 'Get 10 % off your first order' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('document-placement')).toContainText('once it is published and switched on')
+  await expect(page.getByTestId('add-form')).toBeVisible()
+  await expect(page.getByTestId('add-product_grid')).toHaveCount(0)
+
+  // Popup settings: show it when the shopper scrolls 40 % down.
+  const settings = page.getByTestId('popup-settings')
+  await expect(settings.getByTestId('popup-panel-status')).toHaveText('Not published')
+  await expect(settings.getByRole('switch', { name: 'Show on shop' })).toBeDisabled()
+  await settings.getByRole('combobox', { name: 'Show it when' }).click()
+  await page.getByRole('option', { name: 'When the shopper scrolls down' }).click()
+  await settings.getByLabel('After scrolling this far down (%)').fill('40')
+  const id = [...b.docs.keys()][0]!
+  await expect.poll(() => (b.puts[id]?.at(-1) as { popup?: typeof POPUP_SETTINGS } | undefined)?.popup?.trigger, { timeout: 6000 }).toEqual({ kind: 'on_scroll', delay_seconds: 8, scroll_percent: 40 })
+  await expect(page.getByRole('button', { name: 'Preview on store' })).toBeEnabled()
+
+  await page.getByRole('button', { name: 'Publish' }).click()
+  await page.getByRole('dialog', { name: 'Publish this popup?' }).getByRole('button', { name: 'Publish' }).click()
+  await expect(page.getByText('Published — version 1. Switch it on in Popup settings to show it on your shop.')).toBeVisible()
+
+  await settings.getByRole('switch', { name: 'Show on shop' }).click()
+  await expect(page.getByText('Switched on. Shoppers see the published version.')).toBeVisible()
+  await expect(settings.getByTestId('popup-panel-status')).toHaveText('Live')
+  expect(b.popups.get(id)!.patches).toEqual([{ active: true }])
+
+  // Back on the start screen the popup is live, with its switch on.
+  await page.getByRole('link', { name: 'Back to pages' }).click()
+  const row = page.getByTestId(`popup-row-${id}`)
+  await expect(row.getByTestId('popup-status')).toHaveText('Live')
+  await expect(row.getByRole('switch', { name: 'Show Newsletter popup on your shop' })).toBeChecked()
+  await expect(row).toContainText('Popup in the middle · Shows when the shopper scrolls down')
+})
+
+test('B8b: adds a form and builds it with three fields; the canvas shows it and the autosave carries them', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB8bBackend(page)
+  await openListingTop(page)
+  const frame = canvas(page)
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+
+  await page.getByTestId('add-form').click()
+  const form = frame.getByTestId('builder-form')
+  await expect(form).toContainText('Get in touch')
+  await expect(frame.getByTestId('form-draft-note')).toBeVisible()
+
+  const fields = inspector.getByTestId('item-list-fields')
+  await expect(fields.getByTestId('item-card')).toHaveCount(3)
+  await fields.getByRole('button', { name: 'Remove field 3' }).click()
+  await fields.getByRole('button', { name: 'Add field' }).click()
+  const added = inspector.getByRole('group', { name: 'field 3' })
+  await added.getByText('Phone number', { exact: true }).click()
+  await added.getByLabel('Question', { exact: true }).fill('Phone')
+  await added.getByRole('switch', { name: 'Must be filled in' }).click()
+  await expect(form).toContainText('Phone')
+
+  await expect
+    .poll(() => (savedOf(b, 'form')?.props.fields as { kind: string; label: string; required: boolean }[] | undefined)?.map((f) => [f.kind, f.label, f.required]), { timeout: 6000 })
+    .toEqual([
+      ['text', 'Your name', true],
+      ['email', 'E-mail', true],
+      ['phone', 'Phone', true],
+    ])
+})

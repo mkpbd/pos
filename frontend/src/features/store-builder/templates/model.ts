@@ -34,9 +34,9 @@ export function categoryLabel(category: string): string {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Other'
 }
 
-/** Section and page templates allowed in the context (site templates are for "start from a demo look"). */
+/** Section and page templates allowed in the context (site templates are for "start from a demo look", popup templates make new popups). */
 export function usableIn(templates: readonly BuilderTemplate[], context: DocumentContext): BuilderTemplate[] {
-  return templates.filter((template) => template.scope !== 'site' && (template.allowed_in ?? []).includes(context))
+  return templates.filter((template) => template.scope !== 'site' && template.scope !== 'popup' && (template.allowed_in ?? []).includes(context))
 }
 
 export type TemplateQuery = { filter: TemplateFilter; preset: string | null; category: string | null; search: string }

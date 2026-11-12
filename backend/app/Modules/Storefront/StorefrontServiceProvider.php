@@ -13,6 +13,7 @@ use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
+use App\Modules\Storefront\Application\Events\FormSubmitted;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\BuilderBlogReferences;
 use App\Modules\Storefront\Infrastructure\BuilderMediaReferences;
@@ -20,6 +21,7 @@ use App\Modules\Storefront\Infrastructure\BuilderPageDesigns;
 use App\Modules\Storefront\Infrastructure\Caching\CacheStorefrontContentVersion;
 use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
+use App\Modules\Storefront\Infrastructure\Notifications\SendFormSubmissionNotifications;
 use App\Modules\Storefront\Infrastructure\SectionBlogReferences;
 use App\Modules\Storefront\Infrastructure\SectionMediaReferences;
 use App\Modules\Storefront\Infrastructure\ThemeLogoLetterhead;
@@ -27,6 +29,7 @@ use App\Modules\Storefront\Infrastructure\ThemeMediaReferences;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -68,6 +71,11 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         ])));
         // B5: applying templates / starting from a demo imports photos into the media library.
         RateLimiter::for('builder-templates', fn (Request $request) => Limit::perMinute(30)->by('user:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // B8b: builder form submissions per visitor (like the contact form; POS_FORM_RATE_LIMIT).
+        RateLimiter::for('forms', fn (Request $request) => Limit::perHour(max(1, (int) config('pos.form_rate_limit', 10)))->by('forms:'.$request->ip()));
+
+        // B8b: staff hear about form submissions (queued, after commit).
+        Event::listen(FormSubmitted::class, SendFormSubmissionNotifications::class);
     }
 
     protected function permissions(): array
@@ -80,6 +88,9 @@ class StorefrontServiceProvider extends ModuleServiceProvider
             'storefront.publish' => 'Publish store builder pages to the online store',
             // B4: custom HTML elements of the store builder (Organization Admin only by default).
             'storefront.custom_html' => 'Add and edit custom HTML in the store builder',
+            // B8b: what visitors send with store builder forms.
+            'forms.view' => 'View and export form submissions from the online store',
+            'forms.manage' => 'Mark form submissions read or archived and delete them',
         ];
     }
 }

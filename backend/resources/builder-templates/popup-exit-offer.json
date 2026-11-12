@@ -1,0 +1,134 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "modal",
+        "position": "bottom_right",
+        "width": "sm",
+        "overlay": true,
+        "close_on_overlay": true,
+        "label": "A coupon before you go",
+        "trigger": {
+            "kind": "on_exit",
+            "delay_seconds": 20,
+            "scroll_percent": 50
+        },
+        "frequency": {
+            "kind": "once_every_days",
+            "days": 3
+        },
+        "stop_after_action": true,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "all",
+        "priority": 60,
+        "starts_at": null,
+        "ends_at": null,
+        "translations": {
+            "bn": {
+                "label": "যাওয়ার আগে একটি কুপন"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "24px",
+                            "left": "24px",
+                            "right": "24px"
+                        }
+                    },
+                    "typography": {
+                        "align": "center"
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Leaving already?",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "এখনই চলে যাচ্ছেন?"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Here is a little something for your next order.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>আপনার পরের অর্ডারের জন্য ছোট্ট একটি উপহার।</p>"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "discount",
+                            "props": {
+                                "promotion_ref": "coupon",
+                                "title": "",
+                                "text": "",
+                                "show_code": true,
+                                "button_label": "Shop now",
+                                "link": {
+                                    "url": "/shop"
+                                }
+                            },
+                            "translations": {
+                                "bn": {
+                                    "button_label": "এখনই কিনুন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "No, thanks",
+                                "link": {
+                                    "url": "/"
+                                },
+                                "variant": "link",
+                                "size": "sm",
+                                "full_width": false,
+                                "action": "dismiss"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "না, ধন্যবাদ"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -95,6 +95,8 @@ enum SystemRole: string
                 // B1: publishes store builder pages.
                 'storefront.view', 'storefront.manage', 'storefront.publish', 'media.*', 'cms.*', 'online_catalog.*', 'attributes.manage',
                 'promotions.*', 'shipping.*', 'web_orders.*', 'reviews.*',
+                // B8b: what visitors send with store builder forms.
+                'forms.*',
                 'branches.view', 'products.view', 'inventory.view', 'customers.view',
             ],
         };

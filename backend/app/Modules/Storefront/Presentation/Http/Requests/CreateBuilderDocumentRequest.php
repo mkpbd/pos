@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Requests;
 
+use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,7 +14,9 @@ use Illuminate\Validation\Validator;
  * - `page`: `home`, `landing:<slug>` (2–60 lower-case letters, digits and dashes;
  *   `landing:home` is reserved) or (B4) `cms:<cms page uuid>`;
  * - `header`: `header`; `footer`: `footer` (B4);
- * - `zone`: `zone:listing.top`, `zone:listing.bottom`, `zone:product.after` (B4).
+ * - `zone`: `zone:listing.top`, `zone:listing.bottom`, `zone:product.after` (B4);
+ * - `popup` (B8b): no key (the server makes `popup:<uuid>`; `key` and `from` are ignored), an
+ *   optional `template` (a built-in popup template id).
  *
  * `from`: `blank` (default), `homepage` (home only: convert the homepage sections), `cms`
  * (cms keys only: import the CMS page) or `current` (header / footer only: today's layout).
@@ -24,12 +27,29 @@ class CreateBuilderDocumentRequest extends FormRequest
 
     public function rules(): array
     {
+        if ($this->input('kind') === BuilderDocument::KIND_POPUP) {
+            // B8b: the key is made by the server; `template` is a built-in popup template.
+            return [
+                'kind' => ['required', Rule::in(BuilderDocument::BUILDER_KINDS)],
+                'title' => ['required', 'string', 'max:160'],
+                'template' => ['sometimes', 'nullable', 'string', Rule::in($this->popupTemplates())],
+            ];
+        }
+
         return [
             'kind' => ['required', Rule::in(BuilderDocument::BUILDER_KINDS)],
             'key' => ['required', 'string', 'max:120', Rule::notIn(['landing:home'])],
             'title' => ['required', 'string', 'max:160'],
             'from' => ['sometimes', 'nullable', Rule::in(['blank', 'homepage', 'cms', 'current'])],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function popupTemplates(): array
+    {
+        return array_column(array_filter(app(BuilderTemplateLibrary::class)->all(), fn (array $t) => $t['scope'] === 'popup'), 'id');
     }
 
     public function messages(): array
@@ -42,7 +62,7 @@ class CreateBuilderDocumentRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator) {
-            if ($validator->errors()->isNotEmpty()) {
+            if ($validator->errors()->isNotEmpty() || $this->input('kind') === BuilderDocument::KIND_POPUP) {
                 return;
             }
             $kind = $this->input('kind');

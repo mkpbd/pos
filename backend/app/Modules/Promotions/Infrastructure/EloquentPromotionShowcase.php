@@ -83,6 +83,29 @@ class EloquentPromotionShowcase implements PromotionShowcase
         return $result;
     }
 
+    public function runningCouponPromotion(): ?string
+    {
+        $candidates = Promotion::query()
+            ->where('trigger', PromotionTrigger::Coupon)
+            ->whereIn('type', [PromotionType::Percent, PromotionType::Fixed])
+            ->where('is_active', true)
+            ->orderByRaw('ends_at is null')->orderBy('ends_at')->orderBy('created_at')->orderBy('id')
+            ->get();
+        foreach ($candidates as $promotion) {
+            if ($promotion->state()->value !== 'active') {
+                continue;
+            }
+            $usable = Coupon::query()->where('promotion_id', $promotion->id)->where('is_active', true)
+                ->where(fn (Builder $q) => $q->whereNull('usage_limit')->orWhereColumn('used_count', '<', 'usage_limit'))
+                ->exists();
+            if ($usable) {
+                return $promotion->id;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @param  list<string>  $ids
      * @return Builder<Promotion>|null null when no id is well-formed

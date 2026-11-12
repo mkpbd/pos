@@ -16,9 +16,10 @@ import {
   type KeyboardCoordinateGetter,
 } from '@dnd-kit/core'
 import { useQueryClient } from '@tanstack/react-query'
-import { InfoIcon } from 'lucide-react'
+import { InfoIcon, SlidersHorizontalIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useCan } from '@/features/auth/use-auth'
@@ -35,6 +36,7 @@ import {
   renameDocument,
   restoreVersion,
   saveDraft,
+  setPopupActive,
   type CanvasContext,
   type DocumentDetail,
   type ElementsMetadata,
@@ -65,6 +67,7 @@ import { TemplatesPanel } from './templates/templates-panel'
 import { useTemplateInserter } from './templates/use-insert-template'
 import type { Column, InnerRowElement, Section } from '@/storefront/builder/types'
 import { usePreviewData } from './use-preview-data'
+import { readPopupSettings } from './popup-model'
 
 /*
  * The full-screen store builder editor (B2): toolbar, Add / Layers panel, canvas, inspector;
@@ -208,7 +211,11 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   // B4: what this document is (page, header, footer, zone) and which elements it may hold.
   const info = useMemo(() => kindInfo(documentInfo), [documentInfo])
   const context = elementContext(documentInfo)
-  const surroundings = documentInfo.kind === 'zone' ? (documentInfo.key as 'zone:listing.top') : documentInfo.kind === 'header' || documentInfo.kind === 'footer' ? documentInfo.kind : 'page'
+  const surroundings = documentInfo.kind === 'zone' ? (documentInfo.key as 'zone:listing.top') : documentInfo.kind === 'header' || documentInfo.kind === 'footer' || documentInfo.kind === 'popup' ? documentInfo.kind : 'page'
+  // B8b: a popup is drawn in its layout over a dimmed sample page.
+  const isPopup = documentInfo.kind === 'popup'
+  const popupSettings = useMemo(() => (isPopup ? readPopupSettings(content.popup) : undefined), [isPopup, content.popup])
+  const [activePending, setActivePending] = useState(false)
 
   const [tab, setTab] = useState<'add' | 'layers' | 'templates'>('add')
   const templates = useTemplateInserter()
@@ -417,7 +424,11 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       const detail = await publishDocument(documentInfo.id, note)
       store.getState().setDocument({ published: detail.published, preview_url: detail.preview_url ?? store.getState().document.preview_url })
       setPublishOpen(false)
-      toast.success(detail.published ? `Published — version ${detail.published.number} is live.` : 'Published.')
+      const state = store.getState()
+      const version = detail.published ? ` — version ${detail.published.number}` : ''
+      // A popup is live only while it is switched on (B8b).
+      if (state.document.kind === 'popup' && !state.document.active) toast.success(`Published${version}. Switch it on in Popup settings to show it on your shop.`)
+      else toast.success(detail.published ? `Published${version} is live.` : 'Published.')
       refreshList()
     } catch (error) {
       if (error instanceof ApiError && error.status === 422) {
@@ -438,6 +449,21 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       refreshList()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Something went wrong.')
+    }
+  }
+
+  /** B8b: the popup's on / off switch (not versioned, takes effect at once). */
+  const switchPopup = async (active: boolean) => {
+    setActivePending(true)
+    try {
+      const updated = await setPopupActive(documentInfo.id, active)
+      store.getState().setDocument({ active: updated?.active ?? active })
+      toast.success(active ? 'Switched on. Shoppers see the published version.' : 'Switched off. Shoppers no longer see it.')
+      refreshList()
+    } catch (error) {
+      toast.error(error instanceof ApiError && error.status === 422 ? error.message : 'It couldn’t be switched. Try again.')
+    } finally {
+      setActivePending(false)
     }
   }
 
@@ -539,6 +565,9 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     title: documentInfo.title,
     path: documentInfo.path,
     published: documentInfo.published ? { number: documentInfo.published.number, published_at: documentInfo.published.published_at ?? '' } : null,
+    active: documentInfo.active,
+    canPublish,
+    activePending,
   }
   const labelOf = useCallback((id: string) => {
     const info = findNode(store.getState().content, id)
@@ -581,12 +610,20 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
           </nav>
           <main aria-label="Page canvas" className="flex min-w-0 flex-1 flex-col" data-canvas-keys>
             {info.placement && (
-              <p role="note" data-testid="document-placement" className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
-                <InfoIcon className="size-4 shrink-0" aria-hidden /> {info.placement}
-              </p>
+              <div className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-2">
+                <p role="note" data-testid="document-placement" className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+                  <InfoIcon className="size-4 shrink-0" aria-hidden /> {info.placement}
+                </p>
+                {isPopup && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => select(null)} aria-pressed={selection === null}>
+                    <SlidersHorizontalIcon data-icon="inline-start" /> Popup settings
+                  </Button>
+                )}
+              </div>
             )}
             <CanvasFrame
               surroundings={surroundings}
+              popup={popupSettings}
               emptyText={info.empty}
               bootstrap={canvasContext.bootstrap}
               locale={EDITOR_LOCALE}
@@ -646,6 +683,12 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
                   case 'preview-motion':
                     canvas.current?.scrollTo(command.nodeId)
                     return canvas.current?.playMotion(command.nodeId)
+                  case 'set-popup': {
+                    const settings = command.settings
+                    return void state.apply((c) => ({ ...c, popup: settings }), { coalesceKey: command.coalesceKey })
+                  }
+                  case 'set-popup-active':
+                    return void switchPopup(command.active)
                   case 'banner-edited': {
                     // A copy: this draft shows it instead of the original (one undo step, autosaved as usual).
                     if (command.replaced) {
@@ -670,7 +713,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       </DragOverlay>
 
       <SiteStylesDrawer open={stylesOpen} onOpenChange={setStylesOpen} styles={siteStyles} canPublish={canPublish} />
-      <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} pending={publishPending} error={publishError} onPublish={(note) => void publish(note)} />
+      <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} pending={publishPending} error={publishError} onPublish={(note) => void publish(note)} popup={isPopup} />
       <ConflictDialog open={saveStatus === 'conflict'} pending={conflictPending} onChoose={chooseConflict} />
       <VersionHistoryDialog
         documentId={documentInfo.id}

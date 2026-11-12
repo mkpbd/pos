@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Application\Builder\Templates;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\Promotions\Application\Contracts\PromotionShowcase;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Actions\ManageBanners;
 use App\Modules\Storefront\Domain\Builder\Templates\PortableTemplate;
@@ -45,12 +46,28 @@ class TemplateReferences implements TemplateReferenceResolver
     /** @var array<string, list<string>> live product ids by source */
     private array $products = [];
 
+    /** @var array<string, ?string> promotion ids by reference */
+    private array $promotions = [];
+
     public function __construct(
         private readonly BuilderTemplateLibrary $library,
         private readonly MediaLibrary $mediaLibrary,
         private readonly ManageBanners $banners,
         private readonly StorefrontCatalog $catalog,
+        private readonly PromotionShowcase $showcase,
     ) {}
+
+    /**
+     * B8b: `coupon` — the running coupon promotion with a usable code that ends first, or null.
+     */
+    public function promotion(string $ref): ?string
+    {
+        if (array_key_exists($ref, $this->promotions)) {
+            return $this->promotions[$ref];
+        }
+
+        return $this->promotions[$ref] = $ref === 'coupon' ? $this->showcase->runningCouponPromotion() : null;
+    }
 
     /**
      * B6: the index-th live product of a source (the homepage source order), or null.

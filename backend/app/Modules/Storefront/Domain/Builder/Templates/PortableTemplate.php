@@ -28,7 +28,10 @@ use Illuminate\Validation\Rule;
  *   source) instead of `product_id`; spots the store has no product for are left out, and so is
  *   a look left without spots;
  * - B8a: a bundle item has `product_ref` too; a bundle left with fewer than two items is left
- *   out.
+ *   out;
+ * - B8b: a discount element has `promotion_ref: "coupon"` instead of `promotion_id` (the
+ *   store's running coupon promotion; left out when there is none). Popup templates also carry
+ *   a `popup` settings object (no references).
  *
  * concrete() turns such sections into ordinary ones through a TemplateReferenceResolver and
  * gives every node a fresh id; the caller then validates them like any draft content.
@@ -42,6 +45,9 @@ final class PortableTemplate
 
     /** B6: product sources a shop-the-look hotspot's `product_ref` may name. */
     public const PRODUCT_SOURCES = ['featured', 'best_sellers', 'new_arrivals', 'on_sale'];
+
+    /** B8b: promotion references of a discount element (`promotion_ref`). */
+    public const PROMOTION_REFS = ['coupon'];
 
     /** B6: at most this many products per source (`product_ref.index` < this). */
     public const PRODUCT_REF_MAX = 8;
@@ -240,6 +246,15 @@ final class PortableTemplate
                     return null;
                 }
                 $props['hotspots'] = $spots;
+            }
+            if (($node['type'] ?? null) === 'discount' && array_key_exists('promotion_ref', $props)) {
+                // B8b: a discount names "the store's running coupon promotion"; left out without one.
+                $promotionId = in_array($props['promotion_ref'], self::PROMOTION_REFS, true) ? $resolver->promotion($props['promotion_ref']) : null;
+                if ($promotionId === null) {
+                    return null;
+                }
+                unset($props['promotion_ref']);
+                $props['promotion_id'] = $promotionId;
             }
             if (($node['type'] ?? null) === 'bundle' && is_array($props['items'] ?? null)) {
                 // B8a: bundle items name products by source position too; a bundle left with

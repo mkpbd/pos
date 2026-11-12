@@ -6,11 +6,13 @@ use App\Modules\Cms\Application\Contracts\PageContent;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Storefront\Application\Builder\Templates\ManageBuilderTemplates;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Store builder documents (B1): create (blank or from the current homepage), save the draft
@@ -28,6 +30,7 @@ class ManageBuilderDocuments
         private readonly CmsPageImporter $cmsImporter,
         private readonly SitePartsImporter $siteParts,
         private readonly PageContent $cmsPages,
+        private readonly ManageBuilderTemplates $templates,
     ) {}
 
     /**
@@ -44,6 +47,9 @@ class ManageBuilderDocuments
      */
     public function create(array $attributes, ?array $content = null): BuilderDocument
     {
+        if (($attributes['kind'] ?? null) === BuilderDocument::KIND_POPUP) {
+            return $this->createPopup($attributes['title'], $attributes['template'] ?? null);
+        }
         $key = $attributes['key'];
         $context = BuilderDocumentSchema::contextOf($key);
         $pageId = str_starts_with($key, BuilderDocument::CMS_PREFIX) ? substr($key, strlen(BuilderDocument::CMS_PREFIX)) : null;
@@ -88,6 +94,68 @@ class ManageBuilderDocuments
             ]);
 
             return $document;
+        });
+    }
+
+    /**
+     * B8b: a new popup (`popup:<uuid>`, switched off): blank with the default settings, or from a
+     * built-in popup template (its photos imported and references resolved as when applying a
+     * template). Audited like any new document (`from`: blank | template:<id>).
+     */
+    private function createPopup(string $title, ?string $template): BuilderDocument
+    {
+        $key = BuilderDocument::POPUP_PREFIX.strtolower((string) Str::uuid());
+
+        return DB::transaction(function () use ($key, $title, $template) {
+            $content = $template === null
+                ? ($this->prepare)(BuilderDocumentSchema::blankPopup(), 'popup')
+                : ($this->prepare)($this->templates->popupContent($template)['content'], 'popup');
+
+            $document = BuilderDocument::query()->create([
+                'kind' => BuilderDocument::KIND_POPUP,
+                'key' => $key,
+                'title' => $title,
+                'schema_version' => BuilderDocumentSchema::SCHEMA_VERSION,
+                'draft' => $content,
+                'draft_revision' => 0,
+                'draft_updated_at' => CarbonImmutable::now(),
+                'draft_updated_by' => StaffActor::id(),
+                'active' => false,
+            ]);
+            $this->audit->record('storefront.builder_created', $document, [], [
+                'key' => $document->key,
+                'title' => $document->title,
+                'from' => $template === null ? 'blank' : 'template:'.$template,
+            ]);
+
+            return $document;
+        });
+    }
+
+    /**
+     * B8b: switches a popup on or off (not versioned; needs storefront.publish, checked by the
+     * route). Only a published popup can be switched on (422 POPUP_NOT_PUBLISHED); other documents
+     * 422 NOT_A_POPUP. Audited; a published popup's change refreshes the storefront cache.
+     */
+    public function setActive(BuilderDocument $document, bool $active): BuilderDocument
+    {
+        if (! $document->isPopup()) {
+            throw new BusinessRuleViolation('NOT_A_POPUP', 'Only popups and bars can be switched on or off.');
+        }
+
+        return DB::transaction(function () use ($document, $active) {
+            $locked = $this->lock($document);
+            if ($locked->active === $active) {
+                return $locked;
+            }
+            if ($active && $locked->published_version_id === null) {
+                throw new BusinessRuleViolation('POPUP_NOT_PUBLISHED', 'Publish this popup before switching it on.');
+            }
+            $locked->active = $active;
+            $locked->save();
+            $this->audit->record($active ? 'storefront.builder_popup_activated' : 'storefront.builder_popup_deactivated', $locked, ['active' => ! $active], ['active' => $active]);
+
+            return $locked;
         });
     }
 

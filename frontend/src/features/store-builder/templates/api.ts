@@ -12,7 +12,8 @@ import { builderAdminKeys, type DocumentSummary } from '../api'
  * look to drafts and publishing several drafts at once.
  */
 
-export type TemplateScope = 'section' | 'page' | 'site'
+/** B8b: `popup` templates are applied as a new popup document (POST /documents `{kind: popup, template}`). */
+export type TemplateScope = 'section' | 'page' | 'site' | 'popup'
 /** The demo looks with built-in templates (site, page and section); `default` has none. */
 export const TEMPLATE_PRESETS = ['vegan', 'handmade', 'classic', 'kids'] as const
 export type TemplatePreset = (typeof TEMPLATE_PRESETS)[number]
@@ -88,6 +89,16 @@ export function useSiteTemplatesQuery(enabled = true) {
   return useQuery({
     queryKey: templateKeys.list({ scope: 'site' }),
     queryFn: ({ signal }) => listTemplates({ scope: 'site' }, signal),
+    enabled,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** B8b: the popup templates (newsletter, exit offer, free-delivery bar, cookie notice, …). */
+export function usePopupTemplatesQuery(enabled = true) {
+  return useQuery({
+    queryKey: templateKeys.list({ scope: 'popup' }),
+    queryFn: ({ signal }) => listTemplates({ scope: 'popup' }, signal),
     enabled,
     staleTime: 5 * 60_000,
   })

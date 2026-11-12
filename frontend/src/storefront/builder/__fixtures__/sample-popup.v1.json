@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "popup": {
+    "layout": "modal",
+    "position": "bottom_left",
+    "width": "lg",
+    "overlay": true,
+    "close_on_overlay": false,
+    "label": "Weekend offer",
+    "trigger": {
+      "kind": "on_exit",
+      "delay_seconds": 20,
+      "scroll_percent": 40
+    },
+    "frequency": {
+      "kind": "once_every_days",
+      "days": 3
+    },
+    "stop_after_action": true,
+    "pages": {
+      "kind": "paths",
+      "paths": [
+        "/p/eid-sale",
+        "/shop"
+      ]
+    },
+    "devices": "desktop",
+    "audience": "guests",
+    "priority": 70,
+    "starts_at": "2026-12-01T00:00:00+06:00",
+    "ends_at": "2026-12-31T23:59:00+06:00",
+    "translations": {
+      "bn": {
+        "label": "সাপ্তাহিক অফার"
+      }
+    }
+  },
+  "sections": [
+    {
+      "id": "s_popup",
+      "type": "section",
+      "props": {
+        "layout": "boxed",
+        "anchor": null
+      },
+      "style": {
+        "base": {
+          "spacing": {
+            "padding": {
+              "top": "32px",
+              "right": "24px",
+              "bottom": "32px",
+              "left": "24px"
+            }
+          }
+        }
+      },
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_popup",
+          "type": "column",
+          "width": {
+            "base": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_icon",
+              "type": "icon",
+              "props": {
+                "name": "sparkles",
+                "size": 40,
+                "color": "theme:accent",
+                "label": "",
+                "link": null
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_heading",
+              "type": "heading",
+              "props": {
+                "text": "Leaving already?",
+                "level": 2,
+                "link": null
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "text": "এখনই চলে যাচ্ছেন?"
+                }
+              }
+            },
+            {
+              "id": "e_text",
+              "type": "text",
+              "props": {
+                "html": "<p>Here is a little something for your next order.</p>"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "html": "<p>আপনার পরের অর্ডারের জন্য ছোট্ট একটি উপহার।</p>"
+                }
+              }
+            },
+            {
+              "id": "e_discount",
+              "type": "discount",
+              "props": {
+                "promotion_id": "0199a5c1-0000-7000-8000-00000000dd01",
+                "title": "",
+                "text": "",
+                "show_code": true,
+                "button_label": "Shop now",
+                "link": {
+                  "url": "/shop"
+                }
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "button_label": "এখনই কিনুন"
+                }
+              }
+            },
+            {
+              "id": "e_newsletter",
+              "type": "newsletter_form",
+              "props": {
+                "title": "",
+                "text": "",
+                "button_label": "Subscribe",
+                "layout": "stacked"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_shop",
+              "type": "button",
+              "props": {
+                "label": "Shop the offer",
+                "link": {
+                  "url": "/shop"
+                },
+                "variant": "primary",
+                "size": "md",
+                "full_width": true
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_dismiss",
+              "type": "button",
+              "props": {
+                "label": "No, thanks",
+                "link": {
+                  "url": "/"
+                },
+                "variant": "link",
+                "size": "sm",
+                "full_width": false,
+                "action": "dismiss"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "label": "না, ধন্যবাদ"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -86,3 +86,18 @@ Also added:
 - **Templates:** 8 new ones.
 
 Tests: backend 969 (PostgreSQL 968 + 1), vitest 1394, mocked Playwright 215; full-stack integration 24/24, demo stores 10/10 (including a B6 showcase page used by a shopper), acceptance 4/4.
+
+## Addendum — B7 and B8a (2026-11-12)
+
+**B7 — easier start screen:** five demo looks with *BerryKid Kids Store* first and the new *Original look*; a full-page
+preview per look, *See live demo*, *Use and publish now* (with a confirm), a 3-step guide and an English / বাংলা toggle.
+
+**B8a — 10 more elements:**
+- **Selling:** pricing table, before/after slider, comparison table, flash sale bar, bundle (add all to cart).
+- **Trust & people:** team, review wall (real approved reviews), photo grid, store hours with "Open now".
+- **Data:** stacked charts, charts from store data (products per category, customer ratings — public counts only), progress
+  bars / rings.
+- **Templates:** 10 new ones (76 built-ins).
+
+Tests: backend 1035 (PostgreSQL 1034 + 1 skip), vitest 1496, mocked Playwright green; full-stack integration 24/24, demo stores
+11/11 (including a B8a page on Little Sprouts using its real reviews, flash sale and cart), builder acceptance 5/5 (including B7).

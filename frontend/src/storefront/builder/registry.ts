@@ -5,7 +5,7 @@
  * know which types it can draw.
  */
 
-import type { DocumentContext, ElementType, WrappedSectionType } from './types'
+import type { DocumentContext, ElementType, FormField, FormFieldKind, WrappedSectionType } from './types'
 
 /** B4: `site` = header / footer parts (logo, menu, account, cart, social icons, …). B6: `media` (gallery, carousels, map). */
 export type ElementGroup = 'layout' | 'content' | 'media' | 'commerce' | 'marketing' | 'site'
@@ -482,24 +482,77 @@ const B8A: BaseMeta[] = [
   },
 ]
 
+/*
+ * B8b: the form element (contract §2). The default is the server's (ElementRegistry::defaults):
+ * a small contact form (name, e-mail as the reply-to address, message).
+ */
+
+/** Field kinds that need options (2–20). */
+export const FORM_CHOICE_KINDS: readonly FormFieldKind[] = ['select', 'radio', 'checkboxes']
+
+const FORM_FIELD_DEFAULTS = { placeholder: '', help: '', options: [], min: null, max: null, max_length: null, reply_to: false }
+
+/** A new field of a form (the editor's field kind picker): every key set, valid once it has a label (and options for choice kinds). */
+export function formFieldDefaults(id: string, kind: FormFieldKind, label = ''): FormField {
+  return {
+    id,
+    kind,
+    label,
+    ...FORM_FIELD_DEFAULTS,
+    required: false,
+    options: FORM_CHOICE_KINDS.includes(kind)
+      ? [
+          { id: 'option-1', label: 'Option 1' },
+          { id: 'option-2', label: 'Option 2' },
+        ]
+      : [],
+  }
+}
+
+const B8B: BaseMeta[] = [
+  {
+    type: 'form',
+    group: 'content',
+    label: 'Form',
+    translatable: ['title', 'text', 'submit_label', 'success_message', 'consent.text', 'fields.*.label', 'fields.*.placeholder', 'fields.*.help', 'fields.*.options.*.label'],
+    props: {
+      title: 'Get in touch',
+      text: '',
+      fields: [
+        { id: 'f_name', kind: 'text', label: 'Your name', ...FORM_FIELD_DEFAULTS, required: true },
+        { id: 'f_email', kind: 'email', label: 'E-mail', ...FORM_FIELD_DEFAULTS, required: true, reply_to: true },
+        { id: 'f_message', kind: 'textarea', label: 'Message', ...FORM_FIELD_DEFAULTS, required: true },
+      ],
+      submit_label: 'Send',
+      success_message: 'Thank you! We will get back to you soon.',
+      consent: null,
+      notify_email: null,
+      layout: 'stacked',
+    },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] = ['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
+/** B8b: what may sit in a popup (contract §1): simple content, offers and forms; never shop grids, sliders, charts, maps or site parts. */
+const IN_POPUP = (contexts: readonly DocumentContext[]): readonly DocumentContext[] => [...contexts, 'popup']
 
 /** Where each type may be used (contract §1 page / header / footer sets; `faq_list` and `contact_form` on CMS pages only). */
 const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
-  heading: ALL,
-  text: ALL,
-  image: ALL,
-  button: ALL,
-  spacer: ALL,
-  divider: ALL,
-  inner_row: ALL,
+  heading: IN_POPUP(ALL),
+  text: IN_POPUP(ALL),
+  image: IN_POPUP(ALL),
+  button: IN_POPUP(ALL),
+  spacer: IN_POPUP(ALL),
+  divider: IN_POPUP(ALL),
+  inner_row: IN_POPUP(ALL),
   ...(Object.fromEntries(WRAPPED_SECTION_TYPES.map((type) => [type, PAGES])) as Record<WrappedSectionType, readonly DocumentContext[]>),
-  video: PAGES,
-  icon: ALL,
-  countdown: PAGES,
-  discount: PAGES,
-  cta: PAGES,
+  video: IN_POPUP(PAGES),
+  icon: IN_POPUP(ALL),
+  countdown: IN_POPUP(PAGES),
+  discount: IN_POPUP(PAGES),
+  cta: IN_POPUP(PAGES),
   search_box: ['page', 'cms', 'zone', 'header'],
   promo_card: PAGES,
   logo: ['header', 'footer'],
@@ -509,20 +562,20 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   cart_icon: ['header'],
   language_switch: ['header', 'footer'],
   announcement: ['header'],
-  social_icons: ALL,
-  payment_icons: ['page', 'cms', 'zone', 'footer'],
+  social_icons: IN_POPUP(ALL),
+  payment_icons: ['page', 'cms', 'zone', 'footer', 'popup'],
   contact_block: ALL,
   copyright: ['footer'],
-  newsletter_form: ['page', 'cms', 'zone', 'footer'],
+  newsletter_form: ['page', 'cms', 'zone', 'footer', 'popup'],
   faq_list: ['cms'],
   contact_form: ['cms'],
-  custom_html: ALL,
+  custom_html: IN_POPUP(ALL),
   accordion: ['page', 'cms', 'zone', 'footer'],
   tabs: PAGES,
   icon_box: ['page', 'cms', 'zone', 'footer'],
-  icon_list: ALL,
+  icon_list: IN_POPUP(ALL),
   quote: PAGES,
-  notice: PAGES,
+  notice: IN_POPUP(PAGES),
   counter: PAGES,
   steps: PAGES,
   chart: PAGES,
@@ -535,7 +588,7 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   shop_the_look: PAGES,
   trust_badges: ['page', 'cms', 'zone', 'footer'],
   recently_viewed: PAGES,
-  marquee: ALL,
+  marquee: IN_POPUP(ALL),
   pricing_table: PAGES,
   before_after: PAGES,
   comparison_table: PAGES,
@@ -546,6 +599,7 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   photo_grid: PAGES,
   store_hours: ['page', 'cms', 'zone', 'footer'],
   progress_bars: PAGES,
+  form: IN_POPUP(PAGES),
 }
 
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
@@ -562,6 +616,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...B4,
   ...B6,
   ...B8A,
+  ...B8B,
 ].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */
@@ -569,11 +624,12 @@ export function isAllowedIn(type: string, context: DocumentContext): boolean {
   return elementMeta(type)?.allowed_in.includes(context) ?? false
 }
 
-/** The document context of a builder document key: `home` / `landing:*` → page, `cms:*`, `header`, `footer`, `zone:*`. */
+/** The document context of a builder document key: `home` / `landing:*` → page, `cms:*`, `header`, `footer`, `zone:*`, B8b `popup:*`. */
 export function documentContext(key: string): DocumentContext {
   if (key === 'header' || key === 'footer') return key
   if (key.startsWith('cms:')) return 'cms'
   if (key.startsWith('zone:')) return 'zone'
+  if (key.startsWith('popup:')) return 'popup'
   return 'page'
 }
 

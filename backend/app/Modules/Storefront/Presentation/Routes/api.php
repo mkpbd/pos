@@ -5,11 +5,14 @@ use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
+use App\Modules\Storefront\Presentation\Http\Controllers\FormSubmissionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
 use App\Modules\Storefront\Presentation\Http\Controllers\MenuController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBootstrapController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBuilderPageController;
+use App\Modules\Storefront\Presentation\Http\Controllers\StoreBuilderPopupsController;
+use App\Modules\Storefront\Presentation\Http\Controllers\StoreFormController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontAdminController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreHomepageController;
 use App\Modules\Storefront\Presentation\Http\Controllers\ThemeDraftController;
@@ -23,6 +26,11 @@ Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group
     // B1: published store builder pages — `home` or a landing page slug (`?preview=draft` for staff).
     Route::get('builder/pages/{slug}', StoreBuilderPageController::class)->middleware('storefront.cache')
         ->where('slug', '[a-z0-9-]{2,60}')->name('store.builder-page');
+    // B8b: live popups and bars (`?preview=draft&popup=<id>` for staff).
+    Route::get('builder/popups', StoreBuilderPopupsController::class)->middleware('storefront.cache')->name('store.builder-popups');
+    // B8b: a visitor sends a builder form (published documents only).
+    Route::post('forms/{document}/{element}', [StoreFormController::class, 'submit'])
+        ->whereUuid('document')->where('element', '[a-z][a-z0-9_-]{1,31}')->middleware('throttle:forms')->name('store.form-submit');
 });
 
 // T2: the demo store gallery — any host, no store resolution (404 while the gallery is off).
@@ -77,6 +85,19 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
     });
 
     Route::put('theme/custom-css', [StorefrontAdminController::class, 'updateCustomCss'])->middleware('can:storefront.custom_css');
+});
+
+// B8b: what visitors sent with builder forms.
+Route::middleware(['auth:sanctum', 'tenant'])->prefix('forms')->group(function () {
+    Route::middleware('can:forms.view')->group(function () {
+        Route::get('/', [FormSubmissionController::class, 'forms']);
+        Route::get('submissions', [FormSubmissionController::class, 'index']);
+        Route::get('submissions/{submission}', [FormSubmissionController::class, 'show'])->whereUuid('submission');
+    });
+    Route::middleware('can:forms.manage')->group(function () {
+        Route::patch('submissions/{submission}', [FormSubmissionController::class, 'update'])->whereUuid('submission');
+        Route::delete('submissions/{submission}', [FormSubmissionController::class, 'destroy'])->whereUuid('submission');
+    });
 });
 
 // B1: the visual store builder — documents with draft / publish / versions.

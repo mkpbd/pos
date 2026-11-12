@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_form",
+      "type": "section",
+      "props": {
+        "layout": "boxed",
+        "anchor": null
+      },
+      "style": {},
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_form_1",
+          "type": "column",
+          "width": {
+            "base": 60,
+            "mobile": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_form",
+              "type": "form",
+              "props": {
+                "title": "Book a fitting",
+                "text": "Tell us when you would like to visit and we will confirm by e-mail.",
+                "fields": [
+                  {
+                    "id": "f_name",
+                    "kind": "text",
+                    "label": "Your name",
+                    "placeholder": "Full name",
+                    "help": "",
+                    "required": true,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": 120,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_email",
+                    "kind": "email",
+                    "label": "E-mail",
+                    "placeholder": "",
+                    "help": "We reply to this address.",
+                    "required": true,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": true
+                  },
+                  {
+                    "id": "f_phone",
+                    "kind": "phone",
+                    "label": "Phone",
+                    "placeholder": "01XXXXXXXXX",
+                    "help": "",
+                    "required": false,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_notes",
+                    "kind": "textarea",
+                    "label": "Anything else?",
+                    "placeholder": "",
+                    "help": "",
+                    "required": false,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": 500,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_people",
+                    "kind": "number",
+                    "label": "How many people?",
+                    "placeholder": "",
+                    "help": "",
+                    "required": true,
+                    "options": [],
+                    "min": 1,
+                    "max": 6,
+                    "max_length": null,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_size",
+                    "kind": "select",
+                    "label": "Size",
+                    "placeholder": "",
+                    "help": "",
+                    "required": false,
+                    "options": [
+                      {
+                        "id": "o_s",
+                        "label": "Small"
+                      },
+                      {
+                        "id": "o_m",
+                        "label": "Medium"
+                      },
+                      {
+                        "id": "o_l",
+                        "label": "Large"
+                      }
+                    ],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_time",
+                    "kind": "radio",
+                    "label": "Time of day",
+                    "placeholder": "",
+                    "help": "",
+                    "required": true,
+                    "options": [
+                      {
+                        "id": "o_am",
+                        "label": "Morning"
+                      },
+                      {
+                        "id": "o_pm",
+                        "label": "Afternoon"
+                      }
+                    ],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_gift",
+                    "kind": "checkbox",
+                    "label": "It is a gift",
+                    "placeholder": "",
+                    "help": "",
+                    "required": false,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_extras",
+                    "kind": "checkboxes",
+                    "label": "Extras",
+                    "placeholder": "",
+                    "help": "",
+                    "required": false,
+                    "options": [
+                      {
+                        "id": "o_wrap",
+                        "label": "Gift wrap"
+                      },
+                      {
+                        "id": "o_card",
+                        "label": "Card"
+                      },
+                      {
+                        "id": "o_tailor",
+                        "label": "Tailoring"
+                      }
+                    ],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  },
+                  {
+                    "id": "f_date",
+                    "kind": "date",
+                    "label": "Preferred date",
+                    "placeholder": "",
+                    "help": "",
+                    "required": true,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  }
+                ],
+                "submit_label": "Book now",
+                "success_message": "Thank you! We will confirm your fitting by e-mail.",
+                "consent": {
+                  "text": "I agree that the shop stores my answers to reply to me.",
+                  "link": {
+                    "url": "/pages/privacy-policy"
+                  }
+                },
+                "notify_email": "owner@example.com",
+                "layout": "two_columns"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "ফিটিং বুক করুন",
+                  "text": "কখন আসতে চান জানান, আমরা ই-মেইলে নিশ্চিত করব।",
+                  "submit_label": "বুক করুন",
+                  "success_message": "ধন্যবাদ! আমরা ই-মেইলে আপনার ফিটিং নিশ্চিত করব।",
+                  "consent.text": "উত্তর দেওয়ার জন্য দোকান আমার তথ্য সংরক্ষণ করবে — আমি রাজি।",
+                  "fields.f_name.label": "আপনার নাম",
+                  "fields.f_name.placeholder": "পুরো নাম",
+                  "fields.f_email.help": "আমরা এই ঠিকানায় উত্তর দেব।",
+                  "fields.f_people.label": "কতজন?",
+                  "fields.f_size.options.o_m.label": "মাঝারি",
+                  "fields.f_time.options.o_am.label": "সকাল",
+                  "fields.f_time.options.o_pm.label": "বিকেল"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "c_form_2",
+          "type": "column",
+          "width": {
+            "base": 40,
+            "mobile": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_form_short",
+              "type": "form",
+              "props": {
+                "title": "",
+                "text": "",
+                "fields": [
+                  {
+                    "id": "f_email",
+                    "kind": "email",
+                    "label": "E-mail",
+                    "placeholder": "",
+                    "help": "",
+                    "required": true,
+                    "options": [],
+                    "min": null,
+                    "max": null,
+                    "max_length": null,
+                    "reply_to": false
+                  }
+                ],
+                "submit_label": "Notify me",
+                "success_message": "We will let you know.",
+                "consent": null,
+                "notify_email": null,
+                "layout": "stacked"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "modal",
+        "position": "bottom_right",
+        "width": "md",
+        "overlay": true,
+        "close_on_overlay": true,
+        "label": "Newsletter sign-up",
+        "trigger": {
+            "kind": "on_load",
+            "delay_seconds": 8,
+            "scroll_percent": 50
+        },
+        "frequency": {
+            "kind": "once_every_days",
+            "days": 7
+        },
+        "stop_after_action": true,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "guests",
+        "priority": 50,
+        "starts_at": null,
+        "ends_at": null,
+        "translations": {
+            "bn": {
+                "label": "নিউজলেটারে যোগ দিন"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px",
+                            "left": "24px",
+                            "right": "24px"
+                        }
+                    },
+                    "typography": {
+                        "align": "center"
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "icon",
+                            "props": {
+                                "name": "mail",
+                                "size": 40,
+                                "color": "theme:primary",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Be the first to know",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "সবার আগে খবর পান"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>New arrivals, offers and the occasional story, once or twice a month. No spam, unsubscribe any time.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>নতুন পণ্য, অফার আর মাঝে মাঝে গল্প — মাসে এক-দুবার। কোনো স্প্যাম নয়, যেকোনো সময় আনসাবস্ক্রাইব করা যায়।</p>"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "newsletter_form",
+                            "props": {
+                                "title": "",
+                                "text": "",
+                                "button_label": "Subscribe",
+                                "layout": "stacked"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "button_label": "সাবস্ক্রাইব"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

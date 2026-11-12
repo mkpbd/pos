@@ -43,11 +43,50 @@ final class ElementRegistry
         'progress_bars',
     ];
 
+    /** B8b: the form builder element (pages, content pages, shop areas and popups). */
+    public const B8B = ['form'];
+
     /**
      * B4: the document contexts an element can be placed in: home / landing pages, CMS pages
-     * (`cms:<uuid>`), the store header and footer, and the shop / product zones.
+     * (`cms:<uuid>`), the store header and footer, and the shop / product zones. B8b: popups and
+     * bars (`popup:<uuid>`).
      */
-    public const CONTEXTS = ['page', 'cms', 'header', 'footer', 'zone'];
+    public const CONTEXTS = ['page', 'cms', 'header', 'footer', 'zone', 'popup'];
+
+    /**
+     * B8b: the elements a popup or bar may hold (basics, calls to action, offers, the newsletter
+     * and the form — no shop grids, sliders, charts, maps or header / footer parts).
+     */
+    public const POPUP_ELEMENTS = [
+        'heading', 'text', 'image', 'button', 'icon', 'divider', 'spacer', 'inner_row',
+        'cta', 'discount', 'countdown', 'newsletter_form', 'notice', 'icon_list', 'marquee',
+        'video', 'social_icons', 'payment_icons', 'custom_html', 'form',
+    ];
+
+    /** B8b: a button's optional action (`link` is the default and is not stored). */
+    public const BUTTON_ACTIONS = ['link', 'dismiss'];
+
+    /** B8b: form field kinds (no file uploads). */
+    public const FORM_FIELD_KINDS = ['text', 'email', 'phone', 'textarea', 'number', 'select', 'radio', 'checkbox', 'checkboxes', 'date'];
+
+    /** B8b: field kinds with options. */
+    public const FORM_CHOICE_KINDS = ['select', 'radio', 'checkboxes'];
+
+    public const FORM_LAYOUTS = ['stacked', 'two_columns'];
+
+    /** B8b: a text / textarea field's maximum length (and the default when not set). */
+    public const FORM_MAX_LENGTH = [1, 2000];
+
+    public const FORM_DEFAULT_MAX_LENGTH = ['text' => 255, 'textarea' => 2000];
+
+    /** B8b: a number field's min / max bounds (absolute), at most 2 decimals. */
+    public const FORM_NUMBER_BOUND = 1000000000;
+
+    /** B8b: text limits of the form element's fields, options and consent. */
+    public const B8B_TEXT_LIMITS = [
+        'form.fields.label' => 80, 'form.fields.placeholder' => 80, 'form.fields.help' => 160,
+        'form.fields.options.label' => 60, 'form.consent.text' => 300, 'form.notify_email' => 254,
+    ];
 
     /**
      * B4: elements whose render payload carries `data[id]` (besides the wrapped sections); in a
@@ -140,6 +179,9 @@ final class ElementRegistry
         'photo_grid.images' => [3, 24],
         'store_hours.days' => [7, 7],
         'progress_bars.items' => [1, 10],
+        // B8b.
+        'form.fields' => [1, 20],
+        'form.fields.options' => [2, 20],
     ];
 
     /**
@@ -167,6 +209,8 @@ final class ElementRegistry
     public const NESTED_LIST_TRANSLATABLE = [
         'pricing_table' => ['plans.*.button.label' => 30, 'plans.*.features.*.text' => 120],
         'comparison_table' => ['rows.*.cells.*.text' => 60],
+        // B8b.
+        'form' => ['fields.*.options.*.label' => 60],
     ];
 
     /**
@@ -210,6 +254,8 @@ final class ElementRegistry
         'team' => ['members' => ['role' => 80, 'bio' => 300]],
         'photo_grid' => ['images' => ['alt' => 200]],
         'progress_bars' => ['items' => ['label' => 60]],
+        // B8b.
+        'form' => ['fields' => ['label' => 80, 'placeholder' => 80, 'help' => 160]],
     ];
 
     /**
@@ -379,6 +425,8 @@ final class ElementRegistry
         'review_wall' => ['title' => 120],
         'photo_grid' => ['profile.label' => 60],
         'store_hours' => ['title' => 80, 'note' => 200],
+        // B8b (fields: LIST_TRANSLATABLE, options: NESTED_LIST_TRANSLATABLE).
+        'form' => ['title' => 120, 'text' => 400, 'submit_label' => 30, 'success_message' => 300, 'consent.text' => 300],
     ];
 
     /** Translatable fields stored in a nested prop (dot keys in `translations`): field => [prop, key]. */
@@ -388,6 +436,8 @@ final class ElementRegistry
         'before_after' => ['before.alt' => ['before', 'alt'], 'after.alt' => ['after', 'alt']],
         'flash_sale_bar' => ['button.label' => ['button', 'label']],
         'photo_grid' => ['profile.label' => ['profile', 'label']],
+        // B8b.
+        'form' => ['consent.text' => ['consent', 'text']],
     ];
 
     public const HEADING_LEVELS = [1, 6];
@@ -419,7 +469,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B];
     }
 
     public static function exists(mixed $type): bool
@@ -432,7 +482,7 @@ final class ElementRegistry
      */
     public static function sectionType(string $type): ?SectionType
     {
-        return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true)
+        return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true) || in_array($type, self::B8B, true)
             ? null
             : SectionType::tryFrom($type);
     }
@@ -465,9 +515,9 @@ final class ElementRegistry
      */
     public static function allowedIn(string $type): array
     {
-        return match ($type) {
+        $contexts = match ($type) {
             'inner_row', 'heading', 'text', 'button', 'icon', 'image', 'divider', 'spacer',
-            'social_icons', 'contact_block', 'custom_html', 'icon_list', 'marquee' => self::CONTEXTS,
+            'social_icons', 'contact_block', 'custom_html', 'icon_list', 'marquee' => ['page', 'cms', 'header', 'footer', 'zone'],
             'search_box' => ['page', 'cms', 'zone', 'header'],
             'payment_icons', 'newsletter_form',
             'accordion', 'icon_box', 'logo_carousel', 'map', 'trust_badges', 'store_hours' => ['page', 'cms', 'zone', 'footer'],
@@ -475,9 +525,12 @@ final class ElementRegistry
             'account_link', 'wishlist_link', 'cart_icon', 'announcement' => ['header'],
             'copyright' => ['footer'],
             'faq_list', 'contact_form' => ['cms'],
-            // Wrapped sections and the other B4 page elements.
+            // Wrapped sections, the other B4 page elements and (B8b) the form.
             default => ['page', 'cms', 'zone'],
         };
+
+        // B8b: popups and bars take a fixed set of elements.
+        return in_array($type, self::POPUP_ELEMENTS, true) ? [...$contexts, 'popup'] : $contexts;
     }
 
     public static function group(string $type): string
@@ -487,7 +540,7 @@ final class ElementRegistry
             'heading', 'text', 'image', 'button', 'rich_text', 'blog_posts',
             'video', 'icon', 'cta', 'custom_html', 'faq_list', 'contact_form',
             'accordion', 'tabs', 'icon_box', 'icon_list', 'quote', 'notice', 'counter', 'steps', 'chart',
-            'team', 'store_hours', 'progress_bars' => 'content',
+            'team', 'store_hours', 'progress_bars', 'form' => 'content',
             'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
             'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
@@ -559,6 +612,7 @@ final class ElementRegistry
             'photo_grid' => 'Photo grid',
             'store_hours' => 'Store hours',
             'progress_bars' => 'Progress bars',
+            'form' => 'Form',
             default => SectionType::from($type)->label(),
         };
     }
@@ -1038,6 +1092,21 @@ final class ElementRegistry
                 'show_value' => true,
                 'animate' => true,
             ],
+            // B8b: a contact form (name, e-mail for replies, message).
+            'form' => [
+                'title' => 'Get in touch',
+                'text' => '',
+                'fields' => [
+                    ['id' => 'f_name', 'kind' => 'text', 'label' => 'Your name', 'placeholder' => '', 'help' => '', 'required' => true, 'options' => [], 'min' => null, 'max' => null, 'max_length' => null, 'reply_to' => false],
+                    ['id' => 'f_email', 'kind' => 'email', 'label' => 'E-mail', 'placeholder' => '', 'help' => '', 'required' => true, 'options' => [], 'min' => null, 'max' => null, 'max_length' => null, 'reply_to' => true],
+                    ['id' => 'f_message', 'kind' => 'textarea', 'label' => 'Message', 'placeholder' => '', 'help' => '', 'required' => true, 'options' => [], 'min' => null, 'max' => null, 'max_length' => null, 'reply_to' => false],
+                ],
+                'submit_label' => 'Send',
+                'success_message' => 'Thank you! We will get back to you soon.',
+                'consent' => null,
+                'notify_email' => null,
+                'layout' => 'stacked',
+            ],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
     }
@@ -1133,6 +1202,11 @@ final class ElementRegistry
                 'progress_value' => ['min' => 0, 'max' => 100, 'decimals' => 1],
                 'chart_stacked_series' => ['min' => self::CHART_STACKED_SERIES[0], 'max' => self::CHART_STACKED_SERIES[1]],
                 'chart_store_categories' => self::CHART_STORE_CATEGORIES,
+                // B8b.
+                'b8b_text' => self::B8B_TEXT_LIMITS,
+                'form_max_length' => ['min' => self::FORM_MAX_LENGTH[0], 'max' => self::FORM_MAX_LENGTH[1], 'defaults' => self::FORM_DEFAULT_MAX_LENGTH],
+                'form_number' => ['max_abs' => self::FORM_NUMBER_BOUND, 'decimals' => 2],
+                'popup' => PopupSettings::limits(),
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
             'data_when' => ['chart' => 'data_source!=manual'],
@@ -1220,7 +1294,23 @@ final class ElementRegistry
                 'weekdays' => self::WEEKDAYS,
                 'week_starts' => self::WEEK_STARTS,
                 'progress_styles' => self::PROGRESS_STYLES,
+                // B8b.
+                'button_actions' => self::BUTTON_ACTIONS,
+                'form_field_kinds' => self::FORM_FIELD_KINDS,
+                'form_choice_kinds' => self::FORM_CHOICE_KINDS,
+                'form_layouts' => self::FORM_LAYOUTS,
+                'popup_layouts' => PopupSettings::LAYOUTS,
+                'popup_positions' => PopupSettings::POSITIONS,
+                'popup_widths' => PopupSettings::WIDTHS,
+                'popup_triggers' => PopupSettings::TRIGGERS,
+                'popup_frequencies' => PopupSettings::FREQUENCIES,
+                'popup_pages' => PopupSettings::PAGES,
+                'popup_devices' => PopupSettings::DEVICES,
+                'popup_audiences' => PopupSettings::AUDIENCES,
+                'popup_never_on' => PopupSettings::NEVER_ON,
             ],
+            // B8b: the settings a new popup starts with.
+            'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),
         ];
     }
 

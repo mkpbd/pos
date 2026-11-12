@@ -3,6 +3,10 @@ import type { Messages } from '../types'
 /** Popup banner and promotion countdowns. */
 export const promo = {
   'promo.popup.specialOffer': 'Special offer',
+  /** B8b builder popups: the name of a bar without its own, the close button, the draft preview note. */
+  'promo.popup.bar': 'Store notice',
+  'promo.popup.close': 'Close',
+  'promo.popup.preview': 'Draft popup preview — shown at once, whatever its trigger, schedule and rules.',
   'promo.countdown.endsIn': 'Ends in',
   'promo.countdown.ends': 'Ends {date}',
   'promo.countdown.day': 'Day',

@@ -136,9 +136,15 @@ export type ImageElement = ElementOf<
   'image',
   { media_id: string | null; alt: string; link: Link; aspect: 'auto' | '1:1' | '4:3' | '3:2' | '16:9' | '3:4'; fit: 'cover' | 'contain' }
 >
+/**
+ * B8b `action` (context popup only; absent = link — the server normalizes `link` to absent):
+ * `dismiss` closes the popup it sits in (and counts as the visitor's action for
+ * `stop_after_action`); its `link` stays required but is not followed.
+ */
+export type ButtonAction = 'link' | 'dismiss'
 export type ButtonElement = ElementOf<
   'button',
-  { label: string; link: { url: string }; variant: 'primary' | 'accent' | 'outline' | 'link'; size: 'sm' | 'md' | 'lg'; full_width: boolean }
+  { label: string; link: { url: string }; variant: 'primary' | 'accent' | 'outline' | 'link'; size: 'sm' | 'md' | 'lg'; full_width: boolean; action?: ButtonAction }
 >
 export type SpacerElement = ElementOf<'spacer', Record<string, never>>
 export type DividerElement = ElementOf<
@@ -487,7 +493,80 @@ export type B6Element =
   | RecentlyViewedElement
   | MarqueeElement
 
-export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement | B4Element | B6Element | B8aElement
+/* ----------------------------------------------------------------------------------------------
+ * B8b: the form element (contract §2). ✱ text is translatable: `title`, `text`, `submit_label`,
+ * `success_message`, `consent.text`, `fields.<field_id>.label|placeholder|help`,
+ * `fields.<field_id>.options.<option_id>.label`. No file uploads (security).
+ * -------------------------------------------------------------------------------------------- */
+
+export type FormFieldKind = 'text' | 'email' | 'phone' | 'textarea' | 'number' | 'select' | 'radio' | 'checkbox' | 'checkboxes' | 'date'
+/** `label` ✱ ≤ 60. */
+export type FormFieldOption = { id: string; label: string }
+export type FormField = {
+  /** `^[a-z][a-z0-9_-]{1,31}$`, unique within the form; the key of the posted value. */
+  id: string
+  kind: FormFieldKind
+  /** ✱ ≤ 80, required. */
+  label: string
+  /** ✱ ≤ 80. */
+  placeholder: string
+  /** ✱ ≤ 160. */
+  help: string
+  required: boolean
+  /** select / radio / checkboxes: 2–20 options; [] for the other kinds. */
+  options: FormFieldOption[]
+  /** number only (null = unbounded); min ≤ max. */
+  min: number | null
+  max: number | null
+  /** text / textarea only: 1–2000 (null = the server default). */
+  max_length: number | null
+  /** email only: the submission's reply-to address (at most one per form). */
+  reply_to: boolean
+}
+export type FormConsent = { text: string; link: Link }
+export type FormProps = {
+  /** ✱ ≤ 120 (empty = no heading). */
+  title: string
+  /** ✱ ≤ 400. */
+  text: string
+  /** 1–20 fields. */
+  fields: FormField[]
+  /** ✱ ≤ 30. */
+  submit_label: string
+  /** ✱ ≤ 300. */
+  success_message: string
+  /** A required "I agree" checkbox when present (`text` ✱ ≤ 300; `link` to the terms / privacy page). */
+  consent: FormConsent | null
+  /** An extra recipient of each submission (staff with `forms.view` always get a bell notification). */
+  notify_email: string | null
+  layout: 'stacked' | 'two_columns'
+}
+export type FormElement = ElementOf<'form', FormProps>
+
+/** A posted value: text kinds a string, number a number, checkbox a boolean, checkboxes option ids. */
+export type FormSubmitValue = string | number | boolean | string[]
+/**
+ * POST /store/forms/{document_uuid}/{element_id} (202 `{message}`). select / radio values are
+ * option ids, checkboxes an array of option ids, checkbox a boolean; '' / absent = unanswered.
+ */
+export type FormSubmitRequest = { values: Record<string, FormSubmitValue>; consent: boolean; website: string; page_path: string }
+export type FormSubmitResponse = { message: string }
+
+export type B8bElement = FormElement
+
+export type Element =
+  | HeadingElement
+  | TextElement
+  | ImageElement
+  | ButtonElement
+  | SpacerElement
+  | DividerElement
+  | InnerRowElement
+  | WrappedElement
+  | B4Element
+  | B6Element
+  | B8aElement
+  | B8bElement
 
 export type ElementType = Element['type']
 
@@ -511,8 +590,66 @@ export type Section = NodeCommon & {
   columns: Column[]
 }
 
-/** A stored document (draft or published version content). */
-export type BuilderDocument = { schema_version: 1; sections: Section[] }
+/* ----------------------------------------------------------------------------------------------
+ * B8b: popups & bars (contract §1). A `popup:<uuid>` document's content carries `popup` (validated
+ * in context `popup` only; versioned with the content, schedule included). The `active` switch is
+ * document-level and not versioned.
+ * -------------------------------------------------------------------------------------------- */
+
+export type PopupLayout = 'modal' | 'slide_in' | 'bar_top' | 'bar_bottom' | 'fullscreen'
+export type PopupPosition = 'bottom_left' | 'bottom_right'
+export type PopupWidth = 'sm' | 'md' | 'lg'
+export type PopupTriggerKind = 'on_load' | 'on_scroll' | 'on_exit'
+export type PopupFrequencyKind = 'every_page_view' | 'once_per_session' | 'once_every_days' | 'once_forever'
+export type PopupPagesKind = 'all' | 'home' | 'shop' | 'paths'
+export type PopupDevices = 'all' | 'desktop' | 'mobile'
+export type PopupAudience = 'all' | 'guests' | 'signed_in'
+
+export type PopupTrigger = {
+  kind: PopupTriggerKind
+  /** 0–120 s: on_load's delay; on_exit's fallback on touch devices (default 20). */
+  delay_seconds: number
+  /** 10–90 (on_scroll). */
+  scroll_percent: number
+}
+/** `days` 1–365 (once_every_days). */
+export type PopupFrequency = { kind: PopupFrequencyKind; days: number }
+/** `paths`: ≤ 20 site path prefixes (`/p/eid-sale`). Never on /checkout, /cart, /account*, /order*, whatever is set. */
+export type PopupPages = { kind: PopupPagesKind; paths: string[] }
+
+export type PopupSettings = {
+  layout: PopupLayout
+  /** slide_in only. */
+  position: PopupPosition
+  /** modal / slide_in. */
+  width: PopupWidth
+  /** modal / fullscreen: dims the page behind. */
+  overlay: boolean
+  /** modal / fullscreen: a click on the overlay closes it (Esc and the close button always do). */
+  close_on_overlay: boolean
+  trigger: PopupTrigger
+  frequency: PopupFrequency
+  /** Don't show again once the visitor used its dismiss button or submitted its form. */
+  stop_after_action: boolean
+  pages: PopupPages
+  devices: PopupDevices
+  audience: PopupAudience
+  /** 0–100: the highest wins when two modal-like popups are due (then the oldest). */
+  priority: number
+  /** Admin-set accessible name (✱ ≤ 120); '' = the popup's first heading. */
+  label: string
+  /** ISO 8601 with zone, or null; `ends_at` > `starts_at`. */
+  starts_at: string | null
+  ends_at: string | null
+  /** `{bn: {label: '…'}}` (like node translations). */
+  translations: Record<string, { label?: string }>
+}
+
+/** Settings as GET /store/builder/popups serves them: no schedule or translations; `label` in the request language. */
+export type StorePopupSettings = Omit<PopupSettings, 'starts_at' | 'ends_at' | 'translations'>
+
+/** A stored document (draft or published version content). B8b: `popup` on popup documents only. */
+export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings }
 
 /** The editor's names (B2): the whole draft, and any node of it (section, column or element). */
 export type BuilderContent = BuilderDocument
@@ -647,8 +784,8 @@ export type BuilderPage = {
  * B4: document contexts, zones and the bootstrap's builder block
  * -------------------------------------------------------------------------------------------- */
 
-/** Where an element may be used (registry `allowed_in`): home / landing pages, CMS pages, header, footer, zones. */
-export type DocumentContext = 'page' | 'cms' | 'header' | 'footer' | 'zone'
+/** Where an element may be used (registry `allowed_in`): home / landing pages, CMS pages, header, footer, zones; B8b popups. */
+export type DocumentContext = 'page' | 'cms' | 'header' | 'footer' | 'zone' | 'popup'
 
 export type ZoneKey = 'listing.top' | 'listing.bottom' | 'product.after'
 
@@ -661,3 +798,19 @@ export type BootstrapBuilder = {
   footer?: BuilderPage | null
   zones?: Partial<Record<ZoneKey, BuilderPage | null>>
 }
+
+/* ----------------------------------------------------------------------------------------------
+ * B8b: GET /store/builder/popups
+ * -------------------------------------------------------------------------------------------- */
+
+/** One live popup (or, `?preview=draft&popup=<id>` for staff, that popup's draft: version null, nodes keep `state`). */
+export type StorePopupEntry = {
+  /** The popup document's uuid (also the form submit's document). */
+  id: string
+  /** The published version number; null in a draft preview. Frequency records are kept per popup id, across versions. */
+  version: number | null
+  settings: StorePopupSettings
+  payload: Pick<BuilderPage, 'sections' | 'media' | 'data'>
+}
+/** Already ordered (priority desc, then oldest). `never_on`: path prefixes no popup covers. */
+export type StorePopupsResponse = { popups: StorePopupEntry[]; never_on: string[] }

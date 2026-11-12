@@ -14,6 +14,8 @@ import type {
   GradientStop,
   Length,
   Motion,
+  PopupSettings,
+  StorePopupSettings,
   ResponsiveStyle,
   SectionShape,
   Shadow,
@@ -1230,7 +1232,306 @@ export function b8aPropProblems(type: string, props: unknown): PropProblem[] {
   return problems
 }
 
-/** Every problem with an element's props, B6 and B8a rules (empty = valid; unknown types []). */
+/** Every problem with an element's props, B6, B8a and B8b rules (empty = valid; unknown types []). */
 export function elementPropProblems(type: string, props: unknown): PropProblem[] {
-  return b6PropProblems(type, props)
+  return [...b6PropProblems(type, props), ...b8bPropProblems(type, props)]
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B8b: popup settings, the form element and the button `action` (contract §1, §2)
+ * -------------------------------------------------------------------------------------------- */
+
+export const B8B_ENUMS = {
+  popupLayout: ['modal', 'slide_in', 'bar_top', 'bar_bottom', 'fullscreen'],
+  popupPosition: ['bottom_left', 'bottom_right'],
+  popupWidth: ['sm', 'md', 'lg'],
+  popupTrigger: ['on_load', 'on_scroll', 'on_exit'],
+  popupFrequency: ['every_page_view', 'once_per_session', 'once_every_days', 'once_forever'],
+  popupPages: ['all', 'home', 'shop', 'paths'],
+  popupDevices: ['all', 'desktop', 'mobile'],
+  popupAudience: ['all', 'guests', 'signed_in'],
+  buttonAction: ['link', 'dismiss'],
+  formFieldKind: ['text', 'email', 'phone', 'textarea', 'number', 'select', 'radio', 'checkbox', 'checkboxes', 'date'],
+  formLayout: ['stacked', 'two_columns'],
+} as const
+
+/** Numeric bounds and counts of B8b (min / max inclusive). */
+export const B8B_LIMITS = {
+  popupDelay: { min: 0, max: 120 },
+  popupScroll: { min: 10, max: 90 },
+  popupDays: { min: 1, max: 365 },
+  popupPriority: { min: 0, max: 100 },
+  popupPaths: { min: 0, max: 20 },
+  /** Characters of one `pages.paths` entry. */
+  popupPathLength: 120,
+  formFields: { min: 1, max: 20 },
+  formOptions: { min: 2, max: 20 },
+  formMaxLength: { min: 1, max: 2000 },
+  /** Bounds of a number field's min / max. */
+  formNumber: { min: -1_000_000_000, max: 1_000_000_000 },
+} as const
+
+/** Maximum length of each B8b text (✱ translatable). */
+export const B8B_TEXT_LIMITS = {
+  popup: { label: 120 },
+  form: {
+    title: 120,
+    text: 400,
+    submit_label: 30,
+    success_message: 300,
+    'consent.text': 300,
+    'fields.*.label': 80,
+    'fields.*.placeholder': 80,
+    'fields.*.help': 160,
+    'fields.*.options.*.label': 60,
+  },
+} as const
+
+/** What popup settings normalize fills in (a partial or older document still gets every key). */
+export const POPUP_DEFAULTS: PopupSettings = {
+  layout: 'modal',
+  position: 'bottom_right',
+  width: 'md',
+  overlay: true,
+  close_on_overlay: true,
+  trigger: { kind: 'on_load', delay_seconds: 5, scroll_percent: 50 },
+  frequency: { kind: 'once_per_session', days: 7 },
+  stop_after_action: true,
+  pages: { kind: 'all', paths: [] },
+  devices: 'all',
+  audience: 'all',
+  priority: 50,
+  label: '',
+  starts_at: null,
+  ends_at: null,
+  translations: {},
+}
+
+/** on_exit's delay on touch devices (no pointer to leave the page) when `delay_seconds` is 0 (templates set 20). */
+export const POPUP_EXIT_FALLBACK_SECONDS = 20
+
+/** Path prefixes no popup covers (the server's `never_on`; it refuses them in `pages.paths` as POPUP_PAGE_FORBIDDEN). */
+export const POPUP_NEVER_ON = ['/checkout', '/cart', '/account', '/order'] as const
+
+/** A site path prefix of `pages.paths` (lower case, like `/p/eid-sale`). */
+const POPUP_PATH = /^\/[a-z0-9][a-z0-9/_.~-]{0,119}$/
+
+/** Whether a path lies under one of the prefixes (`/order` covers `/order/123`, like the contract's `/account*`). */
+export function isUnderPrefix(pathname: string, prefixes: readonly string[]): boolean {
+  return prefixes.some((prefix) => typeof prefix === 'string' && prefix.startsWith('/') && pathname.startsWith(prefix))
+}
+
+export function isPopupPath(value: unknown): value is string {
+  return typeof value === 'string' && POPUP_PATH.test(value) && !isUnderPrefix(value, POPUP_NEVER_ON)
+}
+
+/** Pages a popup never covers (buying and account tasks), whatever its settings say; `neverOn` adds the server's list. */
+export function isPopupBlockedPathname(pathname: string, neverOn: readonly string[] = []): boolean {
+  return isUnderPrefix(pathname.toLowerCase(), [...POPUP_NEVER_ON, ...neverOn])
+}
+
+/** An ISO-8601 date-time the browser can read, else null. */
+function isoOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.length <= 40 && Number.isFinite(Date.parse(value)) ? value : null
+}
+
+/**
+ * Popup settings with every key valid: invalid or missing values take POPUP_DEFAULTS (the storefront
+ * draws whatever arrives safely; the server refuses invalid settings on save).
+ */
+export function normalizePopupSettings(value: unknown): PopupSettings {
+  const v: Obj = isObject(value) ? value : {}
+  const d = POPUP_DEFAULTS
+  const trigger: Obj = isObject(v.trigger) ? v.trigger : {}
+  const frequency: Obj = isObject(v.frequency) ? v.frequency : {}
+  const pages: Obj = isObject(v.pages) ? v.pages : {}
+  const L = B8B_LIMITS
+  return {
+    layout: oneOf(v.layout, B8B_ENUMS.popupLayout) ?? d.layout,
+    position: oneOf(v.position, B8B_ENUMS.popupPosition) ?? d.position,
+    width: oneOf(v.width, B8B_ENUMS.popupWidth) ?? d.width,
+    overlay: typeof v.overlay === 'boolean' ? v.overlay : d.overlay,
+    close_on_overlay: typeof v.close_on_overlay === 'boolean' ? v.close_on_overlay : d.close_on_overlay,
+    trigger: {
+      kind: oneOf(trigger.kind, B8B_ENUMS.popupTrigger) ?? d.trigger.kind,
+      delay_seconds: isInt(trigger.delay_seconds, L.popupDelay.min, L.popupDelay.max) ? trigger.delay_seconds : d.trigger.delay_seconds,
+      scroll_percent: isInt(trigger.scroll_percent, L.popupScroll.min, L.popupScroll.max) ? trigger.scroll_percent : d.trigger.scroll_percent,
+    },
+    frequency: {
+      kind: oneOf(frequency.kind, B8B_ENUMS.popupFrequency) ?? d.frequency.kind,
+      days: isInt(frequency.days, L.popupDays.min, L.popupDays.max) ? frequency.days : d.frequency.days,
+    },
+    stop_after_action: typeof v.stop_after_action === 'boolean' ? v.stop_after_action : d.stop_after_action,
+    pages: {
+      kind: oneOf(pages.kind, B8B_ENUMS.popupPages) ?? d.pages.kind,
+      paths: Array.isArray(pages.paths) ? pages.paths.filter(isPopupPath).slice(0, L.popupPaths.max) : [],
+    },
+    devices: oneOf(v.devices, B8B_ENUMS.popupDevices) ?? d.devices,
+    audience: oneOf(v.audience, B8B_ENUMS.popupAudience) ?? d.audience,
+    priority: isInt(v.priority, L.popupPriority.min, L.popupPriority.max) ? v.priority : d.priority,
+    label: typeof v.label === 'string' ? v.label.slice(0, B8B_TEXT_LIMITS.popup.label) : '',
+    starts_at: isoOrNull(v.starts_at),
+    ends_at: isoOrNull(v.ends_at),
+    translations: normalizePopupTranslations(v.translations),
+  }
+}
+
+function normalizePopupTranslations(value: unknown): Record<string, { label?: string }> {
+  if (!isObject(value)) return {}
+  const out: Record<string, { label?: string }> = {}
+  for (const [locale, entry] of Object.entries(value)) {
+    if (/^[a-z]{2}$/.test(locale) && isObject(entry) && typeof entry.label === 'string') out[locale] = { label: entry.label.slice(0, B8B_TEXT_LIMITS.popup.label) }
+  }
+  return out
+}
+
+/** Popup settings as served publicly (no schedule or translations), every key valid. */
+export function normalizeStorePopupSettings(value: unknown): StorePopupSettings {
+  const settings: Partial<PopupSettings> = normalizePopupSettings(value)
+  delete settings.starts_at
+  delete settings.ends_at
+  delete settings.translations
+  return settings as StorePopupSettings
+}
+
+/** Every problem with a popup's settings (paths like `trigger.delay_seconds`, `pages.paths.2`); empty = valid. */
+export function popupSettingsProblems(value: unknown): PropProblem[] {
+  if (!isObject(value)) return [{ path: '', code: 'invalid' }]
+  const problems: Problems = []
+  const v = value
+  const L = B8B_LIMITS
+  enumOf(problems, 'layout', v.layout, B8B_ENUMS.popupLayout)
+  enumOf(problems, 'position', v.position, B8B_ENUMS.popupPosition)
+  enumOf(problems, 'width', v.width, B8B_ENUMS.popupWidth)
+  flag(problems, 'overlay', v.overlay)
+  flag(problems, 'close_on_overlay', v.close_on_overlay)
+  if (!isObject(v.trigger)) problems.push({ path: 'trigger', code: 'invalid' })
+  else {
+    enumOf(problems, 'trigger.kind', v.trigger.kind, B8B_ENUMS.popupTrigger)
+    int(problems, 'trigger.delay_seconds', v.trigger.delay_seconds, L.popupDelay)
+    int(problems, 'trigger.scroll_percent', v.trigger.scroll_percent, L.popupScroll)
+  }
+  if (!isObject(v.frequency)) problems.push({ path: 'frequency', code: 'invalid' })
+  else {
+    enumOf(problems, 'frequency.kind', v.frequency.kind, B8B_ENUMS.popupFrequency)
+    int(problems, 'frequency.days', v.frequency.days, L.popupDays)
+  }
+  flag(problems, 'stop_after_action', v.stop_after_action)
+  if (!isObject(v.pages)) problems.push({ path: 'pages', code: 'invalid' })
+  else {
+    enumOf(problems, 'pages.kind', v.pages.kind, B8B_ENUMS.popupPages)
+    const paths = v.pages.paths
+    if (!Array.isArray(paths)) problems.push({ path: 'pages.paths', code: 'invalid' })
+    else {
+      if (paths.length > L.popupPaths.max) problems.push({ path: 'pages.paths', code: 'too_many' })
+      if (v.pages.kind === 'paths' && paths.length === 0) problems.push({ path: 'pages.paths', code: 'too_few' })
+      const seen = new Set<string>()
+      paths.forEach((path, index) => {
+        if (!isPopupPath(path)) problems.push({ path: `pages.paths.${index}`, code: typeof path === 'string' && path.length > L.popupPathLength ? 'too_long' : 'invalid' })
+        else if (seen.has(path)) problems.push({ path: `pages.paths.${index}`, code: 'duplicate' })
+        else seen.add(path)
+      })
+    }
+  }
+  enumOf(problems, 'devices', v.devices, B8B_ENUMS.popupDevices)
+  enumOf(problems, 'audience', v.audience, B8B_ENUMS.popupAudience)
+  int(problems, 'priority', v.priority, L.popupPriority)
+  text(problems, 'label', v.label, B8B_TEXT_LIMITS.popup.label)
+  if (v.translations !== undefined && !isObject(v.translations)) problems.push({ path: 'translations', code: 'invalid' })
+  else if (isObject(v.translations)) {
+    for (const [locale, entry] of Object.entries(v.translations)) {
+      if (!isObject(entry)) problems.push({ path: `translations.${locale}`, code: 'invalid' })
+      else if (entry.label !== undefined) text(problems, `translations.${locale}.label`, entry.label, B8B_TEXT_LIMITS.popup.label)
+    }
+  }
+  for (const key of ['starts_at', 'ends_at'] as const) {
+    if (v[key] !== null && v[key] !== undefined && isoOrNull(v[key]) === null) problems.push({ path: key, code: 'invalid' })
+  }
+  const starts = isoOrNull(v.starts_at)
+  const ends = isoOrNull(v.ends_at)
+  if (starts && ends && Date.parse(ends) <= Date.parse(starts)) problems.push({ path: 'ends_at', code: 'out_of_range' })
+  return problems
+}
+
+/** A plain e-mail address (≤ 254 characters). */
+const EMAIL = /^[^\s@<>"'\\(),;:]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/
+
+export function isEmailAddress(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 254 && EMAIL.test(value)
+}
+
+/** Kinds of form field that hold options (2–20). */
+export const FORM_OPTION_KINDS: readonly string[] = ['select', 'radio', 'checkboxes']
+
+function nullableNumber(problems: Problems, path: string, value: unknown) {
+  if (value === null) return
+  if (!isNumber(value)) problems.push({ path, code: 'invalid' })
+  else if (value < B8B_LIMITS.formNumber.min || value > B8B_LIMITS.formNumber.max || !hasTwoDecimals(value)) problems.push({ path, code: 'out_of_range' })
+}
+
+/** A button's action as stored: 'dismiss', or undefined for a link (the server drops `link`). */
+export function buttonAction(props: unknown): 'dismiss' | undefined {
+  return isObject(props) && props.action === 'dismiss' ? 'dismiss' : undefined
+}
+
+/**
+ * The client mirror of the server's B8b prop rules (empty = valid): the form element and a
+ * button's optional `action` (`dismiss` only in context `popup`, checked when `context` is given).
+ * Types this function does not know return [].
+ */
+export function b8bPropProblems(type: string, props: unknown, context?: string): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const T = B8B_TEXT_LIMITS.form
+  switch (type) {
+    case 'button':
+      if (p.action !== undefined) enumOf(problems, 'action', p.action, B8B_ENUMS.buttonAction)
+      if (p.action === 'dismiss' && context !== undefined && context !== 'popup') problems.push({ path: 'action', code: 'invalid' })
+      break
+    case 'form': {
+      text(problems, 'title', p.title, T.title)
+      text(problems, 'text', p.text, T.text)
+      let replyTo = 0
+      list(problems, 'fields', p.fields, B8B_LIMITS.formFields, (field, at) => {
+        const kind = oneOf(field.kind, B8B_ENUMS.formFieldKind)
+        if (!kind) problems.push({ path: `${at}.kind`, code: 'invalid' })
+        text(problems, `${at}.label`, field.label, T['fields.*.label'], true)
+        text(problems, `${at}.placeholder`, field.placeholder, T['fields.*.placeholder'])
+        text(problems, `${at}.help`, field.help, T['fields.*.help'])
+        flag(problems, `${at}.required`, field.required)
+        if (kind && FORM_OPTION_KINDS.includes(kind)) {
+          list(problems, `${at}.options`, field.options, B8B_LIMITS.formOptions, (option, o) => text(problems, `${o}.label`, option.label, T['fields.*.options.*.label'], true))
+        } else if (!Array.isArray(field.options) || field.options.length > 0) problems.push({ path: `${at}.options`, code: 'invalid' })
+        if (kind === 'number') {
+          nullableNumber(problems, `${at}.min`, field.min)
+          nullableNumber(problems, `${at}.max`, field.max)
+          if (isNumber(field.min) && isNumber(field.max) && field.min > field.max) problems.push({ path: `${at}.max`, code: 'out_of_range' })
+        } else {
+          if (field.min !== null) problems.push({ path: `${at}.min`, code: 'invalid' })
+          if (field.max !== null) problems.push({ path: `${at}.max`, code: 'invalid' })
+        }
+        if (kind === 'text' || kind === 'textarea') {
+          if (field.max_length !== null) int(problems, `${at}.max_length`, field.max_length, B8B_LIMITS.formMaxLength)
+        } else if (field.max_length !== null) problems.push({ path: `${at}.max_length`, code: 'invalid' })
+        if (typeof field.reply_to !== 'boolean') problems.push({ path: `${at}.reply_to`, code: 'invalid' })
+        else if (field.reply_to) {
+          if (kind !== 'email') problems.push({ path: `${at}.reply_to`, code: 'invalid' })
+          else if (++replyTo > 1) problems.push({ path: `${at}.reply_to`, code: 'duplicate' })
+        }
+      })
+      text(problems, 'submit_label', p.submit_label, T.submit_label, true)
+      text(problems, 'success_message', p.success_message, T.success_message, true)
+      if (p.consent !== null) {
+        if (!isObject(p.consent)) problems.push({ path: 'consent', code: 'invalid' })
+        else {
+          text(problems, 'consent.text', p.consent.text, T['consent.text'], true)
+          link(problems, 'consent.link', p.consent.link)
+        }
+      }
+      if (p.notify_email !== null && !isEmailAddress(p.notify_email)) problems.push({ path: 'notify_email', code: 'invalid' })
+      enumOf(problems, 'layout', p.layout, B8B_ENUMS.formLayout)
+      break
+    }
+  }
+  return problems
 }

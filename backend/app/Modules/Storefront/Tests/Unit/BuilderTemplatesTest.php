@@ -89,6 +89,14 @@ class BuilderTemplatesTest extends TestCase
 
                 return $this->withMenus ? $this->uuid("product{$source}{$index}") : null;
             }
+
+            // B8b: a store with a running coupon promotion (with menus) or none.
+            public function promotion(string $ref): ?string
+            {
+                $this->calls[] = "promotion:{$ref}";
+
+                return $this->withMenus ? $this->uuid("promotion{$ref}") : null;
+            }
         };
     }
 
@@ -115,7 +123,14 @@ class BuilderTemplatesTest extends TestCase
             // B7: `preview` (after the thumbnail) is optional.
             $keys = ['id', 'scope', 'preset', 'category', 'name', 'description', 'thumbnail', ...(array_key_exists('preview', $t) ? ['preview'] : []), 'allowed_in', 'requires'];
             $this->assertSame($keys, array_keys($t), $t['id']);
-            $this->assertContains($t['scope'], ['section', 'page', 'site'], $t['id']);
+            $this->assertContains($t['scope'], ['section', 'page', 'site', 'popup'], $t['id']);
+            // B8b: popup templates are applied as a new popup document only.
+            if ($t['scope'] === 'popup') {
+                $this->assertSame(['popup'], $t['allowed_in'], $t['id']);
+                $this->assertNull($t['preset'], $t['id']);
+            } else {
+                $this->assertNotContains('popup', $t['allowed_in'], $t['id']);
+            }
             $this->assertContains($t['preset'], [null, 'default', 'vegan', 'handmade', 'classic', 'kids'], $t['id']);
             if ($t['preset'] === 'default') {
                 $this->assertSame('site', $t['scope'], "{$t['id']}: the original look has a site template only");
@@ -187,7 +202,11 @@ class BuilderTemplatesTest extends TestCase
             $parts = array_map(fn (array $part) => $part['sections'], $content['parts']);
             $contexts = BuilderTemplateLibrary::SITE_PARTS;
         } else {
-            $this->assertSame(['schema_version', 'sections'], array_keys($content));
+            // B8b: popup templates carry their settings (already canonical).
+            $this->assertSame($meta['scope'] === 'popup' ? ['schema_version', 'popup', 'sections'] : ['schema_version', 'sections'], array_keys($content));
+            if ($meta['scope'] === 'popup') {
+                $this->assertSame($content['popup'], BuilderDocumentSchema::normalize(['schema_version' => 1, 'popup' => $content['popup'], 'sections' => []], 'popup')['popup'], $id);
+            }
             $parts = ['sections' => $content['sections']];
             $contexts = null;
         }
@@ -227,6 +246,7 @@ class BuilderTemplatesTest extends TestCase
                     $this->assertStringNotContainsString('"asset"', $json);
                     $this->assertStringNotContainsString('"menu_ref"', $json);
                     $this->assertStringNotContainsString('"product_ref"', $json);
+                    $this->assertStringNotContainsString('"promotion_ref"', $json);
                     $this->assertStringNotContainsString('"when_menu"', $json);
                     $this->assertStringNotContainsString('"banner":', $json);
                 }
@@ -255,7 +275,8 @@ class BuilderTemplatesTest extends TestCase
         $this->assertSame(str_contains($json, '"banner":{'), in_array('banners', $meta['requires'], true), "{$id} banners");
         $this->assertSame(str_contains($json, '"menu_ref"'), in_array('menus', $meta['requires'], true), "{$id} menus");
         // B8a: a flash sale bar needs a running flash sale too.
-        $this->assertSame(str_contains($json, '"type":"hot_deals"') || str_contains($json, '"type":"flash_sale_bar"'), in_array('promotions', $meta['requires'], true), "{$id} promotions");
+        // B8b: so does a discount naming the store's running coupon.
+        $this->assertSame(str_contains($json, '"type":"hot_deals"') || str_contains($json, '"type":"flash_sale_bar"') || str_contains($json, '"promotion_ref"'), in_array('promotions', $meta['requires'], true), "{$id} promotions");
         $this->assertSame(str_contains($json, '"type":"blog_posts"'), in_array('blog', $meta['requires'], true), "{$id} blog");
         $this->assertSame(str_contains($json, '"product_ref"'), in_array('products', $meta['requires'], true), "{$id} products");
     }

@@ -36,4 +36,11 @@ interface PromotionShowcase
      * @return array<string, array{used: int, limit: int}>
      */
     public function claimed(array $ids): array;
+
+    /**
+     * B8b: the id of the running (active) percent / fixed-amount coupon promotion with a usable
+     * code that ends first (open-ended ones last, then the oldest), or null — for store builder
+     * templates that show "a coupon" (the exit-offer popup).
+     */
+    public function runningCouponPromotion(): ?string;
 }

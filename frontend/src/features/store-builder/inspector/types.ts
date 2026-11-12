@@ -5,7 +5,7 @@
 
 import type { MediaRef } from '@/storefront/types'
 import type { ElementMeta } from '@/storefront/builder/registry'
-import type { BuilderDocument, Column, Device, Element, Section } from '@/storefront/builder/types'
+import type { BuilderDocument, Column, Device, Element, PopupSettings, Section } from '@/storefront/builder/types'
 
 /** The whole draft content (schema v1). */
 export type BuilderContent = BuilderDocument
@@ -46,6 +46,10 @@ export type InspectorCommand =
    * re-resolves the elements showing it (their input may be unchanged, the banner is not).
    */
   | { type: 'banner-edited'; bannerId: string; replaced: { old_id: string; new_id: string } | null }
+  /** B8b: the popup's settings changed (`content.popup`; one undo step per coalesce key). */
+  | { type: 'set-popup'; settings: PopupSettings; coalesceKey?: string }
+  /** B8b: switch the popup on or off on the store (not versioned; needs `storefront.publish`). */
+  | { type: 'set-popup-active'; active: boolean }
 
 export type InspectorChangeOptions = {
   /** Edits with the same key within a short time are one undo step (typing). */
@@ -56,13 +60,19 @@ export type InspectorChangeOptions = {
 
 export type InspectorDocument = {
   id: string
-  /** B4: page (default), header, footer or zone, and its key (`cms:<uuid>`, `zone:listing.top`, …). */
-  kind?: 'page' | 'header' | 'footer' | 'theme' | 'zone'
+  /** B4: page (default), header, footer or zone, and its key (`cms:<uuid>`, `zone:listing.top`, …). B8b: popup (`popup:<uuid>`). */
+  kind?: 'page' | 'header' | 'footer' | 'theme' | 'zone' | 'popup'
   key?: string
   title: string
   /** null for the header, footer and zones. */
   path: string | null
   published: { number: number; published_at: string } | null
+  /** B8b popups: switched on on the store. */
+  active?: boolean
+  /** B8b popups: the person may switch it on or off (`storefront.publish`). */
+  canPublish?: boolean
+  /** B8b popups: the on / off switch is waiting for the server. */
+  activePending?: boolean
 }
 
 export type InspectorProps = {

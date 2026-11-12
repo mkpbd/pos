@@ -161,6 +161,7 @@ export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard,
   const canRedo = useEditor((s) => s.history.future.length > 0)
   const undo = useEditor((s) => s.undo)
   const redo = useEditor((s) => s.redo)
+  const isPopup = document.kind === 'popup'
 
   return (
     <header aria-label="Editor toolbar" className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2">
@@ -201,11 +202,11 @@ export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard,
 
       <SaveStatus onShowProblem={onShowProblem} />
 
-      <Hint label={document.preview_url ? 'See your draft on the store (new tab)' : 'Preview needs a store address — add a domain under Settings & domains'}>
+      <Hint label={document.preview_url ? (isPopup ? 'See this popup on your store at once, whatever its trigger (new tab)' : 'See your draft on the store (new tab)') : 'Preview needs a store address — add a domain under Settings & domains'}>
         {/* A span keeps the tooltip working on the disabled button. */}
         <span tabIndex={document.preview_url ? undefined : 0}>
-          <Button type="button" variant="outline" disabled={!document.preview_url} onClick={onPreview} aria-label="Preview draft">
-            <ExternalLinkIcon /> Preview
+          <Button type="button" variant="outline" disabled={!document.preview_url} onClick={onPreview} aria-label={isPopup ? 'Preview on store' : 'Preview draft'}>
+            <ExternalLinkIcon /> {isPopup ? 'Preview on store' : 'Preview'}
           </Button>
         </span>
       </Hint>

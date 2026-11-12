@@ -118,7 +118,7 @@ describe('store builder front page', () => {
     expect(await screen.findByRole('heading', { name: 'Fast delivery' })).toBeInTheDocument()
     expect(screen.getAllByTestId('homepage-section')).toHaveLength(1)
     expect(screen.queryByTestId('builder-page')).not.toBeInTheDocument()
-    expect(requested(fetchMock).some((url) => url.includes('/store/builder/'))).toBe(false)
+    expect(requested(fetchMock).some((url) => url.includes('/store/builder/pages'))).toBe(false)
   })
 
   it('falls back to the homepage sections when the front page is gone (404)', async () => {

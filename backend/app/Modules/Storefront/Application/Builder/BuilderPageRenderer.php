@@ -41,6 +41,8 @@ use stdClass;
  *   store `data_source` have `data[id]` (BuilderElementData); nested list texts are in the
  *   request's language; `media` also holds before / after photos, team portraits and photo
  *   grid images. Published bundles keep only the items of products on sale.
+ * - B8b: published form elements have `notify_email: null` (staff addresses stay private);
+ *   a popup's `popup` settings are not part of the payload (BuilderPopups adds them).
  */
 class BuilderPageRenderer
 {
@@ -218,6 +220,10 @@ class BuilderPageRenderer
             $sectionType = ElementRegistry::sectionType($node['type']);
             if ($sectionType === null) {
                 $node['props'] = self::localizedProps($node['type'], $node['props'], $translations, $locale);
+                if ($node['type'] === 'form' && ! $preview) {
+                    // B8b: the staff address a form notifies is not for visitors.
+                    $node['props']['notify_email'] = null;
+                }
                 if (BuilderElementData::handles($node['type'], $node['props'])) {
                     $dataElements[] = ['id' => $node['id'], 'type' => $node['type'], 'props' => $node['props']];
                 }

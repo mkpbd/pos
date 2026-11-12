@@ -12,14 +12,16 @@ import { B6ElementContent } from './elements/b6'
 import { isB6Type } from './elements/b6-types'
 import { B8aElementContent } from './elements/b8a'
 import { isB8aType } from './elements/b8a-types'
+import { FormElement } from './elements/form'
 import { useMotionRuntime } from './motion'
+import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
 import { BackgroundVideoLayer, ShapeDivider } from './section-layers'
 import { isWrappedSectionType, NODE_ID } from './registry'
 import { ColumnWidthCtx, PageCtx, usePage } from './render-context'
 import { PreviewMark } from './preview-mark'
 import type { BuilderPage, NodeState, RenderColumn, RenderElement, RenderSection } from './types'
-import { ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
+import { buttonAction, ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
 
 /*
  * Draws a builder render payload: sections → columns (flex rows that wrap) → elements, styled by
@@ -135,6 +137,8 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
       return <Divider element={element} />
     case 'inner_row':
       return <InnerRow element={element} />
+    case 'form':
+      return <FormElement element={element} />
     default:
       if (isB4Type(element.type)) return <B4ElementContent element={element} />
       if (isB6Type(element.type)) return <B6ElementContent element={element} />
@@ -236,6 +240,7 @@ const BUTTON_SIZES = {
 } as const
 
 function ButtonElement({ element }: { element: Extract<RenderElement, { type: 'button' }> }) {
+  const popup = usePopupActions()
   const label = typeof element.props?.label === 'string' ? element.props.label : ''
   const variant = oneOf(element.props?.variant, ENUMS.buttonVariant) ?? 'primary'
   const size = oneOf(element.props?.size, ENUMS.buttonSize) ?? 'md'
@@ -248,6 +253,14 @@ function ButtonElement({ element }: { element: Extract<RenderElement, { type: 'b
     element.props?.full_width === true && 'b-full-width',
   )
   if (!label) return null
+  // B8b: a `dismiss` button closes the popup it sits in (it does nothing in the editor canvas or a page).
+  if (buttonAction(element.props) === 'dismiss') {
+    return (
+      <button type="button" data-b={element.id} className={className} onClick={() => popup?.dismiss()}>
+        {label}
+      </button>
+    )
+  }
   // A button without a valid link is drawn but goes nowhere (the server refuses one on save).
   if (!url) return <span data-b={element.id} className={className}>{label}</span>
   return (

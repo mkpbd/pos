@@ -44,7 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/suppliers', label: 'Suppliers', icon: TruckIcon, permission: 'suppliers.view' },
   { to: '/loyalty', label: 'Loyalty', icon: GiftIcon, permission: ['loyalty.view', 'loyalty.manage'] },
   { to: '/storefront', label: 'Online store', icon: GlobeIcon, permission: 'storefront.view' },
-  { to: '/content/pages', label: 'Content', icon: FileTextIcon, permission: 'cms.manage' },
+  { to: '/content', label: 'Content', icon: FileTextIcon, permission: ['cms.manage', 'forms.view'] },
   { to: '/media', label: 'Media library', icon: ImagesIcon, permission: 'media.manage' },
   { to: '/branches', label: 'Branches', icon: StoreIcon, permission: 'branches.view' },
   { to: '/users', label: 'Users', icon: UsersIcon, permission: 'users.view' },

@@ -39,7 +39,7 @@ describe('content pages', () => {
     expect(rows[1]).toHaveTextContent('Scheduled')
     expect(rows[2]).toHaveTextContent('Draft')
     expect(within(rows[0]!).getByRole('link', { name: 'About us' })).toHaveAttribute('href', '/content/pages/p-1')
-    expect(screen.getAllByRole('link', { name: 'Content' })[0]).toHaveAttribute('href', '/content/pages')
+    expect(screen.getAllByRole('link', { name: 'Content' })[0]).toHaveAttribute('href', '/content')
   })
 
   it('creates a page with an address derived from its title', async () => {

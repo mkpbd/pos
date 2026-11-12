@@ -13,7 +13,7 @@ import type { ElementsMetadata, Problem } from './inspector'
 
 export type PublishedRef = { version_id: string; number: number; published_at: string | null }
 
-export type DocumentKind = 'page' | 'header' | 'footer' | 'theme' | 'zone'
+export type DocumentKind = 'page' | 'header' | 'footer' | 'theme' | 'zone' | 'popup'
 
 /** The CMS page a `cms:<uuid>` document designs (B4; title, slug and status stay in the Cms module). */
 export type CmsPageRef = { id: string; title: string; slug: string; status: 'draft' | 'published'; template?: 'default' | 'faq' | 'contact' }
@@ -32,8 +32,25 @@ export type DocumentSummary = {
   path?: string | null
   /** B4: the CMS page of a `cms:<uuid>` document; null otherwise. */
   cms_page?: CmsPageRef | null
-  /** The store URL of the draft preview (`…?preview=draft`); null without a store domain (B2). */
+  /** The store URL of the draft preview (`…?preview=draft`); null without a store domain (B2). B8b popups: `/?preview=draft&popup=<id>`. */
   preview_url?: string | null
+  /** B8b popups: switched on (not versioned; PATCH `{active}`, `storefront.publish`). */
+  active?: boolean
+  /** B8b popups: where it stands on the store (the server's word; see popupStatus for the fallback). */
+  status?: PopupStatus
+  /** B8b popups: a little of the published (else draft) settings, for the list. */
+  popup?: PopupSummary | null
+}
+
+/** B8b: a popup's state on the store. */
+export type PopupStatus = 'draft' | 'live' | 'off' | 'scheduled' | 'expired'
+
+/** B8b: what the start screen shows of a popup's settings. */
+export type PopupSummary = {
+  layout: 'modal' | 'slide_in' | 'bar_top' | 'bar_bottom' | 'fullscreen'
+  trigger: 'on_load' | 'on_scroll' | 'on_exit'
+  starts_at?: string | null
+  ends_at?: string | null
 }
 
 export type DocumentDetail = DocumentSummary & { content: BuilderContent }
@@ -175,6 +192,8 @@ export type CreateDocumentInput =
   | { kind: 'page'; key: string; title: string; from: 'blank' | 'homepage' | 'cms' }
   | { kind: 'header' | 'footer'; key: 'header' | 'footer'; title: string; from: 'blank' | 'current' }
   | { kind: 'zone'; key: ZoneDocumentKey; title: string; from: 'blank' }
+  /** B8b: the server makes the key (`popup:<uuid>`); `template` = a popup template's id (null = blank). */
+  | { kind: 'popup'; key?: undefined; from?: undefined; title: string; template: string | null }
 
 export type ZoneDocumentKey = 'zone:listing.top' | 'zone:listing.bottom' | 'zone:product.after'
 
@@ -194,6 +213,23 @@ export function useDeleteDocumentMutation() {
   return useMutation({
     mutationFn: (id: string) => api.delete(doc(id)),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: builderAdminKeys.documents }),
+  })
+}
+
+/** B8b: switches a popup on or off on the store (`storefront.publish`; on before the first publish → 422 POPUP_NOT_PUBLISHED). */
+export function setPopupActive(id: string, active: boolean) {
+  return api.patch<DocumentSummary>(doc(id), { active }).then((r) => r.data)
+}
+
+/** B8b: setPopupActive for the start screen (updates the documents list). */
+export function useSetPopupActiveMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => setPopupActive(id, active),
+    onSuccess: (updated, { id, active }) => {
+      queryClient.setQueryData<DocumentSummary[]>(builderAdminKeys.documents, (list) => list?.map((d) => (d.id === id ? { ...d, ...(updated ?? {}), active: updated?.active ?? active } : d)))
+      void queryClient.invalidateQueries({ queryKey: builderAdminKeys.documents })
+    },
   })
 }
 

@@ -149,8 +149,10 @@ class BuilderB6SchemaTest extends TestCase
         $withFooter = ['page', 'cms', 'zone', 'footer'];
         foreach (ElementRegistry::B6 as $type) {
             $expected = match ($type) {
-                'icon_list', 'marquee' => $all,
+                'icon_list', 'marquee' => [...$all, 'popup'],
                 'accordion', 'icon_box', 'logo_carousel', 'map', 'trust_badges' => $withFooter,
+                // B8b: notices go in popups too.
+                'notice' => ['page', 'cms', 'zone', 'popup'],
                 default => ['page', 'cms', 'zone'],
             };
             $this->assertEqualsCanonicalizing($expected, ElementRegistry::allowedIn($type), $type);

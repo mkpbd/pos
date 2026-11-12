@@ -6,6 +6,7 @@ import { CartDrawerProvider } from '../cart/mini-cart'
 import { QuickViewProvider } from '../catalog/quick-view'
 import { LocaleContext, useLocale } from '../i18n/locale'
 import { useLocaleController } from '../i18n/use-locale-controller'
+import { PopupHost } from '../builder/popups/popup-host'
 import { PopupBanner } from '../popup/popup-banner'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
@@ -32,6 +33,7 @@ export function StorefrontLayout() {
             <CartDrawerProvider>
               <StoreFrame bootstrap={query.data} />
               <PopupBanner />
+              <PopupHost />
             </CartDrawerProvider>
           </NoticeProvider>
         </BootstrapContext>

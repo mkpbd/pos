@@ -1,0 +1,115 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "bar_bottom",
+        "position": "bottom_right",
+        "width": "md",
+        "overlay": false,
+        "close_on_overlay": false,
+        "label": "Cookie notice",
+        "trigger": {
+            "kind": "on_load",
+            "delay_seconds": 0,
+            "scroll_percent": 50
+        },
+        "frequency": {
+            "kind": "once_forever",
+            "days": 7
+        },
+        "stop_after_action": true,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "all",
+        "priority": 90,
+        "starts_at": null,
+        "ends_at": null,
+        "translations": {
+            "bn": {
+                "label": "কুকি বিজ্ঞপ্তি"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "12px",
+                            "bottom": "12px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "16px"
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 80,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>This shop uses cookies only to keep your cart and sign-in working. No tracking or advertising cookies. <a href=\"/pages/privacy-policy\">Read our privacy policy</a>.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>এই দোকান কুকি ব্যবহার করে শুধু আপনার কার্ট আর সাইন-ইন চালু রাখতে। কোনো ট্র্যাকিং বা বিজ্ঞাপনের কুকি নেই। <a href=\"/pages/privacy-policy\">আমাদের গোপনীয়তা নীতি পড়ুন</a>।</p>"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 20,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "button",
+                            "props": {
+                                "label": "OK",
+                                "link": {
+                                    "url": "/"
+                                },
+                                "variant": "primary",
+                                "size": "sm",
+                                "full_width": false,
+                                "action": "dismiss"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "ঠিক আছে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

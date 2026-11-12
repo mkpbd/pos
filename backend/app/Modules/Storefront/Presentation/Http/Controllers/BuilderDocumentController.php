@@ -22,6 +22,7 @@ use App\Modules\Storefront\Presentation\Http\Support\BuilderPresenter;
 use App\Modules\Storefront\Presentation\Http\Support\ContentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -55,7 +56,9 @@ class BuilderDocumentController
      * `zone:product.after`. One per key (409 DOCUMENT_EXISTS). `from`: `blank`, `homepage`
      * (home: the current homepage sections), `cms` (a content page: its title, body and FAQ list
      * or contact form; 422 CMS_PAGE_NOT_FOUND for an unknown page), `current` (header / footer:
-     * today's default layout with the store's menus).
+     * today's default layout with the store's menus). B8b: popup — `{kind: popup, title,
+     * template?}` (no key: the server makes `popup:<uuid>`; blank with the default settings, or a
+     * built-in popup template), created switched off.
      */
     public function store(CreateBuilderDocumentRequest $request, ManageBuilderDocuments $documents): JsonResponse
     {
@@ -73,15 +76,28 @@ class BuilderDocumentController
     }
 
     /**
-     * Rename a builder document
+     * Rename a builder document / switch a popup on or off
      *
-     * `{title}` (1–160 characters). Audited; the draft and the live page are unchanged.
+     * `{title?, active?}` (at least one). `title` (1–160 characters) renames; audited, the draft
+     * and the live page are unchanged. B8b: `active` switches a popup on or off (not versioned):
+     * needs storefront.publish (403), popups only (422 NOT_A_POPUP), switching on needs a
+     * published version (422 POPUP_NOT_PUBLISHED); audited.
      */
     public function rename(Request $request, BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
     {
-        $title = $request->validate(['title' => ['required', 'string', 'max:160']])['title'];
+        $data = $request->validate([
+            'title' => ['required_without:active', 'string', 'max:160'],
+            'active' => ['sometimes', 'boolean'],
+        ]);
+        if (array_key_exists('active', $data)) {
+            Gate::authorize('storefront.publish');
+            $document = $documents->setActive($document, (bool) $data['active']);
+        }
+        if (array_key_exists('title', $data)) {
+            $document = $documents->rename($document, $data['title']);
+        }
 
-        return ApiResponse::success(BuilderPresenter::document($documents->rename($document, $title)->load('publishedVersion')));
+        return ApiResponse::success(BuilderPresenter::document($document->load('publishedVersion')));
     }
 
     /**

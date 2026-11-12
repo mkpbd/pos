@@ -27,13 +27,16 @@ import { AdvancedTab } from './advanced-tab'
 import { B4Form, type B4FormProps } from './b4-forms'
 import { B6Form } from './b6-forms'
 import { B8aForm } from './b8a-forms'
+import { B8bForm } from './b8b-forms'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
+import { PopupSettingsPanel } from './popup-settings'
+import { readPopupSettings } from '../popup-model'
 import { ElementSetupHost } from './setup-dialog'
 import { StyleTab } from './style-tab'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
-import { B4_TYPES, B6_TYPES, B8A_TYPES, validateNode } from './validate'
+import { B4_TYPES, B6_TYPES, B8A_TYPES, B8B_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
 const ICONS: Record<string, typeof HeadingIcon> = {
@@ -77,6 +80,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   if (B4_TYPES.has(node.type)) return <B4Form key={node.id} node={node as Element} {...common} {...b4} />
   if (B6_TYPES.has(node.type)) return <B6Form key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
   if (B8A_TYPES.has(node.type)) return <B8aForm key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
+  if (B8B_TYPES.has(node.type)) return <B8bForm key={node.id} node={node as Element} {...common} context={b4.context} />
   switch (node.type) {
     case 'section':
       return (
@@ -98,7 +102,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
     case 'image':
       return <ImageForm node={node as ImageElement} {...common} />
     case 'button':
-      return <ButtonForm node={node as ButtonElement} {...common} />
+      return <ButtonForm node={node as ButtonElement} {...common} context={b4.context} />
     case 'divider':
       return <DividerForm node={node as DividerElement} {...common} />
     case 'spacer':
@@ -215,14 +219,19 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
   if (!node) {
     return (
       <aside aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
-        <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} />
+        {document.kind === 'popup' ? (
+          <PopupSettingsPanel settings={readPopupSettings(content.popup)} document={document} problems={serverProblems} bangla={locales.includes('bn')} onCommand={onCommand} />
+        ) : (
+          <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} />
+        )}
       </aside>
     )
   }
 
   const bangla = locales.includes('bn')
   const icons = registryIcons(registry)
-  const problems = validateNode(node, { icons })
+  const context = elementContext({ kind: document.kind ?? 'page', key: document.key ?? '' })
+  const problems = validateNode(node, { icons, context })
   const errors = errorMap(node, problems, serverProblems)
   const hasAdvanced = node.type !== 'column'
   const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
@@ -290,7 +299,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
             bangla={bangla}
             content={content}
             documentId={document.id}
-            b4={{ context: elementContext({ kind: document.kind ?? 'page', key: document.key ?? '' }), theme, icons, canCustomHtml }}
+            b4={{ context, theme, icons, canCustomHtml }}
           />
         </TabsContent>
         <TabsContent value="style" className="pt-4">

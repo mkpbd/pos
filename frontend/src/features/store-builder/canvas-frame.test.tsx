@@ -2,6 +2,7 @@ import { createRef } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { envelope, type CanvasMessage, type ParentMessage } from '@/storefront/builder/canvas/protocol'
 import { cloneSample, samplePage } from '@/storefront/builder/test-payload'
+import { POPUP_DEFAULTS } from '@/storefront/builder/validate'
 import { bootstrapFixture } from '@/storefront/test-fixtures'
 import { CanvasFrame, type CanvasHandle } from './canvas-frame'
 import { toRenderTree } from './render-tree'
@@ -85,6 +86,13 @@ describe('canvas frame (editor side)', () => {
     const sections = toRenderTree(doc, { locale: 'en', now: Date.now() })
     view.rerender(<CanvasFrame {...props} sections={sections} device="mobile" />)
     expect(posted.at(-1)).toMatchObject({ type: 'render', device: 'mobile' })
+  })
+
+  it('B8b: a popup document sends its settings with the render message', () => {
+    const popup = { ...structuredClone(POPUP_DEFAULTS), layout: 'slide_in' as const }
+    const { posted, fromCanvas } = setup({ surroundings: 'popup', popup })
+    fromCanvas({ type: 'ready' })
+    expect(posted.at(-1)).toMatchObject({ type: 'render', surroundings: 'popup', popup: { layout: 'slide_in' } })
   })
 })
 

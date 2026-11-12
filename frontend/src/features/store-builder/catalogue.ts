@@ -71,6 +71,7 @@ import {
   Grid3x3Icon,
   ClockIcon,
   ChartBarIcon,
+  ClipboardListIcon,
   type LucideIcon,
 } from 'lucide-react'
 import type { ElementGroup } from '@/storefront/builder/registry'
@@ -151,6 +152,8 @@ export const ELEMENT_ICONS: Record<string, LucideIcon> = {
   photo_grid: Grid3x3Icon,
   store_hours: ClockIcon,
   progress_bars: ChartBarIcon,
+  // B8b
+  form: ClipboardListIcon,
 }
 
 export function elementIcon(type: string): LucideIcon {
@@ -229,6 +232,7 @@ export const ELEMENT_HINTS: Record<string, string> = {
   photo_grid: 'Your photos in a square grid, Instagram style.',
   store_hours: 'Your opening hours, with “Open now” for shoppers.',
   progress_bars: 'Bars or rings that show percentages.',
+  form: 'Your own form with the questions you choose. Answers arrive under Content → Form submissions.',
 }
 
 /** B4: the server may group the header / footer parts as `site`. */

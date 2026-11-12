@@ -449,6 +449,11 @@ class BuilderB8aSchemaTest extends TestCase
             {
                 return $index < $this->products ? sprintf('0199a5c1-0000-7000-8000-%012d', $index + 1) : null;
             }
+
+            public function promotion(string $ref): ?string
+            {
+                return null;
+            }
         };
         $n = 0;
         $newId = function (string $prefix) use (&$n) {

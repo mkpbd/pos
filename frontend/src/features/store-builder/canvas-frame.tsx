@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { envelope, readCanvasMessage, type CanvasMessage, type CanvasSurroundings, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
-import type { BuilderData, BuilderMedia, Device, RenderSection } from '@/storefront/builder/types'
+import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderSection } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import { CANVAS_URL, DEVICE_WIDTHS } from './canvas-config'
@@ -54,10 +54,12 @@ export type CanvasFrameProps = {
   surroundings?: CanvasSurroundings
   /** B4: the canvas text while the document is empty. */
   emptyText?: string
+  /** B8b: with `surroundings: 'popup'`, the popup's settings (the canvas draws its layout over a dimmed sample page). */
+  popup?: PopupSettings
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -128,8 +130,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
   }, [ready, theme, send])
 
   useEffect(() => {
-    if (ready > 0) send({ type: 'render', sections, data, media, selection, hover, errors: errorIds, device, pending, surroundings, ...(emptyText ? { emptyText } : {}) })
-  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, send])
+    if (ready > 0) send({ type: 'render', sections, data, media, selection, hover, errors: errorIds, device, pending, surroundings, ...(emptyText ? { emptyText } : {}), ...(popup ? { popup } : {}) })
+  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, send])
 
   useImperativeHandle(
     handleRef,

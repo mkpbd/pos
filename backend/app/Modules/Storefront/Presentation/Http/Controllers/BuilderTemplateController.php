@@ -35,12 +35,14 @@ class BuilderTemplateController
      * products)[], source: builtin|mine, created_at|null}]`. The site templates come in the order the
      * demo looks are shown (kids, the original look, vegan, handmade, classic). Filters: `scope`,
      * `preset` (a preset key, or `none` for templates of no preset), `context` (page | cms |
-     * header | footer | zone — only templates usable there), `source` (builtin | mine).
+     * header | footer | zone | popup — only templates usable there), `source` (builtin | mine).
+     * B8b: scope `popup` — popup and bar templates (allowed_in `[popup]`), applied as a new popup
+     * document (`POST /documents {kind: popup, title, template}`).
      */
     public function index(Request $request, ManageBuilderTemplates $templates): JsonResponse
     {
         $filters = $request->validate([
-            'scope' => ['sometimes', 'nullable', Rule::in(['section', 'page', 'site'])],
+            'scope' => ['sometimes', 'nullable', Rule::in(['section', 'page', 'site', 'popup'])],
             'preset' => ['sometimes', 'nullable', Rule::in([...ThemePresets::KEYS, 'none'])],
             'context' => ['sometimes', 'nullable', Rule::in(ElementRegistry::CONTEXTS)],
             'source' => ['sometimes', 'nullable', Rule::in(['builtin', 'mine'])],
@@ -62,7 +64,8 @@ class BuilderTemplateController
      * its part for the context (page → home, header, footer, zone → listing top). 404 for an
      * unknown or another organization's template, 422 TEMPLATE_NOT_ALLOWED for a context the
      * template is not made for, 422 DOCUMENT_INVALID when an own template refers to deleted
-     * records. Audited (`storefront.builder_template_used`).
+     * records. Audited (`storefront.builder_template_used`). B8b: `popup` — a popup template's
+     * settings (null for other templates).
      */
     public function instantiate(Request $request, string $template, ManageBuilderTemplates $templates): JsonResponse
     {
