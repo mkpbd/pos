@@ -1,0 +1,935 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "classic"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {},
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Season sale",
+                                                    "kicker": "SALE UP TO 30 % OFF",
+                                                    "title": "The season sale is on",
+                                                    "subtitle": "Shirts, dresses, sneakers and bags at their lowest prices.",
+                                                    "button_label": "Shop the sale",
+                                                    "link_url": "/shop",
+                                                    "secondary_button_label": "Women",
+                                                    "secondary_link_url": "/category/women",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "classic/banner-sale-1.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "New arrivals",
+                                                    "kicker": "SALE UP TO 30 % OFF",
+                                                    "title": "New arrivals every week",
+                                                    "subtitle": "Fresh styles on the rail, every Thursday.",
+                                                    "button_label": "Shop men",
+                                                    "link_url": "/category/men",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "classic/banner-sale-2.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "3-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Men",
+                                                    "kicker": "Men",
+                                                    "title": "Everyday menswear",
+                                                    "button_label": "Shop men",
+                                                    "link_url": "/category/men",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "classic/banner-men.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Women",
+                                                    "kicker": "Women",
+                                                    "title": "Light layers for summer",
+                                                    "button_label": "Shop women",
+                                                    "link_url": "/category/women",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "classic/banner-women.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Shoes",
+                                                    "kicker": "Shoes",
+                                                    "title": "Boots and sneakers",
+                                                    "button_label": "Shop shoes",
+                                                    "link_url": "/category/shoes",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "classic/banner-shoes.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "product_tabs",
+                                    "props": {
+                                        "title": "Shop the collection",
+                                        "subtitle": null,
+                                        "config": {
+                                            "limit": 8,
+                                            "tabs": [
+                                                {
+                                                    "label": "Featured",
+                                                    "source": "featured"
+                                                },
+                                                {
+                                                    "label": "Best sellers",
+                                                    "source": "best_sellers"
+                                                },
+                                                {
+                                                    "label": "On sale",
+                                                    "source": "on_sale"
+                                                }
+                                            ]
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Shop by category",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 5
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "hot_deals",
+                                    "props": {
+                                        "title": "Flash sale",
+                                        "subtitle": "Ends soon",
+                                        "config": {
+                                            "limit": 8,
+                                            "view_all_url": "/shop",
+                                            "promotion_id": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Free delivery",
+                                                    "text": "Inside Dhaka over ৳5,000"
+                                                },
+                                                {
+                                                    "icon": "rotate-ccw",
+                                                    "title": "7-day exchange",
+                                                    "text": "Unworn, with tags"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Cash on delivery",
+                                                    "text": "Or bank transfer"
+                                                },
+                                                {
+                                                    "icon": "store",
+                                                    "title": "Visit us",
+                                                    "text": "Banani, 10 am to 9 pm"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "product_grid",
+                                    "props": {
+                                        "title": "Best sellers",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "best_sellers",
+                                            "limit": 8,
+                                            "columns": 4,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "testimonials",
+                                    "props": {
+                                        "title": "Customer reviews",
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "quote": "The oxford shirt fits perfectly and the fabric feels great after many washes.",
+                                                    "name": "Rafiq H.",
+                                                    "role": "Gulshan",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Quick delivery and easy exchange when I needed a different size.",
+                                                    "name": "Lamia C.",
+                                                    "role": "Dhanmondi",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Good quality for the price. The sneakers are my daily pair now.",
+                                                    "name": "Sabbir M.",
+                                                    "role": "Chattogram",
+                                                    "rating": 4
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "blog_posts",
+                                    "props": {
+                                        "title": "Style notes",
+                                        "subtitle": null,
+                                        "config": {
+                                            "limit": 3,
+                                            "view_all_url": "/blog"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "16px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 18
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 44,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 50
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search shirts, shoes, bags…",
+                                        "button_label": "Search"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "শার্ট, জুতা, ব্যাগ খুঁজুন…",
+                                            "button_label": "খুঁজুন"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": true
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": true
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "6px",
+                                    "bottom": "6px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:primary"
+                            },
+                            "color": "theme:primary_foreground"
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 85
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 15
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "select"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "48px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "32px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "32px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 28,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_17",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "About the shop",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "দোকান সম্পর্কে"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_18",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Well-made everyday clothes, shoes and accessories at fair prices, online and in store.</p>"
+                                    }
+                                },
+                                {
+                                    "id": "e_19",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 20,
+                                        "style": "square",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 22,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_20",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Information",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "তথ্য"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_21",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 22,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_22",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Customer care",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "গ্রাহক সেবা"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_23",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p><a href=\"/pages/faq\">Help and FAQ</a><br><a href=\"/account/orders\">Track your order</a><br><a href=\"/pages/contact\">Contact us</a></p>"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 28,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_24",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Contact",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "যোগাযোগ"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_25",
+                                    "type": "contact_block",
+                                    "props": {
+                                        "show_phone": true,
+                                        "show_email": true,
+                                        "show_address": true,
+                                        "layout": "stacked"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_28",
+                                    "type": "divider",
+                                    "props": {
+                                        "line": "solid",
+                                        "thickness": 1,
+                                        "width": 100,
+                                        "color": "theme:border",
+                                        "align": "center"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "24px"
+                                }
+                            },
+                            "layout": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 60,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_26",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 40,
+                                "mobile": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                },
+                                "mobile": {
+                                    "layout": {
+                                        "justify": "start"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_27",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 24
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_24",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_29",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "background": "#f3f4f6",
+                                            "items": [
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Free delivery",
+                                                    "text": "On larger orders"
+                                                },
+                                                {
+                                                    "icon": "rotate-ccw",
+                                                    "title": "7-day exchange",
+                                                    "text": "Unworn, with tags"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Cash on delivery",
+                                                    "text": "Or bank transfer"
+                                                }
+                                            ]
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

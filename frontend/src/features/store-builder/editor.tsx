@@ -59,6 +59,9 @@ import { SiteStylesDrawer } from './site-styles'
 import { useSiteStyles } from './use-site-styles'
 import { Toolbar } from './toolbar'
 import { findNode, setColumnPreset, setNode, type DropTarget } from './tree'
+import { SaveTemplateDialog } from './templates/save-template-dialog'
+import { TemplatesPanel } from './templates/templates-panel'
+import { useTemplateInserter } from './templates/use-insert-template'
 import type { Column, InnerRowElement, Section } from '@/storefront/builder/types'
 import { usePreviewData } from './use-preview-data'
 
@@ -105,6 +108,7 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   const queryClient = useQueryClient()
   const canvas = useRef<CanvasHandle | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [saveTemplateId, setSaveTemplateId] = useState<string | null>(null)
 
   const autosave = useMemo(
     () =>
@@ -123,7 +127,7 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   const documentKind = useEditor((s) => s.document.kind)
   const documentKey = useEditor((s) => s.document.key)
   const ui = useMemo<EditorUi>(
-    () => ({ registry, canvas, requestDelete: setDeleteId, canCustomHtml, context: elementContext({ kind: documentKind, key: documentKey }) }),
+    () => ({ registry, canvas, requestDelete: setDeleteId, canCustomHtml, context: elementContext({ kind: documentKind, key: documentKey }), requestSaveTemplate: setSaveTemplateId }),
     [registry, canCustomHtml, documentKind, documentKey],
   )
 
@@ -133,6 +137,7 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
       <TooltipProvider delayDuration={300}>
         <EditorLayout autosave={autosave} canPublish={canPublish} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
         <DeleteConfirm id={deleteId} onClose={() => setDeleteId(null)} />
+        <SaveTemplate id={saveTemplateId} onClose={() => setSaveTemplateId(null)} />
       </TooltipProvider>
     </EditorUiContext>
   )
@@ -157,6 +162,15 @@ function DeleteConfirm({ id, onClose }: { id: string | null; onClose: () => void
       }}
     />
   )
+}
+
+/** Save as template (B5) for the section `id` of the draft as it is now. */
+function SaveTemplate({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const content = useEditor((s) => s.content)
+  const { context = 'page' } = useEditorUi()
+  const info = findNode(content, id)
+  const section = info?.kind === 'section' ? (info.node as Section) : null
+  return <SaveTemplateDialog section={section} context={context} onClose={onClose} />
 }
 
 type LayoutProps = {
@@ -195,7 +209,8 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const context = elementContext(documentInfo)
   const surroundings = documentInfo.kind === 'zone' ? (documentInfo.key as 'zone:listing.top') : documentInfo.kind === 'header' || documentInfo.kind === 'footer' ? documentInfo.kind : 'page'
 
-  const [tab, setTab] = useState<'add' | 'layers'>('add')
+  const [tab, setTab] = useState<'add' | 'layers' | 'templates'>('add')
+  const templates = useTemplateInserter()
   const [publishOpen, setPublishOpen] = useState(false)
   const [publishPending, setPublishPending] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
@@ -500,14 +515,17 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     const target = canvasDrop?.target ?? layerDrop?.target ?? null
     resetDrag()
     if (!item || !target) return
-    if (item.kind === 'new') void commands.insert(item.type, target)
+    if (item.kind === 'template') {
+      // Templates are whole sections: they only go between sections.
+      if (target.kind === 'new-section') void templates.insert({ id: item.id, name: item.name }, target.index)
+    } else if (item.kind === 'new') void commands.insert(item.type, target)
     else {
       commands.move(item.id, target)
       commands.reveal(item.id)
     }
   }
 
-  const draggedLabel = dragged ? (dragged.kind === 'new' ? (registry.types.find((t) => t.type === dragged.type)?.label ?? dragged.type) : (() => {
+  const draggedLabel = dragged ? (dragged.kind === 'template' ? dragged.name : dragged.kind === 'new' ? (registry.types.find((t) => t.type === dragged.type)?.label ?? dragged.type) : (() => {
     const info = findNode(content, dragged.id)
     return info ? nodeLabel(info.node, registry) : ''
   })()) : ''
@@ -542,17 +560,21 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
           onShowProblem={showProblem}
         />
         <div className="flex min-h-0 flex-1">
-          <nav aria-label="Add elements and page layers" className="flex w-72 shrink-0 flex-col border-r bg-background">
-            <Tabs value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers')} className="flex min-h-0 flex-1 flex-col gap-0">
-              <TabsList className="m-2 grid w-auto grid-cols-2">
+          <nav aria-label="Add elements, page layers and templates" className="flex w-72 shrink-0 flex-col border-r bg-background">
+            <Tabs value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
+              <TabsList className="m-2 grid w-auto grid-cols-3">
                 <TabsTrigger value="add">Add</TabsTrigger>
                 <TabsTrigger value="layers">Layers</TabsTrigger>
+                <TabsTrigger value="templates">Templates</TabsTrigger>
               </TabsList>
               <TabsContent value="add" className="flex min-h-0 flex-1 flex-col">
                 <AddPanel registry={registry} context={context} canCustomHtml={canCustomHtml} />
               </TabsContent>
               <TabsContent value="layers" className="flex min-h-0 flex-1 flex-col">
                 <LayersPanel indicator={layerDrop?.indicator ?? null} />
+              </TabsContent>
+              <TabsContent value="templates" className="flex min-h-0 flex-1 flex-col">
+                <TemplatesPanel context={context} currentPreset={themeSettings?.preset ?? null} inserter={templates} enabled={tab === 'templates'} />
               </TabsContent>
             </Tabs>
           </nav>

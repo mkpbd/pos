@@ -1,0 +1,185 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "layout": {
+                        "gap": "32px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 33.33,
+                        "tablet": 33.33,
+                        "mobile": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "icon",
+                            "props": {
+                                "name": "truck",
+                                "size": 40,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Quick delivery",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "দ্রুত ডেলিভারি"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Most orders arrive within two days, with tracking from the moment they ship.</p>"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 33.33,
+                        "tablet": 33.33,
+                        "mobile": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "icon",
+                            "props": {
+                                "name": "shield-check",
+                                "size": 40,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "heading",
+                            "props": {
+                                "text": "Quality checked",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "মান যাচাই করা"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_6",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Every item is checked by hand before it is packed.</p>"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 33.33,
+                        "tablet": 33.33,
+                        "mobile": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_7",
+                            "type": "icon",
+                            "props": {
+                                "name": "headset",
+                                "size": 40,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_8",
+                            "type": "heading",
+                            "props": {
+                                "text": "Real people",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "সত্যিকারের মানুষ"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_9",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Questions are answered by our own team, not a script.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

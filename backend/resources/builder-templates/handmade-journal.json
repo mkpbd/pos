@@ -1,0 +1,43 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "blog_posts",
+                            "props": {
+                                "title": "Journal",
+                                "subtitle": "Notes from the studio",
+                                "config": {
+                                    "category_id": null,
+                                    "limit": 3,
+                                    "view_all_url": "/blog"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "জার্নাল",
+                                    "subtitle": "স্টুডিও থেকে কিছু কথা"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

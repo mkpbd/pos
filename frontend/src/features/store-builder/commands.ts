@@ -21,6 +21,8 @@ export type EditorUi = {
   canCustomHtml?: boolean
   /** B4: the open document's element context (new elements' setup and defaults). */
   context?: DocumentContext
+  /** B5: opens Save as template for a section (absent: not offered). */
+  requestSaveTemplate?: (sectionId: string) => void
 }
 
 export const EditorUiContext = createContext<EditorUi | null>(null)
@@ -118,7 +120,7 @@ export const CUSTOM_HTML_DENIED = 'Only people allowed to use custom HTML can ad
 
 export function useCommands() {
   const store = useEditorStoreApi()
-  const { registry, canvas, requestDelete, canCustomHtml = true, context } = useEditorUi()
+  const { registry, canvas, requestDelete, canCustomHtml = true, context, requestSaveTemplate } = useEditorUi()
 
   const reveal = useCallback(
     (id: string | null) => {
@@ -206,8 +208,8 @@ export function useCommands() {
   )
 
   return useMemo(
-    () => ({ insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal }),
-    [insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal],
+    () => ({ insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal, requestSaveTemplate }),
+    [insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal, requestSaveTemplate],
   )
 }
 

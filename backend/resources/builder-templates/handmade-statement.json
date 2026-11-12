@@ -1,0 +1,44 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "rich_text",
+                            "props": {
+                                "title": "Fewer things, made with care",
+                                "subtitle": null,
+                                "config": {
+                                    "body_html": "<p>We make in small batches so we can take our time. Every mug, candle and ring passes through our hands before it leaves the studio — <a href=\"/pages/about-us\">read how we work</a>.</p>",
+                                    "alignment": "center",
+                                    "width": "narrow",
+                                    "background": null
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "কম জিনিস, যত্ন করে বানানো",
+                                    "body_html": "<p>আমরা অল্প অল্প করে বানাই, যাতে প্রতিটি জিনিসে সময় দিতে পারি। স্টুডিও ছাড়ার আগে প্রতিটি মগ, মোমবাতি আর আংটি আমাদের হাত ঘুরে যায় — <a href=\"/pages/about-us\">আমরা কীভাবে কাজ করি</a>।</p>"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

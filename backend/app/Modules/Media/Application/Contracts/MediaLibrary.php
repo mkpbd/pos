@@ -30,4 +30,17 @@ interface MediaLibrary
      * Null when unknown, unreadable or larger than $maxBytes.
      */
     public function dataUri(string $id, int $minWidth = 240, int $maxBytes = 524288): ?string;
+
+    /**
+     * B5: adds an image file that ships with the application (a store builder template's photo)
+     * to the current organization's library, with the upload's rules (JPEG, PNG, WebP or GIF, at
+     * most 5 MB and 6000 × 6000 px; otherwise BusinessRuleViolation INVALID_IMAGE) and audit.
+     * The same bytes already in the library are reused (`created` false), so applying a template
+     * again imports nothing.
+     *
+     * @param  string  $path  absolute path of the file
+     * @param  string  $name  the original file name to record
+     * @return array{id: string, created: bool}
+     */
+    public function import(string $path, string $name, ?string $alt): array;
 }

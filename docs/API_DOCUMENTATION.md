@@ -2386,6 +2386,17 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
 | PATCH `/storefront/builder/documents/{id}` | manage | B2. `{title}` (1–160) → document (revision unchanged); audited `storefront.builder_renamed`. Summaries also carry `path` (`/` or `/p/<slug>`) and `preview_url` (or null without a domain). |
 | GET `/store/builder/pages/home`, `/store/builder/pages/{slug}` | public | Published render payload. `404 PAGE_NOT_FOUND`. `?preview=draft` for signed-in staff with `storefront.view` → the draft with `state` on non-live nodes, `no-store`. Otherwise ETag / 304 like `/store/homepage`. |
 
+**Templates and start from demo (B5).** Under `/storefront/builder`:
+
+| Method & path | Permission | Notes |
+|---|---|---|
+| GET `/templates?scope=&preset=&context=&source=` | view | Built-ins (files) plus the organization's saved templates: `[{id, scope, preset, category, name, description, thumbnail_url\|null, allowed_in, requires, source: builtin\|mine, created_at}]`. No content. |
+| POST `/templates/{id}/instantiate` | manage (throttled) | `{context}` → `{template, context, nodes: Section[], imported: {media, banners, banners_reused}}`. Imports photos into the media library (deduplicated), creates or reuses banners, resolves menus. Nothing is written into a document. 422 `TEMPLATE_NOT_ALLOWED`; 404 for an unknown template or another organization's. Audited. |
+| POST `/templates` | manage | `{name ≤ 120, description? ≤ 300, scope: 'section', context, section}` → 201. Errors: 422 `DOCUMENT_INVALID`, `TEMPLATE_LIMIT_REACHED` (100), `TEMPLATE_TOO_LARGE` (256 KB). |
+| DELETE `/templates/{uuid}` | manage | Own templates only → 204 |
+| POST `/start-from-demo/{vegan\|handmade\|classic}` | manage | `{include?: {theme, home, header, footer, listing_top}}` → `{preset, documents, theme, imported}`. **Drafts only**; published versions are kept. Audited. |
+| POST `/publish-all` | manage + publish | `{documents: uuid[] ≤ 50, theme?, note?}` → one transaction. Errors: 422 `DOCUMENTS_NOT_FOUND`, `NOTHING_TO_PUBLISH`. |
+
 **Content pages, header, footer, zones and more elements (B4).**
 - **Kinds and keys:**
   - `POST /storefront/builder/documents` also takes `kind` `header` (key `header`), `footer` (`footer`), `zone` (`zone:listing.top`, `zone:listing.bottom`, `zone:product.after`) and `page` with `cms:<cms_page_uuid>`.

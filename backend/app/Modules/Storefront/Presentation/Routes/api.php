@@ -3,6 +3,7 @@
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
@@ -88,6 +89,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::get('documents/{document}/render', [BuilderDocumentController::class, 'render'])->whereUuid('document');
         // B2: the editor canvas — the store bootstrap of the staff member's own organization.
         Route::get('canvas-context', [BuilderDocumentController::class, 'canvasContext']);
+        // B5: built-in and own templates (no content).
+        Route::get('templates', [BuilderTemplateController::class, 'index']);
     });
 
     Route::middleware('can:storefront.manage')->group(function () {
@@ -101,5 +104,14 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
             ->whereUuid(['document', 'version'])->scopeBindings();
         Route::delete('documents/{document}', [BuilderDocumentController::class, 'destroy'])->whereUuid('document');
+        // B5: templates — apply (built-in id or own uuid), save a section, delete an own one.
+        Route::post('templates/{template}/instantiate', [BuilderTemplateController::class, 'instantiate'])
+            ->where('template', '[A-Za-z0-9-]{2,80}')->middleware('throttle:builder-templates');
+        Route::post('templates', [BuilderTemplateController::class, 'store']);
+        Route::delete('templates/{template}', [BuilderTemplateController::class, 'destroy'])->whereUuid('template');
+        // B5: a demo look into drafts only (no storefront.publish needed), then publish them together.
+        Route::post('start-from-demo/{preset}', [BuilderTemplateController::class, 'startFromDemo'])
+            ->whereIn('preset', ['vegan', 'handmade', 'classic'])->middleware('throttle:builder-templates');
+        Route::post('publish-all', [BuilderTemplateController::class, 'publishAll'])->middleware('can:storefront.publish');
     });
 });

@@ -1,0 +1,82 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "2-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "On the wheel",
+                                            "kicker": "Process",
+                                            "title": "Thrown, trimmed and glazed by hand",
+                                            "subtitle": "See how a mug is made.",
+                                            "button_label": "Shop ceramics",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "handmade/banner-artisan.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "প্রক্রিয়া",
+                                                    "title": "হাতে গড়া, হাতে রাঙানো",
+                                                    "button_label": "সিরামিক কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "The workshop",
+                                            "kicker": "Our studio",
+                                            "title": "A small workshop, a few makers",
+                                            "subtitle": "Come and see where it all happens.",
+                                            "button_label": "Our story",
+                                            "link_url": "/pages/about-us",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "handmade/banner-meet.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "আমাদের স্টুডিও",
+                                                    "title": "ছোট্ট কর্মশালা, কয়েকজন কারিগর",
+                                                    "button_label": "আমাদের গল্প"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

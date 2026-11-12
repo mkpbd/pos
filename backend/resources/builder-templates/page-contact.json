@@ -1,0 +1,181 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Contact us",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "যোগাযোগ করুন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Questions about an order, a product or a delivery? Send us a message and we will reply within one working day.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "24px",
+                            "bottom": "72px"
+                        }
+                    },
+                    "layout": {
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "16px",
+                            "bottom": "48px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 40,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "heading",
+                            "props": {
+                                "text": "Get in touch",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "যোগাযোগের ঠিকানা"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "contact_block",
+                            "props": {
+                                "show_phone": true,
+                                "show_email": true,
+                                "show_address": true,
+                                "layout": "stacked"
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "heading",
+                            "props": {
+                                "text": "Follow us",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আমাদের অনুসরণ করুন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_6",
+                            "type": "social_icons",
+                            "props": {
+                                "size": 24,
+                                "style": "circle",
+                                "color": null
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 60,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_7",
+                            "type": "contact_form",
+                            "props": {
+                                "title": "Send us a message",
+                                "show_details": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আমাদের বার্তা পাঠান"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

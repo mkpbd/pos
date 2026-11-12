@@ -687,3 +687,126 @@ test('creates the listing-top area with a call to action', async ({ page }) => {
   expect(area.y + area.height).toBeLessThanOrEqual(sample.y + 1)
   await expect.poll(() => savedTypes(b.puts[[...b.docs.values()][0]!.id]?.at(-1)), { timeout: 6000 }).toContain('cta')
 })
+
+/* ------------------------------------------------------------------------------------------------
+ * B5: templates and "start from a demo look"
+ * ---------------------------------------------------------------------------------------------- */
+
+const TEMPLATES = [
+  { id: 'vegan-hero-fresh', scope: 'section', preset: 'vegan', category: 'hero', name: 'Fresh hero', description: 'A big welcome with a call to action', thumbnail_url: null, allowed_in: PAGES, source: 'builtin' },
+  { id: 'neutral-cta', scope: 'section', preset: null, category: 'cta', name: 'Call-to-action band', description: 'A short message and a button', thumbnail_url: null, allowed_in: PAGES, source: 'builtin' },
+  { id: 'header-simple', scope: 'section', preset: null, category: 'header', name: 'Simple header', description: null, thumbnail_url: null, allowed_in: ['header'], source: 'builtin' },
+]
+const SITE_TEMPLATES = [
+  { id: 'site-vegan', scope: 'site', preset: 'vegan', category: null, name: 'Vegan Market', description: 'Fresh greens and soft colours.', thumbnail_url: null, allowed_in: ['page'], source: 'builtin' },
+  { id: 'site-handmade', scope: 'site', preset: 'handmade', category: null, name: 'Handmade Atelier', description: 'Warm, crafted and premium.', thumbnail_url: null, allowed_in: ['page'], source: 'builtin' },
+  { id: 'site-classic', scope: 'site', preset: 'classic', category: null, name: 'Classic Shop', description: 'A busy, deal-led department store.', thumbnail_url: null, allowed_in: ['page'], source: 'builtin' },
+]
+
+/** Instantiated template nodes (fresh ids, as the server gives them). */
+const templateNodes = (id: string) =>
+  id === 'neutral-cta'
+    ? [section('s_tpl_cta', [[heading('e_tpl_cta', 'Ready for the weekend?')]])]
+    : [section('s_tpl_hero', [[heading('e_tpl_hero', 'Fresh from our farm', 1), { id: 'e_tpl_text', type: 'text', props: { html: '<p>Boxes packed every morning.</p>' }, ...nodeCommon }]])]
+
+async function mockTemplates(page: Page) {
+  const instantiated: { id: string; body: unknown }[] = []
+  await page.route('**/api/v1/storefront/builder/templates*', (route) => {
+    const scope = new URL(route.request().url()).searchParams.get('scope')
+    return route.fulfill({ json: envelope(scope === 'site' ? SITE_TEMPLATES : TEMPLATES) })
+  })
+  await page.route('**/api/v1/storefront/builder/templates/*/instantiate', (route) => {
+    const id = new URL(route.request().url()).pathname.split('/templates/')[1]!.split('/')[0]!
+    instantiated.push({ id, body: route.request().postDataJSON() })
+    return route.fulfill({ json: envelope({ context: 'page', nodes: templateNodes(id), imported: { media: id === 'vegan-hero-fresh' ? 2 : 0, banners: 0, banners_reused: 0 } }) })
+  })
+  return instantiated
+}
+
+test('inserts a template from the Templates tab and drags another onto the canvas; the autosave carries both', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  const instantiated = await mockTemplates(page)
+  await openEditor(page, b)
+  const frame = canvas(page)
+
+  await page.getByRole('tab', { name: 'Templates' }).click()
+  const panel = page.getByTestId('templates-panel')
+  await expect(panel.getByRole('button', { name: 'Insert Fresh hero' })).toBeVisible()
+  // Only templates for pages; no picture yet → the generated placeholder.
+  await expect(panel.getByText('Simple header')).toHaveCount(0)
+  await expect(panel.getByTestId('template-vegan-hero-fresh').getByTestId('template-placeholder')).toContainText('Fresh hero')
+
+  await panel.getByRole('button', { name: 'Insert Fresh hero' }).click()
+  await expect(frame.getByRole('heading', { name: 'Fresh from our farm' })).toBeVisible()
+  await expect(page.getByText('“Fresh hero” added. 2 images were added to your media library.')).toBeVisible()
+  expect(instantiated[0]).toEqual({ id: 'vegan-hero-fresh', body: { context: 'page' } })
+
+  // Drag the CTA template's picture to the top of the features section.
+  const source = panel.getByTestId('template-neutral-cta').getByTestId('template-placeholder')
+  const target = (await frame.locator('[data-b="s_features"]').boundingBox())!
+  const from = (await source.boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 40, from.y + 10, { steps: 4 })
+  await page.mouse.move(target.x + target.width / 2, target.y + 6, { steps: 8 })
+  await expect(page.getByTestId('drop-indicator')).toBeVisible()
+  await page.mouse.up()
+  await expect(frame.getByRole('heading', { name: 'Ready for the weekend?' })).toBeVisible()
+
+  await expect.poll(() => sectionOrder(b), { timeout: 6000 }).toContain('s_tpl_cta')
+  const order = sectionOrder(b)
+  expect(order).toContain('s_tpl_hero')
+  expect(order.indexOf('s_features') - order.indexOf('s_tpl_cta')).toBe(1)
+  expect(savedTypes(b.puts.at(-1)!.content)).toEqual(expect.arrayContaining(['heading', 'text']))
+
+  // One undo removes the dragged template only.
+  await toolbar(page).getByRole('button', { name: 'Undo' }).click()
+  await expect(frame.getByRole('heading', { name: 'Ready for the weekend?' })).toHaveCount(0)
+  await expect(frame.getByRole('heading', { name: 'Fresh from our farm' })).toBeVisible()
+})
+
+test('starts from a demo look: drafts, review with previews, publish all', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await mockTemplates(page)
+  const starts: unknown[] = []
+  const publishAll: unknown[] = []
+  const drafts = [
+    { ...summary(b), title: 'Home' },
+    { ...summary(b), id: 'd-header', kind: 'header', key: 'header', title: 'Header', path: null, preview_url: null },
+    { ...summary(b), id: 'd-footer', kind: 'footer', key: 'footer', title: 'Footer', path: null, preview_url: null },
+    { ...summary(b), id: 'd-zone', kind: 'zone', key: 'zone:listing.top', title: 'Listing top', path: null, preview_url: 'http://shop.test/shop?preview=draft' },
+  ]
+  await page.route('**/api/v1/storefront/builder/start-from-demo/*', (route) => {
+    starts.push({ url: new URL(route.request().url()).pathname, body: route.request().postDataJSON() })
+    return route.fulfill({ json: envelope({ preset: 'handmade', documents: drafts, theme: { draft_revision: 3, has_unpublished_changes: true, preset: 'handmade', published: null, preview_url: 'http://shop.test/?preview=draft' }, imported: { media: 6, banners: 2, banners_reused: 0 } }) })
+  })
+  await page.route('**/api/v1/storefront/builder/publish-all', (route) => {
+    publishAll.push(route.request().postDataJSON())
+    return route.fulfill({ json: envelope({ documents: drafts, theme: null }) })
+  })
+
+  await page.goto('/admin/storefront/pages')
+  const card = page.getByTestId('demo-looks')
+  await expect(card.getByRole('button', { name: /^Use the .* look$/ })).toHaveCount(3)
+  await card.getByRole('button', { name: 'Use the Handmade Atelier look' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Use the Handmade Atelier look?' })
+  await expect(dialog).toContainText('Your live store doesn’t change until you publish')
+  // The home page has unpublished changes: a warning that its draft will be replaced.
+  await expect(dialog.getByTestId('demo-warning-home')).toBeVisible()
+  await dialog.getByRole('checkbox', { name: 'Shop pages' }).click()
+  await dialog.getByRole('button', { name: 'Create drafts' }).click()
+  await expect.poll(() => starts.length).toBe(1)
+  expect(starts[0]).toEqual({ url: '/api/v1/storefront/builder/start-from-demo/handmade', body: { include: { theme: true, home: true, header: true, footer: true, listing_top: false } } })
+
+  const review = page.getByTestId('demo-review')
+  await expect(review.getByRole('heading', { name: 'Review your Handmade Atelier look' })).toBeVisible()
+  await expect(review.getByRole('link', { name: 'Preview Home (opens in a new tab)' })).toHaveAttribute('href', 'http://shop.test/?preview=draft')
+  await expect(review.getByRole('link', { name: 'Edit Footer' })).toHaveAttribute('href', '/admin/storefront/builder/d-footer')
+  await review.getByRole('button', { name: 'Publish all' }).click()
+  await page.getByRole('alertdialog', { name: 'Publish your new look?' }).getByRole('button', { name: 'Publish all' }).click()
+  await expect(review.getByRole('heading', { name: 'The Handmade Atelier look is live' })).toBeVisible()
+  expect(publishAll).toEqual([{ documents: [DOC_ID, 'd-header', 'd-footer', 'd-zone'], theme: true, note: 'Handmade Atelier demo look' }])
+})

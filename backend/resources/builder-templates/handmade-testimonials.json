@@ -1,0 +1,64 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "testimonials",
+                            "props": {
+                                "title": "Kind words",
+                                "subtitle": "From people who live with our pieces",
+                                "config": {
+                                    "background": null,
+                                    "items": [
+                                        {
+                                            "quote": "You can feel the hand that made it. My morning coffee tastes better from this mug.",
+                                            "name": "Ayesha R.",
+                                            "role": "Collector",
+                                            "rating": 5,
+                                            "avatar_media_id": null
+                                        },
+                                        {
+                                            "quote": "Wrapped like a present and arrived without a scratch. I ordered a second set the next week.",
+                                            "name": "Kamal H.",
+                                            "role": "Gift buyer",
+                                            "rating": 5,
+                                            "avatar_media_id": null
+                                        },
+                                        {
+                                            "quote": "The candle burns evenly and smells of real beeswax, not perfume.",
+                                            "name": "Sumaiya T.",
+                                            "role": "Regular customer",
+                                            "rating": 4,
+                                            "avatar_media_id": null
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "কিছু ভালো কথা",
+                                    "subtitle": "যাঁরা আমাদের জিনিস ব্যবহার করেন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

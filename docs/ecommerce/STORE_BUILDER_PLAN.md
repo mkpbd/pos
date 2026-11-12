@@ -1,6 +1,6 @@
 # Visual Store Builder — analysis and architecture (B1–B5)
 
-Status: **approved 2026-11-11** (decisions in §10). **B1–B4 done** (engine, editor, design controls, pages / header / footer / zones; see §11); B5 (templates, start from demo, verification) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
+Status: **approved 2026-11-11** (decisions in §10). **B1–B5 done** — delivered; see §11 and the [delivery report](STORE_BUILDER_REPORT.md). Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
 
 ## 1. What already exists (reused)
 
@@ -44,7 +44,7 @@ builder_versions                 (immutable snapshots)
   note varchar(160) null, published_at timestamptz null, created_by uuid, created_at
   UNIQUE (document_id, number)
 
-builder_templates                (section / page templates; org_id NULL = built-in)
+builder_templates                (organizations' own saved section templates; built-ins ship as files, see §11 B5)
   id uuid PK, organization_id uuid null, scope varchar(20) section|page|site,
   preset varchar(20) null (vegan|handmade|classic|…), name, thumbnail_media_id null,
   content jsonb, timestamps
@@ -294,3 +294,21 @@ Original questions:
 - **Open:**
   - Deleting a CMS page leaves its builder document behind (the list shows it without a page).
   - The divider's colour field in the Content tab still uses the simple select.
+
+### As built — B5 (2026-11-12)
+
+- **Built-in templates are files** in `backend/resources/builder-templates/`: a `manifest.json` plus one JSON file per template. There are 46: 38 sections (vegan 10, handmade 10, classic 9, neutral 9), 5 pages (About, Contact, FAQ, Sale landing, New collection) and 3 sites (one per demo look).
+  - `builder_templates` holds only organizations' own saved sections, with description, context and `allowed_in` inside `content` (no migration).
+  - Thumbnails live in `frontend/public/builder-templates/<id>.png` (44). The two brand templates use the generated placeholder, because the demo stores have no brands.
+- **Portable format:**
+  - Images are `{asset}` (from the demo photo set).
+  - Banners are inline `{banner: {…, image: {asset}}}`.
+  - Menus use `menu_ref` (`main`, `footer`, `footer_1..3`); `when_menu` drops a node when that menu is missing.
+  - Catalogue content uses sources only, never ids, so a template never references another organization's data.
+- **Instantiate** converts a template to concrete nodes for the organization:
+  - photos are imported through `MediaLibrary::import()` (deduplicated by checksum);
+  - banners are created through `ManageBanners`, reusing an identical one;
+  - menu refs are resolved;
+  - the result is validated in the target context and returned. Nothing is written into a document; the editor inserts it as one undo step.
+- **Start from demo** writes drafts only: the theme draft gets the preset, and home, header, footer and listing top are created or have their draft replaced (published versions are kept). **Publish all** publishes the chosen drafts and the theme in one transaction.
+- **Editor:** a Templates tab (All / this look / Mine, categories, search, insert by click or drag), Save as template, and a "Start from a demo look" card with a review panel and Publish all.

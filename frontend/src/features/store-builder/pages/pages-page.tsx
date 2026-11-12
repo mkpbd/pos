@@ -14,6 +14,7 @@ import { StorefrontHeader } from '@/features/storefront/components/storefront-he
 import { ApiError } from '@/lib/api/client'
 import { documentPath, useCreateDocumentMutation, useDeleteDocumentMutation, useDocumentsQuery, type DocumentSummary } from '../api'
 import { CmsPagesCard, SitePartsCard, ZonesCard, type RemoveRequest } from './builder-parts'
+import { DemoLooksCard } from './demo-looks'
 import { ListingColumnsCard } from './listing-columns-card'
 import { lastEdited, slugify, slugProblem } from './page-helpers'
 import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
@@ -24,7 +25,8 @@ import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
  *  - Site parts: the store's header and footer;
  *  - Shop and product pages: the areas around the product grid / below the product details, and
  *    the products per row of the listings (theme `layout.listing_columns`).
- * Status, creating, editing and deleting (back to the classic rendering) for each.
+ * Status, creating, editing and deleting (back to the classic rendering) for each. B5: above the
+ * groups, "Start from a demo look" (drafts → review → publish all).
  */
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
@@ -236,6 +238,7 @@ export function StoreBuilderPagesPage() {
         <ErrorState title="Could not load your pages" error={documents.error} onRetry={() => void documents.refetch()} />
       ) : (
         <>
+          <DemoLooksCard documents={all} canManage={canManage} canPublish={canPublish} />
           <section aria-labelledby="group-pages" className="flex flex-col gap-4">
             <GroupHeading id="group-pages" title="Pages" description="Your front page, content pages and landing pages." />
             <HomeCard home={home} canManage={canManage} />

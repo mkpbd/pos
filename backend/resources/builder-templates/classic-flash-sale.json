@@ -1,0 +1,43 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hot_deals",
+                            "props": {
+                                "title": "Flash sale",
+                                "subtitle": "Ends soon — while stocks last",
+                                "config": {
+                                    "promotion_id": null,
+                                    "limit": 8,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ফ্ল্যাশ সেল",
+                                    "subtitle": "শীঘ্রই শেষ — স্টক থাকা পর্যন্ত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

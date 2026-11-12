@@ -1,0 +1,159 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "layout": {
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 35,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Questions? We have answers.",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "প্রশ্ন আছে? উত্তর আছে।"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>The things customers ask us most. Anything else, just get in touch.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "button",
+                            "props": {
+                                "label": "See all questions",
+                                "link": {
+                                    "url": "/pages/faq"
+                                },
+                                "variant": "outline",
+                                "size": "md",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "সব প্রশ্ন দেখুন"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 65,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "heading",
+                            "props": {
+                                "text": "How long does delivery take?",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ডেলিভারিতে কত সময় লাগে?"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>One to two days in the city and three to five days elsewhere. You get a tracking link as soon as your order ships.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_6",
+                            "type": "heading",
+                            "props": {
+                                "text": "Can I pay on delivery?",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ডেলিভারির সময় কি টাকা দেওয়া যায়?"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_7",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Yes. Cash on delivery is available on every order, and you can also pay by bank transfer.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_8",
+                            "type": "heading",
+                            "props": {
+                                "text": "What if something is not right?",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "কোনো সমস্যা হলে কী করব?"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_9",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Tell us within a few days of delivery and we will exchange it or refund you.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

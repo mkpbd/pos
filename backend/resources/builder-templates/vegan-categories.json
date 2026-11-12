@@ -1,0 +1,42 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "category_strip",
+                            "props": {
+                                "title": "shop by aisle",
+                                "subtitle": "From the farm, the pantry and the bathroom shelf",
+                                "config": {
+                                    "source": "top_level",
+                                    "limit": 8
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "বিভাগ অনুযায়ী কিনুন",
+                                    "subtitle": "খামার, রান্নাঘর আর প্রতিদিনের যত্ন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

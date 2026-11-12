@@ -1,0 +1,98 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "32px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 45,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Stay in the loop",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "খবর পেতে থাকুন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>New arrivals, offers and the occasional story. No spam, unsubscribe any time.</p>"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 55,
+                        "tablet": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "newsletter_form",
+                            "props": {
+                                "title": "",
+                                "text": "",
+                                "button_label": "Subscribe",
+                                "layout": "inline"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "button_label": "সাবস্ক্রাইব"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

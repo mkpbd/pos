@@ -1,0 +1,106 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 7,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Studio collection",
+                                            "kicker": "New from the studio",
+                                            "title": "Slow made, for everyday rooms",
+                                            "subtitle": "Vases, bowls and candles shaped by hand in small batches.",
+                                            "button_label": "Shop the collection",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "handmade/banner-tile-1.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "স্টুডিও থেকে নতুন",
+                                                    "title": "ধীরে বানানো, প্রতিদিনের ঘরের জন্য",
+                                                    "button_label": "সংগ্রহ দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Green corners",
+                                            "kicker": "Green corners",
+                                            "title": "Plants that feel at home",
+                                            "subtitle": "Easy-care plants in clay pots we throw ourselves.",
+                                            "button_label": "Shop plants",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "handmade/banner-tile-2.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "সবুজ কোণ",
+                                                    "title": "ঘরে মানিয়ে যাওয়া গাছ",
+                                                    "button_label": "গাছ কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Small-batch jewellery",
+                                            "kicker": "Small batch",
+                                            "title": "Pieces to keep and pass on",
+                                            "subtitle": "Silver, brass and clay, finished by hand.",
+                                            "button_label": "Shop jewellery",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "handmade/banner-tile-3.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "অল্প সংখ্যায়",
+                                                    "title": "রেখে দেওয়ার মতো গয়না",
+                                                    "button_label": "গয়না কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

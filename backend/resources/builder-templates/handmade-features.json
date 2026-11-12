@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "background": null,
+                                    "items": [
+                                        {
+                                            "icon": "heart",
+                                            "title": "Made by hand",
+                                            "text": "In our own small studio"
+                                        },
+                                        {
+                                            "icon": "gift",
+                                            "title": "Gift wrapping",
+                                            "text": "Free on every order"
+                                        },
+                                        {
+                                            "icon": "truck",
+                                            "title": "Careful delivery",
+                                            "text": "Packed to arrive in one piece"
+                                        },
+                                        {
+                                            "icon": "headset",
+                                            "title": "Talk to the maker",
+                                            "text": "We answer every message"
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

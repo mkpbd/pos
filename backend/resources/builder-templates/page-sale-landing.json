@@ -1,0 +1,246 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "88px",
+                            "bottom": "88px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "theme:primary",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "theme:accent",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "cta",
+                            "props": {
+                                "title": "The sale is on",
+                                "text": "Up to 30 % off across the shop, for a limited time.",
+                                "primary": {
+                                    "label": "Shop everything on sale",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "secondary": null,
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সেল চলছে",
+                                    "text": "সীমিত সময়ের জন্য পুরো দোকানে ৩০ % পর্যন্ত ছাড়।",
+                                    "primary.label": "ছাড়ের সব পণ্য"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "hot_deals",
+                            "props": {
+                                "title": "Flash deals",
+                                "subtitle": "Until the timer runs out",
+                                "config": {
+                                    "promotion_id": null,
+                                    "limit": 8,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ফ্ল্যাশ অফার",
+                                    "subtitle": "টাইমার শেষ হওয়া পর্যন্ত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "Everything on sale",
+                                "subtitle": null,
+                                "config": {
+                                    "source": "on_sale",
+                                    "category_id": null,
+                                    "limit": 12,
+                                    "columns": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ছাড়ের সব পণ্য"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_4",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "background": null,
+                                    "items": [
+                                        {
+                                            "icon": "badge-percent",
+                                            "title": "Real discounts",
+                                            "text": "Prices cut, not inflated first"
+                                        },
+                                        {
+                                            "icon": "truck",
+                                            "title": "Fast delivery",
+                                            "text": "Across the country"
+                                        },
+                                        {
+                                            "icon": "rotate-ccw",
+                                            "title": "Easy exchange",
+                                            "text": "Even on sale items"
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_5",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_5",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_5",
+                            "type": "newsletter",
+                            "props": {
+                                "title": "Be first to the next sale",
+                                "subtitle": null,
+                                "config": {
+                                    "text": "Sale dates and early access, straight to your inbox.",
+                                    "button_label": "Subscribe",
+                                    "image_media_id": null,
+                                    "background": "#111111",
+                                    "foreground": "#ffffff"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "পরের সেলের খবর সবার আগে",
+                                    "button_label": "সাবস্ক্রাইব"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

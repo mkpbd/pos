@@ -1,0 +1,911 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "handmade"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {},
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "New in decor",
+                                                    "kicker": "New collection",
+                                                    "title": "Made slowly, by hand",
+                                                    "subtitle": "Ceramics, weaving and candles from our studio.",
+                                                    "button_label": "Shop decorations",
+                                                    "link_url": "/category/decorations",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "handmade/banner-tile-1.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Plants",
+                                                    "kicker": "Green corners",
+                                                    "title": "Plants in clay pots",
+                                                    "subtitle": "Easy-care plants, potted by hand.",
+                                                    "button_label": "Shop plants",
+                                                    "link_url": "/category/plants",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "handmade/banner-tile-2.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Jewellery",
+                                                    "kicker": "Small batch",
+                                                    "title": "Jewellery to keep",
+                                                    "subtitle": "Silver, brass and terracotta.",
+                                                    "button_label": "Shop jewellery",
+                                                    "link_url": "/category/jewellery",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "handmade/banner-tile-3.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "heart",
+                                                    "title": "Made by hand",
+                                                    "text": "In our Mirpur studio"
+                                                },
+                                                {
+                                                    "icon": "gift",
+                                                    "title": "Gift wrapping",
+                                                    "text": "Free on every order"
+                                                },
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Careful delivery",
+                                                    "text": "Packed to arrive safely"
+                                                },
+                                                {
+                                                    "icon": "headset",
+                                                    "title": "Talk to the maker",
+                                                    "text": "We answer every message"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "rich_text",
+                                    "props": {
+                                        "title": "Made by hand, made to last",
+                                        "subtitle": null,
+                                        "config": {
+                                            "alignment": "center",
+                                            "body_html": "<p>We make fewer things, more carefully. Every mug, candle and ring in this shop passed through our hands in the studio in Mirpur — <a href=\"/pages/about-us\">read our story</a>.</p>"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Shop by category",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 4
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "product_grid",
+                                    "props": {
+                                        "title": "Editor's pick",
+                                        "subtitle": "Pieces we keep reaching for",
+                                        "config": {
+                                            "source": "featured",
+                                            "limit": 8,
+                                            "columns": 4,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "2-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "The wheel",
+                                                    "kicker": "Process",
+                                                    "title": "Every piece starts on the wheel",
+                                                    "subtitle": "Thrown, trimmed and glazed by two potters.",
+                                                    "button_label": "Shop ceramics",
+                                                    "link_url": "/category/ceramics",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "handmade/banner-artisan.jpg"
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Meet the makers",
+                                                    "kicker": "Our studio",
+                                                    "title": "Meet the makers",
+                                                    "subtitle": "A small workshop in Mirpur.",
+                                                    "button_label": "Our story",
+                                                    "link_url": "/pages/about-us",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "handmade/banner-meet.jpg"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "product_carousel",
+                                    "props": {
+                                        "title": "Seasonal",
+                                        "subtitle": "Reduced for a little while",
+                                        "config": {
+                                            "source": "on_sale",
+                                            "limit": 8,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "blog_posts",
+                                    "props": {
+                                        "title": "Journal",
+                                        "subtitle": "Notes from the studio",
+                                        "config": {
+                                            "limit": 3,
+                                            "view_all_url": "/blog"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "newsletter",
+                                    "props": {
+                                        "title": "Letters from the studio",
+                                        "subtitle": null,
+                                        "config": {
+                                            "text": "New pieces and studio news, once a month.",
+                                            "background": "#3b2a20",
+                                            "foreground": "#f7f1e8"
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "20px",
+                                    "bottom": "12px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 30
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search the studio",
+                                        "button_label": ""
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "স্টুডিওতে খুঁজুন"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 40
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 56,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 12
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "links"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 6
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 6
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 6
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": false
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "0px",
+                                    "bottom": "12px"
+                                }
+                            }
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "divider",
+                                    "props": {
+                                        "line": "solid",
+                                        "thickness": 1,
+                                        "width": 100,
+                                        "color": "theme:border",
+                                        "align": "center"
+                                    }
+                                },
+                                {
+                                    "id": "e_17",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "48px",
+                                    "bottom": "48px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:accent"
+                            },
+                            "color": "theme:accent_foreground"
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "32px",
+                                    "bottom": "32px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_18",
+                                    "type": "newsletter_form",
+                                    "props": {
+                                        "title": "Letters from the studio",
+                                        "text": "New pieces and studio news, once a month.",
+                                        "button_label": "Subscribe",
+                                        "layout": "inline"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "স্টুডিও থেকে চিঠি",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "56px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "40px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "40px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 40,
+                                "tablet": 100,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_19",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 48,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_20",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>A small studio making ceramics, candles and jewellery by hand, in small batches.</p>"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_21",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Information",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "তথ্য"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_22",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_23",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Visit the studio",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "স্টুডিওতে আসুন"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_24",
+                                    "type": "contact_block",
+                                    "props": {
+                                        "show_phone": true,
+                                        "show_email": true,
+                                        "show_address": true,
+                                        "layout": "stacked"
+                                    }
+                                },
+                                {
+                                    "id": "e_25",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 20,
+                                        "style": "plain",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "24px"
+                                }
+                            },
+                            "layout": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 60,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_26",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 40,
+                                "mobile": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                },
+                                "mobile": {
+                                    "layout": {
+                                        "justify": "start"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_27",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 20
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "16px"
+                                },
+                                "margin": {
+                                    "bottom": "16px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_28",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p><em>Every piece is made by hand, so yours may differ a little from the photo — that is part of its charm.</em></p>"
+                                    },
+                                    "style": {
+                                        "base": {
+                                            "typography": {
+                                                "align": "center"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

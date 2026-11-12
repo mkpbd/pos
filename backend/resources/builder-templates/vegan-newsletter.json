@@ -1,0 +1,46 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "newsletter",
+                            "props": {
+                                "title": "fresh picks in your inbox",
+                                "subtitle": null,
+                                "config": {
+                                    "text": "One short e-mail a week with what is in season. Unsubscribe any time.",
+                                    "button_label": "Sign me up",
+                                    "image_media_id": null,
+                                    "background": "#2e7d32",
+                                    "foreground": "#ffffff"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আপনার ইনবক্সে তাজা বাছাই",
+                                    "text": "সপ্তাহে একটি ছোট ই-মেইল, মৌসুমের সেরা পণ্য নিয়ে। যেকোনো সময় বন্ধ করা যায়।",
+                                    "button_label": "সাইন আপ"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

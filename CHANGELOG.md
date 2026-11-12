@@ -21,6 +21,39 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B5 — Visual store builder: templates, start from a demo look, acceptance
+
+Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11). Delivery report: [STORE_BUILDER_REPORT.md](docs/ecommerce/STORE_BUILDER_REPORT.md).
+
+#### Added
+- **46 built-in templates:** 38 sections (vegan, handmade, classic and neutral), 5 pages and 3 full-site looks, all with original copy and Bangla headings and buttons.
+  - They are shipped as files and kept portable: photos come from the demo photo set and are imported into the store's own media library when used (deduplicated); banners are created in the store; products always come from the store's own catalogue.
+  - Each has a thumbnail (44 screenshots plus the generated placeholder).
+- **Editor Templates tab:** filters (All / this look / Mine), categories and search; insert by click or drag, as one undo step. **Save as template** for sections, and deleting your own.
+- **Start from a demo look** (Page builder list): pick Vegan Store, Handmade or Classic Shop and choose the parts.
+  - The theme, home page, header, footer and shop top area become **drafts**.
+  - A review panel offers previews and **Publish all**, which publishes everything in one transaction.
+- API: `GET/POST /storefront/builder/templates`, `POST …/templates/{id}/instantiate`, `DELETE …/templates/{id}`, `POST …/start-from-demo/{preset}`, `POST …/publish-all`; `MediaLibrary::import()`.
+
+#### Acceptance
+- New `e2e/builder-acceptance.spec.ts` (full-stack) walks through the brief's §L criteria on Demo Mart as the client:
+  1. Start from the Classic look; drafts stay private until Publish all.
+  2. Drag a heading in, type it with live preview, duplicate, delete, reorder.
+  3. Gradient background; heading 48 px on computers and 22 px on phones only.
+  4. Publish; shoppers see it.
+  5. Another store gets 404 and sees nothing.
+  6. Restore version 1 and publish; the heading is gone.
+
+  4/4 tests pass. The full criterion-by-criterion evidence is in the delivery report.
+
+#### Tests
+- Backend 891 (PostgreSQL 890 + 1 skip; SQLite 885 + 6 skip; 59 new template / demo / publish-all tests, including every built-in template validated in its contexts and tenant isolation).
+- Vitest 1261. Mocked Playwright 202 passed, 100 skipped.
+- Full-stack: integration 24/24, demo stores 8/8, acceptance 4/4.
+
+#### Docs
+- Bangla manual §17.7 (templates, start from a demo look; screenshots 49–50); API documentation; plan §3 and §11; delivery report.
+
 ### B4 — Visual store builder: content pages, header, footer, shop zones, remaining elements
 
 Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built). With nothing published in the builder, every page renders exactly as before.

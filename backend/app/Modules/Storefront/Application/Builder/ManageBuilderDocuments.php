@@ -36,9 +36,13 @@ class ManageBuilderDocuments
      * (header / footer: today's default layout). A CMS page must exist in the organization
      * (422 CMS_PAGE_NOT_FOUND otherwise — another organization's page included).
      *
+     * B5: `$content` — a draft to start from instead of `from` (start from a demo; validated
+     * here like any draft), recorded as `from` in the audit.
+     *
      * @param  array{kind: string, key: string, title: string, from?: ?string}  $attributes  validated
+     * @param  array<string, mixed>|null  $content
      */
-    public function create(array $attributes): BuilderDocument
+    public function create(array $attributes, ?array $content = null): BuilderDocument
     {
         $key = $attributes['key'];
         $context = BuilderDocumentSchema::contextOf($key);
@@ -48,7 +52,7 @@ class ManageBuilderDocuments
             throw new BusinessRuleViolation('CMS_PAGE_NOT_FOUND', 'This content page does not exist.', ['key' => $key]);
         }
 
-        $content = match ($attributes['from'] ?? 'blank') {
+        $content = $content !== null ? ($this->prepare)($content, $context) : match ($attributes['from'] ?? 'blank') {
             'homepage' => ($this->prepare)($this->importer->document(), $context),
             'cms' => ($this->prepare)($this->cmsImporter->document($page), $context),
             'current' => ($this->prepare)($key === BuilderDocument::HEADER ? $this->siteParts->header() : $this->siteParts->footer(), $context),

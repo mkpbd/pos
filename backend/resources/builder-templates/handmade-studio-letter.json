@@ -1,0 +1,46 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "newsletter",
+                            "props": {
+                                "title": "Letters from the studio",
+                                "subtitle": null,
+                                "config": {
+                                    "text": "New pieces, studio news and the occasional seconds sale, once a month.",
+                                    "button_label": "Subscribe",
+                                    "image_media_id": null,
+                                    "background": "#3b2a20",
+                                    "foreground": "#f7f1e8"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "স্টুডিও থেকে চিঠি",
+                                    "text": "নতুন জিনিস, স্টুডিওর খবর — মাসে একবার।",
+                                    "button_label": "সাবস্ক্রাইব"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

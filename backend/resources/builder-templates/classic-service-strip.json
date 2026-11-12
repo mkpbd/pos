@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "background": "#f3f4f6",
+                                    "items": [
+                                        {
+                                            "icon": "truck",
+                                            "title": "Fast delivery",
+                                            "text": "Nationwide by courier"
+                                        },
+                                        {
+                                            "icon": "rotate-ccw",
+                                            "title": "7-day exchange",
+                                            "text": "Unworn, with tags"
+                                        },
+                                        {
+                                            "icon": "credit-card",
+                                            "title": "Pay your way",
+                                            "text": "Cash on delivery or transfer"
+                                        },
+                                        {
+                                            "icon": "store",
+                                            "title": "Visit the shop",
+                                            "text": "Try it on in person"
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,86 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 5,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Season sale",
+                                            "kicker": "UP TO 30 % OFF",
+                                            "title": "The big season sale",
+                                            "subtitle": "Shirts, dresses, sneakers and bags at their best prices of the year.",
+                                            "button_label": "Shop the sale",
+                                            "link_url": "/shop",
+                                            "secondary_button_label": "New arrivals",
+                                            "secondary_link_url": "/shop?sort=newest",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "classic/banner-sale-1.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "৩০ % পর্যন্ত ছাড়",
+                                                    "title": "মৌসুমের বড় সেল",
+                                                    "button_label": "সেলে কিনুন",
+                                                    "secondary_button_label": "নতুন এসেছে"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Fresh on the rail",
+                                            "kicker": "NEW EVERY WEEK",
+                                            "title": "Fresh styles on the rail",
+                                            "subtitle": "New arrivals every Thursday.",
+                                            "button_label": "Shop now",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "classic/banner-sale-2.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "প্রতি সপ্তাহে নতুন",
+                                                    "title": "র‍্যাকে নতুন স্টাইল",
+                                                    "button_label": "এখনই কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

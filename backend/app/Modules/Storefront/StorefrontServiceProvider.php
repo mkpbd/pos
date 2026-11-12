@@ -12,6 +12,7 @@ use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\BuilderBlogReferences;
 use App\Modules\Storefront\Infrastructure\BuilderMediaReferences;
@@ -47,6 +48,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         $this->app->tag([MenuPageReferences::class], PageReferences::TAG);
         // B4: content pages designed with the store builder (declared by Cms).
         $this->app->bind(PageDesigns::class, BuilderPageDesigns::class);
+        // B5: the built-in templates are files read once per process (the same for every organization).
+        $this->app->singleton(BuilderTemplateLibrary::class);
         $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class, BuilderBlogReferences::class], BlogReferences::TAG);
     }
 
@@ -63,6 +66,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
             Limit::perMinute(60)->by('ip:'.$request->ip()),
             ($customerId = Auth::guard('customer')->id()) === null ? null : Limit::perMinute(60)->by('customer:'.$customerId),
         ])));
+        // B5: applying templates / starting from a demo imports photos into the media library.
+        RateLimiter::for('builder-templates', fn (Request $request) => Limit::perMinute(30)->by('user:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 
     protected function permissions(): array

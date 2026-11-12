@@ -1,0 +1,175 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "72px",
+                            "bottom": "72px"
+                        }
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "good food grows close to home",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ভালো খাবার জন্মায় ঘরের কাছেই"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Vegetables, plant milks and pantry staples from farms we know by name, packed by hand and delivered across the city.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "inner_row",
+                            "props": [],
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "gap": "12px",
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "columns": [
+                                {
+                                    "id": "c_1",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 50,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_3",
+                                            "type": "button",
+                                            "props": {
+                                                "label": "Shop fresh produce",
+                                                "link": {
+                                                    "url": "/shop"
+                                                },
+                                                "variant": "primary",
+                                                "size": "lg",
+                                                "full_width": false
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "label": "তাজা সবজি কিনুন"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_2",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 50,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_4",
+                                            "type": "button",
+                                            "props": {
+                                                "label": "How we source",
+                                                "link": {
+                                                    "url": "/pages/about-us"
+                                                },
+                                                "variant": "outline",
+                                                "size": "lg",
+                                                "full_width": false
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "label": "আমরা কোথা থেকে আনি"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_6",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "vegan/banner-hero-1.jpg"
+                                },
+                                "alt": "Flat lay of colourful fresh vegetables on a white surface",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            },
+                            "style": {
+                                "base": {
+                                    "border": {
+                                        "radius": {
+                                            "tl": "24px",
+                                            "tr": "24px",
+                                            "br": "24px",
+                                            "bl": "24px"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

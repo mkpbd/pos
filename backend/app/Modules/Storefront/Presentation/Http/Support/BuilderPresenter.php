@@ -114,6 +114,33 @@ final class BuilderPresenter
     }
 
     /**
+     * B5: the theme draft in "start from a demo" / "publish all" results: `{draft_revision,
+     * has_unpublished_changes, preset, published: {version_id, number, published_at}|null,
+     * preview_url}`.
+     *
+     * @param  array{document: ?BuilderDocument, settings: array<string, mixed>, has_unpublished_changes: bool}  $state  ManageThemeDraft::state()
+     * @return array<string, mixed>
+     */
+    public static function themeSummary(array $state): array
+    {
+        $document = $state['document'];
+        $published = $document?->publishedVersion;
+        $storeUrl = self::storeUrl();
+
+        return [
+            'draft_revision' => $document->draft_revision ?? 0,
+            'has_unpublished_changes' => $state['has_unpublished_changes'],
+            'preset' => $state['settings']['preset'] ?? null,
+            'published' => $published === null ? null : [
+                'version_id' => $published->id,
+                'number' => $published->number,
+                'published_at' => $published->published_at?->toIso8601String(),
+            ],
+            'preview_url' => $storeUrl === null ? null : $storeUrl.'/?preview=draft',
+        ];
+    }
+
+    /**
      * Newest first.
      *
      * @param  iterable<BuilderVersion>  $versions

@@ -1,0 +1,102 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "3-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Men",
+                                            "kicker": "Men",
+                                            "title": "Everyday menswear",
+                                            "button_label": "Shop men",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "classic/banner-men.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "পুরুষ",
+                                                    "title": "প্রতিদিনের পোশাক",
+                                                    "button_label": "পুরুষদের"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Women",
+                                            "kicker": "Women",
+                                            "title": "Light layers",
+                                            "button_label": "Shop women",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "classic/banner-women.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "নারী",
+                                                    "title": "হালকা পোশাক",
+                                                    "button_label": "নারীদের"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Shoes",
+                                            "kicker": "Shoes",
+                                            "title": "Boots and sneakers",
+                                            "button_label": "Shop shoes",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "classic/banner-shoes.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "জুতা",
+                                                    "title": "বুট আর স্নিকার",
+                                                    "button_label": "জুতা কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, CopyIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, Trash2Icon } from 'lucide-react'
+import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, BookmarkPlusIcon, CopyIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, Trash2Icon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Section } from '@/storefront/builder/types'
 import { nodeLabel, nodeName, useCommands, useEditorUi } from './commands'
@@ -66,6 +66,11 @@ export function MiniToolbar() {
           <ToolButton label="Duplicate" onClick={() => commands.duplicate(id)}>
             <CopyIcon aria-hidden />
           </ToolButton>
+          {info.kind === 'section' && commands.requestSaveTemplate && (
+            <ToolButton label="Save as template" onClick={() => commands.requestSaveTemplate?.(id)}>
+              <BookmarkPlusIcon aria-hidden />
+            </ToolButton>
+          )}
           <ToolButton label={hidden ? 'Show' : 'Hide'} onClick={() => commands.toggleHidden(id)}>
             {hidden ? <EyeIcon aria-hidden /> : <EyeOffIcon aria-hidden />}
           </ToolButton>

@@ -1,6 +1,6 @@
 import { useMemo, useRef, type KeyboardEvent } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { ArrowDownIcon, ArrowUpIcon, CircleAlertIcon, CopyIcon, EllipsisIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, Trash2Icon } from 'lucide-react'
+import { ArrowDownIcon, ArrowUpIcon, BookmarkPlusIcon, CircleAlertIcon, CopyIcon, EllipsisIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -111,6 +111,11 @@ function LayerItem({ row, selected, tabbable, hasErrors, indicator, onSelectRow 
               <DropdownMenuItem onSelect={() => commands.duplicate(node.id)}>
                 <CopyIcon /> Duplicate
               </DropdownMenuItem>
+              {kind === 'section' && commands.requestSaveTemplate && (
+                <DropdownMenuItem onSelect={() => commands.requestSaveTemplate?.(node.id)}>
+                  <BookmarkPlusIcon /> Save as template
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onSelect={() => commands.requestDelete(node.id)}>
                 <Trash2Icon /> Delete

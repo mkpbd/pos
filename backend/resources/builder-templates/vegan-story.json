@@ -1,0 +1,126 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "vegan/banner-brand.jpg"
+                                },
+                                "alt": "Rows of green crops in a farm field at sunset",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            },
+                            "style": {
+                                "base": {
+                                    "border": {
+                                        "radius": {
+                                            "tl": "24px",
+                                            "tr": "24px",
+                                            "br": "24px",
+                                            "bl": "24px"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "grown by people we know",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "যাঁদের চিনি, তাঁদের হাতে ফলানো"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>We buy from a handful of family farms that rotate their crops with the seasons and feed the soil with compost instead of chemicals.</p><p>That is why the tomatoes taste like tomatoes, and why the range changes a little every month.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "Read our story",
+                                "link": {
+                                    "url": "/pages/about-us"
+                                },
+                                "variant": "outline",
+                                "size": "md",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "আমাদের গল্প পড়ুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

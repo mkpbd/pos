@@ -1,0 +1,171 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Frequently asked questions",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "সচরাচর জিজ্ঞাসা"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Quick answers about orders, delivery, payment and returns.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "16px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "size": {
+                        "max_width": "880px"
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "faq_list",
+                            "props": {
+                                "title": null,
+                                "style": "accordion"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "cta",
+                            "props": {
+                                "title": "Still have a question?",
+                                "text": "Our team is happy to help.",
+                                "primary": {
+                                    "label": "Contact us",
+                                    "link": {
+                                        "url": "/pages/contact"
+                                    }
+                                },
+                                "secondary": null,
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "এখনও প্রশ্ন আছে?",
+                                    "text": "আমাদের দল সাহায্য করতে প্রস্তুত।",
+                                    "primary.label": "যোগাযোগ করুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

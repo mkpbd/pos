@@ -1,0 +1,728 @@
+{
+  "version": 1,
+  "assets": "database/seeders/demo-themes/images",
+  "templates": [
+    {
+      "id": "vegan-hero-slider",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "hero",
+      "name": "Farm-fresh hero slider",
+      "description": "Two full-width slides with a headline and buttons, on photos of fresh produce and smoothie bowls.",
+      "thumbnail": "/builder-templates/vegan-hero-slider.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "vegan-hero-split",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "hero",
+      "name": "Split hero with photo",
+      "description": "A headline, a short promise and two buttons beside a large rounded photo.",
+      "thumbnail": "/builder-templates/vegan-hero-split.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-features",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "features",
+      "name": "Plant-based promises",
+      "description": "Four icons with short promises: plant-based, free delivery, freshness and phone orders.",
+      "thumbnail": "/builder-templates/vegan-features.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-categories",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "categories",
+      "name": "Shop by aisle",
+      "description": "Your top-level categories as round photo tiles with product counts.",
+      "thumbnail": "/builder-templates/vegan-categories.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-new-arrivals",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "products",
+      "name": "Just in from the farms",
+      "description": "A four-column grid of your newest products with a link to the shop.",
+      "thumbnail": "/builder-templates/vegan-new-arrivals.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-best-sellers",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "products",
+      "name": "Best sellers carousel",
+      "description": "A sliding row of the products your customers buy most.",
+      "thumbnail": "/builder-templates/vegan-best-sellers.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-promo-pair",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "promo",
+      "name": "Two promo tiles",
+      "description": "Two photo tiles side by side: a pantry offer and your farm story.",
+      "thumbnail": "/builder-templates/vegan-promo-pair.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "vegan-story",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "story",
+      "name": "Our growers story",
+      "description": "A field photo beside a short story about where your food comes from, with a link to the about page.",
+      "thumbnail": "/builder-templates/vegan-story.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-newsletter",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "newsletter",
+      "name": "Seasonal newsletter",
+      "description": "A green sign-up band for a weekly e-mail about what is in season.",
+      "thumbnail": "/builder-templates/vegan-newsletter.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "vegan-weekend-deals",
+      "scope": "section",
+      "preset": "vegan",
+      "category": "countdown",
+      "name": "Weekend harvest deals",
+      "description": "A countdown with the products of your running flash sales. Hidden while no flash sale is running.",
+      "thumbnail": "/builder-templates/vegan-weekend-deals.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "handmade-hero-tiles",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "hero",
+      "name": "Studio hero slider",
+      "description": "Three slides on calm interior photos: decor, plants and jewellery.",
+      "thumbnail": "/builder-templates/handmade-hero-tiles.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "handmade-maker-story",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "story",
+      "name": "Maker story",
+      "description": "A large photo of the potter at work beside a short story and a link to meet the makers.",
+      "thumbnail": "/builder-templates/handmade-maker-story.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "handmade-features",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "features",
+      "name": "Studio promises",
+      "description": "Four quiet promises: made by hand, gift wrapping, careful delivery and talking to the maker.",
+      "thumbnail": "/builder-templates/handmade-features.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "handmade-editors-pick",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "products",
+      "name": "Editor's pick",
+      "description": "A four-column grid of your featured products.",
+      "thumbnail": "/builder-templates/handmade-editors-pick.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "handmade-seasonal",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "products",
+      "name": "Seasonal carousel",
+      "description": "A sliding row of the products currently on sale.",
+      "thumbnail": "/builder-templates/handmade-seasonal.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "handmade-journal",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "content",
+      "name": "Journal",
+      "description": "Your three newest blog posts. Hidden while the blog is empty.",
+      "thumbnail": "/builder-templates/handmade-journal.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "blog"
+      ]
+    },
+    {
+      "id": "handmade-promo-pair",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "promo",
+      "name": "Process and makers tiles",
+      "description": "Two photo tiles: the potter's wheel and the workshop shelves.",
+      "thumbnail": "/builder-templates/handmade-promo-pair.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "handmade-testimonials",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "testimonials",
+      "name": "Kind words",
+      "description": "Three short customer quotes with star ratings.",
+      "thumbnail": "/builder-templates/handmade-testimonials.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "handmade-statement",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "content",
+      "name": "Studio statement",
+      "description": "A short centred paragraph about making fewer things, more carefully.",
+      "thumbnail": "/builder-templates/handmade-statement.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "handmade-studio-letter",
+      "scope": "section",
+      "preset": "handmade",
+      "category": "newsletter",
+      "name": "Letters from the studio",
+      "description": "A dark brown sign-up band for a monthly studio letter.",
+      "thumbnail": "/builder-templates/handmade-studio-letter.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "classic-sale-hero",
+      "scope": "section",
+      "preset": "classic",
+      "category": "hero",
+      "name": "Season sale hero",
+      "description": "Two bold sale slides with a kicker, a headline and shop buttons.",
+      "thumbnail": "/builder-templates/classic-sale-hero.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "classic-department-tiles",
+      "scope": "section",
+      "preset": "classic",
+      "category": "promo",
+      "name": "Department tiles",
+      "description": "Three photo tiles for men, women and shoes.",
+      "thumbnail": "/builder-templates/classic-department-tiles.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "classic-collection-tabs",
+      "scope": "section",
+      "preset": "classic",
+      "category": "products",
+      "name": "Collection tabs",
+      "description": "Four tabs of products: featured, best sellers, on sale and new arrivals.",
+      "thumbnail": "/builder-templates/classic-collection-tabs.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "classic-flash-sale",
+      "scope": "section",
+      "preset": "classic",
+      "category": "countdown",
+      "name": "Flash sale countdown",
+      "description": "A countdown with the products of your running flash sales. Hidden while no flash sale is running.",
+      "thumbnail": "/builder-templates/classic-flash-sale.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "classic-service-strip",
+      "scope": "section",
+      "preset": "classic",
+      "category": "features",
+      "name": "Service strip",
+      "description": "Four service promises: delivery, exchanges, payment and the shop.",
+      "thumbnail": "/builder-templates/classic-service-strip.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "classic-best-sellers",
+      "scope": "section",
+      "preset": "classic",
+      "category": "products",
+      "name": "Best sellers grid",
+      "description": "A dense five-column grid of your best sellers.",
+      "thumbnail": "/builder-templates/classic-best-sellers.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "classic-brand-wall",
+      "scope": "section",
+      "preset": "classic",
+      "category": "brands",
+      "name": "Brand wall",
+      "description": "A row of every brand you sell, linking to each brand page.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "classic-categories",
+      "scope": "section",
+      "preset": "classic",
+      "category": "categories",
+      "name": "Category tiles",
+      "description": "Your top-level categories as tiles with product counts.",
+      "thumbnail": "/builder-templates/classic-categories.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "classic-sale-cta",
+      "scope": "section",
+      "preset": "classic",
+      "category": "cta",
+      "name": "Sale call to action",
+      "description": "A dark full-width band with a sale headline and two buttons.",
+      "thumbnail": "/builder-templates/classic-sale-cta.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-cta-band",
+      "scope": "section",
+      "preset": null,
+      "category": "cta",
+      "name": "Call-to-action band",
+      "description": "A full-width band in your accent colour with a headline, a line of text and two buttons.",
+      "thumbnail": "/builder-templates/neutral-cta-band.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-faq-teaser",
+      "scope": "section",
+      "preset": null,
+      "category": "faq",
+      "name": "FAQ teaser",
+      "description": "Three common questions with short answers and a link to the full FAQ page.",
+      "thumbnail": "/builder-templates/neutral-faq-teaser.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-video-story",
+      "scope": "section",
+      "preset": null,
+      "category": "video",
+      "name": "Video and text",
+      "description": "A YouTube video beside a heading, a short text and a button. Paste your own video link.",
+      "thumbnail": "/builder-templates/neutral-video-story.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-newsletter-inline",
+      "scope": "section",
+      "preset": null,
+      "category": "newsletter",
+      "name": "Inline newsletter",
+      "description": "A heading and short text beside a one-line e-mail sign-up form.",
+      "thumbnail": "/builder-templates/neutral-newsletter-inline.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "footer",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-testimonials",
+      "scope": "section",
+      "preset": null,
+      "category": "testimonials",
+      "name": "Customer reviews",
+      "description": "Three customer quotes with names and star ratings.",
+      "thumbnail": "/builder-templates/neutral-testimonials.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-brand-strip",
+      "scope": "section",
+      "preset": null,
+      "category": "brands",
+      "name": "Brand logos",
+      "description": "A row of the brands you sell.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-on-sale-grid",
+      "scope": "section",
+      "preset": null,
+      "category": "products",
+      "name": "On sale grid",
+      "description": "A four-column grid of the products currently on sale.",
+      "thumbnail": "/builder-templates/neutral-on-sale-grid.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-icon-columns",
+      "scope": "section",
+      "preset": null,
+      "category": "features",
+      "name": "Three icon columns",
+      "description": "Three centred columns, each with an icon, a heading and a short text.",
+      "thumbnail": "/builder-templates/neutral-icon-columns.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "footer",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-image-text",
+      "scope": "section",
+      "preset": null,
+      "category": "story",
+      "name": "Image and text",
+      "description": "A photo beside a heading, two short paragraphs and a button.",
+      "thumbnail": "/builder-templates/neutral-image-text.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "page-about",
+      "scope": "page",
+      "preset": null,
+      "category": "about",
+      "name": "About us",
+      "description": "An introduction, your story beside a photo, three values with icons and an invitation to get in touch.",
+      "thumbnail": "/builder-templates/page-about.png",
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": []
+    },
+    {
+      "id": "page-contact",
+      "scope": "page",
+      "preset": null,
+      "category": "contact",
+      "name": "Contact",
+      "description": "A short introduction, your contact details and social links beside the contact form. For content pages.",
+      "thumbnail": "/builder-templates/page-contact.png",
+      "allowed_in": [
+        "cms"
+      ],
+      "requires": []
+    },
+    {
+      "id": "page-faq",
+      "scope": "page",
+      "preset": null,
+      "category": "faq",
+      "name": "FAQ",
+      "description": "An introduction, your FAQ entries as an accordion and a call to action for anything else. For content pages.",
+      "thumbnail": "/builder-templates/page-faq.png",
+      "allowed_in": [
+        "cms"
+      ],
+      "requires": []
+    },
+    {
+      "id": "page-sale-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "sale",
+      "name": "Sale landing page",
+      "description": "A bold sale headline, a flash sale countdown, everything on sale, service promises and a newsletter sign-up.",
+      "thumbnail": "/builder-templates/page-sale-landing.png",
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "page-new-collection",
+      "scope": "page",
+      "preset": null,
+      "category": "collection",
+      "name": "New collection landing page",
+      "description": "A split hero for the new collection, the newest products, categories, featured picks and a call to action.",
+      "thumbnail": "/builder-templates/page-new-collection.png",
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": []
+    },
+    {
+      "id": "site-vegan",
+      "scope": "site",
+      "preset": "vegan",
+      "category": "site",
+      "name": "Vegan Store",
+      "description": "Green Basket's look: fresh greens and warm yellow on cream, a farm-fresh slider, features, categories, products, deals and a green newsletter band.",
+      "thumbnail": "/builder-templates/site-vegan.png",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-handmade",
+      "scope": "site",
+      "preset": "handmade",
+      "category": "site",
+      "name": "Handmade",
+      "description": "Mati & Co.'s look: terracotta and dark brown on off-white with serif headings, a studio slider, a maker's note, editor's picks and a journal.",
+      "thumbnail": "/builder-templates/site-handmade.png",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-classic",
+      "scope": "site",
+      "preset": "classic",
+      "category": "site",
+      "name": "Classic Shop",
+      "description": "Classic Shop's look: black and blue on white with uppercase headings, a season-sale slider, department tiles, product tabs and a flash sale.",
+      "thumbnail": "/builder-templates/site-classic.png",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    }
+  ]
+}

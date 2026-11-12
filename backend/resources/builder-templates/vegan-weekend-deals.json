@@ -1,0 +1,43 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hot_deals",
+                            "props": {
+                                "title": "weekend harvest deals",
+                                "subtitle": "Fresh favourites for less while the timer runs",
+                                "config": {
+                                    "promotion_id": null,
+                                    "limit": 8,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সাপ্তাহিক ছুটির অফার",
+                                    "subtitle": "টাইমার চলা পর্যন্ত কম দামে প্রিয় পণ্য"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

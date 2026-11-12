@@ -1,0 +1,298 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "72px",
+                            "bottom": "72px"
+                        }
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 45,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "The new collection",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "নতুন সংগ্রহ"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Fresh shapes and colours for the season ahead. Limited quantities — when they are gone, they are gone.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "button",
+                            "props": {
+                                "label": "Shop the collection",
+                                "link": {
+                                    "url": "/shop?sort=newest"
+                                },
+                                "variant": "primary",
+                                "size": "lg",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "সংগ্রহ দেখুন"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 55,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "classic/banner-sale-2.jpg"
+                                },
+                                "alt": "Neutral-tone clothes on wooden hangers on a rail",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            },
+                            "style": {
+                                "base": {
+                                    "border": {
+                                        "radius": {
+                                            "tl": "8px",
+                                            "tr": "8px",
+                                            "br": "8px",
+                                            "bl": "8px"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_5",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "Just arrived",
+                                "subtitle": null,
+                                "config": {
+                                    "source": "new_arrivals",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "columns": 4,
+                                    "view_all_url": "/shop?sort=newest"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সদ্য এসেছে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_6",
+                            "type": "category_strip",
+                            "props": {
+                                "title": "Shop by category",
+                                "subtitle": null,
+                                "config": {
+                                    "source": "top_level",
+                                    "limit": 8
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ক্যাটাগরি অনুযায়ী কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_4",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_5",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_7",
+                            "type": "product_carousel",
+                            "props": {
+                                "title": "Our favourites",
+                                "subtitle": "Picked by the team",
+                                "config": {
+                                    "source": "featured",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আমাদের প্রিয়",
+                                    "subtitle": "দলের বাছাই"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_5",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_6",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_8",
+                            "type": "cta",
+                            "props": {
+                                "title": "Find your new favourite",
+                                "text": "Free delivery on larger orders and easy exchanges.",
+                                "primary": {
+                                    "label": "Shop now",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "secondary": null,
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "নতুন প্রিয় জিনিস খুঁজে নিন",
+                                    "primary.label": "এখনই কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

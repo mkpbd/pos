@@ -1,0 +1,62 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "product_tabs",
+                            "props": {
+                                "title": "Shop the collection",
+                                "subtitle": null,
+                                "config": {
+                                    "limit": 8,
+                                    "tabs": [
+                                        {
+                                            "label": "Featured",
+                                            "source": "featured",
+                                            "category_id": null
+                                        },
+                                        {
+                                            "label": "Best sellers",
+                                            "source": "best_sellers",
+                                            "category_id": null
+                                        },
+                                        {
+                                            "label": "On sale",
+                                            "source": "on_sale",
+                                            "category_id": null
+                                        },
+                                        {
+                                            "label": "New arrivals",
+                                            "source": "new_arrivals",
+                                            "category_id": null
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সংগ্রহ দেখুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

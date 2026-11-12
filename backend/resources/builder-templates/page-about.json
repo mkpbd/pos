@@ -1,0 +1,416 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "About us",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আমাদের সম্পর্কে"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>A small shop with a simple idea: sell fewer, better things and look after the people who buy them.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "handmade/banner-meet.jpg"
+                                },
+                                "alt": "Handmade ceramic cups on rustic shelves in a pottery workshop",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            },
+                            "style": {
+                                "base": {
+                                    "border": {
+                                        "radius": {
+                                            "tl": "12px",
+                                            "tr": "12px",
+                                            "br": "12px",
+                                            "bl": "12px"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "heading",
+                            "props": {
+                                "text": "How it started",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "যেভাবে শুরু"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>We began with one table at a weekend market and a notebook full of ideas. Customers kept coming back, so we kept going.</p><p>Today we work with a few trusted makers and suppliers, and we still check every order before it leaves.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "gap": "32px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 33.33,
+                        "tablet": 33.33,
+                        "mobile": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_6",
+                            "type": "icon",
+                            "props": {
+                                "name": "heart",
+                                "size": 40,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_7",
+                            "type": "heading",
+                            "props": {
+                                "text": "Care",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "যত্ন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_8",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>We choose every product as if it were for our own home.</p>"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_5",
+                    "type": "column",
+                    "width": {
+                        "base": 33.33,
+                        "tablet": 33.33,
+                        "mobile": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_9",
+                            "type": "icon",
+                            "props": {
+                                "name": "leaf",
+                                "size": 40,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_10",
+                            "type": "heading",
+                            "props": {
+                                "text": "Honesty",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "সততা"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_11",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Clear prices, real photos and straight answers.</p>"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_6",
+                    "type": "column",
+                    "width": {
+                        "base": 33.33,
+                        "tablet": 33.33,
+                        "mobile": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_12",
+                            "type": "icon",
+                            "props": {
+                                "name": "star",
+                                "size": 40,
+                                "color": "theme:accent",
+                                "label": "",
+                                "link": null
+                            }
+                        },
+                        {
+                            "id": "e_13",
+                            "type": "heading",
+                            "props": {
+                                "text": "Service",
+                                "level": 3,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "সেবা"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_14",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>If something is not right, we make it right.</p>"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_4",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_7",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_15",
+                            "type": "cta",
+                            "props": {
+                                "title": "Come and say hello",
+                                "text": "Questions, ideas or a custom order? We would love to hear from you.",
+                                "primary": {
+                                    "label": "Contact us",
+                                    "link": {
+                                        "url": "/pages/contact"
+                                    }
+                                },
+                                "secondary": {
+                                    "label": "Shop now",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "একবার হ্যালো বলুন",
+                                    "primary.label": "যোগাযোগ করুন",
+                                    "secondary.label": "এখনই কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

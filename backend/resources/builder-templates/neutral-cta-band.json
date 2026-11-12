@@ -1,0 +1,75 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:accent"
+                    },
+                    "color": "theme:accent_foreground"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "cta",
+                            "props": {
+                                "title": "Ready when you are",
+                                "text": "Browse the full range and get it delivered to your door.",
+                                "primary": {
+                                    "label": "Shop now",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "secondary": {
+                                    "label": "Contact us",
+                                    "link": {
+                                        "url": "/pages/contact"
+                                    }
+                                },
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আপনি প্রস্তুত হলেই",
+                                    "text": "পুরো সংগ্রহ দেখুন, ঘরে বসে ডেলিভারি নিন।",
+                                    "primary.label": "এখনই কিনুন",
+                                    "secondary.label": "যোগাযোগ করুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,82 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "2-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Lunch bowls",
+                                            "kicker": "Pantry",
+                                            "title": "lunch bowls, sorted",
+                                            "subtitle": "Grains, tofu and dressings in one basket.",
+                                            "button_label": "Shop the pantry",
+                                            "link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "vegan/banner-promo.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "রান্নাঘর",
+                                                    "title": "দুপুরের খাবার, সহজে",
+                                                    "button_label": "রান্নাঘরের পণ্য"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Our growers",
+                                            "kicker": "Grown nearby",
+                                            "title": "meet the people who grow it",
+                                            "subtitle": "Family farms within a short drive of the city.",
+                                            "button_label": "About us",
+                                            "link_url": "/pages/about-us",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "vegan/banner-brand.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "কাছের খামার",
+                                                    "title": "যাঁরা ফলান, তাঁদের চিনুন",
+                                                    "button_label": "আমাদের সম্পর্কে"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

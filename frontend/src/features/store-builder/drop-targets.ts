@@ -9,7 +9,8 @@ import { ancestors, canDropInto, findNode, type DropTarget } from './tree'
  * only ever dropped between sections. Coordinates are canvas-viewport CSS pixels.
  */
 
-export type Dragged = { kind: 'new'; type: string } | { kind: 'node'; id: string; type: string }
+/** B5: a template from the Templates tab drops like a section (between sections only). */
+export type Dragged = { kind: 'new'; type: string } | { kind: 'node'; id: string; type: string } | { kind: 'template'; id: string; type: 'section'; name: string }
 
 export type DropIndicator = { kind: 'line' | 'box'; rect: Rect }
 

@@ -1,0 +1,114 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "80px",
+                            "bottom": "80px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "56px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "48px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 55,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "handmade/banner-artisan.jpg"
+                                },
+                                "alt": "Potter's hands shaping clay on a wheel",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 45,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Every piece starts as a lump of clay",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "প্রতিটি জিনিসের শুরু এক তাল মাটি থেকে"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>We wedge, throw, trim and glaze everything in our own small workshop. Each piece is fired twice and checked by hand before it reaches you.</p><p>No two are exactly alike, and we like it that way.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "Meet the makers",
+                                "link": {
+                                    "url": "/pages/about-us"
+                                },
+                                "variant": "outline",
+                                "size": "md",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "কারিগরদের সাথে পরিচিত হোন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

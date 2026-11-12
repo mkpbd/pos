@@ -1,0 +1,75 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "72px",
+                            "bottom": "72px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#111111"
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "48px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "cta",
+                            "props": {
+                                "title": "Up to 30 % off this season",
+                                "text": "Prices drop on shirts, dresses and shoes. Free delivery on larger orders.",
+                                "primary": {
+                                    "label": "Shop the sale",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "secondary": {
+                                    "label": "New arrivals",
+                                    "link": {
+                                        "url": "/shop?sort=newest"
+                                    }
+                                },
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "এই মৌসুমে ৩০ % পর্যন্ত ছাড়",
+                                    "text": "শার্ট, ড্রেস আর জুতায় দাম কমেছে।",
+                                    "primary.label": "সেলে কিনুন",
+                                    "secondary.label": "নতুন এসেছে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

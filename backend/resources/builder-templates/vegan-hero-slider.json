@@ -1,0 +1,88 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Picked this morning",
+                                            "kicker": "100 % plant-based",
+                                            "title": "picked this morning, on your table tonight",
+                                            "subtitle": "Seasonal vegetables and fruit from small farms, packed by hand and delivered the same day.",
+                                            "button_label": "Shop fresh produce",
+                                            "link_url": "/shop",
+                                            "secondary_button_label": "Our story",
+                                            "secondary_link_url": "/pages/about-us",
+                                            "text_color": "#1e3a24",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "vegan/banner-hero-1.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "১০০ % উদ্ভিজ্জ",
+                                                    "title": "আজ সকালে তোলা, আজ রাতেই আপনার টেবিলে",
+                                                    "button_label": "তাজা সবজি কিনুন",
+                                                    "secondary_button_label": "আমাদের গল্প"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Breakfast bowls",
+                                            "kicker": "New this week",
+                                            "title": "breakfast bowls in five minutes",
+                                            "subtitle": "Berries, plant milk and crunchy granola for a bright start to the day.",
+                                            "button_label": "Shop drinks",
+                                            "link_url": "/shop",
+                                            "text_color": "#1e3a24",
+                                            "text_position": "center",
+                                            "image": {
+                                                "asset": "vegan/banner-hero-2.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "এই সপ্তাহে নতুন",
+                                                    "title": "পাঁচ মিনিটে সকালের নাস্তা",
+                                                    "button_label": "পানীয় কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

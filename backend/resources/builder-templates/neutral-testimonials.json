@@ -1,0 +1,63 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "testimonials",
+                            "props": {
+                                "title": "What our customers say",
+                                "subtitle": null,
+                                "config": {
+                                    "background": null,
+                                    "items": [
+                                        {
+                                            "quote": "Ordered on Monday, it arrived on Tuesday, exactly as pictured.",
+                                            "name": "Rumana A.",
+                                            "role": "Customer",
+                                            "rating": 5,
+                                            "avatar_media_id": null
+                                        },
+                                        {
+                                            "quote": "Friendly service and an easy exchange when I needed a different size.",
+                                            "name": "Fahim K.",
+                                            "role": "Customer",
+                                            "rating": 5,
+                                            "avatar_media_id": null
+                                        },
+                                        {
+                                            "quote": "Good quality for the price. I will order again.",
+                                            "name": "Nadia S.",
+                                            "role": "Customer",
+                                            "rating": 4,
+                                            "avatar_media_id": null
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "গ্রাহকরা যা বলেন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

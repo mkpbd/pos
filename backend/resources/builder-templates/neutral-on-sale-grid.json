@@ -1,0 +1,45 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "On sale now",
+                                "subtitle": "Grab them while the prices last",
+                                "config": {
+                                    "source": "on_sale",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "columns": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "এখন ছাড়ে",
+                                    "subtitle": "দাম কম থাকতে থাকতে নিয়ে নিন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
