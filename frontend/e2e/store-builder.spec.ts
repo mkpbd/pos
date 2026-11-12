@@ -981,3 +981,48 @@ test('B6: enters chart data in the grid and pastes a table; the canvas chart upd
   await expect.poll(() => savedOf(b, 'chart')?.props.labels, { timeout: 6000 }).toEqual(['Apr', 'May', 'Jun'])
   expect((savedOf(b, 'chart')!.props.series as { values: number[] }[])[0]!.values).toEqual([40, 55, 70])
 })
+
+test('edits a banner of the hero slider from the inspector: the canvas shows the new headline', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  const BANNER = '01a1c9d9-0000-7000-8000-000000000001'
+  const banner = {
+    id: BANNER, placement: 'hero_slider', name: 'Farm boxes', kicker: null, title: 'Farm boxes are back', subtitle: null, link_url: '/shop', button_label: 'Order a box',
+    secondary_link_url: null, secondary_button_label: null, desktop_media_id: 'img-1', mobile_media_id: null, text_color: '#ffffff', text_position: 'left',
+    starts_at: null, ends_at: null, is_active: true, is_live: true, state: 'live', sort_order: 0, updated_at: null, translations: { bn: {} },
+  }
+  const edits: Record<string, unknown>[] = []
+  await page.route('**/api/v1/storefront/banners', (route) => route.fulfill({ json: envelope([banner]) }))
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/banners/${BANNER}`, (route) => {
+    const input = route.request().postDataJSON() as Record<string, unknown>
+    edits.push(input)
+    Object.assign(banner, input)
+    return route.fulfill({ json: envelope({ banner, replaced: null }) })
+  })
+  // The slider's data follows the banner (the resolve input is unchanged: only an explicit refresh asks again).
+  await page.route('**/api/v1/storefront/builder/resolve', (route) => {
+    const body = route.request().postDataJSON() as { elements: { id: string }[]; media_ids: string[] }
+    const slider = sectionData.e_slider as { banners: Record<string, unknown>[] }
+    const data = Object.fromEntries(body.elements.filter((e) => sectionData[e.id]).map((e) => [e.id, e.id === 'e_slider' ? { ...slider, banners: [{ ...slider.banners[0], title: banner.title }] } : sectionData[e.id]]))
+    return route.fulfill({ json: envelope({ data, media: {}, errors: {} }) })
+  })
+  await openEditor(page, b)
+  const frame = canvas(page)
+  await expect(frame.getByText('Farm boxes are back')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  await page.getByTestId('layer-e_slider').getByRole('button', { name: /^Hero slider/ }).click()
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+  await inspector.getByRole('button', { name: 'Edit Farm boxes' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Edit banner' })
+  await expect(dialog.getByLabel('Headline')).toHaveValue('Farm boxes are back')
+  await dialog.getByLabel('Headline').fill('Summer boxes are here')
+  await dialog.getByRole('button', { name: 'Save banner' }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('Banner updated')).toBeVisible()
+  expect(edits).toHaveLength(1)
+  expect(edits[0]).toMatchObject({ title: 'Summer boxes are here', name: 'Farm boxes', link_url: '/shop' })
+  await expect(frame.getByText('Summer boxes are here')).toBeVisible()
+  await expect(frame.getByText('Farm boxes are back')).toHaveCount(0)
+})

@@ -26,6 +26,7 @@ import { ApiError } from '@/lib/api/client'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { RenderSection } from '@/storefront/builder/types'
 import { AddPanel } from './add-panel'
+import { elementsShowingBanners, replaceBanner } from './banner-refs'
 import {
   builderAdminKeys,
   discardDraft,
@@ -645,6 +646,15 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
                   case 'preview-motion':
                     canvas.current?.scrollTo(command.nodeId)
                     return canvas.current?.playMotion(command.nodeId)
+                  case 'banner-edited': {
+                    // A copy: this draft shows it instead of the original (one undo step, autosaved as usual).
+                    if (command.replaced) {
+                      const { old_id, new_id } = command.replaced
+                      state.apply((c) => replaceBanner(c, old_id, new_id))
+                    }
+                    const ids = command.replaced ? [command.replaced.old_id, command.replaced.new_id] : [command.bannerId]
+                    return preview.refresh(elementsShowingBanners(store.getState().content, ids))
+                  }
                 }
               }}
             />

@@ -1,5 +1,5 @@
-import { useId, useState } from 'react'
-import { ArrowDownIcon, ArrowUpIcon, Loader2Icon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react'
+import { useId, useState, type ComponentType } from 'react'
+import { ArrowDownIcon, ArrowUpIcon, Loader2Icon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import {
   useBannersQuery,
   useSaveSectionMutation,
   type AnySectionConfig,
+  type Banner,
   type BannerGridLayout,
   type BannerPlacement,
   type FeatureIcon,
@@ -30,7 +31,7 @@ import {
   type SectionTypeInfo,
   type TestimonialItem,
 } from '@/features/storefront/api'
-import { BannerForm } from '@/features/storefront/components/banner-form'
+import { BannerForm, type BannerLinkInputProps, type BannerSave } from '@/features/storefront/components/banner-form'
 import { CatalogSectionFields } from '@/features/storefront/components/catalog-section-fields'
 import { ColorField } from '@/features/storefront/components/color-field'
 import { HotDealsFields } from '@/features/storefront/components/hot-deals-fields'
@@ -95,11 +96,22 @@ function OptionalColor({ label, value, onChange }: { label: string; value: strin
 
 /**
  * Picks banners of one placement and puts them in order. A new banner can be created right
- * here (it joins the section at once), so an empty placement is not a dead end.
+ * here (it joins the section at once), so an empty placement is not a dead end; a chosen one
+ * is edited in place (its Edit button, thumbnail or name). `saveEdit` replaces the default
+ * banner update (the store builder's copy-on-write edit); `linkInput` the banner form's link boxes.
  */
-export function BannerChooser({ placement, value, onChange, limits, error }: { placement: BannerPlacement; value: string[]; onChange: (ids: string[]) => void; limits: { min: number; max: number }; error?: string }) {
+export function BannerChooser({ placement, value, onChange, limits, error, saveEdit, linkInput }: {
+  placement: BannerPlacement
+  value: string[]
+  onChange: (ids: string[]) => void
+  limits: { min: number; max: number }
+  error?: string
+  saveEdit?: BannerSave
+  linkInput?: ComponentType<BannerLinkInputProps>
+}) {
   const banners = useBannersQuery()
   const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState<Banner | null>(null)
   const available = (banners.data ?? []).filter((b) => b.placement === placement)
   const byId = new Map(available.map((b) => [b.id, b]))
   const media = useMediaLookup(available.map((b) => b.desktop_media_id))
@@ -114,12 +126,26 @@ export function BannerChooser({ placement, value, onChange, limits, error }: { p
           {value.map((id, i) => {
             const banner = byId.get(id)
             return (
-              <li key={id} className="flex items-center gap-3 rounded-md border p-2">
-                {banner && <MediaThumb id={banner.desktop_media_id} byId={media.byId} className="h-10 w-16" />}
-                <span className="min-w-0 flex-1 truncate text-sm">{banner?.name ?? 'Banner'}{banner && !banner.is_live && ' (not live)'}</span>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move ${banner?.name ?? 'banner'} up`} disabled={i === 0} onClick={() => onChange(move(value, i, -1))}><ArrowUpIcon /></Button>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move ${banner?.name ?? 'banner'} down`} disabled={i === value.length - 1} onClick={() => onChange(move(value, i, 1))}><ArrowDownIcon /></Button>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${banner?.name ?? 'banner'}`} onClick={() => onChange(value.filter((x) => x !== id))}><XIcon /></Button>
+              <li key={id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border p-2">
+                {banner ? (
+                  // The Edit button is the keyboard path; the picture and name are a bigger mouse target for the same thing.
+                  <button type="button" tabIndex={-1} className="flex min-w-0 flex-1 basis-40 cursor-pointer items-center gap-3 rounded-sm text-left hover:underline" onClick={() => setEditing(banner)}>
+                    <MediaThumb id={banner.desktop_media_id} byId={media.byId} className="h-10 w-16" />
+                    <span className="min-w-0 flex-1 truncate text-sm">{banner.name}{!banner.is_live && ' (not live)'}</span>
+                  </button>
+                ) : (
+                  <span className="min-w-0 flex-1 basis-40 truncate text-sm">Banner</span>
+                )}
+                <div className="ml-auto flex items-center">
+                  {banner && (
+                    <Button type="button" variant="ghost" size="sm" aria-label={`Edit ${banner.name}`} onClick={() => setEditing(banner)}>
+                      <PencilIcon data-icon="inline-start" /> Edit
+                    </Button>
+                  )}
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move ${banner?.name ?? 'banner'} up`} disabled={i === 0} onClick={() => onChange(move(value, i, -1))}><ArrowUpIcon /></Button>
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Move ${banner?.name ?? 'banner'} down`} disabled={i === value.length - 1} onClick={() => onChange(move(value, i, 1))}><ArrowDownIcon /></Button>
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${banner?.name ?? 'banner'}`} onClick={() => onChange(value.filter((x) => x !== id))}><XIcon /></Button>
+                </div>
               </li>
             )
           })}
@@ -151,12 +177,19 @@ export function BannerChooser({ placement, value, onChange, limits, error }: { p
           {creating && (
             <BannerForm
               placement={placement}
+              LinkInput={linkInput}
               onDone={(saved) => {
                 setCreating(false)
                 if (saved && !value.includes(saved.id)) onChange([...value, saved.id])
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl" onSubmit={(e) => e.stopPropagation()}>
+          {editing && <BannerForm key={editing.id} banner={editing} placement={placement} save={saveEdit} LinkInput={linkInput} onDone={() => setEditing(null)} />}
         </DialogContent>
       </Dialog>
     </div>

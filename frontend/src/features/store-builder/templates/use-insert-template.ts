@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { storefrontKeys } from '@/features/storefront/api'
 import type { DocumentContext, Section } from '@/storefront/builder/types'
 import { containsCustomHtml, CUSTOM_HTML_DENIED, useEditorUi } from '../commands'
 import { useEditorStoreApi } from '../store'
@@ -38,6 +40,7 @@ export type TemplateInserter = {
 
 export function useTemplateInserter(instantiate: Instantiate = instantiateTemplate): TemplateInserter {
   const store = useEditorStoreApi()
+  const queryClient = useQueryClient()
   const { canvas, context = 'page', canCustomHtml = true } = useEditorUi()
   const [pendingId, setPendingId] = useState<string | null>(null)
   const busy = useRef(false)
@@ -49,6 +52,8 @@ export function useTemplateInserter(instantiate: Instantiate = instantiateTempla
       setPendingId(template.id)
       try {
         const result = await instantiate(template.id, context)
+        // New banners must be in the banner chooser at once (its Edit button needs them).
+        if (result.imported?.banners) void queryClient.invalidateQueries({ queryKey: storefrontKeys.banners })
         const nodes = (result.nodes ?? []).filter((node): node is Section => node?.type === 'section')
         if (nodes.length === 0) {
           toast.error('This template has nothing to add here.')
@@ -78,7 +83,7 @@ export function useTemplateInserter(instantiate: Instantiate = instantiateTempla
         setPendingId(null)
       }
     },
-    [canCustomHtml, canvas, context, instantiate, store],
+    [canCustomHtml, canvas, context, instantiate, queryClient, store],
   )
 
   return { insert, pendingId }

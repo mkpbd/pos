@@ -9,7 +9,7 @@ import { B6Form } from './b6-forms'
 import { B4_TYPES, B6_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
-function SetupForm({ request, canCustomHtml }: { request: SetupRequest; canCustomHtml: boolean }) {
+function SetupForm({ request, canCustomHtml, documentId }: { request: SetupRequest; canCustomHtml: boolean; documentId?: string }) {
   const [node, setNode] = useState<Element>(request.node)
   const problems = validateNode(node)
   const label = request.label.toLowerCase()
@@ -29,7 +29,22 @@ function SetupForm({ request, canCustomHtml }: { request: SetupRequest; canCusto
         // Only the fields still missing are marked; everything else can be changed later too.
         <B4Form node={node} onChange={(next) => setNode(next as Element)} errors={errors} bangla={false} context={request.context} canCustomHtml={canCustomHtml} />
       ) : (
-        <WrappedSectionForm node={node as WrappedElement} onChange={(next) => setNode(next as WrappedElement)} errors={errors} bangla={false} />
+        <WrappedSectionForm
+          node={node as WrappedElement}
+          onChange={(next) => setNode(next as WrappedElement)}
+          errors={errors}
+          bangla={false}
+          documentId={documentId}
+          // A banner edited here is saved for this page; a copy replaces the original in the new element.
+          onCommand={(command) => {
+            if (command.type !== 'banner-edited' || !command.replaced) return
+            const { old_id, new_id } = command.replaced
+            setNode((current) => {
+              const props = (current as WrappedElement).props
+              return { ...current, props: { ...props, items: props.items.map((item) => (item.item_type === 'banner' && item.item_id === old_id ? { ...item, item_id: new_id } : item)) } } as Element
+            })
+          }}
+        />
       )}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => finishSetup(null)}>Cancel</Button>
@@ -45,7 +60,7 @@ function SetupForm({ request, canCustomHtml }: { request: SetupRequest; canCusto
  * Renders createElement()'s setup dialog. The Inspector mounts one; with several mounted only
  * the first renders.
  */
-export function ElementSetupHost({ canCustomHtml = false }: { canCustomHtml?: boolean }) {
+export function ElementSetupHost({ canCustomHtml = false, documentId }: { canCustomHtml?: boolean; documentId?: string }) {
   const [hostId] = useState(newSetupHostId)
   const snapshot = useSyncExternalStore(subscribeSetup, getSetupSnapshot, getSetupSnapshot)
 
@@ -56,7 +71,7 @@ export function ElementSetupHost({ canCustomHtml = false }: { canCustomHtml?: bo
   return (
     <Dialog open={request !== null} onOpenChange={(open) => !open && finishSetup(null)}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
-        {request && <SetupForm key={request.node.id} request={request} canCustomHtml={canCustomHtml} />}
+        {request && <SetupForm key={request.node.id} request={request} canCustomHtml={canCustomHtml} documentId={documentId} />}
       </DialogContent>
     </Dialog>
   )

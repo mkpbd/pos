@@ -7,15 +7,19 @@ use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Builder\BuilderCanvasContext;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
+use App\Modules\Storefront\Application\Builder\EditBuilderBanner;
 use App\Modules\Storefront\Application\Builder\ManageBuilderDocuments;
 use App\Modules\Storefront\Application\Builder\ResolveBuilderElements;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
+use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
+use App\Modules\Storefront\Presentation\Http\Requests\BannerRules;
 use App\Modules\Storefront\Presentation\Http\Requests\CreateBuilderDocumentRequest;
 use App\Modules\Storefront\Presentation\Http\Requests\ResolveBuilderElementsRequest;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveBuilderDraftRequest;
 use App\Modules\Storefront\Presentation\Http\Support\BuilderPresenter;
+use App\Modules\Storefront\Presentation\Http\Support\ContentPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -223,5 +227,27 @@ class BuilderDocumentController
         }
 
         return ApiResponse::success($payload);
+    }
+
+    /**
+     * Edit a banner of the page
+     *
+     * The banner update fields (validated like `PATCH /storefront/banners/{banner}`; `placement`
+     * is ignored). Copy-on-write: when only this document's draft shows the banner it is
+     * updated in place (`replaced: null`); when a homepage section, another document's draft,
+     * any published version (this document's own too) or a saved template uses it, a new banner
+     * with the submitted values is created (same placement, the name suffixed with the document
+     * title) and `replaced: {old_id, new_id}` tells the editor to swap the id in its draft — the
+     * live store doesn't change until that draft is published. Popups: 422
+     * BANNER_NOT_EDITABLE_HERE. Audited.
+     */
+    public function editBanner(Request $request, BuilderDocument $document, Banner $banner, EditBuilderBanner $edit): JsonResponse
+    {
+        $result = $edit->edit($document, $banner, $request->validate(BannerRules::rules(false)));
+
+        return ApiResponse::success([
+            'banner' => ContentPresenter::banner($result['banner']),
+            'replaced' => $result['replaced'],
+        ]);
     }
 }

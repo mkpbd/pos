@@ -338,3 +338,8 @@ Original questions:
   - Pie / donut with more than 6 parts or a negative value is drawn as horizontal bars.
   - The data table toggle is always offered (contrast relief); `show_table` only sets whether it starts open.
 - **Canvas protocol:** additive `play-motion {id}` (v1).
+
+### As built — B6.1 banner editing (2026-11-12)
+
+- **Endpoint:** `EditBuilderBanner` + `BuilderBannerUsage`. A banner referenced outside this document's draft is copied: homepage section items, other documents' drafts (including the theme), any version's content, and the organization's saved templates. On PostgreSQL the check is `jsonb_path_exists`; on other databases it is a text match. The banner rules are shared with the Banners API (`BannerRules`).
+- **Editor:** a `banner-edited` command swaps a copied id across the draft as one undo step, and `usePreviewData.refresh(ids)` forces a re-resolve even when the element's own input is unchanged.

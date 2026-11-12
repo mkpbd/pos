@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isWrappedSectionType } from '@/storefront/builder/registry'
 import type { BuilderContent, BuilderData, BuilderMedia, Element } from '@/storefront/builder/types'
 import type { StoreSection } from '@/storefront/types'
@@ -11,6 +11,9 @@ import { mediaIds, resolveInput, resolveKey, withLocalTitles, wrappedElements } 
  * after the last change, only for wrapped elements whose resolve input changed and media ids not
  * seen yet. While an element is re-resolved its previous data stays on screen; an element that has
  * never had data is `pending` (the canvas draws a skeleton).
+ *
+ * `refresh(ids)` resolves elements again although their input is unchanged (a banner they show
+ * was edited): an answer to a request sent before the refresh is dropped for them.
  */
 
 export const RESOLVE_DEBOUNCE = 400
@@ -27,6 +30,8 @@ export type PreviewData = {
   pending: string[]
   /** Problems the resolve found per wrapped element (before any save). */
   errors: Record<string, Problem[]>
+  /** Resolve these elements again (after the debounce) even if their input didn't change. */
+  refresh: (elementIds: readonly string[]) => void
 }
 
 type Resolver = (input: Parameters<typeof resolvePreview>[0], signal?: AbortSignal) => Promise<ResolveResult>
@@ -47,6 +52,20 @@ export function usePreviewData(content: BuilderContent, options: { locale: strin
   }, [cache])
   const inFlight = useRef<Record<string, string>>({})
   const first = useRef(true)
+  // refresh(): elements to send regardless of their key, and a generation per element so an
+  // answer to an older request can't overwrite the newer data.
+  const forced = useRef<Set<string>>(new Set())
+  const generation = useRef<Record<string, number>>({})
+  const [refreshTick, setRefreshTick] = useState(0)
+  const refresh = useCallback((elementIds: readonly string[]) => {
+    if (elementIds.length === 0) return
+    for (const id of elementIds) {
+      forced.current.add(id)
+      generation.current[id] = (generation.current[id] ?? 0) + 1
+      delete inFlight.current[id]
+    }
+    setRefreshTick((tick) => tick + 1)
+  }, [])
 
   const elements = useMemo(() => wrappedElements(content), [content])
   const ids = useMemo(() => mediaIds(content), [content])
@@ -57,11 +76,13 @@ export function usePreviewData(content: BuilderContent, options: { locale: strin
       const current = cacheRef.current
       const send = elements.filter((element) => {
         const key = resolveKey(element)
-        return current.entries[element.id]?.key !== key && inFlight.current[element.id] !== key
+        return forced.current.has(element.id) || (current.entries[element.id]?.key !== key && inFlight.current[element.id] !== key)
       })
       const media = ids.filter((id) => !current.media[id] && !current.missingMedia[id] && !localMedia[id] && inFlight.current[`m:${id}`] === undefined)
       if (send.length === 0 && media.length === 0) return
       const keys = Object.fromEntries(send.map((element) => [element.id, resolveKey(element)]))
+      const sentGeneration = Object.fromEntries(send.map((element) => [element.id, generation.current[element.id] ?? 0]))
+      for (const element of send) forced.current.delete(element.id)
       for (const [id, key] of Object.entries(keys)) inFlight.current[id] = key
       for (const id of media) inFlight.current[`m:${id}`] = '1'
       const elementChunks = chunk(send, MAX_ELEMENTS)
@@ -75,6 +96,7 @@ export function usePreviewData(content: BuilderContent, options: { locale: strin
             setCache((previous) => {
               const entries = { ...previous.entries }
               for (const element of batch) {
+                if ((generation.current[element.id] ?? 0) !== sentGeneration[element.id]) continue
                 entries[element.id] = { key: keys[element.id]!, section: result.data[element.id] ?? null, errors: result.errors[element.id] ?? [] }
               }
               const missingMedia = { ...previous.missingMedia }
@@ -98,7 +120,7 @@ export function usePreviewData(content: BuilderContent, options: { locale: strin
     }
     const timer = setTimeout(run, RESOLVE_DEBOUNCE)
     return () => clearTimeout(timer)
-  }, [elements, ids, enabled, locale, localMedia, resolve])
+  }, [elements, ids, enabled, locale, localMedia, resolve, refreshTick])
 
   return useMemo(() => {
     const data: Record<string, BuilderData> = {}
@@ -110,6 +132,6 @@ export function usePreviewData(content: BuilderContent, options: { locale: strin
       else if (!entry || entry.key !== resolveKey(element)) pending.push(element.id)
       if (entry && entry.errors.length > 0 && entry.key === resolveKey(element)) errors[element.id] = entry.errors
     }
-    return { data, media: { ...cache.media, ...localMedia }, pending, errors }
-  }, [cache, elements, localMedia, locale])
+    return { data, media: { ...cache.media, ...localMedia }, pending, errors, refresh }
+  }, [cache, elements, localMedia, locale, refresh])
 }

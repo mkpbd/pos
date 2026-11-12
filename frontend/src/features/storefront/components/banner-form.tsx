@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
@@ -15,6 +16,7 @@ import {
   POPUP_DELAY,
   POPUP_FREQUENCIES,
   POPUP_FREQUENCY_LABELS,
+  storefrontKeys,
   useSaveBannerMutation,
   type Banner,
   type BannerInput,
@@ -72,7 +74,19 @@ const ALL_BANNER_TRANSLATION_NAMES = BANNER_TRANSLATIONS.map((f) => f.name)
 const bannerTranslations = (placement: BannerPlacement) => BANNER_TRANSLATIONS.filter((f) => placement === 'hero_slider' || f.name !== 'secondary_button_label')
 
 const text = (value: string | null) => value ?? ''
-const nullable = (value: string) => (value.trim() === '' ? null : value.trim())
+const nullable = (value: string | null) => (value === null || value.trim() === '' ? null : value.trim())
+/** While typing keep the text as is (trimming each keystroke would eat the space before the next word); trimmed on save. */
+const typed = (value: string) => (value === '' ? null : value)
+const TEXT_FIELDS = ['name', 'kicker', 'title', 'subtitle', 'link_url', 'button_label', 'secondary_link_url', 'secondary_button_label'] as const
+
+function trimmed(d: Draft): Draft {
+  const next = { ...d }
+  for (const field of TEXT_FIELDS) {
+    if (field === 'name') next.name = d.name.trim()
+    else next[field] = nullable(d[field] ?? null)
+  }
+  return next
+}
 
 /** Client checks mirroring the API, keyed like its validation errors. */
 function validateBanner(d: Draft): Record<string, string> {
@@ -91,9 +105,37 @@ function validateBanner(d: Draft): Record<string, string> {
   return errors
 }
 
-/** Add or edit one banner; mounted inside DialogContent. `onDone` gets the saved banner, or nothing on cancel. */
-export function BannerForm({ banner, placement, onDone }: { banner?: Banner; placement: BannerPlacement; onDone: (saved?: Banner) => void }) {
+/**
+ * Saves an edit of an existing banner somewhere other than PATCH /storefront/banners/{id} (the
+ * store builder edits a page's banner copy-on-write); resolves with the saved banner and the
+ * success message to show.
+ */
+export type BannerSave = (id: string, input: Partial<BannerInput>) => Promise<{ banner: Banner; message: string }>
+
+/** A link target picker for the banner's links (the store builder's page / category / custom picker); a plain text box otherwise. */
+export type BannerLinkInputProps = { label: string; value: string | null; onChange: (url: string | null) => void; error?: string; hint?: string }
+
+/**
+ * Add or edit one banner; mounted inside DialogContent. `onDone` gets the saved banner, or nothing
+ * on cancel. `save` (edits only) replaces the default PATCH; `LinkInput` replaces the link boxes.
+ */
+export function BannerForm({ banner, placement, onDone, save: saveEdit, LinkInput }: {
+  banner?: Banner
+  placement: BannerPlacement
+  onDone: (saved?: Banner) => void
+  save?: BannerSave
+  LinkInput?: ComponentType<BannerLinkInputProps>
+}) {
   const save = useSaveBannerMutation()
+  const queryClient = useQueryClient()
+  const custom = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<BannerInput> }) => {
+      if (!saveEdit) throw new Error('No custom banner save.')
+      return saveEdit(id, input)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.banners }),
+  })
+  const pending = save.isPending || custom.isPending
   const [draft, setDraft] = useState<Draft>(() => toDraft(placement, banner))
   const [bn, setBn] = useState<BnValues>(() => readBn(banner?.translations, ALL_BANNER_TRANSLATION_NAMES))
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -110,18 +152,33 @@ export function BannerForm({ banner, placement, onDone }: { banner?: Banner; pla
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    const local = { ...validateBanner(draft), ...validateBn(bn, translatable) }
+    const clean = trimmed(draft)
+    const local = { ...validateBanner(clean), ...validateBn(bn, translatable) }
     if (Object.keys(local).length > 0) return setErrors(local)
-    const { popup_delay, popup_frequency, ...rest } = draft
+    const { popup_delay, popup_frequency, ...rest } = clean
     const input: Partial<BannerInput> = {
       ...rest,
-      desktop_media_id: draft.desktop_media_id ?? undefined,
-      starts_at: fromLocalInput(draft.starts_at),
-      ends_at: fromLocalInput(draft.ends_at),
-      ...(draft.placement === 'popup' ? { popup_delay_seconds: Number(popup_delay.trim()), popup_frequency } : {}),
+      desktop_media_id: clean.desktop_media_id ?? undefined,
+      starts_at: fromLocalInput(clean.starts_at),
+      ends_at: fromLocalInput(clean.ends_at),
+      ...(clean.placement === 'popup' ? { popup_delay_seconds: Number(popup_delay.trim()), popup_frequency } : {}),
       translations: toTranslationsInput(bn, translatable.map((f) => f.name), banner?.translations),
     }
     if (banner) delete input.placement
+    const onError = (error: Error) => setErrors(error instanceof ApiError && error.code !== 'VALIDATION_FAILED' ? { form: error.message } : fieldErrorMap(error))
+    if (banner && saveEdit) {
+      custom.mutate(
+        { id: banner.id, input },
+        {
+          onSuccess: (result) => {
+            toast.success(result.message)
+            onDone(result.banner)
+          },
+          onError,
+        },
+      )
+      return
+    }
     save.mutate(
       { id: banner?.id, input },
       {
@@ -129,7 +186,7 @@ export function BannerForm({ banner, placement, onDone }: { banner?: Banner; pla
           toast.success(banner ? 'Banner saved.' : 'Banner added.')
           onDone(saved)
         },
-        onError: (error) => setErrors(error instanceof ApiError && error.code !== 'VALIDATION_FAILED' ? { form: error.message } : fieldErrorMap(error)),
+        onError,
       },
     )
   }
@@ -165,30 +222,38 @@ export function BannerForm({ banner, placement, onDone }: { banner?: Banner; pla
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Small heading" hint="Optional line above the headline.">
-          <Input maxLength={60} value={text(draft.kicker)} onChange={(e) => set({ kicker: nullable(e.target.value) })} />
+          <Input maxLength={60} value={text(draft.kicker)} onChange={(e) => set({ kicker: typed(e.target.value) })} />
         </FormField>
         <FormField label="Headline" error={errors.title}>
-          <Input maxLength={120} value={text(draft.title)} onChange={(e) => set({ title: nullable(e.target.value) })} />
+          <Input maxLength={120} value={text(draft.title)} onChange={(e) => set({ title: typed(e.target.value) })} />
         </FormField>
       </div>
       <FormField label="Text" error={errors.subtitle}>
-        <Input maxLength={255} value={text(draft.subtitle)} onChange={(e) => set({ subtitle: nullable(e.target.value) })} />
+        <Input maxLength={255} value={text(draft.subtitle)} onChange={(e) => set({ subtitle: typed(e.target.value) })} />
       </FormField>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Link" error={errors.link_url} hint="Without a button label, the whole banner is the link.">
-          <Input placeholder="/pages/about-us" spellCheck={false} value={text(draft.link_url)} onChange={(e) => set({ link_url: nullable(e.target.value) })} />
-        </FormField>
+        {LinkInput ? (
+          <LinkInput label="Link" value={draft.link_url} onChange={(url) => set({ link_url: url === null ? null : typed(url) })} error={errors.link_url} hint="Without a button label, the whole banner is the link." />
+        ) : (
+          <FormField label="Link" error={errors.link_url} hint="Without a button label, the whole banner is the link.">
+            <Input placeholder="/pages/about-us" spellCheck={false} value={text(draft.link_url)} onChange={(e) => set({ link_url: typed(e.target.value) })} />
+          </FormField>
+        )}
         <FormField label="Button label" error={errors.button_label}>
-          <Input maxLength={40} value={text(draft.button_label)} onChange={(e) => set({ button_label: nullable(e.target.value) })} />
+          <Input maxLength={40} value={text(draft.button_label)} onChange={(e) => set({ button_label: typed(e.target.value) })} />
         </FormField>
         {draft.placement === 'hero_slider' && (
           <>
-            <FormField label="Second button link" error={errors.secondary_link_url}>
-              <Input spellCheck={false} value={text(draft.secondary_link_url)} onChange={(e) => set({ secondary_link_url: nullable(e.target.value) })} />
-            </FormField>
+            {LinkInput ? (
+              <LinkInput label="Second button link" value={draft.secondary_link_url} onChange={(url) => set({ secondary_link_url: url === null ? null : typed(url) })} error={errors.secondary_link_url} />
+            ) : (
+              <FormField label="Second button link" error={errors.secondary_link_url}>
+                <Input spellCheck={false} value={text(draft.secondary_link_url)} onChange={(e) => set({ secondary_link_url: typed(e.target.value) })} />
+              </FormField>
+            )}
             <FormField label="Second button label" error={errors.secondary_button_label}>
-              <Input maxLength={40} value={text(draft.secondary_button_label)} onChange={(e) => set({ secondary_button_label: nullable(e.target.value) })} />
+              <Input maxLength={40} value={text(draft.secondary_button_label)} onChange={(e) => set({ secondary_button_label: typed(e.target.value) })} />
             </FormField>
           </>
         )}
@@ -241,8 +306,8 @@ export function BannerForm({ banner, placement, onDone }: { banner?: Banner; pla
       {errors.form && <p role="alert" className="text-sm text-destructive">{errors.form}</p>}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={() => onDone()}>Cancel</Button>
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending && <Loader2Icon className="animate-spin" data-icon="inline-start" />} {banner ? 'Save banner' : 'Add banner'}
+        <Button type="submit" disabled={pending}>
+          {pending && <Loader2Icon className="animate-spin" data-icon="inline-start" />} {banner ? 'Save banner' : 'Add banner'}
         </Button>
       </DialogFooter>
     </form>

@@ -40,6 +40,12 @@ export type InspectorCommand =
   | { type: 'open-site-styles' }
   /** B6: replay the node's entrance animation on the canvas ("Preview animation"). */
   | { type: 'preview-motion'; nodeId: string }
+  /**
+   * A banner of the page was edited from the inspector: in place (`replaced` null) or copied by
+   * the server (swap `old_id` for `new_id` in the draft, one undo step). Either way the canvas
+   * re-resolves the elements showing it (their input may be unchanged, the banner is not).
+   */
+  | { type: 'banner-edited'; bannerId: string; replaced: { old_id: string; new_id: string } | null }
 
 export type InspectorChangeOptions = {
   /** Edits with the same key within a short time are one undo step (typing). */

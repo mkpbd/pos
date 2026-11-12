@@ -21,6 +21,26 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B6.1 — Edit banners from the page builder
+
+#### Added
+- **Edit button on banner rows:** banner-based sections (hero slider, banner grid and the rest) get an **Edit** button on every banner row in the builder inspector, as does the homepage section editor. Clicking the picture or name does the same. It opens the banner form prefilled: desktop and mobile image, kicker, title, text, buttons with the link picker, colours, position and Bangla.
+- **Draft-safe saving:** `POST /storefront/builder/documents/{document}/banners/{banner}` decides between editing in place and copying.
+  - The banner is **copied for this draft** when it is used anywhere else: a homepage section, another document's draft, any published version (including this page's own), or a saved template.
+  - Otherwise it is edited in place.
+  - The editor swaps the copy's id into the draft as one undo step, and the canvas re-fetches the banner at once.
+  - The live store changes only on publish.
+  - Popup banners can't be edited here (`422 BANNER_NOT_EDITABLE_HERE`).
+  - Edits are audited as `storefront.builder_banner_edited`.
+
+#### Fixed
+- The banner form trimmed text on every keystroke, so a space couldn't be typed between words in the headline, text or button labels. It now trims only on save.
+
+#### Tests
+- Backend PostgreSQL 975 passed + 1 skip (7 new tests for copy-on-write, validation and isolation).
+- Vitest 1397. Mocked Playwright 216 passed: a test edits a banner in the builder and the canvas shows the new headline.
+- Full-stack: integration 24/24, demo stores 10/10.
+
 ### B6 — Store builder: more elements, motion and D3 charts
 
 #### Added

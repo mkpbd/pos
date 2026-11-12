@@ -14,9 +14,12 @@ import { isCatalogSection, SECTION_ITEM_KIND, usesManualItems } from '@/features
 import { CatalogSectionFields } from '@/features/storefront/components/catalog-section-fields'
 import { sectionTranslations } from '@/features/storefront/components/section-draft'
 import { BannerChooser, ConfigFields } from '@/features/storefront/components/section-editor'
+import type { BannerSave } from '@/features/storefront/components/banner-form'
 import type { WrappedElement } from '@/storefront/builder/types'
-import { FieldError, NodeBangla } from './fields'
+import { editPageBanner } from '../api'
+import { FieldError, LinkField, NodeBangla } from './fields'
 import type { FormProps } from './content-forms'
+import type { InspectorCommand } from './types'
 import { BANNER_SECTIONS, SECTION_SUBTITLE_MAX, SECTION_TITLE_MAX, sectionInfo } from './validate'
 
 function bannerLimits(node: WrappedElement): { min: number; max: number } {
@@ -25,7 +28,22 @@ function bannerLimits(node: WrappedElement): { min: number; max: number } {
   return limits
 }
 
-export function WrappedSectionForm({ node, onChange, errors, bangla }: FormProps<WrappedElement>) {
+const BANNER_UPDATED = 'Banner updated'
+const BANNER_COPIED = 'Banner copied for this page — the live store doesn’t change until you publish'
+
+/**
+ * The banner chooser's Edit saves through the builder (copy-on-write, see editPageBanner) and
+ * tells the editor what happened.
+ */
+function pageBannerSave(documentId: string, onCommand: (cmd: InspectorCommand) => void): BannerSave {
+  return async (id, input) => {
+    const result = await editPageBanner(documentId, id, input)
+    onCommand({ type: 'banner-edited', bannerId: id, replaced: result.replaced })
+    return { banner: result.banner, message: result.replaced ? BANNER_COPIED : BANNER_UPDATED }
+  }
+}
+
+export function WrappedSectionForm({ node, onChange, errors, bangla, documentId, onCommand }: FormProps<WrappedElement> & { documentId?: string; onCommand?: (cmd: InspectorCommand) => void }) {
   const { title, subtitle, config, items } = node.props
   const type = node.type
   const info = sectionInfo(type)
@@ -59,6 +77,8 @@ export function WrappedSectionForm({ node, onChange, errors, bangla }: FormProps
           onChange={(ids) => setProps({ items: ids.map((item_id) => ({ item_type: 'banner', item_id })) })}
           limits={bannerLimits(node)}
           error={errors.banner_ids}
+          saveEdit={documentId && onCommand ? pageBannerSave(documentId, onCommand) : undefined}
+          linkInput={LinkField}
         />
       )}
 

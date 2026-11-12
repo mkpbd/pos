@@ -104,6 +104,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
             ->whereUuid(['document', 'version'])->scopeBindings();
         Route::delete('documents/{document}', [BuilderDocumentController::class, 'destroy'])->whereUuid('document');
+        // A banner of the page, edited in place or copied when anything else shows it (copy-on-write).
+        Route::post('documents/{document}/banners/{banner}', [BuilderDocumentController::class, 'editBanner'])->whereUuid(['document', 'banner']);
         // B5: templates — apply (built-in id or own uuid), save a section, delete an own one.
         Route::post('templates/{template}/instantiate', [BuilderTemplateController::class, 'instantiate'])
             ->where('template', '[A-Za-z0-9-]{2,80}')->middleware('throttle:builder-templates');

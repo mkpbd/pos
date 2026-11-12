@@ -62,8 +62,9 @@ function NodeIcon({ type }: { type: string }) {
   return <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
 }
 
-function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4 }: {
+function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, documentId }: {
   node: BuilderNode
+  documentId: string
   onChange: (next: BuilderNode, opts?: InspectorChangeOptions) => void
   onCommand: InspectorProps['onCommand']
   errors: Record<string, string>
@@ -107,7 +108,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4 }:
     return (
       // The homepage forms lay fields out for a wide dialog; the panel is narrow, so one column.
       <div className="[&_.grid]:grid-cols-1 [&_button[role=combobox]]:w-full">
-        <WrappedSectionForm key={node.id} node={node as WrappedElement} {...common} />
+        <WrappedSectionForm key={node.id} node={node as WrappedElement} {...common} documentId={documentId} onCommand={onCommand} />
       </div>
     )
   }
@@ -194,7 +195,7 @@ type Tab = 'content' | 'style' | 'advanced'
 export function Inspector(props: InspectorProps) {
   return (
     <>
-      <ElementSetupHost canCustomHtml={props.canCustomHtml} />
+      <ElementSetupHost canCustomHtml={props.canCustomHtml} documentId={props.document.id} />
       <InspectorPanel {...props} />
     </>
   )
@@ -286,6 +287,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
             errors={errors}
             bangla={bangla}
             content={content}
+            documentId={document.id}
             b4={{ context: elementContext({ kind: document.kind ?? 'page', key: document.key ?? '' }), theme, icons, canCustomHtml }}
           />
         </TabsContent>

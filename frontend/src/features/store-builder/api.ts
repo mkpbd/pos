@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated } from '@/lib/api/client'
+import type { Banner, BannerInput } from '@/features/storefront/api'
 import type { BuilderContent, BuilderData, BuilderMedia } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { ElementsMetadata, Problem } from './inspector'
@@ -220,4 +221,15 @@ export function restoreVersion(id: string, versionId: string) {
 export async function resolvePreview(input: { elements: (ResolveElement | ResolveDataElement)[]; media_ids: string[]; locale?: string }, signal?: AbortSignal): Promise<ResolveResult> {
   const body = (await api.post<Partial<ResolveResult>>(`${BASE}/resolve`, input, { signal })).data ?? {}
   return { data: body.data ?? {}, media: body.media ?? {}, errors: body.errors ?? {} }
+}
+
+/** POST …/documents/{id}/banners/{banner}: `replaced` is set when the server copied the banner (anything else shows it). */
+export type PageBannerEdit = { banner: Banner; replaced: { old_id: string; new_id: string } | null }
+
+/**
+ * Edits a banner of this page copy-on-write: in place when only this draft shows it, else the
+ * server creates a copy (the live store keeps the original until the draft is published).
+ */
+export function editPageBanner(documentId: string, bannerId: string, input: Partial<BannerInput>) {
+  return api.post<PageBannerEdit>(`${doc(documentId)}/banners/${encodeURIComponent(bannerId)}`, input).then((r) => r.data)
 }
