@@ -2386,6 +2386,23 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
 | PATCH `/storefront/builder/documents/{id}` | manage | B2. `{title}` (1–160) → document (revision unchanged); audited `storefront.builder_renamed`. Summaries also carry `path` (`/` or `/p/<slug>`) and `preview_url` (or null without a domain). |
 | GET `/store/builder/pages/home`, `/store/builder/pages/{slug}` | public | Published render payload. `404 PAGE_NOT_FOUND`. `?preview=draft` for signed-in staff with `storefront.view` → the draft with `state` on non-live nodes, `no-store`. Otherwise ETag / 304 like `/store/homepage`. |
 
+**More elements, motion and charts (B6).**
+- **New element types:**
+  - `accordion`, `tabs`, `icon_box`, `icon_list`, `quote`, `notice`, `counter`, `steps`, `chart`
+  - `gallery`, `image_carousel`, `logo_carousel`, `map`
+  - `category_card`, `product_spotlight`, `shop_the_look`, `trust_badges`, `recently_viewed`
+  - `marquee`
+  - Registry group `media`. The limits and enums are in `GET /storefront/builder/elements` (`limits.lists`, `limits.b6_text`, `limits.chart_*` and so on).
+- **Translations:** list item fields are stored as `translations.<locale>["<list>.<item_id>.<field>"]`; chart labels as `labels.<index>`.
+- **Styles:** `motion {entrance, duration, delay}` (base only); `background.video {url, provider, video_id, poster?}` (base only, sections and inner rows). Section props `sticky`, `shape_top` and `shape_bottom` are kept only when set.
+- **`data[id]`:**
+  - category_card `{name, url|null, image, product_count}`
+  - product_spotlight: the `GET /store/products/{slug}` object
+  - shop_the_look `{products: {<id>: card}}`, which may be `[]` when empty
+  - Drafts add `state: unavailable`.
+- **`POST /builder/resolve`** also covers `category_card`, `product_spotlight` and `shop_the_look`. A spotlight product with no online listing → `PRODUCT_UNAVAILABLE`.
+- **Templates:** the `requires` value `products` (shop-the-look templates pick products by source).
+
 **Templates and start from demo (B5).** Under `/storefront/builder`:
 
 | Method & path | Permission | Notes |

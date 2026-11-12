@@ -193,7 +193,7 @@ describe('store builder landing pages', () => {
     const column = document.sections[1]!.columns[0]!
     const button = column.elements[2]!
     if (button.type === 'button') button.props.link = { url: 'javascript:alert(1)' }
-    column.elements.push({ ...column.elements[0]!, id: 'e_future', type: 'marquee' } as unknown as (typeof column.elements)[number])
+    column.elements.push({ ...column.elements[0]!, id: 'e_future', type: 'hologram' } as unknown as (typeof column.elements)[number])
     mockApi({ 'GET /store/bootstrap': ok(bootstrapFixture()), 'GET /store/builder/pages/promo': ok(samplePage({ document, key: 'landing:promo' })) })
     const { container } = renderRoutes(storefrontRoutes, '/p/promo')
 

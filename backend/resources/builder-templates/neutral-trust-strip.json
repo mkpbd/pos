@@ -1,0 +1,50 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "full" },
+            "style": {
+                "base": {
+                    "background": { "type": "color", "color": "theme:surface" },
+                    "spacing": { "padding": { "top": "32px", "bottom": "32px" } }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "trust_badges",
+                            "props": {
+                                "items": [
+                                    { "id": "b1", "icon": "truck", "title": "Fast delivery", "text": "Across the country in days" },
+                                    { "id": "b2", "icon": "shield-check", "title": "Secure payment", "text": "Pay online or on delivery" },
+                                    { "id": "b3", "icon": "rotate-ccw", "title": "Easy returns", "text": "Within 7 days of delivery" },
+                                    { "id": "b4", "icon": "headset", "title": "Real help", "text": "Talk to a person, every day" }
+                                ],
+                                "style": "row"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.b1.title": "দ্রুত ডেলিভারি",
+                                    "items.b1.text": "কয়েক দিনে সারা দেশে",
+                                    "items.b2.title": "নিরাপদ পেমেন্ট",
+                                    "items.b2.text": "অনলাইনে বা পণ্য হাতে পেয়ে",
+                                    "items.b3.title": "সহজ ফেরত",
+                                    "items.b3.text": "ডেলিভারির ৭ দিনের মধ্যে",
+                                    "items.b4.title": "সত্যিকারের সাহায্য",
+                                    "items.b4.text": "প্রতিদিন মানুষের সাথে কথা বলুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

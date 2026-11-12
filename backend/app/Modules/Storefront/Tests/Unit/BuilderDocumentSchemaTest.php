@@ -179,7 +179,7 @@ class BuilderDocumentSchemaTest extends TestCase
                         ['id' => 'e_nested', 'type' => 'inner_row', 'columns' => []],
                     ]]]],
                     ['id' => 'e_div', 'type' => 'divider', 'props' => ['color' => 'blue', 'thickness' => 11]],
-                    ['id' => 'e_what', 'type' => 'marquee'],
+                    ['id' => 'e_what', 'type' => 'fireworks'],
                     ['id' => 'Bad Id', 'type' => 'spacer'],
                     ['id' => 'e_sched', 'type' => 'spacer', 'schedule' => ['starts_at' => '2026-12-02T00:00:00Z', 'ends_at' => '2026-12-01T00:00:00Z']],
                     ['id' => 'e_img', 'type' => 'image', 'props' => ['media_id' => 'not-a-uuid']],
@@ -265,7 +265,7 @@ class BuilderDocumentSchemaTest extends TestCase
     public function test_the_registry_describes_every_element_type(): void
     {
         $meta = ElementRegistry::metadata();
-        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4), $meta['types']);
+        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6), $meta['types']);
         $byType = array_column($meta['types'], null, 'type');
         $this->assertSame('columns', $byType['inner_row']['children']);
         $this->assertSame(['text'], $byType['heading']['translatable']);
@@ -280,7 +280,9 @@ class BuilderDocumentSchemaTest extends TestCase
                 continue;
             }
             // B4: these start without the content they need (the editor's setup dialog).
-            if (in_array($type, ['video', 'countdown', 'discount', 'promo_card', 'menu', 'custom_html'], true)) {
+            if (in_array($type, ['video', 'countdown', 'discount', 'promo_card', 'menu', 'custom_html',
+                // B6: images, an address or a catalogue record first.
+                'gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look'], true)) {
                 continue;
             }
             $element = ['id' => 'e_x', 'type' => $type, 'props' => ElementRegistry::defaults($type)] + ($type === 'inner_row' ? ['columns' => [['id' => 'c_x', 'width' => ['base' => 100], 'elements' => []]]] : []);

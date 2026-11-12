@@ -1,0 +1,64 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": {
+                    "spacing": { "padding": { "top": "64px", "bottom": "64px" } },
+                    "layout": { "align": "center", "gap": "40px" }
+                },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 40, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Visit our store", "level": 2, "link": null },
+                            "translations": { "bn": { "text": "আমাদের দোকানে আসুন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "icon_list",
+                            "props": {
+                                "items": [
+                                    { "id": "l1", "icon": "map-pin", "text": "Dhanmondi, Dhaka", "link": null },
+                                    { "id": "l2", "icon": "clock", "text": "Open every day, 10 am to 9 pm", "link": null },
+                                    { "id": "l3", "icon": "phone", "text": "Call us before you come", "link": { "url": "/pages/contact" } }
+                                ],
+                                "layout": "vertical"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.l1.text": "ধানমন্ডি, ঢাকা",
+                                    "items.l2.text": "প্রতিদিন সকাল ১০টা থেকে রাত ৯টা",
+                                    "items.l3.text": "আসার আগে ফোন করুন"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": { "base": 60, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "map",
+                            "props": { "query": "Dhanmondi, Dhaka, Bangladesh", "title": "Map of our store", "height": 380, "zoom": 15 },
+                            "translations": { "bn": { "title": "আমাদের দোকানের মানচিত্র" } }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

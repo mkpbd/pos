@@ -642,6 +642,9 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
                   }
                   case 'open-site-styles':
                     return setStylesOpen(true)
+                  case 'preview-motion':
+                    canvas.current?.scrollTo(command.nodeId)
+                    return canvas.current?.playMotion(command.nodeId)
                 }
               }}
             />

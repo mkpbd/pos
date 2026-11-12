@@ -13,6 +13,7 @@ use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
  * translations; B4: custom HTML elements' `html` — the same whitelist, so no scripts, event
  * handlers, iframes, style/link tags, classes or ids), then checked for references the
  * organization owns. B4: `$context` is the document context (which elements are allowed).
+ * B6: accordion and tabs panels (`items[].html`) and their translations are sanitized the same way.
  */
 class PrepareBuilderContent
 {
@@ -91,6 +92,29 @@ class PrepareBuilderContent
                     unset($node['translations'][$locale][$field]);
                 } else {
                     $node['translations'][$locale][$field] = $html;
+                }
+            }
+            $node['translations'] = array_filter($node['translations'], fn (array $texts) => $texts !== []);
+        }
+
+        // B6: rich text inside list items (accordion and tabs panels) and its translations
+        // (`items.<item id>.html`); an item's panel may be empty.
+        foreach (ElementRegistry::HTML_ITEM_PROPS[$type] ?? [] as $list => $itemFields) {
+            foreach ($node['props'][$list] as $i => $item) {
+                foreach ($itemFields as $field) {
+                    $node['props'][$list][$i][$field] = $this->sanitizer->clean((string) $item[$field]);
+                    $key = "{$list}.{$item['id']}.{$field}";
+                    foreach ($node['translations'] as $locale => $texts) {
+                        if (! isset($texts[$key])) {
+                            continue;
+                        }
+                        $translated = $this->sanitizer->clean($texts[$key]);
+                        if (trim(strip_tags($translated, '<img>')) === '') {
+                            unset($node['translations'][$locale][$key]);
+                        } else {
+                            $node['translations'][$locale][$key] = $translated;
+                        }
+                    }
                 }
             }
             $node['translations'] = array_filter($node['translations'], fn (array $texts) => $texts !== []);

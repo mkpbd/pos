@@ -41,7 +41,41 @@ class ProductPage
      */
     public function show(string $slug, bool $preview = false): array
     {
-        $record = $this->find($slug, $preview);
+        return $this->detail($this->find($slug, $preview), $preview);
+    }
+
+    /**
+     * B6: the product page objects of several products (live ones; `$preview` also drafts,
+     * scheduled and ended listings), keyed by product id in the given order — the store
+     * builder's product spotlight.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array<string, mixed>>
+     */
+    public function details(array $productIds, bool $preview = false): array
+    {
+        $productIds = array_values(array_unique($productIds));
+        if ($productIds === []) {
+            return [];
+        }
+        $records = array_column($this->catalog->products(['ids' => $productIds, 'live' => ! $preview]), null, 'id');
+
+        $result = [];
+        foreach ($productIds as $id) {
+            if (isset($records[$id])) {
+                $result[$id] = $this->detail($records[$id], $preview);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function detail(array $record, bool $preview): array
+    {
         /** @var ProductListing $listing */
         $listing = $record['listing'];
         $variants = $this->catalog->activeVariants($record);

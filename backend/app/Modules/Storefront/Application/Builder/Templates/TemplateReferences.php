@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Application\Builder\Templates;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Actions\ManageBanners;
 use App\Modules\Storefront\Domain\Builder\Templates\PortableTemplate;
@@ -23,7 +24,9 @@ use Illuminate\Support\Facades\Validator;
  *   unless the organization already has one with the same placement, name, title, link and image
  *   — what an earlier apply of the same template created — which is reused;
  * - a menu reference is the organization's active menu at that location (`footer`: the first
- *   footer column that has one), or null.
+ *   footer column that has one), or null;
+ * - B6: a product reference is the index-th live product of a homepage source (featured, best
+ *   sellers, new arrivals, on sale), or null.
  */
 class TemplateReferences implements TemplateReferenceResolver
 {
@@ -39,11 +42,28 @@ class TemplateReferences implements TemplateReferenceResolver
 
     private int $reusedBanners = 0;
 
+    /** @var array<string, list<string>> live product ids by source */
+    private array $products = [];
+
     public function __construct(
         private readonly BuilderTemplateLibrary $library,
         private readonly MediaLibrary $mediaLibrary,
         private readonly ManageBanners $banners,
+        private readonly StorefrontCatalog $catalog,
     ) {}
+
+    /**
+     * B6: the index-th live product of a source (the homepage source order), or null.
+     */
+    public function product(string $source, int $index): ?string
+    {
+        if (! in_array($source, PortableTemplate::PRODUCT_SOURCES, true)) {
+            return null;
+        }
+        $this->products[$source] ??= array_values(array_filter(array_column($this->catalog->sourceProductCards($source, null, PortableTemplate::PRODUCT_REF_MAX), 'id'), 'is_string'));
+
+        return $this->products[$source][$index] ?? null;
+    }
 
     public function media(string $asset): string
     {

@@ -21,6 +21,43 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B6 — Store builder: more elements, motion and D3 charts
+
+#### Added
+- **19 new elements**, all with Content, Style and Advanced tabs, per-device styles, Bangla (per item for lists), draft / publish and server validation:
+  - **Content:** accordion, tabs, icon box, icon list, quote, notice (tone shown as icon + word), number counter (count-up; off for reduced motion), steps / how it works, **chart**.
+  - **Media:** gallery with an accessible lightbox, image carousel (pausable autoplay), logo carousel, Google Map (click-to-load: nothing reaches Google until the visitor asks).
+  - **Shop:** category card, product spotlight (variants and add to cart), shop the look (photo hotspots with product cards), trust badges, recently viewed.
+  - **Motion:** marquee (pausable; static for reduced motion).
+- **Charts (D3):** bar, column, line, area, pie and donut, following the dataviz rules:
+  - **Data:** one y-axis; a fixed, colour-blind-validated categorical palette (light and dark sets); legend for 2+ series; selective direct labels.
+  - **Interaction:** hover / tap / keyboard tooltips.
+  - **Accessibility:** a `<figure>` with an always-present data table and a texture fill for print and forced-colors.
+  - **Loading:** lazily loaded (57 kB chunk).
+  - **Dependencies:** `d3-scale` 4.0.2, `d3-shape` 3.2.0, `d3-array` 3.2.4, pinned with npm `overrides` across the d3 chain. The 2026-11-03 releases were avoided as too new.
+- **Effects:**
+  - Entrance animations (fade / slide / zoom) on any node. They are progressive (content is visible without JS), off for reduced motion, and the editor has a *Preview animation* button.
+  - Sticky section (one per page).
+  - Wave / curve / tilt / triangle / zigzag shape dividers.
+  - Section background video (YouTube / Vimeo, muted, privacy-enhanced). Only the poster shows on phones, with reduced motion and with Save-Data.
+- **Editor:**
+  - A reusable item list: collapsible cards, drag or keyboard reorder, duplicate, limits and per-item Bangla.
+  - A hotspot editor: click to place, drag or arrow keys to nudge, a product per dot.
+  - A spreadsheet-like chart grid: paste from Excel / CSV, Bangla digits, live checks and a chart-kind hint.
+  - A new "Media" group in the Add panel.
+- **8 new templates** with thumbnails (65 in total): how it works, stats band, FAQ accordion, photo gallery, shop the look, store location map, trust strip, growth chart.
+- **Server:**
+  - `StorefrontCatalog::productDetails()` for product spotlights.
+  - Template hotspots refer to products by source (`product_ref`), so templates never carry ids.
+
+#### Security / config
+- `config/cache.php` `serializable_classes` is now `[stdClass::class]`, instead of `false`. Before this, a cached builder payload with an empty JSON object (`{}`) came back from serializing cache stores (e.g. `database`) as an incomplete class. `stdClass` has no magic methods, so it is no gadget, and every other class stays forbidden. A regression test is included.
+
+#### Tests
+- Backend 969 (PostgreSQL 968 + 1 skip; SQLite 963 + 6 skip), including 47 schema and 7 feature tests for B6 (limits, translations, sanitizing, data, resolve, isolation, cache round-trip).
+- Vitest 1394. Mocked Playwright 215 passed, 113 skipped; this includes the chart spec (every kind at 1366 / 375, tooltips, keyboard, table, forced-colors) and the new element and editor specs.
+- Full-stack: integration 24/24; demo stores 10/10, including a B6 showcase page built from the templates, published, and used by a shopper (accordion, gallery lightbox, chart, click-to-load map); acceptance 4/4.
+
 ### K1 — Kids demo look (BerryKid-inspired) for the store builder
 
 The BerryKid baby-store design (the storefront's original reference, [UI_REFERENCE_ANALYSIS.md](docs/ecommerce/UI_REFERENCE_ANALYSIS.md)) is now a fourth demo look. It reuses layout and interaction patterns only, with original names, copy and photos.

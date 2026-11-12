@@ -23,7 +23,10 @@ use Illuminate\Validation\Rule;
  *   `footer_1` … `footer_3`) instead of `menu_id`; any node may carry `when_menu: <ref>` to be
  *   left out when the organization has no such menu (e.g. the heading above a footer menu);
  * - catalog data comes from sources only (featured, best sellers, new arrivals, on sale, top-level
- *   categories, all brands; hot deals of every countdown promotion), never from hand-picked ids.
+ *   categories, all brands; hot deals of every countdown promotion), never from hand-picked ids;
+ * - B6: a shop-the-look hotspot has `product_ref: {source, index}` (the index-th product of a
+ *   source) instead of `product_id`; spots the store has no product for are left out, and so is
+ *   a look left without spots.
  *
  * concrete() turns such sections into ordinary ones through a TemplateReferenceResolver and
  * gives every node a fresh id; the caller then validates them like any draft content.
@@ -34,6 +37,12 @@ final class PortableTemplate
 
     /** Menu references: a menu location; `footer` = the first footer column that has a menu. */
     public const MENU_REFS = ['main', 'footer', 'footer_1', 'footer_2', 'footer_3'];
+
+    /** B6: product sources a shop-the-look hotspot's `product_ref` may name. */
+    public const PRODUCT_SOURCES = ['featured', 'best_sellers', 'new_arrivals', 'on_sale'];
+
+    /** B6: at most this many products per source (`product_ref.index` < this). */
+    public const PRODUCT_REF_MAX = 8;
 
     /** Fields a template banner may set (besides `image` / `mobile_image`). */
     public const BANNER_FIELDS = [
@@ -205,6 +214,30 @@ final class PortableTemplate
                 $props['items'] = array_map(fn ($item) => is_array($item) && is_array($item['banner'] ?? null)
                     ? ['item_type' => 'banner', 'item_id' => $resolver->banner(self::bannerAttributes($item['banner'], $resolver))]
                     : $item, $props['items']);
+            }
+            if (($node['type'] ?? null) === 'shop_the_look' && is_array($props['hotspots'] ?? null)) {
+                // B6: hotspots name products by source position; those the store lacks are left
+                // out, and a look without any spot is left out.
+                $spots = [];
+                foreach ($props['hotspots'] as $spot) {
+                    if (is_array($spot) && array_key_exists('product_ref', $spot)) {
+                        $ref = $spot['product_ref'];
+                        $productId = is_array($ref) && in_array($ref['source'] ?? null, self::PRODUCT_SOURCES, true) && is_int($ref['index'] ?? null)
+                            && $ref['index'] >= 0 && $ref['index'] < self::PRODUCT_REF_MAX
+                            ? $resolver->product($ref['source'], $ref['index'])
+                            : null;
+                        if ($productId === null) {
+                            continue;
+                        }
+                        unset($spot['product_ref']);
+                        $spot['product_id'] = $productId;
+                    }
+                    $spots[] = $spot;
+                }
+                if ($spots === []) {
+                    return null;
+                }
+                $props['hotspots'] = $spots;
             }
             if (isset($node['props'])) {
                 $node['props'] = self::assetsToMedia($props, $resolver);

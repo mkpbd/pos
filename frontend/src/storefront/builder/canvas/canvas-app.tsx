@@ -8,6 +8,7 @@ import { parseLocale, setLocaleRuntime, type Locale } from '../../i18n/runtime'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../../theme'
 import type { StorefrontBootstrap } from '../../types'
 import { PageRenderer } from '../page-renderer'
+import { playMotion } from '../motion'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
 import { CANVAS_SURROUNDINGS, envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type CanvasSurroundings, type ParentMessage, type Rect } from './protocol'
@@ -211,6 +212,11 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         const r = el.getBoundingClientRect()
         if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ block: r.height > window.innerHeight ? 'start' : 'center' })
       } else if (message.type === 'scroll-by' && Number.isFinite(message.dy)) window.scrollBy(0, Math.max(-200, Math.min(200, message.dy)))
+      else if (message.type === 'play-motion') {
+        if (!NODE_ID.test(message.id)) return
+        const el = document.querySelector<HTMLElement>(`[data-b="${message.id}"]`)
+        if (el) playMotion(el)
+      }
     }
     window.addEventListener('message', onMessage)
     post({ type: 'ready' })

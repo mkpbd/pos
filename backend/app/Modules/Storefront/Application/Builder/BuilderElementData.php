@@ -28,6 +28,13 @@ use Carbon\CarbonImmutable;
  * - faq_list: `{groups: [{group, items: [{id, question, answer_html}]}]}`; published only with
  *   at least one active entry.
  *
+ * - B6 category_card: `{name, url, image: MediaRef|null, product_count}` of a visible category
+ *   (draft: a hidden one with `url: null, image: null, product_count: 0, state: unavailable`).
+ * - B6 product_spotlight: the product page object (GET /store/products/{slug}) of a live
+ *   product (draft: a draft / scheduled / ended one with `state: unavailable`).
+ * - B6 shop_the_look: `{products: {<product id>: product card}}` of the hotspots' live
+ *   products (always present; published payloads also drop the other hotspots).
+ *
  * In a draft (preview) an element that would be left out publicly keeps its data with
  * `state: expired | inactive | unavailable`; an element whose record is gone has no data.
  */
@@ -61,6 +68,22 @@ class BuilderElementData
         $menus = $this->menus->load($menuIds)->keyBy('id');
         $trees = $menus->isEmpty() ? [] : $this->menus->trees($menus->values());
         $faq = null;
+
+        // B6: category cards, product spotlights and shop-the-look products.
+        $categoryIds = $ids('category_card', 'category_id');
+        $categories = $this->categoryCards($categoryIds, $preview);
+        $spotlightIds = $ids('product_spotlight', 'product_id');
+        $details = $spotlightIds === [] ? [] : $this->catalog->productDetails($spotlightIds);
+        $missing = array_values(array_diff($spotlightIds, array_keys($details)));
+        $previewDetails = $preview && $missing !== [] ? $this->catalog->productDetails($missing, true) : [];
+        $lookIds = [];
+        foreach ($elements as $element) {
+            if ($element['type'] === 'shop_the_look') {
+                array_push($lookIds, ...array_filter(array_column($element['props']['hotspots'] ?? [], 'product_id'), 'is_string'));
+            }
+        }
+        $lookIds = array_values(array_unique($lookIds));
+        $lookCards = $lookIds === [] ? [] : array_column($this->catalog->productCards($lookIds), null, 'id');
 
         $now = CarbonImmutable::now();
         $result = [];
@@ -104,6 +127,26 @@ class BuilderElementData
                     $faq ??= $this->content->publicFaq();
                     $data = ['groups' => $faq];
                     $state = $faq === [] ? 'unavailable' : null;
+                    break;
+                case 'category_card':
+                    [$data, $state] = $categories[$props['category_id']] ?? [null, null];
+                    break;
+                case 'product_spotlight':
+                    $data = $details[$props['product_id']] ?? null;
+                    if ($data === null && isset($previewDetails[$props['product_id']])) {
+                        $data = $previewDetails[$props['product_id']];
+                        unset($data['preview_state']);
+                        $state = 'unavailable';
+                    }
+                    break;
+                case 'shop_the_look':
+                    $products = [];
+                    foreach ($props['hotspots'] as $spot) {
+                        if (isset($lookCards[$spot['product_id']])) {
+                            $products[$spot['product_id']] = $lookCards[$spot['product_id']];
+                        }
+                    }
+                    $data = ['products' => $products];
                     break;
             }
 
@@ -200,6 +243,39 @@ class BuilderElementData
         };
 
         return [$data, $state];
+    }
+
+    /**
+     * B6: category card data `{name, url, image, product_count}` and state by category id —
+     * visible categories (state null); in a draft also hidden ones (`url` null, no image, 0
+     * products, state `unavailable`). Categories that no longer exist are left out.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{0: array<string, mixed>, 1: ?string}>
+     */
+    private function categoryCards(array $ids, bool $preview): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $visible = $this->catalog->visibleCategories($ids);
+        $strip = $visible === [] ? [] : array_column($this->catalog->categoryStrip(array_keys($visible), count($visible)), null, 'slug');
+
+        $result = [];
+        foreach ($visible as $id => $category) {
+            $card = $strip[$category['slug']] ?? null;
+            if ($card !== null) {
+                $result[$id] = [['name' => $card['name'], 'url' => $card['url'], 'image' => $card['image'], 'product_count' => $card['product_count']], null];
+            }
+        }
+        if ($preview) {
+            $hidden = array_values(array_diff($ids, array_keys($result)));
+            foreach ($hidden === [] ? [] : $this->catalog->itemSummaries('category', $hidden) as $id => $summary) {
+                $result[$id] = [['name' => $summary['name'], 'url' => null, 'image' => null, 'product_count' => 0], 'unavailable'];
+            }
+        }
+
+        return $result;
     }
 
     /**

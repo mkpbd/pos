@@ -13,8 +13,8 @@
  */
 
 import { NODE_ID } from './registry'
-import type { Background, Breakpoint, Gradient, ResponsiveStyle, Shadow, Style } from './types'
-import { normalizeColor, normalizeStyle, normalizeWidth, oneOf } from './validate'
+import type { Background, Breakpoint, Gradient, Motion, ResponsiveStyle, Shadow, Style } from './types'
+import { normalizeColor, normalizeGradient, normalizeStyle, normalizeWidth, oneOf } from './validate'
 
 export const TABLET_QUERY = '(max-width: 1023px)'
 export const MOBILE_QUERY = '(max-width: 639px)'
@@ -47,7 +47,7 @@ type Kind = 'section' | 'column' | 'element'
 
 type Rule = { selector: string; declarations: string[] }
 
-type Output = Record<Breakpoint, Rule[]> & { hideDesktop: string[]; hideTablet: string[]; hideMobile: string[]; reducedMotion: Rule[] }
+type Output = Record<Breakpoint, Rule[]> & { hideDesktop: string[]; hideTablet: string[]; hideMobile: string[]; reducedMotion: Rule[]; motion: Rule[] }
 
 /* -------------------------------------------------------------------------------------------- */
 
@@ -67,6 +67,16 @@ export function colorCss(value: unknown): string | undefined {
 function gradientCss(gradient: Gradient): string {
   const stops = gradient.stops.map((stop) => `${colorCss(stop.color)} ${num(stop.position)}%`).join(', ')
   return gradient.type === 'linear' ? `linear-gradient(${num(gradient.angle ?? 180)}deg, ${stops})` : `radial-gradient(${gradient.shape ?? 'ellipse'}, ${stops})`
+}
+
+/** B6: a background overlay (colour or gradient) as a `background-image` value, for layers drawn over a background video. */
+export function overlayCss(overlay: unknown): string | undefined {
+  if (typeof overlay === 'string') {
+    const color = colorCss(overlay)
+    return color ? `linear-gradient(${color}, ${color})` : undefined
+  }
+  const gradient = normalizeGradient(overlay)
+  return gradient ? gradientCss(gradient) : undefined
 }
 
 function shadowCss(shadow: Shadow, text = false): string {
@@ -268,6 +278,56 @@ function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown
   if (hasHover) {
     out.reducedMotion.push({ selector, declarations: ['transition:none'] }, { selector: `${selector}:hover,${selector}:focus-visible`, declarations: ['transform:none'] })
   }
+  const motion = style.base?.motion
+  if (motion) out.motion.push(...motionRules(selector, motion))
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B6 motion: entrance animations. Content is visible without JS; the runtime (./motion.ts) sets
+ * `data-b-motion="start"` (hidden) on a node with an entrance, then `run` when it enters the
+ * viewport. These rules exist only under `prefers-reduced-motion: no-preference`, so a visitor who
+ * prefers reduced motion never sees a hidden or moving node, whatever the runtime does. The
+ * keyframes (`b-motion-<entrance>`) are in storefront.css.
+ * -------------------------------------------------------------------------------------------- */
+
+export const MOTION_DEFAULTS = { duration: 600, delay: 0 } as const
+
+/** A node's entrance with its defaults filled in; null for none / no motion. */
+export function motionOf(style: unknown): Required<Motion> | null {
+  const motion = normalizeStyle(style).base?.motion
+  if (!motion || motion.entrance === 'none') return null
+  return { entrance: motion.entrance, duration: motion.duration ?? MOTION_DEFAULTS.duration, delay: motion.delay ?? MOTION_DEFAULTS.delay }
+}
+
+function motionRules(selector: string, motion: Motion): Rule[] {
+  const value = motionOf({ base: { motion } })
+  if (!value) return []
+  return [
+    { selector: `${selector}[data-b-motion="start"]`, declarations: ['opacity:0'] },
+    {
+      selector: `${selector}[data-b-motion="run"]`,
+      declarations: [`animation:b-motion-${value.entrance} ${num(value.duration)}ms cubic-bezier(0.2,0.7,0.2,1) ${num(value.delay)}ms backwards`],
+    },
+  ]
+}
+
+export type MotionTarget = { id: string; motion: Required<Motion> }
+
+/** The nodes of a document or render tree that have an entrance (sections, columns and elements, in document order). */
+export function motionTargets(sections: readonly unknown[]): MotionTarget[] {
+  const out: MotionTarget[] = []
+  const visit = (node: unknown) => {
+    if (typeof node !== 'object' || node === null) return
+    const n = node as NodeLike & { elements?: unknown }
+    if (validId(n.id)) {
+      const motion = motionOf(n.style)
+      if (motion) out.push({ id: n.id, motion })
+    }
+    if (Array.isArray(n.columns)) n.columns.forEach(visit)
+    if (Array.isArray(n.elements)) n.elements.forEach(visit)
+  }
+  sections.forEach(visit)
+  return out
 }
 
 function compileVisibility(out: Output, id: string, visibility: unknown, options: CompileOptions) {
@@ -316,7 +376,7 @@ function hideCss(selectors: string[]): string[] {
 
 /** The CSS for a document or render tree (sections). Invalid nodes and values produce nothing. */
 export function compileStyles(sections: readonly unknown[], options: CompileOptions = {}): string {
-  const out: Output = { base: [], tablet: [], mobile: [], hideDesktop: [], hideTablet: [], hideMobile: [], reducedMotion: [] }
+  const out: Output = { base: [], tablet: [], mobile: [], hideDesktop: [], hideTablet: [], hideMobile: [], reducedMotion: [], motion: [] }
 
   for (const section of sections as NodeLike[]) {
     if (typeof section !== 'object' || section === null || !validId(section.id)) continue
@@ -332,6 +392,7 @@ export function compileStyles(sections: readonly unknown[], options: CompileOpti
     ...block(DESKTOP_ONLY, hideCss(out.hideDesktop)),
     ...block(TABLET_ONLY, hideCss(out.hideTablet)),
     ...block('(prefers-reduced-motion: reduce)', rulesCss(out.reducedMotion)),
+    ...block('(prefers-reduced-motion: no-preference)', rulesCss(out.motion)),
   ].join('\n')
 }
 

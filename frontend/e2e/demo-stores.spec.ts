@@ -352,3 +352,62 @@ test('B4: Green Basket designs its footer and About page with the builder; shopp
   await page.goto(`${base}/`)
   await expect(page.locator('[data-b-scope="footer"]')).toBeAttached({ timeout: 15_000 })
 })
+
+test('B6: Green Basket publishes a page built from the new element templates; shoppers can use every one', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(180_000)
+  const base = origin('vegan.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: Record<string, unknown> & { id: string; nodes: unknown[]; draft_revision: number } } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // The owner inserts the new templates (as the Templates tab does) into a landing page and publishes it.
+  const sections: unknown[] = []
+  for (const id of ['neutral-stats-band', 'neutral-faq-accordion', 'neutral-photo-gallery', 'neutral-growth-chart', 'neutral-how-it-works', 'neutral-trust-strip', 'neutral-store-map']) {
+    const made = await call('POST', `/api/v1/storefront/builder/templates/${id}/instantiate`, { context: 'page' })
+    expect(made.status, id).toBe(200)
+    sections.push(...made.body.data.nodes)
+  }
+  const doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b6-showcase', title: 'B6 showcase', from: 'blank' })
+  expect(doc.status).toBe(201)
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${doc.body.data.id}/draft`, { revision: doc.body.data.draft_revision, content: { schema_version: 1, sections } })
+  expect(saved.status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${doc.body.data.id}/publish`, { note: 'B6 showcase' })).status).toBe(200)
+  await adminContext.close()
+
+  await page.goto(`${base}/p/b6-showcase`)
+  // Accordion: the first panel is open; opening another works by click.
+  const accordion = page.getByTestId('builder-accordion').first()
+  await expect(accordion).toBeVisible()
+  const headers = accordion.locator('button[aria-expanded]')
+  await expect(headers.first()).toHaveAttribute('aria-expanded', 'true')
+  await headers.nth(1).click()
+  await expect(headers.nth(1)).toHaveAttribute('aria-expanded', 'true')
+
+  // Gallery: a photo opens larger in a dialog; Escape closes it.
+  await page.getByRole('button', { name: /^View larger:/ }).first().click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  // Chart: an accessible figure with its data table toggle.
+  const chart = page.getByTestId('builder-chart').first()
+  await chart.scrollIntoViewIfNeeded()
+  await expect(chart.locator('svg[role="img"]')).toBeVisible()
+  await expect(chart.getByRole('button', { name: /data table/i })).toBeVisible()
+
+  // Map: nothing loads from Google until the visitor asks for it.
+  await expect(page.locator('iframe[src*="google"]')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show map' }).click()
+  await expect(page.locator('iframe[src*="google.com/maps"]')).toHaveCount(1)
+})

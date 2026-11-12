@@ -1,0 +1,833 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_b6",
+      "type": "section",
+      "props": {
+        "layout": "boxed",
+        "anchor": "b6-elements",
+        "sticky": true,
+        "shape_top": {
+          "shape": "wave",
+          "color": "theme:surface",
+          "height": 64,
+          "flip": false
+        },
+        "shape_bottom": {
+          "shape": "zigzag",
+          "color": "#f4e9dc",
+          "height": 40,
+          "flip": true
+        }
+      },
+      "style": {
+        "base": {
+          "background": {
+            "type": "color",
+            "color": "#1f2933",
+            "overlay": "#00000066",
+            "video": {
+              "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+              "provider": "youtube",
+              "video_id": "aqz-KE-bpKQ",
+              "poster": {
+                "media_id": "0199a5c1-0000-7000-8000-000000000b01"
+              }
+            }
+          },
+          "motion": {
+            "entrance": "fade",
+            "duration": 600,
+            "delay": 0
+          }
+        }
+      },
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_b6",
+          "type": "column",
+          "width": {
+            "base": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_accordion",
+              "type": "accordion",
+              "props": {
+                "items": [
+                  {
+                    "id": "q1",
+                    "title": "How long does delivery take?",
+                    "html": "<p>Two to three days in Dhaka.</p>"
+                  },
+                  {
+                    "id": "q2",
+                    "title": "Can I pay on delivery?",
+                    "html": "<p>Yes, <strong>cash on delivery</strong> is available.</p>"
+                  }
+                ],
+                "open_first": true,
+                "allow_multiple": false,
+                "style": "boxed"
+              },
+              "style": {
+                "base": {
+                  "motion": {
+                    "entrance": "slide-up",
+                    "duration": 500,
+                    "delay": 100
+                  }
+                }
+              },
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.q1.title": "ডেলিভারিতে কত দিন লাগে?",
+                  "items.q1.html": "<p>ঢাকায় দুই থেকে তিন দিন।</p>"
+                }
+              }
+            },
+            {
+              "id": "e_tabs",
+              "type": "tabs",
+              "props": {
+                "items": [
+                  {
+                    "id": "t1",
+                    "title": "Details",
+                    "html": "<p>Made from cold-pressed mango.</p>"
+                  },
+                  {
+                    "id": "t2",
+                    "title": "Storage",
+                    "html": "<p>Keep in the fridge after opening.</p>"
+                  }
+                ],
+                "layout": "vertical"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.t2.title": "সংরক্ষণ"
+                }
+              }
+            },
+            {
+              "id": "e_icon_box",
+              "type": "icon_box",
+              "props": {
+                "icon": "leaf",
+                "title": "Grown without chemicals",
+                "text": "Straight from our partner farms.",
+                "link": {
+                  "url": "/pages/our-farms"
+                },
+                "layout": "left",
+                "icon_style": "square"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "রাসায়নিক ছাড়া চাষ"
+                }
+              }
+            },
+            {
+              "id": "e_icon_list",
+              "type": "icon_list",
+              "props": {
+                "items": [
+                  {
+                    "id": "l1",
+                    "icon": "truck",
+                    "text": "Free delivery over 1000 taka",
+                    "link": null
+                  },
+                  {
+                    "id": "l2",
+                    "icon": "phone",
+                    "text": "Call us any day",
+                    "link": {
+                      "url": "/pages/contact"
+                    }
+                  }
+                ],
+                "layout": "inline"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.l1.text": "১০০০ টাকার বেশি অর্ডারে ফ্রি ডেলিভারি"
+                }
+              }
+            },
+            {
+              "id": "e_quote",
+              "type": "quote",
+              "props": {
+                "text": "The freshest jam in town.",
+                "author": "Nadia Rahman",
+                "role": "Customer since 2023",
+                "style": "large"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "text": "শহরের সবচেয়ে তাজা জ্যাম।"
+                }
+              }
+            },
+            {
+              "id": "e_notice",
+              "type": "notice",
+              "props": {
+                "tone": "promo",
+                "title": "Eid offer",
+                "text": "10% off every jar until Friday.",
+                "show_icon": true
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "ঈদ অফার"
+                }
+              }
+            },
+            {
+              "id": "e_counter",
+              "type": "counter",
+              "props": {
+                "items": [
+                  {
+                    "id": "n1",
+                    "value": 12500,
+                    "prefix": "",
+                    "suffix": "+",
+                    "label": "Jars delivered"
+                  },
+                  {
+                    "id": "n2",
+                    "value": 4.85,
+                    "prefix": "",
+                    "suffix": "/5",
+                    "label": "Average rating"
+                  },
+                  {
+                    "id": "n3",
+                    "value": 0,
+                    "prefix": "৳",
+                    "suffix": "",
+                    "label": "Delivery in Dhaka"
+                  }
+                ],
+                "animate": true
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.n1.label": "জার পৌঁছেছে",
+                  "items.n2.suffix": "/৫"
+                }
+              }
+            },
+            {
+              "id": "e_steps",
+              "type": "steps",
+              "props": {
+                "items": [
+                  {
+                    "id": "p1",
+                    "title": "Choose",
+                    "text": "Pick your jars.",
+                    "icon": "store"
+                  },
+                  {
+                    "id": "p2",
+                    "title": "Pay",
+                    "text": "Online or on delivery.",
+                    "icon": "credit-card"
+                  },
+                  {
+                    "id": "p3",
+                    "title": "Enjoy",
+                    "text": "",
+                    "icon": null
+                  }
+                ],
+                "layout": "horizontal",
+                "numbered": true
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.p1.title": "বাছাই করুন"
+                }
+              }
+            },
+            {
+              "id": "e_chart",
+              "type": "chart",
+              "props": {
+                "kind": "line",
+                "title": "Orders per year",
+                "description": "Online orders grew every year since we opened.",
+                "labels": [
+                  "2022",
+                  "2023",
+                  "2024",
+                  "2025"
+                ],
+                "series": [
+                  {
+                    "id": "s_online",
+                    "name": "Online",
+                    "values": [
+                      120,
+                      340,
+                      560,
+                      910.5
+                    ]
+                  },
+                  {
+                    "id": "s_shop",
+                    "name": "In the shop",
+                    "values": [
+                      400,
+                      420,
+                      390,
+                      450
+                    ]
+                  }
+                ],
+                "unit": "pcs",
+                "unit_position": "after",
+                "y_starts_at_zero": true,
+                "show_values": "last",
+                "show_legend": true,
+                "show_table": true,
+                "height": 360
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "বছরে অর্ডার",
+                  "series.s_shop.name": "দোকানে",
+                  "labels.0": "২০২২"
+                }
+              }
+            },
+            {
+              "id": "e_gallery",
+              "type": "gallery",
+              "props": {
+                "images": [
+                  {
+                    "id": "g1",
+                    "media_id": "0199a5c1-0000-7000-8000-000000000b02",
+                    "alt": "Mango jam on toast",
+                    "caption": "Breakfast favourite"
+                  },
+                  {
+                    "id": "g2",
+                    "media_id": "0199a5c1-0000-7000-8000-000000000b03",
+                    "alt": "Jars on a shelf",
+                    "caption": ""
+                  }
+                ],
+                "columns": {
+                  "base": 4,
+                  "tablet": 3,
+                  "mobile": 2
+                },
+                "aspect": "4:3",
+                "lightbox": true,
+                "gap": "sm"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "images.g1.alt": "টোস্টে আমের জ্যাম",
+                  "images.g1.caption": "সকালের প্রিয়"
+                }
+              }
+            },
+            {
+              "id": "e_carousel",
+              "type": "image_carousel",
+              "props": {
+                "images": [
+                  {
+                    "id": "k1",
+                    "media_id": "0199a5c1-0000-7000-8000-000000000b02",
+                    "alt": "Mango jam on toast",
+                    "caption": "New season",
+                    "link": {
+                      "url": "/shop"
+                    }
+                  },
+                  {
+                    "id": "k2",
+                    "media_id": "0199a5c1-0000-7000-8000-000000000b03",
+                    "alt": "Jars on a shelf",
+                    "caption": "",
+                    "link": null
+                  }
+                ],
+                "autoplay": 5,
+                "show_dots": true,
+                "show_arrows": false,
+                "aspect": "16:9"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "images.k1.caption": "নতুন মৌসুম"
+                }
+              }
+            },
+            {
+              "id": "e_logos",
+              "type": "logo_carousel",
+              "props": {
+                "logos": [
+                  {
+                    "id": "o1",
+                    "media_id": "0199a5c1-0000-7000-8000-000000000b04",
+                    "alt": "Green Farms",
+                    "link": null
+                  },
+                  {
+                    "id": "o2",
+                    "media_id": "0199a5c1-0000-7000-8000-000000000b05",
+                    "alt": "Dhaka Organics",
+                    "link": {
+                      "url": "https://example.com"
+                    }
+                  }
+                ],
+                "grayscale": true,
+                "speed": "slow"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "logos.o1.alt": "গ্রিন ফার্মস"
+                }
+              }
+            },
+            {
+              "id": "e_map",
+              "type": "map",
+              "props": {
+                "query": "House 12, Road 5, Dhanmondi, Dhaka",
+                "title": "Our shop in Dhanmondi",
+                "height": 360,
+                "zoom": 16
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "ধানমন্ডিতে আমাদের দোকান"
+                }
+              }
+            },
+            {
+              "id": "e_category",
+              "type": "category_card",
+              "props": {
+                "category_id": "0199a5c1-0000-7000-8000-000000000c01",
+                "media_id": null,
+                "title": null,
+                "button_label": "Shop jams",
+                "layout": "overlay"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "button_label": "জ্যাম কিনুন"
+                }
+              }
+            },
+            {
+              "id": "e_spotlight",
+              "type": "product_spotlight",
+              "props": {
+                "product_id": "0199a5c1-0000-7000-8000-000000000d01",
+                "layout": "image-right",
+                "show_description": true,
+                "badge": "Best seller"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "badge": "সেরা বিক্রি"
+                }
+              }
+            },
+            {
+              "id": "e_look",
+              "type": "shop_the_look",
+              "props": {
+                "media_id": "0199a5c1-0000-7000-8000-000000000b06",
+                "alt": "A breakfast table with jam, bread and tea",
+                "title": "Breakfast, sorted",
+                "hotspots": [
+                  {
+                    "id": "h1",
+                    "x": 32.5,
+                    "y": 60,
+                    "product_id": "0199a5c1-0000-7000-8000-000000000d01"
+                  },
+                  {
+                    "id": "h2",
+                    "x": 71,
+                    "y": 44.25,
+                    "product_id": "0199a5c1-0000-7000-8000-000000000d02"
+                  }
+                ]
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "সকালের নাস্তা তৈরি"
+                }
+              }
+            },
+            {
+              "id": "e_trust",
+              "type": "trust_badges",
+              "props": {
+                "items": [
+                  {
+                    "id": "b1",
+                    "icon": "truck",
+                    "title": "Fast delivery",
+                    "text": "In 2 to 3 days"
+                  },
+                  {
+                    "id": "b2",
+                    "icon": "shield-check",
+                    "title": "Secure payment",
+                    "text": ""
+                  }
+                ],
+                "style": "grid"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.b1.title": "দ্রুত ডেলিভারি"
+                }
+              }
+            },
+            {
+              "id": "e_recent",
+              "type": "recently_viewed",
+              "props": {
+                "title": "You looked at",
+                "limit": 8
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "title": "আপনি দেখেছেন"
+                }
+              }
+            },
+            {
+              "id": "e_marquee",
+              "type": "marquee",
+              "props": {
+                "items": [
+                  {
+                    "id": "m1",
+                    "text": "Free delivery over 1000 taka"
+                  },
+                  {
+                    "id": "m2",
+                    "text": "New mango season"
+                  }
+                ],
+                "speed": "fast",
+                "direction": "right",
+                "separator": "leaf"
+              },
+              "style": {},
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "items.m2.text": "আমের নতুন মৌসুম"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_row",
+      "type": "section",
+      "props": {
+        "layout": "full",
+        "anchor": null,
+        "shape_bottom": {
+          "shape": "curve",
+          "color": "theme:primary",
+          "height": 120,
+          "flip": false
+        }
+      },
+      "style": {},
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_row",
+          "type": "column",
+          "width": {
+            "base": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_row",
+              "type": "inner_row",
+              "props": {},
+              "style": {
+                "base": {
+                  "background": {
+                    "type": "none",
+                    "video": {
+                      "url": "https://vimeo.com/76979871",
+                      "provider": "vimeo",
+                      "video_id": "76979871"
+                    }
+                  },
+                  "motion": {
+                    "entrance": "zoom"
+                  }
+                }
+              },
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {},
+              "columns": [
+                {
+                  "id": "c_inner",
+                  "type": "column",
+                  "width": {
+                    "base": 50,
+                    "mobile": 100
+                  },
+                  "style": {
+                    "base": {
+                      "motion": {
+                        "entrance": "slide-left",
+                        "delay": 200
+                      }
+                    }
+                  },
+                  "elements": [
+                    {
+                      "id": "e_pie",
+                      "type": "chart",
+                      "props": {
+                        "kind": "donut",
+                        "title": "Where orders come from",
+                        "description": "",
+                        "labels": [
+                          "Dhaka",
+                          "Chattogram",
+                          "Other"
+                        ],
+                        "series": [
+                          {
+                            "id": "s1",
+                            "name": "Orders",
+                            "values": [
+                              62,
+                              23,
+                              15
+                            ]
+                          }
+                        ],
+                        "unit": "%",
+                        "unit_position": "after",
+                        "y_starts_at_zero": true,
+                        "show_values": "all-small",
+                        "show_legend": true,
+                        "show_table": false,
+                        "height": 280
+                      },
+                      "style": {},
+                      "visibility": {
+                        "desktop": true,
+                        "tablet": true,
+                        "mobile": true
+                      },
+                      "hidden": false,
+                      "schedule": null,
+                      "translations": {}
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

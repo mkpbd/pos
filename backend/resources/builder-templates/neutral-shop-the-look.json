@@ -1,0 +1,38 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "shop_the_look",
+                            "props": {
+                                "media_id": { "asset": "handmade/banner-tile-1.jpg" },
+                                "alt": "Handmade decor, vases and plants styled on a sideboard",
+                                "title": "Shop the look",
+                                "hotspots": [
+                                    { "id": "h1", "x": 28, "y": 55, "product_ref": { "source": "featured", "index": 0 } },
+                                    { "id": "h2", "x": 52, "y": 40, "product_ref": { "source": "featured", "index": 1 } },
+                                    { "id": "h3", "x": 76, "y": 62, "product_ref": { "source": "featured", "index": 2 } }
+                                ]
+                            },
+                            "translations": { "bn": { "title": "পুরো সাজটি কিনুন" } }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

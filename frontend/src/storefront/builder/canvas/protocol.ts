@@ -48,6 +48,8 @@ export type ParentMessage =
   | { type: 'theme'; settings: CanvasThemeSettings }
   /** Drag autoscroll near the canvas edges. */
   | { type: 'scroll-by'; dy: number }
+  /** B6 (additive, v stays 1): replay a node's entrance animation once (the inspector's "Preview animation"). */
+  | { type: 'play-motion'; id: string }
 
 /** Canvas → parent. Rects are in the canvas viewport's CSS pixels. */
 export type CanvasMessage =
@@ -63,7 +65,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion'])
 const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {

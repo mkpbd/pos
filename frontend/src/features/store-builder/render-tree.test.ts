@@ -82,3 +82,57 @@ describe('the canvas render tree: B4 elements', () => {
     expect(DATA_ELEMENT_TYPES.has('contact_form')).toBe(true)
   })
 })
+
+describe('B6 in the canvas render tree', () => {
+  const common = { style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null }
+  const UUID = '0b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+  const UUID2 = '1b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+  const UUID3 = '2b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+  const doc = (elements: Element[], style: Section['style'] = {}): BuilderContent => ({
+    schema_version: 1,
+    sections: [{ id: 's_b6', type: 'section', props: { layout: 'boxed', anchor: null }, ...common, style, translations: {}, columns: [{ id: 'c_b6', type: 'column', width: { base: 100 }, style: {}, elements }] }],
+  })
+
+  it('applies item, label and series translations by id and position', () => {
+    const accordion = {
+      id: 'e_acc', type: 'accordion', ...common,
+      props: { items: [{ id: 'i_a', title: 'Fresh?', html: '<p>Yes</p>' }, { id: 'i_b', title: 'Cash?', html: '' }], open_first: true, allow_multiple: false, style: 'boxed' },
+      translations: { bn: { 'items.i_b.title': 'নগদ?', 'items.i_x.title': 'ignored', 'items.i_a.secret': 'ignored' } },
+    } as unknown as Element
+    const chart = {
+      id: 'e_chart', type: 'chart', ...common,
+      props: { kind: 'column', title: 'Sales', description: '', labels: ['Jan', 'Feb'], series: [{ id: 'series-1', name: 'Online', values: [1, 2] }], unit: '', unit_position: 'after', y_starts_at_zero: true, show_values: 'none', show_legend: true, show_table: false, height: 320 },
+      translations: { bn: { title: 'বিক্রি', 'labels.1': 'ফেব্রু', 'series.series-1.name': 'অনলাইন' } },
+    } as unknown as Element
+    const bn = toRenderTree(doc([accordion, chart]), { locale: 'bn', now: NOW })
+    expect((element(bn, 'e_acc')!.props as { items: { title: string }[] }).items.map((i) => i.title)).toEqual(['Fresh?', 'নগদ?'])
+    expect(element(bn, 'e_acc')!.props).not.toHaveProperty('items.0.secret')
+    expect(element(bn, 'e_chart')!.props).toMatchObject({ title: 'বিক্রি', labels: ['Jan', 'ফেব্রু'], series: [{ name: 'অনলাইন' }] })
+  })
+
+  it('category card, product spotlight and shop the look are resolved by the server; moving a hotspot keeps the key', () => {
+    expect(['category_card', 'product_spotlight', 'shop_the_look'].every((t) => DATA_ELEMENT_TYPES.has(t))).toBe(true)
+    const look = { id: 'e_look', type: 'shop_the_look', ...common, translations: {}, props: { media_id: UUID, alt: '', title: '', hotspots: [{ id: 'h_a', x: 10, y: 10, product_id: UUID2 }] } } as unknown as Element
+    expect(wrappedElements(doc([look])).map((e) => e.id)).toEqual(['e_look'])
+    expect(resolveInput(look)).toMatchObject({ id: 'e_look', type: 'shop_the_look', props: { media_id: UUID } })
+  })
+
+  it('collects media ids of gallery, carousels, logos, category card, shop the look and background video posters', () => {
+    const gallery = { id: 'e_gal', type: 'gallery', ...common, translations: {}, props: { images: [{ id: 'i_a', media_id: UUID, alt: '', caption: '' }], columns: { base: 3 }, aspect: 'square', lightbox: true, gap: 'md' } } as unknown as Element
+    const logos = { id: 'e_logo', type: 'logo_carousel', ...common, translations: {}, props: { logos: [{ id: 'i_l', media_id: UUID2, alt: '', link: null }], grayscale: true, speed: 'normal' } } as unknown as Element
+    const card = { id: 'e_card', type: 'category_card', ...common, translations: {}, props: { category_id: UUID, media_id: UUID3, title: null, button_label: 'Shop', layout: 'overlay' } } as unknown as Element
+    const style = { base: { background: { type: 'none', video: { url: 'https://youtu.be/dQw4w9WgXcQ', provider: 'youtube', video_id: 'dQw4w9WgXcQ', poster: { media_id: 'ffffffff-1a2b-4c3d-8e9f-0123456789ab' } } } } } as Section['style']
+    expect(mediaIds(doc([gallery, logos, card], style)).sort()).toEqual([UUID, UUID2, UUID3, 'ffffffff-1a2b-4c3d-8e9f-0123456789ab'].sort())
+  })
+})
+
+describe('B6 resolve keys', () => {
+  it('a shop the look is re-resolved only when its photo or products change', async () => {
+    const { resolveKey } = await import('./render-tree')
+    const common = { style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null, translations: {} }
+    const look = (x: number, product: string) =>
+      ({ id: 'e_look', type: 'shop_the_look', ...common, props: { media_id: 'm', alt: '', title: '', hotspots: [{ id: 'h_a', x, y: 10, product_id: product }] } }) as unknown as Element
+    expect(resolveKey(look(10, 'p1'))).toBe(resolveKey(look(55, 'p1')))
+    expect(resolveKey(look(10, 'p1'))).not.toBe(resolveKey(look(10, 'p2')))
+  })
+})

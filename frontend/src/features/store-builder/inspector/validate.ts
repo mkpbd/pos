@@ -7,10 +7,23 @@
 
 import type { SectionConfigs, SectionType, SectionTypeInfo } from '@/features/storefront/api'
 import { validateSectionDraft } from '@/features/storefront/components/section-draft'
-import { isWrappedSectionType, NODE_ID } from '@/storefront/builder/registry'
+import { isWrappedSectionType, matchesTranslatable, NODE_ID } from '@/storefront/builder/registry'
 import type { Column, Element, Section, WrappedElement, WrappedSectionType } from '@/storefront/builder/types'
 import { ICON_NAMES } from '@/storefront/builder/icons'
-import { B4_ENUMS, ENUMS, isUuid, normalizeColor, normalizeWidthValue, parseVideoUrl, safeUrl } from '@/storefront/builder/validate'
+import {
+  B4_ENUMS,
+  B6_LIMITS,
+  B6_TEXT_LIMITS,
+  b6PropProblems,
+  ENUMS,
+  isUuid,
+  normalizeColor,
+  normalizeSectionShape,
+  normalizeWidthValue,
+  parseVideoUrl,
+  safeUrl,
+  type PropProblem,
+} from '@/storefront/builder/validate'
 import type { BuilderNode, Problem } from './types'
 
 /** Text limits of the basic elements (backend ElementRegistry::TEXT_LIMITS). */
@@ -55,8 +68,24 @@ export const B4_BOUNDS = {
   customHtml: 20_000,
 } as const
 
-/** Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable). */
+/** B6 element types (contract §1). */
+export const B6_TYPES: ReadonlySet<string> = new Set([
+  'accordion', 'tabs', 'icon_box', 'icon_list', 'quote', 'notice', 'counter', 'steps', 'chart', 'gallery', 'image_carousel', 'logo_carousel', 'map',
+  'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed', 'marquee',
+])
+
+/** B6 props that are not translated although they have a text limit. */
+const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'] }
+
+const B6_TEXTS = B6_TEXT_LIMITS as Record<string, Record<string, number>>
+
+/**
+ * Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable).
+ * B6 list fields are patterns (`items.*.title`, `labels.*`); see `translationLimit`.
+ */
 export function translatableFields(type: string): Record<string, number> {
+  const b6 = B6_TEXTS[type]
+  if (b6) return Object.fromEntries(Object.entries(b6).filter(([field]) => !(B6_NOT_TRANSLATED[type] ?? []).includes(field)))
   const b4 = B4_TEXT_LIMITS[type]
   if (b4) return b4
   switch (type) {
@@ -288,8 +317,107 @@ function validateB4(node: Element, add: (path: string, message: string) => void,
   }
 }
 
+/** The maximum length of a stored translation key (`items.i_ab12cd.title` → the `items.*.title` limit); undefined = not translatable. */
+export function translationLimit(type: string, key: string): number | undefined {
+  for (const [pattern, max] of Object.entries(translatableFields(type))) if (matchesTranslatable(pattern, key)) return max
+  return undefined
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B6: the storefront's prop rules (b6PropProblems) with messages
+ * -------------------------------------------------------------------------------------------- */
+
+type Range = { min: number; max: number }
+
+/** List props and their item counts. */
+const B6_LISTS: Record<string, Record<string, Range & { noun: string; plural: string }>> = {
+  accordion: { items: { ...B6_LIMITS.accordionItems, noun: 'panel', plural: 'panels' } },
+  tabs: { items: { ...B6_LIMITS.tabsItems, noun: 'tab', plural: 'tabs' } },
+  icon_list: { items: { ...B6_LIMITS.iconListItems, noun: 'line', plural: 'lines' } },
+  counter: { items: { ...B6_LIMITS.counterItems, noun: 'number', plural: 'numbers' } },
+  steps: { items: { ...B6_LIMITS.stepsItems, noun: 'step', plural: 'steps' } },
+  chart: { labels: { ...B6_LIMITS.chartLabels, noun: 'row', plural: 'rows' }, series: { ...B6_LIMITS.chartSeries, noun: 'series', plural: 'series' } },
+  gallery: { images: { ...B6_LIMITS.galleryImages, noun: 'image', plural: 'images' } },
+  image_carousel: { images: { ...B6_LIMITS.carouselImages, noun: 'image', plural: 'images' } },
+  logo_carousel: { logos: { ...B6_LIMITS.logos, noun: 'logo', plural: 'logos' } },
+  shop_the_look: { hotspots: { ...B6_LIMITS.hotspots, noun: 'hotspot', plural: 'hotspots' } },
+  trust_badges: { items: { ...B6_LIMITS.trustBadges, noun: 'badge', plural: 'badges' } },
+  marquee: { items: { ...B6_LIMITS.marqueeItems, noun: 'text', plural: 'texts' } },
+}
+
+/** Whole-number props and their ranges. */
+const B6_NUMBERS: Record<string, Record<string, Range & { unit?: string }>> = {
+  chart: { height: { ...B6_LIMITS.chartHeight, unit: 'px' } },
+  map: { height: { ...B6_LIMITS.mapHeight, unit: 'px' }, zoom: B6_LIMITS.mapZoom },
+  image_carousel: { autoplay: { ...B6_LIMITS.carouselAutoplay, unit: 's' } },
+  recently_viewed: { limit: B6_LIMITS.recentlyViewed },
+  gallery: { 'columns.base': B6_LIMITS.galleryColumns, 'columns.tablet': { min: 1, max: 6 }, 'columns.mobile': { min: 1, max: 6 } },
+}
+
+const REQUIRED_MESSAGES: Record<string, string> = {
+  media_id: 'Choose an image.',
+  product_id: 'Choose a product.',
+  category_id: 'Choose a category.',
+  query: 'Enter an address or map coordinates.',
+  title: 'Enter a title.',
+  text: 'Enter the text.',
+  labels: 'Enter a label.',
+}
+
+/** `items.2.title` → `items.*.title`. */
+const toPattern = (path: string) => path.replace(/\.\d+(?=\.|$)/g, '.*')
+
+/** A friendly message for a B6 prop problem. */
+export function b6Message(type: string, problem: PropProblem): string {
+  const { path, code } = problem
+  const parts = path.split('.')
+  const last = parts[parts.length - 1] ?? ''
+  const field = /^\d+$/.test(last) ? (parts[parts.length - 2] ?? '') : last
+  const list = B6_LISTS[type]?.[path]
+  switch (code) {
+    case 'required':
+      return REQUIRED_MESSAGES[field] ?? 'This can’t be empty.'
+    case 'too_long': {
+      const max = B6_TEXTS[type]?.[toPattern(path)]
+      return max ? `At most ${max} characters.` : 'This is too long.'
+    }
+    case 'too_few':
+      return list ? `Add at least ${list.min} ${list.min === 1 ? list.noun : list.plural}.` : 'Add more.'
+    case 'too_many':
+      if (type === 'chart' && path === 'series') return 'A pie or donut chart shows exactly one series.'
+      if (type === 'chart' && path === 'labels') return 'Too many rows for this chart (pie and donut: at most 8; others: at most 24).'
+      return list ? `At most ${list.max} ${list.plural}.` : 'Too many.'
+    case 'duplicate':
+      return 'Two items share the same id; remove one and add it again.'
+    case 'out_of_range': {
+      if (type === 'counter' && field === 'value') return 'Use a number from 0 to 1,000,000,000 with at most 2 decimals.'
+      if (field === 'x' || field === 'y') return 'Use a position from 0 to 100 %.'
+      if (type === 'chart' && field === 'values') return 'A pie or donut chart can’t show negative numbers.'
+      const range = B6_NUMBERS[type]?.[path]
+      return range ? `Use ${range.min} to ${range.max}${range.unit ? ` ${range.unit}` : ''}.` : 'This number is out of range.'
+    }
+    default: {
+      if (field === 'link') return 'Use a site path such as /sale or an http(s) URL.'
+      if (field === 'icon') return 'Choose an icon.'
+      if (field === 'media_id') return 'Choose an image from the media library.'
+      if (field === 'product_id') return 'Choose a product.'
+      if (field === 'category_id') return 'Choose a category.'
+      if (type === 'chart' && field === 'values') return /^\d+$/.test(last) ? 'Enter a number.' : 'Each series needs one number per row.'
+      if (type === 'counter' && field === 'value') return 'Enter a number.'
+      const range = B6_NUMBERS[type]?.[path]
+      if (range) return `Enter a whole number from ${range.min} to ${range.max}.`
+      return 'Choose one of the offered options.'
+    }
+  }
+}
+
+function validateB6(node: Element, add: (path: string, message: string) => void) {
+  for (const problem of b6PropProblems(node.type, node.props)) add(`props.${problem.path}`, b6Message(node.type, problem))
+}
+
 function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[]) {
   if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)
+  if (B6_TYPES.has(node.type)) return validateB6(node, add)
   switch (node.type) {
     case 'heading':
       textRule(node.props.text, 1, TEXT_LIMITS.heading, 'props.text', add, 'Enter the heading text.')
@@ -344,10 +472,9 @@ function validateSchedule(node: Section | Element, add: (path: string, message: 
 }
 
 function validateTranslations(node: Section | Element, add: (path: string, message: string) => void) {
-  const fields = translatableFields(node.type)
   for (const [locale, texts] of Object.entries(node.translations ?? {})) {
     for (const [field, text] of Object.entries(texts ?? {})) {
-      const max = fields[field]
+      const max = translationLimit(node.type, field)
       if (max !== undefined && typeof text === 'string' && text.length > max) add(`translations.${locale}.${field}`, `At most ${max} characters.`)
     }
   }
@@ -377,6 +504,13 @@ export function validateNode(node: BuilderNode, options: { icons?: readonly stri
     enumRule(node.props.layout, ENUMS.layout, 'props.layout', add)
     if (node.props.anchor !== null && !ANCHOR_PATTERN.test(node.props.anchor)) add('props.anchor', 'Use lower-case letters, digits and dashes, starting with a letter (at most 60).')
     if (node.columns.length < 1 || node.columns.length > 6) add('columns', 'A row needs 1 to 6 columns.')
+    // B6: sticky and the shape dividers.
+    const { sticky } = node.props
+    if (sticky !== undefined && typeof sticky !== 'boolean') add('props.sticky', 'This is on or off.')
+    for (const edge of ['shape_top', 'shape_bottom'] as const) {
+      const shape = node.props[edge]
+      if (shape != null && normalizeSectionShape(shape) === null) add(`props.${edge}`, `Choose a shape, a colour and a height from ${B6_LIMITS.shapeHeight.min} to ${B6_LIMITS.shapeHeight.max} px.`)
+    }
   } else {
     validateElement(node, add, options.icons ?? ICON_NAMES)
   }

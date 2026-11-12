@@ -5,7 +5,8 @@ import type { Element, WrappedElement } from '@/storefront/builder/types'
 import { B4Form } from './b4-forms'
 import { errorMap } from './errors'
 import { finishSetup, getSetupSnapshot, newSetupHostId, registerSetupHost, subscribeSetup, type SetupRequest } from './setup-store'
-import { B4_TYPES, validateNode } from './validate'
+import { B6Form } from './b6-forms'
+import { B4_TYPES, B6_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
 function SetupForm({ request, canCustomHtml }: { request: SetupRequest; canCustomHtml: boolean }) {
@@ -14,6 +15,7 @@ function SetupForm({ request, canCustomHtml }: { request: SetupRequest; canCusto
   const label = request.label.toLowerCase()
   const errors = errorMap(node, problems, [])
   const b4 = B4_TYPES.has(node.type)
+  const b6 = B6_TYPES.has(node.type)
 
   return (
     <>
@@ -21,7 +23,9 @@ function SetupForm({ request, canCustomHtml }: { request: SetupRequest; canCusto
         <DialogTitle>Add {label}</DialogTitle>
         <DialogDescription>Choose what the {label} shows. You can change everything later in the panel on the right.</DialogDescription>
       </DialogHeader>
-      {b4 ? (
+      {b6 ? (
+        <B6Form node={node} onChange={(next) => setNode(next as Element)} errors={errors} bangla={false} context={request.context} setup />
+      ) : b4 ? (
         // Only the fields still missing are marked; everything else can be changed later too.
         <B4Form node={node} onChange={(next) => setNode(next as Element)} errors={errors} bangla={false} context={request.context} canCustomHtml={canCustomHtml} />
       ) : (

@@ -160,4 +160,15 @@ interface StorefrontCatalog
      * sale online (the store builder previews the product page zone on it).
      */
     public function latestProductSlug(): ?string;
+
+    /**
+     * B6: product page objects (exactly what GET /store/products/{slug} returns) keyed by
+     * product id, in the given order. Live products only; `$preview` also opens drafts,
+     * scheduled and ended listings (with `preview_state`, as the staff product preview does).
+     * Other organizations' and unknown ids are left out.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array<string, mixed>>
+     */
+    public function productDetails(array $productIds, bool $preview = false): array;
 }

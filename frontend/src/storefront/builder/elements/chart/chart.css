@@ -1,0 +1,106 @@
+/*
+ * Builder chart roles (dataviz palette.md — the same hexes as ./palette.ts). Marks are written against
+ * these roles, so the light/dark sets swap in one place. The store does not run dark today
+ * (prefers-color-scheme is not used); the dark set applies under an explicit `data-theme="dark"`
+ * ancestor or `data-mode="dark"` on the chart, so it is ready when the storefront opts in.
+ * Text never wears a series colour: it uses the theme's text tokens.
+ */
+.sf-chart {
+  --viz-s1: #2a78d6;
+  --viz-s2: #eb6834;
+  --viz-s3: #1baf7a;
+  --viz-s4: #eda100;
+  --viz-s5: #e87ba4;
+  --viz-s6: #008300;
+  --viz-s7: #6250d6;
+  --viz-s8: #e34948;
+  --viz-on-s1: #ffffff;
+  --viz-on-s2: #ffffff;
+  --viz-on-s3: #ffffff;
+  --viz-on-s4: #0b0b0b;
+  --viz-on-s5: #ffffff;
+  --viz-on-s6: #ffffff;
+  --viz-on-s7: #ffffff;
+  --viz-on-s8: #ffffff;
+  --viz-surface: var(--sf-surface, #ffffff);
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-ink: var(--sf-heading, #0b0b0b);
+  --viz-ink-2: var(--sf-text, #52514e);
+  color: var(--viz-ink-2);
+}
+
+:where([data-theme='dark']) .sf-chart,
+.sf-chart[data-mode='dark'] {
+  color-scheme: dark;
+  --viz-s1: #3987e5;
+  --viz-s2: #d95926;
+  --viz-s3: #199e70;
+  --viz-s4: #c98500;
+  --viz-s5: #d55181;
+  --viz-s6: #008300;
+  --viz-s7: #9085e9;
+  --viz-s8: #e66767;
+  --viz-on-s4: #ffffff;
+  --viz-surface: #1a1a19;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-ink: #f0efec;
+  --viz-ink-2: #c3c2b7;
+}
+
+.sf-chart .viz-tick {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The hovered / focused mark lifts (slight lighten). */
+.sf-chart [data-viz-mark][data-active='true'] {
+  filter: brightness(1.12);
+}
+
+.sf-chart .viz-hit {
+  outline: none;
+}
+
+/* Texture — the backup identity channel: print and forced colours only, never decorative or on by default. */
+.sf-chart[data-texture='on'] [data-fill] {
+  fill: var(--viz-tex) !important;
+}
+@media print {
+  .sf-chart [data-fill] {
+    fill: var(--viz-tex) !important;
+  }
+  .sf-chart .viz-table-wrap {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    clip: auto !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    margin: 0 !important;
+  }
+}
+@media (forced-colors: active) {
+  .sf-chart svg {
+    forced-color-adjust: none;
+  }
+  .sf-chart [data-fill] {
+    fill: var(--viz-tex) !important;
+  }
+  .sf-chart .viz-tex-bg {
+    fill: Canvas !important;
+  }
+  .sf-chart .viz-tex-ink {
+    stroke: CanvasText !important;
+  }
+  .sf-chart [data-stroke] {
+    stroke: CanvasText !important;
+  }
+  .sf-chart svg text {
+    fill: CanvasText !important;
+  }
+  .sf-chart .viz-grid,
+  .sf-chart .viz-axis {
+    stroke: GrayText;
+  }
+}

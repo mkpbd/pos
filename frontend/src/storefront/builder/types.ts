@@ -4,7 +4,7 @@
  * BuilderDocumentSchema::normalize is the source of truth; ./validate.ts mirrors its value rules.
  */
 
-import type { FaqGroup, MediaRef, ProductCard, StoreSection, StorefrontMenu, ThemeColors } from '../types'
+import type { FaqGroup, MediaRef, ProductCard, ProductDetail, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
 export type Device = 'desktop' | 'tablet' | 'mobile'
@@ -29,7 +29,23 @@ export type Background = {
   gradient?: Gradient
   image?: { media_id: string; position: BackgroundPosition; size: 'cover' | 'contain' | 'auto'; repeat: boolean }
   overlay?: Color | Gradient
+  /**
+   * B6: a muted, looping YouTube / Vimeo video behind a section's (or inner row's) content. `url`
+   * goes through parseVideoUrl like the video element; normalize derives `provider` and
+   * `video_id`. The poster shows first, and alone under reduced motion, Save-Data and below 768 px.
+   * Read from the `base` breakpoint only.
+   */
+  video?: BackgroundVideo
 }
+
+/** B6 `background.video` (sections and inner rows). */
+/** `poster` is absent when none was chosen (never null). Kept on the `base` breakpoint of sections and inner rows only. */
+export type BackgroundVideo = { url: string; provider: VideoProvider; video_id: string; poster?: { media_id: string } }
+
+/** B6 style group `motion` (any node, `base` only): an entrance animation played once on entering the viewport. */
+export type MotionEntrance = 'none' | 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'zoom'
+/** `duration` 200–2000 ms (default 600), `delay` 0–2000 ms (default 0). */
+export type Motion = { entrance: MotionEntrance; duration?: number; delay?: number }
 
 export type Typography = {
   font?: 'theme:heading' | 'theme:body'
@@ -70,6 +86,8 @@ export type Style = {
     opacity?: number
     hover?: { color?: Color; background_color?: Color; shadow?: Shadow[]; transform?: 'none' | 'lift' | 'grow' }
   }
+  /** B6: `base` breakpoint only (normalize drops it from tablet / mobile). */
+  motion?: Motion
 }
 
 export type ResponsiveStyle = Partial<Record<Breakpoint, Style>>
@@ -205,13 +223,145 @@ export type B4Element =
   | ContactFormElement
   | CustomHtmlElement
 
-export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement | B4Element
+/* ----------------------------------------------------------------------------------------------
+ * B6 elements (contract §1). ✱ text props are translatable; an item field is translated under
+ * `<list>.<item_id>.<field>` (registry `translatable` spells it `<list>.*.<field>`).
+ * -------------------------------------------------------------------------------------------- */
+
+/** Every list item carries an id (`^[a-z][a-z0-9_-]{1,31}$`), unique within its list. */
+export type AccordionItem = { id: string; title: string; html: string }
+export type AccordionElement = ElementOf<'accordion', { items: AccordionItem[]; open_first: boolean; allow_multiple: boolean; style: 'plain' | 'boxed' }>
+
+export type TabItem = { id: string; title: string; html: string }
+export type TabsElement = ElementOf<'tabs', { items: TabItem[]; layout: 'horizontal' | 'vertical' }>
+
+export type IconBoxElement = ElementOf<
+  'icon_box',
+  { icon: string; title: string; text: string; link: Link; layout: 'top' | 'left'; icon_style: 'plain' | 'circle' | 'square' }
+>
+
+export type IconListItem = { id: string; icon: string; text: string; link: Link }
+export type IconListElement = ElementOf<'icon_list', { items: IconListItem[]; layout: 'vertical' | 'inline' }>
+
+export type QuoteElement = ElementOf<'quote', { text: string; author: string; role: string; style: 'plain' | 'card' | 'large' }>
+
+export type NoticeTone = 'info' | 'success' | 'warning' | 'promo'
+export type NoticeElement = ElementOf<'notice', { tone: NoticeTone; title: string; text: string; show_icon: boolean }>
+
+/** `value` 0–1e9 with at most two decimals; `prefix` ≤ 4 (not translated), `suffix` ✱ ≤ 8, `label` ✱ ≤ 60. */
+export type CounterItem = { id: string; value: number; prefix: string; suffix: string; label: string }
+export type CounterElement = ElementOf<'counter', { items: CounterItem[]; animate: boolean }>
+
+export type StepItem = { id: string; title: string; text: string; icon: string | null }
+export type StepsElement = ElementOf<'steps', { items: StepItem[]; layout: 'horizontal' | 'vertical'; numbered: boolean }>
+
+/* Chart (contract §3; drawn by ./elements/chart). */
+export type ChartKind = 'bar' | 'column' | 'line' | 'area' | 'pie' | 'donut'
+export type ChartSeries = { id: string; name: string; values: number[] }
+export type ChartUnitPosition = 'before' | 'after'
+export type ChartShowValues = 'none' | 'last' | 'all-small'
+export type ChartProps = {
+  kind: ChartKind
+  title: string
+  /** Shown under the title; also the figure caption. */
+  description: string
+  /** Category names, 1–24, each ≤ 40 (✱ `labels.<index>`). */
+  labels: string[]
+  /** 1–6 series (pie / donut: exactly one, ≤ 8 labels); `values` as long as `labels`. */
+  series: ChartSeries[]
+  /** ≤ 8 characters ("৳", "%", "pcs"). */
+  unit: string
+  unit_position: ChartUnitPosition
+  y_starts_at_zero: boolean
+  show_values: ChartShowValues
+  show_legend: boolean
+  show_table: boolean
+  /** px, 200–600. */
+  height: number
+}
+/** The chart element node (the renderer component is elements/chart's `ChartElement`). */
+export type ChartElementNode = ElementOf<'chart', ChartProps>
+
+export type GalleryAspect = 'square' | '4:3' | '3:4' | '16:9' | 'auto'
+export type GalleryImage = { id: string; media_id: string; alt: string; caption: string }
+/** `columns.base` 2–6; tablet / mobile fall back to the wider breakpoint. */
+export type GalleryColumns = { base: number; tablet?: number; mobile?: number }
+export type GalleryElement = ElementOf<'gallery', { images: GalleryImage[]; columns: GalleryColumns; aspect: GalleryAspect; lightbox: boolean; gap: 'sm' | 'md' | 'lg' }>
+
+export type CarouselImage = { id: string; media_id: string; alt: string; caption: string; link: Link }
+/** `autoplay` in seconds (0 = off, ≤ 15). */
+export type ImageCarouselElement = ElementOf<'image_carousel', { images: CarouselImage[]; autoplay: number; show_dots: boolean; show_arrows: boolean; aspect: GalleryAspect }>
+
+export type MotionSpeed = 'slow' | 'normal' | 'fast'
+export type LogoItem = { id: string; media_id: string; alt: string; link: Link }
+export type LogoCarouselElement = ElementOf<'logo_carousel', { logos: LogoItem[]; grayscale: boolean; speed: MotionSpeed }>
+
+/** `query`: an address or "lat,lng"; `height` px 200–600; `zoom` 3–20. Google Maps loads only after a click. */
+export type MapElement = ElementOf<'map', { query: string; title: string; height: number; zoom: number }>
+
+/** `title` null = the category's name; `media_id` overrides the category image. */
+export type CategoryCardElement = ElementOf<
+  'category_card',
+  { category_id: string | null; media_id: string | null; title: string | null; button_label: string; layout: 'overlay' | 'below' }
+>
+export type ProductSpotlightElement = ElementOf<'product_spotlight', { product_id: string | null; layout: 'image-left' | 'image-right'; show_description: boolean; badge: string }>
+
+/** `x` / `y` in percent of the image (0–100, ≤ 2 decimals). */
+export type Hotspot = { id: string; x: number; y: number; product_id: string }
+export type ShopTheLookElement = ElementOf<'shop_the_look', { media_id: string | null; alt: string; title: string; hotspots: Hotspot[] }>
+
+export type TrustBadgeItem = { id: string; icon: string; title: string; text: string }
+export type TrustBadgesElement = ElementOf<'trust_badges', { items: TrustBadgeItem[]; style: 'row' | 'grid' }>
+
+/** Client-side only: this browser's recently viewed products (hidden when there are none). `limit` 4–12. */
+export type RecentlyViewedElement = ElementOf<'recently_viewed', { title: string; limit: number }>
+
+export type MarqueeItem = { id: string; text: string }
+export type MarqueeSeparator = 'dot' | 'star' | 'leaf' | 'none'
+export type MarqueeElement = ElementOf<'marquee', { items: MarqueeItem[]; speed: MotionSpeed; direction: 'left' | 'right'; separator: MarqueeSeparator }>
+
+export type B6Element =
+  | AccordionElement
+  | TabsElement
+  | IconBoxElement
+  | IconListElement
+  | QuoteElement
+  | NoticeElement
+  | CounterElement
+  | StepsElement
+  | ChartElementNode
+  | GalleryElement
+  | ImageCarouselElement
+  | LogoCarouselElement
+  | MapElement
+  | CategoryCardElement
+  | ProductSpotlightElement
+  | ShopTheLookElement
+  | TrustBadgesElement
+  | RecentlyViewedElement
+  | MarqueeElement
+
+export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement | B4Element | B6Element
 
 export type ElementType = Element['type']
 
+/** B6 section shape divider (inline SVG, decorative). `height` px 16–200. */
+export type SectionShapeKind = 'wave' | 'curve' | 'tilt' | 'triangle' | 'zigzag'
+export type SectionShape = { shape: SectionShapeKind; color: Color; height: number; flip: boolean }
+
+export type SectionProps = {
+  layout: 'boxed' | 'full' | 'full-bleed'
+  anchor: string | null
+  /** B6: sticks below the store header while scrolling (at most one per document; page / cms / zone). Absent (pre-B6) = false. */
+  sticky?: boolean
+  /** B6: shape dividers at the section's top / bottom edge; absent = null. */
+  shape_top?: SectionShape | null
+  shape_bottom?: SectionShape | null
+}
+
 export type Section = NodeCommon & {
   type: 'section'
-  props: { layout: 'boxed' | 'full' | 'full-bleed'; anchor: string | null }
+  props: SectionProps
   columns: Column[]
 }
 
@@ -261,7 +411,16 @@ export type MenuData = StorefrontMenu & { state?: ElementDataState }
 /** `data[id]` of an FAQ list: the CMS FAQ items by group (the shape of /store/pages/{slug} `faq`). */
 export type FaqListData = { groups: FaqGroup[]; state?: ElementDataState }
 
-export type ElementData = CountdownData | DiscountData | PromoCardData | MenuData | FaqListData
+/** B6 `data[id]` of a category card. */
+/** `url` is null for a category that is no longer visible (draft preview only; publicly the card is dropped). */
+export type CategoryCardData = { name: string; url: string | null; image: MediaRef | null; product_count: number; state?: ElementDataState }
+/** B6 `data[id]` of a product spotlight: the storefront product detail (as GET /store/products/{slug} returns it). */
+export type ProductSpotlightData = ProductDetail & { state?: ElementDataState }
+/** B6 `data[id]` of shop the look: product cards by product id (publicly, unavailable products are absent). */
+// The server sends an empty list (`[]`) when no product is live; lookups by id still miss safely.
+export type ShopTheLookData = { products: Record<string, ProductCard> | []; state?: ElementDataState }
+
+export type ElementData = CountdownData | DiscountData | PromoCardData | MenuData | FaqListData | CategoryCardData | ProductSpotlightData | ShopTheLookData
 
 /** One entry of a payload's `data` map. */
 export type BuilderData = StoreSection | ElementData

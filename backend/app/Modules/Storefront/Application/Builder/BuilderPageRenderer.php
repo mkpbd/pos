@@ -32,6 +32,11 @@ use stdClass;
  *   `state: empty`, or its data carries `state: expired | inactive | unavailable`). Translatable
  *   B4 props are in the request's language too (`cta` button labels from the dot keys
  *   `primary.label` / `secondary.label`).
+ * - B6: category_card, product_spotlight and shop_the_look have `data[id]` too
+ *   (BuilderElementData); list items' texts are in the request's language (translation keys
+ *   `<list>.<item id>.<field>`, chart labels `labels.<index>`); `media` also holds gallery,
+ *   carousel and logo images, category card and shop-the-look photos and background-video
+ *   posters. Published shop-the-look elements keep only the hotspots of products on sale.
  */
 class BuilderPageRenderer
 {
@@ -79,8 +84,9 @@ class BuilderPageRenderer
         $mediaIds = [];
         BuilderDocumentSchema::walk(['sections' => $sections], function (array $node) use (&$mediaIds) {
             array_push($mediaIds, ...StyleSchema::mediaIds($node['style'] ?? []));
-            if (($node['type'] ?? null) === 'image' && is_string($node['props']['media_id'] ?? null)) {
-                $mediaIds[] = $node['props']['media_id'];
+            // Image elements; B6: galleries, carousels, logos, category cards and shop-the-look photos.
+            if (is_string($node['type'] ?? null) && $node['type'] !== 'section' && $node['type'] !== 'column') {
+                array_push($mediaIds, ...ElementRegistry::mediaIds($node['type'], $node['props'] ?? []));
             }
         });
         $media = [];
@@ -134,12 +140,24 @@ class BuilderPageRenderer
      */
     public static function localizedProps(string $type, array $props, array $translations, string $locale): array
     {
-        foreach (array_keys(ElementRegistry::translatable($type)) as $field) {
-            $target = ElementRegistry::TRANSLATION_PATHS[$type][$field] ?? null;
+        // B6: list items' fields too (`items.<item id>.title`, chart `labels.<index>`).
+        foreach (array_keys(ElementRegistry::translationFields($type, $props)) as $field) {
+            $target = ElementRegistry::translationTarget($type, $field, $props);
             if ($target === null) {
-                $props[$field] = Translations::value($translations, $field, $locale, $props[$field]);
-            } elseif (is_array($props[$target[0]] ?? null)) {
-                $props[$target[0]][$target[1]] = Translations::value($translations, $field, $locale, $props[$target[0]][$target[1]]);
+                continue;
+            }
+            switch (count($target)) {
+                case 1:
+                    $props[$field] = Translations::value($translations, $field, $locale, $props[$field] ?? null);
+                    break;
+                case 2:
+                    if (is_array($props[$target[0]] ?? null) && array_key_exists($target[1], $props[$target[0]])) {
+                        $props[$target[0]][$target[1]] = Translations::value($translations, $field, $locale, $props[$target[0]][$target[1]]);
+                    }
+                    break;
+                default:
+                    [$list, $index, $key] = $target;
+                    $props[$list][$index][$key] = Translations::value($translations, $field, $locale, $props[$list][$index][$key] ?? null);
             }
         }
 
@@ -273,6 +291,11 @@ class BuilderPageRenderer
                         continue;
                     }
                     $element['state'] ??= 'empty';
+                }
+                if ($element['type'] === 'shop_the_look' && ! $preview && isset($data[$element['id']])) {
+                    // B6: visitors only see the spots of products on sale.
+                    $products = $data[$element['id']]['products'];
+                    $element['props']['hotspots'] = array_values(array_filter($element['props']['hotspots'], fn (array $spot) => isset($products[$spot['product_id']])));
                 }
                 $elements[] = $this->withData($element, $data, $preview);
             }

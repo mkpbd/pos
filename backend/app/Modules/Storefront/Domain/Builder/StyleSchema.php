@@ -46,6 +46,14 @@ final class StyleSchema
 
     public const HOVER_TRANSFORMS = ['none', 'lift', 'grow'];
 
+    /** B6: entrance animations of the `motion` group (base only). */
+    public const MOTION_ENTRANCES = ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom'];
+
+    /** B6: entrance duration and delay, milliseconds. */
+    public const MOTION_DURATION = [200, 2000];
+
+    public const MOTION_DELAY = [0, 2000];
+
     public const MAX_SHADOWS = 3;
 
     public const MAX_TEXT_SHADOWS = 2;
@@ -59,9 +67,12 @@ final class StyleSchema
     private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
     /**
+     * B6: `motion` is kept at `base` only; `background.video` only at `base` and only where
+     * `$backgroundVideo` allows it (sections and inner rows).
+     *
      * @return array<string, array<string, mixed>>
      */
-    public static function normalize(mixed $style): array
+    public static function normalize(mixed $style, bool $backgroundVideo = false): array
     {
         if (! is_array($style)) {
             return [];
@@ -69,7 +80,7 @@ final class StyleSchema
 
         $result = [];
         foreach (self::BREAKPOINTS as $breakpoint) {
-            $groups = self::groups($style[$breakpoint] ?? null);
+            $groups = self::groups($style[$breakpoint] ?? null, $breakpoint === 'base', $backgroundVideo && $breakpoint === 'base');
             if ($groups !== []) {
                 $result[$breakpoint] = $groups;
             }
@@ -88,9 +99,11 @@ final class StyleSchema
     {
         $ids = [];
         foreach ($style as $groups) {
-            $id = $groups['background']['image']['media_id'] ?? null;
-            if (is_string($id)) {
-                $ids[] = $id;
+            // B6: the poster of a background video too.
+            foreach ([$groups['background']['image']['media_id'] ?? null, $groups['background']['video']['poster']['media_id'] ?? null] as $id) {
+                if (is_string($id)) {
+                    $ids[] = $id;
+                }
             }
         }
 
@@ -100,14 +113,14 @@ final class StyleSchema
     /**
      * @return array<string, mixed>
      */
-    private static function groups(mixed $groups): array
+    private static function groups(mixed $groups, bool $base, bool $video): array
     {
         if (! is_array($groups)) {
             return [];
         }
 
         return self::compact([
-            'background' => self::background($groups['background'] ?? null),
+            'background' => self::background($groups['background'] ?? null, $video),
             'color' => self::color($groups['color'] ?? null),
             'typography' => self::typography($groups['typography'] ?? null),
             'spacing' => self::spacing($groups['spacing'] ?? null),
@@ -115,7 +128,47 @@ final class StyleSchema
             'layout' => self::layout($groups['layout'] ?? null),
             'border' => self::border($groups['border'] ?? null),
             'effects' => self::effects($groups['effects'] ?? null),
+            'motion' => $base ? self::motion($groups['motion'] ?? null) : null,
         ]) ?? [];
+    }
+
+    /**
+     * B6: `{entrance, duration?, delay?}` — an entrance animation played once when the node
+     * scrolls into view (the storefront skips it under reduced motion).
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function motion(mixed $value): ?array
+    {
+        if (! is_array($value) || ($entrance = self::enum($value['entrance'] ?? null, self::MOTION_ENTRANCES)) === null) {
+            return null;
+        }
+        $int = fn (mixed $v, array $range) => is_int($v) && $v >= $range[0] && $v <= $range[1] ? $v : null;
+
+        return self::compact([
+            'entrance' => $entrance,
+            'duration' => $int($value['duration'] ?? null, self::MOTION_DURATION),
+            'delay' => $int($value['delay'] ?? null, self::MOTION_DELAY),
+        ]);
+    }
+
+    /**
+     * B6: a section background video `{url, provider, video_id, poster?: {media_id}}` — a YouTube
+     * or Vimeo link (the video element's parser), stored with its provider and id.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function video(mixed $value): ?array
+    {
+        if (! is_array($value) || ($parsed = ElementRegistry::parseVideoUrl($value['url'] ?? null)) === null) {
+            return null;
+        }
+        $poster = null;
+        if (is_array($value['poster'] ?? null) && is_string($id = $value['poster']['media_id'] ?? null) && preg_match(self::UUID, strtolower($id)) === 1) {
+            $poster = ['media_id' => strtolower($id)];
+        }
+
+        return self::compact(['url' => $value['url'], ...$parsed, 'poster' => $poster]);
     }
 
     /**
@@ -177,7 +230,7 @@ final class StyleSchema
     /**
      * @return array<string, mixed>|null
      */
-    private static function background(mixed $value): ?array
+    private static function background(mixed $value, bool $video = false): ?array
     {
         if (! is_array($value) || ($type = self::enum($value['type'] ?? null, self::BACKGROUND_TYPES)) === null) {
             return null;
@@ -199,6 +252,7 @@ final class StyleSchema
             'gradient' => self::gradient($value['gradient'] ?? null),
             'image' => $image,
             'overlay' => self::color($value['overlay'] ?? null) ?? self::gradient($value['overlay'] ?? null),
+            'video' => $video ? self::video($value['video'] ?? null) : null,
         ]);
     }
 

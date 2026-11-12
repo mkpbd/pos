@@ -10,6 +10,13 @@ import { sanitizeHtml } from './sanitize'
 
 const ORIGIN = window.location.origin
 
+// B6: the canvas replays an entrance through the motion runtime's playMotion.
+const motion = vi.hoisted(() => ({ played: [] as string[] }))
+vi.mock('../motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../motion')>()),
+  playMotion: (el: HTMLElement) => void motion.played.push(el.dataset.b ?? ''),
+}))
+
 function message(data: unknown, init: { origin?: string; source?: MessageEventSource | null } = {}) {
   return new MessageEvent('message', { data, origin: init.origin ?? ORIGIN, source: init.source === undefined ? window : init.source })
 }
@@ -100,6 +107,18 @@ describe('builder canvas app', () => {
     // Editor shortcuts typed inside the canvas go to the editor.
     fireEvent.keyDown(document.body, { key: 'z', ctrlKey: true })
     expect(posted.at(-1)).toMatchObject({ type: 'key', key: 'z', ctrl: true })
+  })
+
+  it('B6: replays a node’s entrance animation when the editor asks (valid ids only)', async () => {
+    const { send } = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(frame())
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    motion.played.length = 0
+    send({ type: 'play-motion', id: 'e_heading' })
+    send({ type: 'play-motion', id: 'e_missing' })
+    send({ type: 'play-motion', id: '"]*' })
+    expect(motion.played).toEqual(['e_heading'])
   })
 
   it('ignores messages from another origin and shows skeletons for pending sections', async () => {

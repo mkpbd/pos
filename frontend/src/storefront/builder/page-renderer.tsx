@@ -1,13 +1,18 @@
-import { useContext, useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useContext, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { MediaImage } from '../components/media-image'
 import { MenuLink } from '../components/menu-link'
 import { RichText } from '../components/rich-text'
 import { SectionItem } from '../sections/section-renderer'
 import type { SectionPreviewState, StoreSection } from '../types'
-import { aspectRatioCss, colorCss, compileStyles, scopePrefix } from './compile-styles'
+import { aspectRatioCss, colorCss, compileStyles, motionTargets, scopePrefix } from './compile-styles'
 import { B4ElementContent } from './elements'
 import { isB4Type } from './elements/b4-types'
+import { B6ElementContent } from './elements/b6'
+import { isB6Type } from './elements/b6-types'
+import { useMotionRuntime } from './motion'
+import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
+import { BackgroundVideoLayer, ShapeDivider } from './section-layers'
 import { isWrappedSectionType, NODE_ID } from './registry'
 import { ColumnWidthCtx, PageCtx, usePage } from './render-context'
 import { PreviewMark } from './preview-mark'
@@ -49,19 +54,34 @@ function visibility(node: { id: unknown; hidden?: boolean; state?: NodeState }, 
 
 const LAYOUT_CLASSES = { boxed: 'b-boxed', full: 'b-full', 'full-bleed': 'b-bleed' } as const
 
-function SectionNode({ section }: { section: RenderSection }) {
+function SectionNode({ section, sticky }: { section: RenderSection; sticky: boolean }) {
   const { draft } = usePage()
   const visible = visibility(section, draft)
+  const stickyTop = useStickyTop(sticky && visible.show)
   if (!visible.show) return null
   const layout = oneOf(section.props?.layout, ENUMS.layout) ?? 'boxed'
   const anchor = typeof section.props?.anchor === 'string' && ANCHOR.test(section.props.anchor) ? section.props.anchor : undefined
+  // B6 layers: shape dividers and a background video (absent on pre-B6 sections: unchanged markup).
+  const shapes = sectionShapes(section.props)
+  const video = backgroundVideoOf(section.style)
+  const layered = Boolean(shapes.top || shapes.bottom || video)
 
   return (
     <PreviewMark state={visible.state}>
-      <section data-b={section.id} id={anchor} className="b-section" data-layout={layout}>
+      <section
+        data-b={section.id}
+        id={anchor}
+        className={cn('b-section', layered && 'b-layered', sticky && 'b-sticky')}
+        data-layout={layout}
+        data-sticky={sticky || undefined}
+        style={sticky ? ({ '--b-sticky-top': `${stickyTop}px` } as CSSProperties) : undefined}
+      >
+        {video && <BackgroundVideoLayer video={video} />}
+        {shapes.top && <ShapeDivider shape={shapes.top} edge="top" />}
         <div className={cn('b-container', LAYOUT_CLASSES[layout])}>
           <Columns columns={section.columns} rowId={section.id} nested={false} />
         </div>
+        {shapes.bottom && <ShapeDivider shape={shapes.bottom} edge="bottom" />}
       </section>
     </PreviewMark>
   )
@@ -112,16 +132,23 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
     case 'divider':
       return <Divider element={element} />
     case 'inner_row':
-      return (
-        <div data-b={element.id} className="b-inner-row">
-          <Columns columns={element.columns} rowId={element.id} nested />
-        </div>
-      )
+      return <InnerRow element={element} />
     default:
       if (isB4Type(element.type)) return <B4ElementContent element={element} />
+      if (isB6Type(element.type)) return <B6ElementContent element={element} />
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
   }
+}
+
+function InnerRow({ element }: { element: Extract<RenderElement, { type: 'inner_row' }> }) {
+  const video = backgroundVideoOf(element.style)
+  return (
+    <div data-b={element.id} className={cn('b-inner-row', video && 'b-layered')}>
+      {video && <BackgroundVideoLayer video={video} />}
+      <Columns columns={element.columns} rowId={element.id} nested />
+    </div>
+  )
 }
 
 const HEADING_CLASSES: Record<number, string> = {
@@ -284,6 +311,7 @@ export function PageRenderer({
   testId = 'builder-page',
   className,
   scope,
+  motion,
 }: {
   page: BuilderPage
   placeholder?: (element: RenderElement) => ReactNode
@@ -296,19 +324,33 @@ export function PageRenderer({
    * The editor canvas draws one document and leaves it unscoped.
    */
   scope?: string
+  /**
+   * B6: whether entrance animations run. Default: everywhere but the editor canvas (document key
+   * `canvas`), which replays one on request through `playMotion` (./motion.ts).
+   */
+  motion?: boolean
 }) {
   const draft = page.document?.source === 'draft'
+  const rootRef = useRef<HTMLDivElement>(null)
   const sections = useMemo(() => (Array.isArray(page.sections) ? page.sections : []), [page.sections])
   const validScope = scopePrefix(scope) ? scope : undefined
   const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope }), [sections, page.media, validScope])
   const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
+  const targets = useMemo(() => motionTargets(sections), [sections])
+  useMotionRuntime(rootRef, targets, motion ?? page.document?.key !== 'canvas')
+  // B6: at most one sticky section, and only in page-like documents (never the header or footer).
+  const stickyId = useMemo(() => {
+    const key = page.document?.key
+    if (key === 'header' || key === 'footer') return null
+    return sections.find((section) => section.props?.sticky === true)?.id ?? null
+  }, [sections, page.document?.key])
 
   return (
     <PageCtx.Provider value={context}>
-      <div className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
+      <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
         <style data-testid="builder-styles">{css}</style>
         {sections.map((section) => (
-          <SectionNode key={section.id} section={section} />
+          <SectionNode key={section.id} section={section} sticky={section.id === stickyId} />
         ))}
       </div>
     </PageCtx.Provider>

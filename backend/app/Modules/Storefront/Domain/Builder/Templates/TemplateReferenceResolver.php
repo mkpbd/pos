@@ -28,4 +28,11 @@ interface TemplateReferenceResolver
      * or null when it has none (the menu element is then left out).
      */
     public function menu(string $ref): ?string;
+
+    /**
+     * B6: the id of the organization's `$index`-th live product of a source (featured,
+     * best_sellers, new_arrivals, on_sale; 0-based), or null when it has fewer (a shop-the-look
+     * hotspot is then left out).
+     */
+    public function product(string $source, int $index): ?string;
 }

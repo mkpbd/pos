@@ -7,8 +7,8 @@
 
 import type { DocumentContext, ElementType, WrappedSectionType } from './types'
 
-/** B4: `site` = header / footer parts (logo, menu, account, cart, social icons, …). */
-export type ElementGroup = 'layout' | 'content' | 'commerce' | 'marketing' | 'site'
+/** B4: `site` = header / footer parts (logo, menu, account, cart, social icons, …). B6: `media` (gallery, carousels, map). */
+export type ElementGroup = 'layout' | 'content' | 'media' | 'commerce' | 'marketing' | 'site'
 
 export type ElementMeta = {
   type: ElementType
@@ -200,6 +200,160 @@ const B4: BaseMeta[] = [
   { type: 'custom_html', group: 'content', label: 'Custom HTML', translatable: [], props: { html: '' }, children: null },
 ]
 
+/**
+ * B6 elements (contract §1). Item lists hold sample items where the element needs them to be
+ * valid; elements that need a reference or an upload (gallery and carousel images, logos, the
+ * category, the product, the shop-the-look image, the map address) are invalid until set up.
+ * Translatable item fields are spelled `<list>.*.<field>` (stored as `<list>.<item_id>.<field>`);
+ * chart labels `labels.*` (stored as `labels.<index>`).
+ */
+const B6: BaseMeta[] = [
+  {
+    type: 'accordion',
+    group: 'content',
+    label: 'Accordion',
+    translatable: ['items.*.title', 'items.*.html'],
+    props: { items: [{ id: 'item-1', title: 'A question shoppers ask', html: '<p>The answer.</p>' }], open_first: true, allow_multiple: false, style: 'boxed' },
+    children: null,
+  },
+  {
+    type: 'tabs',
+    group: 'content',
+    label: 'Tabs',
+    translatable: ['items.*.title', 'items.*.html'],
+    props: {
+      items: [
+        { id: 'tab-1', title: 'Details', html: '<p>Write something here.</p>' },
+        { id: 'tab-2', title: 'Delivery', html: '<p>Write something here.</p>' },
+      ],
+      layout: 'horizontal',
+    },
+    children: null,
+  },
+  {
+    type: 'icon_box',
+    group: 'content',
+    label: 'Icon box',
+    translatable: ['title', 'text'],
+    props: { icon: 'truck', title: 'Fast delivery', text: '', link: null, layout: 'top', icon_style: 'circle' },
+    children: null,
+  },
+  {
+    type: 'icon_list',
+    group: 'content',
+    label: 'Icon list',
+    translatable: ['items.*.text'],
+    props: { items: [{ id: 'item-1', icon: 'check', text: 'Fresh every day', link: null }], layout: 'vertical' },
+    children: null,
+  },
+  { type: 'quote', group: 'content', label: 'Quote', translatable: ['text', 'author', 'role'], props: { text: 'Write the quote here.', author: '', role: '', style: 'card' }, children: null },
+  { type: 'notice', group: 'content', label: 'Notice', translatable: ['title', 'text'], props: { tone: 'info', title: '', text: 'Write the notice here.', show_icon: true }, children: null },
+  {
+    type: 'counter',
+    group: 'content',
+    label: 'Counter',
+    translatable: ['items.*.suffix', 'items.*.label'],
+    props: { items: [{ id: 'item-1', value: 100, prefix: '', suffix: '+', label: 'Happy customers' }], animate: true },
+    children: null,
+  },
+  {
+    type: 'steps',
+    group: 'content',
+    label: 'Steps',
+    translatable: ['items.*.title', 'items.*.text'],
+    props: {
+      items: [
+        { id: 'step-1', title: 'Choose', text: '', icon: null },
+        { id: 'step-2', title: 'Order', text: '', icon: null },
+        { id: 'step-3', title: 'Enjoy', text: '', icon: null },
+      ],
+      layout: 'horizontal',
+      numbered: true,
+    },
+    children: null,
+  },
+  {
+    type: 'chart',
+    group: 'content',
+    label: 'Chart',
+    translatable: ['title', 'description', 'labels.*', 'series.*.name'],
+    props: {
+      kind: 'column',
+      title: '',
+      description: '',
+      labels: ['Jan', 'Feb', 'Mar'],
+      series: [{ id: 'series-1', name: 'Sales', values: [10, 20, 30] }],
+      unit: '',
+      unit_position: 'after',
+      y_starts_at_zero: true,
+      show_values: 'none',
+      show_legend: true,
+      show_table: false,
+      height: 320,
+    },
+    children: null,
+  },
+  {
+    type: 'gallery',
+    group: 'media',
+    label: 'Gallery',
+    translatable: ['images.*.alt', 'images.*.caption'],
+    props: { images: [], columns: { base: 3 }, aspect: 'square', lightbox: true, gap: 'md' },
+    children: null,
+  },
+  {
+    type: 'image_carousel',
+    group: 'media',
+    label: 'Image carousel',
+    translatable: ['images.*.alt', 'images.*.caption'],
+    props: { images: [], autoplay: 0, show_dots: true, show_arrows: true, aspect: '16:9' },
+    children: null,
+  },
+  { type: 'logo_carousel', group: 'media', label: 'Logo carousel', translatable: ['logos.*.alt'], props: { logos: [], grayscale: true, speed: 'normal' }, children: null },
+  { type: 'map', group: 'media', label: 'Map', translatable: ['query', 'title'], props: { query: '', title: '', height: 360, zoom: 15 }, children: null },
+  {
+    type: 'category_card',
+    group: 'commerce',
+    label: 'Category card',
+    translatable: ['title', 'button_label'],
+    props: { category_id: null, media_id: null, title: null, button_label: 'Shop now', layout: 'overlay' },
+    children: null,
+  },
+  {
+    type: 'product_spotlight',
+    group: 'commerce',
+    label: 'Product spotlight',
+    translatable: ['badge'],
+    props: { product_id: null, layout: 'image-left', show_description: true, badge: '' },
+    children: null,
+  },
+  { type: 'shop_the_look', group: 'commerce', label: 'Shop the look', translatable: ['alt', 'title'], props: { media_id: null, alt: '', title: '', hotspots: [] }, children: null },
+  {
+    type: 'trust_badges',
+    group: 'commerce',
+    label: 'Trust badges',
+    translatable: ['items.*.title', 'items.*.text'],
+    props: {
+      items: [
+        { id: 'item-1', icon: 'truck', title: 'Fast delivery', text: '' },
+        { id: 'item-2', icon: 'shield-check', title: 'Secure payment', text: '' },
+        { id: 'item-3', icon: 'rotate-ccw', title: 'Easy returns', text: '' },
+      ],
+      style: 'row',
+    },
+    children: null,
+  },
+  { type: 'recently_viewed', group: 'commerce', label: 'Recently viewed', translatable: ['title'], props: { title: 'Recently viewed', limit: 8 }, children: null },
+  {
+    type: 'marquee',
+    group: 'marketing',
+    label: 'Marquee',
+    translatable: ['items.*.text'],
+    props: { items: [{ id: 'item-1', text: 'Free delivery on every order' }], speed: 'normal', direction: 'left', separator: 'dot' },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] = ['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 
@@ -235,6 +389,25 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   faq_list: ['cms'],
   contact_form: ['cms'],
   custom_html: ALL,
+  accordion: ['page', 'cms', 'zone', 'footer'],
+  tabs: PAGES,
+  icon_box: ['page', 'cms', 'zone', 'footer'],
+  icon_list: ALL,
+  quote: PAGES,
+  notice: PAGES,
+  counter: PAGES,
+  steps: PAGES,
+  chart: PAGES,
+  gallery: PAGES,
+  image_carousel: PAGES,
+  logo_carousel: ['page', 'cms', 'zone', 'footer'],
+  map: ['page', 'cms', 'zone', 'footer'],
+  category_card: PAGES,
+  product_spotlight: PAGES,
+  shop_the_look: PAGES,
+  trust_badges: ['page', 'cms', 'zone', 'footer'],
+  recently_viewed: PAGES,
+  marquee: ALL,
 }
 
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
@@ -249,6 +422,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
     }),
   ),
   ...B4,
+  ...B6,
 ].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */
@@ -272,6 +446,21 @@ export function elementMeta(type: string): ElementMeta | undefined {
 
 export function isWrappedSectionType(type: string): type is WrappedSectionType {
   return (WRAPPED_SECTION_TYPES as readonly string[]).includes(type)
+}
+
+/**
+ * A registry translatable pattern against a stored translation key: `items.*.title` matches
+ * `items.item-1.title`, `labels.*` matches `labels.0`, a plain name only itself.
+ */
+export function matchesTranslatable(pattern: string, key: string): boolean {
+  const a = pattern.split('.')
+  const b = key.split('.')
+  return a.length === b.length && a.every((part, i) => (part === '*' ? /^[A-Za-z0-9_-]{1,32}$/.test(b[i]!) : part === b[i]))
+}
+
+/** Whether a stored translation key (`title`, `primary.label`, `items.item-1.title`, …) is translatable for this type. */
+export function isTranslatableKey(type: string, key: string): boolean {
+  return (elementMeta(type)?.translatable ?? []).some((pattern) => matchesTranslatable(pattern, key))
 }
 
 /** Document limits (contract §1). */

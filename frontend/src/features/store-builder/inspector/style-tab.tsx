@@ -10,7 +10,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRightIcon, MonitorIcon, SmartphoneIcon, TabletIcon } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import type { Background, Breakpoint, Column, Device, ResponsiveStyle, Shadow, Sides, Typography } from '@/storefront/builder/types'
+import type { Background, BackgroundVideo, Breakpoint, Column, Device, ResponsiveStyle, Shadow, Sides, Typography } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
 import {
   BackgroundControl,
@@ -32,6 +32,7 @@ import {
   type TypographyKey,
 } from '../controls'
 import { HelpTip } from '../controls/control-label'
+import { BackgroundVideoControl, MotionControl } from './b6-style'
 import { DeviceStatus } from './device-status'
 import { GROUP_TIPS, GROUP_TITLES, groupsFor, type GroupId } from './style-groups'
 import { BREAKPOINT, CASCADE, DEVICE_LABEL, effectiveGroup, getAt, resolveStyleValue, sameJson, styleIsValid, widthAt, writeStyleValue, type Resolved, type StylePath } from './style-model'
@@ -127,6 +128,8 @@ const GROUP_PATHS: Record<GroupId, StylePath[]> = {
   effects: [['effects', 'shadow'], ['effects', 'opacity']],
   'text-effects': [['effects', 'text_shadow'], ['effects', 'opacity'], ['effects', 'hover', 'color']],
   hover: [['effects', 'hover', 'transform'], ['effects', 'hover', 'shadow']],
+  motion: [['motion']],
+  'background-video': [['background', 'video']],
 }
 
 export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabProps) {
@@ -150,6 +153,32 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
     onChange({ ...node, style: next } as BuilderNode, { coalesceKey: `${node.id}:style:${bp}:${key}`, ...(media ? { media } : {}) })
   }
   const set = (path: StylePath, value: unknown, media?: Record<string, MediaRef>) => setMany([[path, value]], media)
+  /** B6: motion and the background video live on `base` only (the same on every device). */
+  const setBase = (path: StylePath, value: unknown, media?: Record<string, MediaRef>) => {
+    const next = writeStyleValue(style, 'base', path, value)
+    if (sameJson(next, style)) return
+    if (!styleIsValid(next)) {
+      setRefused('That value isn’t allowed here, so it wasn’t saved.')
+      return
+    }
+    setRefused(null)
+    onChange({ ...node, style: next } as BuilderNode, { coalesceKey: `${node.id}:style:base:${path.join('.')}`, ...(media ? { media } : {}) })
+  }
+  const baseVideo = style.base?.background?.video
+  /** Writes the background at this breakpoint, keeping the desktop background video (the background controls don't know it). */
+  const setBackground = (bg: Background | undefined, media?: Record<string, MediaRef>) => {
+    if (bp !== 'base' || !baseVideo) return set(['background'], bg, media)
+    set(['background'], bg ? { ...bg, video: baseVideo } : { type: 'none', video: baseVideo }, media)
+  }
+  const setVideo = (video: BackgroundVideo | undefined, media?: Record<string, MediaRef>) => {
+    const current = style.base?.background
+    if (video) return setBase(['background'], { ...(current ?? { type: 'none' }), video }, media)
+    if (!current) return
+    const { video: _old, ...rest } = current
+    void _old
+    // A background that only carried the video goes away with it.
+    setBase(['background'], rest.type === 'none' && Object.keys(rest).length === 1 ? undefined : rest)
+  }
   const get = <T,>(path: StylePath) => resolveStyleValue<T>(style, bp, path)
   const group = <T extends object>(path: StylePath) => effectiveGroup<T & Record<string, unknown>>(style, bp, path) as T
 
@@ -177,8 +206,8 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
   const sections: Record<GroupId, () => ReactNode> = {
     background: () => (
       <BackgroundControl
-        value={get<Background>(['background']).value}
-        onChange={(bg, media) => set(['background'], bg, media)}
+        value={withoutVideo(get<Background>(['background']).value)}
+        onChange={(bg, media) => setBackground(bg, media)}
         themeColors={themeColors}
         palette={palette}
         status={status(['background'], 'Background')}
@@ -312,6 +341,19 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
         palette={palette}
       />
     ),
+    motion: () => (
+      <MotionControl
+        value={style.base?.motion}
+        onChange={(motion) => setBase(['motion'], motion)}
+        onPreview={() => onCommand({ type: 'preview-motion', nodeId: node.id })}
+      />
+    ),
+    'background-video': () => (
+      <>
+        <BackgroundVideoControl value={baseVideo} onChange={setVideo} />
+        {bp !== 'base' && <p className="text-xs text-muted-foreground">The background video is the same on every device (phones show its poster).</p>}
+      </>
+    ),
   }
 
   const groups = groupsFor(node)
@@ -333,6 +375,14 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
       )}
     </div>
   )
+}
+
+/** The background without the B6 video (edited in its own group). */
+function withoutVideo(bg: Background | undefined): Background | undefined {
+  if (!bg?.video) return bg
+  const { video: _video, ...rest } = bg
+  void _video
+  return rest
 }
 
 const TYPOGRAPHY_LABELS: Record<TypographyKey, string> = {

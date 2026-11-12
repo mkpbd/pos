@@ -1,0 +1,75 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 35, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Questions, answered", "level": 2, "link": null },
+                            "translations": { "bn": { "text": "আপনার প্রশ্নের উত্তর" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": { "html": "<p>Can't find what you are looking for? Write to us and we will reply within a day.</p>" },
+                            "translations": { "bn": { "html": "<p>যা খুঁজছেন পাচ্ছেন না? আমাদের লিখুন, এক দিনের মধ্যে উত্তর দেব।</p>" } }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "button",
+                            "props": { "label": "Contact us", "link": { "url": "/pages/contact" }, "variant": "outline", "size": "md", "full_width": false },
+                            "translations": { "bn": { "label": "যোগাযোগ করুন" } }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": { "base": 65, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "accordion",
+                            "props": {
+                                "items": [
+                                    { "id": "q1", "title": "How long does delivery take?", "html": "<p>Orders in the city arrive within 1 to 2 days, elsewhere within 3 to 5 days.</p>" },
+                                    { "id": "q2", "title": "Can I pay on delivery?", "html": "<p>Yes. You can pay in cash when the order arrives, or online when you check out.</p>" },
+                                    { "id": "q3", "title": "Can I return an item?", "html": "<p>Unused items can be returned within 7 days of delivery. Contact us to arrange a pickup.</p>" },
+                                    { "id": "q4", "title": "Do you deliver outside the country?", "html": "<p>Not yet. We deliver everywhere in the country.</p>" }
+                                ],
+                                "open_first": true,
+                                "allow_multiple": false,
+                                "style": "boxed"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.q1.title": "ডেলিভারিতে কত দিন লাগে?",
+                                    "items.q1.html": "<p>শহরের ভেতরে ১ থেকে ২ দিন, অন্যত্র ৩ থেকে ৫ দিন।</p>",
+                                    "items.q2.title": "পণ্য হাতে পেয়ে কি টাকা দিতে পারব?",
+                                    "items.q2.html": "<p>হ্যাঁ। পণ্য হাতে পেয়ে নগদে অথবা চেকআউটের সময় অনলাইনে পরিশোধ করতে পারেন।</p>",
+                                    "items.q3.title": "পণ্য কি ফেরত দেওয়া যায়?",
+                                    "items.q3.html": "<p>অব্যবহৃত পণ্য ডেলিভারির ৭ দিনের মধ্যে ফেরত দেওয়া যায়। পিকআপের জন্য আমাদের সাথে যোগাযোগ করুন।</p>",
+                                    "items.q4.title": "দেশের বাইরে কি ডেলিভারি দেন?",
+                                    "items.q4.html": "<p>এখনো না। আমরা দেশের সব জায়গায় ডেলিভারি দিই।</p>"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

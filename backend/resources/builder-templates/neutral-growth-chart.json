@@ -1,0 +1,75 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": {
+                    "spacing": { "padding": { "top": "64px", "bottom": "64px" } },
+                    "layout": { "align": "center", "gap": "40px" }
+                },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 40, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Growing with you", "level": 2, "link": null },
+                            "translations": { "bn": { "text": "আপনার সাথে বেড়ে উঠছি" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": { "html": "<p>Every year more customers order from us. Thank you for your trust. Replace these sample numbers with your own.</p>" },
+                            "translations": { "bn": { "html": "<p>প্রতি বছর আরও বেশি গ্রাহক আমাদের কাছ থেকে অর্ডার করছেন। আপনার আস্থার জন্য ধন্যবাদ।</p>" } }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": { "base": 60, "tablet": 100, "mobile": 100 },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "chart",
+                            "props": {
+                                "kind": "column",
+                                "title": "Orders per year",
+                                "description": "Sample numbers: orders grew every year since we opened.",
+                                "labels": ["2022", "2023", "2024", "2025"],
+                                "series": [{ "id": "s1", "name": "Orders", "values": [1200, 2600, 4100, 6300] }],
+                                "unit": "",
+                                "unit_position": "after",
+                                "y_starts_at_zero": true,
+                                "show_values": "last",
+                                "show_legend": false,
+                                "show_table": false,
+                                "height": 320
+                            },
+                            "style": { "base": { "motion": { "entrance": "fade", "duration": 600 } } },
+                            "translations": {
+                                "bn": {
+                                    "title": "বছরে অর্ডার",
+                                    "description": "নমুনা সংখ্যা: শুরু থেকে প্রতি বছর অর্ডার বেড়েছে।",
+                                    "labels.0": "২০২২",
+                                    "labels.1": "২০২৩",
+                                    "labels.2": "২০২৪",
+                                    "labels.3": "২০২৫",
+                                    "series.s1.name": "অর্ডার"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -290,3 +290,50 @@ html:lang(bn) body {
 .b-button { align-self: var(--b-align); }
 .b-button.b-full-width { align-self: stretch; }
 .b-spacer { height: 1.5rem; }
+
+/*
+ * Store builder B6: section layers (shape dividers, background video), the sticky section, the
+ * gallery grid, moving strips (logo carousel, marquee) and the entrance keyframes. Only nodes that
+ * use these features get the classes, so pre-B6 pages render exactly as before.
+ */
+.b-layered { position: relative; isolation: isolate; }
+.b-layered > .b-container, .b-layered > .b-row { position: relative; z-index: 1; }
+.b-sticky { position: sticky; top: var(--b-sticky-top, 0px); z-index: 30; }
+.b-shape { position: absolute; left: 0; width: 100%; z-index: 0; line-height: 0; pointer-events: none; overflow: hidden; }
+.b-shape[data-edge="top"] { top: -1px; }
+.b-shape[data-edge="bottom"] { bottom: -1px; }
+.b-shape svg { display: block; width: 100%; height: 100%; }
+.b-bg-video { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; container-type: size; }
+.b-bg-video .b-bg-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.b-bg-video iframe {
+  position: absolute; top: 50%; left: 50%; border: 0;
+  width: max(100cqw, 177.78cqh); height: max(56.25cqw, 100cqh);
+  transform: translate(-50%, -50%);
+}
+.b-bg-video .b-bg-overlay { position: absolute; inset: 0; }
+
+.b-gallery-grid { display: grid; grid-template-columns: repeat(var(--b-cols, 3), minmax(0, 1fr)); gap: var(--b-gallery-gap, 1rem); }
+@media (max-width: 1023px) {
+  .b-gallery-grid { grid-template-columns: repeat(var(--b-cols-t, var(--b-cols, 3)), minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  .b-gallery-grid { grid-template-columns: repeat(var(--b-cols-m, var(--b-cols-t, var(--b-cols, 3))), minmax(0, 1fr)); }
+}
+
+@keyframes b-strip {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.b-strip-track { animation: b-strip var(--b-strip-duration, 40s) linear infinite; }
+.b-strip-track[data-direction="right"] { animation-direction: reverse; }
+.b-strip-track[data-paused="true"] { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .b-strip-track { animation: none; }
+}
+
+@keyframes b-motion-fade { from { opacity: 0; } }
+@keyframes b-motion-slide-up { from { opacity: 0; transform: translateY(2rem); } }
+@keyframes b-motion-slide-down { from { opacity: 0; transform: translateY(-2rem); } }
+@keyframes b-motion-slide-left { from { opacity: 0; transform: translateX(2rem); } }
+@keyframes b-motion-slide-right { from { opacity: 0; transform: translateX(-2rem); } }
+@keyframes b-motion-zoom { from { opacity: 0; transform: scale(0.92); } }

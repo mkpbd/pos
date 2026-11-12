@@ -320,3 +320,21 @@ Original questions:
 - **Templates:**
   - `site-kids` plus 10 kids section templates, with thumbnails.
   - The kids "Deal of the week" template puts the photo next to hot deals in two columns on a mint panel, because `hot_deals` has no image field.
+
+### As built — B6 more elements, motion and charts (2026-11-12)
+
+- **Elements:** `B6ElementProps` normalizes the 19 new types. A new registry group `media` sits between content and commerce.
+  - List item translations use `<list>.<item_id>.<field>`; chart labels use `labels.<index>`.
+  - Keys of removed items are dropped on save.
+- **Styles:** `motion` (base only, any node) and `background.video` (base only, sections and inner rows; the poster is omitted when absent).
+- **Section props:** `sticky`, `shape_top` and `shape_bottom` are kept only when set, so older documents round-trip unchanged.
+- **Data:** category card, product spotlight (the product-detail shape) and shop the look (cards by id). Unavailable ones are dropped publicly and get a draft `state`. `/builder/resolve` covers all three.
+- **Storefront:**
+  - `builder/motion.ts` is one shared IntersectionObserver; entrances are off in the canvas, and `playMotion` handles the editor preview.
+  - `section-layers.tsx` / `section-layer-utils.ts` handle shapes, the background video and sticky.
+  - Charts live in `builder/elements/chart/` (lazy, D3 modules only).
+- **Chart choices:**
+  - A single series uses palette slot 1, because the default and kids theme primaries fail the palette validator.
+  - Pie / donut with more than 6 parts or a negative value is drawn as horizontal bars.
+  - The data table toggle is always offered (contrast relief); `show_table` only sets whether it starts open.
+- **Canvas protocol:** additive `play-motion {id}` (v1).

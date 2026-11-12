@@ -1,0 +1,49 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "full" },
+            "style": {
+                "base": {
+                    "background": { "type": "color", "color": "theme:primary" },
+                    "color": "theme:primary_foreground",
+                    "spacing": { "padding": { "top": "56px", "bottom": "56px" } }
+                },
+                "mobile": { "spacing": { "padding": { "top": "36px", "bottom": "36px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "counter",
+                            "props": {
+                                "items": [
+                                    { "id": "n1", "value": 12000, "prefix": "", "suffix": "+", "label": "Happy customers" },
+                                    { "id": "n2", "value": 450, "prefix": "", "suffix": "+", "label": "Products in stock" },
+                                    { "id": "n3", "value": 64, "prefix": "", "suffix": "", "label": "Districts we deliver to" },
+                                    { "id": "n4", "value": 4.8, "prefix": "", "suffix": "/5", "label": "Average rating" }
+                                ],
+                                "animate": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.n1.label": "সন্তুষ্ট গ্রাহক",
+                                    "items.n2.label": "স্টকে থাকা পণ্য",
+                                    "items.n3.label": "জেলায় ডেলিভারি",
+                                    "items.n4.suffix": "/৫",
+                                    "items.n4.label": "গড় রেটিং"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

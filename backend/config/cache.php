@@ -131,6 +131,9 @@ return [
     |
     */
 
-    'serializable_classes' => false,
+    // stdClass (no magic methods, so no gadget) is allowed: cached storefront payloads use it
+    // for JSON objects that may be empty (`{}`), e.g. a builder page's `media` / `data` and a
+    // product's `option_values` (B6 product spotlight).
+    'serializable_classes' => [stdClass::class],
 
 ];

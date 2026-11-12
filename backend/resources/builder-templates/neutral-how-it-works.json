@@ -1,0 +1,54 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "How it works", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "যেভাবে কাজ করে" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "steps",
+                            "props": {
+                                "items": [
+                                    { "id": "st1", "title": "Choose", "text": "Browse the shop and add what you like to your cart.", "icon": "store" },
+                                    { "id": "st2", "title": "Pay", "text": "Pay online or in cash when your order arrives.", "icon": "credit-card" },
+                                    { "id": "st3", "title": "Receive", "text": "We pack your order with care and bring it to your door.", "icon": "truck" }
+                                ],
+                                "layout": "horizontal",
+                                "numbered": true
+                            },
+                            "style": { "base": { "motion": { "entrance": "slide-up", "duration": 600 } } },
+                            "translations": {
+                                "bn": {
+                                    "items.st1.title": "বাছাই করুন",
+                                    "items.st1.text": "দোকান ঘুরে দেখুন এবং পছন্দের জিনিস কার্টে যোগ করুন।",
+                                    "items.st2.title": "পেমেন্ট করুন",
+                                    "items.st2.text": "অনলাইনে অথবা পণ্য হাতে পেয়ে নগদে পরিশোধ করুন।",
+                                    "items.st3.title": "হাতে পান",
+                                    "items.st3.text": "আমরা যত্ন করে প্যাক করে আপনার দরজায় পৌঁছে দিই।"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

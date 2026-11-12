@@ -17,6 +17,8 @@ import type { DropIndicator } from './drop-targets'
 export type CanvasHandle = {
   scrollTo: (id: string) => void
   scrollBy: (dy: number) => void
+  /** B6: replays the node's entrance animation once. */
+  playMotion: (id: string) => void
   /** A client (parent window) point in canvas viewport pixels; null outside the canvas. */
   toCanvasPoint: (clientX: number, clientY: number) => { x: number; y: number } | null
   rects: () => Record<string, Rect>
@@ -134,6 +136,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
     () => ({
       scrollTo: (id) => send({ type: 'scroll-to', id }),
       scrollBy: (dy) => send({ type: 'scroll-by', dy }),
+      playMotion: (id) => send({ type: 'play-motion', id }),
       toCanvasPoint: (clientX, clientY) => {
         const frame = frameRef.current
         if (!frame) return null

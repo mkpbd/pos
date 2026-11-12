@@ -13,7 +13,7 @@ The no-code store builder (brief §14) is built into the existing POS and online
 | **C. Colour & styling** | • **Colour:** solid colours, theme colours, palettes (8 built-in plus up to 8 of the store's own), HEX, RGB(A) and opacity.<br>• **Backgrounds:** linear and radial gradients (2–5 stops), images with an overlay.<br>• **Typography:** font, size, weight, line height, letter spacing, align, transform.<br>• **Box:** margin and padding, size, gap and alignment, border and per-corner radius.<br>• **Effects:** box and text shadows, opacity, hover effects.<br>• **Global colour roles:** primary, secondary, background, text, heading, button, button hover, border, link, sale badge. |
 | **D. Responsive** | • Desktop / Tablet / Mobile editing with per-device overrides, "inherited / set here" indicators and reset.<br>• Per-device visibility and column widths.<br>• Products per row per device (default 3 / 3 / 2). |
 | **E. Live preview** | Every change shows in the canvas without saving or reloading; site styles preview instantly too. |
-| **F. Theme customization** | • The four demo looks (Vegan, Handmade, Classic, Kids) are starting points ("Start from a demo look").<br>• The home page, header, footer, product cards (theme), category / listing areas, colour schemes, banners and images can all be changed, and additional pages added.<br>• 57 professionally designed templates are included. |
+| **F. Theme customization** | • The four demo looks (Vegan, Handmade, Classic, Kids) are starting points ("Start from a demo look").<br>• The home page, header, footer, product cards (theme), category / listing areas, colour schemes, banners and images can all be changed, and additional pages added.<br>• 65 professionally designed templates are included. |
 | **G. Page management** | • Home, Shop (zones and columns), and About / Contact / FAQ / Privacy / Terms (any CMS page) in the builder.<br>• Custom landing pages at `/p/<slug>`.<br>• Each page has its own document, draft and versions. |
 | **H. Header & footer** | Builders for both, started from today's layout. The header is used from 768 px; phones keep the compact header. |
 | **I. Save / undo / publish** | • **Saving:** autosave, manual flush, undo / redo (100 steps), draft preview on the real store.<br>• **Publishing:** publish with a note, publish all, discard, version history with restore.<br>• **Protection:** a guard against leaving with unsaved changes, and a conflict dialog when another tab saved first. |
@@ -70,3 +70,19 @@ The no-code store builder (brief §14) is built into the existing POS and online
 - **Deleted CMS pages:** deleting a CMS page leaves its builder design behind, listed without a page.
 - **Version restore:** restoring a version doesn't re-check the custom-HTML permission, because that HTML was allowed when it was saved.
 - **Open bug (not from the builder):** under heavy machine load, the admin *New product* form once lost typed prices and barcode after choosing a unit. It was not reproducible at normal load; to be investigated.
+
+## Addendum — B6 (2026-11-12)
+
+19 more elements:
+- **Content:** accordion, tabs, icon box, icon list, quote, notice, counter, steps, chart.
+- **Media:** gallery, image carousel, logo carousel, map.
+- **Shop:** category card, product spotlight, shop the look, trust badges, recently viewed.
+- **Motion:** marquee.
+
+Also added:
+- **Effects:** entrance animations, sticky sections, shape dividers and section background video.
+- **Charts:** D3 charts following the dataviz rules.
+- **Editor:** an item-list editor, a hotspot editor and a chart data grid.
+- **Templates:** 8 new ones.
+
+Tests: backend 969 (PostgreSQL 968 + 1), vitest 1394, mocked Playwright 215; full-stack integration 24/24, demo stores 10/10 (including a B6 showcase page used by a shopper), acceptance 4/4.

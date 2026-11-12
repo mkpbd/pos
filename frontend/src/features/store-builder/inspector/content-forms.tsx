@@ -13,8 +13,10 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { RichTextEditor } from '@/features/content/components/rich-text-editor'
 import { cn } from '@/lib/utils'
-import type { ButtonElement, Column, DividerElement, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, Style, TextElement } from '@/storefront/builder/types'
+import type { ButtonElement, Column, DividerElement, DocumentContext, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, Style, TextElement } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
+import type { PaletteColor } from '../controls'
+import { SectionShapeControl } from './b6-style'
 import { FieldError, ImageChooser, LinkField, NodeBangla, ThemeColorField, type Errors } from './fields'
 import { COLUMN_PRESETS, currentPreset } from './tree-lookup'
 import { DIVIDER_THICKNESS, DIVIDER_WIDTH, TEXT_LIMITS } from './validate'
@@ -316,8 +318,23 @@ const LAYOUTS: { value: Section['props']['layout']; label: string; hint: string 
   { value: 'full-bleed', label: 'Edge to edge', hint: 'Content across the whole screen.' },
 ]
 
-export function SectionForm({ node, onChange, errors, onCommand }: FormProps<Section> & { onCommand: (cmd: InspectorCommand) => void }) {
+export function SectionForm({ node, onChange, errors, onCommand, theme, context = 'page', otherSticky = false }: FormProps<Section> & {
+  onCommand: (cmd: InspectorCommand) => void
+  theme?: { colors?: Record<string, string>; palette?: readonly PaletteColor[] }
+  context?: DocumentContext
+  /** B6: another section of the document sticks already (at most one may). */
+  otherSticky?: boolean
+}) {
   const layout = LAYOUTS.find((l) => l.value === node.props.layout)
+  const sticky = node.props.sticky === true
+  // B6: sticky and the shapes are written only when set; turning them off removes the key.
+  const setOptional = <K extends 'sticky' | 'shape_top' | 'shape_bottom'>(key: K, value: Section['props'][K] | null | false, coalesce?: string) => {
+    const props = { ...node.props }
+    if (value === null || value === false || value === undefined) delete props[key]
+    else props[key] = value
+    onChange({ ...node, props }, coalesce ? { coalesceKey: `${node.id}:${coalesce}` } : undefined)
+  }
+  const canStick = context === 'page' || context === 'cms' || context === 'zone'
   return (
     <div className="flex flex-col gap-4">
       <FormField label="Width" error={errors.layout} hint={layout?.hint}>
@@ -328,6 +345,20 @@ export function SectionForm({ node, onChange, errors, onCommand }: FormProps<Sec
       </FormField>
       <ColumnPresetPicker nodeId={node.id} columns={node.columns} onCommand={onCommand} />
       <FieldError message={errors.columns} />
+      {canStick && (
+        <div className="flex flex-col gap-1" data-testid="section-sticky">
+          <div className="flex items-center gap-2">
+            <Switch id={`sticky-${node.id}`} checked={sticky} disabled={!sticky && otherSticky} onCheckedChange={(on) => setOptional('sticky', on)} />
+            <Label htmlFor={`sticky-${node.id}`}>Stick to the top when scrolling</Label>
+          </div>
+          <p className="pl-11 text-sm text-muted-foreground">
+            {!sticky && otherSticky ? 'Another section already sticks; only one section per page can.' : 'Stays visible below the store header, e.g. for a short offer bar. Keep it slim.'}
+          </p>
+          <FieldError message={errors.sticky} />
+        </div>
+      )}
+      <SectionShapeControl edge="top" value={node.props.shape_top ?? null} error={errors.shape_top} themeColors={theme?.colors} palette={theme?.palette} onChange={(shape, coalesce) => setOptional('shape_top', shape, coalesce)} />
+      <SectionShapeControl edge="bottom" value={node.props.shape_bottom ?? null} error={errors.shape_bottom} themeColors={theme?.colors} palette={theme?.palette} onChange={(shape, coalesce) => setOptional('shape_bottom', shape, coalesce)} />
     </div>
   )
 }

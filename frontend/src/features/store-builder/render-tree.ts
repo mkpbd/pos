@@ -1,4 +1,4 @@
-import { elementMeta, isWrappedSectionType } from '@/storefront/builder/registry'
+import { isTranslatableKey, isWrappedSectionType } from '@/storefront/builder/registry'
 import type { BuilderContent, Column, Element, NodeState, RenderColumn, RenderElement, RenderSection, Schedule, Section } from '@/storefront/builder/types'
 import type { StoreSection } from '@/storefront/types'
 import type { ResolveDataElement, ResolveElement } from './api'
@@ -17,11 +17,19 @@ type AnyNode = Section | Element
 function translated(node: AnyNode, locale: string): Record<string, unknown> {
   const props = structuredClone(node.props) as Record<string, unknown>
   const texts = node.translations?.[locale] ?? {}
-  const translatable = elementMeta(node.type)?.translatable ?? []
   for (const [field, value] of Object.entries(texts)) {
-    if (!translatable.includes(field) || typeof value !== 'string' || value === '') continue
+    if (!isTranslatableKey(node.type, field) || typeof value !== 'string' || value === '') continue
+    const parts = field.split('.')
     if (isWrappedSectionType(node.type) && field !== 'title' && field !== 'subtitle') {
       props.config = { ...(props.config as Record<string, unknown>), [field]: value }
+    } else if (parts.length === 3 && Array.isArray(props[parts[0]!])) {
+      // B6: a list item's field (`items.<item_id>.title`, `series.<id>.name`).
+      const [list, id, child] = parts as [string, string, string]
+      props[list] = (props[list] as Record<string, unknown>[]).map((item) => (item && item.id === id ? { ...item, [child]: value } : item))
+    } else if (parts.length === 2 && parts[0] === 'labels' && Array.isArray(props.labels)) {
+      // B6: a chart label by position (`labels.<index>`).
+      const index = Number(parts[1])
+      props.labels = (props.labels as unknown[]).map((label, i) => (i === index ? value : label))
     } else if (field.includes('.')) {
       // B4: a nested prop (`primary.label` of a call to action); an absent parent (no secondary button) stays absent.
       const [parent, child] = field.split('.', 2) as [string, string]
@@ -73,8 +81,8 @@ export function toRenderTree(content: BuilderContent, options: RenderTreeOptions
  * Wrapped elements and media for /builder/resolve
  * -------------------------------------------------------------------------------------------- */
 
-/** B4 elements whose `data[id]` comes from the server (the resolve takes their props). */
-export const DATA_ELEMENT_TYPES: ReadonlySet<string> = new Set(['countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'contact_form'])
+/** B4 / B6 elements whose `data[id]` comes from the server (the resolve takes their props). */
+export const DATA_ELEMENT_TYPES: ReadonlySet<string> = new Set(['countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'contact_form', 'category_card', 'product_spotlight', 'shop_the_look'])
 
 /** Elements the canvas needs server data for: wrapped homepage sections and the B4 data elements. */
 export function wrappedElements(content: BuilderContent): Element[] {
@@ -108,25 +116,39 @@ export function resolveInput(element: Element): ResolveElement | ResolveDataElem
 
 /** A stable key of a wrapped element's resolve input: the element is re-resolved when it changes. */
 export function resolveKey(element: Element): string {
+  // B6: moving a hotspot or retyping its alt text doesn't change the products the look needs.
+  if (element.type === 'shop_the_look') {
+    const { media_id, hotspots } = element.props
+    return JSON.stringify({ id: element.id, type: element.type, media_id, products: [...new Set(hotspots.map((h) => h.product_id))].sort() })
+  }
   return JSON.stringify(resolveInput(element))
 }
 
-/** Media ids used by image elements and background images (any breakpoint). */
+/** B6 list props whose items carry a `media_id`. */
+const MEDIA_LISTS: Record<string, string> = { gallery: 'images', image_carousel: 'images', logo_carousel: 'logos' }
+/** Element types with a `media_id` prop (B6: category card override, shop-the-look photo). */
+const MEDIA_PROP_TYPES = new Set(['image', 'category_card', 'shop_the_look'])
+
+/** Media ids used by image elements, B6 media elements, background images and background video posters (any breakpoint). */
 export function mediaIds(content: BuilderContent): string[] {
   const ids = new Set<string>()
+  const add = (id: unknown) => {
+    if (typeof id === 'string' && id !== '') ids.add(id)
+  }
   const style = (value: unknown) => {
     if (!value || typeof value !== 'object') return
     for (const breakpoint of Object.values(value as Record<string, unknown>)) {
-      const id = (breakpoint as { background?: { image?: { media_id?: unknown } } } | undefined)?.background?.image?.media_id
-      if (typeof id === 'string') ids.add(id)
+      const background = (breakpoint as { background?: { image?: { media_id?: unknown }; video?: { poster?: { media_id?: unknown } | null } } } | undefined)?.background
+      add(background?.image?.media_id)
+      add(background?.video?.poster?.media_id)
     }
   }
   const visit = (node: { style?: unknown; type: string; props?: unknown; columns?: unknown; elements?: unknown }) => {
     style(node.style)
-    if (node.type === 'image') {
-      const id = (node.props as { media_id?: unknown }).media_id
-      if (typeof id === 'string') ids.add(id)
-    }
+    const props = (node.props ?? {}) as Record<string, unknown>
+    if (MEDIA_PROP_TYPES.has(node.type)) add(props.media_id)
+    const list = MEDIA_LISTS[node.type]
+    if (list && Array.isArray(props[list])) for (const item of props[list] as { media_id?: unknown }[]) add(item?.media_id)
     if (Array.isArray(node.columns)) (node.columns as Column[]).forEach((column) => visit(column as never))
     if (Array.isArray(node.elements)) (node.elements as Element[]).forEach((element) => visit(element as never))
   }

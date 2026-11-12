@@ -751,6 +751,128 @@
       "requires": []
     },
     {
+      "id": "neutral-how-it-works",
+      "scope": "section",
+      "preset": null,
+      "category": "steps",
+      "name": "How it works in three steps",
+      "description": "Three numbered steps with icons: choose, pay and receive. Edit the texts to explain how ordering works.",
+      "thumbnail": "/builder-templates/neutral-how-it-works.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-stats-band",
+      "scope": "section",
+      "preset": null,
+      "category": "stats",
+      "name": "Numbers band",
+      "description": "A full-width band in your main colour with four counters that count up when they scroll into view.",
+      "thumbnail": "/builder-templates/neutral-stats-band.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-faq-accordion",
+      "scope": "section",
+      "preset": null,
+      "category": "faq",
+      "name": "FAQ accordion",
+      "description": "Four common questions about delivery, payment and returns that open one at a time, beside a contact button.",
+      "thumbnail": "/builder-templates/neutral-faq-accordion.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-photo-gallery",
+      "scope": "section",
+      "preset": null,
+      "category": "gallery",
+      "name": "Photo gallery",
+      "description": "Six photos in a square grid that open full size in a lightbox. Replace them with photos of your shop.",
+      "thumbnail": "/builder-templates/neutral-photo-gallery.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-shop-the-look",
+      "scope": "section",
+      "preset": null,
+      "category": "look",
+      "name": "Shop the look",
+      "description": "A styled photo with spots that show your featured products. Click the photo in the editor to move the spots.",
+      "thumbnail": "/builder-templates/neutral-shop-the-look.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "products"
+      ]
+    },
+    {
+      "id": "neutral-store-map",
+      "scope": "section",
+      "preset": null,
+      "category": "location",
+      "name": "Store location map",
+      "description": "Your address, opening hours and phone beside a map that loads when a visitor asks for it.",
+      "thumbnail": "/builder-templates/neutral-store-map.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-trust-strip",
+      "scope": "section",
+      "preset": null,
+      "category": "features",
+      "name": "Trust badges strip",
+      "description": "Four promises in a row: fast delivery, secure payment, easy returns and real help.",
+      "thumbnail": "/builder-templates/neutral-trust-strip.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-growth-chart",
+      "scope": "section",
+      "preset": null,
+      "category": "chart",
+      "name": "Our growth chart",
+      "description": "A column chart of orders per year with sample numbers beside a short thank-you text. Enter your own numbers.",
+      "thumbnail": "/builder-templates/neutral-growth-chart.png",
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "page-about",
       "scope": "page",
       "preset": null,

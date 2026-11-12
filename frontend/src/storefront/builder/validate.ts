@@ -6,7 +6,22 @@
  */
 
 import type { ListingColumns, ThemeColors } from '../types'
-import type { Background, Gradient, GradientStop, Length, ResponsiveStyle, Shadow, Sides, Style, Typography, VideoProvider } from './types'
+import { ICON_NAMES } from './icons'
+import type {
+  Background,
+  BackgroundVideo,
+  Gradient,
+  GradientStop,
+  Length,
+  Motion,
+  ResponsiveStyle,
+  SectionShape,
+  Shadow,
+  Sides,
+  Style,
+  Typography,
+  VideoProvider,
+} from './types'
 
 type Obj = Record<string, unknown>
 
@@ -133,7 +148,36 @@ function normalizeBackground(value: unknown): Background | undefined {
     if (isUuid(media_id) && pos && fit && typeof repeat === 'boolean') image = { media_id, position: pos, size: fit, repeat }
   }
   const overlay = typeof value.overlay === 'string' ? normalizeColor(value.overlay) : normalizeGradient(value.overlay)
-  return compact({ type, color: normalizeColor(value.color), gradient: normalizeGradient(value.gradient), image, overlay })
+  return compact({ type, color: normalizeColor(value.color), gradient: normalizeGradient(value.gradient), image, overlay, video: normalizeBackgroundVideo(value.video) })
+}
+
+/**
+ * B6 `background.video`: a URL the video element accepts (provider and id are derived from it, as
+ * the server does) and an optional poster image. Anything else is dropped.
+ */
+export function normalizeBackgroundVideo(value: unknown): BackgroundVideo | undefined {
+  if (!isObject(value)) return undefined
+  const parsed = parseVideoUrl(value.url)
+  if (!parsed) return undefined
+  const video: BackgroundVideo = { url: value.url as string, provider: parsed.provider, video_id: parsed.video_id }
+  // Absent when none was chosen (the server omits it too).
+  if (isObject(value.poster) && isUuid(value.poster.media_id)) video.poster = { media_id: value.poster.media_id }
+  return video
+}
+
+/** B6 `motion`: entrance plus bounded duration / delay (ms, whole numbers); `none` keeps the group. */
+export function normalizeMotion(value: unknown): Motion | undefined {
+  if (!isObject(value)) return undefined
+  const entrance = oneOf(value.entrance, B6_ENUMS.motionEntrance)
+  if (!entrance) return undefined
+  const motion: Motion = { entrance }
+  if (isInt(value.duration, B6_LIMITS.motionDuration.min, B6_LIMITS.motionDuration.max)) motion.duration = value.duration
+  if (isInt(value.delay, B6_LIMITS.motionDelay.min, B6_LIMITS.motionDelay.max)) motion.delay = value.delay
+  return motion
+}
+
+function isInt(value: unknown, min: number, max: number): value is number {
+  return inRange(value, min, max) && Number.isInteger(value)
 }
 
 function normalizeTypography(value: unknown): Typography | undefined {
@@ -243,15 +287,27 @@ export function normalizeStyleValue(value: unknown): Style | undefined {
     layout,
     border,
     effects,
+    motion: normalizeMotion(value.motion),
   })
 }
 
-/** `{base?, tablet?, mobile?}`; anything else (or invalid) is dropped. Always an object. */
+/** `{base?, tablet?, mobile?}`; anything else (or invalid) is dropped. Always an object. B6: `motion` and `background.video` are kept on `base` only. */
 export function normalizeStyle(value: unknown): ResponsiveStyle {
   if (!isObject(value)) return {}
   const style: ResponsiveStyle = {}
   for (const breakpoint of ['base', 'tablet', 'mobile'] as const) {
-    const normalized = normalizeStyleValue(value[breakpoint])
+    let normalized = normalizeStyleValue(value[breakpoint])
+    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.background?.video)) {
+      const { motion, background, ...rest } = normalized
+      void motion
+      let kept: Background | undefined = background
+      if (background?.video) {
+        const { video, ...other } = background
+        void video
+        kept = other
+      }
+      normalized = compact({ ...rest, background: kept })
+    }
     if (normalized) style[breakpoint] = normalized
   }
   return style
@@ -383,6 +439,22 @@ export function videoEmbedUrl(provider: unknown, videoId: unknown, options: { au
   return null
 }
 
+/**
+ * B6 section background video: the privacy-enhanced player muted, autoplaying, looping, without
+ * controls and inline on phones (YouTube `playlist=<id>` makes `loop` work; Vimeo `background=1`).
+ */
+export function backgroundVideoEmbedUrl(provider: unknown, videoId: unknown): string | null {
+  if (provider === 'youtube' && typeof videoId === 'string' && YOUTUBE_ID.test(videoId)) {
+    const query = new URLSearchParams({ autoplay: '1', mute: '1', loop: '1', playlist: videoId, controls: '0', playsinline: '1', rel: '0', disablekb: '1', modestbranding: '1' })
+    return `https://www.youtube-nocookie.com/embed/${videoId}?${query.toString()}`
+  }
+  if (provider === 'vimeo' && typeof videoId === 'string' && VIMEO_ID.test(videoId)) {
+    const query = new URLSearchParams({ background: '1', dnt: '1', autoplay: '1', muted: '1', loop: '1', playsinline: '1' })
+    return `https://player.vimeo.com/video/${videoId}?${query.toString()}`
+  }
+  return null
+}
+
 /** An integer in [min, max], else the fallback. */
 export function boundedInt(value: unknown, min: number, max: number, fallback: number): number {
   return isNumber(value) && Number.isInteger(value) && value >= min && value <= max ? value : fallback
@@ -403,4 +475,405 @@ export function normalizeListingColumns(value: unknown): ListingColumns {
   const pick = <K extends keyof ListingColumns>(key: K): ListingColumns[K] =>
     ((LISTING_COLUMN_OPTIONS[key] as readonly number[]).includes(source[key] as number) ? source[key] : DEFAULT_LISTING_COLUMNS[key]) as ListingColumns[K]
   return { desktop: pick('desktop'), tablet: pick('tablet'), mobile: pick('mobile') }
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B6 elements, motion, section shapes (contract §1)
+ * -------------------------------------------------------------------------------------------- */
+
+export const B6_ENUMS = {
+  motionEntrance: ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom'],
+  shape: ['wave', 'curve', 'tilt', 'triangle', 'zigzag'],
+  accordionStyle: ['plain', 'boxed'],
+  tabsLayout: ['horizontal', 'vertical'],
+  iconBoxLayout: ['top', 'left'],
+  iconStyle: ['plain', 'circle', 'square'],
+  iconListLayout: ['vertical', 'inline'],
+  quoteStyle: ['plain', 'card', 'large'],
+  noticeTone: ['info', 'success', 'warning', 'promo'],
+  stepsLayout: ['horizontal', 'vertical'],
+  chartKind: ['bar', 'column', 'line', 'area', 'pie', 'donut'],
+  chartUnitPosition: ['before', 'after'],
+  chartShowValues: ['none', 'last', 'all-small'],
+  galleryAspect: ['square', '4:3', '3:4', '16:9', 'auto'],
+  galleryGap: ['sm', 'md', 'lg'],
+  speed: ['slow', 'normal', 'fast'],
+  marqueeDirection: ['left', 'right'],
+  marqueeSeparator: ['dot', 'star', 'leaf', 'none'],
+  categoryCardLayout: ['overlay', 'below'],
+  spotlightLayout: ['image-left', 'image-right'],
+  trustBadgesStyle: ['row', 'grid'],
+} as const
+
+/** Item counts and numeric bounds of the B6 props (min / max inclusive). */
+export const B6_LIMITS = {
+  motionDuration: { min: 200, max: 2000 },
+  motionDelay: { min: 0, max: 2000 },
+  shapeHeight: { min: 16, max: 200 },
+  accordionItems: { min: 1, max: 20 },
+  tabsItems: { min: 2, max: 8 },
+  iconListItems: { min: 1, max: 20 },
+  counterItems: { min: 1, max: 6 },
+  counterValue: { min: 0, max: 1_000_000_000 },
+  stepsItems: { min: 2, max: 8 },
+  galleryImages: { min: 1, max: 30 },
+  galleryColumns: { min: 2, max: 6 },
+  carouselImages: { min: 1, max: 20 },
+  carouselAutoplay: { min: 0, max: 15 },
+  logos: { min: 2, max: 24 },
+  mapHeight: { min: 200, max: 600 },
+  mapZoom: { min: 3, max: 20 },
+  hotspots: { min: 1, max: 8 },
+  trustBadges: { min: 1, max: 6 },
+  recentlyViewed: { min: 4, max: 12 },
+  marqueeItems: { min: 1, max: 10 },
+  chartLabels: { min: 1, max: 24 },
+  chartSeries: { min: 1, max: 6 },
+  chartPieLabels: 8,
+  chartHeight: { min: 200, max: 600 },
+  counterPrefix: 4,
+} as const
+
+/**
+ * Maximum length of each B6 text prop (✱ = translatable). Item fields are named `<list>.*.<field>`,
+ * chart labels `labels.*`. `counter` `items.*.prefix` and `chart` `unit` are not translated.
+ */
+export const B6_TEXT_LIMITS = {
+  accordion: { 'items.*.title': 120, 'items.*.html': 5000 },
+  tabs: { 'items.*.title': 60, 'items.*.html': 8000 },
+  icon_box: { title: 120, text: 400 },
+  icon_list: { 'items.*.text': 160 },
+  quote: { text: 600, author: 80, role: 80 },
+  notice: { title: 120, text: 400 },
+  counter: { 'items.*.prefix': 4, 'items.*.suffix': 8, 'items.*.label': 60 },
+  steps: { 'items.*.title': 80, 'items.*.text': 300 },
+  chart: { title: 120, description: 300, 'labels.*': 40, 'series.*.name': 40, unit: 8 },
+  gallery: { 'images.*.alt': 200, 'images.*.caption': 200 },
+  image_carousel: { 'images.*.alt': 200, 'images.*.caption': 200 },
+  logo_carousel: { 'logos.*.alt': 200 },
+  map: { query: 200, title: 120 },
+  category_card: { title: 120, button_label: 30 },
+  product_spotlight: { badge: 24 },
+  shop_the_look: { alt: 200, title: 120 },
+  trust_badges: { 'items.*.title': 60, 'items.*.text': 120 },
+  recently_viewed: { title: 120 },
+  marquee: { 'items.*.text': 120 },
+} as const
+
+/** A list item's id: like a node id (`^[a-z][a-z0-9_-]{1,31}$`), unique within its list. */
+export const ITEM_ID = /^[a-z][a-z0-9_-]{1,31}$/
+
+/** A finite number with at most two decimals. */
+export function hasTwoDecimals(value: unknown): value is number {
+  return isNumber(value) && Math.abs(Math.round(value * 100) - value * 100) < 1e-6
+}
+
+/** B6 section `shape_top` / `shape_bottom`: null, or a valid shape (anything else is dropped to null). */
+export function normalizeSectionShape(value: unknown): SectionShape | null {
+  if (!isObject(value)) return null
+  const shape = oneOf(value.shape, B6_ENUMS.shape)
+  const color = normalizeColor(value.color)
+  if (!shape || !color || !isInt(value.height, B6_LIMITS.shapeHeight.min, B6_LIMITS.shapeHeight.max)) return null
+  return { shape, color, height: value.height, flip: value.flip === true }
+}
+
+/** Gallery `columns`: base 2–6 (default 3); tablet / mobile only when valid. */
+export function normalizeGalleryColumns(value: unknown): { base: number; tablet?: number; mobile?: number } {
+  const source = isObject(value) ? value : {}
+  const { min, max } = B6_LIMITS.galleryColumns
+  const out: { base: number; tablet?: number; mobile?: number } = { base: isInt(source.base, min, max) ? source.base : 3 }
+  // Phones may show one column per row.
+  if (isInt(source.tablet, 1, max)) out.tablet = source.tablet
+  if (isInt(source.mobile, 1, max)) out.mobile = source.mobile
+  return out
+}
+
+/** The items of a list prop that have a valid id (unique), in order; non-objects are skipped. */
+export function listItems(value: unknown, max: number): Obj[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const out: Obj[] = []
+  for (const item of value) {
+    if (!isObject(item) || typeof item.id !== 'string' || !ITEM_ID.test(item.id) || seen.has(item.id)) continue
+    seen.add(item.id)
+    out.push(item)
+    if (out.length >= max) break
+  }
+  return out
+}
+
+/** One problem with an element's props: the prop path (`items.2.title`) and a short code. */
+export type PropProblem = { path: string; code: 'required' | 'invalid' | 'too_long' | 'too_few' | 'too_many' | 'out_of_range' | 'duplicate' }
+
+type Problems = PropProblem[]
+
+function text(problems: Problems, path: string, value: unknown, max: number, required = false) {
+  if (typeof value !== 'string') problems.push({ path, code: 'invalid' })
+  else if (value.length > max) problems.push({ path, code: 'too_long' })
+  else if (required && value.trim() === '') problems.push({ path, code: 'required' })
+}
+
+function nullableText(problems: Problems, path: string, value: unknown, max: number) {
+  if (value !== null) text(problems, path, value, max)
+}
+
+function enumOf(problems: Problems, path: string, value: unknown, options: readonly string[]) {
+  if (!oneOf(value, options)) problems.push({ path, code: 'invalid' })
+}
+
+function flag(problems: Problems, path: string, value: unknown) {
+  if (typeof value !== 'boolean') problems.push({ path, code: 'invalid' })
+}
+
+function int(problems: Problems, path: string, value: unknown, range: { min: number; max: number }) {
+  if (!isInt(value, range.min, range.max)) problems.push({ path, code: isNumber(value) ? 'out_of_range' : 'invalid' })
+}
+
+function link(problems: Problems, path: string, value: unknown) {
+  if (value !== null && !safeLink(value)) problems.push({ path, code: 'invalid' })
+}
+
+function icon(problems: Problems, path: string, value: unknown, nullable = false) {
+  if (nullable && value === null) return
+  if (!(ICON_NAMES as readonly unknown[]).includes(value)) problems.push({ path, code: 'invalid' })
+}
+
+function uuid(problems: Problems, path: string, value: unknown) {
+  if (value === null || value === undefined || value === '') problems.push({ path, code: 'required' })
+  else if (!isUuid(value)) problems.push({ path, code: 'invalid' })
+}
+
+/** Checks a list prop's shape and count, then each item with `each` (path `list.<index>`). */
+function list(problems: Problems, path: string, value: unknown, range: { min: number; max: number }, each: (item: Obj, at: string) => void) {
+  if (!Array.isArray(value)) {
+    problems.push({ path, code: 'invalid' })
+    return
+  }
+  if (value.length < range.min) problems.push({ path, code: 'too_few' })
+  if (value.length > range.max) problems.push({ path, code: 'too_many' })
+  const seen = new Set<string>()
+  value.forEach((item, index) => {
+    const at = `${path}.${index}`
+    if (!isObject(item)) {
+      problems.push({ path: at, code: 'invalid' })
+      return
+    }
+    if (typeof item.id !== 'string' || !ITEM_ID.test(item.id)) problems.push({ path: `${at}.id`, code: 'invalid' })
+    else if (seen.has(item.id)) problems.push({ path: `${at}.id`, code: 'duplicate' })
+    else seen.add(item.id)
+    each(item, at)
+  })
+}
+
+/** Chart props: shape, counts, lengths and the pie / donut rules (contract §3). */
+export function chartProblems(p: Obj): Problems {
+  const problems: Problems = []
+  const L = B6_TEXT_LIMITS.chart
+  enumOf(problems, 'kind', p.kind, B6_ENUMS.chartKind)
+  text(problems, 'title', p.title, L.title)
+  text(problems, 'description', p.description, L.description)
+  const labels = Array.isArray(p.labels) ? p.labels : null
+  if (!labels) problems.push({ path: 'labels', code: 'invalid' })
+  else {
+    if (labels.length < B6_LIMITS.chartLabels.min) problems.push({ path: 'labels', code: 'too_few' })
+    if (labels.length > B6_LIMITS.chartLabels.max) problems.push({ path: 'labels', code: 'too_many' })
+    labels.forEach((label, i) => text(problems, `labels.${i}`, label, L['labels.*'], true))
+  }
+  list(problems, 'series', p.series, B6_LIMITS.chartSeries, (series, at) => {
+    text(problems, `${at}.name`, series.name, L['series.*.name'])
+    if (!Array.isArray(series.values)) problems.push({ path: `${at}.values`, code: 'invalid' })
+    else {
+      if (labels && series.values.length !== labels.length) problems.push({ path: `${at}.values`, code: 'invalid' })
+      series.values.forEach((v, i) => {
+        if (!isNumber(v) || Math.abs(v) > 1e12) problems.push({ path: `${at}.values.${i}`, code: 'invalid' })
+      })
+    }
+  })
+  if (p.kind === 'pie' || p.kind === 'donut') {
+    if (Array.isArray(p.series) && p.series.length !== 1) problems.push({ path: 'series', code: 'too_many' })
+    if (labels && labels.length > B6_LIMITS.chartPieLabels) problems.push({ path: 'labels', code: 'too_many' })
+    if (Array.isArray(p.series))
+      p.series.forEach((series: unknown, s: number) => {
+        if (isObject(series) && Array.isArray(series.values))
+          series.values.forEach((v, i) => {
+            if (isNumber(v) && v < 0) problems.push({ path: `series.${s}.values.${i}`, code: 'out_of_range' })
+          })
+      })
+  }
+  text(problems, 'unit', p.unit, L.unit)
+  enumOf(problems, 'unit_position', p.unit_position, B6_ENUMS.chartUnitPosition)
+  flag(problems, 'y_starts_at_zero', p.y_starts_at_zero)
+  enumOf(problems, 'show_values', p.show_values, B6_ENUMS.chartShowValues)
+  flag(problems, 'show_legend', p.show_legend)
+  flag(problems, 'show_table', p.show_table)
+  int(problems, 'height', p.height, B6_LIMITS.chartHeight)
+  return problems
+}
+
+/**
+ * The client mirror of the server's B6 prop rules: every problem with an element's props (empty =
+ * valid). The editor uses it for live validation; the server still decides on save. Types this
+ * function does not know return [].
+ */
+export function b6PropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const T = B6_TEXT_LIMITS
+  switch (type) {
+    case 'accordion':
+      list(problems, 'items', p.items, B6_LIMITS.accordionItems, (item, at) => {
+        text(problems, `${at}.title`, item.title, T.accordion['items.*.title'], true)
+        text(problems, `${at}.html`, item.html, T.accordion['items.*.html'])
+      })
+      flag(problems, 'open_first', p.open_first)
+      flag(problems, 'allow_multiple', p.allow_multiple)
+      enumOf(problems, 'style', p.style, B6_ENUMS.accordionStyle)
+      break
+    case 'tabs':
+      list(problems, 'items', p.items, B6_LIMITS.tabsItems, (item, at) => {
+        text(problems, `${at}.title`, item.title, T.tabs['items.*.title'], true)
+        text(problems, `${at}.html`, item.html, T.tabs['items.*.html'])
+      })
+      enumOf(problems, 'layout', p.layout, B6_ENUMS.tabsLayout)
+      break
+    case 'icon_box':
+      icon(problems, 'icon', p.icon)
+      text(problems, 'title', p.title, T.icon_box.title)
+      text(problems, 'text', p.text, T.icon_box.text)
+      link(problems, 'link', p.link)
+      enumOf(problems, 'layout', p.layout, B6_ENUMS.iconBoxLayout)
+      enumOf(problems, 'icon_style', p.icon_style, B6_ENUMS.iconStyle)
+      break
+    case 'icon_list':
+      list(problems, 'items', p.items, B6_LIMITS.iconListItems, (item, at) => {
+        icon(problems, `${at}.icon`, item.icon)
+        text(problems, `${at}.text`, item.text, T.icon_list['items.*.text'], true)
+        link(problems, `${at}.link`, item.link)
+      })
+      enumOf(problems, 'layout', p.layout, B6_ENUMS.iconListLayout)
+      break
+    case 'quote':
+      text(problems, 'text', p.text, T.quote.text, true)
+      text(problems, 'author', p.author, T.quote.author)
+      text(problems, 'role', p.role, T.quote.role)
+      enumOf(problems, 'style', p.style, B6_ENUMS.quoteStyle)
+      break
+    case 'notice':
+      enumOf(problems, 'tone', p.tone, B6_ENUMS.noticeTone)
+      text(problems, 'title', p.title, T.notice.title)
+      text(problems, 'text', p.text, T.notice.text)
+      flag(problems, 'show_icon', p.show_icon)
+      break
+    case 'counter':
+      list(problems, 'items', p.items, B6_LIMITS.counterItems, (item, at) => {
+        if (!hasTwoDecimals(item.value) || item.value < B6_LIMITS.counterValue.min || item.value > B6_LIMITS.counterValue.max)
+          problems.push({ path: `${at}.value`, code: isNumber(item.value) ? 'out_of_range' : 'invalid' })
+        text(problems, `${at}.prefix`, item.prefix, T.counter['items.*.prefix'])
+        text(problems, `${at}.suffix`, item.suffix, T.counter['items.*.suffix'])
+        text(problems, `${at}.label`, item.label, T.counter['items.*.label'])
+      })
+      flag(problems, 'animate', p.animate)
+      break
+    case 'steps':
+      list(problems, 'items', p.items, B6_LIMITS.stepsItems, (item, at) => {
+        text(problems, `${at}.title`, item.title, T.steps['items.*.title'], true)
+        text(problems, `${at}.text`, item.text, T.steps['items.*.text'])
+        icon(problems, `${at}.icon`, item.icon, true)
+      })
+      enumOf(problems, 'layout', p.layout, B6_ENUMS.stepsLayout)
+      flag(problems, 'numbered', p.numbered)
+      break
+    case 'chart':
+      return chartProblems(p)
+    case 'gallery':
+      list(problems, 'images', p.images, B6_LIMITS.galleryImages, (item, at) => {
+        uuid(problems, `${at}.media_id`, item.media_id)
+        text(problems, `${at}.alt`, item.alt, T.gallery['images.*.alt'])
+        text(problems, `${at}.caption`, item.caption, T.gallery['images.*.caption'])
+      })
+      if (!isObject(p.columns) || !isInt(p.columns.base, B6_LIMITS.galleryColumns.min, B6_LIMITS.galleryColumns.max)) problems.push({ path: 'columns.base', code: 'invalid' })
+      else {
+        for (const device of ['tablet', 'mobile'] as const) {
+          const v = p.columns[device]
+          if (v !== undefined && !isInt(v, 1, B6_LIMITS.galleryColumns.max)) problems.push({ path: `columns.${device}`, code: 'invalid' })
+        }
+      }
+      enumOf(problems, 'aspect', p.aspect, B6_ENUMS.galleryAspect)
+      flag(problems, 'lightbox', p.lightbox)
+      enumOf(problems, 'gap', p.gap, B6_ENUMS.galleryGap)
+      break
+    case 'image_carousel':
+      list(problems, 'images', p.images, B6_LIMITS.carouselImages, (item, at) => {
+        uuid(problems, `${at}.media_id`, item.media_id)
+        text(problems, `${at}.alt`, item.alt, T.image_carousel['images.*.alt'])
+        text(problems, `${at}.caption`, item.caption, T.image_carousel['images.*.caption'])
+        link(problems, `${at}.link`, item.link)
+      })
+      int(problems, 'autoplay', p.autoplay, B6_LIMITS.carouselAutoplay)
+      flag(problems, 'show_dots', p.show_dots)
+      flag(problems, 'show_arrows', p.show_arrows)
+      enumOf(problems, 'aspect', p.aspect, B6_ENUMS.galleryAspect)
+      break
+    case 'logo_carousel':
+      list(problems, 'logos', p.logos, B6_LIMITS.logos, (item, at) => {
+        uuid(problems, `${at}.media_id`, item.media_id)
+        text(problems, `${at}.alt`, item.alt, T.logo_carousel['logos.*.alt'])
+        link(problems, `${at}.link`, item.link)
+      })
+      flag(problems, 'grayscale', p.grayscale)
+      enumOf(problems, 'speed', p.speed, B6_ENUMS.speed)
+      break
+    case 'map':
+      text(problems, 'query', p.query, T.map.query, true)
+      text(problems, 'title', p.title, T.map.title)
+      int(problems, 'height', p.height, B6_LIMITS.mapHeight)
+      int(problems, 'zoom', p.zoom, B6_LIMITS.mapZoom)
+      break
+    case 'category_card':
+      uuid(problems, 'category_id', p.category_id)
+      if (p.media_id !== null && !isUuid(p.media_id)) problems.push({ path: 'media_id', code: 'invalid' })
+      nullableText(problems, 'title', p.title, T.category_card.title)
+      text(problems, 'button_label', p.button_label, T.category_card.button_label)
+      enumOf(problems, 'layout', p.layout, B6_ENUMS.categoryCardLayout)
+      break
+    case 'product_spotlight':
+      uuid(problems, 'product_id', p.product_id)
+      enumOf(problems, 'layout', p.layout, B6_ENUMS.spotlightLayout)
+      flag(problems, 'show_description', p.show_description)
+      text(problems, 'badge', p.badge, T.product_spotlight.badge)
+      break
+    case 'shop_the_look':
+      uuid(problems, 'media_id', p.media_id)
+      text(problems, 'alt', p.alt, T.shop_the_look.alt)
+      text(problems, 'title', p.title, T.shop_the_look.title)
+      list(problems, 'hotspots', p.hotspots, B6_LIMITS.hotspots, (item, at) => {
+        for (const axis of ['x', 'y'] as const) {
+          const v = item[axis]
+          if (!hasTwoDecimals(v) || v < 0 || v > 100) problems.push({ path: `${at}.${axis}`, code: isNumber(v) ? 'out_of_range' : 'invalid' })
+        }
+        uuid(problems, `${at}.product_id`, item.product_id)
+      })
+      break
+    case 'trust_badges':
+      list(problems, 'items', p.items, B6_LIMITS.trustBadges, (item, at) => {
+        icon(problems, `${at}.icon`, item.icon)
+        text(problems, `${at}.title`, item.title, T.trust_badges['items.*.title'], true)
+        text(problems, `${at}.text`, item.text, T.trust_badges['items.*.text'])
+      })
+      enumOf(problems, 'style', p.style, B6_ENUMS.trustBadgesStyle)
+      break
+    case 'recently_viewed':
+      text(problems, 'title', p.title, T.recently_viewed.title)
+      int(problems, 'limit', p.limit, B6_LIMITS.recentlyViewed)
+      break
+    case 'marquee':
+      list(problems, 'items', p.items, B6_LIMITS.marqueeItems, (item, at) => text(problems, `${at}.text`, item.text, T.marquee['items.*.text'], true))
+      enumOf(problems, 'speed', p.speed, B6_ENUMS.speed)
+      enumOf(problems, 'direction', p.direction, B6_ENUMS.marqueeDirection)
+      enumOf(problems, 'separator', p.separator, B6_ENUMS.marqueeSeparator)
+      break
+    default:
+      return []
+  }
+  return problems
 }

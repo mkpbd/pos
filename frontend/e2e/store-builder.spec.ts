@@ -810,3 +810,174 @@ test('starts from a demo look: drafts, review with previews, publish all', async
   await expect(review.getByRole('heading', { name: 'The Handmade Atelier look is live' })).toBeVisible()
   expect(publishAll).toEqual([{ documents: [DOC_ID, 'd-header', 'd-footer', 'd-zone'], theme: true, note: 'Handmade Atelier demo look' }])
 })
+
+/* ------------------------------------------------------------------------------------------------
+ * B6: more elements (accordion, gallery, shop the look, chart)
+ * ---------------------------------------------------------------------------------------------- */
+
+/** GET /storefront/builder/elements: the B6 types these tests add (as the registry declares them). */
+const B6_ELEMENTS = [
+  b4Meta('accordion', 'content', 'Accordion', ['items.*.title', 'items.*.html'], { items: [{ id: 'item-1', title: 'A question shoppers ask', html: '<p>The answer.</p>' }], open_first: true, allow_multiple: false, style: 'boxed' }, ['page', 'cms', 'zone', 'footer']),
+  b4Meta('chart', 'content', 'Chart', ['title', 'description', 'labels.*', 'series.*.name'], {
+    kind: 'column', title: '', description: '', labels: ['Jan', 'Feb', 'Mar'], series: [{ id: 'series-1', name: 'Sales', values: [10, 20, 30] }],
+    unit: '', unit_position: 'after', y_starts_at_zero: true, show_values: 'none', show_legend: true, show_table: false, height: 320,
+  }, PAGES),
+  b4Meta('gallery', 'media', 'Gallery', ['images.*.alt', 'images.*.caption'], { images: [], columns: { base: 3 }, aspect: 'square', lightbox: true, gap: 'md' }, PAGES),
+  b4Meta('shop_the_look', 'commerce', 'Shop the look', ['alt', 'title'], { media_id: null, alt: '', title: '', hotspots: [] }, PAGES),
+]
+const MEDIA_A = '5a1e0000-0000-4000-8000-0000000000a1'
+const MEDIA_B = '5a1e0000-0000-4000-8000-0000000000b2'
+const HAT = '9d1e0000-0000-4000-8000-0000000000c3'
+const mediaItem = (id: string, alt: string) => ({ id, url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 1000, alt, original_name: `${alt}.jpg`, mime_type: 'image/jpeg', size: 1200, created_at: null })
+
+/** The B4 backend plus the B6 element types, the media library, a product and shop-the-look data. */
+async function mockB6Backend(page: Page): Promise<B4Backend> {
+  const b = await mockB4Backend(page)
+  await page.route('**/api/v1/storefront/builder/elements', (route) => route.fulfill({ json: envelope({ types: [...B4_ELEMENTS, ...B6_ELEMENTS], limits: {}, enums: {} }) }))
+  await page.route('**/api/v1/media*', (route) =>
+    route.fulfill({ json: envelope([mediaItem(MEDIA_A, 'Summer look'), mediaItem(MEDIA_B, 'Market stall')], { pagination: { current_page: 1, per_page: 24, total: 2, last_page: 1 } }) }),
+  )
+  await page.route('**/api/v1/products**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith(`/products/${HAT}`)) return route.fulfill({ json: envelope({ id: HAT, name: 'Straw hat', images: [] }) })
+    return route.fulfill({ json: envelope([{ id: HAT, name: 'Straw hat', variants: [{ sku: 'SH-1' }], images: [], is_active: true }], { pagination: { current_page: 1, per_page: 20, total: 1, last_page: 1 } }) })
+  })
+  await page.route('**/api/v1/storefront/builder/resolve', (route) => {
+    const body = route.request().postDataJSON() as { elements: { id: string; type: string }[]; media_ids?: string[] }
+    const data = Object.fromEntries(body.elements.filter((e) => e.type === 'shop_the_look').map((e) => [e.id, { products: { [HAT]: { ...product('straw-hat', 'Straw hat'), id: HAT } } }]))
+    const media = Object.fromEntries((body.media_ids ?? []).map((id) => [id, { url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 1600, height: 1000, alt: null }]))
+    return route.fulfill({ json: envelope({ data, media, errors: {} }) })
+  })
+  return b
+}
+
+async function openListingTop(page: Page) {
+  await page.goto('/admin/storefront/pages')
+  await page.getByRole('button', { name: 'Create Listing top' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  await expect(canvas(page).getByTestId('canvas-empty')).toBeVisible()
+}
+
+type Saved = AnyNode & { props: Record<string, unknown> }
+function savedOf(b: B4Backend, type: string): Saved | undefined {
+  const content = b.puts[[...b.docs.values()][0]!.id]?.at(-1)
+  let found: Saved | undefined
+  const visit = (node: AnyNode) => {
+    if (node.type === type) found = node as Saved
+    for (const column of node.columns ?? []) column.elements.forEach(visit)
+  }
+  content?.sections.forEach(visit)
+  return found
+}
+
+test('B6: adds an accordion, edits a panel and adds another; the canvas updates before the autosave', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB6Backend(page)
+  await openListingTop(page)
+  const frame = canvas(page)
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+
+  await page.getByTestId('add-accordion').click()
+  const accordion = frame.getByTestId('builder-accordion')
+  await expect(accordion).toContainText('A question shoppers ask')
+  await inspector.getByRole('group', { name: 'panel 1' }).getByLabel('Title', { exact: true }).fill('Do you deliver on Fridays?')
+  await expect(accordion).toContainText('Do you deliver on Fridays?')
+
+  await inspector.getByRole('button', { name: 'Add panel' }).click()
+  await inspector.getByRole('group', { name: 'panel 2' }).getByLabel('Title', { exact: true }).fill('Can I pay cash?')
+  await expect(accordion).toContainText('Can I pay cash?')
+  await inspector.getByRole('button', { name: 'Move panel 2 up' }).click()
+
+  await expect.poll(() => (savedOf(b, 'accordion')?.props.items as { title: string }[] | undefined)?.map((i) => i.title), { timeout: 6000 }).toEqual(['Can I pay cash?', 'Do you deliver on Fridays?'])
+})
+
+test('B6: builds a gallery from the media library in the setup dialog', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB6Backend(page)
+  await openListingTop(page)
+
+  await page.getByTestId('add-gallery').click()
+  const dialog = page.getByRole('dialog', { name: 'Add gallery' })
+  await expect(dialog.getByRole('button', { name: 'Insert' })).toBeDisabled()
+  await dialog.getByRole('button', { name: 'Choose images' }).click()
+  const picker = page.getByRole('dialog', { name: 'Add images' })
+  await picker.getByRole('button', { name: 'Summer look' }).click()
+  await picker.getByRole('button', { name: 'Market stall' }).click()
+  await picker.getByRole('button', { name: 'Use 2 images' }).click()
+  await expect(dialog.getByTestId('item-card')).toHaveCount(2)
+  await dialog.getByRole('button', { name: 'Insert' }).click()
+
+  const gallery = canvas(page).getByTestId('builder-gallery')
+  await expect(gallery.getByRole('button', { name: /Summer look/ })).toBeVisible()
+  await expect(gallery.getByRole('button', { name: /Market stall/ })).toBeVisible()
+  await expect.poll(() => (savedOf(b, 'gallery')?.props.images as { media_id: string; alt: string }[] | undefined)?.map((i) => [i.media_id, i.alt]), { timeout: 6000 }).toEqual([
+    [MEDIA_A, 'Summer look'],
+    [MEDIA_B, 'Market stall'],
+  ])
+})
+
+test('B6: places a shop-the-look hotspot on the photo and picks its product', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB6Backend(page)
+  await openListingTop(page)
+
+  await page.getByTestId('add-shop_the_look').click()
+  const dialog = page.getByRole('dialog', { name: 'Add shop the look' })
+  await dialog.getByRole('button', { name: 'Choose image' }).click()
+  const picker = page.getByRole('dialog', { name: 'Choose the photo' })
+  await picker.getByRole('button', { name: 'Summer look' }).click()
+  await picker.getByRole('button', { name: 'Use image' }).click()
+
+  // Click the photo at 25 % across, 40 % down.
+  const area = dialog.getByTestId('hotspot-area')
+  await expect(area.locator('img')).toBeVisible()
+  const box = (await area.boundingBox())!
+  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.4)
+  const dot = dialog.getByRole('button', { name: 'Hotspot 1: no product yet' })
+  await expect(dot).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Insert' })).toBeDisabled()
+  // Nudge it with the keyboard.
+  await dot.press('ArrowRight')
+  await dialog.getByTestId('hotspot-detail').getByRole('button', { name: 'Choose product' }).click()
+  await page.getByRole('option', { name: /Straw hat/ }).click()
+  await expect(dialog.getByRole('button', { name: 'Hotspot 1: Straw hat' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Insert' }).click()
+
+  await expect(canvas(page).getByTestId('builder-shop-look').getByRole('button', { name: /Straw hat/ }).first()).toBeVisible()
+  await expect.poll(() => (savedOf(b, 'shop_the_look')?.props.hotspots as unknown[] | undefined)?.length, { timeout: 6000 }).toBe(1)
+  const spot = (savedOf(b, 'shop_the_look')!.props.hotspots as { x: number; y: number; product_id: string }[])[0]!
+  expect(spot.product_id).toBe(HAT)
+  expect(spot.x).toBeCloseTo(26, 0)
+  expect(spot.y).toBeCloseTo(40, 0)
+})
+
+test('B6: enters chart data in the grid and pastes a table; the canvas chart updates', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB6Backend(page)
+  await openListingTop(page)
+  const frame = canvas(page)
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+
+  await page.getByTestId('add-chart').click()
+  const chart = frame.getByTestId('builder-chart')
+  await expect(chart).toBeVisible()
+  await inspector.getByLabel('Title', { exact: true }).fill('Orders per month')
+  await expect(chart).toContainText('Orders per month')
+
+  const grid = inspector.getByTestId('chart-data-editor')
+  await grid.getByLabel('Sales, Feb').fill('95')
+  await expect(frame.getByTestId('chart-table')).toContainText('95')
+
+  // Paste a block copied from a spreadsheet into the first label cell.
+  await grid.getByLabel('Label of row 1').focus()
+  // A string: the e2e project has no DOM types.
+  await page.evaluate(`(() => {
+    const data = new DataTransfer()
+    data.setData('text/plain', ${JSON.stringify('Apr\t40\nMay\t55\nJun\t70')})
+    document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })()`)
+  await expect(frame.getByTestId('chart-table')).toContainText('Jun')
+  await expect(frame.getByTestId('chart-table')).toContainText('70')
+  await expect.poll(() => savedOf(b, 'chart')?.props.labels, { timeout: 6000 }).toEqual(['Apr', 'May', 'Jun'])
+  expect((savedOf(b, 'chart')!.props.series as { values: number[] }[])[0]!.values).toEqual([40, 55, 70])
+})

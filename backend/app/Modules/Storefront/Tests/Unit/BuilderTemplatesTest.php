@@ -81,6 +81,14 @@ class BuilderTemplatesTest extends TestCase
             {
                 return $this->withMenus ? $this->uuid('menu'.$ref) : null;
             }
+
+            // B6: a store with products (with menus) or an empty one.
+            public function product(string $source, int $index): ?string
+            {
+                $this->calls[] = "product:{$source}:{$index}";
+
+                return $this->withMenus ? $this->uuid("product{$source}{$index}") : null;
+            }
         };
     }
 
@@ -117,7 +125,8 @@ class BuilderTemplatesTest extends TestCase
             }
             $this->assertNotEmpty($t['allowed_in'], $t['id']);
             $this->assertSame([], array_diff($t['allowed_in'], ElementRegistry::CONTEXTS), $t['id']);
-            $this->assertSame([], array_diff($t['requires'], ['banners', 'menus', 'promotions', 'blog']), $t['id']);
+            // B6: `products` — hotspots of a shop-the-look template need live products.
+            $this->assertSame([], array_diff($t['requires'], ['banners', 'menus', 'promotions', 'blog', 'products']), $t['id']);
         }
 
         // The library: ≥ 24 section templates, 6+ per preset and neutral ones; the five pages; one site per preset.
@@ -199,6 +208,7 @@ class BuilderTemplatesTest extends TestCase
                     $json = json_encode($concrete);
                     $this->assertStringNotContainsString('"asset"', $json);
                     $this->assertStringNotContainsString('"menu_ref"', $json);
+                    $this->assertStringNotContainsString('"product_ref"', $json);
                     $this->assertStringNotContainsString('"when_menu"', $json);
                     $this->assertStringNotContainsString('"banner":', $json);
                 }
@@ -228,6 +238,7 @@ class BuilderTemplatesTest extends TestCase
         $this->assertSame(str_contains($json, '"menu_ref"'), in_array('menus', $meta['requires'], true), "{$id} menus");
         $this->assertSame(str_contains($json, '"type":"hot_deals"'), in_array('promotions', $meta['requires'], true), "{$id} promotions");
         $this->assertSame(str_contains($json, '"type":"blog_posts"'), in_array('blog', $meta['requires'], true), "{$id} blog");
+        $this->assertSame(str_contains($json, '"product_ref"'), in_array('products', $meta['requires'], true), "{$id} products");
     }
 
     public function test_menu_references_are_resolved_or_left_out(): void

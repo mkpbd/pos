@@ -7,7 +7,7 @@
 import { productCard } from '../test-fixtures'
 import type { StoreBanner, StoreSection } from '../types'
 import fixture from './__fixtures__/sample-document.v1.json'
-import { elementMeta, isWrappedSectionType } from './registry'
+import { elementMeta, isTranslatableKey, isWrappedSectionType } from './registry'
 import type { BuilderData, BuilderDocument, BuilderMedia, BuilderPage, Element, NodeState, Section } from './types'
 
 export const sampleDocument = fixture as unknown as BuilderDocument
@@ -62,11 +62,22 @@ function resolveNode(node: AnyNode, locale: string, draft: boolean): AnyNode | n
   const { translations, ...rest } = node as AnyNode & { translations?: Record<string, Record<string, string>> }
   const props = structuredClone(node.props ?? {})
   const texts = translations?.[locale] ?? {}
-  const translatable = elementMeta(node.type)?.translatable ?? []
   for (const [key, value] of Object.entries(texts)) {
-    if (!translatable.includes(key)) continue
+    if (!isTranslatableKey(node.type, key)) continue
     if (isWrappedSectionType(node.type) && key !== 'title' && key !== 'subtitle') (props.config as Record<string, unknown>)[key] = value
-    else if (key.includes('.')) {
+    else if (key.split('.').length === 3 || (key.split('.').length === 2 && Array.isArray(props[key.split('.')[0]!]))) {
+      // B6: an item field (`items.<item_id>.title`) or a chart label (`labels.<index>`).
+      const [list, at, field] = key.split('.') as [string, string, string | undefined]
+      const items = props[list]
+      if (!Array.isArray(items)) continue
+      if (field === undefined) {
+        const index = Number(at)
+        if (Number.isInteger(index) && index >= 0 && index < items.length) items[index] = value
+      } else {
+        const item = items.find((entry) => entry && typeof entry === 'object' && (entry as Record<string, unknown>).id === at) as Record<string, unknown> | undefined
+        if (item) item[field] = value
+      }
+    } else if (key.includes('.')) {
       // A nested prop (`primary.label` of a call to action).
       const [outer, inner] = key.split('.') as [string, string]
       const target = props[outer]

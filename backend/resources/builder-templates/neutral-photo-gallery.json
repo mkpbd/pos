@@ -1,0 +1,49 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "A look inside", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "ভেতরের এক ঝলক" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "gallery",
+                            "props": {
+                                "images": [
+                                    { "id": "g1", "media_id": { "asset": "handmade/banner-meet.jpg" }, "alt": "Handmade ceramic cups on rustic shelves in a pottery workshop", "caption": "" },
+                                    { "id": "g2", "media_id": { "asset": "handmade/banner-artisan.jpg" }, "alt": "Potter's hands shaping clay on a wheel", "caption": "" },
+                                    { "id": "g3", "media_id": { "asset": "handmade/banner-tile-1.jpg" }, "alt": "Handmade decor, vases and plants styled on a sideboard", "caption": "" },
+                                    { "id": "g4", "media_id": { "asset": "handmade/banner-tile-2.jpg" }, "alt": "White shelves styled with potted plants and decor", "caption": "" },
+                                    { "id": "g5", "media_id": { "asset": "handmade/cat-ceramics.jpg" }, "alt": "Assorted handmade ceramic bowls on a pink surface", "caption": "" },
+                                    { "id": "g6", "media_id": { "asset": "handmade/plate-set.jpg" }, "alt": "Stacks of rustic ceramic plates and bowls on a shelf", "caption": "" }
+                                ],
+                                "columns": { "base": 3, "tablet": 3, "mobile": 2 },
+                                "aspect": "square",
+                                "lightbox": true,
+                                "gap": "md"
+                            },
+                            "style": { "base": { "motion": { "entrance": "fade", "duration": 700 } } }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

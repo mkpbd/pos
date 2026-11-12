@@ -17,6 +17,11 @@ use Illuminate\Support\Facades\Validator;
  * throws InvalidBuilderDocument listing every problem with its path and node id.
  * normalize(normalize(x)) === normalize(x). Ownership of referenced ids is checked
  * separately (Application\Builder\BuilderReferences), rich text is sanitized on save.
+ *
+ * B6: the B6 elements' props (B6ElementProps) with list translations `<list>.<item id>.<field>`;
+ * sections may set `sticky` (at most one per document; pages, CMS pages and zones) and
+ * `shape_top` / `shape_bottom` dividers — kept only when set, so older documents normalize
+ * unchanged; sections and inner rows may have a `background.video` (StyleSchema).
  */
 final class BuilderDocumentSchema
 {
@@ -44,6 +49,15 @@ final class BuilderDocumentSchema
 
     public const DEVICES = ['desktop', 'tablet', 'mobile'];
 
+    /** B6: section shape dividers (`shape_top` / `shape_bottom`). */
+    public const SHAPES = ['wave', 'curve', 'tilt', 'triangle', 'zigzag'];
+
+    /** B6: a shape divider's height, px. */
+    public const SHAPE_HEIGHT = [16, 200];
+
+    /** B6: the contexts where a section may be sticky (at most one per document). */
+    public const STICKY_CONTEXTS = ['page', 'cms', 'zone'];
+
     private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
     private const INSTANT = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:?\d{2})$/';
@@ -60,6 +74,9 @@ final class BuilderDocumentSchema
     private array $anchors = [];
 
     private int $nodes = 0;
+
+    /** B6: the id of the document's sticky section, once one is found. */
+    private ?string $sticky = null;
 
     /** B4: the document context (ElementRegistry::CONTEXTS) — which element types are allowed. */
     private function __construct(private readonly string $context) {}
@@ -210,13 +227,76 @@ final class BuilderDocumentSchema
             }
         }
 
+        $sectionProps = ['layout' => $layout, 'anchor' => $anchor];
+        // B6: `sticky` and the shape dividers are kept only when set (a section without them
+        // normalizes exactly as before B6).
+        $sticky = $props['sticky'] ?? false;
+        if (! is_bool($sticky)) {
+            $this->error("{$path}.props.sticky", $id, 'Sticky is true or false.');
+        } elseif ($sticky) {
+            if (! in_array($this->context, self::STICKY_CONTEXTS, true)) {
+                $this->error("{$path}.props.sticky", $id, 'Only sections of pages, content pages and shop areas can stick to the top.');
+            } elseif ($this->sticky !== null) {
+                $this->error("{$path}.props.sticky", $id, 'Only one section of a page can stick to the top.');
+            } else {
+                $this->sticky = $id ?? '';
+            }
+            $sectionProps['sticky'] = true;
+        }
+        foreach (['shape_top', 'shape_bottom'] as $key) {
+            $shape = $this->shape($props[$key] ?? null, "{$path}.props.{$key}", $id);
+            if ($shape !== null) {
+                $sectionProps[$key] = $shape;
+            }
+        }
+
         return [
             'id' => $id,
             'type' => 'section',
-            'props' => ['layout' => $layout, 'anchor' => $anchor],
-            ...$this->common($node, $path, $id, []),
+            'props' => $sectionProps,
+            ...$this->common($node, $path, $id, [], true),
             'columns' => $this->columns($node['columns'] ?? null, "{$path}.columns", $id, false),
         ];
+    }
+
+    /**
+     * B6: a section shape divider `{shape, color, height, flip}`, or null for none.
+     *
+     * @return array{shape: string, color: string, height: int, flip: bool}|null
+     */
+    private function shape(mixed $value, string $path, ?string $id): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (! is_array($value)) {
+            $this->error($path, $id, 'A shape divider is null or {shape, color, height, flip}.');
+
+            return null;
+        }
+        $valid = true;
+        $shape = $value['shape'] ?? null;
+        if (! in_array($shape, self::SHAPES, true)) {
+            $this->error("{$path}.shape", $id, 'Choose one of: '.implode(', ', self::SHAPES).'.');
+            $valid = false;
+        }
+        $color = StyleSchema::color($value['color'] ?? null);
+        if ($color === null) {
+            $this->error("{$path}.color", $id, 'Use #rrggbb, #rrggbbaa or a theme colour (theme:<role>).');
+            $valid = false;
+        }
+        $height = $value['height'] ?? 64;
+        if (! is_int($height) || $height < self::SHAPE_HEIGHT[0] || $height > self::SHAPE_HEIGHT[1]) {
+            $this->error("{$path}.height", $id, 'Enter a whole number from '.self::SHAPE_HEIGHT[0].' to '.self::SHAPE_HEIGHT[1].'.');
+            $valid = false;
+        }
+        $flip = $value['flip'] ?? false;
+        if (! is_bool($flip)) {
+            $this->error("{$path}.flip", $id, 'Flip is true or false.');
+            $valid = false;
+        }
+
+        return $valid ? ['shape' => $shape, 'color' => $color, 'height' => $height, 'flip' => $flip] : null;
     }
 
     /**
@@ -337,11 +417,14 @@ final class BuilderDocumentSchema
             $props = [];
         }
 
+        $props = $this->props($type, $props, "{$path}.props", $id);
         $result = [
             'id' => $id,
             'type' => $type,
-            'props' => $this->props($type, $props, "{$path}.props", $id),
-            ...$this->common($node, $path, $id, ElementRegistry::translatable($type)),
+            'props' => $props,
+            // B6: list items' fields are translated with dot keys (`items.<item id>.title`); inner
+            // rows may have a background video like sections.
+            ...$this->common($node, $path, $id, ElementRegistry::translationFields($type, $props), $type === 'inner_row'),
         ];
         if (ElementRegistry::children($type) === 'columns') {
             $result['columns'] = $this->columns($node['columns'] ?? null, "{$path}.columns", $id, true);
@@ -355,9 +438,10 @@ final class BuilderDocumentSchema
      *
      * @param  array<string, mixed>  $node
      * @param  array<string, int>  $translatable  field => max length
+     * @param  bool  $backgroundVideo  B6: sections and inner rows may have a background video
      * @return array<string, mixed>
      */
-    private function common(array $node, string $path, ?string $id, array $translatable): array
+    private function common(array $node, string $path, ?string $id, array $translatable, bool $backgroundVideo = false): array
     {
         $visibility = [];
         $raw = is_array($node['visibility'] ?? null) ? $node['visibility'] : [];
@@ -377,7 +461,7 @@ final class BuilderDocumentSchema
         }
 
         return [
-            'style' => StyleSchema::normalize($node['style'] ?? null),
+            'style' => StyleSchema::normalize($node['style'] ?? null, $backgroundVideo),
             'visibility' => $visibility,
             'hidden' => $hidden,
             'schedule' => $this->schedule($node['schedule'] ?? null, "{$path}.schedule", $id),
@@ -510,6 +594,9 @@ final class BuilderDocumentSchema
         }
         if (in_array($type, ElementRegistry::B4, true)) {
             return $this->b4Props($type, $props, $path, $id);
+        }
+        if (in_array($type, ElementRegistry::B6, true)) {
+            return (new B6ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
         }
 
         // Optional texts (alt, html) may arrive as null (empty strings become null on input).

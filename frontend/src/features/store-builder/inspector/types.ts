@@ -38,6 +38,8 @@ export type InspectorCommand =
   | { type: 'set-column-width'; columnId: string; device: Device; width: number | null }
   /** B3: open the Site styles drawer (theme draft). */
   | { type: 'open-site-styles' }
+  /** B6: replay the node's entrance animation on the canvas ("Preview animation"). */
+  | { type: 'preview-motion'; nodeId: string }
 
 export type InspectorChangeOptions = {
   /** Edits with the same key within a short time are one undo step (typing). */
