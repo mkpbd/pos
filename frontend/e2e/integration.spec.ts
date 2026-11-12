@@ -1,4 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { expect as baseExpect, test } from '@playwright/test'
+
+// Full-stack against `php artisan serve` (one request at a time): storefront pages need a few seconds after admin changes.
+const expect = baseExpect.configure({ timeout: 15_000 })
 
 /**
  * Full-stack checks against a real backend seeded with `php artisan migrate:fresh --seed`

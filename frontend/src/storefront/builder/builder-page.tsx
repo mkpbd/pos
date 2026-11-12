@@ -56,7 +56,7 @@ export function BuilderPageView({ pageKey, notFound, meta, children }: Props) {
           {t('content.builder.preview')}
         </p>
       )}
-      <PageRenderer page={page.data} />
+      <PageRenderer page={page.data} scope="page" />
     </>
   )
 }

@@ -1,7 +1,7 @@
 import { cloneSample } from '@/storefront/builder/test-payload'
-import type { Element, RenderElement } from '@/storefront/builder/types'
+import type { BuilderContent, Element, RenderElement, Section } from '@/storefront/builder/types'
 import type { StoreSection } from '@/storefront/types'
-import { mediaIds, resolveInput, toRenderTree, withLocalTitles, wrappedElements } from './render-tree'
+import { DATA_ELEMENT_TYPES, mediaIds, resolveInput, toRenderTree, withLocalTitles, wrappedElements } from './render-tree'
 import { findNode, setHidden, setSchedule } from './tree'
 
 const NOW = Date.parse('2026-11-11T12:00:00Z')
@@ -52,5 +52,33 @@ describe('the canvas render tree', () => {
     const data = { id: 'e_grid', type: 'product_grid', title: 'Old', subtitle: 'Sub', config: {}, products: [] } as unknown as StoreSection
     const renamed = { ...grid, props: { ...grid.props, title: 'New title' } } as Element
     expect(withLocalTitles(data, renamed, 'en')).toMatchObject({ title: 'New title', subtitle: 'What everyone is buying' })
+  })
+})
+
+describe('the canvas render tree: B4 elements', () => {
+  const common = { style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null }
+  const withElements = (...elements: Element[]): BuilderContent => ({
+    schema_version: 1,
+    sections: [{ id: 's_b4', type: 'section', props: { layout: 'boxed', anchor: null }, ...common, translations: {}, columns: [{ id: 'c_b4', type: 'column', width: { base: 100 }, style: {}, elements }] } as Section],
+  })
+
+  it('resolves dot-key translations of nested labels; an absent second button stays absent', () => {
+    const cta = {
+      id: 'e_cta', type: 'cta', ...common,
+      props: { title: 'Hi', text: '', primary: { label: 'Shop', link: { url: '/shop' } }, secondary: null, align: 'center' },
+      translations: { bn: { title: 'হাই', 'primary.label': 'কিনুন', 'secondary.label': 'আরও' } },
+    } as unknown as Element
+    const tree = toRenderTree(withElements(cta), { locale: 'bn', now: NOW })
+    expect(element(tree, 'e_cta')!.props).toMatchObject({ title: 'হাই', primary: { label: 'কিনুন', link: { url: '/shop' } }, secondary: null })
+  })
+
+  it('sends the B4 data elements to /builder/resolve with their props', () => {
+    const menu = { id: 'e_menu', type: 'menu', ...common, props: { menu_id: 'm-1', layout: 'horizontal', show_children: 'dropdown' }, translations: {} } as unknown as Element
+    const icon = { id: 'e_icon', type: 'icon', ...common, props: { name: 'star', size: 32, color: null, label: '', link: null }, translations: {} } as unknown as Element
+    const faq = { id: 'e_faq', type: 'faq_list', ...common, props: { title: null, style: 'accordion' }, translations: { bn: { title: 'প্রশ্ন' } } } as unknown as Element
+    const doc = withElements(menu, icon, faq)
+    expect(wrappedElements(doc).map((e) => e.id)).toEqual(['e_menu', 'e_faq'])
+    expect(resolveInput(faq)).toEqual({ id: 'e_faq', type: 'faq_list', props: { title: null, style: 'accordion' }, translations: { bn: { title: 'প্রশ্ন' } } })
+    expect(DATA_ELEMENT_TYPES.has('contact_form')).toBe(true)
   })
 })

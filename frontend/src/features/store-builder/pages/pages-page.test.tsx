@@ -122,3 +122,179 @@ describe('page helpers', () => {
     expect(liveUrl({ ...landing, preview_url: null })).toBeNull()
   })
 })
+
+/* ------------------------------------------------------------------------------------------------
+ * B4: content pages, site parts, shop and product areas, products per row
+ * ---------------------------------------------------------------------------------------------- */
+
+const contentManager = () => makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage', 'storefront.publish', 'cms.manage'] })
+const publisher = () => makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage', 'storefront.publish'] })
+const ABOUT = '0b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+const FAQ = '1b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+const cmsPages = [
+  { id: ABOUT, title: 'About us', slug: 'about', status: 'published', template: 'default' },
+  { id: FAQ, title: 'Questions', slug: 'faq', status: 'draft', template: 'faq' },
+]
+const cmsList = ok(cmsPages, { pagination: { current_page: 1, per_page: 100, total: 2, last_page: 1 } })
+const aboutDoc: DocumentSummary = {
+  ...home, id: 'd-about', key: `cms:${ABOUT}`, title: 'About us', path: '/pages/about', preview_url: 'https://shop.test/pages/about?preview=draft',
+  cms_page: { id: ABOUT, title: 'About us', slug: 'about', status: 'published', template: 'default' },
+}
+const footerDoc: DocumentSummary = { ...home, id: 'd-footer', kind: 'footer', key: 'footer', title: 'Footer', path: null, preview_url: null, has_unpublished_changes: false }
+const zoneDoc: DocumentSummary = { ...home, id: 'd-top', kind: 'zone', key: 'zone:listing.top', title: 'Listing top', path: null, preview_url: null, published: null }
+const themeDraft = (listing?: Record<string, number>) => ({
+  settings: { colors: {}, typography: {}, shape: {}, layout: { container_width: 1170, sticky_header: true, ...(listing ? { listing_columns: listing } : {}) }, footer: {}, announcement: {} },
+  draft_revision: 2, has_unpublished_changes: false, published: { number: 4, published_at: null }, custom_css: null, has_custom_css: false,
+})
+const editorMocks = {
+  'GET /storefront/builder/elements': ok({ types: [], limits: {}, enums: {} }),
+  'GET /storefront/builder/canvas-context': ok({ bootstrap: {}, store_url: null, locales: ['en'] }),
+}
+
+describe('page builder: B4 groups', () => {
+  it('lists the three groups; content pages show design / edit / back to classic', async () => {
+    mockApi({
+      'GET /auth/me': ok(contentManager()),
+      'GET /storefront/builder/documents': ok([home, aboutDoc, footerDoc, zoneDoc]),
+      'GET /cms/pages': cmsList,
+      'GET /storefront/theme/draft': ok(themeDraft()),
+    })
+    renderRoutes(routes, '/storefront/pages')
+
+    expect(await screen.findByRole('heading', { name: 'Pages', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Site parts', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Shop and product pages', level: 2 })).toBeInTheDocument()
+
+    const about = await screen.findByTestId(`page-row-cms:${ABOUT}`)
+    expect(within(about).getByText(/Designed with the builder/)).toBeInTheDocument()
+    expect(within(about).getByRole('link', { name: 'Edit design About us' })).toHaveAttribute('href', '/storefront/builder/d-about')
+    expect(within(about).getByRole('button', { name: 'Back to the classic page for About us' })).toBeInTheDocument()
+
+    const faq = screen.getByTestId(`page-row-cms:${FAQ}`)
+    expect(within(faq).getByText('Page not published')).toBeInTheDocument()
+    expect(within(faq).getByText(/FAQ page · Classic page/)).toBeInTheDocument()
+    expect(within(faq).getByRole('button', { name: 'Design Questions with the builder' })).toBeInTheDocument()
+
+    const header = screen.getByTestId('page-row-header')
+    expect(within(header).getByText(/Using the theme’s header/)).toBeInTheDocument()
+    expect(within(header).getByRole('button', { name: 'Design the header' })).toBeInTheDocument()
+    const footer = screen.getByTestId('page-row-footer')
+    expect(within(footer).getByText(/Published v3/)).toBeInTheDocument()
+    expect(within(footer).getByRole('link', { name: 'Edit the footer' })).toBeInTheDocument()
+    expect(within(footer).getByRole('button', { name: 'Use the theme’s footer' })).toBeInTheDocument()
+
+    expect(within(screen.getByTestId('page-row-zone:listing.top')).getByText('Not published')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-row-zone:listing.bottom')).getByRole('button', { name: 'Create Listing bottom' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-row-zone:product.after')).getByRole('button', { name: 'Create Product page' })).toBeInTheDocument()
+  })
+
+  it('designs a CMS page with the builder (from: cms) and the header from the current one', async () => {
+    const user = userEvent.setup()
+    const bodies: unknown[] = []
+    mockApi({
+      'GET /auth/me': ok(contentManager()),
+      'GET /storefront/builder/documents': ok([]),
+      'GET /cms/pages': cmsList,
+      'GET /storefront/theme/draft': ok(themeDraft()),
+      'POST /storefront/builder/documents': (init) => {
+        const body = JSON.parse(String(init.body)) as { key: string }
+        bodies.push(body)
+        return { status: 201, ...ok({ ...home, id: body.key === 'header' ? 'd-header' : 'd-faq', key: body.key, content: { schema_version: 1, sections: [] } }) }
+      },
+      ...editorMocks,
+    })
+    const { router } = renderRoutes(routes, '/storefront/pages')
+    await user.click(await screen.findByRole('button', { name: 'Design Questions with the builder' }))
+    await waitFor(() => expect(bodies[0]).toEqual({ kind: 'page', key: `cms:${FAQ}`, title: 'Questions', from: 'cms' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/storefront/builder/d-faq'))
+
+    await router.navigate('/storefront/pages')
+    await user.click(await screen.findByRole('button', { name: 'Design the header' }))
+    await waitFor(() => expect(bodies[1]).toEqual({ kind: 'header', key: 'header', title: 'Header', from: 'current' }))
+  })
+
+  it('goes back to the classic page and to the theme footer after confirming; creates a zone blank', async () => {
+    const user = userEvent.setup()
+    const deleted: string[] = []
+    let created: unknown
+    const remove = (id: string) => () => {
+      deleted.push(id)
+      return { status: 204 }
+    }
+    mockApi({
+      'GET /auth/me': ok(contentManager()),
+      'GET /storefront/builder/documents': () => ok([aboutDoc, footerDoc].filter((d) => !deleted.includes(d.id))),
+      'GET /cms/pages': cmsList,
+      'GET /storefront/theme/draft': ok(themeDraft()),
+      'DELETE /storefront/builder/documents/d-about': remove('d-about'),
+      'DELETE /storefront/builder/documents/d-footer': remove('d-footer'),
+      'POST /storefront/builder/documents': (init) => {
+        created = JSON.parse(String(init.body))
+        return { status: 201, ...ok({ ...zoneDoc, id: 'd-bottom', key: 'zone:listing.bottom', content: { schema_version: 1, sections: [] } }) }
+      },
+      ...editorMocks,
+    })
+    const { router } = renderRoutes(routes, '/storefront/pages')
+
+    await user.click(await screen.findByRole('button', { name: 'Back to the classic page for About us' }))
+    const confirm = await screen.findByRole('alertdialog', { name: 'Go back to the classic “About us” page?' })
+    await user.click(within(confirm).getByRole('button', { name: 'Use the classic page' }))
+    await waitFor(() => expect(within(screen.getByTestId(`page-row-cms:${ABOUT}`)).getByRole('button', { name: 'Design About us with the builder' })).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: 'Use the theme’s footer' }))
+    await user.click(within(await screen.findByRole('alertdialog', { name: 'Use the theme’s footer?' })).getByRole('button', { name: 'Use the theme’s footer' }))
+    await waitFor(() => expect(within(screen.getByTestId('page-row-footer')).getByRole('button', { name: 'Design the footer' })).toBeInTheDocument())
+    expect(deleted).toEqual(['d-about', 'd-footer'])
+
+    await user.click(screen.getByRole('button', { name: 'Create Listing bottom' }))
+    await waitFor(() => expect(created).toEqual({ kind: 'zone', key: 'zone:listing.bottom', title: 'Listing bottom', from: 'blank' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/storefront/builder/d-bottom'))
+  })
+
+  it('without cms.manage, content pages come from the link targets; viewers get no actions', async () => {
+    mockApi({
+      'GET /auth/me': ok(viewer()),
+      'GET /storefront/builder/documents': ok([footerDoc]),
+      'GET /storefront/link-targets': ok({ pages: [{ id: ABOUT, title: 'About us', slug: 'about', status: 'published' }], categories: [], brands: [], blog_categories: [], blog_posts: [] }),
+      'GET /storefront/theme/draft': ok(themeDraft()),
+    })
+    renderRoutes(routes, '/storefront/pages')
+    expect(await screen.findByTestId(`page-row-cms:${ABOUT}`)).toHaveTextContent('/pages/about')
+    expect(screen.queryByRole('link', { name: 'Manage pages' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Design/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /theme’s footer/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Create/ })).toBeNull()
+  })
+
+  it('products per row: shows today’s grid by default, saves to the theme draft and publishes', async () => {
+    const user = userEvent.setup()
+    let put: { revision: number; settings: { layout: Record<string, unknown> } } | undefined
+    let published = false
+    mockApi({
+      'GET /auth/me': ok(publisher()),
+      'GET /storefront/builder/documents': ok([]),
+      'GET /storefront/link-targets': ok({ pages: [], categories: [], brands: [], blog_categories: [], blog_posts: [] }),
+      'GET /storefront/theme/draft': ok(themeDraft()),
+      'PUT /storefront/theme/draft': (init) => {
+        put = JSON.parse(String(init.body)) as typeof put
+        return ok({ ...themeDraft(put!.settings.layout.listing_columns as Record<string, number>), draft_revision: 3, has_unpublished_changes: true })
+      },
+      'POST /storefront/theme/publish': () => {
+        published = true
+        return ok(themeDraft({ desktop: 4, tablet: 3, mobile: 2 }))
+      },
+    })
+    renderRoutes(routes, '/storefront/pages')
+    const card = await screen.findByTestId('listing-columns')
+    const desktop = await within(card).findByRole('combobox', { name: 'Products per row on computers' })
+    expect(desktop).toHaveTextContent('3 products (standard)')
+    expect(within(card).getByRole('combobox', { name: 'Products per row on phones' })).toHaveTextContent('2 products (standard)')
+    expect(within(card).getByRole('button', { name: 'Save and publish' })).toBeDisabled()
+
+    await user.click(desktop)
+    await user.click(await screen.findByRole('option', { name: '4 products' }))
+    await user.click(within(card).getByRole('button', { name: 'Save and publish' }))
+    await waitFor(() => expect(published).toBe(true))
+    expect(put).toMatchObject({ revision: 2, settings: { layout: { container_width: 1170, listing_columns: { desktop: 4, tablet: 3, mobile: 2 } } } })
+  })
+})

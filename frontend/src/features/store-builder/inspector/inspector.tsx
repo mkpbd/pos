@@ -17,18 +17,21 @@ import {
   ShoppingBagIcon,
   SquareIcon,
 } from 'lucide-react'
+import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { elementMeta, isWrappedSectionType } from '@/storefront/builder/registry'
 import type { ButtonElement, DividerElement, Element, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, TextElement, WrappedElement } from '@/storefront/builder/types'
+import { elementContext, kindInfo } from '../document-kind'
 import { AdvancedTab } from './advanced-tab'
+import { B4Form, type B4FormProps } from './b4-forms'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
 import { ElementSetupHost } from './setup-dialog'
 import { StyleTab } from './style-tab'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
-import { validateNode } from './validate'
+import { B4_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
 const ICONS: Record<string, typeof HeadingIcon> = {
@@ -58,15 +61,17 @@ function NodeIcon({ type }: { type: string }) {
   return <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
 }
 
-function ContentForm({ node, onChange, onCommand, errors, bangla, content }: {
+function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4 }: {
   node: BuilderNode
   onChange: (next: BuilderNode, opts?: InspectorChangeOptions) => void
   onCommand: InspectorProps['onCommand']
   errors: Record<string, string>
   bangla: boolean
   content: InspectorProps['content']
+  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'>
 }) {
   const common = { onChange, errors, bangla } as const
+  if (B4_TYPES.has(node.type)) return <B4Form key={node.id} node={node as Element} {...common} {...b4} />
   switch (node.type) {
     case 'section':
       return <SectionForm node={node} {...common} onCommand={onCommand} />
@@ -101,17 +106,32 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content }: {
 function PageSettings({ document, content, locales, onCommand }: Pick<InspectorProps, 'document' | 'content' | 'locales' | 'onCommand'>) {
   const published = document.published
   const sections = content.sections.length
+  const kind = document.kind ?? 'page'
+  const info = kindInfo({ kind, key: document.key ?? '' })
+  const heading = kind === 'header' ? 'Header' : kind === 'footer' ? 'Footer' : kind === 'zone' ? 'Area' : 'Page'
+  const cms = (document.key ?? '').startsWith('cms:')
   return (
     <div className="flex flex-col gap-5 p-4">
       <div>
-        <h2 className="text-base font-semibold">Page</h2>
-        <p className="text-sm text-muted-foreground">Select a section or element on the page or in Layers to edit it. Add new ones from the Add panel.</p>
+        <h2 className="text-base font-semibold">{heading}</h2>
+        <p className="text-sm text-muted-foreground">Select a section or element on the {info.noun} or in Layers to edit it. Add new ones from the Add panel.</p>
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
         <dt className="text-muted-foreground">Title</dt>
         <dd className="min-w-0 break-words">{document.title}</dd>
-        <dt className="text-muted-foreground">Address</dt>
-        <dd className="min-w-0 font-mono break-all">{document.path}</dd>
+        {document.path ? (
+          <>
+            <dt className="text-muted-foreground">Address</dt>
+            <dd className="min-w-0 font-mono break-all">{document.path}</dd>
+          </>
+        ) : (
+          info.placement && (
+            <>
+              <dt className="text-muted-foreground">Shown</dt>
+              <dd className="min-w-0">{info.placement}</dd>
+            </>
+          )
+        )}
         <dt className="text-muted-foreground">Last published</dt>
         <dd>
           {published
@@ -130,6 +150,19 @@ function PageSettings({ document, content, locales, onCommand }: Pick<InspectorP
         )}
       </dl>
       <p className="text-sm text-muted-foreground">Changes are saved as a draft automatically. Visitors see them only after you publish.</p>
+      {cms && (
+        <p className="text-sm text-muted-foreground">
+          The page’s title, address, search texts and whether it is published are set on the{' '}
+          <Link to="/content/pages" className="underline underline-offset-2">Content pages</Link> screen. Deleting this design brings the classic page back.
+        </p>
+      )}
+      {(kind === 'header' || kind === 'footer') && (
+        <p className="text-sm text-muted-foreground">
+          The logo, menus, contact details, social links and payment logos come from the{' '}
+          <Link to="/storefront/theme" className="underline underline-offset-2">Theme page</Link> and{' '}
+          <Link to="/storefront/menus" className="underline underline-offset-2">Menus</Link>.
+        </p>
+      )}
       <div className="flex flex-col gap-2 rounded-md border p-3">
         <h3 className="text-sm font-semibold">Site styles</h3>
         <p className="text-sm text-muted-foreground">Colours, fonts, text sizes and buttons for the whole store. Changes show here at once and go live when you publish them.</p>
@@ -150,13 +183,19 @@ type Tab = 'content' | 'style' | 'advanced'
 export function Inspector(props: InspectorProps) {
   return (
     <>
-      <ElementSetupHost />
+      <ElementSetupHost canCustomHtml={props.canCustomHtml} />
       <InspectorPanel {...props} />
     </>
   )
 }
 
-function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme }: InspectorProps) {
+/** The icon names the server accepts (GET /elements `enums.icons`), else the storefront's. */
+function registryIcons(registry: InspectorProps['registry']): readonly string[] | undefined {
+  const icons = registry.enums?.icons
+  return Array.isArray(icons) && icons.every((name) => typeof name === 'string') ? (icons as string[]) : undefined
+}
+
+function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false }: InspectorProps) {
   const [tab, setTab] = useState<Tab>('content')
 
   if (!node) {
@@ -168,7 +207,8 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
   }
 
   const bangla = locales.includes('bn')
-  const problems = validateNode(node)
+  const icons = registryIcons(registry)
+  const problems = validateNode(node, { icons })
   const errors = errorMap(node, problems, serverProblems)
   const hasAdvanced = node.type !== 'column'
   const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
@@ -228,7 +268,15 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
           )}
         </TabsList>
         <TabsContent value="content" className="pt-4">
-          <ContentForm node={node} onChange={onChange} onCommand={onCommand} errors={errors} bangla={bangla} content={content} />
+          <ContentForm
+            node={node}
+            onChange={onChange}
+            onCommand={onCommand}
+            errors={errors}
+            bangla={bangla}
+            content={content}
+            b4={{ context: elementContext({ kind: document.kind ?? 'page', key: document.key ?? '' }), theme, icons, canCustomHtml }}
+          />
         </TabsContent>
         <TabsContent value="style" className="pt-4">
           <StyleTab node={node} device={device} onChange={onChange} onCommand={onCommand} theme={theme} />

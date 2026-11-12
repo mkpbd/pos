@@ -23,6 +23,12 @@ class StoreBootstrapController
      * B3: `?preview=draft` from a signed-in staff member of this store holding storefront.view
      * carries the **draft** theme instead of the live one, with `theme_source: "draft"`
      * (`no-store`); anyone else gets the live theme.
+     *
+     * B4: `builder` is `{home: bool, header, footer, zones: {listing.top, listing.bottom,
+     * product.after}}` — each a builder render payload `{document, sections, media, data}` of
+     * the published document, or null (the classic rendering). The staff draft preview carries
+     * the drafts (also of documents never published). Publishing any of them refreshes the
+     * cached bootstrap.
      */
     public function __invoke(Request $request, StorefrontBootstrap $bootstrap, ManageThemeDraft $theme): Response
     {

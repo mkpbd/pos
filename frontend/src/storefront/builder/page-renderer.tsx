@@ -1,14 +1,16 @@
-import { createContext, useContext, useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useContext, useMemo, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { MediaImage } from '../components/media-image'
 import { MenuLink } from '../components/menu-link'
 import { RichText } from '../components/rich-text'
-import { useLocale } from '../i18n/locale'
-import type { MessageKey } from '../i18n/en'
 import { SectionItem } from '../sections/section-renderer'
 import type { SectionPreviewState, StoreSection } from '../types'
-import { aspectRatioCss, colorCss, compileStyles } from './compile-styles'
+import { aspectRatioCss, colorCss, compileStyles, scopePrefix } from './compile-styles'
+import { B4ElementContent } from './elements'
+import { isB4Type } from './elements/b4-types'
 import { isWrappedSectionType, NODE_ID } from './registry'
+import { ColumnWidthCtx, PageCtx, usePage } from './render-context'
+import { PreviewMark } from './preview-mark'
 import type { BuilderPage, NodeState, RenderColumn, RenderElement, RenderSection } from './types'
 import { ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
 
@@ -19,25 +21,7 @@ import { ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
  * Used by the live store and, in B2, by the editor canvas.
  */
 
-type PageContext = { page: BuilderPage; draft: boolean; placeholder?: (element: RenderElement) => ReactNode }
-
-const PageCtx = createContext<PageContext | null>(null)
-
-function usePage(): PageContext {
-  const value = useContext(PageCtx)
-  if (!value) throw new Error('builder nodes render inside PageRenderer')
-  return value
-}
-
-/** The column an element sits in (image `sizes`). */
-const ColumnWidthCtx = createContext<{ base: number; tablet?: number; mobile?: number }>({ base: 100 })
-
-const STATE_LABELS: Record<NodeState, MessageKey> = {
-  hidden: 'content.builder.hidden',
-  scheduled: 'content.preview.scheduled',
-  expired: 'content.preview.expired',
-  empty: 'content.builder.empty',
-}
+const STATE_KEYS: readonly NodeState[] = ['hidden', 'scheduled', 'expired', 'empty']
 
 const SECTION_STATES: Record<NodeState, SectionPreviewState> = { hidden: 'disabled', scheduled: 'scheduled', expired: 'expired', empty: 'empty' }
 
@@ -57,22 +41,10 @@ type Visible = { show: false } | { show: true; state: NodeState | null }
  */
 function visibility(node: { id: unknown; hidden?: boolean; state?: NodeState }, draft: boolean): Visible {
   if (typeof node.id !== 'string' || !NODE_ID.test(node.id)) return { show: false }
-  const state = node.state && Object.hasOwn(STATE_LABELS, node.state) ? node.state : null
+  const state = node.state && STATE_KEYS.includes(node.state) ? node.state : null
   if (state) return draft ? { show: true, state } : { show: false }
   if (node.hidden === true) return draft ? { show: true, state: 'hidden' } : { show: false }
   return { show: true, state: null }
-}
-
-/** A draft-preview frame around a node visitors would not see. */
-function PreviewMark({ state, children }: { state: NodeState | null; children: ReactNode }) {
-  const { t } = useLocale()
-  if (!state) return <>{children}</>
-  return (
-    <div data-node-state={state} className="relative opacity-60 outline-2 outline-offset-[-2px] outline-dashed outline-sf-sale">
-      <p className="absolute top-2 left-2 z-10 rounded bg-neutral-900 px-2 py-1 text-xs font-semibold text-white">{t(STATE_LABELS[state])}</p>
-      {children}
-    </div>
-  )
 }
 
 const LAYOUT_CLASSES = { boxed: 'b-boxed', full: 'b-full', 'full-bleed': 'b-bleed' } as const
@@ -146,6 +118,7 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
         </div>
       )
     default:
+      if (isB4Type(element.type)) return <B4ElementContent element={element} />
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
   }
@@ -276,9 +249,10 @@ function Divider({ element }: { element: Extract<RenderElement, { type: 'divider
 
 function WrappedSection({ element, state }: { element: RenderElement; state: NodeState | null }) {
   const { page, draft, placeholder } = usePage()
-  const data = Object.hasOwn(page.data ?? {}, element.id) ? page.data[element.id] : undefined
+  const entry = Object.hasOwn(page.data ?? {}, element.id) ? page.data[element.id] : undefined
+  const data = entry && 'type' in entry && entry.type === element.type ? (entry as StoreSection) : undefined
 
-  if (!data || data.type !== element.type) {
+  if (!data) {
     // The editor canvas draws its own placeholder (a skeleton while the data loads).
     const custom = draft && placeholder ? placeholder(element) : null
     if (custom) return <>{custom}</>
@@ -304,15 +278,34 @@ function WrappedSection({ element, state }: { element: RenderElement; state: Nod
  * canvas): drawn instead of a wrapped section that has no data yet; null falls back to the
  * default marked placeholder.
  */
-export function PageRenderer({ page, placeholder }: { page: BuilderPage; placeholder?: (element: RenderElement) => ReactNode }) {
+export function PageRenderer({
+  page,
+  placeholder,
+  testId = 'builder-page',
+  className,
+  scope,
+}: {
+  page: BuilderPage
+  placeholder?: (element: RenderElement) => ReactNode
+  /** B4: the header, footer and zones mark their own payloads (`builder-header`, `builder-zone-listing.top`, …). */
+  testId?: string
+  className?: string
+  /**
+   * B4: the documents drawn together on a store page (page, header, footer, zones) each get their
+   * own scope, so their compiled styles never reach another document's nodes with the same id.
+   * The editor canvas draws one document and leaves it unscoped.
+   */
+  scope?: string
+}) {
   const draft = page.document?.source === 'draft'
   const sections = useMemo(() => (Array.isArray(page.sections) ? page.sections : []), [page.sections])
-  const css = useMemo(() => compileStyles(sections, { media: page.media ?? {} }), [sections, page.media])
+  const validScope = scopePrefix(scope) ? scope : undefined
+  const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope }), [sections, page.media, validScope])
   const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
 
   return (
     <PageCtx.Provider value={context}>
-      <div className="b-page" data-testid="builder-page" data-document-key={page.document?.key}>
+      <div className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
         <style data-testid="builder-styles">{css}</style>
         {sections.map((section) => (
           <SectionNode key={section.id} section={section} />

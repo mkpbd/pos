@@ -5,20 +5,28 @@
  * know which types it can draw.
  */
 
-import type { ElementType, WrappedSectionType } from './types'
+import type { DocumentContext, ElementType, WrappedSectionType } from './types'
 
-export type ElementGroup = 'layout' | 'content' | 'commerce' | 'marketing'
+/** B4: `site` = header / footer parts (logo, menu, account, cart, social icons, …). */
+export type ElementGroup = 'layout' | 'content' | 'commerce' | 'marketing' | 'site'
 
 export type ElementMeta = {
   type: ElementType
   group: ElementGroup
   label: string
-  /** Props (and, for wrapped sections, config fields) that can be translated per locale. */
+  /**
+   * Props (and, for wrapped sections, config fields) that can be translated per locale. A nested
+   * prop is named with a dot (`primary.label` of a call to action).
+   */
   translatable: readonly string[]
   /** Props after normalize when nothing was set. */
   props: Readonly<Record<string, unknown>>
   children: 'columns' | null
+  /** B4: the document contexts the type may be used in. */
+  allowed_in: readonly DocumentContext[]
 }
+
+type BaseMeta = Omit<ElementMeta, 'allowed_in'>
 
 export const WRAPPED_SECTION_TYPES = [
   'hero_slider',
@@ -75,7 +83,7 @@ const SECTION_META: Record<WrappedSectionType, { group: ElementGroup; label: str
   blog_posts: { group: 'content', label: 'Blog posts' },
 }
 
-const BASIC: ElementMeta[] = [
+const BASIC: BaseMeta[] = [
   { type: 'heading', group: 'content', label: 'Heading', translatable: ['text'], props: { text: 'Heading', level: 2, link: null }, children: null },
   { type: 'text', group: 'content', label: 'Text', translatable: ['html'], props: { html: '<p>Write something here.</p>' }, children: null },
   {
@@ -106,10 +114,133 @@ const BASIC: ElementMeta[] = [
   { type: 'inner_row', group: 'layout', label: 'Inner row', translatable: [], props: {}, children: 'columns' },
 ]
 
+/**
+ * B4 elements (contract §2). Defaults are what normalize keeps when nothing was set; a video
+ * (url) and a promo card (product) are invalid until set up, a countdown until it has an end or a
+ * promotion, a discount until it has a promotion, a menu until it has a menu.
+ */
+const B4: BaseMeta[] = [
+  {
+    type: 'video',
+    group: 'content',
+    label: 'Video',
+    translatable: ['title'],
+    props: { url: '', provider: 'youtube', video_id: '', title: '', aspect: '16:9', autoplay: false, start: 0 },
+    children: null,
+  },
+  { type: 'icon', group: 'content', label: 'Icon', translatable: ['label'], props: { name: 'star', size: 32, color: null, label: '', link: null }, children: null },
+  {
+    type: 'countdown',
+    group: 'marketing',
+    label: 'Countdown',
+    translatable: ['title', 'expired_text'],
+    props: { source: 'date', ends_at: null, promotion_id: null, title: '', expired_text: '', style: 'boxes' },
+    children: null,
+  },
+  {
+    type: 'discount',
+    group: 'marketing',
+    label: 'Discount',
+    translatable: ['title', 'text', 'button_label'],
+    props: { promotion_id: null, title: '', text: '', show_code: true, button_label: 'Shop now', link: { url: '/shop' } },
+    children: null,
+  },
+  {
+    type: 'cta',
+    group: 'marketing',
+    label: 'Call to action',
+    translatable: ['title', 'text', 'primary.label', 'secondary.label'],
+    props: { title: 'Ready when you are', text: '', primary: { label: 'Shop now', link: { url: '/shop' } }, secondary: null, align: 'center' },
+    children: null,
+  },
+  {
+    type: 'search_box',
+    group: 'commerce',
+    label: 'Search box',
+    translatable: ['placeholder', 'button_label'],
+    props: { placeholder: 'Search products', button_label: '' },
+    children: null,
+  },
+  {
+    type: 'promo_card',
+    group: 'commerce',
+    label: 'Promoted product',
+    translatable: ['badge', 'title', 'text', 'button_label'],
+    props: { product_id: null, badge: '', title: null, text: '', button_label: 'Shop now' },
+    children: null,
+  },
+  { type: 'logo', group: 'site', label: 'Logo', translatable: [], props: { height: 48, link: { url: '/' } }, children: null },
+  { type: 'menu', group: 'site', label: 'Menu', translatable: [], props: { menu_id: null, layout: 'horizontal', show_children: 'dropdown' }, children: null },
+  { type: 'account_link', group: 'site', label: 'Account', translatable: [], props: { show_label: false }, children: null },
+  { type: 'wishlist_link', group: 'site', label: 'Wishlist', translatable: [], props: { show_label: false }, children: null },
+  { type: 'cart_icon', group: 'site', label: 'Cart', translatable: [], props: { show_count: true, show_total: false }, children: null },
+  { type: 'language_switch', group: 'site', label: 'Language switch', translatable: [], props: { style: 'links' }, children: null },
+  { type: 'announcement', group: 'site', label: 'Announcement', translatable: [], props: {}, children: null },
+  { type: 'social_icons', group: 'site', label: 'Social icons', translatable: [], props: { size: 24, style: 'plain', color: null }, children: null },
+  { type: 'payment_icons', group: 'site', label: 'Payment icons', translatable: [], props: { height: 24 }, children: null },
+  {
+    type: 'contact_block',
+    group: 'site',
+    label: 'Contact details',
+    translatable: [],
+    props: { show_phone: true, show_email: true, show_address: true, layout: 'stacked' },
+    children: null,
+  },
+  { type: 'copyright', group: 'site', label: 'Copyright', translatable: ['text'], props: { text: null }, children: null },
+  {
+    type: 'newsletter_form',
+    group: 'marketing',
+    label: 'Newsletter form',
+    translatable: ['title', 'text', 'button_label'],
+    props: { title: 'Join our newsletter', text: '', button_label: 'Subscribe', layout: 'inline' },
+    children: null,
+  },
+  { type: 'faq_list', group: 'content', label: 'FAQ list', translatable: ['title'], props: { title: null, style: 'accordion' }, children: null },
+  { type: 'contact_form', group: 'content', label: 'Contact form', translatable: ['title'], props: { title: null, show_details: true }, children: null },
+  { type: 'custom_html', group: 'content', label: 'Custom HTML', translatable: [], props: { html: '' }, children: null },
+]
+
+const ALL: readonly DocumentContext[] = ['page', 'cms', 'header', 'footer', 'zone']
+const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
+
+/** Where each type may be used (contract §1 page / header / footer sets; `faq_list` and `contact_form` on CMS pages only). */
+const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
+  heading: ALL,
+  text: ALL,
+  image: ALL,
+  button: ALL,
+  spacer: ALL,
+  divider: ALL,
+  inner_row: ALL,
+  ...(Object.fromEntries(WRAPPED_SECTION_TYPES.map((type) => [type, PAGES])) as Record<WrappedSectionType, readonly DocumentContext[]>),
+  video: PAGES,
+  icon: ALL,
+  countdown: PAGES,
+  discount: PAGES,
+  cta: PAGES,
+  search_box: ['page', 'cms', 'zone', 'header'],
+  promo_card: PAGES,
+  logo: ['header', 'footer'],
+  menu: ['header', 'footer'],
+  account_link: ['header'],
+  wishlist_link: ['header'],
+  cart_icon: ['header'],
+  language_switch: ['header', 'footer'],
+  announcement: ['header'],
+  social_icons: ALL,
+  payment_icons: ['page', 'cms', 'zone', 'footer'],
+  contact_block: ALL,
+  copyright: ['footer'],
+  newsletter_form: ['page', 'cms', 'zone', 'footer'],
+  faq_list: ['cms'],
+  contact_form: ['cms'],
+  custom_html: ALL,
+}
+
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...BASIC,
   ...WRAPPED_SECTION_TYPES.map(
-    (type): ElementMeta => ({
+    (type): BaseMeta => ({
       type,
       ...SECTION_META[type],
       translatable: ['title', 'subtitle', ...(SECTION_TRANSLATABLE_CONFIG[type] ?? [])],
@@ -117,7 +248,21 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
       children: null,
     }),
   ),
-]
+  ...B4,
+].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
+
+/** Whether a type may be used in a document of this context (the server answers 422 otherwise). */
+export function isAllowedIn(type: string, context: DocumentContext): boolean {
+  return elementMeta(type)?.allowed_in.includes(context) ?? false
+}
+
+/** The document context of a builder document key: `home` / `landing:*` → page, `cms:*`, `header`, `footer`, `zone:*`. */
+export function documentContext(key: string): DocumentContext {
+  if (key === 'header' || key === 'footer') return key
+  if (key.startsWith('cms:')) return 'cms'
+  if (key.startsWith('zone:')) return 'zone'
+  return 'page'
+}
 
 const BY_TYPE = new Map<string, ElementMeta>(ELEMENT_REGISTRY.map((meta) => [meta.type, meta]))
 

@@ -54,7 +54,8 @@ class ThemeSchemaTest extends TestCase
         // Everything that was there is unchanged.
         $this->assertSame('vegan', $normalized['preset']);
         $this->assertSame(self::OLD_THEME['shape'], $normalized['shape']);
-        $this->assertSame(self::OLD_THEME['layout'], $normalized['layout']);
+        // B4: plus today's listing grid.
+        $this->assertSame(self::OLD_THEME['layout'] + ['listing_columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2]], $normalized['layout']);
         $this->assertSame(self::OLD_THEME['colors'], array_intersect_key($normalized['colors'], self::OLD_THEME['colors']));
         // The new colour roles copy this theme's primary pair and accent (not the default ones).
         $this->assertSame(['#123456', '#ffffff', '#2e7d32', null], [

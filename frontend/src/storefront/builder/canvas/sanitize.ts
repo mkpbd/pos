@@ -11,7 +11,8 @@ const SAFE_URL = /^(?:\/(?![/\\])|#|https?:\/\/|mailto:|tel:)/i
 /** The only inline style the rich-text editor writes. */
 const TEXT_ALIGN = /^text-align:\s*(?:left|center|right|justify);?$/i
 
-export function sanitizeHtml(html: string): string {
+/** `dropClassAndId`: custom HTML (B4) keeps no `class` / `id` either — the server drops them, styling goes through the node style. */
+export function sanitizeHtml(html: string, options: { dropClassAndId?: boolean } = {}): string {
   if (typeof html !== 'string' || html === '') return ''
   const template = document.createElement('template')
   template.innerHTML = html
@@ -25,7 +26,8 @@ export function sanitizeHtml(html: string): string {
         const name = attribute.name.toLowerCase()
         const value = attribute.value.trim()
         const style = name === 'style' && !TEXT_ALIGN.test(value)
-        if (name.startsWith('on') || style || (URL_ATTRIBUTES.has(name) && !SAFE_URL.test(value))) child.removeAttribute(attribute.name)
+        const identity = options.dropClassAndId === true && (name === 'class' || name === 'id')
+        if (name.startsWith('on') || style || identity || (URL_ATTRIBUTES.has(name) && !SAFE_URL.test(value))) child.removeAttribute(attribute.name)
       }
       walk(child)
     }

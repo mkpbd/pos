@@ -27,6 +27,19 @@ type NodeLike = { id?: unknown; type?: unknown; style?: unknown; visibility?: un
 export type CompileOptions = {
   /** The render payload's media map: background images are looked up here (and nowhere else). */
   media?: Readonly<Record<string, { url: string }>>
+  /**
+   * B4: several documents share a page (header, footer, zones, the page itself) and node ids are
+   * unique per document only, so each one's rules are scoped to its wrapper
+   * (`[data-b-scope="<scope>"] [data-b="…"]`). `^[a-z][a-z0-9-]{0,31}$`; anything else = unscoped.
+   */
+  scope?: string
+}
+
+const SCOPE = /^[a-z][a-z0-9-]{0,31}$/
+
+/** The scope prefix of a selector (`[data-b-scope="header"] `), or '' when unscoped. */
+export function scopePrefix(scope: unknown): string {
+  return typeof scope === 'string' && SCOPE.test(scope) ? `[data-b-scope="${scope}"] ` : ''
 }
 
 /** `section` = anything holding a row of columns (sections and inner rows): its layout goes to `[data-b-row]`. */
@@ -222,8 +235,8 @@ function columnBasis(width: number): string {
 
 /* -------------------------------------------------------------------------------------------- */
 
-function selectorFor(id: string): string {
-  return `[data-b="${id}"]`
+function selectorFor(id: string, options: CompileOptions = {}): string {
+  return `${scopePrefix(options.scope)}[data-b="${id}"]`
 }
 
 function validId(id: unknown): id is string {
@@ -236,7 +249,7 @@ function addRule(rules: Rule[], selector: string, declarations: string[]) {
 
 function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown, options: CompileOptions, extra: Partial<Record<Breakpoint, string[]>> = {}) {
   const style: ResponsiveStyle = normalizeStyle(rawStyle)
-  const selector = selectorFor(id)
+  const selector = selectorFor(id, options)
   const breakpoints = ['base', 'tablet', 'mobile'] as const
   const compiled = breakpoints.map((breakpoint) => {
     const value = style[breakpoint]
@@ -249,7 +262,7 @@ function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown
   breakpoints.forEach((breakpoint, index) => {
     const declarations = compiled[index]!
     addRule(out[breakpoint], selector, [...(extra[breakpoint] ?? []), ...declarations.self, ...(breakpoint === 'base' ? transition : [])])
-    addRule(out[breakpoint], `[data-b-row="${id}"]`, declarations.row)
+    addRule(out[breakpoint], `${scopePrefix(options.scope)}[data-b-row="${id}"]`, declarations.row)
     addRule(out[breakpoint], `${selector}:hover,${selector}:focus-visible`, declarations.hover)
   })
   if (hasHover) {
@@ -257,10 +270,10 @@ function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown
   }
 }
 
-function compileVisibility(out: Output, id: string, visibility: unknown) {
+function compileVisibility(out: Output, id: string, visibility: unknown, options: CompileOptions) {
   if (typeof visibility !== 'object' || visibility === null) return
   const v = visibility as Record<string, unknown>
-  const selector = selectorFor(id)
+  const selector = selectorFor(id, options)
   if (v.desktop === false) out.hideDesktop.push(selector)
   if (v.tablet === false) out.hideTablet.push(selector)
   if (v.mobile === false) out.hideMobile.push(selector)
@@ -285,7 +298,7 @@ function compileElement(out: Output, element: NodeLike, options: CompileOptions)
   if (typeof element !== 'object' || element === null || !validId(element.id)) return
   const isRow = element.type === 'inner_row'
   compileNodeStyle(out, element.id, isRow ? 'section' : 'element', element.style, options)
-  compileVisibility(out, element.id, element.visibility)
+  compileVisibility(out, element.id, element.visibility, options)
   if (isRow) compileColumns(out, element.columns, options)
 }
 
@@ -308,7 +321,7 @@ export function compileStyles(sections: readonly unknown[], options: CompileOpti
   for (const section of sections as NodeLike[]) {
     if (typeof section !== 'object' || section === null || !validId(section.id)) continue
     compileNodeStyle(out, section.id, 'section', section.style, options)
-    compileVisibility(out, section.id, section.visibility)
+    compileVisibility(out, section.id, section.visibility, options)
     compileColumns(out, section.columns, options)
   }
 

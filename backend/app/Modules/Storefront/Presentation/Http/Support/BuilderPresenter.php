@@ -2,6 +2,8 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
+use App\Modules\Cms\Application\Contracts\PageContent;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\Builder\BuilderJson;
@@ -18,14 +20,35 @@ final class BuilderPresenter
      * B2: `path` on the store (`/`, `/p/<slug>`) and `preview_url` — the draft on the store's
      * primary domain (`<store_url><path>?preview=draft`), null without a domain.
      *
+     * B4: `kind` page | header | footer | zone; `path` null for the header, footer and zones,
+     * `/pages/<slug>` for a CMS page design; `cms_page` `{id, title, slug, status, template}` of
+     * a CMS page design (null for other documents, and when the CMS page was deleted).
+     * `preview_url` of the header and footer is the home page, of the listing zones `/shop`, of
+     * the product zone the product changed last (null when nothing is on sale online).
+     *
      * @param  string|false|null  $storeUrl  the primary store URL when already known (false: look it up)
+     * @param  array<string, array<string, mixed>>|null  $cmsPages  CMS page summaries by id when already known
      * @return array<string, mixed>
      */
-    public static function summary(BuilderDocument $document, string|false|null $storeUrl = false): array
+    public static function summary(BuilderDocument $document, string|false|null $storeUrl = false, ?array $cmsPages = null): array
     {
         $published = $document->publishedVersion;
         $storeUrl = $storeUrl === false ? self::storeUrl() : $storeUrl;
-        $path = $document->storePath();
+        $pageId = $document->cmsPageId();
+        $cmsPage = null;
+        if ($pageId !== null) {
+            $cmsPages ??= app(PageContent::class)->summaries([$pageId]);
+            $cmsPage = $cmsPages[$pageId] ?? null;
+        }
+        $path = $cmsPage !== null ? '/pages/'.$cmsPage['slug'] : $document->storePath();
+        // B4: where the draft of a page part shows — header / footer on the home page, listing
+        // zones on /shop, the product zone on the product changed last (none: null).
+        $previewPath = $path ?? match ($document->key) {
+            BuilderDocument::HEADER, BuilderDocument::FOOTER => '/',
+            BuilderDocument::ZONE_PREFIX.'listing.top', BuilderDocument::ZONE_PREFIX.'listing.bottom' => '/shop',
+            BuilderDocument::ZONE_PREFIX.'product.after' => $storeUrl === null ? null : self::latestProductPath(),
+            default => null,
+        };
 
         return [
             'id' => $document->id,
@@ -33,7 +56,8 @@ final class BuilderPresenter
             'key' => $document->key,
             'title' => $document->title,
             'path' => $path,
-            'preview_url' => $storeUrl === null || $path === null ? null : $storeUrl.$path.'?preview=draft',
+            'cms_page' => $cmsPage,
+            'preview_url' => $storeUrl === null || $previewPath === null ? null : $storeUrl.$previewPath.'?preview=draft',
             'schema_version' => $document->schema_version,
             'draft_revision' => $document->draft_revision,
             'has_unpublished_changes' => $published === null || self::canonical($published->content) !== self::canonical($document->draft),
@@ -55,8 +79,20 @@ final class BuilderPresenter
     public static function summaries(iterable $documents): array
     {
         $storeUrl = self::storeUrl();
+        $documents = collect($documents);
+        $cmsPages = app(PageContent::class)->summaries($documents->map(fn (BuilderDocument $d) => $d->cmsPageId())->filter()->values()->all());
 
-        return collect($documents)->map(fn (BuilderDocument $d) => self::summary($d, $storeUrl))->values()->all();
+        return $documents->map(fn (BuilderDocument $d) => self::summary($d, $storeUrl, $cmsPages))->values()->all();
+    }
+
+    /**
+     * B4: `/product/<slug>` of the live product whose listing changed last, or null.
+     */
+    private static function latestProductPath(): ?string
+    {
+        $slug = app(StorefrontCatalog::class)->latestProductSlug();
+
+        return $slug === null ? null : '/product/'.$slug;
     }
 
     /**

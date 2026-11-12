@@ -1,5 +1,13 @@
 /** GET /api/v1/store/bootstrap — see backend Storefront\Application\Queries\StorefrontBootstrap. */
 
+import type { BootstrapBuilder, BuilderPage } from './builder/types'
+
+/**
+ * B4: products per row on shop, category, brand and search listings. Desktop ≥ 1024 px, tablet
+ * 768–1023 px, mobile < 768 px. Absent = DEFAULT_LISTING_COLUMNS (today's grid).
+ */
+export type ListingColumns = { desktop: 3 | 4 | 5; tablet: 2 | 3 | 4; mobile: 1 | 2 }
+
 export type MediaRef = {
   id: string
   url: string
@@ -84,7 +92,7 @@ export type StorefrontTheme = {
   colors: ThemeColors
   typography: { heading_font: HeadingFont; body_font: BodyFont } & TypeScaleSettings
   shape: { button_style: ButtonStyle; card_radius: number }
-  layout: { container_width: number; sticky_header: boolean } & Partial<LayoutVariants>
+  layout: { container_width: number; sticky_header: boolean; listing_columns?: ListingColumns } & Partial<LayoutVariants>
   /** The preset the theme was last set from (absent before T1 = `default`). */
   preset?: ThemePreset
   logo: MediaRef | null
@@ -140,7 +148,7 @@ export type StorefrontBootstrap = {
   /** The live popup banner (E11); absent from older payloads. */
   popup?: StorePopup | null
   /** Store builder (B1): `home` = a published builder front page replaces the homepage sections; absent = false. */
-  builder?: { home: boolean }
+  builder?: BootstrapBuilder
 }
 
 /** GET /api/v1/store/homepage — see backend Storefront\Application\Queries\StorefrontHomepage. */
@@ -219,6 +227,8 @@ export type StorePage = {
   seo_description: string | null
   updated_at: string | null
   faq?: FaqGroup[]
+  /** B4: the page's published builder document (staff `?preview=draft`: the draft); null / absent = the CMS body. */
+  builder?: BuilderPage | null
 }
 
 export type ContactInput = { name: string; email: string; phone?: string; subject?: string; message: string; website?: string }

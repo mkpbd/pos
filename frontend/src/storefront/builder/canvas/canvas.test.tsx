@@ -115,3 +115,63 @@ describe('builder canvas app', () => {
     expect(await screen.findByTestId('canvas-empty')).toBeInTheDocument()
   })
 })
+
+describe('builder canvas: headers, footers and zones (B4)', () => {
+  function mount() {
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    render(
+      <QueryClientProvider client={createCanvasQueryClient()}>
+        <MemoryRouter>
+          <CanvasApp parent={window} origin={ORIGIN} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    return (data: ParentMessage) => act(() => void window.dispatchEvent(message(envelope(data))))
+  }
+  const page = samplePage({ source: 'draft' })
+  const render$ = (overrides: Partial<Extract<ParentMessage, { type: 'render' }>> = {}): ParentMessage => ({
+    type: 'render', sections: page.sections, data: page.data, media: page.media, selection: null, hover: null, errors: [], device: 'desktop', pending: [], ...overrides,
+  })
+
+  it('draws a header above a faded sample page; phones get a note about the compact header', async () => {
+    const send = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(render$({ surroundings: 'header' }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    const main = screen.getByRole('main')
+    expect(main).toHaveAttribute('data-surroundings', 'header')
+    const header = main.querySelector('[data-canvas-part="header"]')!
+    const sample = screen.getByTestId('canvas-sample')
+    expect(sample).toHaveAttribute('aria-hidden', 'true')
+    expect(header.compareDocumentPosition(sample) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('canvas-compact-note')).toBeNull()
+
+    send(render$({ surroundings: 'header', device: 'mobile' }))
+    expect(await screen.findByTestId('canvas-compact-note')).toHaveTextContent('compact header')
+  })
+
+  it('draws a footer and the listing-bottom zone below their samples, with the kind’s empty text', async () => {
+    const send = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(render$({ surroundings: 'zone:listing.bottom', sections: [], emptyText: 'This area is empty.' }))
+    expect(await screen.findByTestId('canvas-empty')).toHaveTextContent('This area is empty.')
+    const sample = screen.getByTestId('canvas-sample')
+    expect(sample).toHaveTextContent('Product grid')
+    expect(sample.compareDocumentPosition(screen.getByTestId('canvas-empty')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    send(render$({ surroundings: 'footer' }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    expect(screen.getByRole('main').querySelector('[data-canvas-part="footer"]')).not.toBeNull()
+    expect(screen.getByTestId('canvas-sample')).toHaveTextContent('Your page content')
+
+    // An unknown kind draws as a page.
+    send(render$({ surroundings: 'evil' as never }))
+    await waitFor(() => expect(screen.getByRole('main')).toHaveAttribute('data-surroundings', 'page'))
+    expect(screen.queryByTestId('canvas-sample')).toBeNull()
+  })
+
+  it('cleans custom HTML like the server: no scripts, iframes, handlers, classes or ids', () => {
+    expect(sanitizeHtml('<div class="x" id="y" onclick="z()"><script>1</script><iframe src="https://evil.test"></iframe><b>Hi</b></div>', { dropClassAndId: true })).toBe('<div><b>Hi</b></div>')
+    expect(sanitizeHtml('<p class="x">a</p>')).toBe('<p class="x">a</p>')
+  })
+})

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { AddToCartForm } from '../cart/add-to-cart'
 import { isNotFound, useProductQuery, useProductsBySlugsQuery, useRelatedProductsQuery } from '../catalog/api'
+import { BuilderZone } from '../builder/zone'
 import { Breadcrumbs } from '../catalog/breadcrumbs'
 import { ProductBadges, ProductCard } from '../catalog/product-card'
 import { ProductGallery } from '../catalog/product-gallery'
@@ -146,7 +147,7 @@ function ProductView({ product }: { product: ProductDetail }) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-sf px-4 py-8">
+      <div className="mx-auto max-w-sf px-4 pt-8">
         <div className="grid gap-8 rounded-sf-card bg-sf-surface p-4 md:grid-cols-2 md:p-8 lg:gap-12">
           <div className="relative">
             <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} />
@@ -185,7 +186,12 @@ function ProductView({ product }: { product: ProductDetail }) {
             <Tabs tabs={tabs} label={t('catalog.product.information')} selectedId={tab} onSelect={setTab} />
           </section>
         )}
+      </div>
 
+      {/* B4: the store builder's "product page" zone, full width below the details and tabs. */}
+      <BuilderZone zone="product.after" />
+
+      <div className="mx-auto max-w-sf px-4 pb-8">
         <RelatedSections slug={product.slug} />
         <RecentlyViewed currentSlug={product.slug} />
       </div>

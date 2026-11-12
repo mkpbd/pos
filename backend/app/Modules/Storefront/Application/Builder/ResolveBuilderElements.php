@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Application\Builder;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Storefront\Application\Queries\SectionContentResolver;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
@@ -31,6 +32,8 @@ class ResolveBuilderElements
         private readonly SectionContentResolver $sections,
         private readonly MediaLibrary $media,
         private readonly BuilderPreviewLocale $locale,
+        private readonly BuilderElementData $elementData,
+        private readonly LocaleContext $localeContext,
     ) {}
 
     /**
@@ -55,11 +58,33 @@ class ResolveBuilderElements
         /** @var array<string, array<string, mixed>> $valid element id => normalized element */
         $valid = [];
 
+        /** @var array<string, array<string, mixed>> $b4 element id => normalized B4 data element */
+        $b4 = [];
+
         foreach ($elements as $element) {
             $id = (string) $element['id'];
             $type = $element['type'] ?? null;
+            if (is_string($type) && in_array($type, ElementRegistry::RESOLVABLE, true)) {
+                // B4 data elements: `{id, type, props, translations}`, valid in any context the type is allowed in.
+                $node = ['id' => $id, 'type' => $type, 'props' => is_array($element['props'] ?? null) ? $element['props'] : [], 'translations' => $element['translations'] ?? []];
+                $first = null;
+                foreach (ElementRegistry::allowedIn($type) as $context) {
+                    try {
+                        $b4[$id] = $this->prepare->sanitized($this->wrap($node), $context)['sections'][0]['columns'][0]['elements'][0];
+                        $first = null;
+                        break;
+                    } catch (InvalidBuilderDocument $e) {
+                        $first ??= $e;
+                    }
+                }
+                if ($first !== null) {
+                    $errors[$id] = $this->problems($first->errors);
+                }
+
+                continue;
+            }
             if (! is_string($type) || ElementRegistry::sectionType($type) === null) {
-                $errors[$id] = [['path' => 'type', 'message' => 'Only section elements (product grids, banners, newsletters, …) need resolving.']];
+                $errors[$id] = [['path' => 'type', 'message' => 'Only section elements (product grids, banners, newsletters, …) and data elements (countdown, discount, promoted product, menu, FAQ list, contact form) need resolving.']];
 
                 continue;
             }
@@ -81,21 +106,22 @@ class ResolveBuilderElements
             }
         }
 
-        if ($valid !== []) {
+        if ($valid !== [] || $b4 !== []) {
             // References of every valid element in one pass (a query per kind, not per element).
             try {
                 $this->references->check(['sections' => array_map(fn (array $element) => [
                     'id' => 'resolve-s',
                     'columns' => [['id' => 'resolve-c', 'elements' => [$element]]],
-                ], array_values($valid))]);
+                ], [...array_values($valid), ...array_values($b4)])]);
             } catch (InvalidBuilderDocument $e) {
                 foreach ($e->errors as $error) {
                     $nodeId = $error['node_id'] ?? null;
-                    if (is_string($nodeId) && isset($valid[$nodeId])) {
+                    if (is_string($nodeId) && (isset($valid[$nodeId]) || isset($b4[$nodeId]))) {
                         $errors[$nodeId] = [...($errors[$nodeId] ?? []), ...$this->problems([$error])];
                     }
                 }
                 $valid = array_diff_key($valid, $errors);
+                $b4 = array_diff_key($b4, $errors);
                 // Problems in request order.
                 $ordered = [];
                 foreach ($elements as $element) {
@@ -117,6 +143,34 @@ class ResolveBuilderElements
             'translations' => $element['translations'],
             'state' => 'live',
         ], $valid)), true);
+
+        // B4 data elements, exactly as the draft render resolves them.
+        $locale = $this->localeContext->current();
+        $data += $this->elementData->resolve(array_values(array_map(fn (array $element) => [
+            'id' => $element['id'],
+            'type' => $element['type'],
+            'props' => BuilderPageRenderer::localizedProps($element['type'], $element['props'], $element['translations'], $locale),
+        ], array_filter($b4, fn (array $element) => BuilderElementData::handles($element['type'])))), true);
+        foreach ($b4 as $id => $element) {
+            if ($element['type'] === 'promo_card' && ! isset($data[$id])) {
+                $errors[$id] = [[
+                    'path' => 'props.product_id',
+                    'message' => 'This product is not on sale in the online store (not listed, unpublished or out of its schedule).',
+                    'code' => 'PRODUCT_UNAVAILABLE',
+                    'ids' => [$element['props']['product_id']],
+                ]];
+            }
+        }
+        if ($errors !== []) {
+            // Problems in request order.
+            $ordered = [];
+            foreach ($elements as $element) {
+                if (isset($errors[(string) $element['id']])) {
+                    $ordered[(string) $element['id']] = $errors[(string) $element['id']];
+                }
+            }
+            $errors = $ordered;
+        }
 
         $mediaIds = array_values(array_unique(array_map('strtolower', $mediaIds)));
         $media = [];

@@ -154,4 +154,10 @@ interface StorefrontCatalog
      * @return list<array{slug: string, updated_at: ?DateTimeInterface, image_url?: ?string, name?: string}>
      */
     public function sitemapEntries(string $type): array;
+
+    /**
+     * B4: the slug of the live product whose listing changed last, or null when nothing is on
+     * sale online (the store builder previews the product page zone on it).
+     */
+    public function latestProductSlug(): ?string;
 }

@@ -5,14 +5,17 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
+import { isBuilderPayload } from '../builder/payload'
+import { PageRenderer } from '../builder/page-renderer'
 import { useStoreLayout } from '../theme'
+import type { BuilderPage } from '../builder/types'
 import { HeaderActions } from './header-actions'
 import { HeaderSearch } from './header-search'
 import { LanguageSwitcher } from './language-switcher'
 import { MainNav } from './main-nav'
 import { MediaImage } from './media-image'
 import { MobileMenu } from './mobile-menu'
-import { useIsDesktop } from './use-media-query'
+import { useIsDesktop, useIsTabletUp } from './use-media-query'
 
 /**
  * The header in the theme's `header_style`. The centered and commerce variants are desktop
@@ -20,7 +23,11 @@ import { useIsDesktop } from './use-media-query'
  */
 export function SiteHeader() {
   const { header_style: style } = useStoreLayout()
+  const { builder } = useStorefront()
   const desktop = useIsDesktop()
+  const tabletUp = useIsTabletUp()
+  // B4: a header designed in the store builder, from 768 px; phones keep the compact header and its drawer.
+  if (tabletUp && isBuilderPayload(builder?.header)) return <BuilderHeader page={builder.header} />
   if (desktop && style === 'centered') return <CenteredHeader />
   if (desktop && style === 'commerce') return <CommerceHeader />
   return <StandardHeader nameClassName={MOBILE_NAME[style]} />
@@ -184,5 +191,18 @@ function SearchPanel() {
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+/**
+ * The header designed in the store builder (B4), shown alone from 768 px. It keeps the theme's
+ * sticky setting; its elements (logo, menu, search, account, wishlist, cart, …) are the store's own.
+ */
+function BuilderHeader({ page }: { page: BuilderPage }) {
+  const { sticky_header } = useStoreLayout()
+  return (
+    <header className={cn('z-40 bg-sf-surface', sticky_header && 'sticky top-0')} data-testid="site-header" data-header-style="builder">
+      <PageRenderer page={page} testId="builder-header" scope="header" />
+    </header>
   )
 }

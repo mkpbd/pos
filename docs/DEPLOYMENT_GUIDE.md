@@ -27,6 +27,8 @@ The PHP-FPM hosts also need Node.js ≥ 22.12 and a Chromium for PDF exports (X1
 
 Serving the SPA and API from the **same origin** is required for Sanctum cookie authentication without third-party cookies.
 
+**Store builder upgrade (B1–B4):** run `php artisan migrate` (B1 adds `builder_documents`, `builder_versions` and `builder_templates`) and `php artisan pos:permissions:sync`. The sync adds `storefront.publish` (builder and theme publishing; Organization Admin and Online Store Manager) and `storefront.custom_html` (custom HTML elements; Organization Admin only) to the built-in roles. Without the sync, nobody can publish on an existing database.
+
 The store builder's canvas (B2) is a third built page that the admin editor loads in an iframe from the same origin. Map it before the `/admin/` fallback:
 
 ```nginx

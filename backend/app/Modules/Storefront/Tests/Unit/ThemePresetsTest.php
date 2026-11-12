@@ -35,6 +35,8 @@ class ThemePresetsTest extends TestCase
             'hero_style' => 'full',
             'heading_case' => 'normal',
             'top_bar' => 'none',
+            // B4: today's listing grid.
+            'listing_columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2],
         ], ThemeSchema::defaults()['layout']);
         $this->assertSame('default', ThemeSchema::defaults()['preset']);
 
@@ -71,7 +73,8 @@ class ThemePresetsTest extends TestCase
         $this->assertThat($partial['shape']['card_radius'], $this->logicalAnd($this->greaterThanOrEqual(0), $this->lessThanOrEqual(24)));
 
         $layout = $partial['layout'];
-        $this->assertSame(array_keys(ThemeSchema::defaults()['layout']), array_keys($layout));
+        // B4: presets do not set the products per row (owner content, kept when applying one).
+        $this->assertSame(array_values(array_diff(array_keys(ThemeSchema::defaults()['layout']), ['listing_columns'])), array_keys($layout));
         $this->assertThat($layout['container_width'], $this->logicalAnd($this->greaterThanOrEqual(960), $this->lessThanOrEqual(1440)));
         $this->assertIsBool($layout['sticky_header']);
         $this->assertContains($layout['header_style'], ThemeSchema::HEADER_STYLES);

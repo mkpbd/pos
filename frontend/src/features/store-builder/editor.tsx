@@ -16,6 +16,7 @@ import {
   type KeyboardCoordinateGetter,
 } from '@dnd-kit/core'
 import { useQueryClient } from '@tanstack/react-query'
+import { InfoIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -45,6 +46,7 @@ import { resetColumnWidth, resizeColumns, setColumnWidth } from './column-resize
 import { EditorUiContext, nodeLabel, nodeName, useCommands, useEditorUi, type EditorUi } from './commands'
 import { ElementIcon } from './element-icon'
 import { ConflictDialog, LeaveDialog, PublishDialog, VersionHistoryDialog } from './dialogs'
+import { elementContext, kindInfo } from './document-kind'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector } from './inspector'
 import { BREAKPOINT, widthAt } from './inspector/style-model'
@@ -99,6 +101,7 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   const store = useEditorStoreApi()
   const can = useCan()
   const canPublish = can('storefront.publish')
+  const canCustomHtml = can('storefront.custom_html')
   const queryClient = useQueryClient()
   const canvas = useRef<CanvasHandle | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -117,13 +120,18 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
     return () => autosave.stop()
   }, [autosave])
 
-  const ui = useMemo<EditorUi>(() => ({ registry, canvas, requestDelete: setDeleteId }), [registry])
+  const documentKind = useEditor((s) => s.document.kind)
+  const documentKey = useEditor((s) => s.document.key)
+  const ui = useMemo<EditorUi>(
+    () => ({ registry, canvas, requestDelete: setDeleteId, canCustomHtml, context: elementContext({ kind: documentKind, key: documentKey }) }),
+    [registry, canCustomHtml, documentKind, documentKey],
+  )
 
   return (
     <EditorUiContext value={ui}>
       {/* Its own provider: the editor renders outside the admin shell. */}
       <TooltipProvider delayDuration={300}>
-        <EditorLayout autosave={autosave} canPublish={canPublish} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
+        <EditorLayout autosave={autosave} canPublish={canPublish} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
         <DeleteConfirm id={deleteId} onClose={() => setDeleteId(null)} />
       </TooltipProvider>
     </EditorUiContext>
@@ -154,12 +162,21 @@ function DeleteConfirm({ id, onClose }: { id: string | null; onClose: () => void
 type LayoutProps = {
   autosave: Autosave
   canPublish: boolean
+  canCustomHtml: boolean
   canvasContext: CanvasContext
   registry: ElementsMetadata
   queryClient: ReturnType<typeof useQueryClient>
 }
 
-function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClient }: LayoutProps) {
+/** Where a published header, footer or zone can be seen on the store (version history's "View"). */
+function livePath(doc: { kind: string; key: string; path: string | null }): string | null {
+  if (doc.path) return doc.path
+  if (doc.kind === 'header' || doc.kind === 'footer') return '/'
+  if (doc.key === 'zone:listing.top' || doc.key === 'zone:listing.bottom') return '/shop'
+  return null
+}
+
+function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, registry, queryClient }: LayoutProps) {
   const store = useEditorStoreApi()
   const commands = useCommands()
   const content = useEditor((s) => s.content)
@@ -173,6 +190,10 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
   const select = useEditor((s) => s.select)
   const setHover = useEditor((s) => s.setHover)
   const { canvas } = useEditorUi()
+  // B4: what this document is (page, header, footer, zone) and which elements it may hold.
+  const info = useMemo(() => kindInfo(documentInfo), [documentInfo])
+  const context = elementContext(documentInfo)
+  const surroundings = documentInfo.kind === 'zone' ? (documentInfo.key as 'zone:listing.top') : documentInfo.kind === 'header' || documentInfo.kind === 'footer' ? documentInfo.kind : 'page'
 
   const [tab, setTab] = useState<'add' | 'layers'>('add')
   const [publishOpen, setPublishOpen] = useState(false)
@@ -385,7 +406,7 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
     } catch (error) {
       if (error instanceof ApiError && error.status === 422) {
         if (error.code === 'DOCUMENT_INVALID') store.getState().setErrors(problemsByNode(error))
-        setPublishError(error.code === 'DOCUMENT_EMPTY' ? 'Add something to the page before publishing it.' : error.message)
+        setPublishError(error.code === 'DOCUMENT_EMPTY' ? `Add something to the ${info.noun} before publishing it.` : error.message)
       } else setPublishError(error instanceof Error ? error.message : 'Could not publish.')
     } finally {
       setPublishPending(false)
@@ -494,6 +515,8 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
   const selectedNode = selectedInfo?.node ?? null
   const inspectorDocument = {
     id: documentInfo.id,
+    kind: documentInfo.kind,
+    key: documentInfo.key,
     title: documentInfo.title,
     path: documentInfo.path,
     published: documentInfo.published ? { number: documentInfo.published.number, published_at: documentInfo.published.published_at ?? '' } : null,
@@ -526,7 +549,7 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
                 <TabsTrigger value="layers">Layers</TabsTrigger>
               </TabsList>
               <TabsContent value="add" className="flex min-h-0 flex-1 flex-col">
-                <AddPanel registry={registry} />
+                <AddPanel registry={registry} context={context} canCustomHtml={canCustomHtml} />
               </TabsContent>
               <TabsContent value="layers" className="flex min-h-0 flex-1 flex-col">
                 <LayersPanel indicator={layerDrop?.indicator ?? null} />
@@ -534,7 +557,14 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
             </Tabs>
           </nav>
           <main aria-label="Page canvas" className="flex min-w-0 flex-1 flex-col" data-canvas-keys>
+            {info.placement && (
+              <p role="note" data-testid="document-placement" className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
+                <InfoIcon className="size-4 shrink-0" aria-hidden /> {info.placement}
+              </p>
+            )}
             <CanvasFrame
+              surroundings={surroundings}
+              emptyText={info.empty}
               bootstrap={canvasContext.bootstrap}
               locale={EDITOR_LOCALE}
               sections={sections}
@@ -569,6 +599,7 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
               onChange={(next, options) => store.getState().apply((c) => setNode(c, next), { coalesceKey: options?.coalesceKey, media: options?.media })}
               device={device}
               theme={inspectorTheme}
+              canCustomHtml={canCustomHtml}
               onCommand={(command) => {
                 const state = store.getState()
                 switch (command.type) {
@@ -611,7 +642,7 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
         open={historyOpen}
         onOpenChange={setHistoryOpen}
         liveVersionId={documentInfo.published?.version_id ?? null}
-        liveUrl={canvasContext.store_url ? `${canvasContext.store_url}${documentInfo.path}` : null}
+        liveUrl={canvasContext.store_url && livePath(documentInfo) ? `${canvasContext.store_url}${livePath(documentInfo)}` : null}
         canRestore
         onRestore={restore}
       />

@@ -175,19 +175,7 @@ class CatalogReadModel
      */
     public function sitemapProducts(): array
     {
-        $org = $this->organizationId();
-        $now = now();
-        $rows = DB::table('product_listings as pl')
-            ->join('products as p', 'p.id', '=', 'pl.product_id')
-            ->where('pl.organization_id', $org)
-            ->where('p.organization_id', $org)
-            ->whereNull('p.deleted_at')
-            ->where('p.is_active', true)
-            ->where('pl.is_published', true)
-            ->where(fn (QueryBuilder $q) => $q->whereNull('pl.published_at')->orWhere('pl.published_at', '<=', $now))
-            ->where(fn (QueryBuilder $q) => $q->whereNull('pl.unpublished_at')->orWhere('pl.unpublished_at', '>', $now))
-            ->whereExists(fn (QueryBuilder $s) => $s->from('product_variants as v')
-                ->whereColumn('v.product_id', 'p.id')->where('v.organization_id', $org)->whereNull('v.deleted_at')->where('v.is_active', true))
+        $rows = $this->liveListings()
             ->orderBy('pl.slug')
             ->get(['pl.product_id', 'pl.slug', 'pl.updated_at', 'p.updated_at as product_updated_at', 'p.name']);
 
@@ -199,6 +187,39 @@ class CatalogReadModel
             'updated_at' => self::earliest([$row->updated_at, $row->product_updated_at], latest: true),
             'image_url' => $images[$row->product_id][0]['url'] ?? null,
         ])->all();
+    }
+
+    /**
+     * B4: the slug of the live product whose listing changed last, or null (store builder
+     * preview of the product page zone).
+     */
+    public function latestProductSlug(): ?string
+    {
+        $slug = $this->liveListings()->orderByDesc('pl.updated_at')->orderBy('pl.slug')->value('pl.slug');
+
+        return $slug === null ? null : (string) $slug;
+    }
+
+    /**
+     * Listings of live products (published, inside their schedule, an active product with an
+     * active variant), as `pl` joined to `p`.
+     */
+    private function liveListings(): QueryBuilder
+    {
+        $org = $this->organizationId();
+        $now = now();
+
+        return DB::table('product_listings as pl')
+            ->join('products as p', 'p.id', '=', 'pl.product_id')
+            ->where('pl.organization_id', $org)
+            ->where('p.organization_id', $org)
+            ->whereNull('p.deleted_at')
+            ->where('p.is_active', true)
+            ->where('pl.is_published', true)
+            ->where(fn (QueryBuilder $q) => $q->whereNull('pl.published_at')->orWhere('pl.published_at', '<=', $now))
+            ->where(fn (QueryBuilder $q) => $q->whereNull('pl.unpublished_at')->orWhere('pl.unpublished_at', '>', $now))
+            ->whereExists(fn (QueryBuilder $s) => $s->from('product_variants as v')
+                ->whereColumn('v.product_id', 'p.id')->where('v.organization_id', $org)->whereNull('v.deleted_at')->where('v.is_active', true));
     }
 
     /**

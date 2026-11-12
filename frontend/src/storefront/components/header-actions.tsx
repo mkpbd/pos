@@ -38,7 +38,13 @@ export function HeaderActions({ cartTotal = false, className }: { cartTotal?: bo
   )
 }
 
-function AccountMenu() {
+/** How a header action shows its text: from `lg` (the theme headers), always, or never (the builder's `show_label`). */
+export type ActionLabel = 'responsive' | 'always' | 'never'
+
+const LABEL_CLASS: Record<ActionLabel, string> = { responsive: 'hidden lg:inline', always: 'inline', never: 'hidden' }
+const LABEL_BUTTON: Record<ActionLabel, string> = { responsive: 'lg:flex lg:w-auto lg:gap-2 lg:px-2', always: 'flex w-auto gap-2 px-2', never: '' }
+
+export function AccountMenu({ label = 'responsive' }: { label?: ActionLabel }) {
   const customer = useCustomer()
   const logout = useLogoutMutation()
   const notify = useNotice()
@@ -46,9 +52,9 @@ function AccountMenu() {
 
   if (!customer) {
     return (
-      <Link to="/account/login" className={cn(iconButton, 'lg:flex lg:w-auto lg:gap-2 lg:px-2')} aria-label={t('common.account.signIn')}>
+      <Link to="/account/login" className={cn(iconButton, LABEL_BUTTON[label])} aria-label={t('common.account.signIn')}>
         <UserIcon aria-hidden className="size-6" />
-        <span aria-hidden className="hidden text-sm font-semibold lg:inline">{t('common.account.signIn')}</span>
+        <span aria-hidden className={cn('text-sm font-semibold', LABEL_CLASS[label])}>{t('common.account.signIn')}</span>
       </Link>
     )
   }
@@ -63,9 +69,9 @@ function AccountMenu() {
 
   return (
     <DropdownMenu modal={false}>
-      <DropdownMenuTrigger className={cn(iconButton, 'lg:flex lg:w-auto lg:gap-2 lg:px-2')} aria-label={t('common.account.myAccount')}>
+      <DropdownMenuTrigger className={cn(iconButton, LABEL_BUTTON[label])} aria-label={t('common.account.myAccount')}>
         <UserIcon aria-hidden className="size-6" />
-        <span aria-hidden className="hidden max-w-32 truncate text-sm font-semibold lg:inline">{first}</span>
+        <span aria-hidden className={cn('max-w-32 truncate text-sm font-semibold', LABEL_CLASS[label])}>{first}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-sf-surface">
         <DropdownMenuLabel className="truncate text-sf-heading">{customer.name}</DropdownMenuLabel>
@@ -100,19 +106,31 @@ function AccountMenu() {
   )
 }
 
-function WishlistLink() {
+export function WishlistLink({ label = 'never' }: { label?: ActionLabel }) {
   const wishlist = useWishlist()
   const { t } = useLocale()
   const count = String(wishlist.count)
   return (
-    <Link to="/wishlist" className={iconButton} aria-label={count === '0' ? t('common.wishlist') : t('common.wishlistWithCount', { items: t('common.items', { count: Number(count) }) })}>
-      <HeartIcon aria-hidden className="size-6" />
-      <CountBadge count={count} testId="wishlist-count" />
+    <Link to="/wishlist" className={cn(iconButton, LABEL_BUTTON[label])} aria-label={count === '0' ? t('common.wishlist') : t('common.wishlistWithCount', { items: t('common.items', { count: Number(count) }) })}>
+      {label === 'never' ? (
+        <>
+          <HeartIcon aria-hidden className="size-6" />
+          <CountBadge count={count} testId="wishlist-count" />
+        </>
+      ) : (
+        <>
+          <span className="relative grid size-8 place-items-center">
+            <HeartIcon aria-hidden className="size-6" />
+            <CountBadge count={count} testId="wishlist-count" />
+          </span>
+          <span aria-hidden className={cn('text-sm font-semibold', LABEL_CLASS[label])}>{t('common.wishlist')}</span>
+        </>
+      )}
     </Link>
   )
 }
 
-function CartButton() {
+export function CartButton({ showCount = true }: { showCount?: boolean }) {
   const cart = useCartQuery()
   const drawer = useCartDrawer()
   const { t } = useLocale()
@@ -120,13 +138,13 @@ function CartButton() {
   return (
     <button type="button" className={iconButton} aria-label={count === '0' ? t('common.cart') : t('common.cartWithCount', { items: t('common.items', { count: Number(count) }) })} aria-haspopup="dialog" onClick={() => drawer?.open()}>
       <ShoppingBagIcon aria-hidden className="size-6" />
-      <CountBadge count={count} testId="cart-count" />
+      {showCount && <CountBadge count={count} testId="cart-count" />}
     </button>
   )
 }
 
 /** The cart with its item count and total ("Cart, 2 items, ৳900.00"), for the commerce header. */
-function CartTotalButton() {
+export function CartTotalButton({ showCount = true }: { showCount?: boolean }) {
   const cart = useCartQuery()
   const drawer = useCartDrawer()
   const format = usePriceFormat()
@@ -144,7 +162,7 @@ function CartTotalButton() {
     >
       <span className="relative grid size-10 place-items-center group-hover/cart:text-sf-accent">
         <ShoppingBagIcon aria-hidden className="size-6" />
-        <CountBadge count={count} testId="cart-count" />
+        {showCount && <CountBadge count={count} testId="cart-count" />}
       </span>
       <span aria-hidden className="flex flex-col items-start leading-tight">
         <span className="text-[0.7rem] font-medium tracking-wide text-sf-text uppercase">{t('common.cart')}</span>

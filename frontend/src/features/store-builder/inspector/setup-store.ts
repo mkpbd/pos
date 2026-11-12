@@ -4,10 +4,11 @@
  * providers: query client, router, tooltips).
  */
 
-import type { WrappedElement } from '@/storefront/builder/types'
+import type { DocumentContext, Element } from '@/storefront/builder/types'
 import type { BuilderNode } from './types'
 
-export type SetupRequest = { node: WrappedElement; label: string; resolve: (node: BuilderNode | null) => void }
+/** A new element to set up: a wrapped section or a B4 element (with the document context its form needs). */
+export type SetupRequest = { node: Element; label: string; context: DocumentContext; resolve: (node: BuilderNode | null) => void }
 export type SetupSnapshot = { request: SetupRequest | null; host: number | null }
 
 let snapshot: SetupSnapshot = { request: null, host: null }
@@ -45,13 +46,13 @@ export function registerSetupHost(id: number): () => void {
 }
 
 /** Opens the setup dialog for the node; resolves with the configured node or null (cancelled). */
-export function requestSetup(node: WrappedElement, label: string): Promise<BuilderNode | null> {
+export function requestSetup(node: Element, label: string, context: DocumentContext = 'page'): Promise<BuilderNode | null> {
   if (hosts.length === 0) {
     console.warn(`createElement(${node.type}): the Inspector is not mounted, so the setup dialog can't open.`)
     return Promise.resolve(null)
   }
   snapshot.request?.resolve(null)
-  return new Promise((resolve) => update({ request: { node, label, resolve } }))
+  return new Promise((resolve) => update({ request: { node, label, context, resolve } }))
 }
 
 export function finishSetup(node: BuilderNode | null) {

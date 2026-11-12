@@ -5,10 +5,10 @@
  */
 
 import { elementMeta, isWrappedSectionType, type ElementMeta } from '@/storefront/builder/registry'
-import type { Column, Element, InnerRowElement, WrappedElement } from '@/storefront/builder/types'
+import type { Column, DocumentContext, Element, InnerRowElement, WrappedElement } from '@/storefront/builder/types'
 import { requestSetup } from './setup-store'
 import type { BuilderNode, ElementsMetadata } from './types'
-import { validateNode } from './validate'
+import { B4_TYPES, validateNode } from './validate'
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -35,15 +35,21 @@ function metaOf(type: string, registry: ElementsMetadata): ElementMeta | undefin
   return registry.types?.find((t) => t.type === type) ?? elementMeta(type)
 }
 
+/** B4: starting props that depend on where the element goes (a footer menu is a list). */
+function contextProps(type: string, context: DocumentContext | undefined): Record<string, unknown> {
+  if (type === 'menu' && context === 'footer') return { layout: 'vertical', show_children: 'list' }
+  return {}
+}
+
 /** A new element of the type with registry defaults and fresh ids; null for an unknown type. */
-export function buildElement(type: string, registry: ElementsMetadata, existingIds: Set<string>): Element | null {
+export function buildElement(type: string, registry: ElementsMetadata, existingIds: Set<string>, context?: DocumentContext): Element | null {
   const meta = metaOf(type, registry)
   if (!meta || type === 'section' || type === 'column') return null
   const taken = new Set(existingIds)
   const node = {
     id: newId('e', taken),
     type: meta.type,
-    props: { ...structuredClone(meta.props), ...structuredClone(STARTING_PROPS[type] ?? {}) },
+    props: { ...structuredClone(meta.props), ...structuredClone(STARTING_PROPS[type] ?? {}), ...contextProps(type, context) },
     style: {},
     visibility: { desktop: true, tablet: true, mobile: true },
     hidden: false,
@@ -57,15 +63,19 @@ export function buildElement(type: string, registry: ElementsMetadata, existingI
   return node as unknown as Element
 }
 
-/** Wrapped sections whose default content isn't valid yet (e.g. a hero slider without banners). */
-export function needsSetup(node: Element): node is WrappedElement {
-  return isWrappedSectionType(node.type) && validateNode(node).length > 0
+/**
+ * Elements whose default content isn't valid yet: wrapped sections (a hero slider without
+ * banners) and B4 elements that need something chosen first (a video's link, a promoted
+ * product, a countdown's end, a discount's promotion, a menu).
+ */
+export function needsSetup(node: Element): node is WrappedElement | Element {
+  return (isWrappedSectionType(node.type) || B4_TYPES.has(node.type)) && validateNode(node).length > 0
 }
 
 /** A new element of the type with fresh ids, or null when the user cancels its setup dialog. */
-export async function createElement(type: string, ctx: { registry: ElementsMetadata; existingIds: Set<string> }): Promise<BuilderNode | null> {
-  const node = buildElement(type, ctx.registry, ctx.existingIds)
+export async function createElement(type: string, ctx: { registry: ElementsMetadata; existingIds: Set<string>; context?: DocumentContext }): Promise<BuilderNode | null> {
+  const node = buildElement(type, ctx.registry, ctx.existingIds, ctx.context)
   if (!node) return null
   if (!needsSetup(node)) return node
-  return requestSetup(node, metaOf(type, ctx.registry)?.label ?? type)
+  return requestSetup(node, metaOf(type, ctx.registry)?.label ?? type, ctx.context ?? 'page')
 }

@@ -2386,6 +2386,28 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
 | PATCH `/storefront/builder/documents/{id}` | manage | B2. `{title}` (1–160) → document (revision unchanged); audited `storefront.builder_renamed`. Summaries also carry `path` (`/` or `/p/<slug>`) and `preview_url` (or null without a domain). |
 | GET `/store/builder/pages/home`, `/store/builder/pages/{slug}` | public | Published render payload. `404 PAGE_NOT_FOUND`. `?preview=draft` for signed-in staff with `storefront.view` → the draft with `state` on non-live nodes, `no-store`. Otherwise ETag / 304 like `/store/homepage`. |
 
+**Content pages, header, footer, zones and more elements (B4).**
+- **Kinds and keys:**
+  - `POST /storefront/builder/documents` also takes `kind` `header` (key `header`), `footer` (`footer`), `zone` (`zone:listing.top`, `zone:listing.bottom`, `zone:product.after`) and `page` with `cms:<cms_page_uuid>`.
+  - `from`: `cms` (cms keys; imports the page's text plus `faq_list` or `contact_form`) or `current` (header and footer).
+  - Errors: 422 `CMS_PAGE_NOT_FOUND`; 409 `DOCUMENT_EXISTS`.
+- **Summaries** add `cms_page {id, title, slug, status, template} | null`. `path` is null for header, footer and zones. `preview_url` per kind: header and footer → `/?preview=draft`; listing zones → `/shop?preview=draft`; product zone → a live product.
+- **Elements:**
+  - Every type carries `allowed_in` (`page|cms|header|footer|zone`) and `has_data`, plus `enums.icons` (20 names) and `limits.translatable`.
+  - A type outside its contexts → 422 `DOCUMENT_INVALID`, `code: ELEMENT_NOT_ALLOWED`.
+  - Adding or changing `custom_html` without `storefront.custom_html` → 403 `CUSTOM_HTML_FORBIDDEN` with `details.errors[]`.
+- **`POST /storefront/builder/resolve`** also accepts `{id, type, props, translations}` for `countdown`, `discount`, `promo_card`, `menu`, `faq_list` and `contact_form`. It returns the draft data, with `state: expired|inactive|unavailable` where relevant.
+- **`data[id]` shapes:**
+  - countdown `{ends_at, title, promotion: {id, name}|null}`
+  - discount `{name, kind, value, coupon_code|null, min_subtotal, ends_at}` (`coupon_code` only when `show_code`)
+  - promo_card: the catalog product card
+  - menu `{name, items}`
+  - faq_list `{groups: [{group, items: [{id, question, answer_html}]}]}`
+- **Storefront:**
+  - Bootstrap `builder: {home: bool, header, footer, zones: {listing.top, listing.bottom, product.after}}`, each a render payload or null; drafts for staff with `?preview=draft`.
+  - `GET /store/pages/{slug}` adds `builder: payload|null`.
+  - Theme `layout.listing_columns {desktop 3|4|5, tablet 2|3|4, mobile 1|2}` (default 3 / 3 / 2).
+
 **Theme draft → publish (B3).** Under `/storefront/theme`:
 
 | Method & path | Permission | Notes |

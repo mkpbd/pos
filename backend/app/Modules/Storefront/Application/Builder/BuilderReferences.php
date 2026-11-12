@@ -7,18 +7,22 @@ use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
+use App\Modules\Promotions\Application\Contracts\PromotionShowcase;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
 use App\Modules\Storefront\Domain\Builder\StyleSchema;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
+use App\Modules\Storefront\Infrastructure\Models\Menu;
 
 /**
  * Ownership of the ids a (normalized) builder document refers to, for the current
  * organization (B1): media (image elements, background images, testimonial photos and the
  * newsletter image), banners of the right placement, hand-picked products / categories /
- * brands, category sources, the hot-deals promotion and the blog category. Another
+ * brands, category sources, the hot-deals promotion and the blog category; B4: the countdown's
+ * promotion (a countdown promotion), the discount's promotion (percent / fixed), the promoted
+ * product and the menu of a menu element. Another
  * organization's id is reported exactly like a missing one: 422 DOCUMENT_INVALID with the
  * node id, path, a code and the ids.
  */
@@ -32,6 +36,9 @@ class BuilderReferences
         'BRAND_NOT_FOUND' => 'Some selected brands no longer exist.',
         'PROMOTION_NOT_FOUND' => 'Choose an automatic promotion with a countdown (a flash sale).',
         'BLOG_CATEGORY_NOT_FOUND' => 'The selected blog category no longer exists.',
+        // B4.
+        'DISCOUNT_NOT_FOUND' => 'Choose a percentage or fixed-amount promotion.',
+        'MENU_NOT_FOUND' => 'The selected menu no longer exists.',
     ];
 
     public function __construct(
@@ -39,6 +46,7 @@ class BuilderReferences
         private readonly StorefrontCatalog $catalog,
         private readonly CatalogPromotions $promotions,
         private readonly BlogDirectory $blog,
+        private readonly PromotionShowcase $showcase,
     ) {}
 
     /**
@@ -66,6 +74,14 @@ class BuilderReferences
             if ($node['type'] === 'image') {
                 $use('MEDIA_NOT_FOUND', "{$path}.props.media_id", $node['id'], [$props['media_id']]);
             }
+            // B4 elements.
+            match ($node['type']) {
+                'countdown' => $use('PROMOTION_NOT_FOUND', "{$path}.props.promotion_id", $node['id'], [$props['promotion_id']]),
+                'discount' => $use('DISCOUNT_NOT_FOUND', "{$path}.props.promotion_id", $node['id'], [$props['promotion_id']]),
+                'promo_card' => $use('PRODUCT_NOT_FOUND', "{$path}.props.product_id", $node['id'], [$props['product_id']]),
+                'menu' => $use('MENU_NOT_FOUND', "{$path}.props.menu_id", $node['id'], [$props['menu_id']]),
+                default => null,
+            };
             $type = ElementRegistry::sectionType($node['type']);
             if ($type === null) {
                 return;
@@ -122,6 +138,8 @@ class BuilderReferences
             'BRAND_NOT_FOUND' => $this->catalog->existing('brand', $ids),
             'PROMOTION_NOT_FOUND' => array_values(array_filter($ids, fn (string $id) => $this->promotions->isCountdownPromotion($id))),
             'BLOG_CATEGORY_NOT_FOUND' => $this->blog->existing(BlogReferences::CATEGORY, $ids),
+            'DISCOUNT_NOT_FOUND' => array_keys($this->showcase->discounts($ids)),
+            'MENU_NOT_FOUND' => Menu::query()->whereIn('id', $ids)->pluck('id')->all(),
         };
     }
 }

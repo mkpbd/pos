@@ -10,7 +10,9 @@ use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
 /**
  * A builder document as it is stored (B1): normalized by the schema, rich text sanitized
  * with the HtmlSanitizer (text elements' `html`, text blocks' `body_html` and their
- * translations), then checked for references the organization owns.
+ * translations; B4: custom HTML elements' `html` — the same whitelist, so no scripts, event
+ * handlers, iframes, style/link tags, classes or ids), then checked for references the
+ * organization owns. B4: `$context` is the document context (which elements are allowed).
  */
 class PrepareBuilderContent
 {
@@ -25,9 +27,9 @@ class PrepareBuilderContent
      *
      * @throws InvalidBuilderDocument
      */
-    public function __invoke(array $content): array
+    public function __invoke(array $content, string $context = 'page'): array
     {
-        $document = $this->sanitized($content);
+        $document = $this->sanitized($content, $context);
         $this->references->check($document);
 
         return $document;
@@ -42,9 +44,9 @@ class PrepareBuilderContent
      *
      * @throws InvalidBuilderDocument
      */
-    public function sanitized(array $content): array
+    public function sanitized(array $content, string $context = 'page'): array
     {
-        $document = BuilderDocumentSchema::normalize($content);
+        $document = BuilderDocumentSchema::normalize($content, $context);
 
         $errors = [];
         foreach ($document['sections'] as $i => $section) {
@@ -75,6 +77,10 @@ class PrepareBuilderContent
                 $node['props']['config'][$field] = $html;
             } else {
                 $node['props'][$field] = $this->sanitizer->clean((string) $node['props'][$field]);
+                // B4: custom HTML that is all scripts, frames, styles or event handlers is nothing.
+                if ($type === 'custom_html' && trim(strip_tags($node['props'][$field], '<img><hr><br>')) === '') {
+                    $errors[] = ['path' => "{$path}.props.{$field}", 'node_id' => $node['id'], 'message' => 'The custom HTML has no content left after removing unsupported tags (scripts, frames, styles and event handlers are not allowed).'];
+                }
             }
             foreach ($node['translations'] as $locale => $texts) {
                 if (! isset($texts[$field])) {

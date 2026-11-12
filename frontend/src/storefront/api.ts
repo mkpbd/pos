@@ -16,6 +16,8 @@ export const storefrontKeys = {
   homepage: (preview: boolean) => ['store', 'homepage', { preview }] as const,
   homepageAll: ['store', 'homepage'] as const,
   page: (slug: string) => ['store', 'pages', slug] as const,
+  /** B4: a staff draft preview (`?preview=draft`) of a CMS page is cached apart from the published one. */
+  pageFor: (slug: string, draft: boolean) => (draft ? (['store', 'pages', slug, { draft: true }] as const) : (['store', 'pages', slug] as const)),
 }
 
 /**
@@ -108,12 +110,14 @@ export function useHomepageQuery(preview: boolean) {
   })
 }
 
-export function useStorePageQuery(slug: string) {
+/** A CMS page. `draft` (staff `?preview=draft`): its builder draft instead of the published builder document. */
+export function useStorePageQuery(slug: string, draft = false) {
   const { locale } = useLocale()
   return useQuery({
-    queryKey: localized(storefrontKeys.page(slug), locale),
-    queryFn: ({ signal }) => storeApi.get<StorePage>(`/store/pages/${encodeURIComponent(slug)}`, { signal }).then((r) => r.data),
-    staleTime: 60_000,
+    queryKey: localized(storefrontKeys.pageFor(slug, draft), locale),
+    queryFn: ({ signal }) =>
+      storeApi.get<StorePage>(`/store/pages/${encodeURIComponent(slug)}`, { signal, query: draft ? { preview: 'draft' } : undefined }).then((r) => r.data),
+    staleTime: draft ? 0 : 60_000,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   })
 }

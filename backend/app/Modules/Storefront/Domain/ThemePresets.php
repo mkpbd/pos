@@ -30,6 +30,8 @@ final class ThemePresets
     public static function all(): array
     {
         $defaults = ThemeSchema::defaults();
+        // B4: presets do not set the products per row on listings (owner content).
+        unset($defaults['layout']['listing_columns']);
 
         return [
             'default' => array_intersect_key($defaults, array_flip(self::PRESENTATION_KEYS)),
@@ -174,14 +176,19 @@ final class ThemePresets
 
     /**
      * The theme with the preset's presentation values over it; content (logo, favicon,
-     * announcement, footer) is kept.
+     * announcement, footer) is kept — B4: and the products per row on listings
+     * (`layout.listing_columns`), which presets do not set.
      *
      * @param  array<string, mixed>  $settings  the current theme
      * @return array<string, mixed>
      */
     public static function apply(string $preset, array $settings): array
     {
-        return array_replace(ThemeSchema::normalize($settings), self::all()[self::assertKnown($preset)]);
+        $current = ThemeSchema::normalize($settings);
+        $result = array_replace($current, self::all()[self::assertKnown($preset)]);
+        $result['layout']['listing_columns'] = $current['layout']['listing_columns'];
+
+        return $result;
     }
 
     /**

@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { ExternalLinkIcon, FilePlusIcon, HouseIcon, Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { FilePlusIcon, HouseIcon, Loader2Icon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -14,61 +13,41 @@ import { useCan } from '@/features/auth/use-auth'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { ApiError } from '@/lib/api/client'
 import { documentPath, useCreateDocumentMutation, useDeleteDocumentMutation, useDocumentsQuery, type DocumentSummary } from '../api'
-import { formatDateTime } from '../format'
-import { liveUrl, slugify, slugProblem } from './page-helpers'
+import { CmsPagesCard, SitePartsCard, ZonesCard, type RemoveRequest } from './builder-parts'
+import { ListingColumnsCard } from './listing-columns-card'
+import { lastEdited, slugify, slugProblem } from './page-helpers'
+import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
 
 /*
- * Online store → Page builder (/admin/storefront/pages): the home page and landing pages built
- * with the visual builder, their status, and creating / deleting them.
+ * Online store → Page builder (/admin/storefront/pages), in three groups (B4):
+ *  - Pages: the home page, content pages (CMS) designed with the builder, landing pages;
+ *  - Site parts: the store's header and footer;
+ *  - Shop and product pages: the areas around the product grid / below the product details, and
+ *    the products per row of the listings (theme `layout.listing_columns`).
+ * Status, creating, editing and deleting (back to the classic rendering) for each.
  */
-
-function StatusBadges({ summary }: { summary: DocumentSummary }) {
-  if (!summary.published) return <Badge variant="soft">Not published</Badge>
-  return (
-    <span className="flex flex-wrap items-center gap-1.5">
-      <Badge variant="success">
-        Published v{summary.published.number}
-        {summary.published.published_at && ` · ${new Date(summary.published.published_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}`}
-      </Badge>
-      {summary.has_unpublished_changes && <Badge variant="warning">Unpublished changes</Badge>}
-    </span>
-  )
-}
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
   const path = documentPath(summary)
-  const view = summary.published ? liveUrl(summary) : null
   return (
-    <li className="flex flex-wrap items-center gap-3 py-3" data-testid={`page-row-${summary.key}`}>
-      <div className="min-w-0 flex-1">
-        <p className="font-medium">{summary.title}</p>
-        <p className="text-sm text-muted-foreground">
-          <span className="font-mono">{path}</span> · Last edited {formatDateTime(summary.draft_updated_at)}
-        </p>
-      </div>
-      <StatusBadges summary={summary} />
-      <div className="flex items-center gap-1">
-        {canManage && (
-          <Button variant="outline" size="sm" asChild>
-            <Link to={`/storefront/builder/${summary.id}`} aria-label={`Edit ${summary.title}`}>
-              <PencilIcon aria-hidden /> Edit
-            </Link>
-          </Button>
-        )}
-        {view && (
-          <Button variant="ghost" size="sm" asChild>
-            <a href={view} target="_blank" rel="noopener noreferrer" aria-label={`View ${summary.title} on your store (opens in a new tab)`}>
-              <ExternalLinkIcon aria-hidden /> View
-            </a>
-          </Button>
-        )}
-        {canManage && onDelete && (
-          <Button variant="ghost" size="icon-sm" aria-label={`Delete ${summary.title}`} title="Delete this page" onClick={onDelete}>
-            <Trash2Icon />
-          </Button>
-        )}
-      </div>
-    </li>
+    <ListRow
+      testId={`page-row-${summary.key}`}
+      title={summary.title}
+      detail={
+        <>
+          <span className="font-mono">{path}</span> · {lastEdited(summary)}
+        </>
+      }
+      status={<StatusBadges summary={summary} />}
+    >
+      {canManage && <EditLink summary={summary} name={summary.title} />}
+      <ViewLink summary={summary} name={summary.title} />
+      {canManage && onDelete && (
+        <Button variant="ghost" size="icon-sm" aria-label={`Delete ${summary.title}`} title="Delete this page" onClick={onDelete}>
+          <Trash2Icon />
+        </Button>
+      )}
+    </ListRow>
   )
 }
 
@@ -212,17 +191,41 @@ function HomeCard({ home, canManage }: { home: DocumentSummary | undefined; canM
   )
 }
 
+function GroupHeading({ id, title, description }: { id: string; title: string; description: string }) {
+  return (
+    <div>
+      <h2 id={id} className="text-lg font-semibold">{title}</h2>
+      <p className="text-sm text-muted-foreground">{description}</p>
+    </div>
+  )
+}
+
 export function StoreBuilderPagesPage() {
   const can = useCan()
   const canManage = can('storefront.manage')
+  const canPublish = can('storefront.publish')
+  const canManageContent = can('cms.manage')
   const documents = useDocumentsQuery()
   const remove = useDeleteDocumentMutation()
   const [creating, setCreating] = useState(false)
-  const [deleting, setDeleting] = useState<DocumentSummary | null>(null)
+  const [removing, setRemoving] = useState<RemoveRequest | null>(null)
 
-  const pages = documents.data?.filter((d) => d.kind === 'page') ?? []
+  const all = documents.data ?? []
+  const pages = all.filter((d) => d.kind === 'page')
   const home = pages.find((d) => d.key === 'home')
   const landings = pages.filter((d) => d.key.startsWith('landing:')).sort((a, b) => a.title.localeCompare(b.title))
+  const cmsDocs = pages.filter((d) => d.key.startsWith('cms:'))
+  const parts = all.filter((d) => d.kind === 'header' || d.kind === 'footer')
+  const zones = all.filter((d) => d.kind === 'zone')
+
+  const deleteLanding = (summary: DocumentSummary) =>
+    setRemoving({
+      summary,
+      title: `Delete “${summary.title}”?`,
+      description: 'The page, its draft and all its versions are deleted. If it is published, its address stops working.',
+      confirmLabel: 'Delete page',
+      done: 'Page deleted.',
+    })
 
   return (
     <div className="flex flex-col gap-6">
@@ -233,47 +236,62 @@ export function StoreBuilderPagesPage() {
         <ErrorState title="Could not load your pages" error={documents.error} onRetry={() => void documents.refetch()} />
       ) : (
         <>
-          <HomeCard home={home} canManage={canManage} />
-          <Card>
-            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle>Landing pages</CardTitle>
-                <CardDescription>Pages for campaigns and collections, each at /p/&lt;address&gt;.</CardDescription>
-              </div>
-              {canManage && (
-                <Button onClick={() => setCreating(true)}>
-                  <PlusIcon aria-hidden /> New landing page
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {landings.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No landing pages yet.</p>
-              ) : (
-                <ul className="divide-y" aria-label="Landing pages">
-                  {landings.map((summary) => (
-                    <PageRow key={summary.id} summary={summary} canManage={canManage} onDelete={() => setDeleting(summary)} />
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          <section aria-labelledby="group-pages" className="flex flex-col gap-4">
+            <GroupHeading id="group-pages" title="Pages" description="Your front page, content pages and landing pages." />
+            <HomeCard home={home} canManage={canManage} />
+            <CmsPagesCard documents={cmsDocs} canManage={canManage} canManageContent={canManageContent} onRemove={setRemoving} />
+            <Card>
+              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Landing pages</CardTitle>
+                  <CardDescription>Pages for campaigns and collections, each at /p/&lt;address&gt;.</CardDescription>
+                </div>
+                {canManage && (
+                  <Button onClick={() => setCreating(true)}>
+                    <PlusIcon aria-hidden /> New landing page
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {landings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No landing pages yet.</p>
+                ) : (
+                  <ul className="divide-y" aria-label="Landing pages">
+                    {landings.map((summary) => (
+                      <PageRow key={summary.id} summary={summary} canManage={canManage} onDelete={() => deleteLanding(summary)} />
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+          <section aria-labelledby="group-parts" className="flex flex-col gap-4">
+            <GroupHeading id="group-parts" title="Site parts" description="The header and footer around every page of your store." />
+            <SitePartsCard documents={parts} canManage={canManage} onRemove={setRemoving} />
+          </section>
+          <section aria-labelledby="group-shop" className="flex flex-col gap-4">
+            <GroupHeading id="group-shop" title="Shop and product pages" description="Content around your product listings and product details, and how many products show per row." />
+            <ZonesCard documents={zones} canManage={canManage} onRemove={setRemoving}>
+              <ListingColumnsCard canManage={canManage} canPublish={canPublish} />
+            </ZonesCard>
+          </section>
         </>
       )}
       <NewLandingDialog open={creating} onOpenChange={setCreating} />
       <ConfirmDialog
-        open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title={`Delete “${deleting?.title ?? ''}”?`}
-        description="The page, its draft and all its versions are deleted. If it is published, its address stops working."
-        confirmLabel="Delete page"
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        title={removing?.title ?? ''}
+        description={removing?.description ?? ''}
+        confirmLabel={removing?.confirmLabel ?? 'Delete'}
         pending={remove.isPending}
         onConfirm={() => {
-          if (!deleting) return
-          remove.mutate(deleting.id, {
+          if (!removing) return
+          const done = removing.done
+          remove.mutate(removing.summary.id, {
             onSuccess: () => {
-              toast.success('Page deleted.')
-              setDeleting(null)
+              toast.success(done)
+              setRemoving(null)
             },
             onError: (error) => toast.error(error.message),
           })

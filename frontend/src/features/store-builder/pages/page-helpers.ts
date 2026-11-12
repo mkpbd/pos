@@ -1,4 +1,5 @@
 import type { DocumentSummary } from '../api'
+import { formatDateTime } from '../format'
 
 const SLUG = /^[a-z0-9-]{2,60}$/
 
@@ -31,3 +32,6 @@ export function liveUrl(summary: DocumentSummary): string | null {
     return null
   }
 }
+
+/** "Last edited 12 Nov 2026, 10:00" of a document. */
+export const lastEdited = (summary: DocumentSummary) => `Last edited ${formatDateTime(summary.draft_updated_at)}`

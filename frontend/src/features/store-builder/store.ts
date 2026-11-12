@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import type { BuilderContent, BuilderMedia, Device } from '@/storefront/builder/types'
-import type { DocumentDetail, Problem, PublishedRef } from './api'
+import { documentPath, type CmsPageRef, type DocumentDetail, type DocumentKind, type Problem, type PublishedRef } from './api'
 
 /*
  * The editor's state (one store per open document). Content edits go through `apply` with a pure
@@ -17,9 +17,13 @@ export const COALESCE_MS = 800
 
 export type EditorDocument = {
   id: string
+  /** B4: page, header, footer or zone. */
+  kind: DocumentKind
   key: string
   title: string
-  path: string
+  /** The store address; null for the header, footer and zones (they show on many pages). */
+  path: string | null
+  cms_page: CmsPageRef | null
   preview_url: string | null
   published: PublishedRef | null
 }
@@ -82,9 +86,18 @@ export type EditorActions = {
 
 export type EditorStore = StoreApi<EditorState & EditorActions>
 
-export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'>): EditorDocument {
-  const path = detail.path ?? (detail.key === 'home' ? '/' : detail.key.startsWith('landing:') ? `/p/${detail.key.slice(8)}` : '/')
-  return { id: detail.id, key: detail.key, title: detail.title, path, preview_url: detail.preview_url ?? null, published: detail.published }
+export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page'>>): EditorDocument {
+  const kind = detail.kind ?? 'page'
+  return {
+    id: detail.id,
+    kind,
+    key: detail.key,
+    title: detail.title,
+    path: documentPath({ ...detail, kind }),
+    cms_page: detail.cms_page ?? null,
+    preview_url: detail.preview_url ?? null,
+    published: detail.published,
+  }
 }
 
 export function createEditorStore(detail: DocumentDetail, now: () => number = Date.now): EditorStore {

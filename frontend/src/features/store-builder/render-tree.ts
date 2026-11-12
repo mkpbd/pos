@@ -1,7 +1,7 @@
 import { elementMeta, isWrappedSectionType } from '@/storefront/builder/registry'
 import type { BuilderContent, Column, Element, NodeState, RenderColumn, RenderElement, RenderSection, Schedule, Section } from '@/storefront/builder/types'
 import type { StoreSection } from '@/storefront/types'
-import type { ResolveElement } from './api'
+import type { ResolveDataElement, ResolveElement } from './api'
 
 /*
  * The draft as the canvas draws it (B2): the editor converts its content to the render-tree shape
@@ -22,6 +22,11 @@ function translated(node: AnyNode, locale: string): Record<string, unknown> {
     if (!translatable.includes(field) || typeof value !== 'string' || value === '') continue
     if (isWrappedSectionType(node.type) && field !== 'title' && field !== 'subtitle') {
       props.config = { ...(props.config as Record<string, unknown>), [field]: value }
+    } else if (field.includes('.')) {
+      // B4: a nested prop (`primary.label` of a call to action); an absent parent (no secondary button) stays absent.
+      const [parent, child] = field.split('.', 2) as [string, string]
+      const holder = props[parent]
+      if (holder && typeof holder === 'object') props[parent] = { ...(holder as Record<string, unknown>), [child]: value }
     } else {
       props[field] = value
     }
@@ -68,12 +73,16 @@ export function toRenderTree(content: BuilderContent, options: RenderTreeOptions
  * Wrapped elements and media for /builder/resolve
  * -------------------------------------------------------------------------------------------- */
 
+/** B4 elements whose `data[id]` comes from the server (the resolve takes their props). */
+export const DATA_ELEMENT_TYPES: ReadonlySet<string> = new Set(['countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'contact_form'])
+
+/** Elements the canvas needs server data for: wrapped homepage sections and the B4 data elements. */
 export function wrappedElements(content: BuilderContent): Element[] {
   const result: Element[] = []
   const visit = (columns: Column[]) => {
     for (const column of columns) {
       for (const element of column.elements) {
-        if (isWrappedSectionType(element.type)) result.push(element)
+        if (isWrappedSectionType(element.type) || DATA_ELEMENT_TYPES.has(element.type)) result.push(element)
         if ('columns' in element) visit(element.columns as Column[])
       }
     }
@@ -82,8 +91,9 @@ export function wrappedElements(content: BuilderContent): Element[] {
   return result
 }
 
-/** What /builder/resolve needs of a wrapped element. */
-export function resolveInput(element: Element): ResolveElement {
+/** What /builder/resolve needs of a wrapped element (B4 data elements: their props). */
+export function resolveInput(element: Element): ResolveElement | ResolveDataElement {
+  if (DATA_ELEMENT_TYPES.has(element.type)) return { id: element.id, type: element.type, props: element.props as Record<string, unknown>, translations: element.translations ?? {} }
   const props = element.props as { title?: string | null; subtitle?: string | null; config?: Record<string, unknown>; items?: { item_type: string; item_id: string }[] }
   return {
     id: element.id,

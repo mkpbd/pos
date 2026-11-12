@@ -10,7 +10,7 @@ import type { StorefrontBootstrap } from '../../types'
 import { PageRenderer } from '../page-renderer'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
-import { envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type ParentMessage, type Rect } from './protocol'
+import { CANVAS_SURROUNDINGS, envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type CanvasSurroundings, type ParentMessage, type Rect } from './protocol'
 import { sanitizeHtml } from './sanitize'
 import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
 
@@ -27,10 +27,10 @@ type InitFrame = Extract<ParentMessage, { type: 'init' }>
 
 const noop = () => {}
 
-/** Text elements from the unsaved draft are cleaned here too (the canvas shares the admin's origin). */
+/** Text and custom HTML elements from the unsaved draft are cleaned here too (the canvas shares the admin's origin). */
 function cleanSections(sections: RenderSection[]): RenderSection[] {
   const element = (node: RenderElement): RenderElement => {
-    if (node.type === 'text') return { ...node, props: { ...node.props, html: sanitizeHtml(String(node.props?.html ?? '')) } } as RenderElement
+    if (node.type === 'text' || node.type === 'custom_html') return { ...node, props: { ...node.props, html: sanitizeHtml(String(node.props?.html ?? ''), { dropClassAndId: node.type === 'custom_html' }) } } as RenderElement
     if ('columns' in node && Array.isArray(node.columns)) return { ...node, columns: node.columns.map(column) } as RenderElement
     return node
   }
@@ -81,6 +81,77 @@ function Skeleton({ element }: { element: RenderElement }) {
     </div>
   )
 }
+
+/* ----------------------------------------------------------------------------------------------
+ * B4: the faded page around a header, footer or zone
+ * -------------------------------------------------------------------------------------------- */
+
+const block = 'rounded bg-neutral-300'
+
+function Sample({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div aria-hidden="true" data-testid="canvas-sample" className="pointer-events-none select-none bg-neutral-50 py-8 opacity-50">
+      <div className="mx-auto max-w-sf px-4">
+        <p className="mb-4 text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</p>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function PageSample() {
+  return (
+    <Sample label="Your page content">
+      <div className={`${block} mb-6 h-56 w-full`} />
+      <div className="mb-6 grid grid-cols-3 gap-4">{[0, 1, 2].map((i) => <div key={i} className={`${block} h-32`} />)}</div>
+      <div className="space-y-2"><div className={`${block} h-4 w-2/3`} /><div className={`${block} h-4 w-1/2`} /></div>
+    </Sample>
+  )
+}
+
+function GridSample() {
+  return (
+    <Sample label="Product grid (filled in by your shop)">
+      <div className="mb-4 flex items-center justify-between"><div className={`${block} h-5 w-40`} /><div className={`${block} h-8 w-32`} /></div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="space-y-2"><div className={`${block} aspect-square`} /><div className={`${block} h-4 w-3/4`} /><div className={`${block} h-4 w-1/3`} /></div>
+        ))}
+      </div>
+    </Sample>
+  )
+}
+
+function ProductSample() {
+  return (
+    <Sample label="Product details (filled in for each product)">
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className={`${block} aspect-square`} />
+        <div className="space-y-3"><div className={`${block} h-7 w-3/4`} /><div className={`${block} h-6 w-1/4`} /><div className={`${block} h-4 w-full`} /><div className={`${block} h-4 w-5/6`} /><div className={`${block} h-11 w-40`} /></div>
+      </div>
+    </Sample>
+  )
+}
+
+/** Where the document sits: the sample before it, the sample after it. */
+function surroundingSamples(surroundings: CanvasSurroundings): { before: ReactNode; after: ReactNode } {
+  switch (surroundings) {
+    case 'header':
+      return { before: null, after: <PageSample /> }
+    case 'footer':
+      return { before: <PageSample />, after: null }
+    case 'zone:listing.top':
+      return { before: null, after: <GridSample /> }
+    case 'zone:listing.bottom':
+      return { before: <GridSample />, after: null }
+    case 'zone:product.after':
+      return { before: <ProductSample />, after: null }
+    default:
+      return { before: null, after: null }
+  }
+}
+
+const EMPTY_TEXT = 'This page is empty. Drag an element from the Add panel onto this area, or click one to add it.'
 
 function useThemeEffects(bootstrap: StorefrontBootstrap | null) {
   const theme = bootstrap?.theme
@@ -244,6 +315,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     [frame, sections],
   )
   const pending = useMemo(() => new Set(frame?.pending ?? []), [frame])
+  const surroundings: CanvasSurroundings = frame?.surroundings && CANVAS_SURROUNDINGS.includes(frame.surroundings) ? frame.surroundings : 'page'
+  const samples = useMemo(() => surroundingSamples(surroundings), [surroundings])
   const placeholder = useCallback((element: RenderElement) => (pending.has(element.id) ? <Skeleton element={element} /> : null), [pending])
 
   // Report positions after every drawn frame.
@@ -266,14 +339,29 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         <NoticeProvider>
           <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
           <style data-testid="canvas-outlines">{outlineCss(frame)}</style>
-          <main id="main" className="min-h-screen">
+          <main id="main" className="min-h-screen" data-surroundings={surroundings}>
+            {surroundings === 'header' && frame?.device === 'mobile' && (
+              <p role="note" data-testid="canvas-compact-note" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
+                Phones (narrower than 768 px) show your store’s compact header instead of this one. Switch to tablet or desktop to see it in use.
+              </p>
+            )}
+            {samples.before}
             {page.sections.length === 0 ? (
-              <div data-testid="canvas-empty" className="grid min-h-[60vh] place-items-center p-8 text-center text-neutral-500">
-                <p className="max-w-sm text-sm">This page is empty. Drag an element from the Add panel onto this area, or click one to add it.</p>
+              <div data-testid="canvas-empty" className={`grid place-items-center p-8 text-center text-neutral-500 ${surroundings === 'page' ? 'min-h-[60vh]' : 'min-h-40 border-y border-dashed border-neutral-300'}`}>
+                <p className="max-w-sm text-sm">{typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT}</p>
               </div>
+            ) : surroundings === 'header' ? (
+              <header data-canvas-part="header">
+                <PageRenderer page={page} placeholder={placeholder} />
+              </header>
+            ) : surroundings === 'footer' ? (
+              <footer data-canvas-part="footer">
+                <PageRenderer page={page} placeholder={placeholder} />
+              </footer>
             ) : (
               <PageRenderer page={page} placeholder={placeholder} />
             )}
+            {samples.after}
           </main>
         </NoticeProvider>
       </BootstrapContext>

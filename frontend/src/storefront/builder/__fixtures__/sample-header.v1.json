@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_top_bar",
+      "type": "section",
+      "props": { "layout": "full", "anchor": null },
+      "style": {
+        "base": { "background": { "type": "color", "color": "theme:accent" }, "color": "theme:accent_foreground", "layout": { "align": "center" } },
+        "mobile": { "spacing": { "padding": { "top": "4px", "bottom": "4px" } } }
+      },
+      "visibility": { "desktop": true, "tablet": true, "mobile": false },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_top_contact",
+          "type": "column",
+          "width": { "base": 60 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_top_contact",
+              "type": "contact_block",
+              "props": { "show_phone": true, "show_email": true, "show_address": false, "layout": "inline" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_top_social",
+          "type": "column",
+          "width": { "base": 40 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_top_social",
+              "type": "social_icons",
+              "props": { "size": 16, "style": "plain", "color": "#ffffff" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_main_row",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": null },
+      "style": { "base": { "layout": { "align": "center" } } },
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_logo",
+          "type": "column",
+          "width": { "base": 16 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_logo",
+              "type": "logo",
+              "props": { "height": 48, "link": { "url": "/" } },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_search",
+          "type": "column",
+          "width": { "base": 44 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_search",
+              "type": "search_box",
+              "props": { "placeholder": "Search products", "button_label": "" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "placeholder": "পণ্য খুঁজুন" } }
+            }
+          ]
+        },
+        {
+          "id": "c_language",
+          "type": "column",
+          "width": { "base": 16 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_language",
+              "type": "language_switch",
+              "props": { "style": "links" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_account",
+          "type": "column",
+          "width": { "base": 8 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_account",
+              "type": "account_link",
+              "props": { "show_label": false },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_wishlist",
+          "type": "column",
+          "width": { "base": 8 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_wishlist",
+              "type": "wishlist_link",
+              "props": { "show_label": false },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_cart",
+          "type": "column",
+          "width": { "base": 8 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_cart",
+              "type": "cart_icon",
+              "props": { "show_count": true, "show_total": false },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_nav",
+      "type": "section",
+      "props": { "layout": "full", "anchor": null },
+      "style": { "base": { "background": { "type": "color", "color": "theme:surface" } } },
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_nav",
+          "type": "column",
+          "width": { "base": 80 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_main_menu",
+              "type": "menu",
+              "props": { "menu_id": "01a1c9d9-0000-7000-8000-000000000101", "layout": "horizontal", "show_children": "dropdown" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_nav_extra",
+          "type": "column",
+          "width": { "base": 20 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_hotline",
+              "type": "icon",
+              "props": { "name": "phone", "size": 20, "color": null, "label": "Call us", "link": { "url": "/pages/contact" } },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "label": "ফোন করুন" } }
+            },
+            {
+              "id": "e_header_html",
+              "type": "custom_html",
+              "props": { "html": "<p><strong>Free delivery</strong> over ৳1,000</p>" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": false, "mobile": false },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_announcement",
+      "type": "section",
+      "props": { "layout": "full-bleed", "anchor": null },
+      "style": {},
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": { "starts_at": "2026-12-01T00:00:00+06:00", "ends_at": "2026-12-31T23:59:59+06:00" },
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_announcement",
+          "type": "column",
+          "width": { "base": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_announcement",
+              "type": "announcement",
+              "props": {},
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

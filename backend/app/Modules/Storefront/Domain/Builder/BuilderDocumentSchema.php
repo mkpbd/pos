@@ -61,15 +61,37 @@ final class BuilderDocumentSchema
 
     private int $nodes = 0;
 
+    /** B4: the document context (ElementRegistry::CONTEXTS) — which element types are allowed. */
+    private function __construct(private readonly string $context) {}
+
     /**
      * @param  array<string, mixed>  $document
+     * @param  string  $context  B4: `page` (home / landing), `cms`, `header`, `footer` or `zone`
      * @return array{schema_version: int, sections: list<array<string, mixed>>}
      *
      * @throws InvalidBuilderDocument
      */
-    public static function normalize(array $document): array
+    public static function normalize(array $document, string $context = 'page'): array
     {
-        return (new self)->document($document);
+        if (! in_array($context, ElementRegistry::CONTEXTS, true)) {
+            throw new \InvalidArgumentException("Unknown builder document context \"{$context}\".");
+        }
+
+        return (new self($context))->document($document);
+    }
+
+    /**
+     * B4: the context of a document key — `cms:<uuid>` → cms, `header`, `footer`, `zone:*` →
+     * zone, everything else (home, landing pages) → page.
+     */
+    public static function contextOf(string $key): string
+    {
+        return match (true) {
+            str_starts_with($key, 'cms:') => 'cms',
+            $key === 'header', $key === 'footer' => $key,
+            str_starts_with($key, 'zone:') => 'zone',
+            default => 'page',
+        };
     }
 
     /**
@@ -302,6 +324,12 @@ final class BuilderDocumentSchema
 
             return null;
         }
+        if (! in_array($this->context, ElementRegistry::allowedIn($type), true)) {
+            $noun = ['page' => 'this page', 'cms' => 'a content page', 'header' => 'the header', 'footer' => 'the footer', 'zone' => 'a shop area'][$this->context];
+            $this->error("{$path}.type", $id, 'The '.ElementRegistry::label($type).' element cannot be used in '.$noun.'.', 'ELEMENT_NOT_ALLOWED');
+
+            return null;
+        }
 
         $props = $node['props'] ?? [];
         if (! is_array($props)) {
@@ -480,6 +508,9 @@ final class BuilderDocumentSchema
         if ($sectionType !== null) {
             return $this->sectionProps($sectionType, $props, $path, $id);
         }
+        if (in_array($type, ElementRegistry::B4, true)) {
+            return $this->b4Props($type, $props, $path, $id);
+        }
 
         // Optional texts (alt, html) may arrive as null (empty strings become null on input).
         $value = fn (string $key) => array_key_exists($key, $props)
@@ -527,6 +558,201 @@ final class BuilderDocumentSchema
             ],
             default => [],
         };
+    }
+
+    /**
+     * B4 elements' props (contract §2). Every key is present afterwards; optional texts may
+     * arrive as null (stored as '' — or null for the props where null means "use the default").
+     * A video stores the `provider` and `video_id` parsed from its URL; a countdown keeps only
+     * the field of its source (`ends_at` for date, `promotion_id` for promotion; the other is
+     * null). Ownership of referenced ids is checked by BuilderReferences.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array<string, mixed>
+     */
+    private function b4Props(string $type, array $props, string $path, ?string $id): array
+    {
+        $defaults = ElementRegistry::defaults($type);
+        $raw = fn (string $key) => array_key_exists($key, $props) ? $props[$key] : $defaults[$key];
+        $fail = function (string $key, string $message) use ($path, $id, $defaults) {
+            $this->error("{$path}.{$key}", $id, $message);
+
+            return $defaults[$key];
+        };
+        $text = function (string $key, int $min, int $max) use ($raw, $fail) {
+            $value = $raw($key);
+            if ($value === null && $min === 0) {
+                return '';
+            }
+            if (is_string($value) && mb_strlen(trim($value)) >= $min && mb_strlen($value) <= $max) {
+                return $value;
+            }
+
+            return $fail($key, $min > 0 ? "Enter {$min} to {$max} characters." : "At most {$max} characters.");
+        };
+        $nullableText = function (string $key, int $max) use ($raw, $fail) {
+            $value = $raw($key);
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                return null;
+            }
+
+            return is_string($value) && mb_strlen($value) <= $max ? $value : $fail($key, "At most {$max} characters.");
+        };
+        $enum = fn (string $key, array $allowed) => in_array($raw($key), $allowed, true) ? $raw($key) : $fail($key, 'Choose one of: '.implode(', ', $allowed).'.');
+        $int = fn (string $key, array $range) => is_int($raw($key)) && $raw($key) >= $range[0] && $raw($key) <= $range[1]
+            ? $raw($key)
+            : $fail($key, "Enter a whole number from {$range[0]} to {$range[1]}.");
+        $bool = fn (string $key) => is_bool($raw($key)) ? $raw($key) : $fail($key, 'This setting is true or false.');
+        $color = function (string $key) use ($raw, $fail) {
+            $value = $raw($key);
+
+            return $value === null ? null : (StyleSchema::color($value) ?? $fail($key, 'Use #rrggbb, #rrggbbaa or a theme colour (theme:<role>).'));
+        };
+        $link = fn (string $key, bool $required) => $this->link($raw($key), $required, "{$path}.{$key}", $id) ?? ($required ? $defaults[$key] : null);
+        $uuid = function (string $key, string $message) use ($raw, $fail) {
+            $value = $raw($key);
+
+            return is_string($value) && preg_match(self::UUID, strtolower($value)) === 1 ? strtolower($value) : $fail($key, $message);
+        };
+        $button = function (string $key, bool $required) use ($raw, $path, $id, $defaults) {
+            $value = $raw($key);
+            if ($value === null && ! $required) {
+                return null;
+            }
+            if (! is_array($value)) {
+                $this->error("{$path}.{$key}", $id, 'A button needs a label and a link.');
+
+                return $defaults[$key] ?? ['label' => 'Learn more', 'link' => ['url' => '/']];
+            }
+            $label = $value['label'] ?? null;
+            if (! is_string($label) || trim($label) === '' || mb_strlen($label) > 60) {
+                $this->error("{$path}.{$key}.label", $id, 'Enter 1 to 60 characters.');
+                $label = 'Shop now';
+            }
+
+            return ['label' => $label, 'link' => $this->link($value['link'] ?? null, true, "{$path}.{$key}.link", $id) ?? ['url' => '/']];
+        };
+
+        return match ($type) {
+            'video' => $this->videoProps($raw('url'), $path, $id) + [
+                'title' => $text('title', 1, ElementRegistry::TRANSLATABLE['video']['title']),
+                'aspect' => $enum('aspect', ElementRegistry::VIDEO_ASPECTS),
+                'autoplay' => $bool('autoplay'),
+                'start' => $int('start', ElementRegistry::VIDEO_START),
+            ],
+            'icon' => [
+                'name' => $enum('name', ElementRegistry::ICONS),
+                'size' => $int('size', ElementRegistry::ICON_SIZE),
+                'color' => $color('color'),
+                'label' => $text('label', 0, 120),
+                'link' => $link('link', false),
+            ],
+            'countdown' => (function () use ($enum, $raw, $uuid, $text, $path, $id) {
+                $source = $enum('source', ElementRegistry::COUNTDOWN_SOURCES);
+                $endsAt = null;
+                $promotionId = null;
+                if ($source === 'promotion') {
+                    $promotionId = $uuid('promotion_id', 'Choose a flash sale (a promotion with a countdown).');
+                } elseif ($this->instant($raw('ends_at'))) {
+                    $endsAt = $raw('ends_at');
+                } else {
+                    $this->error("{$path}.ends_at", $id, 'Choose when the countdown ends: an ISO 8601 date and time with a time zone, e.g. 2026-12-01T00:00:00+06:00.');
+                }
+
+                return [
+                    'source' => $source,
+                    'ends_at' => $endsAt,
+                    'promotion_id' => $promotionId,
+                    'title' => $text('title', 0, 120),
+                    'expired_text' => $text('expired_text', 0, 200),
+                    'style' => $enum('style', ElementRegistry::COUNTDOWN_STYLES),
+                ];
+            })(),
+            'discount' => [
+                'promotion_id' => $uuid('promotion_id', 'Choose a promotion.'),
+                'title' => $text('title', 0, 120),
+                'text' => $text('text', 0, 400),
+                'show_code' => $bool('show_code'),
+                'button_label' => $text('button_label', 0, 60),
+                'link' => $link('link', false),
+            ],
+            'cta' => [
+                'title' => $text('title', 1, 120),
+                'text' => $text('text', 0, 400),
+                'primary' => $button('primary', true),
+                'secondary' => $button('secondary', false),
+                'align' => $enum('align', ElementRegistry::ALIGNS),
+            ],
+            'search_box' => ['placeholder' => $text('placeholder', 0, 80), 'button_label' => $text('button_label', 0, 30)],
+            'promo_card' => [
+                'product_id' => $uuid('product_id', 'Choose a product.'),
+                'badge' => $text('badge', 0, 24),
+                'title' => $nullableText('title', 120),
+                'text' => $text('text', 0, 200),
+                'button_label' => $text('button_label', 0, 30),
+            ],
+            'logo' => ['height' => $int('height', ElementRegistry::LOGO_HEIGHT), 'link' => $link('link', true)],
+            'menu' => [
+                'menu_id' => $uuid('menu_id', 'Choose a menu.'),
+                'layout' => $enum('layout', ElementRegistry::MENU_LAYOUTS),
+                'show_children' => $enum('show_children', ElementRegistry::MENU_CHILDREN[$this->context] ?? ElementRegistry::MENU_CHILDREN['header']),
+            ],
+            'account_link', 'wishlist_link' => ['show_label' => $bool('show_label')],
+            'cart_icon' => ['show_count' => $bool('show_count'), 'show_total' => $bool('show_total')],
+            'language_switch' => ['style' => $enum('style', ElementRegistry::LANGUAGE_SWITCH_STYLES)],
+            'social_icons' => [
+                'size' => $int('size', ElementRegistry::SOCIAL_ICON_SIZE),
+                'style' => $enum('style', ElementRegistry::SOCIAL_ICON_STYLES),
+                'color' => $color('color'),
+            ],
+            'payment_icons' => ['height' => $int('height', ElementRegistry::PAYMENT_ICON_HEIGHT)],
+            'contact_block' => [
+                'show_phone' => $bool('show_phone'),
+                'show_email' => $bool('show_email'),
+                'show_address' => $bool('show_address'),
+                'layout' => $enum('layout', ElementRegistry::BLOCK_LAYOUTS),
+            ],
+            'copyright' => ['text' => $nullableText('text', 200)],
+            'newsletter_form' => [
+                'title' => $text('title', 0, 120),
+                'text' => $text('text', 0, 300),
+                'button_label' => $text('button_label', 1, 40),
+                'layout' => $enum('layout', ElementRegistry::BLOCK_LAYOUTS),
+            ],
+            'faq_list' => ['title' => $nullableText('title', 120), 'style' => $enum('style', ElementRegistry::FAQ_STYLES)],
+            'contact_form' => ['title' => $nullableText('title', 120), 'show_details' => $bool('show_details')],
+            'custom_html' => ['html' => $text('html', 1, ElementRegistry::CUSTOM_HTML_MAX)],
+            // announcement: the theme's announcement, no props.
+            default => [],
+        };
+    }
+
+    /**
+     * `{url, provider, video_id}` of a video element (an error when the URL is not supported).
+     *
+     * @return array{url: string, provider: string, video_id: string}
+     */
+    private function videoProps(mixed $url, string $path, ?string $id): array
+    {
+        $parsed = ElementRegistry::parseVideoUrl($url);
+        if ($parsed === null) {
+            $this->error("{$path}.url", $id, 'Paste a YouTube link (youtube.com/watch?v=…, youtu.be/…, youtube.com/shorts/…) or a Vimeo link (vimeo.com/…).');
+        }
+
+        return [
+            'url' => is_string($url) ? $url : '',
+            'provider' => $parsed['provider'] ?? 'youtube',
+            'video_id' => $parsed['video_id'] ?? '',
+        ];
+    }
+
+    /**
+     * An ISO 8601 instant with a time zone (as schedules accept).
+     */
+    private function instant(mixed $value): bool
+    {
+        return is_string($value) && preg_match(self::INSTANT, $value) === 1
+            && DateTimeImmutable::createFromFormat(DATE_ATOM, $this->atom($value)) !== false;
     }
 
     /**
@@ -657,10 +883,10 @@ final class BuilderDocumentSchema
         return strtolower($value);
     }
 
-    private function error(string $path, ?string $nodeId, string $message): void
+    private function error(string $path, ?string $nodeId, string $message, ?string $code = null): void
     {
         if (count($this->errors) < self::MAX_ERRORS) {
-            $this->errors[] = $this->entry($path, $nodeId, $message);
+            $this->errors[] = $this->entry($path, $nodeId, $message) + ($code === null ? [] : ['code' => $code]);
         }
     }
 

@@ -8,7 +8,7 @@ import { productCard } from '../test-fixtures'
 import type { StoreBanner, StoreSection } from '../types'
 import fixture from './__fixtures__/sample-document.v1.json'
 import { elementMeta, isWrappedSectionType } from './registry'
-import type { BuilderDocument, BuilderMedia, BuilderPage, NodeState } from './types'
+import type { BuilderData, BuilderDocument, BuilderMedia, BuilderPage, Element, NodeState, Section } from './types'
 
 export const sampleDocument = fixture as unknown as BuilderDocument
 
@@ -66,7 +66,12 @@ function resolveNode(node: AnyNode, locale: string, draft: boolean): AnyNode | n
   for (const [key, value] of Object.entries(texts)) {
     if (!translatable.includes(key)) continue
     if (isWrappedSectionType(node.type) && key !== 'title' && key !== 'subtitle') (props.config as Record<string, unknown>)[key] = value
-    else props[key] = value
+    else if (key.includes('.')) {
+      // A nested prop (`primary.label` of a call to action).
+      const [outer, inner] = key.split('.') as [string, string]
+      const target = props[outer]
+      if (target && typeof target === 'object') (target as Record<string, unknown>)[inner] = value
+    } else props[key] = value
   }
   const out: AnyNode = { ...rest, props }
   let state: NodeState | null = null
@@ -93,4 +98,41 @@ export function samplePage(options: { locale?: string; source?: 'published' | 'd
     media: sampleMedia,
     data: sampleData(locale),
   }
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B4 helpers: a document of given elements (one boxed section, one full-width column each row)
+ * -------------------------------------------------------------------------------------------- */
+
+const VISIBLE = { desktop: true, tablet: true, mobile: true }
+
+/** An element node with the registry's defaults under `props`. */
+export function elementNode(type: string, id: string, props: Record<string, unknown> = {}, extra: Partial<Element> = {}): Element {
+  const defaults = structuredClone((elementMeta(type)?.props ?? {}) as Record<string, unknown>)
+  return { id, type, props: { ...defaults, ...props }, style: {}, visibility: VISIBLE, hidden: false, schedule: null, translations: {}, ...extra } as unknown as Element
+}
+
+/** A document with one section per list of elements. */
+export function documentOf(...rows: Element[][]): BuilderDocument {
+  const sections: Section[] = rows.map((elements, i) => ({
+    id: `s_row${i}`,
+    type: 'section',
+    props: { layout: 'boxed', anchor: null },
+    style: {},
+    visibility: VISIBLE,
+    hidden: false,
+    schedule: null,
+    translations: {},
+    columns: [{ id: `c_row${i}`, type: 'column', width: { base: 100 }, style: {}, elements }],
+  }))
+  return { schema_version: 1, sections }
+}
+
+/** The render payload of a document (published unless `source: 'draft'`) with the given `data`. */
+export function payloadOf(
+  document: BuilderDocument,
+  options: { key?: string; title?: string; source?: 'published' | 'draft'; locale?: string; data?: Record<string, BuilderData>; media?: Record<string, BuilderMedia> } = {},
+): BuilderPage {
+  const page = samplePage({ document, key: options.key, title: options.title, source: options.source, locale: options.locale })
+  return { ...page, data: options.data ?? {}, media: options.media ?? sampleMedia }
 }

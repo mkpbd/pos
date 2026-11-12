@@ -5,6 +5,7 @@
  */
 
 import { isWrappedSectionType } from '@/storefront/builder/registry'
+import { B4_TYPES } from './validate'
 import type { BuilderNode, Problem } from './types'
 
 /** Drops the `sections.0.columns.1.elements.2.` chain of a document path. */
@@ -26,8 +27,12 @@ export function formKey(node: BuilderNode, path: string): string {
     if (prop === 'items' || prop.startsWith('items.')) return node.type === 'hero_slider' || node.type === 'banner_grid' ? 'banner_ids' : 'item_ids'
     return prop
   }
+  const parts = prop.split('.')
+  // B4: a video's derived provider / id belong to its URL field; a call to action's buttons have a label and a link each.
+  if (node.type === 'video' && (parts[0] === 'provider' || parts[0] === 'video_id')) return 'url'
+  if (node.type === 'cta' && (parts[0] === 'primary' || parts[0] === 'secondary') && parts.length > 1) return `${parts[0]}.${parts[1]}`
   // `link.url` → `link`
-  return prop.split('.')[0] ?? prop
+  return parts[0] ?? prop
 }
 
 /** First message per form key; server problems win over client ones for the same key. */
@@ -65,5 +70,7 @@ export function isInlineProblem(node: BuilderNode, problem: Problem, bangla: boo
     if (key === 'title' || key === 'subtitle') return node.type !== 'hero_slider'
     return key === 'banner_ids' || key === 'item_ids' || key.startsWith('config.')
   }
+  // B4 elements show every prop's problem next to its field.
+  if (B4_TYPES.has(node.type)) return key !== '' && key !== 'id' && key !== 'type'
   return (BASIC_FIELDS[node.type] ?? []).includes(key)
 }

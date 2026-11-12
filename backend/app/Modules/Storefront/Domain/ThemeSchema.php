@@ -36,6 +36,16 @@ final class ThemeSchema
     public const SOCIAL_NETWORKS = ['facebook', 'instagram', 'youtube', 'tiktok', 'x', 'linkedin'];
 
     /**
+     * B4: products per row on shop, category, brand and search listings, per device (desktop
+     * ≥ 1024 px, tablet 768–1023 px, mobile < 768 px). The defaults are today's grid
+     * (`grid-cols-2 md:grid-cols-3`: 2 on phones, 3 from 768 px up). Owner content: applying a
+     * preset keeps it.
+     */
+    public const LISTING_COLUMNS = ['desktop' => [3, 4, 5], 'tablet' => [2, 3, 4], 'mobile' => [1, 2]];
+
+    public const LISTING_COLUMNS_DEFAULT = ['desktop' => 3, 'tablet' => 3, 'mobile' => 2];
+
+    /**
      * The base colour roles (always `#rrggbb`). They are also the `theme:<role>` colour tokens of
      * store builder styles (StyleSchema; mirrored by the editor), so this list only grows together
      * with the builder's token list.
@@ -143,6 +153,8 @@ final class ThemeSchema
                 'hero_style' => self::HERO_STYLES[0],
                 'heading_case' => self::HEADING_CASES[0],
                 'top_bar' => self::TOP_BARS[0],
+                // B4: products per row on listings (LISTING_COLUMNS).
+                'listing_columns' => self::LISTING_COLUMNS_DEFAULT,
             ],
             'logo_media_id' => null,
             'favicon_media_id' => null,
@@ -195,6 +207,15 @@ final class ThemeSchema
         }
 
         $result['palette'] = self::palette($result['palette']);
+
+        // B4: whole numbers (a stored "4" reads as 4); values outside a device's choices fall back to the default.
+        if (is_array($result['layout']) && is_array($result['layout']['listing_columns'] ?? null)) {
+            foreach (self::LISTING_COLUMNS as $device => $choices) {
+                $value = $result['layout']['listing_columns'][$device] ?? null;
+                $value = is_int($value) || (is_string($value) && ctype_digit($value)) ? (int) $value : null;
+                $result['layout']['listing_columns'][$device] = in_array($value, $choices, true) ? $value : self::LISTING_COLUMNS_DEFAULT[$device];
+            }
+        }
 
         return $result;
     }

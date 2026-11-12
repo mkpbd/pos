@@ -9,7 +9,8 @@ import type { SectionConfigs, SectionType, SectionTypeInfo } from '@/features/st
 import { validateSectionDraft } from '@/features/storefront/components/section-draft'
 import { isWrappedSectionType, NODE_ID } from '@/storefront/builder/registry'
 import type { Column, Element, Section, WrappedElement, WrappedSectionType } from '@/storefront/builder/types'
-import { ENUMS, isUuid, normalizeColor, normalizeWidthValue, safeUrl } from '@/storefront/builder/validate'
+import { ICON_NAMES } from '@/storefront/builder/icons'
+import { B4_ENUMS, ENUMS, isUuid, normalizeColor, normalizeWidthValue, parseVideoUrl, safeUrl } from '@/storefront/builder/validate'
 import type { BuilderNode, Problem } from './types'
 
 /** Text limits of the basic elements (backend ElementRegistry::TEXT_LIMITS). */
@@ -22,8 +23,42 @@ export const ANCHOR_PATTERN = /^[a-z][a-z0-9-]{0,59}$/
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:?\d{2})$/
 const HEX6 = /^#[0-9a-f]{6}$/i
 
+/** B4 element types (contract §2). */
+export const B4_TYPES: ReadonlySet<string> = new Set([
+  'video', 'icon', 'countdown', 'discount', 'cta', 'search_box', 'promo_card', 'logo', 'menu', 'account_link', 'wishlist_link', 'cart_icon',
+  'language_switch', 'announcement', 'social_icons', 'payment_icons', 'contact_block', 'copyright', 'newsletter_form', 'faq_list', 'contact_form', 'custom_html',
+])
+
+/** B4 translatable props and their maximum length (backend ElementRegistry::TRANSLATABLE; the base prop has the same limit). */
+export const B4_TEXT_LIMITS: Record<string, Record<string, number>> = {
+  video: { title: 200 },
+  icon: { label: 120 },
+  countdown: { title: 120, expired_text: 200 },
+  discount: { title: 120, text: 400, button_label: 60 },
+  cta: { title: 120, text: 400, 'primary.label': 60, 'secondary.label': 60 },
+  search_box: { placeholder: 80, button_label: 30 },
+  promo_card: { badge: 24, title: 120, text: 200, button_label: 30 },
+  copyright: { text: 200 },
+  newsletter_form: { title: 120, text: 300, button_label: 40 },
+  faq_list: { title: 120 },
+  contact_form: { title: 120 },
+}
+
+/** Other B4 bounds (backend ElementRegistry). */
+export const B4_BOUNDS = {
+  videoUrl: 500,
+  videoStart: { min: 0, max: 86_400 },
+  iconSize: { min: 16, max: 128 },
+  logoHeight: { min: 24, max: 96 },
+  socialSize: { min: 16, max: 48 },
+  paymentHeight: { min: 16, max: 48 },
+  customHtml: 20_000,
+} as const
+
 /** Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable). */
 export function translatableFields(type: string): Record<string, number> {
+  const b4 = B4_TEXT_LIMITS[type]
+  if (b4) return b4
   switch (type) {
     case 'heading':
       return { text: TEXT_LIMITS.heading }
@@ -113,7 +148,148 @@ function intRule(value: unknown, min: number, max: number, path: string, add: (p
   if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) add(path, `Enter a whole number from ${min} to ${max}.`)
 }
 
-function validateElement(node: Element, add: (path: string, message: string) => void) {
+function linkRule(link: unknown, required: boolean, path: string, add: (path: string, message: string) => void, missing = 'Choose where it leads.') {
+  if (link === null && !required) return
+  const url = typeof link === 'object' && link !== null ? (link as { url?: unknown }).url : undefined
+  if (required && (typeof url !== 'string' || url.trim() === '')) return add(path, missing)
+  if (safeUrl(url) === null) add(path, 'Use a site path such as /sale or an http(s) URL.')
+}
+
+function boolRule(value: unknown, path: string, add: (path: string, message: string) => void) {
+  if (typeof value !== 'boolean') add(path, 'This is on or off.')
+}
+
+function colorRule(value: unknown, path: string, add: (path: string, message: string) => void) {
+  if (value !== null && normalizeColor(value) === undefined) add(path, 'Use a colour such as #1f2937 or a theme colour.')
+}
+
+function nullableText(value: unknown, max: number, path: string, add: (path: string, message: string) => void) {
+  if (value !== null) textRule(value, 0, max, path, add, '')
+}
+
+/** B4 elements (contract §2), mirroring the backend normalizer and the reference checks that can be done offline. */
+function validateB4(node: Element, add: (path: string, message: string) => void, icons: readonly string[]) {
+  const p = node.props as Record<string, unknown>
+  const limits = B4_TEXT_LIMITS[node.type] ?? {}
+  const text = (field: string, min = 0, empty = '') => textRule(p[field] ?? '', min, limits[field] ?? 255, `props.${field}`, add, empty)
+  switch (node.type) {
+    case 'video': {
+      const url = typeof p.url === 'string' ? p.url.trim() : ''
+      if (!url) add('props.url', 'Paste the link of a YouTube or Vimeo video.')
+      else if (url.length > B4_BOUNDS.videoUrl || !parseVideoUrl(url)) add('props.url', 'Use a YouTube link (youtube.com/watch?v=…, youtu.be/…, youtube.com/shorts/…) or a Vimeo link (vimeo.com/123456).')
+      text('title', 1, 'Describe the video in a few words (for screen readers).')
+      enumRule(p.aspect, B4_ENUMS.videoAspect, 'props.aspect', add)
+      boolRule(p.autoplay, 'props.autoplay', add)
+      intRule(p.start, B4_BOUNDS.videoStart.min, B4_BOUNDS.videoStart.max, 'props.start', add)
+      return
+    }
+    case 'icon':
+      if (typeof p.name !== 'string' || !icons.includes(p.name)) add('props.name', 'Choose an icon.')
+      intRule(p.size, B4_BOUNDS.iconSize.min, B4_BOUNDS.iconSize.max, 'props.size', add)
+      colorRule(p.color, 'props.color', add)
+      text('label')
+      linkRule(p.link, false, 'props.link', add)
+      return
+    case 'countdown':
+      enumRule(p.source, B4_ENUMS.countdownSource, 'props.source', add)
+      if (p.source === 'promotion') {
+        if (typeof p.promotion_id !== 'string' || !isUuid(p.promotion_id)) add('props.promotion_id', 'Choose the sale to count down to.')
+      } else if (typeof p.ends_at !== 'string' || !INSTANT.test(p.ends_at) || Number.isNaN(Date.parse(p.ends_at))) add('props.ends_at', 'Choose the date and time the countdown ends.')
+      text('title')
+      text('expired_text')
+      enumRule(p.style, B4_ENUMS.countdownStyle, 'props.style', add)
+      return
+    case 'discount':
+      if (typeof p.promotion_id !== 'string' || !isUuid(p.promotion_id)) add('props.promotion_id', 'Choose the promotion to show.')
+      text('title')
+      text('text')
+      boolRule(p.show_code, 'props.show_code', add)
+      text('button_label')
+      linkRule(p.link, false, 'props.link', add)
+      return
+    case 'cta': {
+      text('title', 1, 'Enter the title.')
+      text('text')
+      const button = (key: 'primary' | 'secondary') => {
+        const value = p[key] as { label?: unknown; link?: unknown } | null | undefined
+        if (key === 'secondary' && value === null) return
+        if (!value || typeof value !== 'object') return add(`props.${key}.label`, 'Enter the button text.')
+        textRule(value.label ?? '', 1, limits[`${key}.label`] ?? 60, `props.${key}.label`, add, 'Enter the button text.')
+        linkRule(value.link, true, `props.${key}.link`, add, 'Choose where the button leads.')
+      }
+      button('primary')
+      button('secondary')
+      enumRule(p.align, B4_ENUMS.ctaAlign, 'props.align', add)
+      return
+    }
+    case 'search_box':
+      text('placeholder')
+      text('button_label')
+      return
+    case 'promo_card':
+      if (typeof p.product_id !== 'string' || !isUuid(p.product_id)) add('props.product_id', 'Choose the product to promote.')
+      text('badge')
+      nullableText(p.title, limits.title ?? 120, 'props.title', add)
+      text('text')
+      text('button_label')
+      return
+    case 'logo':
+      intRule(p.height, B4_BOUNDS.logoHeight.min, B4_BOUNDS.logoHeight.max, 'props.height', add)
+      linkRule(p.link, false, 'props.link', add)
+      return
+    case 'menu':
+      if (typeof p.menu_id !== 'string' || !isUuid(p.menu_id)) add('props.menu_id', 'Choose a menu.')
+      enumRule(p.layout, B4_ENUMS.menuLayout, 'props.layout', add)
+      enumRule(p.show_children, [...new Set<string>([...B4_ENUMS.menuChildrenHeader, ...B4_ENUMS.menuChildrenFooter])], 'props.show_children', add)
+      return
+    case 'account_link':
+    case 'wishlist_link':
+      boolRule(p.show_label, 'props.show_label', add)
+      return
+    case 'cart_icon':
+      boolRule(p.show_count, 'props.show_count', add)
+      boolRule(p.show_total, 'props.show_total', add)
+      return
+    case 'language_switch':
+      enumRule(p.style, B4_ENUMS.languageStyle, 'props.style', add)
+      return
+    case 'social_icons':
+      intRule(p.size, B4_BOUNDS.socialSize.min, B4_BOUNDS.socialSize.max, 'props.size', add)
+      enumRule(p.style, B4_ENUMS.socialStyle, 'props.style', add)
+      colorRule(p.color, 'props.color', add)
+      return
+    case 'payment_icons':
+      intRule(p.height, B4_BOUNDS.paymentHeight.min, B4_BOUNDS.paymentHeight.max, 'props.height', add)
+      return
+    case 'contact_block':
+      for (const key of ['show_phone', 'show_email', 'show_address']) boolRule(p[key], `props.${key}`, add)
+      enumRule(p.layout, B4_ENUMS.blockLayout, 'props.layout', add)
+      return
+    case 'copyright':
+      nullableText(p.text, limits.text ?? 200, 'props.text', add)
+      return
+    case 'newsletter_form':
+      text('title')
+      text('text')
+      text('button_label', 1, 'Enter the button text.')
+      enumRule(p.layout, B4_ENUMS.blockLayout, 'props.layout', add)
+      return
+    case 'faq_list':
+      nullableText(p.title, limits.title ?? 120, 'props.title', add)
+      enumRule(p.style, B4_ENUMS.faqStyle, 'props.style', add)
+      return
+    case 'contact_form':
+      nullableText(p.title, limits.title ?? 120, 'props.title', add)
+      boolRule(p.show_details, 'props.show_details', add)
+      return
+    case 'custom_html':
+      textRule(p.html ?? '', 0, B4_BOUNDS.customHtml, 'props.html', add, '')
+      return
+  }
+}
+
+function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[]) {
+  if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)
   switch (node.type) {
     case 'heading':
       textRule(node.props.text, 1, TEXT_LIMITS.heading, 'props.text', add, 'Enter the heading text.')
@@ -185,8 +361,8 @@ function validateColumn(node: Column, add: (path: string, message: string) => vo
   }
 }
 
-/** Client-side checks of one node; empty = valid. */
-export function validateNode(node: BuilderNode): Problem[] {
+/** Client-side checks of one node; empty = valid. `icons`: the icon names the server accepts (default: the storefront's). */
+export function validateNode(node: BuilderNode, options: { icons?: readonly string[] } = {}): Problem[] {
   const problems: Problem[] = []
   const add = (path: string, message: string) => {
     if (!problems.some((p) => p.path === path)) problems.push({ path, message })
@@ -202,7 +378,7 @@ export function validateNode(node: BuilderNode): Problem[] {
     if (node.props.anchor !== null && !ANCHOR_PATTERN.test(node.props.anchor)) add('props.anchor', 'Use lower-case letters, digits and dashes, starting with a letter (at most 60).')
     if (node.columns.length < 1 || node.columns.length > 6) add('columns', 'A row needs 1 to 6 columns.')
   } else {
-    validateElement(node, add)
+    validateElement(node, add, options.icons ?? ICON_NAMES)
   }
   validateSchedule(node, add)
   validateTranslations(node, add)

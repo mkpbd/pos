@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, type RefObject } from 'react'
+import { toast } from 'sonner'
 import { elementMeta } from '@/storefront/builder/registry'
-import type { BuilderNode, Column, Element, InnerRowElement, Section } from '@/storefront/builder/types'
+import type { BuilderNode, Column, DocumentContext, Element, InnerRowElement, Section } from '@/storefront/builder/types'
 import type { ElementsMetadata } from './api'
 import type { CanvasHandle } from './canvas-frame'
 import { createElement } from './inspector'
@@ -16,6 +17,10 @@ export type EditorUi = {
   registry: ElementsMetadata
   canvas: RefObject<CanvasHandle | null>
   requestDelete: (id: string) => void
+  /** B4: the user may add or change custom HTML (`storefront.custom_html`); default true. */
+  canCustomHtml?: boolean
+  /** B4: the open document's element context (new elements' setup and defaults). */
+  context?: DocumentContext
 }
 
 export const EditorUiContext = createContext<EditorUi | null>(null)
@@ -100,9 +105,20 @@ export function insertionTarget(content: Parameters<typeof findNode>[0], selecti
   return { kind: 'new-section', index: content.sections.length }
 }
 
+/** Whether a node is or holds a custom HTML element (B4). */
+export function containsCustomHtml(node: BuilderNode): boolean {
+  if (node.type === 'custom_html') return true
+  const columns = (node as { columns?: Column[] }).columns
+  if (Array.isArray(columns)) return columns.some((column) => column.elements.some(containsCustomHtml))
+  const elements = (node as { elements?: Element[] }).elements
+  return Array.isArray(elements) && elements.some(containsCustomHtml)
+}
+
+export const CUSTOM_HTML_DENIED = 'Only people allowed to use custom HTML can add or copy it. You can still move, hide or delete it.'
+
 export function useCommands() {
   const store = useEditorStoreApi()
-  const { registry, canvas, requestDelete } = useEditorUi()
+  const { registry, canvas, requestDelete, canCustomHtml = true, context } = useEditorUi()
 
   const reveal = useCallback(
     (id: string | null) => {
@@ -115,9 +131,13 @@ export function useCommands() {
 
   const insert = useCallback(
     async (type: string, target?: DropTarget): Promise<boolean> => {
+      if (type === 'custom_html' && !canCustomHtml) {
+        toast.error(CUSTOM_HTML_DENIED)
+        return false
+      }
       const state = store.getState()
       const existing = collectIds(state.content)
-      const node = await createElement(type, { registry, existingIds: existing })
+      const node = await createElement(type, { registry, existingIds: existing, context })
       if (!node) return false
       const current = store.getState()
       const where = target ?? insertionTarget(current.content, current.selection, type)
@@ -125,7 +145,7 @@ export function useCommands() {
       if (ok) reveal(node.id)
       return ok
     },
-    [registry, reveal, store],
+    [registry, reveal, store, canCustomHtml, context],
   )
 
   const move = useCallback((id: string, target: DropTarget) => store.getState().apply((content) => moveNode(content, id, target), { select: id }), [store])
@@ -142,13 +162,18 @@ export function useCommands() {
   const duplicate = useCallback(
     (id: string) => {
       const state = store.getState()
+      const info = findNode(state.content, id)
+      if (info && !canCustomHtml && containsCustomHtml(info.node)) {
+        toast.error(CUSTOM_HTML_DENIED)
+        return false
+      }
       const result = duplicateNode(state.content, id)
       if (!result.id) return false
       const ok = state.apply(() => result.content, { select: result.id })
       if (ok) reveal(result.id)
       return ok
     },
-    [reveal, store],
+    [reveal, store, canCustomHtml],
   )
 
   const toggleHidden = useCallback(

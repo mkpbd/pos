@@ -5,12 +5,13 @@ import { cn } from '@/lib/utils'
 import { useCustomer } from '../account/api'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
+import { containsElement, isBuilderPayload } from '../builder/payload'
 import { useStoreLayout } from '../theme'
 import type { Announcement } from '../types'
 import { AnnouncementBar } from './announcement-bar'
 import { LanguageSwitcher } from './language-switcher'
 import { MenuLink } from './menu-link'
-import { REDUCED_MOTION_QUERY, useIsDesktop, useMediaQuery } from './use-media-query'
+import { REDUCED_MOTION_QUERY, useIsDesktop, useIsTabletUp, useMediaQuery } from './use-media-query'
 
 /** How often the message repeats in one half of the ticker track (enough to span a wide screen). */
 const TICKER_REPEATS = 6
@@ -21,10 +22,14 @@ const TICKER_REPEATS = 6
  * (desktop; small screens show the announcement bar instead).
  */
 export function TopBar() {
-  const { theme } = useStorefront()
+  const { theme, builder } = useStorefront()
   const { top_bar: style } = useStoreLayout()
   const desktop = useIsDesktop()
+  const tabletUp = useIsTabletUp()
   const announcement = theme.announcement
+
+  // B4: a builder header that places the announcement itself replaces the strip (from 768 px, where it shows).
+  if (tabletUp && isBuilderPayload(builder?.header) && containsElement(builder.header, 'announcement')) return null
 
   if (style === 'ticker') return announcement ? <AnnouncementTicker announcement={announcement} /> : null
   if (style === 'utility' && desktop) return <UtilityBar />

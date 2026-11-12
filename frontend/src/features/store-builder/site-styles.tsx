@@ -53,7 +53,7 @@ export function SiteStylesDrawer({ open, onOpenChange, styles, canPublish }: { o
             <p className="text-xs text-muted-foreground">Someone with permission to publish makes these changes live.</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Logo, announcement, footer and layouts are on the <Link to="/admin/storefront/theme" className="underline underline-offset-2">Theme page</Link>.
+            Logo, announcement, footer and layouts are on the <Link to="/storefront/theme" className="underline underline-offset-2">Theme page</Link>.
           </p>
         </div>
       </SheetContent>

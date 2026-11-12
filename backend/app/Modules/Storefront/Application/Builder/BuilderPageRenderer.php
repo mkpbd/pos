@@ -27,6 +27,11 @@ use stdClass;
  *   An element whose content resolves empty is left out (draft: kept with `state: empty`).
  * - `media[media_id]`: `{url, srcset, width, height, alt}` for image elements and
  *   background images.
+ * - B4: `data[element_id]` also for countdown, discount, promo_card, menu and faq_list elements
+ *   (BuilderElementData); such an element without data is left out (draft: kept with
+ *   `state: empty`, or its data carries `state: expired | inactive | unavailable`). Translatable
+ *   B4 props are in the request's language too (`cta` button labels from the dot keys
+ *   `primary.label` / `secondary.label`).
  */
 class BuilderPageRenderer
 {
@@ -34,6 +39,7 @@ class BuilderPageRenderer
         private readonly SectionContentResolver $sections,
         private readonly MediaLibrary $media,
         private readonly LocaleContext $locale,
+        private readonly BuilderElementData $elementData,
     ) {}
 
     /**
@@ -48,15 +54,17 @@ class BuilderPageRenderer
 
         /** @var list<array<string, mixed>> $wrapped */
         $wrapped = [];
+        /** @var list<array{id: string, type: string, props: array<string, mixed>}> $dataElements */
+        $dataElements = [];
         $sections = [];
         foreach ($content['sections'] ?? [] as $section) {
-            $node = $this->node($section, $preview, $now, $wrapped);
+            $node = $this->node($section, $preview, $now, $wrapped, $dataElements);
             if ($node !== null) {
                 $sections[] = $node;
             }
         }
 
-        $data = $this->sections->resolve($wrapped, $preview);
+        $data = $this->sections->resolve($wrapped, $preview) + $this->elementData->resolve($dataElements, $preview);
         $sections = array_map(fn (array $section) => $this->withData($section, $data, $preview), $sections);
         if (! $preview) {
             // A section whose elements all dropped out (hidden, out of schedule, no content) would
@@ -117,6 +125,28 @@ class BuilderPageRenderer
     }
 
     /**
+     * The props of a basic or B4 element with its translatable props in `$locale` (per-field
+     * fallback to the base text; B4: nested props such as `cta` button labels use dot keys).
+     *
+     * @param  array<string, mixed>  $props
+     * @param  array<string, array<string, string>>  $translations
+     * @return array<string, mixed>
+     */
+    public static function localizedProps(string $type, array $props, array $translations, string $locale): array
+    {
+        foreach (array_keys(ElementRegistry::translatable($type)) as $field) {
+            $target = ElementRegistry::TRANSLATION_PATHS[$type][$field] ?? null;
+            if ($target === null) {
+                $props[$field] = Translations::value($translations, $field, $locale, $props[$field]);
+            } elseif (is_array($props[$target[0]] ?? null)) {
+                $props[$target[0]][$target[1]] = Translations::value($translations, $field, $locale, $props[$target[0]][$target[1]]);
+            }
+        }
+
+        return $props;
+    }
+
+    /**
      * `live`, `hidden`, `scheduled` (not started) or `expired`.
      *
      * @param  array<string, mixed>  $node
@@ -141,7 +171,7 @@ class BuilderPageRenderer
      * @param  list<array<string, mixed>>  $wrapped  inputs of the section content resolver (collected)
      * @return array<string, mixed>|null
      */
-    private function node(array $node, bool $preview, CarbonImmutable $now, array &$wrapped): ?array
+    private function node(array $node, bool $preview, CarbonImmutable $now, array &$wrapped, array &$dataElements): ?array
     {
         $state = $this->state($node, $now);
         if ($state !== 'live' && ! $preview) {
@@ -155,8 +185,9 @@ class BuilderPageRenderer
         if ($node['type'] !== 'section') {
             $sectionType = ElementRegistry::sectionType($node['type']);
             if ($sectionType === null) {
-                foreach (array_keys(ElementRegistry::translatable($node['type'])) as $field) {
-                    $node['props'][$field] = Translations::value($translations, $field, $locale, $node['props'][$field]);
+                $node['props'] = self::localizedProps($node['type'], $node['props'], $translations, $locale);
+                if (BuilderElementData::handles($node['type'])) {
+                    $dataElements[] = ['id' => $node['id'], 'type' => $node['type'], 'props' => $node['props']];
                 }
             } else {
                 $wrapped[] = [
@@ -185,7 +216,7 @@ class BuilderPageRenderer
             foreach ($node['columns'] as $c => $column) {
                 $elements = [];
                 foreach ($column['elements'] as $element) {
-                    $rendered = $this->node($element, $preview, $now, $wrapped);
+                    $rendered = $this->node($element, $preview, $now, $wrapped, $dataElements);
                     if ($rendered !== null) {
                         $elements[] = $rendered;
                     }
@@ -236,6 +267,12 @@ class BuilderPageRenderer
                     if ($preview && ($data[$element['id']]['state'] ?? null) === 'empty') {
                         $element['state'] = 'empty';
                     }
+                } elseif (BuilderElementData::handles($element['type']) && ! isset($data[$element['id']])) {
+                    // B4: the record is gone or not shown (published: left out; draft: kept as empty).
+                    if (! $preview) {
+                        continue;
+                    }
+                    $element['state'] ??= 'empty';
                 }
                 $elements[] = $this->withData($element, $data, $preview);
             }

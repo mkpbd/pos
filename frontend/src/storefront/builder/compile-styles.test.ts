@@ -237,3 +237,15 @@ describe('links', () => {
     expect(copy).toEqual(sampleDocument)
   })
 })
+
+describe('compileStyles scope (B4)', () => {
+  it('prefixes every selector with the document scope, and ignores an unsafe scope', () => {
+    const css = compileStyles(sampleDocument.sections, { media: sampleMedia, scope: 'header' })
+    const unscoped = compileStyles(sampleDocument.sections, { media: sampleMedia })
+    const selectors = css.split('\n').filter((line) => line.includes('{') && !line.startsWith('@media'))
+    expect(selectors.length).toBeGreaterThan(0)
+    for (const line of selectors) for (const part of line.trim().split('{')[0]!.split(',')) expect(part.trim().startsWith('[data-b-scope="header"] [data-b')).toBe(true)
+    expect(css.replaceAll('[data-b-scope="header"] ', '')).toBe(unscoped)
+    expect(compileStyles(sampleDocument.sections, { scope: 'x"]{}*{color:red' })).toBe(compileStyles(sampleDocument.sections))
+  })
+})

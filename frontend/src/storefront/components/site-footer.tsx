@@ -2,6 +2,8 @@ import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
+import { PageRenderer } from '../builder/page-renderer'
+import { isBuilderPayload } from '../builder/payload'
 import { useStoreLayout } from '../theme'
 import { CURRENT_YEAR, FOOTER_MENUS, SOCIAL_LABELS } from './footer-parts'
 import { ShowcaseFooter, WidgetsFooter } from './footer-variants'
@@ -12,6 +14,15 @@ import { MenuLink } from './menu-link'
 /** The footer in the theme's `footer_style`: link columns (today's), a product showcase, or widget columns. */
 export function SiteFooter() {
   const { footer_style: style } = useStoreLayout()
+  const { builder } = useStorefront()
+  // B4: a footer designed in the store builder, at every width.
+  if (isBuilderPayload(builder?.footer)) {
+    return (
+      <footer className="mt-auto bg-sf-surface" data-testid="site-footer" data-footer-style="builder">
+        <PageRenderer page={builder.footer} testId="builder-footer" scope="footer" />
+      </footer>
+    )
+  }
   if (style === 'showcase') return <ShowcaseFooter />
   if (style === 'widgets') return <WidgetsFooter />
   return <ColumnsFooter />

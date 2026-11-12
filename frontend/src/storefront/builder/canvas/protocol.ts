@@ -1,5 +1,5 @@
-import type { StoreSection, StorefrontBootstrap } from '../../types'
-import type { BuilderMedia, Device, RenderSection } from '../types'
+import type { StorefrontBootstrap } from '../../types'
+import type { BuilderData, BuilderMedia, Device, RenderSection } from '../types'
 import type { CanvasThemeSettings } from './theme-override'
 
 /*
@@ -14,13 +14,22 @@ export const PROTOCOL_VERSION = 1
 
 export type Rect = { x: number; y: number; w: number; h: number }
 
+/**
+ * B4 (additive, v stays 1): what kind of document the canvas draws. A page fills the canvas; a
+ * header, footer or zone is drawn where it sits on the store, next to a faded sample of the page
+ * around it. Absent = `page`.
+ */
+export type CanvasSurroundings = 'page' | 'header' | 'footer' | 'zone:listing.top' | 'zone:listing.bottom' | 'zone:product.after'
+
+export const CANVAS_SURROUNDINGS: readonly CanvasSurroundings[] = ['page', 'header', 'footer', 'zone:listing.top', 'zone:listing.bottom', 'zone:product.after']
+
 /** Parent → canvas. */
 export type ParentMessage =
   | { type: 'init'; bootstrap: StorefrontBootstrap; locale: string }
   | {
       type: 'render'
       sections: RenderSection[]
-      data: Record<string, StoreSection>
+      data: Record<string, BuilderData>
       media: Record<string, BuilderMedia>
       selection: string | null
       hover: string | null
@@ -29,6 +38,10 @@ export type ParentMessage =
       device: Device
       /** Wrapped elements waiting for their data (drawn as skeletons). */
       pending: string[]
+      /** B4: the kind of document (default `page`). */
+      surroundings?: CanvasSurroundings
+      /** B4: what the canvas says while the document is empty. */
+      emptyText?: string
     }
   | { type: 'scroll-to'; id: string }
   /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */

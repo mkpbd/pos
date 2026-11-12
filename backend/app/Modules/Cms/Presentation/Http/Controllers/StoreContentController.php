@@ -4,6 +4,7 @@ namespace App\Modules\Cms\Presentation\Http\Controllers;
 
 use App\Modules\Cms\Application\Actions\ContactMessages;
 use App\Modules\Cms\Application\Actions\NewsletterSubscriptions;
+use App\Modules\Cms\Application\Contracts\PageDesigns;
 use App\Modules\Cms\Domain\PageTemplate;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
@@ -23,8 +24,14 @@ class StoreContentController
      *
      * A published page by slug; drafts, scheduled and deleted pages are 404. Pages with the
      * `faq` template include the active FAQ entries, grouped.
+     *
+     * B4: `builder` — the page's published store builder design as a render payload
+     * `{document, sections, media, data}` (`faq_list` elements carry the FAQ in `data`), or null
+     * (the storefront shows `body_html`). `?preview=draft` from staff of this store holding
+     * storefront.view gives the builder draft instead (`no-store`). Title, slug and SEO fields
+     * stay the page's own.
      */
-    public function page(string $slug, LocaleContext $locale): JsonResponse
+    public function page(Request $request, string $slug, LocaleContext $locale, PageDesigns $designs): JsonResponse
     {
         $page = CmsPage::query()->visible()->whereRaw('lower(slug) = ?', [mb_strtolower($slug)])->first();
         if ($page === null) {
@@ -35,8 +42,12 @@ class StoreContentController
         if ($page->template === PageTemplate::Faq) {
             $data['faq'] = CmsPresenter::publicFaq(FaqItem::query()->where('is_active', true)->get(), $locale->current());
         }
+        $draft = $designs->isDraftPreview($request);
+        $data['builder'] = $designs->forPage($page->id, $draft);
 
-        return ApiResponse::success($data);
+        $response = ApiResponse::success($data);
+
+        return $draft ? $response->header('Cache-Control', 'no-store, private') : $response;
     }
 
     /**

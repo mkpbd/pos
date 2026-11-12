@@ -63,6 +63,11 @@ class SaveThemeRequest extends FormRequest
             "{$p}layout.hero_style" => ['sometimes', Rule::in(ThemeSchema::HERO_STYLES)],
             "{$p}layout.heading_case" => ['sometimes', Rule::in(ThemeSchema::HEADING_CASES)],
             "{$p}layout.top_bar" => ['sometimes', Rule::in(ThemeSchema::TOP_BARS)],
+            // B4: products per row on listings, per device.
+            "{$p}layout.listing_columns" => ['sometimes', 'array'],
+            "{$p}layout.listing_columns.desktop" => ['sometimes', 'integer', Rule::in(ThemeSchema::LISTING_COLUMNS['desktop'])],
+            "{$p}layout.listing_columns.tablet" => ['sometimes', 'integer', Rule::in(ThemeSchema::LISTING_COLUMNS['tablet'])],
+            "{$p}layout.listing_columns.mobile" => ['sometimes', 'integer', Rule::in(ThemeSchema::LISTING_COLUMNS['mobile'])],
             "{$p}logo_media_id" => ['sometimes', 'nullable', 'uuid'],
             "{$p}favicon_media_id" => ['sometimes', 'nullable', 'uuid'],
             "{$p}announcement" => ['sometimes', 'array'],

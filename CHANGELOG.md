@@ -21,6 +21,54 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B4 — Visual store builder: content pages, header, footer, shop zones, remaining elements
+
+Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built). With nothing published in the builder, every page renders exactly as before.
+
+#### Added
+- **Content pages:** any CMS page (About, Contact, FAQ, Privacy, Terms …) can be designed with the builder (document `cms:<id>`; "Design with the builder" imports the page's text). The FAQ list and contact form keep working as elements. Title, slug and SEO stay in the Cms module, and deleting the design restores the classic page.
+- **Header and footer builders** (`header`, `footer` documents; "Design" starts from today's layout):
+  - The header is used from 768 px; phones keep the compact header and drawer.
+  - The footer is used at every width.
+  - The classic announcement bar stays unless the builder header contains it.
+- **Shop and product zones:** `listing.top` / `listing.bottom` around the grid on shop, category, brand and search pages, and `product.after` below product details. **Products per row** per device (`layout.listing_columns`, default 3 / 3 / 2 = today's grid). Listings, filters, cart and checkout are unchanged.
+- **Elements:**
+  - Video: YouTube / Vimeo, click-to-load, privacy-enhanced embeds.
+  - Icon (20-icon set), countdown (date or promotion), discount (live promotion with optional coupon code and a copy button), call-to-action, search box, promoted product.
+  - Site parts: logo, menu, account, wishlist, cart with count and total, language switch, announcement, social icons, payment icons, contact details, copyright, newsletter form.
+  - FAQ list and contact form (content pages).
+  - Custom HTML, sanitized server- and client-side.
+  - Each element type declares where it is allowed (`allowed_in`); the editor only offers those, and the server enforces it (`ELEMENT_NOT_ALLOWED`).
+- **Permission `storefront.custom_html`:** adding or changing custom HTML needs it (403 `CUSTOM_HTML_FORBIDDEN`), while moving, hiding or deleting does not. Organization Admin has it; Online Store Manager does not.
+- **Editor:**
+  - The Page builder list has three groups: Pages, Site parts, and Shop & product pages, the last with a products-per-row card.
+  - The canvas shows per-kind surroundings: a sample page under a header, sample products around a listing zone.
+  - Forms and setup dialogs exist for every new element, with Bangla fields.
+  - Live preview data for countdown, discount, promoted product, menu and FAQ comes through `POST /builder/resolve`.
+- **API:**
+  - Document kinds `header`, `footer` and `zone`, plus `cms:` keys.
+  - `from: cms | current` importers.
+  - Summaries carry `cms_page` and `preview_url` for every kind.
+  - Bootstrap `builder: {home, header, footer, zones}`.
+  - `GET /store/pages/{slug}` carries `builder`.
+  - New module contracts: `PromotionShowcase`, Cms `PageContent` / `PageDesigns`, and `StorefrontCatalog::latestProductSlug()`.
+- **Styles are now scoped per document** (`compileStyles(…, {scope})`), so a header and a footer that use the same node ids no longer share styles.
+
+#### Upgrade
+- Run `php artisan pos:permissions:sync` after deploying. It adds `storefront.publish` (B1) and `storefront.custom_html` (B4) to the catalog and to the built-in roles. Without it, nobody can publish builder pages or the theme on existing databases.
+
+#### Tests
+- Backend 832 (PostgreSQL 831 + 1 skip; SQLite 826 + 6 skip).
+- Vitest 1243. Mocked Playwright 200 passed, 90 skipped (the editor spec now allows 30 s for the canvas's first compile when all specs run in parallel).
+- Full-stack: integration 24/24; demo stores 8/8. The new test has Green Basket's footer and About page designed with the builder, hidden while in draft and live after publishing.
+- The full-stack specs now use a 15 s assertion timeout. During one run the machine was heavily loaded by other applications (Visual Studio), every request took 2–4 s on the single-threaded dev server, and several tests timed out at different steps. A clean run at normal load passed 24/24.
+
+#### Known issue (not from B4)
+- Under heavy load the admin *New product* form once lost typed prices and barcode after the unit was chosen. It could not be reproduced at normal load, and the cause is not found yet.
+
+#### Docs
+- Bangla manual §17.6 (content pages, header / footer, shop zones, new elements; screenshot 48); API documentation; deployment guide upgrade note; plan §11.
+
 ### B3 — Visual store builder: design controls and theme drafts
 
 Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built).

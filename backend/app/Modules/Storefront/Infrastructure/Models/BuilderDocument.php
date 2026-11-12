@@ -15,7 +15,9 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * A store builder document (B1): an editable draft and a pointer to its published version.
- * `key` is `home` or `landing:<slug>` for pages (later `cms:<id>`, `header`, `footer`, …).
+ * `key` is `home`, `landing:<slug>` or (B4) `cms:<cms page id>` for pages (kind `page`), `header`
+ * and `footer` (kinds `header`, `footer`) and `zone:<listing.top|listing.bottom|product.after>`
+ * (kind `zone`); `theme` for the theme draft (kind `theme`, B3).
  *
  * Only what shoppers can see bumps the storefront content version: publishing (the pointer),
  * the title of a published document, deleting a published document. Draft saves do not.
@@ -40,6 +42,16 @@ class BuilderDocument extends Model
 
     public const KIND_PAGE = 'page';
 
+    /** B4: the store header, footer and the shop / product zones. */
+    public const KIND_HEADER = 'header';
+
+    public const KIND_FOOTER = 'footer';
+
+    public const KIND_ZONE = 'zone';
+
+    /** The kinds of the builder documents API (everything but the theme draft). */
+    public const BUILDER_KINDS = [self::KIND_PAGE, self::KIND_HEADER, self::KIND_FOOTER, self::KIND_ZONE];
+
     /** B3: the theme draft (one per organization, key `theme`); not a page of the builder API. */
     public const KIND_THEME = 'theme';
 
@@ -48,6 +60,19 @@ class BuilderDocument extends Model
     public const HOME = 'home';
 
     public const LANDING_PREFIX = 'landing:';
+
+    /** B4: a CMS page designed with the builder: `cms:<cms page uuid>`. */
+    public const CMS_PREFIX = 'cms:';
+
+    public const HEADER = 'header';
+
+    public const FOOTER = 'footer';
+
+    /** B4: `zone:<zone>`. */
+    public const ZONE_PREFIX = 'zone:';
+
+    /** Above / below the product grid on shop, category, brand and search; below product details. */
+    public const ZONES = ['listing.top', 'listing.bottom', 'product.after'];
 
     protected $attributes = [
         'draft' => '{}',
@@ -84,30 +109,39 @@ class BuilderDocument extends Model
     }
 
     /**
-     * Route binding (`{document}` of the builder API) finds pages only: the theme draft has its
-     * own endpoints (`/storefront/theme/draft`, …) and content format.
+     * Route binding (`{document}` of the builder API) finds builder documents only (pages,
+     * B4: header, footer, zones): the theme draft has its own endpoints (`/storefront/theme/draft`,
+     * …) and content format.
      *
      * @param  Builder<static>|Relation<static, *, *>  $query
      * @return Builder<static>|Relation<static, *, *>
      */
     public function resolveRouteBindingQuery($query, $value, $field = null)
     {
-        return parent::resolveRouteBindingQuery($query, $value, $field)->where('kind', self::KIND_PAGE);
+        return parent::resolveRouteBindingQuery($query, $value, $field)->whereIn('kind', self::BUILDER_KINDS);
     }
 
     /**
-     * Pages only (B3: the theme draft is a document too).
+     * Builder documents: pages, header, footer and zones (B3: the theme draft is a document too).
      *
      * @param  Builder<BuilderDocument>  $query
      */
-    public function scopePages(Builder $query): void
+    public function scopeBuilder(Builder $query): void
     {
-        $query->where('kind', self::KIND_PAGE);
+        $query->whereIn('kind', self::BUILDER_KINDS);
     }
 
     public function isHome(): bool
     {
         return $this->key === self::HOME;
+    }
+
+    /**
+     * B4: the CMS page id of a `cms:<uuid>` document, or null.
+     */
+    public function cmsPageId(): ?string
+    {
+        return str_starts_with($this->key, self::CMS_PREFIX) ? substr($this->key, strlen(self::CMS_PREFIX)) : null;
     }
 
     /**
@@ -120,7 +154,8 @@ class BuilderDocument extends Model
 
     /**
      * Where the page is on the store (B2): `/` for the home page, `/p/<slug>` for a landing
-     * page; null for documents that are not pages of their own.
+     * page; null for documents that are not pages of their own (B4: header, footer, zones; a CMS
+     * page's path `/pages/<slug>` comes from the Cms module, see BuilderPresenter).
      */
     public function storePath(): ?string
     {

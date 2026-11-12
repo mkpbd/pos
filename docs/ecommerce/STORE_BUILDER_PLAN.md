@@ -1,6 +1,6 @@
 # Visual Store Builder — analysis and architecture (B1–B5)
 
-Status: **approved 2026-11-11** (decisions in §10). **B1–B3 done** (engine, editor, design controls; see §11); B4 (pages, header, footer) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
+Status: **approved 2026-11-11** (decisions in §10). **B1–B4 done** (engine, editor, design controls, pages / header / footer / zones; see §11); B5 (templates, start from demo, verification) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
 
 ## 1. What already exists (reused)
 
@@ -273,3 +273,24 @@ Original questions:
   - `theme:button` / `theme:link` are not style tokens: the 11-role token list stays shared with `validate.ts`.
 - **Draft preview:** `StaffPreview` support. Staff `?preview=draft` on bootstrap and on the HTML shell (`no-store`, noindex); canvas-context always returns the draft theme.
 - **Not covered:** the divider's colour field in the Content tab still uses the simple theme-colour select. Turning off "fill the column width" on a device that inherits 100 % isn't possible (no `auto` width).
+
+### As built — B4 (2026-11-12)
+
+- **Kinds and keys:** `page` (`home`, `landing:<slug>`, `cms:<uuid>`), `header`, `footer`, and `zone` (`zone:listing.top|listing.bottom|product.after`). `ElementRegistry` declares `allowed_in` per type, and a sixth group, `site`, covers the header and footer parts.
+  - Importers: `from: homepage` (home), `cms` (cms keys), `current` (header and footer).
+  - Deleting any non-home document returns that part to its classic rendering.
+- **Module boundaries:**
+  - Promotions exposes `PromotionShowcase` (countdowns, discounts and the first usable coupon code).
+  - Cms exposes `PageContent` and declares `PageDesigns` (bound by Storefront; `NoPageDesigns` by default).
+  - OnlineCatalog adds `latestProductSlug()` for the product-zone preview link.
+  - Menu trees moved to `Storefront/Application/Queries/MenuTrees`, with unchanged output.
+- **Data elements:** countdown, discount, promo card, menu and FAQ list resolve server-side. Published payloads drop an element whose data isn't running; drafts keep it with `state`. Countdown and promotion boundaries feed the next-change time, so caches expire on time.
+- **Storefront:**
+  - Bootstrap carries header, footer and zone payloads.
+  - The header applies from 768 px; phones keep the compact header.
+  - `listing_columns` breakpoints are 768 / 1024 px, so the default output stays identical to today.
+  - CMS builder pages keep the page title band unless the design has its own visible h1.
+- **Custom HTML:** sanitized by `HtmlSanitizer` (class and id dropped) and re-sanitized on the client. The permission is checked when a node is added or its `html` changes. Restoring a version does not re-check it, because that HTML was allowed when it was saved.
+- **Open:**
+  - Deleting a CMS page leaves its builder document behind (the list shows it without a page).
+  - The divider's colour field in the Content tab still uses the simple select.

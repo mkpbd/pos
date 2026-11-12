@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_footer_main",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": null },
+      "style": {
+        "base": { "background": { "type": "color", "color": "theme:surface" }, "spacing": { "padding": { "top": "48px", "bottom": "48px" } } }
+      },
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_brand",
+          "type": "column",
+          "width": { "base": 34, "tablet": 50, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_logo",
+              "type": "logo",
+              "props": { "height": 40, "link": { "url": "/" } },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_about",
+              "type": "text",
+              "props": { "html": "<p>Fresh, local food since 2010.</p>" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "html": "<p>২০১০ সাল থেকে তাজা, স্থানীয় খাবার।</p>" } }
+            },
+            {
+              "id": "e_payment",
+              "type": "payment_icons",
+              "props": { "height": 24 },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_links",
+          "type": "column",
+          "width": { "base": 22, "tablet": 50, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_links_heading",
+              "type": "heading",
+              "props": { "text": "Shop", "level": 2, "link": null },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "text": "কেনাকাটা" } }
+            },
+            {
+              "id": "e_footer_menu",
+              "type": "menu",
+              "props": { "menu_id": "01a1c9d9-0000-7000-8000-000000000102", "layout": "vertical", "show_children": "none" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_contact",
+          "type": "column",
+          "width": { "base": 22, "tablet": 50, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_contact_heading",
+              "type": "heading",
+              "props": { "text": "Contact us", "level": 2, "link": null },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_contact",
+              "type": "contact_block",
+              "props": { "show_phone": true, "show_email": true, "show_address": true, "layout": "stacked" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_social",
+              "type": "social_icons",
+              "props": { "size": 24, "style": "square", "color": "theme:accent" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_newsletter",
+          "type": "column",
+          "width": { "base": 22, "tablet": 50, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_newsletter",
+              "type": "newsletter_form",
+              "props": { "title": "Join our newsletter", "text": "", "button_label": "Subscribe", "layout": "stacked" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": { "bn": { "title": "নিউজলেটারে যোগ দিন" } }
+            },
+            {
+              "id": "e_footer_icon",
+              "type": "icon",
+              "props": { "name": "leaf", "size": 32, "color": "#2e7d32", "label": "", "link": null },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_footer_bottom",
+      "type": "section",
+      "props": { "layout": "boxed", "anchor": null },
+      "style": { "base": { "layout": { "align": "center", "justify": "between" } } },
+      "visibility": { "desktop": true, "tablet": true, "mobile": true },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_copyright",
+          "type": "column",
+          "width": { "base": 70, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_copyright",
+              "type": "copyright",
+              "props": { "text": null },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        },
+        {
+          "id": "c_language",
+          "type": "column",
+          "width": { "base": 30, "mobile": 100 },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_language",
+              "type": "language_switch",
+              "props": { "style": "select" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            },
+            {
+              "id": "e_footer_html",
+              "type": "custom_html",
+              "props": { "html": "<p>Trade licence 12345</p>" },
+              "style": {},
+              "visibility": { "desktop": true, "tablet": true, "mobile": true },
+              "hidden": false,
+              "schedule": null,
+              "translations": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -5,8 +5,8 @@
  * invalid values are dropped, unknown keys are dropped, nothing is filled in.
  */
 
-import type { ThemeColors } from '../types'
-import type { Background, Gradient, GradientStop, Length, ResponsiveStyle, Shadow, Sides, Style, Typography } from './types'
+import type { ListingColumns, ThemeColors } from '../types'
+import type { Background, Gradient, GradientStop, Length, ResponsiveStyle, Shadow, Sides, Style, Typography, VideoProvider } from './types'
 
 type Obj = Record<string, unknown>
 
@@ -287,4 +287,120 @@ export function safeUrl(value: unknown): string | null {
 /** `{url}` with a safe url, else null. */
 export function safeLink(value: unknown): string | null {
   return isObject(value) ? safeUrl(value.url) : null
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B4 elements (contract §2)
+ * -------------------------------------------------------------------------------------------- */
+
+export const B4_ENUMS = {
+  videoProvider: ['youtube', 'vimeo'],
+  videoAspect: ['16:9', '4:3', '1:1', '9:16'],
+  countdownSource: ['date', 'promotion'],
+  countdownStyle: ['boxes', 'inline'],
+  ctaAlign: ['left', 'center', 'right'],
+  menuLayout: ['horizontal', 'vertical'],
+  /** Header menus: none | dropdown | mega; footer menus: none | list. */
+  menuChildrenHeader: ['none', 'dropdown', 'mega'],
+  menuChildrenFooter: ['none', 'list'],
+  languageStyle: ['links', 'select'],
+  socialStyle: ['plain', 'circle', 'square'],
+  blockLayout: ['stacked', 'inline'],
+  faqStyle: ['accordion', 'list'],
+} as const
+
+/** Bounds of the B4 numeric and text props. */
+export const B4_LIMITS = {
+  videoStart: { min: 0, max: 86_400 },
+  iconSize: { min: 16, max: 128 },
+  socialSize: { min: 16, max: 48 },
+  paymentHeight: { min: 16, max: 48 },
+  logoHeight: { min: 24, max: 96 },
+  ctaTitle: 120,
+  ctaText: 400,
+  promoBadge: 24,
+  customHtml: 20_000,
+} as const
+
+/** Maximum length of each translatable B4 text prop (backend ElementRegistry::TRANSLATABLE; nested props with a dot). */
+export const B4_TEXT_LIMITS = {
+  video: { title: 200 },
+  icon: { label: 120 },
+  countdown: { title: 120, expired_text: 200 },
+  discount: { title: 120, text: 400, button_label: 60 },
+  cta: { title: 120, text: 400, 'primary.label': 60, 'secondary.label': 60 },
+  search_box: { placeholder: 80, button_label: 30 },
+  promo_card: { badge: 24, title: 120, text: 200, button_label: 30 },
+  copyright: { text: 200 },
+  newsletter_form: { title: 120, text: 300, button_label: 40 },
+  faq_list: { title: 120 },
+  contact_form: { title: 120 },
+} as const
+
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{6,20}$/
+const VIMEO_ID = /^\d{1,20}$/
+
+/** Longest video URL normalize accepts (backend ElementRegistry::VIDEO_URL_MAX). */
+export const VIDEO_URL_MAX = 500
+
+const VIDEO_PATTERNS: [VideoProvider, RegExp][] = [
+  ['youtube', /^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(?:[^\s#]*&)?v=([A-Za-z0-9_-]{6,20})(?:[&#][^\s]*)?$/],
+  ['youtube', /^https?:\/\/youtu\.be\/([A-Za-z0-9_-]{6,20})(?:[?#][^\s]*)?$/],
+  ['youtube', /^https?:\/\/(?:www\.|m\.)?youtube\.com\/shorts\/([A-Za-z0-9_-]{6,20})(?:[?#][^\s]*)?$/],
+  ['vimeo', /^https?:\/\/(?:www\.)?vimeo\.com\/(\d{1,20})(?:[/?#][^\s]*)?$/],
+]
+
+/**
+ * A video URL the builder accepts → provider and id (the backend's ElementRegistry::parseVideoUrl
+ * patterns): YouTube `youtube.com/watch?v=<id>`, `youtu.be/<id>`, `youtube.com/shorts/<id>`
+ * (id 6–20 of `[A-Za-z0-9_-]`); Vimeo `vimeo.com/<digits>`. Anything else is null.
+ */
+export function parseVideoUrl(value: unknown): { provider: VideoProvider; video_id: string } | null {
+  if (typeof value !== 'string' || value.length > VIDEO_URL_MAX) return null
+  for (const [provider, pattern] of VIDEO_PATTERNS) {
+    const match = pattern.exec(value)
+    if (match?.[1]) return { provider, video_id: match[1] }
+  }
+  return null
+}
+
+/** The privacy-enhanced player URL of a video (no cookies before play; Vimeo `dnt=1`). Null for an invalid id. */
+export function videoEmbedUrl(provider: unknown, videoId: unknown, options: { autoplay?: boolean; start?: number } = {}): string | null {
+  const start = typeof options.start === 'number' && Number.isInteger(options.start) && options.start > 0 ? options.start : 0
+  if (provider === 'youtube' && typeof videoId === 'string' && YOUTUBE_ID.test(videoId)) {
+    const query = new URLSearchParams({ rel: '0' })
+    // The visitor clicked play: start playing (muted when the owner asked for autoplay).
+    query.set('autoplay', '1')
+    if (options.autoplay) query.set('mute', '1')
+    if (start) query.set('start', String(start))
+    return `https://www.youtube-nocookie.com/embed/${videoId}?${query.toString()}`
+  }
+  if (provider === 'vimeo' && typeof videoId === 'string' && VIMEO_ID.test(videoId)) {
+    const query = new URLSearchParams({ dnt: '1', autoplay: '1' })
+    if (options.autoplay) query.set('muted', '1')
+    return `https://player.vimeo.com/video/${videoId}?${query.toString()}${start ? `#t=${start}s` : ''}`
+  }
+  return null
+}
+
+/** An integer in [min, max], else the fallback. */
+export function boundedInt(value: unknown, min: number, max: number, fallback: number): number {
+  return isNumber(value) && Number.isInteger(value) && value >= min && value <= max ? value : fallback
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B4 theme `layout.listing_columns`
+ * -------------------------------------------------------------------------------------------- */
+
+export const LISTING_COLUMN_OPTIONS = { desktop: [3, 4, 5], tablet: [2, 3, 4], mobile: [1, 2] } as const
+
+/** Today's listing grid (`grid-cols-2 md:grid-cols-3`): 3 per row from 768 px, 2 below. */
+export const DEFAULT_LISTING_COLUMNS = { desktop: 3, tablet: 3, mobile: 2 } as const satisfies ListingColumns
+
+/** The theme's products per row with every device set; missing or invalid values take today's grid. */
+export function normalizeListingColumns(value: unknown): ListingColumns {
+  const source = isObject(value) ? value : {}
+  const pick = <K extends keyof ListingColumns>(key: K): ListingColumns[K] =>
+    ((LISTING_COLUMN_OPTIONS[key] as readonly number[]).includes(source[key] as number) ? source[key] : DEFAULT_LISTING_COLUMNS[key]) as ListingColumns[K]
+  return { desktop: pick('desktop'), tablet: pick('tablet'), mobile: pick('mobile') }
 }

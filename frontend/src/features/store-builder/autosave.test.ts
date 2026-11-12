@@ -2,7 +2,7 @@ import { ApiError } from '@/lib/api/client'
 import { cloneSample } from '@/storefront/builder/test-payload'
 import type { BuilderContent } from '@/storefront/builder/types'
 import type { DocumentDetail } from './api'
-import { Autosave, AUTOSAVE_DELAY, problemsByNode } from './autosave'
+import { Autosave, AUTOSAVE_DELAY, isCustomHtmlForbidden, problemsByNode } from './autosave'
 import { createEditorStore } from './store'
 import { detail } from './test-helpers'
 import { setProps } from './tree'
@@ -184,5 +184,30 @@ describe('autosave', () => {
 
   it('groups problems without a node under the page', () => {
     expect(problemsByNode(new ApiError(422, 'DOCUMENT_EMPTY', 'Empty page'))).toEqual({ '': [{ path: '', message: 'Empty page' }] })
+  })
+})
+
+describe('autosave: custom HTML permission (B4)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('403 CUSTOM_HTML_FORBIDDEN marks the node like a 422 and waits for the next change', async () => {
+    const error = new ApiError(403, 'CUSTOM_HTML_FORBIDDEN', 'You may not add or change custom HTML.', {
+      errors: [{ path: 'sections.1.columns.0.elements.0', node_id: 'e_heading', message: 'You may not add or change custom HTML.', code: 'CUSTOM_HTML_FORBIDDEN' }],
+    })
+    const { store, save, edit } = setup(async () => {
+      throw error
+    })
+    edit('x')
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY)
+    expect(store.getState().saveState.status).toBe('invalid')
+    expect(store.getState().errors.e_heading?.[0]).toMatchObject({ message: 'You may not add or change custom HTML.', code: 'CUSTOM_HTML_FORBIDDEN' })
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY * 5)
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
+  it('a 403 naming only the node goes to that node', () => {
+    expect(problemsByNode(new ApiError(403, 'CUSTOM_HTML_FORBIDDEN', 'Not allowed', { node_id: 'e_html' }))).toEqual({ e_html: [{ path: '', message: 'Not allowed' }] })
+    expect(isCustomHtmlForbidden(new ApiError(403, 'FORBIDDEN', 'No'))).toBe(false)
   })
 })

@@ -3,9 +3,13 @@
 namespace App\Modules\Cms;
 
 use App\Modules\Cms\Application\Contracts\BlogDirectory;
+use App\Modules\Cms\Application\Contracts\PageContent;
+use App\Modules\Cms\Application\Contracts\PageDesigns;
 use App\Modules\Cms\Application\Contracts\PageDirectory;
+use App\Modules\Cms\Application\Services\NoPageDesigns;
 use App\Modules\Cms\Infrastructure\BlogMediaReferences;
 use App\Modules\Cms\Infrastructure\EloquentBlogDirectory;
+use App\Modules\Cms\Infrastructure\EloquentPageContent;
 use App\Modules\Cms\Infrastructure\EloquentPageDirectory;
 use App\Modules\Media\Application\Contracts\MediaReferences;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
@@ -23,6 +27,9 @@ class CmsServiceProvider extends ModuleServiceProvider
     {
         $this->app->bind(PageDirectory::class, EloquentPageDirectory::class);
         $this->app->bind(BlogDirectory::class, EloquentBlogDirectory::class);
+        // B4: pages and FAQ for the store builder; the builder's designs of pages (Storefront binds it).
+        $this->app->bind(PageContent::class, EloquentPageContent::class);
+        $this->app->bindIf(PageDesigns::class, NoPageDesigns::class);
         $this->app->tag([BlogMediaReferences::class], MediaReferences::TAG);
     }
 

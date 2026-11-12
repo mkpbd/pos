@@ -265,7 +265,7 @@ class BuilderDocumentSchemaTest extends TestCase
     public function test_the_registry_describes_every_element_type(): void
     {
         $meta = ElementRegistry::metadata();
-        $this->assertCount(7 + count(SectionType::cases()), $meta['types']);
+        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4), $meta['types']);
         $byType = array_column($meta['types'], null, 'type');
         $this->assertSame('columns', $byType['inner_row']['children']);
         $this->assertSame(['text'], $byType['heading']['translatable']);
@@ -279,8 +279,12 @@ class BuilderDocumentSchemaTest extends TestCase
             if ($sectionType !== null && ($sectionType->itemLimits() !== null || in_array($sectionType, [SectionType::RichText, SectionType::FeaturesStrip, SectionType::Testimonials, SectionType::BannerGrid, SectionType::ProductTabs], true))) {
                 continue;
             }
+            // B4: these start without the content they need (the editor's setup dialog).
+            if (in_array($type, ['video', 'countdown', 'discount', 'promo_card', 'menu', 'custom_html'], true)) {
+                continue;
+            }
             $element = ['id' => 'e_x', 'type' => $type, 'props' => ElementRegistry::defaults($type)] + ($type === 'inner_row' ? ['columns' => [['id' => 'c_x', 'width' => ['base' => 100], 'elements' => []]]] : []);
-            $props = BuilderDocumentSchema::normalize($this->withElement($element))['sections'][0]['columns'][0]['elements'][0]['props'];
+            $props = BuilderDocumentSchema::normalize($this->withElement($element), ElementRegistry::allowedIn($type)[0])['sections'][0]['columns'][0]['elements'][0]['props'];
             $this->assertSame(ElementRegistry::defaults($type), $props, $type);
         }
     }

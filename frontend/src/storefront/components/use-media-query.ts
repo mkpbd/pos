@@ -3,6 +3,9 @@ import { useCallback, useSyncExternalStore } from 'react'
 /** Tailwind's `lg` breakpoint (64rem): the desktop header, top bar and navigation. */
 export const DESKTOP_QUERY = '(min-width: 64rem)'
 
+/** Tailwind's `md` breakpoint (48rem): from here a store-builder header replaces the compact phone header (B4). */
+export const TABLET_UP_QUERY = '(min-width: 48rem)'
+
 export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
 function mediaQueryList(query: string): MediaQueryList | null {
@@ -25,4 +28,9 @@ export function useMediaQuery(query: string): boolean {
 /** Desktop layout (≥ lg). Header and top-bar variants are desktop-only; smaller screens keep the standard mobile header. */
 export function useIsDesktop(): boolean {
   return useMediaQuery(DESKTOP_QUERY)
+}
+
+/** ≥ md (768 px): where a store-builder header is shown (B4). */
+export function useIsTabletUp(): boolean {
+  return useMediaQuery(TABLET_UP_QUERY)
 }

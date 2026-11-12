@@ -29,6 +29,8 @@ class ThemePresetsTest extends TestCase
         'hero_style' => 'full',
         'heading_case' => 'normal',
         'top_bar' => 'none',
+        // B4: products per row on listings (today's grid).
+        'listing_columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2],
     ];
 
     public function test_a_theme_stored_before_presets_reads_as_todays_look(): void
@@ -73,6 +75,7 @@ class ThemePresetsTest extends TestCase
                 'container_width' => 1170, 'sticky_header' => true,
                 'header_style' => 'commerce', 'footer_style' => 'widgets', 'card_style' => 'minimal',
                 'hero_style' => 'tiles', 'heading_case' => 'uppercase', 'top_bar' => 'ticker',
+                'listing_columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2],
             ]);
 
         $this->putJson('/api/v1/storefront/theme', ['typography' => ['heading_font' => 'jost', 'body_font' => 'jost']])->assertOk();

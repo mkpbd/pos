@@ -1,4 +1,7 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect as baseExpect, test, type Page } from '@playwright/test'
+
+// Full-stack against `php artisan serve` (one request at a time): storefront pages need a few seconds after admin changes.
+const expect = baseExpect.configure({ timeout: 15_000 })
 
 /**
  * Full-stack checks of the three theme demo stores (T3) against a real backend seeded with
@@ -294,4 +297,57 @@ test('B2: the Mati & Co. owner builds the homepage in the page builder and publi
   await expect(live).toBeVisible()
   expect((await welcome.boundingBox())!.y).toBeLessThan((await live.boundingBox())!.y)
   await shopper.close()
+})
+
+test('B4: Green Basket designs its footer and About page with the builder; shoppers see them only after publishing', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(120_000)
+  const base = origin('vegan.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json()) as { data: Record<string, unknown> & { id: string } } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // Before: the theme's footer and the classic About page.
+  await page.goto(`${base}/pages/about-us`)
+  await expect(page.getByRole('heading', { name: 'Plants first, since 2019' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('[data-b-scope="footer"]')).toHaveCount(0)
+  await expect(page.locator('[data-b-scope="page"]')).toHaveCount(0)
+
+  // The owner starts the footer from the current one and the About page from its CMS content.
+  const footer = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'footer', key: 'footer', title: 'Footer', from: 'current' })
+  expect(footer.status).toBe(201)
+  const pages = await admin.evaluate(async () => (await (await fetch('/api/v1/cms/pages?per_page=100', { headers: { Accept: 'application/json' }, credentials: 'include' })).json()) as { data: { id: string; slug: string }[] })
+  const about = pages.data.find((p) => p.slug === 'about-us')!
+  const design = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: `cms:${about.id}`, title: 'About us', from: 'cms' })
+  expect(design.status).toBe(201)
+
+  // Drafts are not live.
+  await page.goto(`${base}/pages/about-us`)
+  await expect(page.getByRole('heading', { name: 'Plants first, since 2019' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('[data-b-scope="footer"]')).toHaveCount(0)
+  await expect(page.locator('[data-b-scope="page"]')).toHaveCount(0)
+
+  // Published: the builder footer is on every page and the About page renders from its design, same text.
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${footer.body.data.id}/publish`, { note: 'Builder footer' })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${design.body.data.id}/publish`, { note: 'About in the builder' })).status).toBe(200)
+  await adminContext.close()
+
+  await page.goto(`${base}/pages/about-us`)
+  await expect(page.locator('[data-b-scope="page"]')).toBeAttached({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: 'Plants first, since 2019' })).toBeVisible()
+  const builtFooter = page.locator('[data-b-scope="footer"]')
+  await expect(builtFooter).toBeAttached()
+  await expect(builtFooter).toContainText('Green Basket')
+  await page.goto(`${base}/`)
+  await expect(page.locator('[data-b-scope="footer"]')).toBeAttached({ timeout: 15_000 })
 })

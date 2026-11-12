@@ -18,7 +18,14 @@ export const SEARCH_DEBOUNCE_MS = 250
  * characters fetches suggestions after a short pause; Arrow keys move through them, Enter
  * opens the highlighted one (or searches), Escape closes the list. Submitting goes to /search.
  */
-type SearchProps = { className?: string; autoFocus?: boolean; onDone?: () => void }
+type SearchProps = {
+  className?: string
+  autoFocus?: boolean
+  onDone?: () => void
+  /** B4 (builder search box): the field's placeholder and a text on the button (default: the icon alone). */
+  placeholder?: string
+  buttonLabel?: string
+}
 
 export function HeaderSearch(props: SearchProps) {
   const location = useLocation()
@@ -27,7 +34,7 @@ export function HeaderSearch(props: SearchProps) {
   return <SearchBox key={`${location.pathname}|${urlTerm}`} initialValue={urlTerm} {...props} />
 }
 
-function SearchBox({ className, autoFocus = false, onDone, initialValue }: SearchProps & { initialValue: string }) {
+function SearchBox({ className, autoFocus = false, onDone, initialValue, placeholder, buttonLabel }: SearchProps & { initialValue: string }) {
   const id = useId()
   const listId = `${id}-list`
   const navigate = useNavigate()
@@ -135,7 +142,7 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
           autoComplete="off"
           enterKeyHint="search"
           maxLength={100}
-          placeholder={t('shell.search.placeholder')}
+          placeholder={placeholder || t('shell.search.placeholder')}
           autoFocus={autoFocus}
           value={value}
           onChange={(e) => {
@@ -148,9 +155,16 @@ function SearchBox({ className, autoFocus = false, onDone, initialValue }: Searc
           onKeyDown={onKeyDown}
           className="h-full min-w-0 flex-1 bg-transparent text-sm text-sf-heading outline-none placeholder:text-sf-text [&::-webkit-search-cancel-button]:hidden"
         />
-        <button type="submit" aria-label={t('shell.search.submit')} className="m-1 grid size-8 shrink-0 place-items-center rounded-sf-button bg-sf-accent text-sf-accent-foreground transition hover:brightness-110">
-          <SearchIcon aria-hidden className="size-4" />
-        </button>
+        {buttonLabel ? (
+          <button type="submit" className="m-1 flex h-8 shrink-0 items-center gap-1.5 rounded-sf-button bg-sf-accent px-4 text-sm font-semibold text-sf-accent-foreground transition hover:brightness-110">
+            <SearchIcon aria-hidden className="size-4" />
+            {buttonLabel}
+          </button>
+        ) : (
+          <button type="submit" aria-label={t('shell.search.submit')} className="m-1 grid size-8 shrink-0 place-items-center rounded-sf-button bg-sf-accent text-sf-accent-foreground transition hover:brightness-110">
+            <SearchIcon aria-hidden className="size-4" />
+          </button>
+        )}
       </div>
 
       <div

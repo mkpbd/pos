@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { BuilderContent, BuilderMedia, Element } from '@/storefront/builder/types'
+import { isWrappedSectionType } from '@/storefront/builder/registry'
+import type { BuilderContent, BuilderData, BuilderMedia, Element } from '@/storefront/builder/types'
 import type { StoreSection } from '@/storefront/types'
 import { resolvePreview, type Problem, type ResolveResult } from './api'
 import { mediaIds, resolveInput, resolveKey, withLocalTitles, wrappedElements } from './render-tree'
 
 /*
- * Data for the canvas's wrapped homepage sections and images (B2): POST /builder/resolve, 400 ms
+ * Data for the canvas's wrapped homepage sections, B4 data elements (countdown, discount, promo
+ * card, menu, FAQ list, contact form) and images (B2): POST /builder/resolve, 400 ms
  * after the last change, only for wrapped elements whose resolve input changed and media ids not
  * seen yet. While an element is re-resolved its previous data stays on screen; an element that has
  * never had data is `pending` (the canvas draws a skeleton).
@@ -15,12 +17,12 @@ export const RESOLVE_DEBOUNCE = 400
 const MAX_ELEMENTS = 60
 const MAX_MEDIA = 200
 
-type Entry = { key: string; section: StoreSection | null; errors: Problem[] }
+type Entry = { key: string; section: BuilderData | null; errors: Problem[] }
 
 type Cache = { entries: Record<string, Entry>; media: Record<string, BuilderMedia>; missingMedia: Record<string, true> }
 
 export type PreviewData = {
-  data: Record<string, StoreSection>
+  data: Record<string, BuilderData>
   media: Record<string, BuilderMedia>
   pending: string[]
   /** Problems the resolve found per wrapped element (before any save). */
@@ -99,12 +101,12 @@ export function usePreviewData(content: BuilderContent, options: { locale: strin
   }, [elements, ids, enabled, locale, localMedia, resolve])
 
   return useMemo(() => {
-    const data: Record<string, StoreSection> = {}
+    const data: Record<string, BuilderData> = {}
     const pending: string[] = []
     const errors: Record<string, Problem[]> = {}
     for (const element of elements as Element[]) {
       const entry = cache.entries[element.id]
-      if (entry?.section) data[element.id] = withLocalTitles(entry.section, element, locale)
+      if (entry?.section) data[element.id] = isWrappedSectionType(element.type) ? withLocalTitles(entry.section as StoreSection, element, locale) : entry.section
       else if (!entry || entry.key !== resolveKey(element)) pending.push(element.id)
       if (entry && entry.errors.length > 0 && entry.key === resolveKey(element)) errors[element.id] = entry.errors
     }

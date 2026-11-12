@@ -22,6 +22,10 @@ import {
 } from '../catalog/listing-params'
 import { ListingToolbar, Pagination } from '../catalog/listing-toolbar'
 import { ProductCard } from '../catalog/product-card'
+import { useStorefront } from '../api'
+import { BuilderZone } from '../builder/zone'
+import { listingGridClasses } from '../builder/listing-columns'
+import { normalizeListingColumns } from '../builder/validate'
 import { HeaderSearch } from '../components/header-search'
 import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
@@ -157,6 +161,7 @@ function ListingPage({ scope }: { scope: ListingScope }) {
   return (
     <div data-testid="listing-page">
       <ListingHeader heading={heading} breadcrumbs={breadcrumbs} category={category.data} brand={brand.data} />
+      <BuilderZone zone="listing.top" />
 
       <div className="mx-auto max-w-sf px-4 py-8">
         {needsTerm ? (
@@ -202,6 +207,7 @@ function ListingPage({ scope }: { scope: ListingScope }) {
           </div>
         )}
       </div>
+      <BuilderZone zone="listing.bottom" />
 
       {filterPanel && (
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -338,6 +344,7 @@ function Results({
   onClear: () => void
 }) {
   const { t } = useLocale()
+  const columns = normalizeListingColumns(useStorefront().theme.layout.listing_columns)
   if (listing.isPending) return <Spinner label={t('catalog.listing.loadingProducts')} />
 
   if (listing.isError) {
@@ -379,12 +386,9 @@ function Results({
   return (
     <ul
       aria-busy={listing.isPlaceholderData || undefined}
-      className={cn(
-        'grid gap-3 transition-opacity sm:gap-5',
-        state.view === 'list' ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3',
-        listing.isPlaceholderData && 'opacity-60',
-      )}
+      className={cn('grid gap-3 transition-opacity sm:gap-5', state.view === 'list' ? 'grid-cols-1' : listingGridClasses(columns), listing.isPlaceholderData && 'opacity-60')}
       data-testid="product-results"
+      data-columns={state.view === 'list' ? undefined : `${columns.desktop}-${columns.tablet}-${columns.mobile}`}
     >
       {products.map((product, i) => (
         <li key={product.id}>

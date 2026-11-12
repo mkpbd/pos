@@ -48,8 +48,12 @@ export type InspectorChangeOptions = {
 
 export type InspectorDocument = {
   id: string
+  /** B4: page (default), header, footer or zone, and its key (`cms:<uuid>`, `zone:listing.top`, …). */
+  kind?: 'page' | 'header' | 'footer' | 'theme' | 'zone'
+  key?: string
   title: string
-  path: string
+  /** null for the header, footer and zones. */
+  path: string | null
   published: { number: number; published_at: string } | null
 }
 
@@ -71,4 +75,6 @@ export type InspectorProps = {
   device?: Device
   /** B3: the draft theme's colours and the store palette, for the colour controls. */
   theme?: { colors?: Record<string, string>; palette?: readonly { name: string; hex: string }[] }
+  /** B4: the user may add or change custom HTML (`storefront.custom_html`); default false (read only). */
+  canCustomHtml?: boolean
 }

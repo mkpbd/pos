@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { envelope, readCanvasMessage, type CanvasMessage, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
-import type { BuilderMedia, Device, RenderSection } from '@/storefront/builder/types'
-import type { StoreSection, StorefrontBootstrap } from '@/storefront/types'
+import { envelope, readCanvasMessage, type CanvasMessage, type CanvasSurroundings, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
+import type { BuilderData, BuilderMedia, Device, RenderSection } from '@/storefront/builder/types'
+import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import { CANVAS_URL, DEVICE_WIDTHS } from './canvas-config'
 import { ColumnHandles, type ResizePhase, type ResizeRow } from './column-handles'
@@ -27,7 +27,7 @@ export type CanvasFrameProps = {
   bootstrap: StorefrontBootstrap
   locale: string
   sections: RenderSection[]
-  data: Record<string, StoreSection>
+  data: Record<string, BuilderData>
   media: Record<string, BuilderMedia>
   pending: string[]
   selection: string | null
@@ -48,10 +48,14 @@ export type CanvasFrameProps = {
   /** B3: the row whose column widths can be dragged (the selected section / inner row / column's row), widths at this device. */
   resizeRow?: ResizeRow | null
   onResize?: (rowId: string, index: number, left: number, phase: ResizePhase) => void
+  /** B4: a header, footer or zone is drawn with a faded sample of the page around it. */
+  surroundings?: CanvasSurroundings
+  /** B4: the canvas text while the document is empty. */
+  emptyText?: string
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -122,8 +126,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
   }, [ready, theme, send])
 
   useEffect(() => {
-    if (ready > 0) send({ type: 'render', sections, data, media, selection, hover, errors: errorIds, device, pending })
-  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, send])
+    if (ready > 0) send({ type: 'render', sections, data, media, selection, hover, errors: errorIds, device, pending, surroundings, ...(emptyText ? { emptyText } : {}) })
+  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, send])
 
   useImperativeHandle(
     handleRef,

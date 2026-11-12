@@ -185,7 +185,8 @@ const canvas = (page: Page): FrameLocator => page.frameLocator('[data-testid="bu
 async function openEditor(page: Page, b: Backend) {
   b.exists = true
   await page.goto(`/admin/storefront/builder/${DOC_ID}`)
-  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+  // The canvas iframe's entry is compiled on first use by the dev server (slow when all specs run in parallel).
+  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible({ timeout: 30_000 })
 }
 
 function sectionOrder(b: Backend): string[] {
@@ -206,7 +207,7 @@ test('creates the home page from the current homepage and adds a heading by drag
   // The editor chunk is compiled on first use by the dev server.
   await expect(page).toHaveURL(new RegExp(`/admin/storefront/builder/${DOC_ID}$`), { timeout: 30_000 })
   const frame = canvas(page)
-  await expect(frame.getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+  await expect(frame.getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible({ timeout: 30_000 })
   await expect(frame.getByText('Farm boxes are back')).toBeVisible()
 
   // Drag "Heading" from the Add panel to the top edge of the features section.
@@ -483,4 +484,206 @@ test('Site styles: a colour change shows on the canvas at once and saves to the 
   await expect.poll(() => canvas(page).locator('html').evaluate("document.documentElement.style.getPropertyValue('--sf-primary')")).toBe('#123456')
   await expect.poll(() => b.themePuts.at(-1)?.settings.colors.primary, { timeout: 6000 }).toBe('#123456')
   expect(b.themePuts[0]!.revision).toBe(0)
+})
+
+/* ------------------------------------------------------------------------------------------------
+ * B4: footer, CMS pages and shop zones
+ * ---------------------------------------------------------------------------------------------- */
+
+const ABOUT_ID = '0b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
+const nodeCommon = { style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null, translations: {} }
+const b4Meta = (type: string, group: string, label: string, translatable: string[], props: Record<string, unknown>, allowed_in: string[]) => ({ ...meta(type, group, label, translatable, props), allowed_in })
+const PAGES = ['page', 'cms', 'zone']
+const ALL = ['page', 'cms', 'header', 'footer', 'zone']
+/** GET /storefront/builder/elements with the B4 types (`allowed_in` per document context). */
+const B4_ELEMENTS = [
+  ...ELEMENTS.map((m) => ({ ...m, allowed_in: ['heading', 'text', 'image', 'button', 'spacer', 'divider', 'inner_row'].includes(m.type) ? ALL : PAGES })),
+  b4Meta('video', 'content', 'Video', ['title'], { url: '', provider: 'youtube', video_id: '', title: '', aspect: '16:9', autoplay: false, start: 0 }, PAGES),
+  b4Meta('cta', 'marketing', 'Call to action', ['title', 'text', 'primary.label', 'secondary.label'], { title: 'Ready when you are', text: '', primary: { label: 'Shop now', link: { url: '/shop' } }, secondary: null, align: 'center' }, PAGES),
+  b4Meta('social_icons', 'site', 'Social icons', [], { size: 24, style: 'plain', color: null }, ALL),
+  b4Meta('payment_icons', 'site', 'Payment icons', [], { height: 24 }, ['page', 'cms', 'zone', 'footer']),
+  b4Meta('copyright', 'site', 'Copyright', ['text'], { text: null }, ['footer']),
+  b4Meta('logo', 'site', 'Logo', [], { height: 48, link: { url: '/' } }, ['header', 'footer']),
+  b4Meta('faq_list', 'content', 'FAQ list', ['title'], { title: null, style: 'accordion' }, ['cms']),
+  b4Meta('contact_form', 'content', 'Contact form', ['title'], { title: null, show_details: true }, ['cms']),
+]
+
+type B4Doc = { id: string; kind: string; key: string; title: string; path: string | null; revision: number; content: { schema_version: 1; sections: AnyNode[] }; published: Backend['published'] }
+type B4Backend = { docs: Map<string, B4Doc>; creates: Record<string, unknown>[]; puts: Record<string, { sections: AnyNode[] }[]>; publishes: string[] }
+
+const section = (id: string, columns: AnyNode[][]) => ({
+  id, type: 'section', props: { layout: 'boxed', anchor: null }, ...nodeCommon,
+  columns: columns.map((elements, i) => ({ id: `${id}_c${i}`, type: 'column', width: { base: Math.round(100 / columns.length), mobile: 100 }, style: {}, elements })),
+})
+const heading = (id: string, text: string, level = 2) => ({ id, type: 'heading', props: { text, level, link: null }, ...nodeCommon })
+
+/** What POST documents starts each document with (the server's importers). */
+function startingContent(input: { kind: string; key: string; from: string }): B4Doc['content'] {
+  if (input.kind === 'footer' && input.from === 'current') {
+    return {
+      schema_version: 1,
+      sections: [section('s_footer', [[heading('e_footer_name', 'Green Basket', 3)], [{ id: 'e_footer_copy', type: 'copyright', props: { text: '© {year} Green Basket' }, ...nodeCommon }]]) as unknown as AnyNode],
+    }
+  }
+  if (input.from === 'cms') {
+    return {
+      schema_version: 1,
+      sections: [section('s_page', [[heading('e_page_title', 'About us', 1), { id: 'e_page_body', type: 'text', props: { html: '<p>We grow vegetables near Savar.</p>' }, ...nodeCommon }]]) as unknown as AnyNode],
+    }
+  }
+  return { schema_version: 1, sections: [] }
+}
+
+async function mockB4Backend(page: Page): Promise<B4Backend> {
+  const b: B4Backend = { docs: new Map(), creates: [], puts: {}, publishes: [] }
+  const b4Bootstrap = { ...bootstrap, theme: { ...bootstrap.theme, footer: { ...bootstrap.theme.footer, social: { facebook: 'https://facebook.com/greenbasket', instagram: 'https://instagram.com/greenbasket' } } } }
+  const summary = (d: B4Doc) => ({
+    id: d.id, kind: d.kind, key: d.key, title: d.title, schema_version: 1, draft_revision: d.revision, has_unpublished_changes: true,
+    draft_updated_at: '2026-11-12T08:00:00+00:00', published: d.published, path: d.path, preview_url: d.path ? `http://shop.test${d.path}?preview=draft` : null,
+    cms_page: d.key.startsWith('cms:') ? { id: ABOUT_ID, title: 'About us', slug: 'about', status: 'published', template: 'default' } : null,
+  })
+  const detailOf = (d: B4Doc) => ({ ...summary(d), content: d.content })
+
+  await page.route('**/api/v1/**', (route) => route.fulfill({ json: envelope([], { pagination: { current_page: 1, per_page: 24, total: 0, last_page: 1 } }) }))
+  await page.route('**/sanctum/csrf-cookie', (route) => route.fulfill({ status: 204, headers: { 'Set-Cookie': 'XSRF-TOKEN=e2e; Path=/' } }))
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: envelope({ ...me, permissions: [...me.permissions, 'cms.manage'] }) }))
+  await page.route('**/api/v1/storefront/link-targets*', (route) => route.fulfill({ json: envelope({ pages: [{ id: ABOUT_ID, slug: 'about', title: 'About us', status: 'published' }], categories: [], brands: [], blog_categories: [], blog_posts: [] }) }))
+  await page.route('**/api/v1/notifications/unread-count', (route) => route.fulfill({ json: envelope({ count: 0 }) }))
+  await page.route('**/api/v1/cms/pages*', (route) =>
+    route.fulfill({ json: envelope([{ id: ABOUT_ID, slug: 'about', title: 'About us', template: 'default', status: 'published', is_visible: true, published_at: null, seo_title: null, seo_description: null, updated_at: null }], { pagination: { current_page: 1, per_page: 100, total: 1, last_page: 1 } }) }),
+  )
+  await page.route('**/api/v1/storefront/theme/draft', (route) =>
+    route.fulfill({ json: envelope({ settings: { ...bootstrap.theme, logo_media_id: null, favicon_media_id: null }, draft_revision: 0, has_unpublished_changes: false, published: null, preview_url: null, custom_css: null, has_custom_css: false }) }),
+  )
+  await page.route('**/api/v1/storefront/builder/elements', (route) => route.fulfill({ json: envelope({ types: B4_ELEMENTS, limits: {}, enums: {} }) }))
+  await page.route('**/api/v1/storefront/builder/canvas-context*', (route) => route.fulfill({ json: envelope({ bootstrap: b4Bootstrap, store_url: 'http://shop.test', locales: ['en'] }) }))
+  await page.route('**/api/v1/storefront/builder/resolve', (route) => route.fulfill({ json: envelope({ data: {}, media: {}, errors: {} }) }))
+  await page.route('**/api/v1/storefront/builder/documents', (route) => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: envelope([...b.docs.values()].map(summary)) })
+    const input = route.request().postDataJSON() as { kind: string; key: string; title: string; from: string }
+    b.creates.push(input)
+    const id = `01a1c9d9-0000-7000-8000-00000000b4${String(b.docs.size).padStart(2, '0')}`
+    const path = input.key.startsWith('cms:') ? '/pages/about' : input.kind === 'page' ? '/' : null
+    const doc: B4Doc = { id, kind: input.kind, key: input.key, title: input.title, path, revision: 1, content: startingContent(input), published: null }
+    b.docs.set(id, doc)
+    return route.fulfill({ status: 201, json: envelope(detailOf(doc)) })
+  })
+  const docOf = (url: string) => b.docs.get(new URL(url).pathname.split('/documents/')[1]!.split('/')[0]!)
+  await page.route('**/api/v1/storefront/builder/documents/*', (route) => {
+    const doc = docOf(route.request().url())
+    return doc ? route.fulfill({ json: envelope(detailOf(doc)) }) : route.fulfill(failure(404, 'NOT_FOUND', 'Not found'))
+  })
+  await page.route('**/api/v1/storefront/builder/documents/*/draft', (route) => {
+    const doc = docOf(route.request().url())!
+    const body = route.request().postDataJSON() as { revision: number; content: B4Doc['content'] }
+    ;(b.puts[doc.id] ??= []).push(body.content)
+    doc.revision += 1
+    doc.content = body.content
+    return route.fulfill({ json: envelope(detailOf(doc)) })
+  })
+  await page.route('**/api/v1/storefront/builder/documents/*/publish', (route) => {
+    const doc = docOf(route.request().url())!
+    b.publishes.push(doc.key)
+    doc.published = { version_id: 'v-1', number: 1, published_at: '2026-11-12T09:00:00+00:00' }
+    return route.fulfill({ json: envelope(detailOf(doc)) })
+  })
+  return b
+}
+
+/** Every element type in a saved draft. */
+function savedTypes(content: { sections: AnyNode[] } | undefined): string[] {
+  const types: string[] = []
+  const visit = (node: AnyNode) => {
+    types.push(String(node.type))
+    for (const column of node.columns ?? []) column.elements.forEach(visit)
+  }
+  content?.sections.forEach(visit)
+  return types
+}
+
+test('designs the footer from the current one, adds social icons and publishes it', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB4Backend(page)
+  await page.goto('/admin/storefront/pages')
+  await page.getByTestId('page-row-footer').getByRole('button', { name: 'Design the footer' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates[0]).toEqual({ kind: 'footer', key: 'footer', title: 'Footer', from: 'current' })
+
+  await expect(page.getByTestId('document-placement')).toContainText('Shown at the bottom of every page')
+  const frame = canvas(page)
+  await expect(frame.getByRole('heading', { name: 'Green Basket' })).toBeVisible()
+  // The footer sits under a faded sample of the page.
+  await expect(frame.getByTestId('canvas-sample')).toContainText('Your page content')
+  // Footer elements only: no hero slider, but social icons and the copyright.
+  await expect(page.getByTestId('add-hero_slider')).toHaveCount(0)
+  await expect(page.getByTestId('add-copyright')).toBeVisible()
+
+  await page.getByTestId('add-social_icons').click()
+  await expect(frame.getByTestId('builder-social')).toBeVisible()
+  await expect(frame.getByRole('link', { name: /Facebook/ })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Inspector' }).getByRole('heading', { name: 'Social icons' })).toBeVisible()
+
+  await expect.poll(() => savedTypes(b.puts[[...b.docs.values()][0]!.id]?.at(-1)), { timeout: 6000 }).toContain('social_icons')
+  await page.getByRole('button', { name: 'Publish' }).click()
+  await page.getByRole('dialog', { name: 'Publish this page?' }).getByRole('button', { name: 'Publish' }).click()
+  await expect(page.getByText('Published — version 1 is live.')).toBeVisible()
+  expect(b.publishes).toEqual(['footer'])
+})
+
+test('converts the About page to the builder and adds a video: the canvas shows its poster', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB4Backend(page)
+  await page.goto('/admin/storefront/pages')
+  await page.getByRole('button', { name: 'Design About us with the builder' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates[0]).toEqual({ kind: 'page', key: `cms:${ABOUT_ID}`, title: 'About us', from: 'cms' })
+  const frame = canvas(page)
+  await expect(frame.getByRole('heading', { name: 'About us', level: 1 })).toBeVisible()
+  await expect(page.getByTestId('add-faq_list')).toBeVisible()
+
+  // Select the text, then add a video after it: the setup dialog asks for the link and a title.
+  await frame.getByText('We grow vegetables near Savar.').click()
+  await page.getByTestId('add-video').click()
+  const dialog = page.getByRole('dialog', { name: 'Add video' })
+  await expect(dialog.getByRole('button', { name: 'Insert' })).toBeDisabled()
+  await dialog.getByLabel('Video link').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+  await expect(dialog.getByTestId('video-detected')).toContainText('YouTube video found (dQw4w9WgXcQ)')
+  await dialog.getByLabel('Video title').fill('A morning on our farm')
+  await dialog.getByRole('button', { name: 'Insert' }).click()
+
+  // A click-to-load poster: no player (and no request to YouTube) until a shopper clicks play.
+  const video = frame.getByTestId('builder-video')
+  await expect(video).toBeVisible()
+  await expect(video.getByText('A morning on our farm')).toBeVisible()
+  await expect(video.locator('iframe')).toHaveCount(0)
+  await expect.poll(() => savedTypes(b.puts[[...b.docs.values()][0]!.id]?.at(-1)), { timeout: 6000 }).toContain('video')
+  const saved = b.puts[[...b.docs.values()][0]!.id]!.at(-1)!.sections[0]!.columns![0]!.elements.find((e) => e.type === 'video') as AnyNode & { props: Record<string, unknown> }
+  expect(saved.props).toMatchObject({ provider: 'youtube', video_id: 'dQw4w9WgXcQ', title: 'A morning on our farm' })
+})
+
+test('creates the listing-top area with a call to action', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockB4Backend(page)
+  await page.goto('/admin/storefront/pages')
+  await page.getByRole('button', { name: 'Create Listing top' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates[0]).toEqual({ kind: 'zone', key: 'zone:listing.top', title: 'Listing top', from: 'blank' })
+
+  await expect(page.getByTestId('document-placement')).toContainText('Above the product grid on shop, category, brand and search pages.')
+  const frame = canvas(page)
+  await expect(frame.getByTestId('canvas-empty')).toContainText('This area is empty')
+  await expect(frame.getByTestId('canvas-sample')).toContainText('Product grid')
+  await expect(page.getByTestId('add-logo')).toHaveCount(0)
+
+  await page.getByTestId('add-cta').click()
+  const cta = frame.getByTestId('builder-cta')
+  await expect(cta).toBeVisible()
+  await expect(cta.getByText('Ready when you are')).toBeVisible()
+  await page.getByLabel('Title', { exact: true }).fill('Eid offers are here')
+  await expect(cta.getByText('Eid offers are here')).toBeVisible()
+  // The area sits above the sample product grid.
+  const area = (await cta.boundingBox())!
+  const sample = (await frame.getByTestId('canvas-sample').boundingBox())!
+  expect(area.y + area.height).toBeLessThanOrEqual(sample.y + 1)
+  await expect.poll(() => savedTypes(b.puts[[...b.docs.values()][0]!.id]?.at(-1)), { timeout: 6000 }).toContain('cta')
 })

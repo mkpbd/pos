@@ -10,7 +10,7 @@ import { MenuLink } from './menu-link'
  * How the bar looks per header variant: `bar` (standard header — accent bar, uppercase),
  * `centered` (airy row under a centred brand), `commerce` (dark full-width bar).
  */
-export type NavAppearance = 'bar' | 'centered' | 'commerce'
+export type NavAppearance = 'bar' | 'centered' | 'commerce' | 'builder'
 
 const APPEARANCE: Record<NavAppearance, { nav: string; list: string; link: string; toggle: string }> = {
   bar: {
@@ -24,6 +24,13 @@ const APPEARANCE: Record<NavAppearance, { nav: string; list: string; link: strin
     list: 'justify-center gap-x-2',
     link: 'flex items-center px-4 py-3.5 text-[0.95rem] font-medium tracking-wide transition-colors hover:text-sf-accent focus-visible:text-sf-accent focus-visible:underline focus-visible:underline-offset-8 focus-visible:outline-none',
     toggle: 'flex items-center pr-3 pl-0.5 transition-colors hover:text-sf-accent focus-visible:text-sf-accent focus-visible:outline-none',
+  },
+  /** B4: a menu element in a builder header — no bar of its own (the section's style sets colours). */
+  builder: {
+    nav: '',
+    list: 'gap-x-1',
+    link: 'flex items-center px-3 py-2 text-sm font-semibold transition-colors hover:text-sf-accent focus-visible:text-sf-accent focus-visible:underline focus-visible:underline-offset-8 focus-visible:outline-none',
+    toggle: 'flex items-center pr-2 pl-0.5 transition-colors hover:text-sf-accent focus-visible:text-sf-accent focus-visible:outline-none',
   },
   commerce: {
     nav: 'bg-sf-heading text-sf-surface',
@@ -45,7 +52,19 @@ const MEGA_GRID: Record<number, string> = {
  * (Enter/Space), close on Escape (focus returns to the toggle) and when focus leaves.
  * Mega items open a full-width panel: one column per child, grandchildren as links.
  */
-export function MainNav({ items, appearance = 'bar' }: { items: MenuNode[]; appearance?: NavAppearance }) {
+export function MainNav({
+  items,
+  appearance = 'bar',
+  label,
+  bare = false,
+}: {
+  items: MenuNode[]
+  appearance?: NavAppearance
+  /** The landmark's name (default "Main"). */
+  label?: string
+  /** B4 builder menus: shown at every width, without the full-width container. */
+  bare?: boolean
+}) {
   const [openId, setOpenId] = useState<string | null>(null)
   const navRef = useRef<HTMLElement>(null)
   const { t } = useLocale()
@@ -63,8 +82,8 @@ export function MainNav({ items, appearance = 'bar' }: { items: MenuNode[]; appe
   if (items.length === 0) return null
 
   return (
-    <nav ref={navRef} aria-label={t('shell.nav.main')} className={cn('relative hidden lg:block', APPEARANCE[appearance].nav)} data-appearance={appearance}>
-      <ul className={cn('mx-auto flex max-w-sf flex-wrap items-stretch px-4', APPEARANCE[appearance].list)}>
+    <nav ref={navRef} aria-label={label ?? t('shell.nav.main')} className={cn('relative', !bare && 'hidden lg:block', APPEARANCE[appearance].nav)} data-appearance={appearance}>
+      <ul className={cn(bare ? 'flex flex-wrap items-stretch' : 'mx-auto flex max-w-sf flex-wrap items-stretch px-4', APPEARANCE[appearance].list)}>
         {items.map((item) => (
           <NavItem
             key={item.id}

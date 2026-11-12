@@ -128,7 +128,9 @@ class StoreBuilderTest extends TestCase
         $this->postJson(self::DOCS, ['kind' => 'page', 'key' => 'landing:eid-sale', 'title' => 'Twice'])->assertStatus(409)->assertJsonPath('error.code', 'DOCUMENT_EXISTS');
 
         foreach ([
-            ['kind' => 'header', 'key' => 'header', 'title' => 'Header'],
+            // B4: header documents exist now, but their key must match their kind.
+            ['kind' => 'header', 'key' => 'landing:top', 'title' => 'Header'],
+            ['kind' => 'theme', 'key' => 'theme', 'title' => 'Theme'],
             ['kind' => 'page', 'key' => 'landing:home', 'title' => 'Reserved'],
             ['kind' => 'page', 'key' => 'landing:Eid Sale', 'title' => 'Bad slug'],
             ['kind' => 'page', 'key' => 'cms:about', 'title' => 'Later'],
@@ -241,7 +243,13 @@ class StoreBuilderTest extends TestCase
 
         $this->asVisitor();
         $this->getJson('http://berry.test/api/v1/store/builder/pages/home')->assertNotFound()->assertJsonPath('error.code', 'PAGE_NOT_FOUND');
-        $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertOk()->assertJsonPath('data.builder', ['home' => false]);
+        $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertOk()->assertJsonPath('data.builder', [
+            'home' => false,
+            // B4: no builder header, footer or zones — the classic rendering.
+            'header' => null,
+            'footer' => null,
+            'zones' => ['listing.top' => null, 'listing.bottom' => null, 'product.after' => null],
+        ]);
 
         $this->actingAsUser($admin);
         $this->postJson(self::DOCS."/{$home}/discard")->assertStatus(409)->assertJsonPath('error.code', 'NOTHING_PUBLISHED');
@@ -259,7 +267,7 @@ class StoreBuilderTest extends TestCase
             ->assertJsonPath('data.document.source', 'published')
             ->assertJsonPath('data.sections.0.columns.0.elements.0.props.text', 'Version one');
         // Publishing refreshed the cached bootstrap.
-        $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertJsonPath('data.builder', ['home' => true]);
+        $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertJsonPath('data.builder.home', true);
 
         // A saved draft changes nothing for shoppers.
         $this->actingAsUser($admin);

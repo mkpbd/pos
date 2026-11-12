@@ -9,7 +9,8 @@ import { isDirty, type EditorStore } from './store'
  *  - 409 DRAFT_CONFLICT → status `conflict`; nothing is saved until the user chooses
  *    (`resolveConflict('theirs' | 'mine')`).
  *  - 422 → the problems per node (`details.errors[].node_id`) go to `errors`, status `invalid`;
- *    the same content is not sent again — the next change retries.
+ *    the same content is not sent again — the next change retries. B4: a 403
+ *    CUSTOM_HTML_FORBIDDEN (adding or changing custom HTML without the permission) is the same.
  *  - Network errors and 5xx → status `offline`, retried with exponential back-off (2 s … 30 s).
  *  - Any other error → status `error` with its message, retried on the next change.
  */
@@ -36,8 +37,17 @@ export function problemsByNode(error: ApiError): Record<string, Problem[]> {
     if (entry.code) problem.code = entry.code
     ;(result[key] ??= []).push(problem)
   }
-  if (list.length === 0) result[''] = [{ path: '', message: error.message }]
+  if (list.length === 0) {
+    // B4: a 403 CUSTOM_HTML_FORBIDDEN may name the node directly.
+    const nodeId = typeof error.details?.node_id === 'string' ? error.details.node_id : ''
+    result[nodeId] = [{ path: '', message: error.message }]
+  }
   return result
+}
+
+/** B4: a draft save that adds or changes custom HTML without `storefront.custom_html`. */
+export function isCustomHtmlForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403 && error.code === 'CUSTOM_HTML_FORBIDDEN'
 }
 
 export function problemCount(errors: Record<string, Problem[]>): number {
@@ -166,7 +176,7 @@ export class Autosave {
         current.setSaveState({ status: 'conflict', savedAt })
         return false
       }
-      if (error instanceof ApiError && error.status === 422) {
+      if (error instanceof ApiError && (error.status === 422 || isCustomHtmlForbidden(error))) {
         this.stuck = content
         current.setErrors(problemsByNode(error))
         current.setSaveState({ status: current.content === content ? 'invalid' : 'dirty', savedAt })

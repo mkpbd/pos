@@ -1,12 +1,16 @@
 import { Link, useParams } from 'react-router'
-import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
-import { useStorefront, useStorePageQuery } from '../api'
+import { useStorePageQuery } from '../api'
+import { useDraftPreview } from '../builder/api'
+import { FaqFallbackCtx } from '../builder/elements/faq-fallback'
+import { hasHeadingLevel } from '../builder/payload'
+import { PageRenderer } from '../builder/page-renderer'
+import { ContactDetails, FaqGroups } from '../components/content-blocks'
 import { ContactForm } from '../components/contact-form'
 import { RichText } from '../components/rich-text'
 import { useLocale } from '../i18n/locale'
-import type { FaqGroup } from '../types'
+import type { StorePage } from '../types'
 import { useDocumentMeta } from '../use-document-meta'
 import { NotFoundPage } from './not-found-page'
 
@@ -28,49 +32,15 @@ function PageTitle({ title }: { title: string }) {
   )
 }
 
-function Faq({ groups }: { groups: FaqGroup[] }) {
-  const { t } = useLocale()
-  if (groups.length === 0) return null
-
-  return (
-    <div className="mt-10 flex flex-col gap-8">
-      {groups.map((g) => (
-        <section key={g.group ?? ''} aria-label={g.group ?? t('content.page.questions')}>
-          {g.group && <h2 className="mb-3 text-2xl font-bold">{g.group}</h2>}
-          <div className="divide-y rounded-sf-card bg-sf-surface">
-            {g.items.map((item) => (
-              <details key={item.id} className="group px-5 py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-sf-heading">
-                  {item.question}
-                  <span aria-hidden className="text-xl transition-transform group-open:rotate-45">+</span>
-                </summary>
-                <RichText html={item.answer_html} className="pt-3" />
-              </details>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  )
-}
-
-function ContactDetails() {
-  const { contact } = useStorefront().theme.footer
-  if (!contact.email && !contact.phone && !contact.address) return null
-
-  return (
-    <ul className="flex flex-col gap-3 rounded-sf-card bg-sf-surface p-6">
-      {contact.address && <li className="flex gap-3"><MapPinIcon className="size-5 shrink-0 text-sf-accent" aria-hidden /><span className="whitespace-pre-line">{contact.address}</span></li>}
-      {contact.phone && <li className="flex gap-3"><PhoneIcon className="size-5 shrink-0 text-sf-accent" aria-hidden /><a href={`tel:${contact.phone}`} className="hover:underline">{contact.phone}</a></li>}
-      {contact.email && <li className="flex gap-3"><MailIcon className="size-5 shrink-0 text-sf-accent" aria-hidden /><a href={`mailto:${contact.email}`} className="hover:underline">{contact.email}</a></li>}
-    </ul>
-  )
-}
-
-/** A content page (/pages/:slug) in its layout: standard, FAQ or contact. */
+/**
+ * A content page (/pages/:slug) in its layout: standard, FAQ or contact. B4: a page designed in the
+ * store builder (`builder` payload) shows that design instead of the CMS body; the page title
+ * band stays unless the design has its own level-1 heading. SEO and meta are the CMS page's.
+ */
 export function ContentPage() {
   const { slug = '' } = useParams()
-  const page = useStorePageQuery(slug)
+  const draft = useDraftPreview()
+  const page = useStorePageQuery(slug, draft)
   const { t } = useLocale()
   useDocumentMeta(page.data ? { title: page.data.seo_title ?? page.data.title, description: page.data.seo_description, canonical: `/pages/${page.data.slug}` } : null)
 
@@ -93,6 +63,7 @@ export function ContentPage() {
   }
 
   const data = page.data
+  if (data.builder && Array.isArray(data.builder.sections)) return <BuilderContentPage page={data} />
   return (
     <article>
       <PageTitle title={data.title} />
@@ -108,10 +79,28 @@ export function ContentPage() {
         ) : (
           <div className="mx-auto max-w-3xl">
             {data.body_html && <RichText html={data.body_html} />}
-            {data.template === 'faq' && <Faq groups={data.faq ?? []} />}
+            {data.template === 'faq' && <FaqGroups groups={data.faq ?? []} className="mt-10" />}
           </div>
         )}
       </div>
+    </article>
+  )
+}
+
+function BuilderContentPage({ page }: { page: StorePage }) {
+  const { t } = useLocale()
+  const builder = page.builder!
+  return (
+    <article data-testid="content-page" data-builder="true">
+      {builder.document?.source === 'draft' && (
+        <p role="status" className="bg-neutral-900 px-4 py-1.5 text-center text-xs font-semibold text-white">
+          {t('content.builder.preview')}
+        </p>
+      )}
+      {!hasHeadingLevel(builder.sections, 1) && <PageTitle title={page.title} />}
+      <FaqFallbackCtx value={page.faq ?? null}>
+        <PageRenderer page={builder} scope="page" />
+      </FaqFallbackCtx>
     </article>
   )
 }

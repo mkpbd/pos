@@ -20,8 +20,9 @@ const UUID2 = '1b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
 const UUID3 = '2b6f2e3c-1a2b-4c3d-8e9f-0123456789ab'
 
 describe('validateNode: builder elements', () => {
-  it('accepts every registry default except the wrapped sections that need content', () => {
-    const needContent = ['hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'product_tabs']
+  it('accepts every registry default except the elements that need content first', () => {
+    // B4: a video needs its link, a promoted product its product, a countdown its end, a discount its promotion, a menu its menu.
+    const needContent = ['hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'product_tabs', 'video', 'promo_card', 'countdown', 'discount', 'menu']
     for (const meta of ELEMENT_REGISTRY) {
       const node = buildElement(meta.type, registry, new Set())!
       expect(validateNode(node).length > 0, meta.type).toBe(needContent.includes(meta.type))
@@ -192,5 +193,81 @@ describe('problem paths and tree lookups', () => {
   it('writes Bangla translations without blanks', () => {
     expect(withBangla({}, { text: 'হ্যালো', other: ' ' })).toEqual({ bn: { text: 'হ্যালো' } })
     expect(withBangla({ bn: { text: 'x' } }, { text: '' })).toEqual({})
+  })
+})
+
+describe('validateNode: B4 elements', () => {
+  const b4 = (type: string, props: Record<string, unknown> = {}) => {
+    const base = buildElement(type, registry, new Set())!
+    return { ...base, id: 'e_test01', props: { ...base.props, ...props } } as unknown as Element
+  }
+
+  it('video: YouTube watch / youtu.be / Shorts and Vimeo links; a title; start 0–86400', () => {
+    for (const url of ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://youtube.com/shorts/dQw4w9WgXcQ', 'https://vimeo.com/76979871']) {
+      expect(paths(b4('video', { url, title: 'Clip' })), url).toEqual([])
+    }
+    expect(paths(b4('video', { url: 'https://example.com/v.mp4', title: 'Clip' }))).toEqual(['props.url'])
+    expect(paths(b4('video', { url: `https://youtu.be/dQw4w9WgXcQ?x=${'a'.repeat(500)}`, title: 'Clip' }))).toEqual(['props.url'])
+    expect(paths(b4('video', { url: 'https://youtu.be/dQw4w9WgXcQ', title: ' ', start: 90_000, aspect: '2:1' }))).toEqual(['props.title', 'props.aspect', 'props.start'])
+  })
+
+  it('icon: a known name, size 16–128, colour, optional link', () => {
+    expect(paths(b4('icon'))).toEqual([])
+    expect(paths(b4('icon', { name: 'rocket', size: 8, color: 'red', link: { url: 'javascript:x' } }))).toEqual(['props.name', 'props.size', 'props.color', 'props.link'])
+    // The server's icon list wins when the editor has it.
+    expect(validateNode(b4('icon', { name: 'rocket' }), { icons: ['rocket'] })).toEqual([])
+  })
+
+  it('countdown: an instant for the date source, a promotion for the promotion source', () => {
+    expect(paths(b4('countdown'))).toEqual(['props.ends_at'])
+    expect(paths(b4('countdown', { ends_at: '2026-12-01T18:30:00+06:00' }))).toEqual([])
+    expect(paths(b4('countdown', { source: 'promotion' }))).toEqual(['props.promotion_id'])
+    expect(paths(b4('countdown', { source: 'promotion', promotion_id: UUID, style: 'big' }))).toEqual(['props.style'])
+  })
+
+  it('discount, promoted product and menu need their record', () => {
+    expect(paths(b4('discount'))).toEqual(['props.promotion_id'])
+    expect(paths(b4('discount', { promotion_id: UUID, button_label: 'x'.repeat(61) }))).toEqual(['props.button_label'])
+    expect(paths(b4('promo_card'))).toEqual(['props.product_id'])
+    expect(paths(b4('promo_card', { product_id: UUID, badge: 'x'.repeat(25) }))).toEqual(['props.badge'])
+    expect(paths(b4('menu'))).toEqual(['props.menu_id'])
+    expect(paths(b4('menu', { menu_id: UUID, show_children: 'list' }))).toEqual([])
+  })
+
+  it('call to action: title and both buttons need text and a link', () => {
+    expect(paths(b4('cta'))).toEqual([])
+    expect(paths(b4('cta', { title: '', primary: { label: '', link: { url: '' } }, secondary: { label: 'More', link: { url: 'ftp://x' } }, align: 'top' }))).toEqual([
+      'props.title',
+      'props.primary.label',
+      'props.primary.link',
+      'props.secondary.link',
+      'props.align',
+    ])
+  })
+
+  it('site parts: bounds and enums', () => {
+    for (const type of ['logo', 'account_link', 'wishlist_link', 'cart_icon', 'language_switch', 'announcement', 'social_icons', 'payment_icons', 'contact_block', 'copyright', 'newsletter_form', 'faq_list', 'contact_form', 'search_box', 'custom_html']) {
+      expect(paths(b4(type)), type).toEqual([])
+    }
+    expect(paths(b4('logo', { height: 100 }))).toEqual(['props.height'])
+    expect(paths(b4('social_icons', { size: 50, style: 'round' }))).toEqual(['props.size', 'props.style'])
+    expect(paths(b4('payment_icons', { height: 10 }))).toEqual(['props.height'])
+    expect(paths(b4('contact_block', { show_phone: 'yes', layout: 'grid' }))).toEqual(['props.show_phone', 'props.layout'])
+    expect(paths(b4('copyright', { text: 'x'.repeat(201) }))).toEqual(['props.text'])
+    expect(paths(b4('newsletter_form', { button_label: '' }))).toEqual(['props.button_label'])
+    expect(paths(b4('custom_html', { html: 'x'.repeat(20_001) }))).toEqual(['props.html'])
+  })
+
+  it('B4 translations use the same limits, nested labels by dot key', () => {
+    expect(paths({ ...b4('cta'), translations: { bn: { 'primary.label': 'x'.repeat(61), title: 'ঠিক' } } })).toEqual(['translations.bn.primary.label'])
+    expect(paths({ ...b4('video', { url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Clip' }), translations: { bn: { title: 'x'.repeat(201) } } })).toEqual(['translations.bn.title'])
+  })
+
+  it('maps nested and derived props to their form fields', () => {
+    expect(formKey(b4('cta'), 'sections.0.columns.0.elements.0.props.primary.link.url')).toBe('primary.link')
+    expect(formKey(b4('cta'), 'props.secondary.label')).toBe('secondary.label')
+    expect(formKey(b4('video'), 'props.video_id')).toBe('url')
+    expect(isInlineProblem(b4('video'), { path: 'props.provider', message: 'x' }, false)).toBe(true)
+    expect(isInlineProblem(b4('custom_html'), { path: '', message: 'Not allowed' }, false)).toBe(false)
   })
 })

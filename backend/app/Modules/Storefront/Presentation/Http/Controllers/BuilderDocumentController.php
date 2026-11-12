@@ -24,7 +24,8 @@ use Illuminate\Validation\Rule;
  * Store builder documents (B1): pages with a draft, immutable published versions, discard
  * and restore; B2 adds rename, the editor's canvas context and the canvas resolver for unsaved
  * elements. Reading needs storefront.view, editing (and resolving) storefront.manage,
- * publishing also storefront.publish.
+ * publishing also storefront.publish. B4: CMS page designs, the header, the footer and the
+ * shop / product zones are documents too; custom HTML needs storefront.custom_html.
  */
 class BuilderDocumentController
 {
@@ -32,19 +33,25 @@ class BuilderDocumentController
      * List builder documents
      *
      * Each with its draft revision, whether the draft differs from the live version, the
-     * published version (or null), its `path` on the store (`/`, `/p/<slug>`) and
-     * `preview_url` (the draft on the store's primary domain; null without a domain).
+     * published version (or null), its `path` on the store (`/`, `/p/<slug>`, B4: `/pages/<slug>`
+     * for a CMS page design, null for the header, footer and zones), `cms_page` (`{id, title,
+     * slug, status, template}` of a CMS page design, else null) and `preview_url` (the draft on
+     * the store's primary domain; null without a domain or path).
      */
     public function index(): JsonResponse
     {
-        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->pages()->with('publishedVersion')->orderBy('key')->get()));
+        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->builder()->with('publishedVersion')->orderBy('kind')->orderBy('key')->get()));
     }
 
     /**
-     * Create a builder page
+     * Create a builder document
      *
-     * `key`: `home` (once) or `landing:<slug>`; 409 DOCUMENT_EXISTS when taken. `from:
-     * homepage` converts the current homepage sections into the draft.
+     * `kind` + `key`: page — `home` (once), `landing:<slug>` or (B4) `cms:<content page id>`;
+     * header — `header`; footer — `footer`; zone — `zone:listing.top`, `zone:listing.bottom`,
+     * `zone:product.after`. One per key (409 DOCUMENT_EXISTS). `from`: `blank`, `homepage`
+     * (home: the current homepage sections), `cms` (a content page: its title, body and FAQ list
+     * or contact form; 422 CMS_PAGE_NOT_FOUND for an unknown page), `current` (header / footer:
+     * today's default layout with the store's menus).
      */
     public function store(CreateBuilderDocumentRequest $request, ManageBuilderDocuments $documents): JsonResponse
     {
@@ -79,10 +86,19 @@ class BuilderDocumentController
      * The whole document with the revision it was edited from: normalized, sanitized and
      * reference-checked (422 DOCUMENT_INVALID with `details.errors[]` {path, node_id, message});
      * a stale revision is 409 DRAFT_CONFLICT with `details.revision`. Not live until published.
+     *
+     * B4: elements not allowed in the document's kind are 422 (`code: ELEMENT_NOT_ALLOWED`).
+     * Adding a custom HTML element or changing its HTML needs storefront.custom_html: 403
+     * CUSTOM_HTML_FORBIDDEN with `details.errors[]` {path, node_id, message, code}.
      */
     public function saveDraft(SaveBuilderDraftRequest $request, BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
     {
-        $saved = $documents->saveDraft($document, (int) $request->validated('revision'), (array) $request->validated('content'));
+        $saved = $documents->saveDraft(
+            $document,
+            (int) $request->validated('revision'),
+            (array) $request->validated('content'),
+            (bool) $request->user()?->can('storefront.custom_html'),
+        );
 
         return ApiResponse::success(BuilderPresenter::document($saved->load('publishedVersion')));
     }
@@ -130,9 +146,11 @@ class BuilderDocumentController
     }
 
     /**
-     * Delete a landing page
+     * Delete a builder document
      *
-     * With its versions. The home page cannot be deleted (422 CANNOT_DELETE_HOME).
+     * With its versions: a landing page, or (B4) a CMS page design, the header, the footer or a
+     * zone — the store goes back to the classic rendering. The home page cannot be deleted (422
+     * CANNOT_DELETE_HOME).
      */
     public function destroy(BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
     {
@@ -144,8 +162,9 @@ class BuilderDocumentController
     /**
      * Element registry
      *
-     * Element types (group, label, translatable props, default props, children), limits and
-     * enums for the editor.
+     * Element types (group, label, translatable props, default props, children; B4: `allowed_in`
+     * — the document contexts page | cms | header | footer | zone — and `has_data`), limits and
+     * enums for the editor (B4: `enums.icons`, the storefront icon names).
      */
     public function elements(): JsonResponse
     {
@@ -162,6 +181,13 @@ class BuilderDocumentController
      * alt}}, errors: {<element or media id>: [{path, message, code?, ids?}]}}` — invalid
      * elements and unknown (or another organization's) media appear only in `errors`. 422
      * only for a malformed envelope.
+     *
+     * B4: also the data elements `countdown`, `discount`, `promo_card`, `menu`, `faq_list` and
+     * `contact_form` as `{id, type, props, translations}`, validated with the draft-save rules
+     * (in any context the type is allowed in; organization-owned promotion / product / menu ids)
+     * and resolved to their draft-render `data[id]` (an expired countdown or a discount whose
+     * promotion is not running keeps its data with `state`; contact_form has no data). A
+     * promoted product that is not on sale online is an error (PRODUCT_UNAVAILABLE).
      */
     public function resolve(ResolveBuilderElementsRequest $request, ResolveBuilderElements $resolve): JsonResponse
     {

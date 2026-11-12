@@ -4,7 +4,7 @@
  * BuilderDocumentSchema::normalize is the source of truth; ./validate.ts mirrors its value rules.
  */
 
-import type { MediaRef, StoreSection, ThemeColors } from '../types'
+import type { FaqGroup, MediaRef, ProductCard, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
 export type Device = 'desktop' | 'tablet' | 'mobile'
@@ -130,7 +130,82 @@ export type DividerElement = ElementOf<
 export type InnerRowElement = ElementOf<'inner_row', Record<string, never>> & { columns: Column<Exclude<Element, InnerRowElement>>[] }
 export type WrappedElement = NodeCommon & { type: WrappedSectionType; props: WrappedSectionProps }
 
-export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement
+/* B4 elements (contract §2). Text props marked ✱ in the contract are translatable (registry `translatable`). */
+
+export type VideoProvider = 'youtube' | 'vimeo'
+export type VideoAspect = '16:9' | '4:3' | '1:1' | '9:16'
+/** `provider` and `video_id` are derived from `url` by normalize (validate.ts `parseVideoUrl` mirrors it). */
+export type VideoElement = ElementOf<
+  'video',
+  { url: string; provider: VideoProvider; video_id: string; title: string; aspect: VideoAspect; autoplay: boolean; start: number }
+>
+/** `name` ∈ ICON_NAMES (./icons.tsx); `label` empty = decorative; `size` in px (16–128). */
+export type IconElement = ElementOf<'icon', { name: string; size: number; color: Color | null; label: string; link: Link }>
+export type CountdownElement = ElementOf<
+  'countdown',
+  {
+    source: 'date' | 'promotion'
+    /** ISO date-time (date source). */
+    ends_at: string | null
+    /** An organization countdown promotion (promotion source). */
+    promotion_id: string | null
+    title: string
+    /** Shown once the time is up; empty = the element disappears. */
+    expired_text: string
+    style: 'boxes' | 'inline'
+  }
+>
+export type DiscountElement = ElementOf<'discount', { promotion_id: string | null; title: string; text: string; show_code: boolean; button_label: string; link: Link }>
+export type CtaButton = { label: string; link: { url: string } }
+export type CtaElement = ElementOf<'cta', { title: string; text: string; primary: CtaButton; secondary: CtaButton | null; align: 'left' | 'center' | 'right' }>
+export type SearchBoxElement = ElementOf<'search_box', { placeholder: string; button_label: string }>
+/** `title` null = the product's name. */
+export type PromoCardElement = ElementOf<'promo_card', { product_id: string | null; badge: string; title: string | null; text: string; button_label: string }>
+export type LogoElement = ElementOf<'logo', { height: number; link: Link }>
+/** `show_children`: none | dropdown | mega (header), none | list (footer). */
+export type MenuElement = ElementOf<'menu', { menu_id: string | null; layout: 'horizontal' | 'vertical'; show_children: 'none' | 'dropdown' | 'mega' | 'list' }>
+export type AccountLinkElement = ElementOf<'account_link', { show_label: boolean }>
+export type WishlistLinkElement = ElementOf<'wishlist_link', { show_label: boolean }>
+export type CartIconElement = ElementOf<'cart_icon', { show_count: boolean; show_total: boolean }>
+export type LanguageSwitchElement = ElementOf<'language_switch', { style: 'links' | 'select' }>
+/** The theme's announcement (text, link, colours, schedule). */
+export type AnnouncementElement = ElementOf<'announcement', Record<string, never>>
+export type SocialIconsElement = ElementOf<'social_icons', { size: number; style: 'plain' | 'circle' | 'square'; color: Color | null }>
+export type PaymentIconsElement = ElementOf<'payment_icons', { height: number }>
+export type ContactBlockElement = ElementOf<'contact_block', { show_phone: boolean; show_email: boolean; show_address: boolean; layout: 'stacked' | 'inline' }>
+/** `text` null = the theme's footer copyright; `{year}` becomes the current year. */
+export type CopyrightElement = ElementOf<'copyright', { text: string | null }>
+export type NewsletterFormElement = ElementOf<'newsletter_form', { title: string; text: string; button_label: string; layout: 'stacked' | 'inline' }>
+export type FaqListElement = ElementOf<'faq_list', { title: string | null; style: 'accordion' | 'list' }>
+export type ContactFormElement = ElementOf<'contact_form', { title: string | null; show_details: boolean }>
+/** Server-sanitized HTML (≤ 20 000 characters); adding or changing one needs `storefront.custom_html`. */
+export type CustomHtmlElement = ElementOf<'custom_html', { html: string }>
+
+export type B4Element =
+  | VideoElement
+  | IconElement
+  | CountdownElement
+  | DiscountElement
+  | CtaElement
+  | SearchBoxElement
+  | PromoCardElement
+  | LogoElement
+  | MenuElement
+  | AccountLinkElement
+  | WishlistLinkElement
+  | CartIconElement
+  | LanguageSwitchElement
+  | AnnouncementElement
+  | SocialIconsElement
+  | PaymentIconsElement
+  | ContactBlockElement
+  | CopyrightElement
+  | NewsletterFormElement
+  | FaqListElement
+  | ContactFormElement
+  | CustomHtmlElement
+
+export type Element = HeadingElement | TextElement | ImageElement | ButtonElement | SpacerElement | DividerElement | InnerRowElement | WrappedElement | B4Element
 
 export type ElementType = Element['type']
 
@@ -164,10 +239,59 @@ export type RenderSection = Rendered<Omit<Section, 'columns'>> & { columns: Rend
 
 export type BuilderMedia = Omit<MediaRef, 'id'>
 
+/** Draft preview only: why a data element would not show to visitors (public payloads drop the element instead). */
+export type ElementDataState = 'expired' | 'inactive' | 'unavailable'
+
+/** `data[id]` of a countdown: the end (the date, or the promotion's end) and the promotion when it is one. */
+export type CountdownData = { ends_at: string | null; title?: string | null; promotion: { id: string; name: string } | null; state?: ElementDataState }
+/** `data[id]` of a discount. Amounts are decimal strings; `coupon_code` only when the element shows the code. */
+export type DiscountData = {
+  name: string
+  kind: 'percent' | 'fixed'
+  value: string
+  coupon_code: string | null
+  min_subtotal: string | null
+  ends_at: string | null
+  state?: ElementDataState
+}
+/** `data[id]` of a promo card: the storefront product card (catalog listing shape). */
+export type PromoCardData = ProductCard & { state?: ElementDataState }
+/** `data[id]` of a menu: the menu tree as bootstrap serves menus. */
+export type MenuData = StorefrontMenu & { state?: ElementDataState }
+/** `data[id]` of an FAQ list: the CMS FAQ items by group (the shape of /store/pages/{slug} `faq`). */
+export type FaqListData = { groups: FaqGroup[]; state?: ElementDataState }
+
+export type ElementData = CountdownData | DiscountData | PromoCardData | MenuData | FaqListData
+
+/** One entry of a payload's `data` map. */
+export type BuilderData = StoreSection | ElementData
+
 export type BuilderPage = {
   document: { id: string; key: string; title: string; version: number | null; source: 'published' | 'draft' }
   sections: RenderSection[]
   media: Record<string, BuilderMedia>
-  /** For each wrapped-section element: the object /store/homepage returns for that section (id = element id). */
-  data: Record<string, StoreSection>
+  /**
+   * For each wrapped-section element: the object /store/homepage returns for that section (id =
+   * element id). B4: for countdown, discount, promo_card, menu and faq_list elements, their data.
+   */
+  data: Record<string, BuilderData>
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B4: document contexts, zones and the bootstrap's builder block
+ * -------------------------------------------------------------------------------------------- */
+
+/** Where an element may be used (registry `allowed_in`): home / landing pages, CMS pages, header, footer, zones. */
+export type DocumentContext = 'page' | 'cms' | 'header' | 'footer' | 'zone'
+
+export type ZoneKey = 'listing.top' | 'listing.bottom' | 'product.after'
+
+export const ZONE_KEYS = ['listing.top', 'listing.bottom', 'product.after'] as const satisfies readonly ZoneKey[]
+
+/** bootstrap `builder`: published documents (staff `?preview=draft`: drafts); null / absent = the classic rendering. */
+export type BootstrapBuilder = {
+  home: boolean
+  header?: BuilderPage | null
+  footer?: BuilderPage | null
+  zones?: Partial<Record<ZoneKey, BuilderPage | null>>
 }
