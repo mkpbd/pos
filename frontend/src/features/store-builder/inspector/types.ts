@@ -5,7 +5,7 @@
 
 import type { MediaRef } from '@/storefront/types'
 import type { ElementMeta } from '@/storefront/builder/registry'
-import type { BuilderDocument, Column, Element, Section } from '@/storefront/builder/types'
+import type { BuilderDocument, Column, Device, Element, Section } from '@/storefront/builder/types'
 
 /** The whole draft content (schema v1). */
 export type BuilderContent = BuilderDocument
@@ -32,6 +32,12 @@ export type ColumnPreset = '1' | '1-1' | '1-2' | '2-1' | '1-1-1' | '1-1-1-1' | '
 export type InspectorCommand =
   | { type: 'set-column-preset'; nodeId: string; preset: ColumnPreset }
   | { type: 'select'; nodeId: string | null }
+  /** B3: the device being styled (the toolbar's device toggle). */
+  | { type: 'set-device'; device: Device }
+  /** B3: a column's width on a device (the neighbour adjusts, see column-resize.ts); null = back to the wider device's width. */
+  | { type: 'set-column-width'; columnId: string; device: Device; width: number | null }
+  /** B3: open the Site styles drawer (theme draft). */
+  | { type: 'open-site-styles' }
 
 export type InspectorChangeOptions = {
   /** Edits with the same key within a short time are one undo step (typing). */
@@ -61,4 +67,8 @@ export type InspectorProps = {
   /** Replace the node (same id); the editor records history. */
   onChange(next: BuilderNode, opts?: InspectorChangeOptions): void
   onCommand(cmd: InspectorCommand): void
+  /** B3: the device the Style tab edits (Desktop = `style.base`); default desktop. */
+  device?: Device
+  /** B3: the draft theme's colours and the store palette, for the colour controls. */
+  theme?: { colors?: Record<string, string>; palette?: readonly { name: string; hex: string }[] }
 }

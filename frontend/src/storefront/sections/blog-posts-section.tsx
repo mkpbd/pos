@@ -18,7 +18,7 @@ export function BlogPostsSection({ section }: { section: Extract<StoreSection, {
       <div className="mt-6 text-center">
         <MenuLink
           url={viewAll}
-          className="inline-flex items-center gap-2 rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-bold tracking-wide text-sf-primary-foreground uppercase transition hover:brightness-105"
+          className="inline-flex items-center gap-2 sf-button rounded-sf-button bg-sf-button px-6 py-3 text-sm font-bold tracking-wide text-sf-button-foreground uppercase transition hover:brightness-105"
         >
           {t('content.section.viewAllPosts')}
           <ArrowRightIcon aria-hidden className="size-4" />

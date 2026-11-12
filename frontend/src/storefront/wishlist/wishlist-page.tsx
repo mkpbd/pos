@@ -49,7 +49,7 @@ export function WishlistPage() {
         <p className="mt-2 text-sm">
           {rich(t('wishlist.localNote'), {
             signIn: (
-              <Link to="/account/login?next=%2Fwishlist" className="font-semibold text-sf-accent underline-offset-4 hover:underline">
+              <Link to="/account/login?next=%2Fwishlist" className="font-semibold text-sf-link underline-offset-4 hover:underline">
                 {t('wishlist.signIn')}
               </Link>
             ),

@@ -5,7 +5,8 @@ import { expect, test } from '@playwright/test'
  * (accounts from database/seeders/DatabaseSeeder.php). Opt-in: E2E_BACKEND=1 npm run test:e2e
  */
 test.skip(!process.env.E2E_BACKEND, 'Set E2E_BACKEND=1 and VITE_BACKEND_ORIGIN to a freshly seeded backend')
-test.describe.configure({ mode: 'serial' })
+// Long multi-step flows against `php artisan serve` (one request at a time): 60 s per test.
+test.describe.configure({ mode: 'serial', timeout: 60_000 })
 
 test('organization admin signs in with a real Sanctum session and manages users', async ({ page }) => {
   await page.goto('/admin/login')
@@ -226,10 +227,19 @@ test('theme colour and menu changes made in the admin reach the storefront', asy
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
 
+  // B3: the theme is edited as a draft; shoppers see it only after publishing.
   await page.goto('/admin/storefront/theme')
-  await page.getByLabel('Accent', { exact: true }).fill('#1d4ed8')
-  await page.getByRole('button', { name: 'Save theme' }).click()
-  await expect(page.getByText('Theme saved.')).toBeVisible()
+  await page.getByRole('button', { name: /^Secondary: / }).click()
+  await page.getByLabel('Secondary hex value').fill('#1d4ed8')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Save draft' }).click()
+  await expect(page.getByText('Draft saved. Publish to show it on your store.')).toBeVisible()
+  await page.goto('/')
+  await expect(page.getByRole('navigation', { name: 'Main' })).not.toHaveCSS('background-color', 'rgb(29, 78, 216)')
+  await page.goto('/admin/storefront/theme')
+  await page.getByRole('button', { name: 'Publish' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish' }).click()
+  await expect(page.getByText('Theme published. Your store shows it now.')).toBeVisible()
 
   // Add a top-level link after the seeded main menu items (numbered across all levels).
   await page.goto('/admin/storefront/menus')

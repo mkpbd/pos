@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Presentation\Http\Support;
 
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Domain\ThemePresets;
+use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
 use App\Modules\Storefront\Infrastructure\Models\MenuItem;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
@@ -59,6 +60,37 @@ final class StorefrontPresenter
             'custom_css' => $withCss ? $t->custom_css : null,
             'has_custom_css' => $t->custom_css !== null,
             'updated_at' => $t->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * B3: the theme draft — `settings` (the draft, complete), `draft_revision` (0 before the
+     * first draft), `has_unpublished_changes` (the draft differs from the live theme),
+     * `published` (the live version or null), `draft_updated_at`, `preview_url` (the store
+     * home with `?preview=draft`, null without a domain) and the custom CSS as on `GET
+     * /storefront/theme` (not drafted: it stays immediate).
+     *
+     * @param  array{document: ?BuilderDocument, settings: array<string, mixed>, has_unpublished_changes: bool}  $state
+     * @return array<string, mixed>
+     */
+    public static function themeDraft(array $state, ThemeSettings $live, bool $withCss, ?string $storeUrl): array
+    {
+        $document = $state['document'];
+        $published = $document?->publishedVersion;
+
+        return [
+            'settings' => $state['settings'],
+            'draft_revision' => $document->draft_revision ?? 0,
+            'has_unpublished_changes' => $state['has_unpublished_changes'],
+            'draft_updated_at' => $document?->draft_updated_at?->toIso8601String(),
+            'published' => $published === null ? null : [
+                'version_id' => $published->id,
+                'number' => $published->number,
+                'published_at' => $published->published_at?->toIso8601String(),
+            ],
+            'preview_url' => $storeUrl === null ? null : $storeUrl.'/?preview=draft',
+            'custom_css' => $withCss ? $live->custom_css : null,
+            'has_custom_css' => $live->custom_css !== null,
         ];
     }
 

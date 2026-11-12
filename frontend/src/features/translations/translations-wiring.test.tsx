@@ -377,11 +377,13 @@ describe('Bangla translations of the online store', () => {
     }
     mockApi({
       'GET /auth/me': ok(storeManager()),
-      'GET /storefront/theme': ok(theme),
+      // B3: the theme page edits the draft.
+      'GET /storefront/theme/draft': ok({ ...theme, draft_revision: 1, has_unpublished_changes: false, published: null }),
+      'GET /storefront/theme/presets': ok([]),
       'GET /media': emptyMedia,
-      'PUT /storefront/theme': (init) => {
-        saved = json(init)
-        return ok({ ...theme, settings: saved })
+      'PUT /storefront/theme/draft': (init) => {
+        saved = json(init).settings as Record<string, unknown>
+        return ok({ ...theme, settings: saved, draft_revision: 2, has_unpublished_changes: true, published: null })
       },
     })
     renderRoutes(routes, '/storefront/theme')
@@ -390,7 +392,7 @@ describe('Bangla translations of the online store', () => {
     const bn = screen.getByLabelText('Announcement text in Bangla')
     expect(bn).toHaveAttribute('placeholder', 'Free delivery over ৳2000')
     await user.type(bn, '৳২০০০ এর বেশি কেনাকাটায় ফ্রি ডেলিভারি')
-    await user.click(screen.getByRole('button', { name: 'Save theme' }))
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
     await waitFor(() => expect((saved?.announcement as { translations?: unknown } | undefined)?.translations).toEqual({ bn: { text: '৳২০০০ এর বেশি কেনাকাটায় ফ্রি ডেলিভারি' } }))
   })
 })

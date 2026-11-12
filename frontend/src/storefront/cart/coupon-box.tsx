@@ -111,7 +111,7 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
               onClick={removeCoupon}
               disabled={remove.isPending}
               aria-label={t('cart.coupon.removeLabel', { code: coupon.code })}
-              className="shrink-0 font-semibold text-sf-accent underline underline-offset-4 hover:no-underline disabled:opacity-50"
+              className="shrink-0 font-semibold text-sf-link underline underline-offset-4 hover:no-underline disabled:opacity-50"
             >
               {t('cart.coupon.remove')}
             </button>
@@ -142,7 +142,7 @@ export function CouponBox({ cart, compact = false }: { cart: Cart; compact?: boo
             setOpen(true)
             focusNext.current = 'input'
           }}
-          className="inline-flex items-center gap-2 self-start font-semibold text-sf-accent underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-2 self-start font-semibold text-sf-link underline-offset-4 hover:underline"
         >
           <TicketPercentIcon aria-hidden className="size-4" />
           {t('cart.coupon.haveCode')}

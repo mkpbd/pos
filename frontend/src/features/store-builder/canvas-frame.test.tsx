@@ -1,5 +1,5 @@
 import { createRef } from 'react'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { envelope, type CanvasMessage, type ParentMessage } from '@/storefront/builder/canvas/protocol'
 import { cloneSample, samplePage } from '@/storefront/builder/test-payload'
 import { bootstrapFixture } from '@/storefront/test-fixtures'
@@ -85,5 +85,45 @@ describe('canvas frame (editor side)', () => {
     const sections = toRenderTree(doc, { locale: 'en', now: Date.now() })
     view.rerender(<CanvasFrame {...props} sections={sections} device="mobile" />)
     expect(posted.at(-1)).toMatchObject({ type: 'render', device: 'mobile' })
+  })
+})
+
+describe('canvas frame (B3)', () => {
+  it('sends the draft theme after init, and again when it changes', () => {
+    const { posted, fromCanvas, view, props } = setup({ theme: { colors: { primary: '#111111' } } })
+    fromCanvas({ type: 'ready' })
+    expect(posted.map((m) => m.type)).toEqual(['init', 'theme', 'render'])
+    view.rerender(<CanvasFrame {...props} theme={{ colors: { primary: '#222222' } }} />)
+    expect(posted.at(-1)).toMatchObject({ type: 'theme', settings: { colors: { primary: '#222222' } } })
+  })
+
+  it('draws a handle between side-by-side columns; arrow keys and dragging resize', () => {
+    const onResize = vi.fn()
+    const resizeRow = { rowId: 's_story', columns: [{ id: 'c_story_text', width: 50 }, { id: 'c_story_media', width: 50 }] }
+    const { fromCanvas } = setup({ resizeRow, onResize })
+    fromCanvas({ type: 'ready' })
+    fromCanvas({ type: 'rects', nodes: { c_story_text: { x: 0, y: 100, w: 500, h: 300 }, c_story_media: { x: 524, y: 100, w: 500, h: 300 } }, scrollY: 0, height: 2000, viewport: { w: 1366, h: 800 } })
+    const handle = screen.getByRole('separator', { name: 'Width of columns 1 and 2' })
+    expect(handle).toHaveAttribute('aria-valuenow', '50')
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(onResize).toHaveBeenLastCalledWith('s_story', 0, 55, 'end')
+
+    // 1000 px for 100 % at scale 1 in jsdom (area width 0 → scale 1): 10 px per percent.
+    fireEvent.pointerDown(handle, { button: 0, clientX: 512, pointerId: 1 })
+    expect(screen.getByTestId('column-resize-cover')).toBeInTheDocument()
+    fireEvent.pointerMove(window, { clientX: 612, pointerId: 1 })
+    expect(onResize).toHaveBeenLastCalledWith('s_story', 0, 60, 'move')
+    expect(screen.getByTestId('column-resize-label')).toHaveTextContent('60 % | 40 %')
+    fireEvent.pointerUp(window, { clientX: 612, pointerId: 1 })
+    expect(onResize).toHaveBeenLastCalledWith('s_story', 0, 60, 'end')
+    expect(screen.queryByTestId('column-resize-cover')).toBeNull()
+  })
+
+  it('no handle between stacked columns', () => {
+    const resizeRow = { rowId: 's_story', columns: [{ id: 'c_story_text', width: 100 }, { id: 'c_story_media', width: 100 }] }
+    const { fromCanvas } = setup({ resizeRow, onResize: vi.fn() })
+    fromCanvas({ type: 'ready' })
+    fromCanvas({ type: 'rects', nodes: { c_story_text: { x: 0, y: 0, w: 375, h: 300 }, c_story_media: { x: 0, y: 320, w: 375, h: 300 } }, scrollY: 0, height: 2000, viewport: { w: 375, h: 800 } })
+    expect(screen.queryByRole('separator')).toBeNull()
   })
 })

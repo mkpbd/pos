@@ -125,7 +125,7 @@ function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; than
         </p>
         {accountLink && (
           <p className="text-sm">
-            <Link to={`/account/orders/${encodeURIComponent(order.number)}`} className="font-semibold text-sf-accent hover:underline" data-testid="account-order-link">
+            <Link to={`/account/orders/${encodeURIComponent(order.number)}`} className="font-semibold text-sf-link hover:underline" data-testid="account-order-link">
               {t('orders.page.trackInAccount')}
             </Link>
           </p>

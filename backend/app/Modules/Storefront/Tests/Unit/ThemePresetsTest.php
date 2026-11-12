@@ -51,13 +51,21 @@ class ThemePresetsTest extends TestCase
 
         $this->assertSame(ThemePresets::PRESENTATION_KEYS, array_keys($partial));
         $this->assertSame($key, $partial['preset']);
-        $this->assertSame(ThemeSchema::COLORS, array_keys($partial['colors']));
-        foreach ($partial['colors'] as $color) {
-            $this->assertMatchesRegularExpression('/^#[0-9a-f]{6}$/', $color);
+        $this->assertSame(ThemeSchema::colorKeys(), array_keys($partial['colors']));
+        foreach ($partial['colors'] as $role => $color) {
+            if (in_array($role, ThemeSchema::AUTO_COLORS, true) && $color === null) {
+                continue;
+            }
+            $this->assertMatchesRegularExpression('/^#[0-9a-f]{6}$/', $color, $role);
         }
         $this->assertSame(array_keys(ThemeSchema::defaults()['typography']), array_keys($partial['typography']));
         $this->assertContains($partial['typography']['heading_font'], ThemeSchema::HEADING_FONTS);
         $this->assertContains($partial['typography']['body_font'], ThemeSchema::BODY_FONTS);
+        foreach (ThemeSchema::TYPE_SCALE as $scale => [$min, $max]) {
+            $this->assertThat($partial['typography'][$scale], $this->logicalAnd($this->greaterThanOrEqual($min), $this->lessThanOrEqual($max)), $scale);
+        }
+        // The palette is the owner's content: presets never set it.
+        $this->assertArrayNotHasKey('palette', $partial);
         $this->assertSame(array_keys(ThemeSchema::defaults()['shape']), array_keys($partial['shape']));
         $this->assertContains($partial['shape']['button_style'], ThemeSchema::BUTTON_STYLES);
         $this->assertThat($partial['shape']['card_radius'], $this->logicalAnd($this->greaterThanOrEqual(0), $this->lessThanOrEqual(24)));
@@ -90,7 +98,14 @@ class ThemePresetsTest extends TestCase
             'text on surface' => [$c['text'], $c['surface']],
             'sale on canvas' => [$c['sale'], $c['canvas']],
             'sale on surface' => [$c['sale'], $c['surface']],
+            // B3: the button and link roles.
+            'button_foreground on button' => [$c['button_foreground'], $c['button']],
+            'link on canvas' => [$c['link'], $c['canvas']],
+            'link on surface' => [$c['link'], $c['surface']],
         ];
+        if ($c['button_hover'] !== null) {
+            $pairs['button_foreground on button_hover'] = [$c['button_foreground'], $c['button_hover']];
+        }
         foreach ($pairs as $label => [$fg, $bg]) {
             $this->assertGreaterThanOrEqual(4.5, self::contrast($fg, $bg), "{$key}: {$label} ({$fg} on {$bg})");
         }
@@ -103,7 +118,7 @@ class ThemePresetsTest extends TestCase
         $this->assertSame(['lowercase', 'ticker'], [$vegan['layout']['heading_case'], $vegan['layout']['top_bar']]);
 
         $handmade = ThemePresets::theme('handmade');
-        $this->assertSame(['heading_font' => 'playfair', 'body_font' => 'jost'], $handmade['typography']);
+        $this->assertSame(['heading_font' => 'playfair', 'body_font' => 'jost'] + ThemeSchema::defaults()['typography'], $handmade['typography']);
         $this->assertSame(['square', 0], [$handmade['shape']['button_style'], $handmade['shape']['card_radius']]);
         $this->assertSame([1240, 'centered', 'showcase', 'minimal', 'tiles', 'normal', 'utility'], [
             $handmade['layout']['container_width'], $handmade['layout']['header_style'], $handmade['layout']['footer_style'],
@@ -111,7 +126,12 @@ class ThemePresetsTest extends TestCase
         ]);
 
         $classic = ThemePresets::theme('classic');
-        $this->assertSame(['heading_font' => 'jost', 'body_font' => 'jost'], $classic['typography']);
+        $this->assertSame(['heading_font' => 'jost', 'body_font' => 'jost'] + ThemeSchema::defaults()['typography'], $classic['typography']);
+        // B3: buttons and links keep each preset's look (the primary pair and the accent).
+        foreach (ThemePresets::KEYS as $key) {
+            $c = ThemePresets::theme($key)['colors'];
+            $this->assertSame([$c['primary'], $c['primary_foreground'], $c['accent'], null], [$c['button'], $c['button_foreground'], $c['link'], $c['button_hover']], $key);
+        }
         $this->assertSame(['rounded', 4], [$classic['shape']['button_style'], $classic['shape']['card_radius']]);
         $this->assertSame(['#ffffff', 'commerce', 'widgets', 'commerce', 'sale', 'uppercase', 'utility'], [
             $classic['colors']['canvas'], $classic['layout']['header_style'], $classic['layout']['footer_style'],
@@ -123,6 +143,7 @@ class ThemePresetsTest extends TestCase
     {
         $current = ThemeSchema::normalize([
             'colors' => ['primary' => '#123456'],
+            'palette' => [['name' => 'Brand', 'hex' => '#123456']],
             'logo_media_id' => 'logo',
             'favicon_media_id' => 'icon',
             'announcement' => ['enabled' => true, 'text' => 'Hello'],
@@ -134,7 +155,7 @@ class ThemePresetsTest extends TestCase
         $this->assertSame(array_keys(ThemeSchema::defaults()), array_keys($applied));
         $this->assertSame(ThemePresets::theme('handmade')['colors'], $applied['colors']);
         $this->assertSame('handmade', $applied['preset']);
-        foreach (['logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as $content) {
+        foreach (['palette', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as $content) {
             $this->assertSame($current[$content], $applied[$content], $content);
         }
     }

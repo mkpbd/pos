@@ -82,7 +82,7 @@ export function BannerText({ banner, size }: { banner: StoreBanner; size: 'hero'
       {(banner.button_label || banner.secondary_button_label) && (
         <div className="flex flex-wrap gap-3 pt-2">
           {banner.button_label && banner.link_url && (
-            <MenuLink url={banner.link_url} style={buttonColors.primary} className="inline-flex items-center rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-semibold text-sf-primary-foreground uppercase transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2">
+            <MenuLink url={banner.link_url} style={buttonColors.primary} className="inline-flex items-center sf-button rounded-sf-button bg-sf-button px-6 py-3 text-sm font-semibold text-sf-button-foreground uppercase transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2">
               {banner.button_label}
             </MenuLink>
           )}
@@ -119,7 +119,7 @@ export function SaleBannerText({ banner }: { banner: StoreBanner }) {
       {(banner.button_label || banner.secondary_button_label) && (
         <div className="flex flex-wrap gap-3 pt-3">
           {banner.button_label && banner.link_url && (
-            <MenuLink url={banner.link_url} style={buttonColors.primary} className={cn(button, 'bg-sf-primary text-sf-primary-foreground hover:brightness-95')}>
+            <MenuLink url={banner.link_url} style={buttonColors.primary} className={cn(button, 'sf-button bg-sf-button text-sf-button-foreground hover:brightness-95')}>
               {banner.button_label}
             </MenuLink>
           )}

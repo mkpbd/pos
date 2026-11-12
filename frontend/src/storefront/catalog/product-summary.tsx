@@ -54,7 +54,7 @@ export function ProductSummary({
         <p className="text-sm">
           {t('catalog.summary.brand')}{' '}
           {product.brand.slug ? (
-            <Link to={`/brand/${product.brand.slug}`} className="font-semibold text-sf-accent hover:underline">
+            <Link to={`/brand/${product.brand.slug}`} className="font-semibold text-sf-link hover:underline">
               {product.brand.name}
             </Link>
           ) : (

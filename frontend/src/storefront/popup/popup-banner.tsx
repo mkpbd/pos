@@ -91,7 +91,7 @@ export function PopupBanner() {
               <MenuLink
                 url={popup.link_url}
                 onClick={close}
-                className="mt-1 inline-flex items-center rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-bold tracking-wide text-sf-primary-foreground uppercase transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="mt-1 inline-flex items-center sf-button rounded-sf-button bg-sf-button px-6 py-3 text-sm font-bold tracking-wide text-sf-button-foreground uppercase transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2"
               >
                 {popup.button_label}
               </MenuLink>

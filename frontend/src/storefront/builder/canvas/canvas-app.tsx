@@ -12,6 +12,7 @@ import { NODE_ID } from '../registry'
 import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
 import { envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type ParentMessage, type Rect } from './protocol'
 import { sanitizeHtml } from './sanitize'
+import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
 
 /*
  * The store builder canvas (B2), inside the editor's iframe at /admin/builder-canvas. It draws the
@@ -96,6 +97,7 @@ type Props = {
 export function CanvasApp({ parent = window.parent, origin = window.location.origin }: Props) {
   const [init, setInit] = useState<InitFrame | null>(null)
   const [frame, setFrame] = useState<RenderFrame | null>(null)
+  const [themeDraft, setThemeDraft] = useState<CanvasThemeSettings | null>(null)
   const pendingRects = useRef(false)
   const queryClient = useQueryClient()
 
@@ -130,6 +132,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         setInit(message)
       }
       else if (message.type === 'render') setFrame(message)
+      else if (message.type === 'theme') setThemeDraft(message.settings)
       else if (message.type === 'scroll-to') {
         if (!NODE_ID.test(message.id)) return
         const el = document.querySelector(`[data-b="${message.id}"]`)
@@ -206,7 +209,9 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     }
   }, [post, reportRects])
 
-  const bootstrap = init?.bootstrap ?? null
+  const initial = init?.bootstrap ?? null
+  // The theme draft (Site styles) over the bootstrap theme: everything that reads the theme sees it.
+  const bootstrap = useMemo(() => (initial && themeDraft ? { ...initial, theme: mergeThemeSettings(initial.theme, themeDraft) } : initial), [initial, themeDraft])
   const locale: Locale = parseLocale(init?.locale) ?? 'en'
   useThemeEffects(bootstrap)
   useLayoutEffect(() => {

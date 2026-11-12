@@ -3,8 +3,10 @@
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
+use App\Modules\Storefront\Presentation\Http\Support\StaffPreview;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,9 +19,19 @@ class StoreBootstrapController
      * URLs), the live announcement and the active menus as trees. `preview` is true when a
      * signed-in staff member views a storefront that is not open yet. Weak `ETag` +
      * `If-None-Match` (304); `private, no-cache` because the shopper session starts here.
+     *
+     * B3: `?preview=draft` from a signed-in staff member of this store holding storefront.view
+     * carries the **draft** theme instead of the live one, with `theme_source: "draft"`
+     * (`no-store`); anyone else gets the live theme.
      */
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, ManageThemeDraft $theme): Response
     {
-        return ApiResponse::success($bootstrap->build() + ['preview' => $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview']]);
+        $preview = $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview'];
+        if (StaffPreview::draft($request)) {
+            return ApiResponse::success($bootstrap->buildWithTheme($theme->settings()) + ['preview' => $preview, 'theme_source' => 'draft'])
+                ->header('Cache-Control', 'no-store, private');
+        }
+
+        return ApiResponse::success($bootstrap->build() + ['preview' => $preview]);
     }
 }

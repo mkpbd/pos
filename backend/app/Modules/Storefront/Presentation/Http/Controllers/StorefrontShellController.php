@@ -9,8 +9,10 @@ use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Localization\FixedText;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
+use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
+use App\Modules\Storefront\Presentation\Http\Support\StaffPreview;
 use App\Modules\Storefront\Presentation\Http\Support\StructuredData;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -36,6 +38,9 @@ use Illuminate\Http\Response;
  * the page in its language: `lang` is kept only when it is not the store default. Indexable
  * pages of a store with Bangla on list both languages and `x-default` (the default
  * language's URL) as `<link rel="alternate" hreflang>`.
+ *
+ * B3: `?preview=draft` from staff of the store (storefront.view) inlines the bootstrap with the
+ * draft theme (`theme_source: "draft"`); such pages are `no-store` and noindex.
  */
 class StorefrontShellController
 {
@@ -57,14 +62,17 @@ class StorefrontShellController
 
     public const ROBOTS_NOINDEX = 'noindex, follow';
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder, ManageThemeDraft $themeDraft): Response
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
             return response('The storefront has not been built. Run "npm run build" in frontend/.', 503, ['Content-Type' => 'text/plain; charset=UTF-8']);
         }
 
-        $data = $bootstrap->build() + ['preview' => $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview']];
+        // B1 / B3: staff draft preview (`?preview=draft`) — builder pages and the theme as drafted.
+        $draftPreview = StaffPreview::draft($request);
+        $data = ($draftPreview ? $bootstrap->buildWithTheme($themeDraft->settings()) + ['theme_source' => 'draft'] : $bootstrap->build())
+            + ['preview' => $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview']];
         $store = $data['store']['name'];
         $path = '/'.ltrim($request->path(), '/');
         $meta = ['title' => $store, 'description' => $data['store']['description']];
@@ -90,7 +98,7 @@ class StorefrontShellController
         // B1: store builder landing pages (/p/{slug}); staff may preview a draft (?preview=draft).
         $builderPreview = false;
         if (preg_match('#^/p/([a-z0-9-]{2,60})$#', $path, $m) === 1) {
-            $builderPreview = $request->query('preview') === 'draft' && $this->canViewStorefront($request);
+            $builderPreview = $draftPreview;
             $title = $builder->landingTitle($m[1], $builderPreview);
             if ($title !== null) {
                 $status = 200;
@@ -190,7 +198,7 @@ class StorefrontShellController
             }
         }
 
-        $noindex = $data['preview'] || $blogPreview || $builderPreview || $status === 404 || $orderPage || $filtered
+        $noindex = $data['preview'] || $blogPreview || $draftPreview || $status === 404 || $orderPage || $filtered
             || in_array($path, self::NOINDEX_PATHS, true)
             || ! ($data['store']['allow_indexing'] ?? true);
 
@@ -213,7 +221,7 @@ class StorefrontShellController
 
         return response($html, $status, ['Content-Type' => 'text/html; charset=UTF-8', 'Vary' => 'Cookie'])
             // Previews of a closed store must never be cached or indexed.
-            ->header('Cache-Control', $data['preview'] || $blogPreview || $builderPreview ? 'no-store' : 'no-cache')
+            ->header('Cache-Control', $data['preview'] || $blogPreview || $draftPreview ? 'no-store' : 'no-cache')
             ->header('X-Robots-Tag', $noindex ? 'noindex' : 'all');
     }
 
@@ -245,19 +253,6 @@ class StorefrontShellController
             && $user->isActive()
             && $user->organizationId() === $request->attributes->get(ResolveStorefront::ATTRIBUTE)['organization_id']
             && $user->can('cms.manage');
-    }
-
-    /**
-     * A signed-in staff member of this store who may view the storefront settings (builder draft previews).
-     */
-    private function canViewStorefront(Request $request): bool
-    {
-        $user = $request->user();
-
-        return $user instanceof TenantUser
-            && $user->isActive()
-            && $user->organizationId() === $request->attributes->get(ResolveStorefront::ATTRIBUTE)['organization_id']
-            && $user->can('storefront.view');
     }
 
     /**

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, u
 import { envelope, readCanvasMessage, type CanvasMessage, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
 import type { BuilderMedia, Device, RenderSection } from '@/storefront/builder/types'
 import type { StoreSection, StorefrontBootstrap } from '@/storefront/types'
+import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import { CANVAS_URL, DEVICE_WIDTHS } from './canvas-config'
+import { ColumnHandles, type ResizePhase, type ResizeRow } from './column-handles'
 import type { DropIndicator } from './drop-targets'
 
 /*
@@ -41,10 +43,15 @@ export type CanvasFrameProps = {
   toolbar: (rect: Rect) => ReactNode
   hoverLabel: (id: string) => string
   handleRef: Ref<CanvasHandle>
+  /** B3: the theme draft's settings (instant preview of Site styles); null = the bootstrap theme. */
+  theme?: CanvasThemeSettings | null
+  /** B3: the row whose column widths can be dragged (the selected section / inner row / column's row), widths at this device. */
+  resizeRow?: ResizeRow | null
+  onResize?: (rowId: string, index: number, left: number, phase: ResizePhase) => void
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -111,6 +118,10 @@ export function CanvasFrame(props: CanvasFrameProps) {
   }, [ready, bootstrap, locale, send])
 
   useEffect(() => {
+    if (ready > 0 && theme) send({ type: 'theme', settings: theme })
+  }, [ready, theme, send])
+
+  useEffect(() => {
     if (ready > 0) send({ type: 'render', sections, data, media, selection, hover, errors: errorIds, device, pending })
   }, [ready, sections, data, media, selection, hover, errorIds, device, pending, send])
 
@@ -162,6 +173,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
               {toolbar(selected)}
             </div>
           )}
+          {!dragging && resizeRow && onResize && <ColumnHandles row={resizeRow} rects={rects} scale={scale} onResize={onResize} />}
           {dragging && indicator && (
             <div
               data-testid="drop-indicator"

@@ -6,10 +6,12 @@ use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * A store builder document (B1): an editable draft and a pointer to its published version.
@@ -37,6 +39,11 @@ class BuilderDocument extends Model
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
 
     public const KIND_PAGE = 'page';
+
+    /** B3: the theme draft (one per organization, key `theme`); not a page of the builder API. */
+    public const KIND_THEME = 'theme';
+
+    public const THEME = 'theme';
 
     public const HOME = 'home';
 
@@ -74,6 +81,28 @@ class BuilderDocument extends Model
     public function versions(): HasMany
     {
         return $this->hasMany(BuilderVersion::class, 'document_id');
+    }
+
+    /**
+     * Route binding (`{document}` of the builder API) finds pages only: the theme draft has its
+     * own endpoints (`/storefront/theme/draft`, …) and content format.
+     *
+     * @param  Builder<static>|Relation<static, *, *>  $query
+     * @return Builder<static>|Relation<static, *, *>
+     */
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        return parent::resolveRouteBindingQuery($query, $value, $field)->where('kind', self::KIND_PAGE);
+    }
+
+    /**
+     * Pages only (B3: the theme draft is a document too).
+     *
+     * @param  Builder<BuilderDocument>  $query
+     */
+    public function scopePages(Builder $query): void
+    {
+        $query->where('kind', self::KIND_PAGE);
     }
 
     public function isHome(): bool

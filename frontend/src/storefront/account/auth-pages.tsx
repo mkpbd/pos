@@ -18,7 +18,7 @@ function withNext(path: string, next: string | null): string {
   return next ? `${path}?next=${encodeURIComponent(next)}` : path
 }
 
-const linkClass = 'font-semibold text-sf-accent underline-offset-4 hover:underline'
+const linkClass = 'font-semibold text-sf-link underline-offset-4 hover:underline'
 
 /**
  * Sign-in. On success the guard of this page moves on to `?next=` (same-origin paths only) or

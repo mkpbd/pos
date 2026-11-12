@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useCan } from '@/features/auth/use-auth'
 import { ApiError } from '@/lib/api/client'
+import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { RenderSection } from '@/storefront/builder/types'
 import { AddPanel } from './add-panel'
 import {
@@ -39,18 +40,24 @@ import {
 } from './api'
 import { Autosave, problemCount, problemsByNode } from './autosave'
 import { CanvasFrame, type CanvasHandle } from './canvas-frame'
-import { EditorUiContext, nodeLabel, useCommands, useEditorUi, type EditorUi } from './commands'
+import type { ResizePhase, ResizeRow } from './column-handles'
+import { resetColumnWidth, resizeColumns, setColumnWidth } from './column-resize'
+import { EditorUiContext, nodeLabel, nodeName, useCommands, useEditorUi, type EditorUi } from './commands'
 import { ElementIcon } from './element-icon'
 import { ConflictDialog, LeaveDialog, PublishDialog, VersionHistoryDialog } from './dialogs'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector } from './inspector'
+import { BREAKPOINT, widthAt } from './inspector/style-model'
 import { flattenLayers } from './layers'
 import { LayersPanel, type LayerIndicator } from './layers-panel'
 import { MiniToolbar } from './mini-toolbar'
 import { toRenderTree } from './render-tree'
 import { useEditor, useEditorStoreApi } from './store'
+import { SiteStylesDrawer } from './site-styles'
+import { useSiteStyles } from './use-site-styles'
 import { Toolbar } from './toolbar'
 import { findNode, setColumnPreset, setNode, type DropTarget } from './tree'
+import type { Column, InnerRowElement, Section } from '@/storefront/builder/types'
 import { usePreviewData } from './use-preview-data'
 
 /*
@@ -175,6 +182,40 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
   const [discardOpen, setDiscardOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [conflictPending, setConflictPending] = useState(false)
+  const [stylesOpen, setStylesOpen] = useState(false)
+
+  /* ---------------------------------------------------------------- site styles (B3) ------- */
+  const siteStyles = useSiteStyles()
+  const themeSettings = siteStyles.settings
+  const inspectorTheme = useMemo(() => {
+    const colors = (themeSettings?.colors ?? canvasContext.bootstrap.theme.colors) as Record<string, string | null | undefined>
+    return {
+      colors: Object.fromEntries(Object.entries(colors).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+      palette: themeSettings?.palette ?? [],
+    }
+  }, [themeSettings, canvasContext.bootstrap.theme.colors])
+
+  /* ---------------------------------------------------------------- column widths (B3) ----- */
+  const breakpoint = BREAKPOINT[device]
+  const resizeRow = useMemo<ResizeRow | null>(() => {
+    const info = findNode(content, selection)
+    if (!info) return null
+    const row = info.kind === 'column' ? findNode(content, info.parentId)?.node : info.node
+    if (!row || (row.type !== 'section' && row.type !== 'inner_row')) return null
+    const columns = (row as Section | InnerRowElement).columns as Column[]
+    if (columns.length < 2) return null
+    return { rowId: row.id, columns: columns.map((column) => ({ id: column.id, width: widthAt(column.width, breakpoint).value ?? 100 })) }
+  }, [content, selection, breakpoint])
+  // One drag = one undo step, however long it takes.
+  const resizeSession = useRef<string | null>(null)
+  const onResize = useCallback(
+    (rowId: string, index: number, left: number, phase: ResizePhase) => {
+      resizeSession.current ??= `resize:${rowId}:${index}:${Date.now()}`
+      store.getState().apply((c) => resizeColumns(c, rowId, index, left, breakpoint), { coalesceKey: resizeSession.current, coalesceWindow: Number.POSITIVE_INFINITY })
+      if (phase === 'end') resizeSession.current = null
+    },
+    [breakpoint, store],
+  )
 
   /* ---------------------------------------------------------------- canvas data ------------ */
   const preview = usePreviewData(content, { locale: EDITOR_LOCALE, localMedia, enabled: true })
@@ -459,7 +500,7 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
   }
   const labelOf = useCallback((id: string) => {
     const info = findNode(store.getState().content, id)
-    return info ? nodeLabel(info.node, registry) : ''
+    return info ? nodeName(info.node, registry) : ''
   }, [registry, store])
 
   return (
@@ -512,6 +553,9 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
               toolbar={() => <MiniToolbar />}
               hoverLabel={labelOf}
               handleRef={canvas}
+              theme={themeSettings as CanvasThemeSettings | null}
+              resizeRow={resizeRow}
+              onResize={onResize}
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
@@ -523,9 +567,29 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
               locales={canvasContext.locales}
               errors={errors[selection ?? ''] ?? []}
               onChange={(next, options) => store.getState().apply((c) => setNode(c, next), { coalesceKey: options?.coalesceKey, media: options?.media })}
+              device={device}
+              theme={inspectorTheme}
               onCommand={(command) => {
-                if (command.type === 'select') store.getState().select(command.nodeId)
-                else store.getState().apply((c) => setColumnPreset(c, command.nodeId, command.preset))
+                const state = store.getState()
+                switch (command.type) {
+                  case 'select':
+                    return state.select(command.nodeId)
+                  case 'set-column-preset':
+                    return void state.apply((c) => setColumnPreset(c, command.nodeId, command.preset))
+                  case 'set-device':
+                    return state.setDevice(command.device)
+                  case 'set-column-width': {
+                    const bp = BREAKPOINT[command.device]
+                    if (command.width === null) {
+                      if (bp !== 'base') state.apply((c) => resetColumnWidth(c, command.columnId, bp))
+                      return
+                    }
+                    const width = command.width
+                    return void state.apply((c) => setColumnWidth(c, command.columnId, bp, width))
+                  }
+                  case 'open-site-styles':
+                    return setStylesOpen(true)
+                }
               }}
             />
           </div>
@@ -539,6 +603,7 @@ function EditorLayout({ autosave, canPublish, canvasContext, registry, queryClie
         ) : null}
       </DragOverlay>
 
+      <SiteStylesDrawer open={stylesOpen} onOpenChange={setStylesOpen} styles={siteStyles} canPublish={canPublish} />
       <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} pending={publishPending} error={publishError} onPublish={(note) => void publish(note)} />
       <ConflictDialog open={saveStatus === 'conflict'} pending={conflictPending} onChoose={chooseConflict} />
       <VersionHistoryDialog

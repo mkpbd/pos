@@ -37,7 +37,7 @@ class BuilderDocumentController
      */
     public function index(): JsonResponse
     {
-        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->with('publishedVersion')->orderBy('key')->get()));
+        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->pages()->with('publishedVersion')->orderBy('key')->get()));
     }
 
     /**
@@ -171,14 +171,14 @@ class BuilderDocumentController
     /**
      * Canvas context
      *
-     * `{bootstrap, store_url, locales}`: the `/store/bootstrap` payload of the signed-in
-     * staff member's organization (also while the store is closed or has no domain; `lang`
-     * picks the language), the primary store URL (null without a domain) and the enabled
-     * languages.
+     * `{bootstrap, theme_source, store_url, locales}`: the `/store/bootstrap` payload of the
+     * signed-in staff member's organization (also while the store is closed or has no domain;
+     * `lang` picks the language) with the **draft theme** (B3, `theme_source: "draft"`), the
+     * primary store URL (null without a domain) and the enabled languages. `no-store`.
      */
     public function canvasContext(Request $request, BuilderCanvasContext $context): JsonResponse
     {
-        return ApiResponse::success($context->build($request->query('lang')));
+        return ApiResponse::success($context->build($request->query('lang')))->header('Cache-Control', 'no-store, private');
     }
 
     /**

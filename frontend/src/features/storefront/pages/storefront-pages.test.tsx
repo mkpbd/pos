@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
-import type { MenuDetail, StorefrontDomain, ThemeResponse } from '@/features/storefront/api'
+import type { MenuDetail, StorefrontDomain, ThemeDraft, ThemeResponse } from '@/features/storefront/api'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
 
@@ -25,6 +25,8 @@ const theme: ThemeResponse = {
   has_custom_css: false,
   updated_at: null,
 }
+
+const draft: ThemeDraft = { settings: theme.settings, draft_revision: 3, has_unpublished_changes: false, published: { version_id: 'v-1', number: 1, published_at: null }, custom_css: null, has_custom_css: false }
 
 const emptyMedia = ok([], { pagination: { current_page: 1, per_page: 100, total: 0, last_page: 1 } })
 
@@ -62,33 +64,42 @@ describe('online store admin', () => {
     expect(await screen.findByText('Open')).toBeInTheDocument()
   })
 
-  it('saves the whole theme document', async () => {
+  it('saves the whole theme document as the draft', async () => {
     const user = userEvent.setup()
-    let saved: unknown
+    let saved: { revision: number; settings: ThemeDraft['settings'] } | undefined
     mockApi({
       'GET /auth/me': ok(manager()),
-      'GET /storefront/theme': ok(theme),
+      'GET /storefront/theme/draft': ok(draft),
+      'GET /storefront/theme/presets': ok([]),
       'GET /media': emptyMedia,
-      'PUT /storefront/theme': (init) => {
+      'PUT /storefront/theme/draft': (init) => {
         saved = JSON.parse(String(init.body))
-        return ok({ ...theme, settings: saved })
+        return ok({ ...draft, settings: saved!.settings, draft_revision: 4, has_unpublished_changes: true })
       },
     })
     renderRoutes(routes, '/storefront/theme')
 
-    const primary = await screen.findByLabelText('Primary')
+    await user.click(await screen.findByRole('button', { name: /^Primary: #f59e0b/ }))
+    const primary = await screen.findByLabelText('Primary hex value')
     await user.clear(primary)
     await user.type(primary, '#a35a00')
+    await user.keyboard('{Escape}')
     await user.type(screen.getByLabelText('Copyright line'), '© Berry Kids')
-    await user.click(screen.getByRole('button', { name: 'Save theme' }))
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
-    await waitFor(() =>
-      expect(saved).toEqual({
+    await waitFor(() => expect(saved).toBeDefined())
+    expect(saved).toEqual({
+      revision: 3,
+      settings: {
         ...theme.settings,
-        colors: { ...theme.settings.colors, primary: '#a35a00' },
+        // Buttons followed the primary colour before B3: they still do; links keep the secondary colour.
+        colors: { ...theme.settings.colors, primary: '#a35a00', button: '#a35a00', button_foreground: '#3b2500', button_hover: null, link: '#6f55c2' },
+        typography: { ...theme.settings.typography, body_size: 16, heading_scale: 1.25, line_height: 1.5, heading_weight: 700, mobile_scale: 1, letter_spacing: 0 },
+        palette: [],
         footer: { ...theme.settings.footer, copyright: '© Berry Kids' },
-      }),
-    )
+      },
+    })
+    expect(await screen.findByText('Draft saved — not published yet')).toBeInTheDocument()
     // The contrast check reflects the edited colour.
     const checks = screen.getByRole('list', { name: 'Contrast checks' })
     expect(within(checks).getAllByText('AA pass').length).toBeGreaterThan(0)
@@ -97,14 +108,16 @@ describe('online store admin', () => {
   it('is read-only without storefront.manage', async () => {
     mockApi({
       'GET /auth/me': ok(viewer()),
-      'GET /storefront/theme': ok(theme),
+      'GET /storefront/theme/draft': ok(draft),
+      'GET /storefront/theme/presets': ok([]),
       'GET /storefront/menus': ok([{ id: 'm-1', name: 'Main', location: 'main', location_label: 'Main navigation', is_active: true, updated_at: null }]),
       'GET /storefront/menus/m-1': ok({ id: 'm-1', name: 'Main', location: 'main', location_label: 'Main navigation', is_active: true, updated_at: null, items: [{ id: 'i-1', type: 'custom', label: 'Boys', url: '/boys', open_in_new_tab: false, is_visible: true, is_mega: false, mega_columns: null, image_media_id: null, children: [] }] }),
     })
     const { router } = renderRoutes(routes, '/storefront/theme')
 
-    expect(await screen.findByLabelText('Primary')).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'Save theme' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Primary: / })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Publish/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Custom CSS')).not.toBeInTheDocument()
 
     await router.navigate('/storefront/menus')

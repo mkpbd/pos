@@ -3,7 +3,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, CopyIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, Trash2Icon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Section } from '@/storefront/builder/types'
-import { nodeLabel, useCommands, useEditorUi } from './commands'
+import { nodeLabel, nodeName, useCommands, useEditorUi } from './commands'
 import type { Dragged } from './drop-targets'
 import { useEditor } from './store'
 import { findNode } from './tree'
@@ -54,7 +54,7 @@ export function MiniToolbar() {
           <GripVerticalIcon aria-hidden />
         </button>
       )}
-      <span className="px-1.5 text-xs font-medium whitespace-nowrap text-white">{label}</span>
+      <span className="max-w-56 truncate px-1.5 text-xs font-medium whitespace-nowrap text-white" title={nodeName(info.node, registry)}>{nodeName(info.node, registry)}</span>
       {info.kind !== 'column' && (
         <>
           <ToolButton label="Move up" disabled={info.index === 0} onClick={() => commands.step(id, -1)}>

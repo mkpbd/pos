@@ -64,13 +64,26 @@ class StorefrontBootstrap
     }
 
     /**
+     * B3: the payload with another theme document (the staff draft preview) instead of the live
+     * one; not cached. Custom CSS stays the live one (it is not part of the draft).
+     *
+     * @param  array<string, mixed>  $theme  normalized theme settings
      * @return array<string, mixed>
      */
-    private function compute(): array
+    public function buildWithTheme(array $theme): array
+    {
+        return $this->compute($theme);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $override  theme settings instead of the live ones
+     * @return array<string, mixed>
+     */
+    private function compute(?array $override = null): array
     {
         $settings = $this->config->settings();
         $theme = $this->config->theme();
-        $t = $theme->settings;
+        $t = $override ?? $theme->settings;
         $locale = $this->locale->current();
 
         $menus = Menu::query()->where('is_active', true)->with(['items' => fn ($q) => $q->where('is_visible', true)])->get();

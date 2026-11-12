@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 /*
  * Theme presets (T1) on a mocked store: each preset's layout variants render their landmarks on
@@ -38,12 +38,16 @@ type Preset = keyof typeof PRESETS
 
 const node = (id: string, label: string, url: string) => ({ id, label, url, open_in_new_tab: false, is_mega: false, mega_columns: null, image: null, children: [] })
 
-function bootstrap(preset: Preset) {
+type ThemeOverrides = { colors?: Record<string, string | null>; typography?: Record<string, number> }
+
+function bootstrap(preset: Preset, overrides: ThemeOverrides = {}) {
   return {
     store: { name: 'Green Basket', description: 'Organic groceries', prices_include_tax: true, currency: 'BDT' },
     preview: false,
     theme: {
       ...PRESETS[preset],
+      colors: { ...PRESETS[preset].colors, ...overrides.colors },
+      typography: { ...PRESETS[preset].typography, ...overrides.typography },
       preset,
       logo: null,
       favicon: null,
@@ -77,9 +81,9 @@ const sections = [
   { id: 's-2', type: 'product_grid', title: 'Best sellers', subtitle: null, config: { source: 'best_sellers', limit: 8, columns: 4 }, products },
 ]
 
-async function serveStore(page: Page, preset: Preset) {
-  await page.route('**/api/v1/store/bootstrap*', (route) => route.fulfill({ json: envelope(bootstrap(preset)) }))
-  await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections, preview: false }) }))
+async function serveStore(page: Page, preset: Preset, options: { theme?: ThemeOverrides; sections?: unknown[] } = {}) {
+  await page.route('**/api/v1/store/bootstrap*', (route) => route.fulfill({ json: envelope(bootstrap(preset, options.theme)) }))
+  await page.route('**/api/v1/store/homepage*', (route) => route.fulfill({ json: envelope({ sections: options.sections ?? sections, preview: false }) }))
   await page.route('**/api/v1/store/account/me*', (route) => route.fulfill({ json: envelope(null) }))
   await page.route('**/api/v1/store/cart*', (route) =>
     route.fulfill({ json: envelope({ id: null, items: [], item_count: '0', subtotal: '0.00', discount_total: '0.00', tax_total: '0.00', total: '0.00', prices_include_tax: true, currency: 'BDT', issues: [], promotions: [], free_shipping: null, coupon: null }) }),
@@ -184,4 +188,71 @@ test('classic: wide header search with cart total, sale hero, commerce cards and
   await quickView.focus()
   await expect(quickView).toBeVisible()
   await expect(card.getByTestId('card-hover-actions')).toHaveCSS('opacity', '1')
+})
+
+/* B3: the theme's colour roles and type scale. */
+
+const withViewAll = sections.map((section) => (section.type === 'product_grid' ? { ...section, config: { ...section.config, view_all_url: '/shop' } } : section))
+
+const px = (value: string) => Number.parseFloat(value)
+
+/** A computed style of the element (the e2e project has no DOM types). */
+const computed = (locator: Locator, property: string) =>
+  locator.evaluate((el, name) => (globalThis as unknown as { getComputedStyle(e: unknown): Record<string, string> }).getComputedStyle(el)[name] ?? '', property)
+
+/** The heading size the type scale gives a Tailwind step (src/storefront/type-scale.ts). */
+const headingStepPx = (step: number, body: number, ratio: number) => step * (body / 16) * (ratio / 1.25) ** (Math.log(step / 16) / Math.log(1.25))
+
+test('B3 defaults: a theme from before B3 keeps today’s sizes, buttons and links', async ({ page, isMobile }) => {
+  await serveStore(page, 'default', { sections: withViewAll })
+  await page.goto('/')
+
+  const body = page.locator('body')
+  await expect(body).toHaveCSS('font-size', '16px')
+  await expect(body).toHaveCSS('line-height', '24px')
+  const heading = page.getByRole('heading', { level: 2, name: 'Best sellers' })
+  await expect(heading).toHaveCSS('font-size', isMobile ? '30px' : '36px')
+  await expect(heading).toHaveCSS('font-weight', '800')
+  await expect(heading).toHaveCSS('letter-spacing', 'normal')
+  await expect(page.locator('html')).toHaveAttribute('data-sf-button-hover', 'auto')
+
+  // "View all" is a theme button: the primary pair, and the automatic brightness hover.
+  const viewAll = page.getByRole('link', { name: 'View all' })
+  await expect(viewAll).toHaveCSS('background-color', 'rgb(245, 158, 11)')
+  await expect(viewAll).toHaveCSS('color', 'rgb(59, 37, 0)')
+  if (!isMobile) {
+    await viewAll.hover()
+    await expect(viewAll).toHaveCSS('filter', 'brightness(1.05)')
+    await expect(viewAll).toHaveCSS('background-color', 'rgb(245, 158, 11)')
+  }
+})
+
+test('B3 theme: button, hover and link colours and the type scale reach the storefront', async ({ page, isMobile }) => {
+  const typography = { body_size: 18, heading_scale: 1.4, line_height: 1.7, heading_weight: 800, mobile_scale: 0.85, letter_spacing: 0.02 }
+  await serveStore(page, 'default', {
+    sections: withViewAll,
+    theme: { colors: { button: '#1d4ed8', button_foreground: '#ffffff', button_hover: '#1e3a8a', link: '#be123c' }, typography },
+  })
+  await page.goto('/')
+
+  await expect(page.locator('body')).toHaveCSS('font-size', '18px')
+  await expect(page.locator('body')).toHaveCSS('line-height', '30.6px')
+  const heading = page.getByRole('heading', { level: 2, name: 'Best sellers' })
+  // text-3xl on phones (× the mobile scale), lg:text-4xl on desktops.
+  const expected = isMobile ? headingStepPx(30, 18, 1.4) * 0.85 : headingStepPx(36, 18, 1.4)
+  await expect.poll(async () => px(await computed(heading, 'fontSize'))).toBeCloseTo(expected, 1)
+  // font-extrabold (800) shifted by 800 − 700.
+  await expect(heading).toHaveCSS('font-weight', '900')
+  expect(px(await computed(heading, 'letterSpacing'))).toBeCloseTo(0.02 * expected, 1)
+  await expect(page.locator('html')).toHaveAttribute('data-sf-button-hover', 'color')
+  await expect(page.locator('html')).toHaveCSS('--sf-link', '#be123c')
+
+  const viewAll = page.getByRole('link', { name: 'View all' })
+  await expect(viewAll).toHaveCSS('background-color', 'rgb(29, 78, 216)')
+  await expect(viewAll).toHaveCSS('color', 'rgb(255, 255, 255)')
+  if (!isMobile) {
+    await viewAll.hover()
+    await expect(viewAll).toHaveCSS('background-color', 'rgb(30, 58, 138)')
+    await expect(viewAll).toHaveCSS('filter', 'none')
+  }
 })

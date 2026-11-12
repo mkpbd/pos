@@ -32,9 +32,18 @@ export function readInlineBootstrap(doc: Document = document): StorefrontBootstr
   }
 }
 
+/**
+ * `?preview=draft` on the store URL (B3): signed-in staff see the draft theme (and builder drafts).
+ * The API ignores it for everyone else.
+ */
+export function isDraftPreviewUrl(search: string = typeof window === 'undefined' ? '' : window.location.search): boolean {
+  return new URLSearchParams(search).get('preview') === 'draft'
+}
+
 /** `requested`: the language from `?lang=` or the cookie; null asks for the store's default language. */
 export async function fetchBootstrap(requested: Locale | null, signal?: AbortSignal): Promise<StorefrontBootstrap> {
-  return (await storeApi.get<StorefrontBootstrap>('/store/bootstrap', { signal, query: { lang: requested ?? undefined } })).data
+  const preview = isDraftPreviewUrl() ? 'draft' : undefined
+  return (await storeApi.get<StorefrontBootstrap>('/store/bootstrap', { signal, query: { lang: requested ?? undefined, preview } })).data
 }
 
 /** The languages a bootstrap payload offers (English only for payloads from before E12b). */
@@ -62,6 +71,8 @@ export function resolveLocale(bootstrap: StorefrontBootstrap, requested: Locale 
  * (`?lang=` > cookie > default), so it does unless the language changed since.
  */
 function inlineBootstrapFor(requested: Locale | null): StorefrontBootstrap | undefined {
+  // The page carries the live theme; a draft preview asks the API for the draft one.
+  if (isDraftPreviewUrl()) return undefined
   const inline = readInlineBootstrap()
   if (!inline || requested === null) return inline
   return resolveLocale(inline, requested) === resolveLocale(inline, null) ? inline : undefined

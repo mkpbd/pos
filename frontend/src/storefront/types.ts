@@ -21,6 +21,31 @@ export type ThemeColors = {
   canvas: string
   surface: string
   border: string
+  /*
+   * B3 roles. null or absent = follow another role (themes from before B3): button → primary,
+   * button_foreground → primary_foreground, link → accent; button_hover null = the automatic
+   * hover (each button's brightness change).
+   */
+  button?: string | null
+  button_foreground?: string | null
+  button_hover?: string | null
+  link?: string | null
+}
+
+/** B3 type scale; absent keys (themes from before B3) take TYPE_DEFAULTS (storefront/type-scale.ts). */
+export type TypeScaleSettings = {
+  /** Body text size in px (13–20). */
+  body_size?: number
+  /** Ratio between heading steps (1.1–1.5). */
+  heading_scale?: number
+  /** Body line height (1.3–1.9). */
+  line_height?: number
+  /** Heading weight (400–900); 700 keeps each heading's designed weight. */
+  heading_weight?: number
+  /** Heading sizes on phones (0.8–1). */
+  mobile_scale?: number
+  /** Extra heading letter spacing in em (−0.02–0.1). */
+  letter_spacing?: number
 }
 
 export type HeadingFont = 'baloo' | 'poppins' | 'playfair' | 'jost' | 'system'
@@ -57,7 +82,7 @@ export type Announcement = {
 
 export type StorefrontTheme = {
   colors: ThemeColors
-  typography: { heading_font: HeadingFont; body_font: BodyFont }
+  typography: { heading_font: HeadingFont; body_font: BodyFont } & TypeScaleSettings
   shape: { button_style: ButtonStyle; card_radius: number }
   layout: { container_width: number; sticky_header: boolean } & Partial<LayoutVariants>
   /** The preset the theme was last set from (absent before T1 = `default`). */

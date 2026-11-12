@@ -292,7 +292,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       {!customer && (
         <p className="mt-2 text-sm">
           {t('checkout.page.haveAccount')}{' '}
-          <Link to={loginPathFor('/checkout')} className="font-semibold text-sf-accent underline underline-offset-4 hover:no-underline">
+          <Link to={loginPathFor('/checkout')} className="font-semibold text-sf-link underline underline-offset-4 hover:no-underline">
             {t('checkout.page.signInFaster')}
           </Link>
         </p>

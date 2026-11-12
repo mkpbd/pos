@@ -35,7 +35,62 @@ final class ThemeSchema
 
     public const SOCIAL_NETWORKS = ['facebook', 'instagram', 'youtube', 'tiktok', 'x', 'linkedin'];
 
+    /**
+     * The base colour roles (always `#rrggbb`). They are also the `theme:<role>` colour tokens of
+     * store builder styles (StyleSchema; mirrored by the editor), so this list only grows together
+     * with the builder's token list.
+     */
     public const COLORS = ['primary', 'primary_foreground', 'accent', 'accent_foreground', 'highlight', 'sale', 'heading', 'text', 'canvas', 'surface', 'border'];
+
+    /**
+     * B3: colour roles that start as a copy of another role — a theme saved without them gets
+     * that role's value, so it keeps looking exactly as before (buttons were painted in the
+     * primary colour pair, links in the accent). Always `#rrggbb` once normalized.
+     */
+    public const DERIVED_COLORS = ['button' => 'primary', 'button_foreground' => 'primary_foreground', 'link' => 'accent'];
+
+    /**
+     * B3: colour roles where null means "automatic": `button_hover` null keeps today's hover
+     * effect (the button colour, slightly brightened by a CSS filter).
+     */
+    public const AUTO_COLORS = ['button_hover'];
+
+    /** B3: the store's own saved colours (`palette`: [{name, hex}]), offered in every colour picker. */
+    public const MAX_PALETTE = 8;
+
+    public const MAX_PALETTE_NAME = 40;
+
+    /**
+     * B3: type scale bounds [min, max] (validated by the request; heading weights in steps of 100).
+     *
+     * - `body_size`: body text size in px (the root size, rem = this)
+     * - `heading_scale`: ratio between heading levels (h4 = body x scale, h3 = h4 x scale, ...)
+     * - `line_height`: body text line height (unitless)
+     * - `heading_weight`: heading font weight
+     * - `mobile_scale`: factor for heading sizes below 640 px
+     * - `letter_spacing`: extra heading letter spacing in em (added to uppercase headings' 0.04em)
+     */
+    public const TYPE_SCALE = [
+        'body_size' => [13, 20],
+        'heading_scale' => [1.1, 1.5],
+        'line_height' => [1.3, 1.9],
+        'heading_weight' => [400, 900],
+        'mobile_scale' => [0.8, 1.0],
+        'letter_spacing' => [-0.02, 0.1],
+    ];
+
+    /** The integer type scale keys (the others are decimals). */
+    private const INTEGER_TYPE_KEYS = ['body_size', 'heading_weight'];
+
+    /**
+     * Every colour role key in document order.
+     *
+     * @return list<string>
+     */
+    public static function colorKeys(): array
+    {
+        return [...self::COLORS, ...array_keys(self::DERIVED_COLORS), ...self::AUTO_COLORS];
+    }
 
     public const MAX_PAYMENT_LOGOS = 10;
 
@@ -58,8 +113,26 @@ final class ThemeSchema
                 'canvas' => '#f3f7fa',
                 'surface' => '#ffffff',
                 'border' => '#e1e1e1',
+                // B3 (DERIVED_COLORS / AUTO_COLORS): today's buttons and links.
+                'button' => '#f59e0b',
+                'button_foreground' => '#3b2500',
+                'link' => '#6f55c2',
+                'button_hover' => null,
             ],
-            'typography' => ['heading_font' => 'baloo', 'body_font' => 'poppins'],
+            'typography' => [
+                'heading_font' => 'baloo',
+                'body_font' => 'poppins',
+                // B3 type scale (TYPE_SCALE): the defaults reproduce today's storefront sizes.
+                'body_size' => 16,
+                'heading_scale' => 1.25,
+                'line_height' => 1.5,
+                'heading_weight' => 700,
+                // Whole numbers are stored as integers (JSON has one number type).
+                'mobile_scale' => 1,
+                'letter_spacing' => 0,
+            ],
+            // B3: the store's saved colours [{name, hex}] (content: presets keep it).
+            'palette' => [],
             'shape' => ['button_style' => 'pill', 'card_radius' => 12],
             'layout' => [
                 'container_width' => 1170,
@@ -100,7 +173,55 @@ final class ThemeSchema
      */
     public static function normalize(array $settings): array
     {
-        return self::merge(self::defaults(), $settings);
+        $result = self::merge(self::defaults(), $settings);
+
+        // B3: a missing (or null) derived role copies its source role of this theme.
+        $colors = is_array($settings['colors'] ?? null) ? $settings['colors'] : [];
+        foreach (self::DERIVED_COLORS as $key => $source) {
+            if (! isset($colors[$key]) && is_array($result['colors'])) {
+                $result['colors'][$key] = $result['colors'][$source];
+            }
+        }
+
+        if (is_array($result['typography'])) {
+            foreach (self::TYPE_SCALE as $key => $bounds) {
+                $value = $result['typography'][$key] ?? null;
+                if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))) {
+                    $number = round((float) $value, in_array($key, self::INTEGER_TYPE_KEYS, true) ? 0 : 3);
+                    // One form per value whatever the storage (json_encode writes 1.0 as 1): whole numbers are ints.
+                    $result['typography'][$key] = floor($number) === $number ? (int) $number : $number;
+                }
+            }
+        }
+
+        $result['palette'] = self::palette($result['palette']);
+
+        return $result;
+    }
+
+    /**
+     * B3: whether two theme documents are the same theme once normalized (map key order and
+     * stored number forms do not matter: jsonb reorders keys).
+     *
+     * @param  array<string, mixed>  $a
+     * @param  array<string, mixed>  $b
+     */
+    public static function same(array $a, array $b): bool
+    {
+        return self::canonical(self::normalize($a)) === self::canonical(self::normalize($b));
+    }
+
+    private static function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+        $value = array_map(fn ($v) => self::canonical($v), $value);
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 
     /**
@@ -116,6 +237,27 @@ final class ThemeSchema
             $settings['favicon_media_id'],
             ...$settings['footer']['payment_logo_media_ids'],
         ], 'is_string')));
+    }
+
+    /**
+     * Palette entries as `{name, hex}` (other keys dropped, hex lower-cased); entries that are
+     * not well-formed are left out.
+     *
+     * @return list<array{name: string, hex: string}>
+     */
+    private static function palette(mixed $palette): array
+    {
+        if (! is_array($palette)) {
+            return [];
+        }
+        $entries = [];
+        foreach ($palette as $entry) {
+            if (is_array($entry) && is_string($entry['name'] ?? null) && is_string($entry['hex'] ?? null)) {
+                $entries[] = ['name' => trim($entry['name']), 'hex' => strtolower($entry['hex'])];
+            }
+        }
+
+        return $entries;
     }
 
     /**

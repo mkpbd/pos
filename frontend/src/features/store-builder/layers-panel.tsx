@@ -4,7 +4,7 @@ import { ArrowDownIcon, ArrowUpIcon, CircleAlertIcon, CopyIcon, EllipsisIcon, Ey
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { nodeLabel, nodeSummary, useCommands, useEditorUi } from './commands'
+import { nodeLabel, nodeName, nodeSummary, useCommands, useEditorUi } from './commands'
 import type { Dragged, LayerPosition } from './drop-targets'
 import { useEditor } from './store'
 import { ElementIcon } from './element-icon'
@@ -24,8 +24,8 @@ function LayerItem({ row, selected, tabbable, hasErrors, indicator, onSelectRow 
   const commands = useCommands()
   const { node, kind } = row
   const label = row.kind === 'column' ? `Column ${row.columnNumber} of ${row.count}` : nodeLabel(node, registry)
-  const summary = nodeSummary(node)
-  const name = summary ? `${label}: ${summary}` : label
+  const summary = nodeSummary(node, registry)
+  const name = row.kind === 'column' ? label : nodeName(node, registry)
   const hidden = kind !== 'column' && (node as { hidden?: boolean }).hidden === true
   const dragged: Dragged | null = kind === 'column' ? null : { kind: 'node', id: node.id, type: node.type }
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `layer-drag:${node.id}`, data: { dragged }, disabled: dragged === null })

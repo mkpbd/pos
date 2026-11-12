@@ -2,10 +2,9 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
-use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
-use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
+use App\Modules\Storefront\Presentation\Http\Support\StaffPreview;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -23,7 +22,7 @@ class StoreBuilderPageController
     public function __invoke(Request $request, string $slug, BuilderPages $pages): Response
     {
         $key = BuilderPages::key($slug);
-        $preview = $request->query('preview') === 'draft' && $this->isStaff($request);
+        $preview = StaffPreview::draft($request);
         $payload = $preview ? $pages->draft($key) : $pages->published($key);
         if ($payload === null) {
             return ApiResponse::error('PAGE_NOT_FOUND', 'This page does not exist.', 404);
@@ -32,15 +31,5 @@ class StoreBuilderPageController
         $response = ApiResponse::success($payload);
 
         return $preview ? $response->header('Cache-Control', 'no-store, private') : $response;
-    }
-
-    private function isStaff(Request $request): bool
-    {
-        $user = $request->user();
-
-        return $user instanceof TenantUser
-            && $user->isActive()
-            && $user->organizationId() === $request->attributes->get(ResolveStorefront::ATTRIBUTE)['organization_id']
-            && $user->can('storefront.view');
     }
 }

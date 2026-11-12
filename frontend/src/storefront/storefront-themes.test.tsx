@@ -398,7 +398,7 @@ describe('hero variants', () => {
     renderRoutes(storefrontRoutes)
 
     const link = await screen.findByRole('link', { name: 'Shop now' })
-    expect(link).toHaveClass('bg-sf-primary')
+    expect(link).toHaveClass('bg-sf-button', 'sf-button')
     expect(link.getAttribute('style')).toBeNull()
   })
 })

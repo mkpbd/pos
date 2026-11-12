@@ -1,6 +1,6 @@
 # Visual Store Builder — analysis and architecture (B1–B5)
 
-Status: **approved 2026-11-11** (decisions in §10). **B1 + B2 done** (engine, editor; see §11); B3 (design controls) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
+Status: **approved 2026-11-11** (decisions in §10). **B1–B3 done** (engine, editor, design controls; see §11); B4 (pages, header, footer) next. Goal: a drag-and-drop, no-code editor in the admin that lets each organization design its own online store (pages, header, footer, global styles) with draft / publish / version history. It is built on top of the existing storefront, catalog, cart, checkout and POS data, which it does not change.
 
 ## 1. What already exists (reused)
 
@@ -259,3 +259,17 @@ Original questions:
   - The setup dialog opens only when an element type's defaults are invalid.
   - Version "View" is available for the live version only (no endpoint previews older versions).
 - **Polish for B3:** layers rows say only "Section"; name them after their content.
+
+### As built — B3 (2026-11-12)
+
+- **Controls:** `features/store-builder/controls/` (ColorControl, GradientControl, LengthControl, SpacingBox, ShadowControl, TypographyControl, BorderControl, BackgroundControl, HoverControl). Values go in and out; every write is checked against `validate.ts`, so the Style tab never writes a value the server would drop. `compile-styles.ts` is unchanged.
+- **Per device:** mobile falls back to tablet, then desktop. A filled dot means set for this device; a hollow dot means inherited. Column resize (`column-resize.ts`) keeps each pair's total.
+- **Theme document:** `builder_documents` `kind=theme`, `key=theme`, created on the first write. Reading never writes: before the first edit, the draft is the live theme at revision 0. The builder documents API ignores it.
+- **New theme keys:**
+  - `button`, `button_foreground` and `link` are always hex; old themes copy their own primary pair and accent when normalized.
+  - `button_hover: null` = automatic (keeps each button's brightness filter).
+  - Type scale defaults 16 / 1.25 / 1.5 / 700 / 1 / 0 reproduce today's sizes exactly (body × 1.25^k gives Tailwind's 20 … 72 px).
+  - `palette` is owner content, so applying a preset keeps it.
+  - `theme:button` / `theme:link` are not style tokens: the 11-role token list stays shared with `validate.ts`.
+- **Draft preview:** `StaffPreview` support. Staff `?preview=draft` on bootstrap and on the HTML shell (`no-store`, noindex); canvas-context always returns the draft theme.
+- **Not covered:** the divider's colour field in the Content tab still uses the simple theme-colour select. Turning off "fill the column width" on a device that inherits 100 % isn't possible (no `auto` width).

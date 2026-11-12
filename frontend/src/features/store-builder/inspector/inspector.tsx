@@ -10,6 +10,7 @@ import {
   MegaphoneIcon,
   MinusIcon,
   MoveVerticalIcon,
+  PaletteIcon,
   PanelTopIcon,
   PilcrowIcon,
   RectangleHorizontalIcon,
@@ -24,6 +25,7 @@ import { AdvancedTab } from './advanced-tab'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
 import { ElementSetupHost } from './setup-dialog'
+import { StyleTab } from './style-tab'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
 import { validateNode } from './validate'
@@ -96,7 +98,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content }: {
   return <p className="text-sm text-muted-foreground">This element has no settings.</p>
 }
 
-function PageSettings({ document, content, locales }: Pick<InspectorProps, 'document' | 'content' | 'locales'>) {
+function PageSettings({ document, content, locales, onCommand }: Pick<InspectorProps, 'document' | 'content' | 'locales' | 'onCommand'>) {
   const published = document.published
   const sections = content.sections.length
   return (
@@ -128,11 +130,18 @@ function PageSettings({ document, content, locales }: Pick<InspectorProps, 'docu
         )}
       </dl>
       <p className="text-sm text-muted-foreground">Changes are saved as a draft automatically. Visitors see them only after you publish.</p>
+      <div className="flex flex-col gap-2 rounded-md border p-3">
+        <h3 className="text-sm font-semibold">Site styles</h3>
+        <p className="text-sm text-muted-foreground">Colours, fonts, text sizes and buttons for the whole store. Changes show here at once and go live when you publish them.</p>
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => onCommand({ type: 'open-site-styles' })}>
+          <PaletteIcon data-icon="inline-start" /> Site styles
+        </Button>
+      </div>
     </div>
   )
 }
 
-type Tab = 'content' | 'advanced'
+type Tab = 'content' | 'style' | 'advanced'
 
 /**
  * The right panel of the store builder: page settings, or the selected node's Content and
@@ -147,13 +156,13 @@ export function Inspector(props: InspectorProps) {
   )
 }
 
-function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand }: InspectorProps) {
+function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme }: InspectorProps) {
   const [tab, setTab] = useState<Tab>('content')
 
   if (!node) {
     return (
       <aside aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
-        <PageSettings document={document} content={content} locales={locales} />
+        <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} />
       </aside>
     )
   }
@@ -162,7 +171,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
   const problems = validateNode(node)
   const errors = errorMap(node, problems, serverProblems)
   const hasAdvanced = node.type !== 'column'
-  const activeTab: Tab = hasAdvanced ? tab : 'content'
+  const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
   const advancedErrors = Object.keys(errors).some((k) => ADVANCED_KEYS.has(k))
   const contentErrors = Object.keys(errors).some((k) => !ADVANCED_KEYS.has(k))
   const label = nodeLabel(node, registry)
@@ -211,6 +220,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
           <TabsTrigger value="content">
             Content{contentErrors && <span className="size-1.5 rounded-full bg-destructive" aria-label="has problems" />}
           </TabsTrigger>
+          <TabsTrigger value="style">Style</TabsTrigger>
           {hasAdvanced && (
             <TabsTrigger value="advanced">
               Advanced{advancedErrors && <span className="size-1.5 rounded-full bg-destructive" aria-label="has problems" />}
@@ -219,6 +229,9 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
         </TabsList>
         <TabsContent value="content" className="pt-4">
           <ContentForm node={node} onChange={onChange} onCommand={onCommand} errors={errors} bangla={bangla} content={content} />
+        </TabsContent>
+        <TabsContent value="style" className="pt-4">
+          <StyleTab node={node} device={device} onChange={onChange} onCommand={onCommand} theme={theme} />
         </TabsContent>
         {hasAdvanced && (
           <TabsContent value="advanced" className="pt-4">

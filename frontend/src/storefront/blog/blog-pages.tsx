@@ -124,7 +124,7 @@ export function BlogIndexPage() {
             {page > 1 ? (
               <>
                 <h2 className="text-xl font-bold">{t('blog.emptyPage')}</h2>
-                <Link to={blogListUrl(category, 1)} className="mt-4 inline-block font-semibold text-sf-accent hover:underline">{t('blog.firstPage')}</Link>
+                <Link to={blogListUrl(category, 1)} className="mt-4 inline-block font-semibold text-sf-link hover:underline">{t('blog.firstPage')}</Link>
               </>
             ) : (
               <h2 className="text-xl font-bold">{t('blog.empty')}</h2>
@@ -207,7 +207,7 @@ export function BlogPostPage() {
           <p className="mt-10 border-t pt-6 text-sm">
             {rich(t('blog.filedUnder'), {
               category: (
-                <Link to={blogCategoryUrl(post.category.slug)} className="font-semibold text-sf-accent hover:underline">
+                <Link to={blogCategoryUrl(post.category.slug)} className="font-semibold text-sf-link hover:underline">
                   {post.category.name}
                 </Link>
               ),

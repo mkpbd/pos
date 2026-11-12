@@ -9,7 +9,10 @@ use App\Modules\Storefront\Infrastructure\Models\ThemeSettings;
 /**
  * T1: puts a preset's colours, fonts, shape and layout over the current theme and saves it
  * like any theme edit (media check, audit, storefront cache bust). Logo, favicon,
- * announcement and footer content are kept.
+ * announcement, footer content and the palette are kept.
+ *
+ * B3: this writes the live theme directly and is used by seeding (the demo stores). The admin
+ * API applies presets to the theme draft instead (ManageThemeDraft::applyPreset).
  */
 class ApplyThemePreset
 {

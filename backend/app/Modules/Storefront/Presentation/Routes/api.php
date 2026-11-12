@@ -11,6 +11,7 @@ use App\Modules\Storefront\Presentation\Http\Controllers\StoreBootstrapControlle
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBuilderPageController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontAdminController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreHomepageController;
+use App\Modules\Storefront\Presentation\Http\Controllers\ThemeDraftController;
 use Illuminate\Support\Facades\Route;
 
 // Public storefront API: organization from the host name, no authentication.
@@ -33,6 +34,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::get('domains', [StorefrontAdminController::class, 'domains']);
         Route::get('theme', [StorefrontAdminController::class, 'showTheme']);
         Route::get('theme/presets', [StorefrontAdminController::class, 'themePresets']);
+        // B3: the theme draft (draft → publish like builder pages).
+        Route::get('theme/draft', [ThemeDraftController::class, 'show']);
+        Route::get('theme/versions', [ThemeDraftController::class, 'versions']);
         Route::get('menus', [MenuController::class, 'index']);
         Route::get('menus/{menu}', [MenuController::class, 'show'])->whereUuid('menu');
         Route::get('link-targets', LinkTargetController::class);
@@ -48,8 +52,14 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::post('domains', [StorefrontAdminController::class, 'storeDomain']);
         Route::patch('domains/{domain}', [StorefrontAdminController::class, 'updateDomain'])->whereUuid('domain');
         Route::delete('domains/{domain}', [StorefrontAdminController::class, 'destroyDomain'])->whereUuid('domain');
-        Route::put('theme', [StorefrontAdminController::class, 'updateTheme']);
-        Route::post('theme/presets/{preset}/apply', [StorefrontAdminController::class, 'applyThemePreset'])->whereIn('preset', ThemePresets::KEYS);
+        // Legacy: saves the draft and publishes it in one step (B3).
+        Route::put('theme', [StorefrontAdminController::class, 'updateTheme'])->middleware('can:storefront.publish');
+        Route::put('theme/draft', [ThemeDraftController::class, 'save']);
+        Route::post('theme/publish', [ThemeDraftController::class, 'publish'])->middleware('can:storefront.publish');
+        Route::post('theme/discard', [ThemeDraftController::class, 'discard']);
+        Route::post('theme/versions/{version}/restore', [ThemeDraftController::class, 'restore'])->whereUuid('version');
+        // B3: applies to the draft.
+        Route::post('theme/presets/{preset}/apply', [ThemeDraftController::class, 'applyPreset'])->whereIn('preset', ThemePresets::KEYS);
         Route::post('menus', [MenuController::class, 'store']);
         Route::patch('menus/{menu}', [MenuController::class, 'update'])->whereUuid('menu');
         Route::put('menus/{menu}/items', [MenuController::class, 'replaceItems'])->whereUuid('menu');

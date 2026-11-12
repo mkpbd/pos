@@ -7,7 +7,7 @@ const me = {
   user: { id: 'u-1', name: 'Nadia Store', email: 'nadia@berry.test', phone: null, is_platform_admin: false, last_login_at: null },
   organization: { id: 'o-1', name: 'Berry Kids', slug: 'berry-kids', base_currency: 'BDT', timezone: 'Asia/Dhaka', tax_mode: 'exclusive', status: 'active' },
   roles: [{ id: 'r-9', name: 'Online Store Manager', system_key: 'online_store_manager' }],
-  permissions: ['branches.view', 'media.manage', 'storefront.manage', 'storefront.view'],
+  permissions: ['branches.view', 'media.manage', 'storefront.manage', 'storefront.publish', 'storefront.view'],
   branches: [{ id: 'b-1', code: 'MAIN', name: 'Main Branch', is_active: true }],
 }
 
@@ -27,6 +27,19 @@ const theme = {
   updated_at: null,
 }
 
+/** B3: the theme page edits a draft; the store changes on publish. */
+const themeDraft = (overrides: Record<string, unknown> = {}) => ({
+  settings: theme.settings,
+  draft_revision: 4,
+  has_unpublished_changes: false,
+  draft_updated_at: null,
+  published: { version_id: 'v-1', number: 1, published_at: '2026-11-01T10:00:00Z' },
+  preview_url: null,
+  custom_css: null,
+  has_custom_css: false,
+  ...overrides,
+})
+
 const mainMenu = { id: 'm-1', name: 'Main', location: 'main', location_label: 'Main navigation', is_active: true, updated_at: null }
 
 // 1×1 transparent PNG
@@ -42,6 +55,14 @@ async function mockBackend(page: Page) {
     route.request().method() === 'PUT'
       ? route.fulfill({ json: envelope({ ...theme, settings: route.request().postDataJSON() }) })
       : route.fulfill({ json: envelope(theme) }),
+  )
+  await page.route('**/api/v1/storefront/theme/draft', (route) =>
+    route.request().method() === 'PUT'
+      ? route.fulfill({ json: envelope(themeDraft({ settings: (route.request().postDataJSON() as { settings: unknown }).settings, draft_revision: 5, has_unpublished_changes: true })) })
+      : route.fulfill({ json: envelope(themeDraft()) }),
+  )
+  await page.route('**/api/v1/storefront/theme/publish', (route) =>
+    route.fulfill({ json: envelope(themeDraft({ draft_revision: 5, published: { version_id: 'v-2', number: 2, published_at: '2026-11-12T10:00:00Z' } })) }),
   )
   await page.route('**/api/v1/storefront/theme/presets', (route) =>
     route.fulfill({
@@ -63,20 +84,45 @@ async function mockBackend(page: Page) {
   )
 }
 
-test('changes a theme colour and saves the whole theme', async ({ page }) => {
+test('changes a theme colour, saves it as a draft (store unchanged), then publishes it', async ({ page }) => {
   await mockBackend(page)
+  const liveWrites: string[] = []
+  page.on('request', (r) => {
+    if (r.url().endsWith('/api/v1/storefront/theme') && r.method() !== 'GET') liveWrites.push(r.method())
+  })
   await page.goto('/admin/storefront/theme')
 
-  const primary = page.getByLabel('Primary', { exact: true })
-  await primary.fill('#a35a00')
-  const put = page.waitForRequest((r: Request) => r.url().endsWith('/api/v1/storefront/theme') && r.method() === 'PUT')
-  await page.getByRole('button', { name: 'Save theme' }).click()
+  await expect(page.getByTestId('theme-status')).toContainText('Live')
+  await page.getByRole('button', { name: /^Primary: #f59e0b/ }).click()
+  await page.getByLabel('Primary hex value').fill('#a35a00')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: /^Primary: #a35a00/ })).toBeVisible()
+  // The store palette and the type scale are part of the global styles.
+  await page.getByRole('button', { name: 'Add colour' }).click()
+  await page.getByRole('slider', { name: 'Body text size' }).fill('17')
 
-  const body = (await put).postDataJSON() as typeof theme.settings
-  expect(body.colors.primary).toBe('#a35a00')
-  expect(body.colors.accent).toBe('#6f55c2')
-  expect(body.footer.payment_logo_media_ids).toEqual([])
-  await expect(page.getByText('Theme saved.')).toBeVisible()
+  const put = page.waitForRequest((r: Request) => r.url().endsWith('/api/v1/storefront/theme/draft') && r.method() === 'PUT')
+  await page.getByRole('button', { name: 'Save draft' }).click()
+  const body = (await put).postDataJSON() as { revision: number; settings: typeof theme.settings & { palette: unknown[]; typography: Record<string, unknown>; colors: Record<string, unknown> } }
+  expect(body.revision).toBe(4)
+  expect(body.settings.colors).toMatchObject({ primary: '#a35a00', accent: '#6f55c2', button: '#a35a00', link: '#6f55c2', button_hover: null })
+  expect(body.settings.typography).toMatchObject({ body_size: 17, heading_scale: 1.25 })
+  expect(body.settings.palette).toEqual([{ name: 'Colour 1', hex: '#a35a00' }])
+  expect(body.settings.footer.payment_logo_media_ids).toEqual([])
+  await expect(page.getByText('Draft saved. Publish to show it on your store.')).toBeVisible()
+  // Saved but not live: nothing was written to the live theme.
+  await expect(page.getByTestId('theme-status')).toContainText('Draft — not live yet')
+  expect(liveWrites).toEqual([])
+
+  await page.getByRole('button', { name: 'Publish', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Publish the theme?' })
+  await dialog.getByLabel('Note (optional)').fill('Warmer orange')
+  const publish = page.waitForRequest((r: Request) => r.url().endsWith('/api/v1/storefront/theme/publish') && r.method() === 'POST')
+  await dialog.getByRole('button', { name: 'Publish' }).click()
+  expect((await publish).postDataJSON()).toEqual({ note: 'Warmer orange' })
+  await expect(page.getByText('Theme published. Your store shows it now.')).toBeVisible()
+  await expect(page.getByTestId('theme-status')).toContainText('Live: version 2.')
+  expect(liveWrites).toEqual([])
 })
 
 test('builds a menu with a child item and saves the tree', async ({ page }) => {

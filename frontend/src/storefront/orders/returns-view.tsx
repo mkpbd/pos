@@ -80,7 +80,7 @@ export function ReturnItem({
         <p>
           {rich(t('orders.returns.order'), {
             number: (
-              <Link to={`/account/orders/${encodeURIComponent(orderNumber)}`} className="font-semibold text-sf-accent hover:underline">
+              <Link to={`/account/orders/${encodeURIComponent(orderNumber)}`} className="font-semibold text-sf-link hover:underline">
                 {orderNumber}
               </Link>
             ),
@@ -106,7 +106,7 @@ export function ReturnItem({
       {isCancellableReturn(ret) && (
         <button
           type="button"
-          className="inline-flex items-center gap-1 self-start text-xs font-semibold text-sf-accent hover:text-sf-sale hover:underline"
+          className="inline-flex items-center gap-1 self-start text-xs font-semibold text-sf-link hover:text-sf-sale hover:underline"
           aria-label={t('orders.returns.cancelAria', { number: ret.number })}
           onClick={() => onCancel(ret)}
         >
@@ -136,7 +136,7 @@ export function OrderReturnsCard({ returns, currency, orderLines, onCancel }: { 
         ))}
       </ul>
       <p className="text-xs">
-        <Link to="/account/returns" className="font-semibold text-sf-accent hover:underline">
+        <Link to="/account/returns" className="font-semibold text-sf-link hover:underline">
           {t('orders.returns.all')}
         </Link>
       </p>

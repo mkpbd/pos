@@ -1,5 +1,6 @@
 import type { StoreSection, StorefrontBootstrap } from '../../types'
 import type { BuilderMedia, Device, RenderSection } from '../types'
+import type { CanvasThemeSettings } from './theme-override'
 
 /*
  * postMessage protocol between the store builder editor (admin, parent window) and its canvas
@@ -30,6 +31,8 @@ export type ParentMessage =
       pending: string[]
     }
   | { type: 'scroll-to'; id: string }
+  /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */
+  | { type: 'theme'; settings: CanvasThemeSettings }
   /** Drag autoscroll near the canvas edges. */
   | { type: 'scroll-by'; dy: number }
 
@@ -47,7 +50,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme'])
 const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {

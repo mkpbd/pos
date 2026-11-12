@@ -88,7 +88,7 @@ export function ProductReviews({ slug }: { slug: string }) {
   const hint = customer ? (
     <p className="text-sm" data-testid="review-hint">
       {t('reviews.hint.bought')}{' '}
-      <Link to="/account/orders" className="font-semibold text-sf-accent hover:underline">
+      <Link to="/account/orders" className="font-semibold text-sf-link hover:underline">
         {t('reviews.hint.link')}
       </Link>
     </p>

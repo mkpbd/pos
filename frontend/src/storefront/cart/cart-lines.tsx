@@ -148,7 +148,7 @@ function LineFlags({ line, max, busy, onFix }: { line: CartLine; max: string | n
         {message}
       </span>
       {line.purchasable && line.in_stock && line.exceeds_stock && max && (
-        <button type="button" disabled={busy} onClick={() => onFix(max)} className="text-sf-accent underline underline-offset-4 hover:no-underline disabled:opacity-50">
+        <button type="button" disabled={busy} onClick={() => onFix(max)} className="text-sf-link underline underline-offset-4 hover:no-underline disabled:opacity-50">
           {t('cart.line.changeQuantity', { max: formatNumber(max) })}
         </button>
       )}

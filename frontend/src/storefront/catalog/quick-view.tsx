@@ -90,7 +90,7 @@ function QuickViewProduct({ product, onNavigate }: { product: ProductDetail; onN
         <Link
           to={href}
           onClick={onNavigate}
-          className="mt-auto inline-flex items-center gap-2 self-start text-sm font-bold text-sf-accent underline-offset-4 hover:underline"
+          className="mt-auto inline-flex items-center gap-2 self-start text-sm font-bold text-sf-link underline-offset-4 hover:underline"
         >
           {t('catalog.quickView.fullDetails')}
           <ArrowRightIcon aria-hidden className="size-4" />

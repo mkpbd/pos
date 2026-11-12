@@ -276,7 +276,7 @@ function ResendLink() {
   if (resend.isSuccess) return <p role="status" className="text-sm">{t('account.verifyBanner.resent')}</p>
   return (
     <>
-      <button type="button" className="text-sm font-semibold text-sf-accent underline-offset-4 hover:underline" disabled={resend.isPending} onClick={() => resend.mutate()}>
+      <button type="button" className="text-sm font-semibold text-sf-link underline-offset-4 hover:underline" disabled={resend.isPending} onClick={() => resend.mutate()}>
         {t('account.verify.sendNew')}
       </button>
       {resend.isError && <p role="alert" className="text-sm text-sf-sale">{storeFormError(resend.error, t)}</p>}

@@ -1,6 +1,7 @@
 import { useStorefront } from './api'
 import { legibleOn } from './color'
-import type { BodyFont, ButtonStyle, HeadingCase, HeadingFont, LayoutVariants, StorefrontTheme } from './types'
+import { resolveTypeScale, typeScaleVars } from './type-scale'
+import type { BodyFont, ButtonStyle, HeadingCase, HeadingFont, LayoutVariants, StorefrontTheme, ThemeColors } from './types'
 
 const SYSTEM_STACK = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 
@@ -80,6 +81,8 @@ export function themeDataAttributes(theme: StorefrontTheme): Record<string, stri
     'data-sf-hero': layout.hero_style,
     'data-sf-heading-case': layout.heading_case,
     'data-sf-top-bar': layout.top_bar,
+    // B3: a chosen button hover colour replaces the automatic hover (storefront.css `.sf-button`).
+    'data-sf-button-hover': theme.colors.button_hover ? 'color' : 'auto',
   }
 }
 
@@ -101,11 +104,38 @@ const BUTTON_RADII: Record<ButtonStyle, string> = {
  * The theme as CSS custom properties (set on :root so portalled UI such as the mobile
  * drawer picks them up). storefront.css maps them into Tailwind colours, fonts and radii.
  */
+/** The eleven colours every theme has (the B3 roles below are derived when not set). */
+const BASE_COLORS = ['primary', 'primary_foreground', 'accent', 'accent_foreground', 'highlight', 'sale', 'heading', 'text', 'canvas', 'surface', 'border'] as const
+
+/**
+ * The B3 colour roles with their fallbacks: a theme from before B3 (or a role left on "automatic")
+ * follows the colour that part of the store used until then.
+ */
+export function resolveColorRoles(colors: ThemeColors): { button: string; button_foreground: string; button_hover: string | null; link: string } {
+  return {
+    button: colors.button || colors.primary,
+    button_foreground: colors.button_foreground || colors.primary_foreground,
+    button_hover: colors.button_hover || null,
+    link: colors.link || colors.accent,
+  }
+}
+
+/**
+ * The theme as CSS custom properties (set on :root so portalled UI such as the mobile
+ * drawer picks them up). storefront.css maps them into Tailwind colours, fonts, radii and
+ * text sizes.
+ */
 export function themeToCssVars(theme: StorefrontTheme): Record<string, string> {
   const vars: Record<string, string> = {}
-  for (const [name, value] of Object.entries(theme.colors)) {
-    vars[`--sf-${name.replace(/_/g, '-')}`] = value
+  for (const name of BASE_COLORS) {
+    vars[`--sf-${name.replace(/_/g, '-')}`] = theme.colors[name]
   }
+  const roles = resolveColorRoles(theme.colors)
+  vars['--sf-button'] = roles.button
+  vars['--sf-button-foreground'] = roles.button_foreground
+  // Without a hover colour the button keeps its automatic hover; the variable then repeats the button colour.
+  vars['--sf-button-hover'] = roles.button_hover ?? roles.button
+  vars['--sf-link'] = roles.link
   vars['--sf-font-heading'] = HEADING_STACKS[theme.typography.heading_font] ?? SYSTEM_STACK
   vars['--sf-font-body'] = BODY_STACKS[theme.typography.body_font] ?? SYSTEM_STACK
   vars['--sf-radius-button'] = BUTTON_RADII[theme.shape.button_style] ?? BUTTON_RADII.rounded
@@ -113,8 +143,13 @@ export function themeToCssVars(theme: StorefrontTheme): Record<string, string> {
   vars['--sf-container'] = `${theme.layout.container_width}px`
   const headingCase = resolveLayout(theme.layout).heading_case
   vars['--sf-heading-transform'] = HEADING_TRANSFORMS[headingCase]
-  // Capitals read better slightly spaced.
-  vars['--sf-heading-tracking'] = headingCase === 'uppercase' ? '0.04em' : 'normal'
+  // Capitals read better slightly spaced; the theme's heading letter spacing (B3) adds to it.
+  const spacing = resolveTypeScale(theme.typography).letter_spacing
+  const em = (value: number) => `${Number(value.toFixed(3))}em`
+  vars['--sf-heading-tracking'] = headingCase === 'uppercase' ? em(0.04 + spacing) : spacing === 0 ? 'normal' : em(spacing)
+  // Headings without a case class: only set when the theme asks for spacing, so they keep inheriting otherwise.
+  if (spacing !== 0) vars['--sf-heading-letter-spacing'] = em(spacing)
+  Object.assign(vars, typeScaleVars(theme.typography))
   // Stars on a dark surface (`.sf-on-dark`, painted in the heading colour): the primary when it
   // stands out there, else the surface colour (classic's primary is as dark as its footer).
   vars['--sf-star-on-dark'] = legibleOn(theme.colors.heading, [theme.colors.primary, theme.colors.surface, '#ffffff'])

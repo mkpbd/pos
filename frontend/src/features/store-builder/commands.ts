@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, type RefObject } from 'react'
 import { elementMeta } from '@/storefront/builder/registry'
-import type { BuilderNode, Element } from '@/storefront/builder/types'
+import type { BuilderNode, Column, Element, InnerRowElement, Section } from '@/storefront/builder/types'
 import type { ElementsMetadata } from './api'
 import type { CanvasHandle } from './canvas-frame'
 import { createElement } from './inspector'
@@ -33,14 +33,58 @@ export function nodeLabel(node: BuilderNode, registry?: ElementsMetadata): strin
   return registry?.types.find((t) => t.type === node.type)?.label ?? elementMeta(node.type)?.label ?? node.type
 }
 
-export function nodeSummary(node: BuilderNode): string | null {
+const SUMMARY_MAX = 48
+
+function clip(text: string): string {
+  return text.length > SUMMARY_MAX ? `${text.slice(0, SUMMARY_MAX - 1).trimEnd()}…` : text
+}
+
+/** An element's own text: a heading's or button's text, a text's words, a wrapped section's title. */
+function elementSummary(node: BuilderNode): string | null {
   const props = (node as Element).props as Record<string, unknown> | undefined
   if (!props) return null
   if (node.type === 'heading' && typeof props.text === 'string') return props.text
   if (node.type === 'button' && typeof props.label === 'string') return props.label
-  if (node.type === 'text' && typeof props.html === 'string') return props.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  if (node.type === 'text' && typeof props.html === 'string') return props.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').replace(/\s+([.,!?;:])/g, '$1').trim()
+  if (node.type === 'image' && typeof props.alt === 'string' && props.alt) return props.alt
   if (typeof props.title === 'string' && props.title) return props.title
   return null
+}
+
+/** The first element of a section (depth-first, into inner rows). */
+function firstElement(columns: readonly Column[]): Element | null {
+  for (const column of columns) {
+    for (const element of column.elements) {
+      if (element.type !== 'inner_row') return element
+      const inner = firstElement((element as InnerRowElement).columns as Column[])
+      if (inner) return inner
+    }
+  }
+  return null
+}
+
+/**
+ * What a node shows: an element's text, or for a section what it starts with ("Product grid: New
+ * arrivals", the first element's type and text).
+ */
+export function nodeSummary(node: BuilderNode, registry?: ElementsMetadata): string | null {
+  if (node.type === 'section') {
+    const first = firstElement((node as Section).columns)
+    if (!first) return null
+    const text = elementSummary(first)
+    return clip(text ? `${nodeLabel(first, registry)}: ${text}` : nodeLabel(first, registry))
+  }
+  if (node.type === 'column') return null
+  const text = elementSummary(node)
+  return text ? clip(text) : null
+}
+
+/** A node's name in Layers and on the canvas: "Section · Product grid: New arrivals", "Heading: Fresh today", "Column". */
+export function nodeName(node: BuilderNode, registry?: ElementsMetadata): string {
+  const label = nodeLabel(node, registry)
+  const summary = nodeSummary(node, registry)
+  if (!summary) return node.type === 'section' ? 'Section · empty' : label
+  return node.type === 'section' ? `${label} · ${summary}` : `${label}: ${summary}`
 }
 
 /** Where a click in the Add panel puts a new element: after the selected element, at the end of the selected column, after the selected section, else at the end of the page. */

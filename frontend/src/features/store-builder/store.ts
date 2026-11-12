@@ -58,6 +58,8 @@ export type ApplyOptions = {
   select?: string | null
   /** Same key within 800 ms of the last edit = the same undo step. */
   coalesceKey?: string
+  /** How long the coalesce key joins edits (ms; default 800). A drag gesture uses a key of its own and Infinity. */
+  coalesceWindow?: number
   media?: Record<string, BuilderMedia & { id?: string }>
 }
 
@@ -108,7 +110,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
         return false
       }
       const at = now()
-      const coalesce = options.coalesceKey !== undefined && state.lastEdit?.key === options.coalesceKey && at - state.lastEdit.at < COALESCE_MS
+      const coalesce = options.coalesceKey !== undefined && state.lastEdit?.key === options.coalesceKey && at - state.lastEdit.at < (options.coalesceWindow ?? COALESCE_MS)
       const past = coalesce ? state.history.past : [...state.history.past, { content: state.content, selection: state.selection }].slice(-HISTORY_LIMIT)
       const media = options.media ? Object.fromEntries(Object.entries(options.media).map(([id, ref]) => [id, { url: ref.url, srcset: ref.srcset, width: ref.width, height: ref.height, alt: ref.alt }])) : null
       set({

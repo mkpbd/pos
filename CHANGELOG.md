@@ -21,6 +21,41 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B3 — Visual store builder: design controls and theme drafts
+
+Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built).
+
+#### Added
+- **Style tab** in the page builder, showing only the groups relevant to the selected node:
+  - Background: colour, gradient (linear / radial, 2–5 stops) or image with focus point, fit and repeat, plus an overlay.
+  - Typography; spacing box (linked / unlinked sides); size; layout; border and per-corner radius; shadow and text-shadow layers with presets; opacity; hover (colours, shadow, lift / grow).
+  - Colour control: theme colours, store palette, curated swatches, HEX, RGB(A), native picker, alpha slider and contrast hint.
+  - Invalid input is flagged and never written.
+- **Per-device styling:** the toolbar device (Desktop / Tablet / Mobile) chooses the breakpoint being edited. Each control shows whether its value is set for this device or inherited, with a reset; writes stay sparse.
+- **Column resize:** drag handles between columns (per device, 5 % snap, live percentages, one undo step); keyboard arrows; width fields in the inspector.
+- **Global styles / theme:**
+  - New colour roles: button, button text, button hover (automatic by default), link.
+  - Type scale: body size, heading scale, line height, heading weight, mobile scale, heading letter spacing.
+  - Store palette (≤ 8 colours) and 8 predefined palettes, each passing 4.5:1 on every text pair.
+  - `GlobalStylesPanel` on the Theme page and in the builder's **Site styles** drawer. Drawer edits preview instantly on the canvas through a `theme` protocol message.
+- **Theme draft → publish:** `GET/PUT /storefront/theme/draft` (409 on revision conflict), `POST /theme/publish` (`storefront.publish`; the first publish also stores the previous live theme as version 1), `discard`, `versions`, `restore`. Rules:
+  - Preset apply now changes the draft.
+  - Staff see the draft theme with `?preview=draft`, and the builder canvas always shows the draft.
+  - Legacy `PUT /storefront/theme` = save + publish (now needs `storefront.publish`).
+  - Custom CSS stays immediate.
+- Layers, hover labels and the mini toolbar name sections after their content ("Section · Product grid: Best sellers").
+
+#### Unchanged look
+- At the defaults, the storefront renders identically: 7,596 computed-style snapshots across Demo Mart and the three demo presets, on desktop and mobile, showed 0 differences. Permanent parity tests were added (vitest and mocked Playwright).
+
+#### Tests
+- Backend 810 (PostgreSQL 809 + 1 skip; SQLite 804 + 6 skip), including theme draft / publish / versions / restore / 409, preset → draft, legacy PUT, staff-only draft preview and tenant isolation.
+- Vitest 1154. Mocked Playwright 189 passed, 83 skipped. Full-stack integration 24/24 (theme test rewritten for draft → publish: a saved draft is not live, a publish is); demo stores 7/7.
+- The integration spec gets a 60 s per-test budget for its long multi-step flows on the single-threaded dev server.
+
+#### Docs
+- Bangla manual §17.4 (Style tab, per-device, column widths) and §17.5 (site styles, theme draft → publish), screenshots 46–47; API documentation; plan §11.
+
 ### B2 — Visual store builder: the editor
 
 A full-screen drag-and-drop editor for the home page and landing pages, on top of the B1 engine. Plan: [STORE_BUILDER_PLAN.md](docs/ecommerce/STORE_BUILDER_PLAN.md) (§11 as built). Style controls are B3.

@@ -223,7 +223,7 @@ const BUTTON_VARIANTS = {
   primary: 'bg-sf-primary text-sf-primary-foreground hover:opacity-90',
   accent: 'bg-sf-accent text-sf-accent-foreground hover:opacity-90',
   outline: 'border-2 border-current bg-transparent text-sf-heading hover:bg-sf-surface',
-  link: 'bg-transparent px-0 text-sf-accent underline underline-offset-4',
+  link: 'bg-transparent px-0 text-sf-link underline underline-offset-4',
 } as const
 
 const BUTTON_SIZES = {

@@ -29,6 +29,19 @@ export type StorefrontDomain = { id: string; host: string; is_primary: boolean; 
 
 export const THEME_COLORS = ['primary', 'primary_foreground', 'accent', 'accent_foreground', 'highlight', 'sale', 'heading', 'text', 'canvas', 'surface', 'border'] as const
 export type ThemeColor = (typeof THEME_COLORS)[number]
+/**
+ * B3 colour roles. null = follow another role (and the value of themes from before B3):
+ * button → primary, button_foreground → primary_foreground, link → accent; button_hover null =
+ * the automatic hover (each button's brightness change).
+ */
+export const THEME_ROLE_COLORS = ['button', 'button_foreground', 'button_hover', 'link'] as const
+export type ThemeRoleColor = (typeof THEME_ROLE_COLORS)[number]
+/** The store palette: up to eight named colours offered in every colour picker (B3). */
+export const MAX_PALETTE_COLORS = 8
+/** `hex`: `#rrggbb`, or `#rrggbbaa` for a see-through colour. */
+export type PaletteEntry = { name: string; hex: string }
+/** B3 type scale (storefront/type-scale.ts has the defaults and limits). */
+export type ThemeTypeScale = { body_size: number; heading_scale: number; line_height: number; heading_weight: number; mobile_scale: number; letter_spacing: number }
 
 export const HEADING_FONTS = ['baloo', 'poppins', 'playfair', 'jost', 'system'] as const
 export const BODY_FONTS = ['poppins', 'jost', 'system'] as const
@@ -54,8 +67,12 @@ export const MAX_PAYMENT_LOGOS = 10
 
 /** The theme document exactly as the API stores it (backend Domain/ThemeSchema). */
 export type ThemeDocument = {
-  colors: Record<ThemeColor, string>
-  typography: { heading_font: (typeof HEADING_FONTS)[number]; body_font: (typeof BODY_FONTS)[number] }
+  /** The B3 roles are absent in documents from before B3 (= null). */
+  colors: Record<ThemeColor, string> & Partial<Record<ThemeRoleColor, string | null>>
+  /** The type scale keys are absent in documents from before B3 (= the defaults). */
+  typography: { heading_font: (typeof HEADING_FONTS)[number]; body_font: (typeof BODY_FONTS)[number] } & Partial<ThemeTypeScale>
+  /** Absent before B3 (= none). */
+  palette?: PaletteEntry[]
   shape: { button_style: (typeof BUTTON_STYLES)[number]; card_radius: number }
   /** Absent only in documents from before T1 (read as today's look). */
   layout: { container_width: number; sticky_header: boolean } & Partial<LayoutVariants>
@@ -89,6 +106,34 @@ export type ThemeResponse = {
   custom_css: string | null
   has_custom_css: boolean
   updated_at: string | null
+}
+
+/** The theme document (the global styles panel edits its colours, palette, typography and shape). */
+export type ThemeSettings = ThemeDocument
+
+/** GET /storefront/theme/draft (B3): the theme draft, what is live, and the custom CSS (still saved immediately). */
+export type ThemeDraft = {
+  settings: ThemeDocument
+  /** 0 before the first edit. */
+  draft_revision: number
+  has_unpublished_changes: boolean
+  draft_updated_at?: string | null
+  published: { version_id?: string; number: number; published_at: string | null } | null
+  /** The store URL showing the draft to signed-in staff (`…?preview=draft`); null without a store domain. */
+  preview_url?: string | null
+  /** Only returned to holders of storefront.custom_css. */
+  custom_css: string | null
+  has_custom_css: boolean
+}
+
+/** A published theme version (GET /storefront/theme/versions). */
+export type ThemeVersion = {
+  id: string
+  number: number
+  note: string | null
+  published_at: string | null
+  created_by: { id: string; name: string | null } | null
+  created_at: string | null
 }
 
 /** GET /storefront/theme/presets: a preset and the full theme it produces on a blank theme. */
@@ -297,6 +342,8 @@ export const storefrontKeys = {
   domains: ['storefront', 'domains'] as const,
   theme: ['storefront', 'theme'] as const,
   themePresets: ['storefront', 'theme', 'presets'] as const,
+  themeDraft: ['storefront', 'theme', 'draft'] as const,
+  themeVersions: ['storefront', 'theme', 'versions'] as const,
   menus: ['storefront', 'menus'] as const,
   menu: (id: string) => ['storefront', 'menus', id] as const,
   linkTargets: ['storefront', 'link-targets'] as const,
@@ -365,6 +412,7 @@ export function useThemeQuery() {
   })
 }
 
+/** Legacy (before B3): saves and publishes in one step. The Theme page uses the draft endpoints. */
 export function useSaveThemeMutation() {
   const queryClient = useQueryClient()
 
@@ -382,22 +430,108 @@ export function useThemePresetsQuery() {
   })
 }
 
-/** Merges a preset over the theme (colours, fonts, shape, layout; logo, announcement and footer stay) and saves it. */
-export function useApplyThemePresetMutation() {
-  const queryClient = useQueryClient()
+/*
+ * Theme draft and publish (B3, plan §10 decision 4): edits go to a draft; the live store changes
+ * only on publish. Every call answers with the draft payload, which replaces the cached one.
+ */
 
-  return useMutation({
-    mutationFn: (preset: ThemePresetKey) => api.post<ThemeResponse>(`/storefront/theme/presets/${preset}/apply`).then((r) => r.data),
-    onSuccess: (data) => queryClient.setQueryData(storefrontKeys.theme, data),
+export function useThemeDraftQuery() {
+  return useQuery({
+    queryKey: storefrontKeys.themeDraft,
+    queryFn: ({ signal }) => api.get<ThemeDraft>('/storefront/theme/draft', { signal }).then((r) => r.data),
+    // The editor owns the draft once loaded; a background refetch must not replace unsaved edits.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 }
 
+export function fetchThemeDraft() {
+  return api.get<ThemeDraft>('/storefront/theme/draft').then((r) => r.data)
+}
+
+function isThemeDraft(data: unknown): data is ThemeDraft {
+  return !!data && typeof data === 'object' && 'settings' in data && 'draft_revision' in data
+}
+
+/** Takes a draft call's answer: the draft payload replaces the cached one (anything else refetches it). */
+function useDraftResult() {
+  const queryClient = useQueryClient()
+  return (data: unknown) => {
+    void queryClient.invalidateQueries({ queryKey: storefrontKeys.theme, exact: true })
+    if (isThemeDraft(data)) queryClient.setQueryData(storefrontKeys.themeDraft, data)
+    else void queryClient.invalidateQueries({ queryKey: storefrontKeys.themeDraft })
+  }
+}
+
+/** PUT /storefront/theme/draft; a stale `revision` fails with 409 DRAFT_CONFLICT. */
+export function useSaveThemeDraftMutation() {
+  const onResult = useDraftResult()
+  return useMutation({
+    mutationFn: (input: { revision: number; settings: ThemeDocument }) => api.put<ThemeDraft>('/storefront/theme/draft', input).then((r) => r.data),
+    onSuccess: onResult,
+  })
+}
+
+/** Publishes the saved draft (needs storefront.publish). */
+export function usePublishThemeMutation() {
+  const onResult = useDraftResult()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (note: string | null) => api.post<ThemeDraft>('/storefront/theme/publish', note ? { note } : {}).then((r) => r.data),
+    onSuccess: (data) => {
+      onResult(data)
+      void queryClient.invalidateQueries({ queryKey: storefrontKeys.themeVersions })
+    },
+  })
+}
+
+/** Throws the draft away: it becomes the live theme again. */
+export function useDiscardThemeDraftMutation() {
+  const onResult = useDraftResult()
+  return useMutation({
+    mutationFn: () => api.post<ThemeDraft>('/storefront/theme/discard').then((r) => r.data),
+    onSuccess: onResult,
+  })
+}
+
+export function useThemeVersionsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: storefrontKeys.themeVersions,
+    queryFn: ({ signal }) => api.get<ThemeVersion[]>('/storefront/theme/versions', { signal }).then((r) => r.data),
+    enabled,
+    staleTime: 0,
+  })
+}
+
+/** Copies a published version into the draft (the store changes only on publish). */
+export function useRestoreThemeVersionMutation() {
+  const onResult = useDraftResult()
+  return useMutation({
+    mutationFn: (versionId: string) => api.post<ThemeDraft>(`/storefront/theme/versions/${encodeURIComponent(versionId)}/restore`).then((r) => r.data),
+    onSuccess: onResult,
+  })
+}
+
+/** Merges a preset over the draft (colours, fonts, shape, layout; logo, announcement and footer stay). Not live until published. */
+export function useApplyThemePresetMutation() {
+  const onResult = useDraftResult()
+  return useMutation({
+    mutationFn: (preset: ThemePresetKey) => api.post<ThemeDraft>(`/storefront/theme/presets/${preset}/apply`).then((r) => r.data),
+    onSuccess: onResult,
+  })
+}
+
+/** Custom CSS is saved straight to the live store (not part of the draft). */
 export function useSaveCustomCssMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (css: string | null) => api.put<ThemeResponse>('/storefront/theme/custom-css', { custom_css: css }).then((r) => r.data),
-    onSuccess: (data) => queryClient.setQueryData(storefrontKeys.theme, data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(storefrontKeys.theme, data)
+      queryClient.setQueryData<ThemeDraft>(storefrontKeys.themeDraft, (draft) => (draft ? { ...draft, custom_css: data.custom_css, has_custom_css: data.has_custom_css } : draft))
+    },
   })
 }
 

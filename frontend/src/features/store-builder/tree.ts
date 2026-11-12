@@ -545,3 +545,33 @@ export function selectionAfterDelete(content: BuilderContent, id: string): strin
 
 /** Node count of a node with everything in it (limits). */
 export { nodeCount }
+
+/**
+ * Sets column widths of one row at one breakpoint (`base` = desktop): `widths` maps column ids to
+ * percent (5–100, ≤ 2 decimals); other columns and breakpoints are untouched.
+ */
+export function setColumnWidths(content: BuilderContent, rowId: string, breakpoint: 'base' | 'tablet' | 'mobile', widths: Record<string, number>): BuilderContent {
+  const row = rowOf(content, rowId)
+  if (!row) return content
+  let changed = false
+  const columns = (row.columns as Column[]).map((column) => {
+    const value = Object.hasOwn(widths, column.id) ? widths[column.id] : undefined
+    if (value === undefined || column.width[breakpoint] === value) return column
+    if (!(value >= 5 && value <= 100)) return column
+    changed = true
+    return { ...column, width: { ...column.width, [breakpoint]: Math.round(value * 100) / 100 } }
+  })
+  if (!changed) return content
+  return replaceById(content, rowId, (node) => ({ ...node, columns }) as BuilderNode)
+}
+
+/** Removes a column's tablet or mobile width (it falls back to the wider device's width again). */
+export function clearColumnWidth(content: BuilderContent, columnId: string, breakpoint: 'tablet' | 'mobile'): BuilderContent {
+  const info = findNode(content, columnId)
+  if (!info || info.kind !== 'column') return content
+  const column = info.node as Column
+  if (column.width[breakpoint] === undefined) return content
+  const width = { ...column.width }
+  delete width[breakpoint]
+  return replaceById(content, columnId, () => ({ ...column, width }))
+}

@@ -13,7 +13,7 @@ export function NotFoundPage() {
       <p className="mx-auto mt-3 max-w-md">{t('content.notFound.text')}</p>
       <Link
         to="/"
-        className="mt-8 inline-flex items-center rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-bold tracking-wide text-sf-primary-foreground uppercase transition-opacity hover:opacity-90"
+        className="mt-8 inline-flex items-center sf-button rounded-sf-button bg-sf-button px-6 py-3 text-sm font-bold tracking-wide text-sf-button-foreground uppercase transition-opacity hover:opacity-90"
       >
         {t('content.notFound.back')}
       </Link>

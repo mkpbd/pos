@@ -5,18 +5,23 @@ import {
   HEADING_FONTS,
   LAYOUT_OPTIONS,
   LAYOUT_VARIANT_KEYS,
+  MAX_PALETTE_COLORS,
   SOCIAL_NETWORKS,
   THEME_COLORS,
   THEME_PRESETS,
+  THEME_ROLE_COLORS,
   type LayoutVariants,
   type SocialNetwork,
   type ThemeColor,
   type ThemeDocument,
   type ThemePresetKey,
+  type ThemeRoleColor,
+  type ThemeTypeScale,
 } from '@/features/storefront/api'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
+import { resolveTypeScale, TYPE_LIMITS } from '@/storefront/type-scale'
 
 export const ANNOUNCEMENT_TEXT_MAX = 200
 /** The announcement's Bangla text (E12b) lives with it: `announcement.translations.bn.text`. */
@@ -30,12 +35,31 @@ const ANNOUNCEMENT_TRANSLATION_NAMES = ANNOUNCEMENT_TRANSLATIONS.map((f) => f.na
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour such as #f59e0b.')
 const optional = (max: number) => z.string().trim().max(max)
 const socialLink = z.union([z.url({ protocol: /^https$/, error: 'Use an https:// link.' }), z.literal('')])
+const ranged = (key: keyof ThemeTypeScale) => z.number({ error: 'Enter a number.' }).min(TYPE_LIMITS[key].min).max(TYPE_LIMITS[key].max)
+
+export const PALETTE_NAME_MAX = 40
 
 export const themeSchema = z
   .object({
-    colors: z.object(Object.fromEntries(THEME_COLORS.map((c) => [c, hex])) as Record<ThemeColor, typeof hex>),
+    colors: z.object({
+      ...(Object.fromEntries(THEME_COLORS.map((c) => [c, hex])) as Record<ThemeColor, typeof hex>),
+      // B3 roles: null follows another role (button → primary, link → secondary; hover → automatic).
+      ...(Object.fromEntries(THEME_ROLE_COLORS.map((c) => [c, hex.nullable()])) as Record<ThemeRoleColor, z.ZodNullable<typeof hex>>),
+    }),
+    palette: z
+      .array(z.object({ name: z.string().trim().min(1, 'Name the colour.').max(PALETTE_NAME_MAX), hex: z.string().regex(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/, 'Use a hex colour such as #f59e0b.') }))
+      .max(MAX_PALETTE_COLORS, `Up to ${MAX_PALETTE_COLORS} colours.`),
     preset: z.enum(THEME_PRESETS),
-    typography: z.object({ heading_font: z.enum(HEADING_FONTS), body_font: z.enum(BODY_FONTS) }),
+    typography: z.object({
+      heading_font: z.enum(HEADING_FONTS),
+      body_font: z.enum(BODY_FONTS),
+      body_size: ranged('body_size').int(),
+      heading_scale: ranged('heading_scale'),
+      line_height: ranged('line_height'),
+      heading_weight: ranged('heading_weight').multipleOf(100),
+      mobile_scale: ranged('mobile_scale'),
+      letter_spacing: ranged('letter_spacing'),
+    }),
     shape: z.object({ button_style: z.enum(BUTTON_STYLES), card_radius: z.number({ error: 'Enter a number.' }).int().min(0).max(24) }),
     layout: z.object({
       container_width: z.number({ error: 'Enter a number.' }).int().min(960).max(1440),
@@ -76,7 +100,7 @@ export const themeSchema = z
 
 export type ThemeFormValues = z.infer<typeof themeSchema>
 
-export const THEME_FIELDS = ['colors', 'preset', 'typography', 'shape', 'layout', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as const
+export const THEME_FIELDS = ['colors', 'palette', 'preset', 'typography', 'shape', 'layout', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as const
 
 /** Today's look: the layout variants of a document from before T1. */
 export const DEFAULT_LAYOUT: LayoutVariants = Object.fromEntries(LAYOUT_VARIANT_KEYS.map((key) => [key, LAYOUT_OPTIONS[key][0]])) as LayoutVariants
@@ -92,11 +116,24 @@ export function layoutValues(layout: ThemeDocument['layout']): ThemeFormValues['
   return { container_width: layout.container_width, sticky_header: layout.sticky_header, ...variants }
 }
 
+/** The colours with every B3 role set (null = follows another role), as the editor holds them. */
+export function colorValues(colors: ThemeDocument['colors']): ThemeFormValues['colors'] {
+  const roles = Object.fromEntries(THEME_ROLE_COLORS.map((c) => [c, colors[c] ?? null])) as Record<ThemeRoleColor, string | null>
+  const base = Object.fromEntries(THEME_COLORS.map((c) => [c, colors[c]])) as Record<ThemeColor, string>
+  return { ...base, ...roles }
+}
+
+/** Fonts plus every type scale key (themes from before B3 get the defaults, which look as before). */
+export function typographyValues(typography: ThemeDocument['typography']): ThemeFormValues['typography'] {
+  return { heading_font: typography.heading_font, body_font: typography.body_font, ...resolveTypeScale(typography) }
+}
+
 export function toFormValues(doc: ThemeDocument): ThemeFormValues {
   return {
-    colors: { ...doc.colors },
+    colors: colorValues(doc.colors),
+    palette: (doc.palette ?? []).map((c) => ({ name: c.name, hex: c.hex })),
     preset: doc.preset && (THEME_PRESETS as readonly string[]).includes(doc.preset) ? doc.preset : ('default' satisfies ThemePresetKey),
-    typography: { ...doc.typography },
+    typography: typographyValues(doc.typography),
     shape: { ...doc.shape },
     layout: layoutValues(doc.layout),
     logo_media_id: doc.logo_media_id,
@@ -130,7 +167,9 @@ export function toDocument(v: ThemeFormValues, before?: TranslationsMap): ThemeD
   const blank = (s: string) => s.trim() || null
 
   return {
-    colors: { ...v.colors },
+    // The API stores button, button text and link as colours: one left on "same as" takes its source's colour now.
+    colors: { ...v.colors, button: effectiveColor(v.colors, 'button'), button_foreground: effectiveColor(v.colors, 'button_foreground'), link: effectiveColor(v.colors, 'link') },
+    palette: v.palette.map((c) => ({ name: c.name.trim(), hex: c.hex })),
     preset: v.preset,
     typography: { ...v.typography },
     shape: { ...v.shape },
@@ -157,27 +196,55 @@ export function toDocument(v: ThemeFormValues, before?: TranslationsMap): ThemeD
   }
 }
 
-export const COLOR_LABELS: Record<ThemeColor, string> = {
+/** The colour roles as the owner reads them (the API keeps `accent` / `canvas` / `surface`). */
+export const COLOR_LABELS: Record<ThemeColor | ThemeRoleColor, string> = {
   primary: 'Primary',
   primary_foreground: 'Text on primary',
-  accent: 'Accent',
-  accent_foreground: 'Text on accent',
+  accent: 'Secondary',
+  accent_foreground: 'Text on secondary',
   highlight: 'Highlight',
   sale: 'Sale badge',
-  heading: 'Headings',
-  text: 'Body text',
-  canvas: 'Page background',
-  surface: 'Cards & panels',
-  border: 'Borders',
+  heading: 'Heading',
+  text: 'Text',
+  canvas: 'Background',
+  surface: 'Surface',
+  border: 'Border',
+  button: 'Button',
+  button_foreground: 'Button text',
+  button_hover: 'Button hover',
+  link: 'Link',
 }
 
+/** The colour a B3 role shows when it is not set. */
+export function effectiveColor(colors: ThemeFormValues['colors'], role: ThemeColor | ThemeRoleColor): string {
+  switch (role) {
+    case 'button':
+      return colors.button ?? colors.primary
+    case 'button_foreground':
+      return colors.button_foreground ?? colors.primary_foreground
+    case 'button_hover':
+      return colors.button_hover ?? colors.button ?? colors.primary
+    case 'link':
+      return colors.link ?? colors.accent
+    default:
+      return colors[role]
+  }
+}
+
+type ContrastInput = { colors: ThemeFormValues['colors']; announcement?: { foreground: string; background: string } }
+
 /** Text/background pairs checked against WCAG AA in the editor. */
-export function contrastPairs(v: ThemeFormValues): { label: string; foreground: string; background: string }[] {
-  return [
-    { label: 'Text on primary', foreground: v.colors.primary_foreground, background: v.colors.primary },
-    { label: 'Text on accent', foreground: v.colors.accent_foreground, background: v.colors.accent },
-    { label: 'Body text on cards', foreground: v.colors.text, background: v.colors.surface },
-    { label: 'Headings on cards', foreground: v.colors.heading, background: v.colors.surface },
-    { label: 'Announcement bar', foreground: v.announcement.foreground, background: v.announcement.background },
+export function contrastPairs(v: ContrastInput): { label: string; foreground: string; background: string }[] {
+  const c = v.colors
+  const pairs = [
+    { label: 'Text on primary', foreground: c.primary_foreground, background: c.primary },
+    { label: 'Text on secondary', foreground: c.accent_foreground, background: c.accent },
+    { label: 'Button text on button', foreground: effectiveColor(c, 'button_foreground'), background: effectiveColor(c, 'button') },
+    { label: 'Body text on surface', foreground: c.text, background: c.surface },
+    { label: 'Headings on surface', foreground: c.heading, background: c.surface },
+    { label: 'Links on background', foreground: effectiveColor(c, 'link'), background: c.canvas },
   ]
+  if (c.button_hover) pairs.splice(3, 0, { label: 'Button text on hover', foreground: effectiveColor(c, 'button_foreground'), background: c.button_hover })
+  if (v.announcement) pairs.push({ label: 'Announcement bar', foreground: v.announcement.foreground, background: v.announcement.background })
+  return pairs
 }

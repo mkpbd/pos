@@ -318,7 +318,7 @@ function ActiveFilters({
         </li>
       ))}
       <li>
-        <button type="button" onClick={onClear} className="text-sm font-semibold text-sf-accent underline-offset-4 hover:underline">
+        <button type="button" onClick={onClear} className="text-sm font-semibold text-sf-link underline-offset-4 hover:underline">
           {t('catalog.active.clearAll')}
         </button>
       </li>

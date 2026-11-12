@@ -124,7 +124,7 @@ export function FilterPanel({ scope, state, facets, onChange, onClear, categoryH
   return (
     <div className="flex flex-col" data-testid="filter-panel">
       {hasActiveFilters(state) && (
-        <button type="button" onClick={onClear} className="mb-2 self-start text-sm font-semibold text-sf-accent underline-offset-4 hover:underline">
+        <button type="button" onClick={onClear} className="mb-2 self-start text-sm font-semibold text-sf-link underline-offset-4 hover:underline">
           {t('catalog.filter.clearAll')}
         </button>
       )}
@@ -134,7 +134,7 @@ export function FilterPanel({ scope, state, facets, onChange, onClear, categoryH
           <ul className="flex flex-col gap-1 text-sm">
             {state.category && categoryAsParam && (
               <li>
-                <button type="button" className="py-1 font-semibold text-sf-accent hover:underline" onClick={() => onChange({ category: null })}>
+                <button type="button" className="py-1 font-semibold text-sf-link hover:underline" onClick={() => onChange({ category: null })}>
                   {t('catalog.filter.allCategories')}
                 </button>
               </li>

@@ -36,6 +36,37 @@
     --color-sf-canvas: var(--sf-canvas);
     --color-sf-surface: var(--sf-surface);
     --color-sf-border: var(--sf-border);
+    /* B3 colour roles: theme buttons (`bg-sf-button` + `.sf-button`) and text links. */
+    --color-sf-button: var(--sf-button);
+    --color-sf-button-foreground: var(--sf-button-foreground);
+    --color-sf-link: var(--sf-link);
+    /*
+     * B3 type scale: Tailwind's text steps read the theme's sizes (storefront/type-scale.ts). Body
+     * steps also scale their line height with the theme's; heading steps shrink on phones by the
+     * theme's mobile scale. The defaults are exactly Tailwind's values.
+     */
+    --text-xs: var(--sf-text-xs);
+    --text-xs--line-height: calc(1 / 0.75 * var(--sf-leading-factor));
+    --text-sm: var(--sf-text-sm);
+    --text-sm--line-height: calc(1.25 / 0.875 * var(--sf-leading-factor));
+    --text-base: var(--sf-text-base);
+    --text-base--line-height: calc(1.5 * var(--sf-leading-factor));
+    --text-lg: var(--sf-text-lg);
+    --text-lg--line-height: calc(1.75 / 1.125 * var(--sf-leading-factor));
+    --text-xl: calc(var(--sf-text-xl) * var(--sf-heading-mobile));
+    --text-2xl: calc(var(--sf-text-2xl) * var(--sf-heading-mobile));
+    --text-3xl: calc(var(--sf-text-3xl) * var(--sf-heading-mobile));
+    --text-4xl: calc(var(--sf-text-4xl) * var(--sf-heading-mobile));
+    --text-5xl: calc(var(--sf-text-5xl) * var(--sf-heading-mobile));
+    --text-6xl: calc(var(--sf-text-6xl) * var(--sf-heading-mobile));
+    --text-7xl: calc(var(--sf-text-7xl) * var(--sf-heading-mobile));
+    /* Heading weight (B3): inside headings each weight shifts by the theme's heading weight − 700. */
+    --font-weight-normal: var(--sf-fw-normal, 400);
+    --font-weight-medium: var(--sf-fw-medium, 500);
+    --font-weight-semibold: var(--sf-fw-semibold, 600);
+    --font-weight-bold: var(--sf-fw-bold, 700);
+    --font-weight-extrabold: var(--sf-fw-extrabold, 800);
+    --font-weight-black: var(--sf-fw-black, 900);
     --radius-sf-button: var(--sf-radius-button);
     --radius-sf-card: var(--sf-radius-card);
     --container-sf: var(--sf-container);
@@ -76,6 +107,10 @@
     --sf-canvas: #f3f7fa;
     --sf-surface: #ffffff;
     --sf-border: #e1e1e1;
+    --sf-button: var(--sf-primary);
+    --sf-button-foreground: var(--sf-primary-foreground);
+    --sf-button-hover: var(--sf-primary);
+    --sf-link: var(--sf-accent);
     --sf-font-heading: 'Baloo 2 Variable', 'Poppins', system-ui, sans-serif;
     --sf-font-body: 'Poppins', system-ui, sans-serif;
     --sf-radius-button: 9999px;
@@ -83,12 +118,39 @@
     --sf-container: 1170px;
     --sf-heading-transform: none;
     --sf-heading-tracking: normal;
+    /* Type scale defaults (= Tailwind's sizes; themeToCssVars sets the theme's). */
+    --sf-text-xs: 0.75rem;
+    --sf-text-sm: 0.875rem;
+    --sf-text-base: 1rem;
+    --sf-text-lg: 1.125rem;
+    --sf-text-xl: 1.25rem;
+    --sf-text-2xl: 1.5rem;
+    --sf-text-3xl: 1.875rem;
+    --sf-text-4xl: 2.25rem;
+    --sf-text-5xl: 3rem;
+    --sf-text-6xl: 3.75rem;
+    --sf-text-7xl: 4.5rem;
+    --sf-rich-h2: 1.75rem;
+    --sf-rich-h3: 1.375rem;
+    --sf-rich-h4: 1.125rem;
+    --sf-line-height: 1.5;
+    --sf-leading-factor: 1;
+    --sf-mobile-scale: 1;
+    --sf-heading-weight-shift: 0;
+    /* Heading steps on phones: 1 above 639 px, the theme's mobile scale below (media query below). */
+    --sf-heading-mobile: 1;
     /* Rating stars: filled in the primary colour, empty in the border colour. */
     --sf-star: var(--sf-primary);
     --sf-star-empty: var(--sf-border);
     /* themeToCssVars picks the theme colour that stands out on the dark footer (the heading colour). */
     --sf-star-on-dark: #ffffff;
     color-scheme: light;
+}
+
+@media (max-width: 639px) {
+    :root {
+        --sf-heading-mobile: var(--sf-mobile-scale);
+    }
 }
 
 /*
@@ -109,9 +171,22 @@
   }
   body {
     @apply bg-sf-canvas text-sf-text antialiased;
+    font-size: var(--sf-text-base);
+    line-height: var(--sf-line-height);
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading text-sf-heading;
+    /* Only set when the theme asks for letter spacing; otherwise inherited as before (B3). */
+    letter-spacing: var(--sf-heading-letter-spacing);
+  }
+  /* Heading weight (B3): every weight utility inside a heading shifts by the theme's choice. */
+  :is(h1, h2, h3, h4, h5, h6, .font-heading) {
+    --sf-fw-normal: clamp(100, calc(400 + var(--sf-heading-weight-shift)), 900);
+    --sf-fw-medium: clamp(100, calc(500 + var(--sf-heading-weight-shift)), 900);
+    --sf-fw-semibold: clamp(100, calc(600 + var(--sf-heading-weight-shift)), 900);
+    --sf-fw-bold: clamp(100, calc(700 + var(--sf-heading-weight-shift)), 900);
+    --sf-fw-extrabold: clamp(100, calc(800 + var(--sf-heading-weight-shift)), 900);
+    --sf-fw-black: clamp(100, calc(900 + var(--sf-heading-weight-shift)), 900);
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -144,14 +219,25 @@
   .sf-ticker-track { animation: none; }
 }
 
+/*
+ * Theme buttons (`bg-sf-button text-sf-button-foreground sf-button`, B3): with a hover colour chosen
+ * in the theme it replaces each button's automatic hover (a brightness or opacity change).
+ * Unlayered, so it wins over the hover utilities; a banner's own button colours (inline) still win.
+ */
+[data-sf-button-hover="color"] .sf-button:hover:not(:disabled, [aria-disabled="true"]) {
+  background-color: var(--sf-button-hover);
+  filter: none;
+  opacity: 1;
+}
+
 /* Rich text written in the admin editor (pages, FAQ answers, text sections). */
 .sf-rich-text {
-  line-height: 1.7;
+  line-height: calc(1.7 * var(--sf-leading-factor));
   & > * + * { margin-top: 1em; }
-  & h2 { font-size: 1.75rem; font-weight: 800; line-height: 1.25; margin-top: 1.5em; }
-  & h3 { font-size: 1.375rem; font-weight: 700; line-height: 1.3; margin-top: 1.25em; }
-  & h4 { font-size: 1.125rem; font-weight: 700; margin-top: 1em; }
-  & a { color: var(--sf-accent); text-decoration: underline; text-underline-offset: 3px; }
+  & h2 { font-size: calc(var(--sf-rich-h2) * var(--sf-heading-mobile)); font-weight: clamp(100, calc(800 + var(--sf-heading-weight-shift)), 900); line-height: 1.25; margin-top: 1.5em; }
+  & h3 { font-size: calc(var(--sf-rich-h3) * var(--sf-heading-mobile)); font-weight: clamp(100, calc(700 + var(--sf-heading-weight-shift)), 900); line-height: 1.3; margin-top: 1.25em; }
+  & h4 { font-size: calc(var(--sf-rich-h4) * var(--sf-heading-mobile)); font-weight: clamp(100, calc(700 + var(--sf-heading-weight-shift)), 900); margin-top: 1em; }
+  & a { color: var(--sf-link); text-decoration: underline; text-underline-offset: 3px; }
   & ul { list-style: disc; padding-left: 1.5em; }
   & ol { list-style: decimal; padding-left: 1.5em; }
   & blockquote { border-left: 4px solid var(--sf-accent); padding-left: 1em; font-style: italic; }
@@ -179,7 +265,7 @@ html:lang(bn) {
 
 /* Bengali script sits taller than Latin: a little more line height keeps the vowel signs clear. */
 html:lang(bn) body {
-  line-height: 1.6;
+  line-height: calc(var(--sf-line-height) + 0.1);
 }
 
 /*

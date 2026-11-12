@@ -151,7 +151,7 @@ export function TrackParcelLink({ url }: { url: string | null | undefined }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 font-semibold text-sf-accent underline-offset-4 hover:underline"
+      className="inline-flex items-center gap-1 font-semibold text-sf-link underline-offset-4 hover:underline"
       data-testid="track-parcel"
     >
       {t('orders.track.link')} <ExternalLinkIcon aria-hidden className="size-3.5" />

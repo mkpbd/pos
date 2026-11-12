@@ -11,8 +11,9 @@ use InvalidArgumentException;
  * individually editable after applying a preset.
  *
  * `default` is today's look (ThemeSchema defaults). Text colour pairs meet WCAG AA (4.5:1):
- * primary / primary_foreground, accent / accent_foreground, heading, text and sale on canvas
- * and surface (unit tested).
+ * primary / primary_foreground, accent / accent_foreground, button / button_foreground (B3),
+ * heading, text, sale and link (B3) on canvas and surface (unit tested). The palette is the
+ * owner's content and stays as it is.
  */
 final class ThemePresets
 {
@@ -49,8 +50,12 @@ final class ThemePresets
                     'canvas' => '#fbf8ef',
                     'surface' => '#ffffff',
                     'border' => '#e7e1cc',
+                    'button' => '#f6c445',
+                    'button_foreground' => '#3a2c00',
+                    'link' => '#2e7d32',
+                    'button_hover' => null,
                 ],
-                'typography' => ['heading_font' => 'baloo', 'body_font' => 'poppins'],
+                'typography' => self::typography('baloo', 'poppins'),
                 'shape' => ['button_style' => 'pill', 'card_radius' => 16],
                 'layout' => [
                     'container_width' => 1200,
@@ -78,8 +83,12 @@ final class ThemePresets
                     'canvas' => '#f7f2ea',
                     'surface' => '#fffdf9',
                     'border' => '#e3d8c8',
+                    'button' => '#9c4a2a',
+                    'button_foreground' => '#ffffff',
+                    'link' => '#3b2a20',
+                    'button_hover' => null,
                 ],
-                'typography' => ['heading_font' => 'playfair', 'body_font' => 'jost'],
+                'typography' => self::typography('playfair', 'jost'),
                 'shape' => ['button_style' => 'square', 'card_radius' => 0],
                 'layout' => [
                     'container_width' => 1240,
@@ -107,8 +116,12 @@ final class ThemePresets
                     'canvas' => '#ffffff',
                     'surface' => '#ffffff',
                     'border' => '#e5e7eb',
+                    'button' => '#111111',
+                    'button_foreground' => '#ffffff',
+                    'link' => '#1d4ed8',
+                    'button_hover' => null,
                 ],
-                'typography' => ['heading_font' => 'jost', 'body_font' => 'jost'],
+                'typography' => self::typography('jost', 'jost'),
                 'shape' => ['button_style' => 'rounded', 'card_radius' => 4],
                 'layout' => [
                     'container_width' => 1200,
@@ -169,6 +182,17 @@ final class ThemePresets
     public static function apply(string $preset, array $settings): array
     {
         return array_replace(ThemeSchema::normalize($settings), self::all()[self::assertKnown($preset)]);
+    }
+
+    /**
+     * B3: the preset's fonts with the default type scale — the storefront components already size
+     * and weigh each preset's headings, so today's scale keeps every preset's look.
+     *
+     * @return array<string, mixed>
+     */
+    private static function typography(string $heading, string $body): array
+    {
+        return ['heading_font' => $heading, 'body_font' => $body] + ThemeSchema::defaults()['typography'];
     }
 
     private static function assertKnown(string $preset): string

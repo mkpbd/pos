@@ -23,7 +23,7 @@ function ViewAll({ url }: { url: string | null | undefined }) {
     <div className="mt-6 text-center">
       <MenuLink
         url={url}
-        className="inline-flex items-center gap-2 rounded-sf-button bg-sf-primary px-6 py-3 text-sm font-bold tracking-wide text-sf-primary-foreground uppercase transition hover:brightness-105"
+        className="inline-flex items-center gap-2 sf-button rounded-sf-button bg-sf-button px-6 py-3 text-sm font-bold tracking-wide text-sf-button-foreground uppercase transition hover:brightness-105"
       >
         {t('content.section.viewAll')}
         <ArrowRightIcon aria-hidden className="size-4" />

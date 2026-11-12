@@ -17,7 +17,7 @@ export function RecentOrders() {
           {t('orders.recent.title')}
         </h2>
         {recent.length > 0 && (
-          <Link to="/account/orders" className="text-sm font-semibold text-sf-accent hover:underline">
+          <Link to="/account/orders" className="text-sm font-semibold text-sf-link hover:underline">
             {t('orders.recent.viewAll')}
           </Link>
         )}
@@ -33,7 +33,7 @@ export function RecentOrders() {
       ) : recent.length === 0 ? (
         <p className="text-sm">
           {t('orders.list.empty.all')}{' '}
-          <Link to="/shop" className="font-semibold text-sf-accent hover:underline">
+          <Link to="/shop" className="font-semibold text-sf-link hover:underline">
             {t('orders.startShopping')}
           </Link>
         </p>

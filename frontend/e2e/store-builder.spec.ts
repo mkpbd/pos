@@ -88,6 +88,9 @@ type Backend = {
   conflictNext: boolean
   publishes: { note?: string }[]
   restores: string[]
+  /** B3: the theme draft (Site styles). */
+  themeRevision: number
+  themePuts: { revision: number; settings: { colors: Record<string, string | null> } }[]
 }
 
 function summary(b: Backend) {
@@ -98,7 +101,7 @@ function summary(b: Backend) {
 }
 
 async function mockBackend(page: Page, options: { exists?: boolean } = {}): Promise<Backend> {
-  const b: Backend = { revision: 1, content: structuredClone(sample), published: null, exists: options.exists ?? false, puts: [], conflictNext: false, publishes: [], restores: [] }
+  const b: Backend = { revision: 1, content: structuredClone(sample), published: null, exists: options.exists ?? false, puts: [], conflictNext: false, publishes: [], restores: [], themeRevision: 0, themePuts: [] }
   // Anything else the editor or the inspector asks for: an empty list.
   await page.route('**/api/v1/**', (route) => route.fulfill({ json: envelope([], { pagination: { current_page: 1, per_page: 24, total: 0, last_page: 1 } }) }))
   await page.route('**/sanctum/csrf-cookie', (route) => route.fulfill({ status: 204, headers: { 'Set-Cookie': 'XSRF-TOKEN=e2e; Path=/' } }))
@@ -152,6 +155,26 @@ async function mockBackend(page: Page, options: { exists?: boolean } = {}): Prom
     b.revision += 1
     b.content = { schema_version: 1, sections: (sample.sections as AnyNode[]).slice(0, 1) }
     return route.fulfill({ json: envelope({ ...summary(b), content: b.content }) })
+  })
+  // B3: the theme draft behind Site styles.
+  const themeDraft = () => ({
+    settings: {
+      ...bootstrap.theme,
+      colors: { ...bootstrap.theme.colors, button: '#f59e0b', button_foreground: '#3b2500', button_hover: null, link: '#6f55c2' },
+      palette: [{ name: 'Mango', hex: '#ffb300' }],
+      logo_media_id: null,
+      favicon_media_id: null,
+    },
+    draft_revision: b.themeRevision, has_unpublished_changes: b.themeRevision > 0, draft_updated_at: null, published: null, preview_url: null, custom_css: null, has_custom_css: false,
+  })
+  await page.route('**/api/v1/storefront/theme/draft', (route) => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON() as Backend['themePuts'][number]
+      b.themePuts.push(body)
+      b.themeRevision += 1
+      return route.fulfill({ json: envelope({ ...themeDraft(), settings: body.settings }) })
+    }
+    return route.fulfill({ json: envelope(themeDraft()) })
   })
   return b
 }
@@ -359,4 +382,105 @@ test('guards unsaved changes when leaving', async ({ page }) => {
   await page.getByRole('link', { name: 'Back to pages' }).click()
   await page.getByRole('alertdialog', { name: 'Leave without saving?' }).getByRole('button', { name: 'Leave anyway' }).click()
   await expect(page).toHaveURL(/\/admin\/storefront\/pages$/)
+})
+
+/* ------------------------------------------------------------------------------------------------
+ * B3: design controls
+ * ---------------------------------------------------------------------------------------------- */
+
+type StyledNode = AnyNode & { style?: Record<string, Record<string, unknown>>; width?: Record<string, number> }
+/** A node of the last autosaved draft. */
+function savedNode(b: Backend, id: string): StyledNode | undefined {
+  let found: StyledNode | undefined
+  const visit = (node: StyledNode) => {
+    if (node.id === id) found = node
+    for (const column of (node.columns ?? []) as unknown as StyledNode[]) {
+      if (column.id === id) found = column
+      for (const element of (column as { elements?: StyledNode[] }).elements ?? []) visit(element)
+    }
+  }
+  for (const section of b.puts.at(-1)?.content.sections ?? []) visit(section as StyledNode)
+  return found
+}
+
+test('styles a section with a gradient; changes the heading size on mobile only', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  const frame = canvas(page)
+
+  // Layers names sections after their content. Select the hero section; Style → Background → Gradient.
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  await expect(page.getByTestId('layer-s_hero')).toHaveAttribute('aria-label', 'Section · Hero slider')
+  await page.getByTestId('layer-s_hero').getByRole('button', { name: /^Section/ }).click()
+  await page.getByRole('tab', { name: 'Style' }).click()
+  await expect(page.getByTestId('style-device-banner')).toContainText('Styling for Desktop')
+  const background = page.getByTestId('style-group-background')
+  await background.getByRole('radio', { name: 'Gradient' }).click()
+  await background.getByRole('button', { name: 'Top to bottom' }).click()
+  await expect(frame.locator('[data-b="s_hero"]')).toHaveCSS('background-image', /linear-gradient/)
+  await expect.poll(() => (savedNode(b, 's_hero')?.style?.base?.background as { gradient?: { angle?: number } } | undefined)?.gradient?.angle, { timeout: 6000 }).toBe(180)
+  expect(savedNode(b, 's_hero')?.style?.base?.background).toMatchObject({ type: 'gradient', gradient: { type: 'linear', stops: [{ color: 'theme:primary' }, { color: 'theme:accent' }] } })
+
+  // Mobile: the heading's size changes on phones only.
+  await page.getByRole('button', { name: 'Mobile view' }).click()
+  await expect(page.getByTestId('builder-canvas')).toHaveCSS('width', '375px')
+  const heading = frame.getByRole('heading', { name: 'Made fresh every morning' })
+  await heading.click()
+  await expect(page.getByTestId('style-device-banner')).toContainText('Styling for Mobile')
+  const size = page.getByLabel('Text size', { exact: true })
+  await expect(size).toHaveValue('28')
+  await size.fill('22')
+  await expect(heading).toHaveCSS('font-size', '22px')
+  await expect.poll(() => (savedNode(b, 'e_heading')?.style?.mobile?.typography as { size?: string } | undefined)?.size, { timeout: 6000 }).toBe('22px')
+  expect(savedNode(b, 'e_heading')?.style?.base?.typography).toMatchObject({ size: '40px' })
+  // On desktop the heading keeps its desktop size.
+  await page.getByRole('button', { name: 'Desktop view' }).click()
+  await expect.poll(async () => frame.locator('html').evaluate('window.innerWidth')).toBeGreaterThan(1000)
+  await expect(heading).toHaveCSS('font-size', '40px')
+  await expect(page.getByLabel('Text size', { exact: true })).toHaveValue('40')
+})
+
+test('drags a column divider: widths snap to 5 %, one undo step, the autosave carries them', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  await page.getByTestId('layer-s_story').getByRole('button', { name: /^Section/ }).click()
+  const handle = page.getByTestId('column-resize-c_story_text')
+  await expect(handle).toBeVisible()
+  const box = (await handle.boundingBox())!
+  // The canvas is scaled to fit: one percent of the row on screen, from the two columns' drawn widths.
+  const text = (await canvas(page).locator('[data-b="c_story_text"]').boundingBox())!
+  const media = (await canvas(page).locator('[data-b="c_story_media"]').boundingBox())!
+  const percent = (text.width + media.width) / 100
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + percent * 6, y, { steps: 6 })
+  await expect(page.getByTestId('column-resize-label')).toContainText('55 % | 45 %')
+  await page.mouse.move(x + percent * 11, y, { steps: 6 })
+  await expect(page.getByTestId('column-resize-label')).toContainText('60 % | 40 %')
+  await page.mouse.up()
+  await expect.poll(() => savedNode(b, 's_story')?.columns?.map((c) => (c as unknown as StyledNode).width), { timeout: 6000 }).toEqual([
+    { base: 60, tablet: 50, mobile: 100 },
+    { base: 40, tablet: 50, mobile: 100 },
+  ])
+  await toolbar(page).getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByRole('separator', { name: 'Width of columns 1 and 2' })).toHaveAttribute('aria-valuenow', '50')
+})
+
+test('Site styles: a colour change shows on the canvas at once and saves to the theme draft', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  await page.getByRole('button', { name: 'Site styles' }).click()
+  const drawer = page.getByTestId('site-styles-drawer')
+  await expect(drawer).toBeVisible()
+  await drawer.getByTestId('role-primary').getByRole('button', { name: /Change colour/ }).click()
+  await page.getByLabel('Primary hex value').fill('#123456')
+  await expect.poll(() => canvas(page).locator('html').evaluate("document.documentElement.style.getPropertyValue('--sf-primary')")).toBe('#123456')
+  await expect.poll(() => b.themePuts.at(-1)?.settings.colors.primary, { timeout: 6000 }).toBe('#123456')
+  expect(b.themePuts[0]!.revision).toBe(0)
 })

@@ -4,11 +4,11 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
-use App\Modules\Storefront\Application\Actions\ApplyThemePreset;
 use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontSettings;
 use App\Modules\Storefront\Application\Actions\SaveTheme;
+use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveThemeRequest;
@@ -100,7 +100,9 @@ class StorefrontAdminController
     /**
      * Theme settings
      *
-     * Always the complete document (defaults filled in). `custom_css` is only returned to holders of `storefront.custom_css`.
+     * The live theme. Always the complete document (defaults filled in; B3: `colors.button`,
+     * `button_foreground` and `link` default to the theme's primary pair and accent, `button_hover`
+     * null = automatic, the type scale and `palette`). `custom_css` is only returned to holders of `storefront.custom_css`.
      */
     public function showTheme(Request $request, StorefrontConfig $config): JsonResponse
     {
@@ -108,20 +110,24 @@ class StorefrontAdminController
     }
 
     /**
-     * Replace theme settings
+     * Replace theme settings (legacy)
      *
      * Send the whole document; omitted keys take their defaults. Media ids must exist in the media library (`MEDIA_NOT_FOUND`).
+     * B3: kept for API compatibility — saves the theme draft and publishes it in one step (a new
+     * version; needs `storefront.publish`). Editors use `PUT /storefront/theme/draft` + `POST /storefront/theme/publish`.
      */
-    public function updateTheme(SaveThemeRequest $request, SaveTheme $save): JsonResponse
+    public function updateTheme(SaveThemeRequest $request, ManageThemeDraft $theme, StorefrontConfig $config): JsonResponse
     {
-        return ApiResponse::success(StorefrontPresenter::theme($save->settings($request->validated()), $request->user()->can('storefront.custom_css')));
+        $theme->saveAndPublish($request->validated());
+
+        return ApiResponse::success(StorefrontPresenter::theme($config->theme(), $request->user()->can('storefront.custom_css')));
     }
 
     /**
      * Theme presets
      *
      * The ready-made looks (`default`, `vegan`, `handmade`, `classic`), each with the complete theme it
-     * produces on a blank theme. Applying one replaces colours, fonts, shape and layout only.
+     * produces on a blank theme. Applying one (to the draft, B3) replaces colours, fonts, shape and layout only.
      */
     public function themePresets(): JsonResponse
     {
@@ -129,21 +135,9 @@ class StorefrontAdminController
     }
 
     /**
-     * Apply a theme preset
-     *
-     * Puts the preset's colours, fonts, shape and layout over the current theme and saves it; logo,
-     * favicon, announcement and footer content are kept. Returns the saved theme (as `GET /storefront/theme`).
-     * Unknown preset: 404.
-     */
-    public function applyThemePreset(Request $request, string $preset, ApplyThemePreset $apply): JsonResponse
-    {
-        return ApiResponse::success(StorefrontPresenter::theme($apply($preset), $request->user()->can('storefront.custom_css')));
-    }
-
-    /**
      * Replace custom CSS
      *
-     * Checked against the custom CSS policy (`CUSTOM_CSS_REJECTED`): no `<`, `@import`, `expression(`, escapes, or `url()` outside `/storage/`.
+     * Immediate (not part of the theme draft). Checked against the custom CSS policy (`CUSTOM_CSS_REJECTED`): no `<`, `@import`, `expression(`, escapes, or `url()` outside `/storage/`.
      */
     public function updateCustomCss(Request $request, SaveTheme $save): JsonResponse
     {

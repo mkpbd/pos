@@ -68,7 +68,7 @@ class ThemePresetsTest extends TestCase
             'layout' => ['header_style' => 'commerce', 'footer_style' => 'widgets', 'card_style' => 'minimal', 'hero_style' => 'tiles', 'heading_case' => 'uppercase', 'top_bar' => 'ticker'],
         ])->assertOk()
             ->assertJsonPath('data.settings.preset', 'handmade')
-            ->assertJsonPath('data.settings.typography', ['heading_font' => 'playfair', 'body_font' => 'jost'])
+            ->assertJsonPath('data.settings.typography', ['heading_font' => 'playfair', 'body_font' => 'jost'] + ThemeSchema::defaults()['typography'])
             ->assertJsonPath('data.settings.layout', [
                 'container_width' => 1170, 'sticky_header' => true,
                 'header_style' => 'commerce', 'footer_style' => 'widgets', 'card_style' => 'minimal',
@@ -104,7 +104,7 @@ class ThemePresetsTest extends TestCase
             ->assertJsonPath('data.0.theme', ThemeSchema::defaults())
             ->assertJsonPath('data.1.name', 'Vegan Store')
             ->assertJsonPath('data.1.theme.layout.heading_case', 'lowercase')
-            ->assertJsonPath('data.2.theme.typography', ['heading_font' => 'playfair', 'body_font' => 'jost'])
+            ->assertJsonPath('data.2.theme.typography', ['heading_font' => 'playfair', 'body_font' => 'jost'] + ThemeSchema::defaults()['typography'])
             ->assertJsonPath('data.2.theme.layout.header_style', 'centered')
             ->assertJsonPath('data.3.theme.layout.header_style', 'commerce')
             ->assertJsonPath('data.3.theme.preset', 'classic');
@@ -145,18 +145,25 @@ class ThemePresetsTest extends TestCase
         $this->putJson('/api/v1/storefront/theme/custom-css', ['custom_css' => '.x{color:red}'])->assertOk();
         $before = $this->getJson('/api/v1/storefront/theme')->json('data.settings');
 
+        // B3: the preset goes to the draft (the response is the draft payload).
         $saved = $this->postJson('/api/v1/storefront/theme/presets/classic/apply')->assertOk()
             ->assertJsonPath('data.custom_css', '.x{color:red}')
             ->assertJsonPath('data.has_custom_css', true)
+            ->assertJsonPath('data.has_unpublished_changes', true)
             ->json('data.settings');
 
         $classic = ThemePresets::theme('classic');
         foreach (ThemePresets::PRESENTATION_KEYS as $key) {
             $this->assertSame($classic[$key], $saved[$key], $key);
         }
-        foreach (['logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as $key) {
+        foreach (['palette', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as $key) {
             $this->assertSame($before[$key], $saved[$key], $key);
         }
+        $this->assertDatabaseHas('audit_logs', ['action' => 'storefront.theme_preset_applied']);
+
+        // Live only once published.
+        $this->assertSame($before, $this->getJson('/api/v1/storefront/theme')->json('data.settings'));
+        $this->postJson('/api/v1/storefront/theme/publish')->assertOk()->assertJsonPath('data.has_unpublished_changes', false);
         $this->assertSame($saved, $this->getJson('/api/v1/storefront/theme')->json('data.settings'));
         $this->assertDatabaseHas('audit_logs', ['action' => 'storefront.theme_updated']);
 
@@ -167,6 +174,7 @@ class ThemePresetsTest extends TestCase
             ->assertJsonPath('data.settings.layout', self::LAYOUT_DEFAULTS)
             ->assertJsonPath('data.settings.footer.about', 'Clothes for little ones.')
             ->assertJsonPath('data.settings.logo_media_id', $logo['id']);
+        $this->getJson('/api/v1/storefront/theme')->assertJsonPath('data.settings.preset', 'classic');
     }
 
     public function test_unknown_presets_are_not_found(): void
@@ -217,8 +225,13 @@ class ThemePresetsTest extends TestCase
 
         $this->actingAsUser($a);
         $this->postJson('/api/v1/storefront/theme/presets/handmade/apply')->assertOk()->assertJsonPath('data.settings.preset', 'handmade');
+        $this->postJson('/api/v1/storefront/theme/publish')->assertOk();
+        $this->getJson('/api/v1/storefront/theme')->assertJsonPath('data.settings.preset', 'handmade');
 
         $this->actingAsUser($b);
+        $this->getJson('/api/v1/storefront/theme/draft')->assertOk()
+            ->assertJsonPath('data.settings.preset', 'default')
+            ->assertJsonPath('data.settings.colors.primary', '#abcdef');
         $this->getJson('/api/v1/storefront/theme')->assertOk()
             ->assertJsonPath('data.settings.preset', 'default')
             ->assertJsonPath('data.settings.colors.primary', '#abcdef')
@@ -239,6 +252,13 @@ class ThemePresetsTest extends TestCase
 
         $this->actingAsUser($admin);
         $this->postJson('/api/v1/storefront/theme/presets/vegan/apply')->assertOk();
+        $this->app['auth']->forgetGuards();
+
+        // B3: applied to the draft only — shoppers still get the live look.
+        $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertOk()->assertJsonPath('data.theme.preset', 'default');
+
+        $this->actingAsUser($admin);
+        $this->postJson('/api/v1/storefront/theme/publish')->assertOk();
         $this->app['auth']->forgetGuards();
 
         // The cached bootstrap is replaced by the new look.

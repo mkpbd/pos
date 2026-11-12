@@ -35,7 +35,7 @@ export function AccountOrderPage() {
   useDocumentMeta(privatePage(order.data ? t('orders.title', { number: order.data.number }) : notFound ? t('orders.notFoundTitle') : null))
 
   const back = (
-    <Link to="/account/orders" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-sf-accent hover:underline">
+    <Link to="/account/orders" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-sf-link hover:underline">
       <ArrowLeftIcon aria-hidden className="size-4" />
       {t('orders.detail.allOrders')}
     </Link>
@@ -112,7 +112,7 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
           {line.review.status === 'rejected' && full?.rejection_reason && <span className="text-xs text-sf-sale">{t('orders.detail.reviewReason', { reason: full.rejection_reason })}</span>}
           <button
             type="button"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-sf-accent hover:underline disabled:opacity-60"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-sf-link hover:underline disabled:opacity-60"
             disabled={!full}
             onClick={() => editReview(line)}
             aria-label={t('orders.detail.editReviewAria', { product: line.product_name })}
@@ -128,7 +128,7 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
       return (
         <button
           type="button"
-          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-sf-accent hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-sf-link hover:underline"
           onClick={() => setReviewing({ mode: 'create', productId, productName: line.product_name })}
           aria-label={t('orders.detail.writeReviewAria', { product: line.product_name })}
         >

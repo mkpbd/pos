@@ -27,15 +27,7 @@ class SaveTheme
      */
     public function settings(array $settings): ThemeSettings
     {
-        $settings = ThemeSchema::normalize($settings);
-        // E12b: the announcement's translations (the document is replaced, so are they).
-        $settings['announcement']['translations'] = TranslationInput::apply(null, $settings['announcement']['translations'], ['text']);
-
-        $ids = ThemeSchema::mediaIds($settings);
-        $missing = array_values(array_diff($ids, $this->media->existing($ids)));
-        if ($missing !== []) {
-            throw new BusinessRuleViolation('MEDIA_NOT_FOUND', 'Some selected images no longer exist in the media library.', ['media_ids' => $missing]);
-        }
+        $settings = $this->prepare($settings);
 
         return DB::transaction(function () use ($settings) {
             $theme = $this->config->theme();
@@ -49,6 +41,28 @@ class SaveTheme
 
             return $theme;
         });
+    }
+
+    /**
+     * The stored form of a theme document: normalized (ThemeSchema), translations cleaned, every
+     * media id checked against the library (`MEDIA_NOT_FOUND`). B3: theme drafts use it too.
+     *
+     * @param  array<string, mixed>  $settings  validated
+     * @return array<string, mixed>
+     */
+    public function prepare(array $settings): array
+    {
+        $settings = ThemeSchema::normalize($settings);
+        // E12b: the announcement's translations (the document is replaced, so are they).
+        $settings['announcement']['translations'] = TranslationInput::apply(null, $settings['announcement']['translations'], ['text']);
+
+        $ids = ThemeSchema::mediaIds($settings);
+        $missing = array_values(array_diff($ids, $this->media->existing($ids)));
+        if ($missing !== []) {
+            throw new BusinessRuleViolation('MEDIA_NOT_FOUND', 'Some selected images no longer exist in the media library.', ['media_ids' => $missing]);
+        }
+
+        return $settings;
     }
 
     public function customCss(?string $css): ThemeSettings

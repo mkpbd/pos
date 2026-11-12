@@ -86,8 +86,9 @@ describe('announcement schedule', () => {
 
 describe('theme form', () => {
   const doc: ThemeDocument = {
-    colors: { primary: '#f59e0b', primary_foreground: '#3b2500', accent: '#6f55c2', accent_foreground: '#ffffff', highlight: '#2fb79a', sale: '#c2410c', heading: '#3d3d3d', text: '#5f6368', canvas: '#f3f7fa', surface: '#ffffff', border: '#e1e1e1' },
-    typography: { heading_font: 'baloo', body_font: 'poppins' },
+    colors: { primary: '#f59e0b', primary_foreground: '#3b2500', accent: '#6f55c2', accent_foreground: '#ffffff', highlight: '#2fb79a', sale: '#c2410c', heading: '#3d3d3d', text: '#5f6368', canvas: '#f3f7fa', surface: '#ffffff', border: '#e1e1e1', button: '#1d4ed8', button_foreground: '#ffffff', button_hover: null, link: '#6f55c2' },
+    typography: { heading_font: 'baloo', body_font: 'poppins', body_size: 17, heading_scale: 1.3, line_height: 1.6, heading_weight: 800, mobile_scale: 0.9, letter_spacing: -0.01 },
+    palette: [{ name: 'Brand blue', hex: '#1d4ed8' }],
     shape: { button_style: 'pill', card_radius: 12 },
     layout: { container_width: 1170, sticky_header: true, header_style: 'centered', footer_style: 'showcase', card_style: 'minimal', hero_style: 'tiles', heading_case: 'normal', top_bar: 'utility' },
     preset: 'handmade',
@@ -99,6 +100,30 @@ describe('theme form', () => {
 
   it('turns the document into form values and back without loss', () => {
     expect(toDocument(toFormValues(doc))).toEqual(doc)
+  })
+
+  it('a document from before B3 gets the B3 keys at their defaults (null roles = follow, today’s type scale, no palette)', () => {
+    const legacy: ThemeDocument = { ...doc, colors: { ...doc.colors }, typography: { heading_font: 'baloo', body_font: 'poppins' } }
+    delete legacy.palette
+    for (const key of ['button', 'button_foreground', 'button_hover', 'link'] as const) delete legacy.colors[key]
+    const sent = toDocument(toFormValues(legacy))
+    // Button, button text and link take their source colours (what the store showed before B3); the hover stays automatic.
+    expect(sent.colors).toMatchObject({ button: '#f59e0b', button_foreground: '#3b2500', button_hover: null, link: '#6f55c2' })
+    expect(sent.typography).toEqual({ heading_font: 'baloo', body_font: 'poppins', body_size: 16, heading_scale: 1.25, line_height: 1.5, heading_weight: 700, mobile_scale: 1, letter_spacing: 0 })
+    expect(sent.palette).toEqual([])
+    expect(themeSchema.safeParse(toFormValues(legacy)).success).toBe(true)
+  })
+
+  it('validates the type scale ranges and the store palette', () => {
+    const values = toFormValues(doc)
+    values.typography.body_size = 24
+    values.typography.heading_weight = 650
+    values.palette = [...Array(9)].map((_, i) => ({ name: `C${i}`, hex: '#123456' }))
+    const paths = (v: typeof values) => themeSchema.safeParse(v).error?.issues.map((i) => i.path.join('.'))
+    expect(paths(values)).toEqual(expect.arrayContaining(['typography.body_size', 'typography.heading_weight', 'palette']))
+    // A see-through palette colour is fine; a blank name or a bad hex is not.
+    const palette = [{ name: 'Glass', hex: '#1d4ed880' }, { name: '', hex: '#123456' }, { name: 'Bad', hex: 'blue' }]
+    expect(paths({ ...toFormValues(doc), palette })).toEqual(['palette.1.name', 'palette.2.hex'])
   })
 
   it('always sends the preset and every layout variant; a document from before T1 reads as today’s look', () => {

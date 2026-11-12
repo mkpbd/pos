@@ -172,7 +172,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             {product.category?.slug && (
               <p className="border-t pt-4 text-sm">
                 {t('catalog.product.category')}{' '}
-                <Link to={`/category/${product.category.slug}`} className="font-semibold text-sf-accent hover:underline">
+                <Link to={`/category/${product.category.slug}`} className="font-semibold text-sf-link hover:underline">
                   {product.category.name}
                 </Link>
               </p>

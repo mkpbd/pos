@@ -2386,6 +2386,25 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
 | PATCH `/storefront/builder/documents/{id}` | manage | B2. `{title}` (1–160) → document (revision unchanged); audited `storefront.builder_renamed`. Summaries also carry `path` (`/` or `/p/<slug>`) and `preview_url` (or null without a domain). |
 | GET `/store/builder/pages/home`, `/store/builder/pages/{slug}` | public | Published render payload. `404 PAGE_NOT_FOUND`. `?preview=draft` for signed-in staff with `storefront.view` → the draft with `state` on non-live nodes, `no-store`. Otherwise ETag / 304 like `/store/homepage`. |
 
+**Theme draft → publish (B3).** Under `/storefront/theme`:
+
+| Method & path | Permission | Notes |
+|---|---|---|
+| GET `/theme/draft` | view | `{settings, draft_revision, has_unpublished_changes, draft_updated_at, published: null\|{version_id, number, published_at}, preview_url, custom_css, has_custom_css}` (`no-store`); the draft is the live theme at revision 0 until the first edit |
+| PUT `/theme/draft` | manage | `{revision, settings}` → draft payload; `409 DRAFT_CONFLICT` (`details.revision`); 422 like the theme save |
+| POST `/theme/publish` | publish | `{note?}` → writes the live theme (`SaveTheme`: audit and cache bust) and records a version. The first publish stores the previously live theme as version 1. |
+| POST `/theme/discard` | manage | Draft = live theme |
+| GET `/theme/versions` · POST `/theme/versions/{id}/restore` | view · manage | Like builder documents; restore fills in newer keys |
+| POST `/theme/presets/{preset}/apply` | manage | **Changes the draft** (since B3); returns the draft payload |
+| GET / PUT `/theme` | view / publish | Legacy: GET = the live theme; PUT = save the draft and publish in one step |
+
+New theme keys:
+- `colors.button`, `colors.button_foreground`, `colors.link` (hex), `colors.button_hover` (hex or null = automatic)
+- `typography.body_size` (13–20), `heading_scale` (1.1–1.5), `line_height` (1.3–1.9), `heading_weight` (400–900), `mobile_scale` (0.8–1), `letter_spacing` (−0.02–0.1 em, headings)
+- `palette` (≤ 8 `{name, hex}`)
+
+Staff `GET /store/bootstrap?preview=draft` → draft theme + `theme_source: "draft"` (`no-store`). `GET /storefront/builder/canvas-context` always returns the draft theme (`theme_source: "draft"`).
+
 **Render payload:** `{document: {id, key, title, version, source}, sections: <tree>, media: {<media_id>: {url, srcset, width, height, alt}}, data: {<element_id>: <homepage section object>}}`.
 - Texts are resolved to the request language.
 - Hidden and out-of-schedule nodes are removed, along with wrapped elements without content and any section left with no elements.

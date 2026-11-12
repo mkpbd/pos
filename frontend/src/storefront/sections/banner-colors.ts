@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useStorefront } from '../api'
 import { contrastRatio, isLightColor } from '../color'
+import { resolveColorRoles } from '../theme'
 import type { StoreBanner } from '../types'
 
 /**
@@ -24,5 +25,6 @@ export function useBannerButtonColors(banner: StoreBanner): { primary?: CSSPrope
   const backdrop = isLightColor(banner.text_color) ? '#000000' : '#ffffff'
   const invert = (fill: string): CSSProperties | undefined =>
     (contrastRatio(fill, backdrop) ?? Infinity) < MIN_BUTTON_CONTRAST ? { backgroundColor: banner.text_color, color: fill } : undefined
-  return { primary: invert(colors.primary), secondary: invert(colors.accent) }
+  // The primary button is a theme button (B3 `button` role; the primary colour unless the theme sets one).
+  return { primary: invert(resolveColorRoles(colors).button), secondary: invert(colors.accent) }
 }

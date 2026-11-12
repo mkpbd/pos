@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
-import type { ThemeDocument, ThemePreset, ThemeResponse } from '@/features/storefront/api'
+import type { ThemeDocument, ThemeDraft, ThemePreset } from '@/features/storefront/api'
 import { makeCurrentUser } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 
@@ -21,7 +21,7 @@ const settings: ThemeDocument = {
   footer: { about: 'Since 2020', copyright: null, contact: { email: null, phone: null, address: null }, social: { facebook: null, instagram: null, youtube: null, tiktok: null, x: null, linkedin: null }, payment_logo_media_ids: [] },
 }
 
-const theme: ThemeResponse = { settings, custom_css: null, has_custom_css: false, updated_at: null }
+const theme: ThemeDraft = { settings, draft_revision: 2, has_unpublished_changes: false, published: { version_id: 'v-1', number: 1, published_at: null }, custom_css: null, has_custom_css: false }
 
 const handmadeLook: ThemePreset['theme'] = {
   preset: 'handmade',
@@ -41,17 +41,17 @@ const presets: ThemePreset[] = [
 const emptyMedia = ok([], { pagination: { current_page: 1, per_page: 100, total: 0, last_page: 1 } })
 
 describe('theme presets', () => {
-  it('applies a preset after confirmation and refreshes the theme form', async () => {
+  it('applies a preset to the draft after confirmation and refreshes the theme form', async () => {
     const user = userEvent.setup()
     let applied: string | null = null
     mockApi({
       'GET /auth/me': ok(manager()),
-      'GET /storefront/theme': ok(theme),
+      'GET /storefront/theme/draft': ok(theme),
       'GET /storefront/theme/presets': ok(presets),
       'GET /media': emptyMedia,
       'POST /storefront/theme/presets/handmade/apply': () => {
         applied = 'handmade'
-        return ok({ ...theme, settings: { ...settings, ...handmadeLook, layout: handmadeLook.layout } })
+        return ok({ ...theme, draft_revision: 3, has_unpublished_changes: true, settings: { ...settings, ...handmadeLook, layout: handmadeLook.layout } })
       },
     })
     renderRoutes(routes, '/storefront/theme')
@@ -66,12 +66,15 @@ describe('theme presets', () => {
     await user.click(within(group).getByRole('radio', { name: 'Handmade' }))
     await user.click(screen.getByRole('button', { name: 'Apply preset' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Apply the Handmade preset?' })
-    expect(dialog).toHaveTextContent('Replaces colours, fonts and layout; keeps your logo, announcement and footer text')
+    expect(dialog).toHaveTextContent('Replaces colours, fonts and layout in your draft; keeps your logo, announcement and footer text')
+    expect(dialog).toHaveTextContent('Applies to your draft — publish to go live.')
     await user.click(within(dialog).getByRole('button', { name: 'Apply preset' }))
 
     await waitFor(() => expect(applied).toBe('handmade'))
     // The form shows the applied theme: colours, fonts and layout.
-    await waitFor(() => expect(screen.getByLabelText('Primary')).toHaveValue('#9c4a2a'))
+    expect(await screen.findByRole('button', { name: /^Primary: #9c4a2a/ })).toBeInTheDocument()
+    // Not live: the draft waits for a publish.
+    expect(screen.getByTestId('theme-status')).toHaveTextContent('Draft — not live yet')
     expect(screen.getByRole('combobox', { name: 'Header' })).toHaveTextContent('Centered brand, search icon')
     expect(screen.getByRole('combobox', { name: 'Footer' })).toHaveTextContent('Brand & product showcase')
     expect(screen.getByText('Playfair Display (serif, elegant)', { selector: '[data-slot="select-value"] *' })).toBeInTheDocument()
@@ -82,7 +85,7 @@ describe('theme presets', () => {
     const user = userEvent.setup()
     const fetchMock = mockApi({
       'GET /auth/me': ok(manager()),
-      'GET /storefront/theme': ok(theme),
+      'GET /storefront/theme/draft': ok(theme),
       'GET /storefront/theme/presets': ok(presets),
       'GET /media': emptyMedia,
       'POST /storefront/theme/presets/classic/apply': fail(404, 'NOT_FOUND', 'Unknown preset.'),
@@ -97,20 +100,20 @@ describe('theme presets', () => {
     await user.click(screen.getByRole('button', { name: 'Apply preset' }))
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Apply preset' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Unknown preset.')
-    expect(screen.getByLabelText('Primary')).toHaveValue('#f59e0b')
+    expect(screen.getByRole('button', { name: /^Primary: #f59e0b/ })).toBeInTheDocument()
   })
 
-  it('saving the form keeps the preset and every layout variant', async () => {
+  it('saving the draft keeps the preset and every layout variant', async () => {
     const user = userEvent.setup()
     let saved: ThemeDocument | undefined
-    const handmade: ThemeResponse = { ...theme, settings: { ...settings, ...handmadeLook, layout: handmadeLook.layout } }
+    const handmade: ThemeDraft = { ...theme, settings: { ...settings, ...handmadeLook, layout: handmadeLook.layout } }
     mockApi({
       'GET /auth/me': ok(manager()),
-      'GET /storefront/theme': ok(handmade),
+      'GET /storefront/theme/draft': ok(handmade),
       'GET /storefront/theme/presets': ok(presets),
       'GET /media': emptyMedia,
-      'PUT /storefront/theme': (init) => {
-        saved = JSON.parse(String(init.body)) as ThemeDocument
+      'PUT /storefront/theme/draft': (init) => {
+        saved = (JSON.parse(String(init.body)) as { settings: ThemeDocument }).settings
         return ok({ ...handmade, settings: saved })
       },
     })
@@ -120,18 +123,18 @@ describe('theme presets', () => {
     expect(header).toHaveTextContent('Up to three editorial tiles')
     await user.click(screen.getByRole('combobox', { name: 'Section headings' }))
     await user.click(await screen.findByRole('option', { name: 'UPPERCASE' }))
-    await user.click(screen.getByRole('button', { name: 'Save theme' }))
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
     await waitFor(() => expect(saved).toBeDefined())
     expect(saved?.preset).toBe('handmade')
-    expect(saved?.typography).toEqual({ heading_font: 'playfair', body_font: 'jost' })
+    expect(saved?.typography).toMatchObject({ heading_font: 'playfair', body_font: 'jost' })
     expect(saved?.layout).toEqual({ ...handmadeLook.layout, heading_case: 'uppercase' })
   })
 
   it('shows the presets read-only without storefront.manage', async () => {
     mockApi({
       'GET /auth/me': ok(viewer()),
-      'GET /storefront/theme': ok(theme),
+      'GET /storefront/theme/draft': ok(theme),
       'GET /storefront/theme/presets': ok(presets),
     })
     renderRoutes(routes, '/storefront/theme')
