@@ -20,6 +20,8 @@ use Illuminate\Validation\Validator;
  *   category or a product, `zone:<product zone>@category:<uuid>` / `@product:<uuid>` (lower-case);
  * - `popup` (B8b): no key (the server makes `popup:<uuid>`; `key` and `from` are ignored), an
  *   optional `template` (a built-in popup template id).
+ * - `global` (B9): no key (the server makes `global:<uuid>`), `context` (page | header | footer),
+ *   `from` blank (default) | section with `section` (a section from a draft).
  *
  * `from`: `blank` (default), `homepage` (home only: convert the homepage sections), `cms`
  * (cms keys only: import the CMS page) or `current` (header / footer only: today's layout);
@@ -42,6 +44,16 @@ class CreateBuilderDocumentRequest extends FormRequest
 
     public function rules(): array
     {
+        if ($this->input('kind') === BuilderDocument::KIND_GLOBAL) {
+            // B9: the key is made by the server; `section` is a section from a draft.
+            return [
+                'kind' => ['required', Rule::in(BuilderDocument::BUILDER_KINDS)],
+                'title' => ['required', 'string', 'max:160'],
+                'context' => ['required', Rule::in(BuilderDocument::GLOBAL_CONTEXTS)],
+                'from' => ['sometimes', 'nullable', Rule::in(['blank', 'section'])],
+                'section' => ['required_if:from,section', 'nullable', 'array'],
+            ];
+        }
         if ($this->input('kind') === BuilderDocument::KIND_POPUP) {
             // B8b: the key is made by the server; `template` is a built-in popup template.
             return [
@@ -90,7 +102,7 @@ class CreateBuilderDocumentRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator) {
-            if ($validator->errors()->isNotEmpty() || $this->input('kind') === BuilderDocument::KIND_POPUP) {
+            if ($validator->errors()->isNotEmpty() || in_array($this->input('kind'), [BuilderDocument::KIND_POPUP, BuilderDocument::KIND_GLOBAL], true)) {
                 return;
             }
             $kind = $this->input('kind');

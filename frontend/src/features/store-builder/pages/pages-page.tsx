@@ -12,6 +12,7 @@ import { documentPath, useCreateDocumentMutation, useDeleteDocumentMutation, use
 import { isProductZone, parseZoneKey } from '../document-kind'
 import { CmsPagesCard, SitePartsCard, ZonesCard, type RemoveRequest } from './builder-parts'
 import { DemoLooksCard } from './demo-looks'
+import { GlobalSectionsCard } from './global-sections-card'
 import { ListingColumnsCard } from './listing-columns-card'
 import { PopupsCard } from './popups-card'
 import { ProductZonesCard } from './product-zones-card'
@@ -35,6 +36,7 @@ import { StartGuide } from './start-guide'
  * B7: English / বাংলা for this screen (remembered in the browser), a state-aware 3-step guide on
  * top, the looks with a preview, live demos and "use and publish now", and plain wording.
  * B8b: Popups & bars (list, on / off, new from a template, delete).
+ * B9: Global sections (what each is for, where it is used, edit, delete when unused).
  * P2a: a new campaign page may start from a landing page template (new-landing-dialog.tsx).
  */
 
@@ -223,6 +225,10 @@ function PagesScreen() {
             <section aria-labelledby="group-parts" className="flex flex-col gap-4">
               <GroupHeading id="group-parts" title={t('group.parts.title')} description={t('group.parts.text')} />
               <SitePartsCard documents={parts} canManage={canManage} onRemove={setRemoving} />
+            </section>
+            <section aria-labelledby="group-globals" className="flex flex-col gap-4">
+              <GroupHeading id="group-globals" title={t('group.globals.title')} description={t('group.globals.text')} />
+              <GlobalSectionsCard canManage={canManage} />
             </section>
             <section aria-labelledby="group-shop" className="flex flex-col gap-4">
               <GroupHeading id="group-shop" title={t('group.shop.title')} description={t('group.shop.text')} />

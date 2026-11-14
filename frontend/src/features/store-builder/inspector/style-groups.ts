@@ -30,7 +30,7 @@ export const GROUP_TIPS: Partial<Record<GroupId, string>> = {
   layout: 'How the columns or elements inside sit next to each other.',
   hover: 'What happens when a shopper points at it with the mouse.',
   effects: 'Shadow and see-through.',
-  motion: 'An entrance animation that plays once when shoppers scroll to it.',
+  motion: 'Movement: how it appears when shoppers scroll to it, a small loop to draw the eye, what it does when pointed at and, for sections, how the background picture scrolls.',
 }
 
 const B6_MEDIA = new Set(['gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look'])

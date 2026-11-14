@@ -14,6 +14,7 @@ use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
 use App\Modules\Storefront\Domain\Builder\StyleSchema;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
+use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
 
 /**
@@ -58,18 +59,28 @@ class BuilderReferences
      *
      * @throws InvalidBuilderDocument
      */
-    public function check(array $document): void
+    public function check(array $document, ?string $context = null): void
     {
-        /** @var array<string, list<array{path: string, node_id: string, ids: list<string>}>> $uses code => uses */
+        /** @var array<string, list<array{path: string, node_id: ?string, ids: list<string>}>> $uses code => uses */
         $uses = [];
-        $use = function (string $code, string $path, string $nodeId, array $ids) use (&$uses) {
+        $use = function (string $code, string $path, ?string $nodeId, array $ids) use (&$uses) {
             $ids = array_values(array_unique(array_filter($ids, 'is_string')));
             if ($ids !== []) {
                 $uses[$code][] = ['path' => $path, 'node_id' => $nodeId, 'ids' => $ids];
             }
         };
+        // B9: the search & sharing image.
+        $use('MEDIA_NOT_FOUND', 'seo.image.media_id', null, [$document['seo']['image']['media_id'] ?? null]);
+        /** @var list<array{path: string, node_id: string, ref: string}> $globals */
+        $globals = [];
 
-        BuilderDocumentSchema::walk($document, function (array $node, string $path, string $kind) use ($use) {
+        BuilderDocumentSchema::walk($document, function (array $node, string $path, string $kind) use ($use, &$globals) {
+            if ($kind === BuilderDocumentSchema::GLOBAL_SECTION) {
+                // B9: checked below (exists, this organization's, fits the context).
+                $globals[] = ['path' => "{$path}.ref", 'node_id' => $node['id'], 'ref' => $node['ref']];
+
+                return;
+            }
             $use('MEDIA_NOT_FOUND', "{$path}.style", $node['id'], StyleSchema::mediaIds($node['style'] ?? []));
             if ($kind !== 'element') {
                 return;
@@ -131,7 +142,7 @@ class BuilderReferences
             }
         });
 
-        $errors = [];
+        $errors = $this->globalErrors($globals, $context);
         foreach ($uses as $code => $list) {
             $all = array_values(array_unique(array_merge(...array_column($list, 'ids'))));
             $found = $this->existing($code, $all);
@@ -147,6 +158,49 @@ class BuilderReferences
         if ($errors !== []) {
             throw new InvalidBuilderDocument($errors, 'The page refers to records that do not exist.');
         }
+    }
+
+    /**
+     * B9: global section references — the global must exist in this organization (another
+     * organization's reads as missing) and fit the document's context: a `page` global in pages,
+     * content pages and shop areas, a `header` / `footer` global in the header / footer.
+     *
+     * @param  list<array{path: string, node_id: string, ref: string}>  $globals
+     * @return list<array<string, mixed>>
+     */
+    private function globalErrors(array $globals, ?string $context): array
+    {
+        if ($globals === []) {
+            return [];
+        }
+        $contexts = BuilderDocument::query()->where('kind', BuilderDocument::KIND_GLOBAL)
+            ->whereIn('id', array_values(array_unique(array_column($globals, 'ref'))))
+            ->pluck('context', 'id')->all();
+
+        $errors = [];
+        foreach ($globals as $global) {
+            if (! array_key_exists($global['ref'], $contexts)) {
+                $errors[] = ['path' => $global['path'], 'node_id' => $global['node_id'], 'message' => 'This global section no longer exists.', 'code' => 'GLOBAL_NOT_FOUND', 'ids' => [$global['ref']]];
+            } elseif ($context !== null && ! self::globalFits((string) $contexts[$global['ref']], $context)) {
+                $errors[] = ['path' => $global['path'], 'node_id' => $global['node_id'], 'message' => match ($contexts[$global['ref']]) {
+                    'header' => 'This global section is made for the header.',
+                    'footer' => 'This global section is made for the footer.',
+                    default => 'This global section is made for pages, content pages and shop areas.',
+                }, 'code' => 'GLOBAL_CONTEXT_MISMATCH', 'ids' => [$global['ref']]];
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * B9: whether a global made for `$globalContext` may be used in a `$documentContext` document.
+     */
+    public static function globalFits(string $globalContext, string $documentContext): bool
+    {
+        return $globalContext === 'page'
+            ? in_array($documentContext, ['page', 'cms', 'zone'], true)
+            : $globalContext === $documentContext;
     }
 
     /**

@@ -6,6 +6,7 @@ import { useDraftPreview } from '../builder/api'
 import { FaqFallbackCtx } from '../builder/elements/faq-fallback'
 import { hasHeadingLevel } from '../builder/payload'
 import { PageRenderer } from '../builder/page-renderer'
+import { withPageSeo } from '../builder/seo-meta'
 import { ContactDetails, FaqGroups } from '../components/content-blocks'
 import { ContactForm } from '../components/contact-form'
 import { RichText } from '../components/rich-text'
@@ -42,7 +43,12 @@ export function ContentPage() {
   const draft = useDraftPreview()
   const page = useStorePageQuery(slug, draft)
   const { t } = useLocale()
-  useDocumentMeta(page.data ? { title: page.data.seo_title ?? page.data.title, description: page.data.seo_description, canonical: `/pages/${page.data.slug}` } : null)
+  // B9: a page designed in the builder lays its own SEO (published; a draft preview: the draft's) over the CMS page's.
+  useDocumentMeta(
+    page.data
+      ? withPageSeo({ title: page.data.seo_title ?? page.data.title, description: page.data.seo_description, canonical: `/pages/${page.data.slug}` }, page.data.builder)
+      : null,
+  )
 
   if (page.isPending) {
     return (

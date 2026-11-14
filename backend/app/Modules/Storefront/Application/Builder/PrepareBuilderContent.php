@@ -28,10 +28,10 @@ class PrepareBuilderContent
      *
      * @throws InvalidBuilderDocument
      */
-    public function __invoke(array $content, string $context = 'page'): array
+    public function __invoke(array $content, string $context = 'page', bool $global = false): array
     {
-        $document = $this->sanitized($content, $context);
-        $this->references->check($document);
+        $document = $this->sanitized($content, $context, $global);
+        $this->references->check($document, $context);
 
         return $document;
     }
@@ -45,9 +45,10 @@ class PrepareBuilderContent
      *
      * @throws InvalidBuilderDocument
      */
-    public function sanitized(array $content, string $context = 'page'): array
+    public function sanitized(array $content, string $context = 'page', bool $global = false): array
     {
-        $document = BuilderDocumentSchema::normalize($content, $context);
+        // B9: `$global` — the content of a global section (one section, no references or seo).
+        $document = BuilderDocumentSchema::normalize($content, $context, $global);
 
         $errors = [];
         foreach ($document['sections'] as $i => $section) {

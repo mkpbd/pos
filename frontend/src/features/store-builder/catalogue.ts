@@ -35,6 +35,7 @@ import {
   MinusIcon,
   MoveVerticalIcon,
   NewspaperIcon,
+  GlobeIcon,
   PanelTopIcon,
   PilcrowIcon,
   RectangleHorizontalIcon,
@@ -80,6 +81,8 @@ import type { ElementGroup } from '@/storefront/builder/registry'
 /** Icons and one-line explanations of the element catalogue (the server's registry has labels only). */
 export const ELEMENT_ICONS: Record<string, LucideIcon> = {
   section: PanelTopIcon,
+  /** B9: a global section reference (Layers). */
+  global_section: GlobeIcon,
   column: SquareIcon,
   heading: HeadingIcon,
   text: PilcrowIcon,

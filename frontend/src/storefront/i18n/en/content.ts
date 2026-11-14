@@ -10,6 +10,8 @@ export const content = {
   'content.builder.empty': 'Nothing to show — visitors do not see this',
   'content.builder.inactive': 'Promotion not running — visitors do not see this',
   'content.builder.unavailable': 'Not available — visitors do not see this',
+  'content.builder.global.unavailable': 'Global section “{title}” is not available — it was deleted or is not published yet. Visitors do not see it.',
+  'content.builder.global.unnamed': 'Global section',
   'content.builder.noData': 'Nothing set up yet — visitors do not see this',
   'content.builder.video.play': 'Play video: {title}',
   'content.builder.video.source': 'Video from {provider}. It loads when you press play.',

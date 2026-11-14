@@ -16,7 +16,8 @@ export function flattenLayers(content: BuilderContent): LayerRow[] {
   }
   content.sections.forEach((section, si) => {
     rows.push({ node: section, kind: 'section', depth: 0, index: si, count: content.sections.length })
-    columns(section.columns, 1)
+    // B9: a global section reference is one row (its content is edited in its own document).
+    if (Array.isArray(section.columns)) columns(section.columns, 1)
   })
   return rows
 }

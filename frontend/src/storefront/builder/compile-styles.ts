@@ -13,8 +13,8 @@
  */
 
 import { NODE_ID } from './registry'
-import type { Background, Breakpoint, Gradient, Motion, ResponsiveStyle, Shadow, Style } from './types'
-import { normalizeColor, normalizeGradient, normalizeStyle, normalizeWidth, oneOf } from './validate'
+import type { Background, Breakpoint, Gradient, HoverStyle, Motion, ResponsiveStyle, Shadow, Style } from './types'
+import { B9_DEFAULTS, B9_LIMITS, normalizeColor, normalizeGradient, normalizeStyle, normalizeWidth, oneOf } from './validate'
 
 export const TABLET_QUERY = '(max-width: 1023px)'
 export const MOBILE_QUERY = '(max-width: 639px)'
@@ -33,6 +33,8 @@ export type CompileOptions = {
    * (`[data-b-scope="<scope>"] [data-b="…"]`). `^[a-z][a-z0-9-]{0,31}$`; anything else = unscoped.
    */
   scope?: string
+  /** B9: ids of elements whose entrance a parent staggers (motionTargets' `children`); compileStyles fills it. */
+  staggered?: ReadonlySet<string>
 }
 
 const SCOPE = /^[a-z][a-z0-9-]{0,31}$/
@@ -47,7 +49,15 @@ type Kind = 'section' | 'column' | 'element'
 
 type Rule = { selector: string; declarations: string[] }
 
-type Output = Record<Breakpoint, Rule[]> & { hideDesktop: string[]; hideTablet: string[]; hideMobile: string[]; reducedMotion: Rule[]; motion: Rule[] }
+type Output = Record<Breakpoint, Rule[]> & {
+  hideDesktop: string[]
+  hideTablet: string[]
+  hideMobile: string[]
+  reducedMotion: Rule[]
+  motion: Rule[]
+  /** B9: hover effects and parallax, for desktop pointers that allow motion. */
+  pointer: Rule[]
+}
 
 /* -------------------------------------------------------------------------------------------- */
 
@@ -257,7 +267,15 @@ function addRule(rules: Rule[], selector: string, declarations: string[]) {
   if (declarations.length > 0) rules.push({ selector, declarations })
 }
 
-function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown, options: CompileOptions, extra: Partial<Record<Breakpoint, string[]>> = {}) {
+function compileNodeStyle(
+  out: Output,
+  id: string,
+  kind: Kind,
+  rawStyle: unknown,
+  options: CompileOptions,
+  extra: Partial<Record<Breakpoint, string[]>> = {},
+  isSection = false,
+) {
   const style: ResponsiveStyle = normalizeStyle(rawStyle)
   const selector = selectorFor(id, options)
   const breakpoints = ['base', 'tablet', 'mobile'] as const
@@ -278,8 +296,12 @@ function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown
   if (hasHover) {
     out.reducedMotion.push({ selector, declarations: ['transition:none'] }, { selector: `${selector}:hover,${selector}:focus-visible`, declarations: ['transform:none'] })
   }
-  const motion = style.base?.motion
-  if (motion) out.motion.push(...motionRules(selector, motion))
+  const motion = motionOf(style)
+  if (motion) out.motion.push(...motionRules(selector, motion, options.staggered?.has(id) === true))
+  const hover = style.base?.hover
+  if (hover) hoverRules(out, selector, hover)
+  // B9 parallax: real sections only (not inner rows).
+  if (isSection && parallaxOf(style)) out.pointer.push({ selector: `${selector} > .b-parallax`, declarations: ['display:block'] })
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -292,41 +314,124 @@ function compileNodeStyle(out: Output, id: string, kind: Kind, rawStyle: unknown
 
 export const MOTION_DEFAULTS = { duration: 600, delay: 0 } as const
 
-/** A node's entrance with its defaults filled in; null for none / no motion. */
+/** B9 attention loops: one cycle's length (ms); the keyframes are `b-loop-<loop>` in storefront.css. */
+export const LOOP_DURATIONS = { pulse: 1600, float: 3000, shake: 900, glow: 2000 } as const
+
+const EASE = 'cubic-bezier(0.2,0.7,0.2,1)'
+
+/**
+ * A node's motion with every default filled in; null when it has neither an entrance, a loop nor a
+ * stagger (B9: `entrance: 'none'` with a loop or a stagger still counts).
+ */
 export function motionOf(style: unknown): Required<Motion> | null {
   const motion = normalizeStyle(style).base?.motion
-  if (!motion || motion.entrance === 'none') return null
-  return { entrance: motion.entrance, duration: motion.duration ?? MOTION_DEFAULTS.duration, delay: motion.delay ?? MOTION_DEFAULTS.delay }
+  if (!motion) return null
+  const value: Required<Motion> = {
+    entrance: motion.entrance,
+    duration: motion.duration ?? MOTION_DEFAULTS.duration,
+    delay: motion.delay ?? MOTION_DEFAULTS.delay,
+    repeat: motion.repeat ?? B9_DEFAULTS.motionRepeat,
+    stagger_children: motion.stagger_children ?? B9_DEFAULTS.staggerChildren,
+    loop: motion.loop ?? B9_DEFAULTS.motionLoop,
+    loop_forever: motion.loop_forever ?? B9_DEFAULTS.loopForever,
+  }
+  return value.entrance === 'none' && value.loop === 'none' && value.stagger_children === 0 ? null : value
 }
 
-function motionRules(selector: string, motion: Motion): Rule[] {
-  const value = motionOf({ base: { motion } })
-  if (!value) return []
-  return [
-    { selector: `${selector}[data-b-motion="start"]`, declarations: ['opacity:0'] },
-    {
-      selector: `${selector}[data-b-motion="run"]`,
-      declarations: [`animation:b-motion-${value.entrance} ${num(value.duration)}ms cubic-bezier(0.2,0.7,0.2,1) ${num(value.delay)}ms backwards`],
-    },
-  ]
+function motionRules(selector: string, motion: Required<Motion>, staggered: boolean): Rule[] {
+  const rules: Rule[] = []
+  // A staggered element waits its turn: the runtime sets `--b-stagger` (its index × the parent's stagger).
+  const at = (ms: number) => (staggered ? `calc(${num(ms)}ms + var(--b-stagger, 0ms))` : `${num(ms)}ms`)
+  const entrance = motion.entrance === 'none' ? null : `b-motion-${motion.entrance} ${num(motion.duration)}ms ${EASE} ${at(motion.delay)} backwards`
+  if (entrance) {
+    rules.push({ selector: `${selector}[data-b-motion="start"]`, declarations: ['opacity:0'] })
+    rules.push({ selector: `${selector}[data-b-motion="run"]`, declarations: [`animation:${entrance}`] })
+  }
+  if (motion.loop !== 'none') {
+    const loop = `b-loop-${motion.loop} ${num(LOOP_DURATIONS[motion.loop])}ms ease-in-out`
+    const count = motion.loop_forever ? 'infinite' : String(B9_LIMITS.loopCycles)
+    if (entrance) {
+      // The loop starts once the entrance has finished.
+      rules.push({ selector: `${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: [`animation:${entrance},${loop} ${at(motion.delay + motion.duration)} ${count}`] })
+    } else {
+      rules.push({ selector: `${selector}[data-b-loop="run"]`, declarations: [`animation:${loop} 0ms ${count}`] })
+    }
+    // Attention loops pause while the visitor points at or focuses the node.
+    rules.push({ selector: `${selector}[data-b-loop="run"]:hover,${selector}[data-b-loop="run"]:focus-within`, declarations: ['animation-play-state:paused'] })
+  }
+  return rules
 }
 
-export type MotionTarget = { id: string; motion: Required<Motion> }
+/** B9 hover effects (`style.base.hover`): what the node does on hover (desktop pointers) and on keyboard focus. */
+const HOVER_EFFECTS: Record<Exclude<HoverStyle['effect'], 'none'>, string[]> = {
+  lift: ['transform:translateY(-4px)'],
+  grow: ['transform:scale(1.04)'],
+  shrink: ['transform:scale(0.97)'],
+  tilt: ['transform:perspective(800px) rotateX(2deg) rotateY(-3deg)'],
+  glow: ['box-shadow:0 0 0 3px color-mix(in srgb, var(--sf-primary) 35%, transparent),0 10px 28px color-mix(in srgb, var(--sf-primary) 30%, transparent)'],
+  underline: ['text-decoration-line:underline', 'text-decoration-thickness:2px', 'text-underline-offset:4px'],
+}
 
-/** The nodes of a document or render tree that have an entrance (sections, columns and elements, in document order). */
+function hoverRules(out: Output, selector: string, hover: HoverStyle) {
+  if (hover.effect === 'none') return
+  const ms = `${num(hover.duration ?? B9_DEFAULTS.hoverDuration)}ms`
+  const effect = HOVER_EFFECTS[hover.effect]
+  out.motion.push(
+    { selector, declarations: [`transition:transform ${ms} ease,box-shadow ${ms} ease,color ${ms} ease,background-color ${ms} ease,text-decoration-color ${ms} ease`] },
+    // Keyboard users get the same: on the node itself, or while something inside it shows focus.
+    { selector: `${selector}:focus-visible`, declarations: effect },
+    { selector: `${selector}:has(:focus-visible)`, declarations: effect },
+  )
+  out.pointer.push({ selector: `${selector}:hover`, declarations: effect })
+}
+
+/** B9 parallax: how fast the background layer moves against the scroll. */
+export const PARALLAX_FACTORS = { slow: 0.15, medium: 0.3 } as const
+
+/** A section's parallax speed, or null (none, not an image background, or a background video). */
+export function parallaxOf(style: unknown): keyof typeof PARALLAX_FACTORS | null {
+  const background = normalizeStyle(style).base?.background
+  if (!background || background.type !== 'image' || !background.image || background.video) return null
+  return background.parallax === 'slow' || background.parallax === 'medium' ? background.parallax : null
+}
+
+export type MotionTarget = {
+  id: string
+  motion: Required<Motion>
+  /** B9: with `stagger_children`, the elements in this node's columns that have an entrance, column by column. */
+  children: string[]
+}
+
+function hasEntrance(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null) return false
+  const motion = motionOf((node as NodeLike).style)
+  return motion !== null && motion.entrance !== 'none'
+}
+
+function entranceChildren(columns: unknown): string[] {
+  const ids: string[] = []
+  if (!Array.isArray(columns)) return ids
+  for (const column of columns as ColumnLike[]) {
+    if (typeof column !== 'object' || column === null || !Array.isArray(column.elements)) continue
+    for (const element of column.elements as NodeLike[]) if (element && validId(element.id) && hasEntrance(element)) ids.push(element.id)
+  }
+  return ids
+}
+
+/** The nodes of a document or render tree that have motion (sections, columns and elements, in document order). */
 export function motionTargets(sections: readonly unknown[]): MotionTarget[] {
   const out: MotionTarget[] = []
-  const visit = (node: unknown) => {
+  const visit = (node: unknown, row: boolean) => {
     if (typeof node !== 'object' || node === null) return
     const n = node as NodeLike & { elements?: unknown }
     if (validId(n.id)) {
       const motion = motionOf(n.style)
-      if (motion) out.push({ id: n.id, motion })
+      if (motion) out.push({ id: n.id, motion, children: row && motion.stagger_children > 0 ? entranceChildren(n.columns) : [] })
     }
-    if (Array.isArray(n.columns)) n.columns.forEach(visit)
-    if (Array.isArray(n.elements)) n.elements.forEach(visit)
+    if (Array.isArray(n.columns)) n.columns.forEach((column) => visit(column, false))
+    if (Array.isArray(n.elements)) for (const element of n.elements as NodeLike[]) visit(element, element?.type === 'inner_row')
   }
-  sections.forEach(visit)
+  sections.forEach((section) => visit(section, true))
   return out
 }
 
@@ -375,12 +480,14 @@ function hideCss(selectors: string[]): string[] {
 }
 
 /** The CSS for a document or render tree (sections). Invalid nodes and values produce nothing. */
-export function compileStyles(sections: readonly unknown[], options: CompileOptions = {}): string {
-  const out: Output = { base: [], tablet: [], mobile: [], hideDesktop: [], hideTablet: [], hideMobile: [], reducedMotion: [], motion: [] }
+export function compileStyles(sections: readonly unknown[], compileOptions: CompileOptions = {}): string {
+  const out: Output = { base: [], tablet: [], mobile: [], hideDesktop: [], hideTablet: [], hideMobile: [], reducedMotion: [], motion: [], pointer: [] }
+  const staggered = new Set(motionTargets(sections).flatMap((target) => target.children))
+  const options: CompileOptions = { ...compileOptions, staggered }
 
   for (const section of sections as NodeLike[]) {
     if (typeof section !== 'object' || section === null || !validId(section.id)) continue
-    compileNodeStyle(out, section.id, 'section', section.style, options)
+    compileNodeStyle(out, section.id, 'section', section.style, options, {}, true)
     compileVisibility(out, section.id, section.visibility, options)
     compileColumns(out, section.columns, options)
   }
@@ -393,6 +500,7 @@ export function compileStyles(sections: readonly unknown[], options: CompileOpti
     ...block(TABLET_ONLY, hideCss(out.hideTablet)),
     ...block('(prefers-reduced-motion: reduce)', rulesCss(out.reducedMotion)),
     ...block('(prefers-reduced-motion: no-preference)', rulesCss(out.motion)),
+    ...block('(prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine)', rulesCss(out.pointer)),
   ].join('\n')
 }
 

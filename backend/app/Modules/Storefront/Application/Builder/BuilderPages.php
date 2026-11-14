@@ -31,6 +31,7 @@ class BuilderPages
         private readonly TenantContext $tenant,
         private readonly ContentSchedule $schedule,
         private readonly BuilderElementData $elementData,
+        private readonly BuilderGlobals $globals,
     ) {}
 
     /**
@@ -276,6 +277,22 @@ class BuilderPages
     }
 
     /**
+     * B9: the search & sharing settings of a page the shell serves — the home page (`home`), a
+     * landing page (`landing:<slug>`) or a CMS page design (`cms:<page id>`) — from the same render
+     * payload shoppers get (`document.seo`, in the current language): published (cached), or the
+     * draft for a staff preview; null without a document, a published version or settings.
+     *
+     * @return array{title: ?string, description: ?string, image: ?array<string, mixed>, noindex: bool}|null
+     */
+    public function seo(string $key, bool $draft): ?array
+    {
+        $payload = $draft ? $this->draft($key) : $this->published($key);
+        $seo = $payload['document']['seo'] ?? null;
+
+        return is_array($seo) ? $seo : null;
+    }
+
+    /**
      * The next instant the published content of these documents changes on its own.
      *
      * @param  list<string>  $keys
@@ -288,8 +305,11 @@ class BuilderPages
         foreach ($documents as $document) {
             $content = $document->publishedVersion?->content;
             if ($content !== null) {
+                // B9: the references' own schedules, and what the global sections show.
+                $expanded = $this->globals->expand($content, 'published', $document->contentContext());
                 $times[] = BuilderPageRenderer::nextScheduleChange($content);
-                $times[] = $this->elementData->nextChange($content);
+                $times[] = BuilderPageRenderer::nextScheduleChange($expanded);
+                $times[] = $this->elementData->nextChange($expanded);
             }
         }
         $times = array_filter($times);

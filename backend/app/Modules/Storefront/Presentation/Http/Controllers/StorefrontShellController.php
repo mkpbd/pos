@@ -11,6 +11,7 @@ use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
+use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use App\Modules\Storefront\Presentation\Http\Support\StaffPreview;
 use App\Modules\Storefront\Presentation\Http\Support\StructuredData;
@@ -46,6 +47,11 @@ use Illuminate\Http\Response;
  * `twitter:title|description|image(:alt)` on every page, `og:image:alt` with the image (product
  * name, post title, the landing image's alt text); campaign pages (`/p/<slug>`) get the first
  * image of the page and its first text as `og:image` / `og:description`.
+ *
+ * B9: builder pages' own search & sharing settings (`seo` of the published home page, campaign
+ * page or content page design; the draft in a staff preview): the title as written (no store
+ * suffix), the description and the share image replace the fallbacks; `noindex` makes the page
+ * noindex. Products and the blog are unchanged.
  */
 class StorefrontShellController
 {
@@ -89,8 +95,11 @@ class StorefrontShellController
         $documents = [];
         $isListing = in_array($path, ['/shop', '/blog'], true);
 
+        /** B9: the builder page's own search & sharing settings (home, campaign and designed content pages). */
+        $pageSeo = null;
         if ($path === '/') {
             $documents[] = $ld->website($store);
+            $pageSeo = $builder->seo(BuilderDocument::HOME, $draftPreview);
         }
         if (preg_match('#^/pages/([a-z0-9-]{1,100})$#', $path, $m) === 1 && ($page = $pages->visibleBySlug($m[1])) !== null) {
             $status = 200;
@@ -99,6 +108,7 @@ class StorefrontShellController
                 'description' => $page['seo_description'] ?? $data['store']['description'],
             ];
             $documents[] = $ld->breadcrumbs([['name' => $t('Home'), 'url' => '/'], ['name' => $page['title'], 'url' => '/pages/'.$page['slug']]]);
+            $pageSeo = $builder->seo(BuilderDocument::CMS_PREFIX.strtolower($page['id']), $draftPreview);
         }
         // B1: store builder landing pages (/p/{slug}); staff may preview a draft (?preview=draft).
         $builderPreview = false;
@@ -114,7 +124,24 @@ class StorefrontShellController
                     'image' => $ld->absolute($landing['image_url']),
                     'image_alt' => $landing['image_alt'],
                 ];
+                $pageSeo = $builder->seo(BuilderPages::key($m[1]), $builderPreview);
             }
+        }
+        // B9: what the merchant wrote wins (title as written, no store suffix); the rest falls back.
+        $seoNoindex = false;
+        if ($pageSeo !== null) {
+            if (is_string($pageSeo['title']) && trim($pageSeo['title']) !== '') {
+                $meta['title'] = $pageSeo['title'];
+            }
+            if (is_string($pageSeo['description']) && trim($pageSeo['description']) !== '') {
+                $meta['description'] = $pageSeo['description'];
+            }
+            if (is_string($pageSeo['image']['url'] ?? null)) {
+                $meta['image'] = $ld->absolute($pageSeo['image']['url']);
+                $alt = $pageSeo['image']['alt'] ?? null;
+                $meta['image_alt'] = is_string($alt) && trim($alt) !== '' ? $alt : $meta['title'];
+            }
+            $seoNoindex = $pageSeo['noindex'] === true;
         }
         // The blog (E11): index, category pages and posts (staff may preview unpublished posts).
         if ($path === '/blog') {
@@ -212,7 +239,7 @@ class StorefrontShellController
             }
         }
 
-        $noindex = $data['preview'] || $blogPreview || $draftPreview || $status === 404 || $orderPage || $filtered
+        $noindex = $data['preview'] || $blogPreview || $draftPreview || $status === 404 || $orderPage || $filtered || $seoNoindex
             || in_array($path, self::NOINDEX_PATHS, true)
             || ! ($data['store']['allow_indexing'] ?? true);
 

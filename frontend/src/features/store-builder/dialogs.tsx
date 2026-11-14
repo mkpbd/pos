@@ -21,7 +21,7 @@ import { useVersionsQuery, type VersionSummary } from './api'
 import { formatDateTime } from './format'
 
 /** Publish with an optional note; `error` explains why it cannot (problems, empty page). */
-export function PublishDialog({ open, onOpenChange, pending, error, onPublish, popup = false }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string | null; onPublish: (note: string | null) => void; popup?: boolean }) {
+export function PublishDialog({ open, onOpenChange, pending, error, onPublish, popup = false, usedOn = null }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string | null; onPublish: (note: string | null) => void; popup?: boolean; /** B9: a global section — how many pages show it. */ usedOn?: number | null }) {
   const [note, setNote] = useState('')
   return (
     <Dialog
@@ -33,9 +33,11 @@ export function PublishDialog({ open, onOpenChange, pending, error, onPublish, p
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{popup ? 'Publish this popup?' : 'Publish this page?'}</DialogTitle>
+          <DialogTitle>{usedOn !== null ? 'Publish this global section?' : popup ? 'Publish this popup?' : 'Publish this page?'}</DialogTitle>
           <DialogDescription>
-            {popup
+            {usedOn !== null
+              ? `Every page that uses it${usedOn > 0 ? ` (${usedOn})` : ''} shows this version right away. Earlier versions stay in the version history.`
+              : popup
               ? 'Shoppers see this version while the popup is switched on. Earlier versions stay in the version history.'
               : 'Shoppers will see this version of the page right away. Earlier versions stay in the version history.'}
           </DialogDescription>

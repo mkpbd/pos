@@ -10,11 +10,17 @@ import { ICON_NAMES } from './icons'
 import type {
   Background,
   BackgroundVideo,
+  DocumentContext,
+  GlobalContext,
+  GlobalSectionNode,
   Gradient,
+  HoverStyle,
   GradientStop,
   Length,
   Motion,
+  PageSeo,
   PopupSettings,
+  RenderUnavailableGlobal,
   StorePopupSettings,
   ResponsiveStyle,
   SectionShape,
@@ -145,12 +151,25 @@ function normalizeBackground(value: unknown): Background | undefined {
   let image: Background['image']
   if (isObject(value.image)) {
     const { media_id, position, size, repeat } = value.image
-    const pos = oneOf(position, ENUMS.backgroundPosition)
-    const fit = oneOf(size, ENUMS.backgroundSize)
-    if (isUuid(media_id) && pos && fit && typeof repeat === 'boolean') image = { media_id, position: pos, size: fit, repeat }
+    // Like the server: the media id is required; position, size and repeat are kept when valid (B9 fixture: no `repeat`).
+    if (isUuid(media_id))
+      image = compact({
+        media_id,
+        position: oneOf(position, ENUMS.backgroundPosition),
+        size: oneOf(size, ENUMS.backgroundSize),
+        repeat: typeof repeat === 'boolean' ? repeat : undefined,
+      }) as Background['image']
   }
   const overlay = typeof value.overlay === 'string' ? normalizeColor(value.overlay) : normalizeGradient(value.overlay)
-  return compact({ type, color: normalizeColor(value.color), gradient: normalizeGradient(value.gradient), image, overlay, video: normalizeBackgroundVideo(value.video) })
+  return compact({
+    type,
+    color: normalizeColor(value.color),
+    gradient: normalizeGradient(value.gradient),
+    image,
+    overlay,
+    video: normalizeBackgroundVideo(value.video),
+    parallax: oneOf(value.parallax, B9_ENUMS.parallax),
+  })
 }
 
 /**
@@ -175,7 +194,24 @@ export function normalizeMotion(value: unknown): Motion | undefined {
   const motion: Motion = { entrance }
   if (isInt(value.duration, B6_LIMITS.motionDuration.min, B6_LIMITS.motionDuration.max)) motion.duration = value.duration
   if (isInt(value.delay, B6_LIMITS.motionDelay.min, B6_LIMITS.motionDelay.max)) motion.delay = value.delay
+  // B9 (sparse: kept only when valid; the defaults are never filled in).
+  const repeat = oneOf(value.repeat, B9_ENUMS.motionRepeat)
+  if (repeat) motion.repeat = repeat
+  if (isInt(value.stagger_children, B9_LIMITS.staggerChildren.min, B9_LIMITS.staggerChildren.max)) motion.stagger_children = value.stagger_children
+  const loop = oneOf(value.loop, B9_ENUMS.motionLoop)
+  if (loop) motion.loop = loop
+  if (typeof value.loop_forever === 'boolean') motion.loop_forever = value.loop_forever
   return motion
+}
+
+/** B9 style group `hover`: an effect plus a bounded duration (ms, whole number). */
+export function normalizeHover(value: unknown): HoverStyle | undefined {
+  if (!isObject(value)) return undefined
+  const effect = oneOf(value.effect, B9_ENUMS.hoverEffect)
+  if (!effect) return undefined
+  const hover: HoverStyle = { effect }
+  if (isInt(value.duration, B9_LIMITS.hoverDuration.min, B9_LIMITS.hoverDuration.max)) hover.duration = value.duration
+  return hover
 }
 
 function isInt(value: unknown, min: number, max: number): value is number {
@@ -290,23 +326,29 @@ export function normalizeStyleValue(value: unknown): Style | undefined {
     border,
     effects,
     motion: normalizeMotion(value.motion),
+    hover: normalizeHover(value.hover),
   })
 }
 
-/** `{base?, tablet?, mobile?}`; anything else (or invalid) is dropped. Always an object. B6: `motion` and `background.video` are kept on `base` only. */
+/**
+ * `{base?, tablet?, mobile?}`; anything else (or invalid) is dropped. Always an object. B6: `motion`
+ * and `background.video` are kept on `base` only; B9: so are `hover` and `background.parallax`.
+ */
 export function normalizeStyle(value: unknown): ResponsiveStyle {
   if (!isObject(value)) return {}
   const style: ResponsiveStyle = {}
   for (const breakpoint of ['base', 'tablet', 'mobile'] as const) {
     let normalized = normalizeStyleValue(value[breakpoint])
-    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.background?.video)) {
-      const { motion, background, ...rest } = normalized
+    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.hover || normalized.background?.video || normalized.background?.parallax)) {
+      const { motion, hover, background, ...rest } = normalized
       void motion
+      void hover
       let kept: Background | undefined = background
-      if (background?.video) {
-        const { video, ...other } = background
+      if (background?.video || background?.parallax) {
+        const { video, parallax, ...other } = background
         void video
-        kept = other
+        void parallax
+        kept = compact(other)
       }
       normalized = compact({ ...rest, background: kept })
     }
@@ -484,7 +526,8 @@ export function normalizeListingColumns(value: unknown): ListingColumns {
  * -------------------------------------------------------------------------------------------- */
 
 export const B6_ENUMS = {
-  motionEntrance: ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom'],
+  /** B9 adds flip-up, flip-left, bounce-in, blur-in and rotate-in. */
+  motionEntrance: ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'flip-up', 'flip-left', 'bounce-in', 'blur-in', 'rotate-in'],
   shape: ['wave', 'curve', 'tilt', 'triangle', 'zigzag'],
   accordionStyle: ['plain', 'boxed'],
   tabsLayout: ['horizontal', 'vertical'],
@@ -1598,4 +1641,118 @@ export function orderFormPropProblems(props: unknown): PropProblem[] {
   }
   enumOf(problems, 'layout', p.layout, ORDER_FORM_ENUMS.layout)
   return problems
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B9: more motion, hover effects, parallax, page SEO and global sections (contract §1, §4, §5)
+ * -------------------------------------------------------------------------------------------- */
+
+export const B9_ENUMS = {
+  motionRepeat: ['once', 'every_time'],
+  motionLoop: ['none', 'pulse', 'float', 'shake', 'glow'],
+  hoverEffect: ['none', 'lift', 'grow', 'shrink', 'tilt', 'glow', 'underline'],
+  parallax: ['none', 'slow', 'medium'],
+  globalContext: ['page', 'header', 'footer'],
+} as const
+
+/** Numeric bounds of B9 (min / max inclusive, ms). */
+export const B9_LIMITS = {
+  staggerChildren: { min: 0, max: 500 },
+  hoverDuration: { min: 100, max: 600 },
+  /** An attention loop plays this many cycles, then stops (unless `loop_forever`). */
+  loopCycles: 3,
+} as const
+
+/** What an absent B9 key means (normalize never fills these in). */
+export const B9_DEFAULTS = {
+  motionRepeat: 'once',
+  staggerChildren: 0,
+  motionLoop: 'none',
+  loopForever: false,
+  hoverDuration: 250,
+} as const
+
+/** Maximum length of the page SEO texts (✱ translatable: `seo.translations.<lang>.title|description`). */
+export const SEO_LIMITS = { title: 70, description: 160 } as const
+
+/** Documents that carry `seo` (page and cms contexts). */
+export const SEO_CONTEXTS: readonly DocumentContext[] = ['page', 'cms']
+
+const LANG = /^[a-z]{2}$/
+
+/**
+ * B9 page SEO with every key valid (the server's shape): blank texts → null, texts cut to their
+ * limits (the server refuses longer ones on save), an image only with a valid media id,
+ * translations (always an object) only for title / description. Null when the value is not an
+ * object (no SEO set).
+ */
+export function normalizeSeo(value: unknown): PageSeo | null {
+  if (!isObject(value)) return null
+  const text = (raw: unknown, max: number) => (typeof raw === 'string' && raw.trim() !== '' ? raw.slice(0, max) : null)
+  const image = isObject(value.image) && isUuid(value.image.media_id) ? { media_id: value.image.media_id } : null
+  const translations: PageSeo['translations'] = {}
+  if (isObject(value.translations)) {
+    for (const [lang, entry] of Object.entries(value.translations)) {
+      if (!LANG.test(lang) || !isObject(entry)) continue
+      const out: { title?: string; description?: string } = {}
+      const title = text(entry.title, SEO_LIMITS.title)
+      const description = text(entry.description, SEO_LIMITS.description)
+      if (title !== null) out.title = title
+      if (description !== null) out.description = description
+      if (Object.keys(out).length > 0) translations[lang] = out
+    }
+  }
+  return { title: text(value.title, SEO_LIMITS.title), description: text(value.description, SEO_LIMITS.description), image, noindex: value.noindex === true, translations }
+}
+
+/** What the server would refuse in `seo` (paths relative to `seo`): too long, not text, a bad image, a non-boolean noindex. */
+export function seoProblems(value: unknown): PropProblem[] {
+  if (value === undefined || value === null) return []
+  if (!isObject(value)) return [{ path: '', code: 'invalid' }]
+  const problems: PropProblem[] = []
+  const text = (path: string, raw: unknown, max: number) => {
+    if (raw === undefined || raw === null) return
+    if (typeof raw !== 'string') problems.push({ path, code: 'invalid' })
+    else if (raw.length > max) problems.push({ path, code: 'too_long' })
+  }
+  text('title', value.title, SEO_LIMITS.title)
+  text('description', value.description, SEO_LIMITS.description)
+  if (value.image !== undefined && value.image !== null && !(isObject(value.image) && isUuid(value.image.media_id))) problems.push({ path: 'image', code: 'invalid' })
+  if (value.noindex !== undefined && typeof value.noindex !== 'boolean') problems.push({ path: 'noindex', code: 'invalid' })
+  if (value.translations !== undefined) {
+    if (!isObject(value.translations)) problems.push({ path: 'translations', code: 'invalid' })
+    else
+      for (const [lang, entry] of Object.entries(value.translations)) {
+        if (!LANG.test(lang) || !isObject(entry)) {
+          problems.push({ path: `translations.${lang}`, code: 'invalid' })
+          continue
+        }
+        text(`translations.${lang}.title`, entry.title, SEO_LIMITS.title)
+        text(`translations.${lang}.description`, entry.description, SEO_LIMITS.description)
+      }
+  }
+  return problems
+}
+
+/** A global section reference (`{id, type: 'global_section', ref: <uuid>, hidden, schedule}`) in a document's `sections[]`. */
+export function isGlobalSectionNode(value: unknown): value is GlobalSectionNode {
+  return isObject(value) && value.type === 'global_section' && typeof value.id === 'string' && isUuid(value.ref)
+}
+
+/** A draft payload's unavailable global reference (`type: 'global_section'`, `state: 'unavailable'`, no columns). */
+export function isUnavailableGlobal(value: unknown): value is RenderUnavailableGlobal {
+  return isObject(value) && value.type === 'global_section' && value.state === 'unavailable' && typeof value.id === 'string'
+}
+
+/** Which document contexts a global of each context may be referenced from (never from a global or a popup). */
+export const GLOBAL_CONTEXT_USES: Record<GlobalContext, readonly DocumentContext[]> = {
+  page: ['page', 'cms', 'zone'],
+  header: ['header'],
+  footer: ['footer'],
+}
+
+/** Whether a global of context `global` may be placed in a document of `context`. */
+export function globalFitsContext(global: unknown, context: DocumentContext): boolean {
+  const kind = oneOf(global, B9_ENUMS.globalContext)
+  return kind ? GLOBAL_CONTEXT_USES[kind].includes(context) : false
 }

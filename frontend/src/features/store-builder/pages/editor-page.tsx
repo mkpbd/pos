@@ -8,12 +8,27 @@ import { useCanvasContextQuery, useDocumentQuery, useElementsQuery, type Documen
 import { Editor } from '../editor'
 import { createEditorStore, EditorStoreContext } from '../store'
 
+const FRESH_MS = 5_000
+
 /** /admin/storefront/builder/:documentId — the full-screen editor, outside the admin shell. */
 export function StoreBuilderEditorPage() {
   const { documentId = '' } = useParams()
+  return <DocumentEditorRoute key={documentId} documentId={documentId} />
+}
+
+function DocumentEditorRoute({ documentId }: { documentId: string }) {
   const document = useDocumentQuery(documentId)
   const elements = useElementsQuery()
   const context = useCanvasContextQuery()
+  // B9: a document opened again in this session (back from a global section, say) is fetched again,
+  // so the editor never starts from an old draft and revision. Data set just before opening (a new
+  // document) counts as fresh.
+  const [openedAt] = useState(() => Date.now())
+  const stale = document.data !== undefined && document.dataUpdatedAt < openedAt - FRESH_MS
+  const { refetch, isFetching } = document
+  useEffect(() => {
+    if (stale && !isFetching) void refetch()
+  }, [stale, isFetching, refetch])
 
   const error = document.error ?? elements.error ?? context.error
   if (error) {
@@ -34,7 +49,7 @@ export function StoreBuilderEditorPage() {
     )
   }
 
-  if (!document.data || !elements.data || !context.data) {
+  if (!document.data || stale || !elements.data || !context.data) {
     return (
       <div role="status" aria-label="Opening the page builder" className="flex min-h-svh items-center justify-center">
         <Loader2Icon className="size-6 animate-spin text-muted-foreground" aria-hidden />
@@ -42,7 +57,7 @@ export function StoreBuilderEditorPage() {
     )
   }
 
-  return <LoadedEditor key={documentId} detail={document.data} registry={elements.data} canvasContext={context.data} />
+  return <LoadedEditor detail={document.data} registry={elements.data} canvasContext={context.data} />
 }
 
 function LoadedEditor({ detail, registry, canvasContext }: { detail: DocumentDetail; registry: Parameters<typeof Editor>[0]['registry']; canvasContext: Parameters<typeof Editor>[0]['canvasContext'] }) {

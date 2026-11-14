@@ -1,88 +1,17 @@
 /*
- * B6 design controls: the entrance animation (style `motion`, desktop value for every device,
- * with "Preview animation"), the section shape dividers (top / bottom, picked from drawn previews)
- * and the section's background video (YouTube / Vimeo link + poster image).
+ * B6 design controls: the section shape dividers (top / bottom, picked from drawn previews) and
+ * the section's background video (YouTube / Vimeo link + poster image). The Animation group is in b9-motion-control.tsx.
  */
 
 import { useId, useState } from 'react'
-import { PlayIcon } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { BackgroundVideo, Motion, MotionEntrance, SectionShape, SectionShapeKind } from '@/storefront/builder/types'
+import type { BackgroundVideo, SectionShape, SectionShapeKind } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
 import { SHAPE_PATHS } from '@/storefront/builder/section-layer-utils'
 import { B6_ENUMS, B6_LIMITS, parseVideoUrl } from '@/storefront/builder/validate'
-import { ColorControl, ControlLabel, HelpTip, Segmented, SelectControl, SliderControl, type PaletteColor } from '../controls'
-import { MOTION_DEFAULTS } from './b6-model'
+import { ColorControl, ControlLabel, HelpTip, Segmented, SliderControl, type PaletteColor } from '../controls'
 import { ImageChooser } from './fields'
-
-/* ----------------------------------------------------------------------------------------------
- * Motion
- * -------------------------------------------------------------------------------------------- */
-
-const ENTRANCES = B6_ENUMS.motionEntrance
-
-const ENTRANCE_LABELS: Record<MotionEntrance, string> = {
-  none: 'None',
-  fade: 'Fade in',
-  'slide-up': 'Slide up',
-  'slide-down': 'Slide down',
-  'slide-left': 'Slide in from the right',
-  'slide-right': 'Slide in from the left',
-  zoom: 'Zoom in',
-}
-
-const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
-
-/**
- * The entrance animation of a node. `value` undefined = none. Choosing "None" removes the group.
- * `onPreview` replays the animation on the canvas.
- */
-export function MotionControl({ value, onChange, onPreview }: { value: Motion | undefined; onChange: (value: Motion | undefined) => void; onPreview?: () => void }) {
-  const current: Required<Motion> = { entrance: value?.entrance ?? 'none', duration: value?.duration ?? MOTION_DEFAULTS.duration, delay: value?.delay ?? MOTION_DEFAULTS.delay }
-  const on = current.entrance !== 'none'
-  return (
-    <div className="flex flex-col gap-4" data-testid="motion-control">
-      <SelectControl
-        label="Entrance"
-        tooltip="Plays once when the shopper scrolls to it. Shoppers who turned off animations in their device settings see it without movement."
-        value={current.entrance}
-        options={ENTRANCES.map((e) => ({ value: e, label: ENTRANCE_LABELS[e] }))}
-        onChange={(entrance) => onChange(entrance === 'none' ? undefined : { ...current, entrance })}
-      />
-      {on && (
-        <>
-          <SliderControl
-            label="Duration"
-            value={current.duration}
-            min={B6_LIMITS.motionDuration.min}
-            max={B6_LIMITS.motionDuration.max}
-            step={100}
-            format={seconds}
-            onChange={(duration) => onChange({ ...current, duration })}
-          />
-          <SliderControl
-            label="Delay"
-            tooltip="Wait before it starts, e.g. to let elements appear one after another."
-            value={current.delay}
-            min={B6_LIMITS.motionDelay.min}
-            max={B6_LIMITS.motionDelay.max}
-            step={100}
-            format={seconds}
-            onChange={(delay) => onChange({ ...current, delay })}
-          />
-        </>
-      )}
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={!on || !onPreview} onClick={onPreview}>
-          <PlayIcon data-icon="inline-start" /> Preview animation
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">The same on every device. Animations don’t play while you edit; use Preview to see one.</p>
-    </div>
-  )
-}
 
 /* ----------------------------------------------------------------------------------------------
  * Shape dividers

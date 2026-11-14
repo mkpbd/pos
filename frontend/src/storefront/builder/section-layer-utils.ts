@@ -43,3 +43,15 @@ export function useStickyTop(enabled: boolean): number {
   }, [enabled])
   return top
 }
+
+/**
+ * B9 parallax: how far (px) the background layer moves for a section whose centre is at
+ * `center` (viewport px) when the viewport's centre is at `viewportCenter`. The image lags behind
+ * the scroll by `factor` and never moves more than 20 % of the section's height (the layer's
+ * overhang), so no edge shows.
+ */
+export function parallaxOffset(center: number, viewportCenter: number, height: number, factor: number): number {
+  const limit = Math.max(0, height * 0.2)
+  const offset = (viewportCenter - center) * factor
+  return Math.round(Math.max(-limit, Math.min(limit, offset)) * 10) / 10
+}

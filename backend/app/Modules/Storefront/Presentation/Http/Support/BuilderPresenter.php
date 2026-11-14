@@ -5,6 +5,7 @@ namespace App\Modules\Storefront\Presentation\Http\Support;
 use App\Modules\Cms\Application\Contracts\PageContent;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Storefront\Application\Builder\BuilderGlobals;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\Builder\BuilderJson;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
@@ -83,6 +84,8 @@ final class BuilderPresenter
             // B8b: popups' on / off switch, status (draft | off | scheduled | expired | live) and draft settings summary.
             'active' => $document->isPopup() ? $document->active : null,
             'status' => $document->popupStatus(),
+            // B9: a global section's context (page | header | footer); null for other documents.
+            'context' => $document->isGlobal() ? $document->context : null,
             'popup' => $document->isPopup() ? [
                 'layout' => $settings['layout'] ?? 'modal',
                 'trigger' => $settings['trigger']['kind'] ?? 'on_load',
@@ -204,7 +207,37 @@ final class BuilderPresenter
      */
     public static function document(BuilderDocument $document): array
     {
-        return self::summary($document) + ['content' => BuilderJson::present($document->draft)];
+        return self::summary($document) + [
+            'content' => BuilderJson::present($document->draft),
+            // B9: where a global section is used (null for other documents).
+            'global' => $document->isGlobal() ? self::globalUsage(app(BuilderGlobals::class)->usage([$document->id])[$document->id]) : null,
+        ];
+    }
+
+    /**
+     * B9: the global sections list — summaries with `usage_count` and `used_in`.
+     *
+     * @param  iterable<BuilderDocument>  $documents  globals
+     * @return list<array<string, mixed>>
+     */
+    public static function globals(iterable $documents): array
+    {
+        $documents = collect($documents);
+        $usage = app(BuilderGlobals::class)->usage($documents->pluck('id')->all());
+
+        return array_map(
+            fn (array $summary) => $summary + self::globalUsage($usage[$summary['id']] ?? []),
+            self::summaries($documents),
+        );
+    }
+
+    /**
+     * @param  list<array{id: string, title: string, kind: string, key: string}>  $usedIn
+     * @return array{usage_count: int, used_in: list<array{id: string, title: string, kind: string, key: string}>}
+     */
+    private static function globalUsage(array $usedIn): array
+    {
+        return ['usage_count' => count($usedIn), 'used_in' => $usedIn];
     }
 
     /**

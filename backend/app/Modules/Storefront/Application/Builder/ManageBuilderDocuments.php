@@ -35,6 +35,7 @@ class ManageBuilderDocuments
         private readonly ManageBuilderTemplates $templates,
         private readonly StorefrontCatalog $catalog,
         private readonly TenantContext $tenant,
+        private readonly BuilderGlobals $globals,
     ) {}
 
     /**
@@ -53,6 +54,9 @@ class ManageBuilderDocuments
     {
         if (($attributes['kind'] ?? null) === BuilderDocument::KIND_POPUP) {
             return $this->createPopup($attributes['title'], $attributes['template'] ?? null);
+        }
+        if (($attributes['kind'] ?? null) === BuilderDocument::KIND_GLOBAL) {
+            return $this->createGlobal($attributes['title'], $attributes['context'], is_array($attributes['section'] ?? null) ? $attributes['section'] : null);
         }
         $key = $attributes['key'];
         $context = BuilderDocumentSchema::contextOf($key);
@@ -164,6 +168,44 @@ class ManageBuilderDocuments
     }
 
     /**
+     * B9: a new global section (`global:<uuid>`) for `$context` (page | header | footer): blank
+     * (one empty section) or from a section of a draft (`$section`, its ids kept), validated as
+     * a global's content in that context. Audited (`from`: blank | section).
+     *
+     * @param  array<string, mixed>|null  $section
+     */
+    private function createGlobal(string $title, string $context, ?array $section): BuilderDocument
+    {
+        $key = BuilderDocument::GLOBAL_PREFIX.strtolower((string) Str::uuid());
+        $content = $section === null
+            ? BuilderDocumentSchema::blankGlobal('s_'.Str::lower(Str::random(8)), 'c_'.Str::lower(Str::random(8)))
+            : ['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'sections' => [$section]];
+        $content = ($this->prepare)($content, $context, true);
+
+        return DB::transaction(function () use ($key, $title, $context, $content, $section) {
+            $document = BuilderDocument::query()->create([
+                'kind' => BuilderDocument::KIND_GLOBAL,
+                'key' => $key,
+                'title' => $title,
+                'context' => $context,
+                'schema_version' => BuilderDocumentSchema::SCHEMA_VERSION,
+                'draft' => $content,
+                'draft_revision' => 0,
+                'draft_updated_at' => CarbonImmutable::now(),
+                'draft_updated_by' => StaffActor::id(),
+            ]);
+            $this->audit->record('storefront.builder_created', $document, [], [
+                'key' => $document->key,
+                'title' => $document->title,
+                'context' => $context,
+                'from' => $section === null ? 'blank' : 'section',
+            ]);
+
+            return $document;
+        });
+    }
+
+    /**
      * B8b: switches a popup on or off (not versioned; needs storefront.publish, checked by the
      * route). Only a published popup can be switched on (422 POPUP_NOT_PUBLISHED); other documents
      * 422 NOT_A_POPUP. Audited; a published popup's change refreshes the storefront cache.
@@ -203,7 +245,8 @@ class ManageBuilderDocuments
      */
     public function saveDraft(BuilderDocument $document, int $revision, array $content, bool $mayEditCustomHtml = true): BuilderDocument
     {
-        $content = ($this->prepare)($content, BuilderDocumentSchema::contextOf($document->key));
+        // B9: a global section is validated as one section in its own context.
+        $content = ($this->prepare)($content, $document->contentContext(), $document->isGlobal());
 
         return DB::transaction(function () use ($document, $revision, $content, $mayEditCustomHtml) {
             $locked = $this->lock($document);
@@ -354,6 +397,13 @@ class ManageBuilderDocuments
 
         DB::transaction(function () use ($document) {
             $locked = $this->lock($document);
+            if ($locked->isGlobal()) {
+                // B9: only while no page's draft or live version shows it.
+                $usedIn = $this->globals->usage([$locked->id])[$locked->id];
+                if ($usedIn !== []) {
+                    throw new BusinessRuleViolation('GLOBAL_IN_USE', 'This global section is used on '.count($usedIn).' '.(count($usedIn) === 1 ? 'page' : 'pages').'. Remove it there (or detach it) first.', ['used_in' => $usedIn], 409);
+                }
+            }
             $snapshot = ['key' => $locked->key, 'title' => $locked->title, 'published_version_id' => $locked->published_version_id];
             // The document points at a version and the versions at the document: unhook first.
             if ($locked->published_version_id !== null) {

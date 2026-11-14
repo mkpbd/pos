@@ -124,7 +124,8 @@ function walkColumns(columns: readonly Column[], ownerId: string, sectionId: str
 export function walk(content: BuilderContent, visit: Visitor): void {
   for (const [si, section] of content.sections.entries()) {
     if (visit(section, { kind: 'section', parentId: null, index: si, sectionId: section.id, inner: false }) === false) return
-    if (!walkColumns(section.columns, section.id, section.id, false, visit)) return
+    // B9: a global section reference stands in `sections` without columns of its own.
+    if (Array.isArray(section.columns) && !walkColumns(section.columns, section.id, section.id, false, visit)) return
   }
 }
 

@@ -39,6 +39,8 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Social media upgrade (P2b):** `php artisan migrate` (storefront share/WhatsApp settings, the Social tables) and `php artisan pos:permissions:sync` (`social.view`, `social.manage`); demo stores seeded earlier: `php artisan db:seed --class=DemoSocialSeeder`. The scheduler runs `social:publish-due` every minute and a queue worker publishes posts. Product feeds `/feeds/<channel>/<token>.xml|csv` are Laravel routes (no Nginx change) written to the `local` disk; they are sent `Cache-Control: private, no-store` — do not add a CDN/proxy cache rule for `/feeds/*`. **Live Meta posting:** create a Meta app (Facebook Login for Business; permissions pages_show_list, pages_read_engagement, pages_manage_posts, instagram_basic, instagram_content_publish, business_management — some need Meta App Review), add `<APP_URL>/api/v1/social/meta/callback` as a valid OAuth redirect URI, then enter the app id and secret in *Marketing → Social posts* and switch to Live. Instagram fetches photos itself, so product images must be reachable at a public `https://` address (JPEG). Do not log outgoing request bodies of the HTTP client (token exchanges carry the app secret in the form body).
 
+**Store builder upgrade (B9):** `php artisan migrate` adds the nullable `builder_documents.context` (global sections). The AI writer uses the existing AI settings and budget (usage feature `builder_writer`); nothing else to configure.
+
 The store builder's canvas (B2) is a third built page that the admin editor loads in an iframe from the same origin. Map it before the `/admin/` fallback:
 
 ```nginx

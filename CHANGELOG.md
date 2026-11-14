@@ -21,6 +21,21 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B9 — Store builder: global sections, AI writer, copy & paste, page SEO, more animation
+
+#### Added
+- **Global sections:** make any section global (or start a blank one), insert it from the editor's **Global** tab on pages, content pages, shop areas, the header or the footer; edit it once and publish — every page shows the new version. "Used on N pages", **Detach** (a normal copy), delete only when no page uses it (the start screen lists the pages to clear). Forms and order forms inside a global keep working.
+- **AI writer:** *Write with AI* on any element with text, *Write this section*, *Translate to Bangla* — instruction, language and tone; review each text before *Use these texts* (one undo step); Bangla goes into the Bangla fields. Needs AI switched on (the reason is shown otherwise); counted against the AI budget.
+- **Copy & paste across pages:** sections, inner rows and elements to any page, header or footer (Ctrl/Cmd+C / V, also from the canvas), new ids, translations and references kept, refused with a plain reason where an element isn't allowed; **Copy style / Paste style**.
+- **Page settings → Search & sharing:** title, description (counters), share picture, Bangla, *hide from search engines*, with live Google result and Facebook/WhatsApp card previews; used by the server-rendered HTML and the app.
+- **More animation:** five new entrances (flip, flip sideways, bounce, blur, rotate), *play every time*, elements inside appearing one after another, attention loops (pulse, float, shake, glow — three times unless kept repeating), hover effects (lift, grow, shrink, tilt, glow, underline) and a slower-scrolling section background picture; all off for visitors who prefer reduced motion.
+
+#### Upgrade
+- `php artisan migrate` (adds `builder_documents.context`). No new permissions.
+
+#### Tests
+- Backend 1159 on PostgreSQL (1158 pass, 1 opt-in skip), Pint clean; vitest 1885; mocked Playwright `store-builder.spec.ts`, `store-builder-b9.spec.ts`, `storefront-builder-b9.spec.ts`; full-stack integration 24 + demo stores 17 (+1 B9: a global section on a campaign page updates everywhere when published, deleting it in use is refused, page SEO in the server HTML for a campaign page and a designed content page) + builder acceptance 5 (the acceptance spec now clicks a node's corner, since the wider mini toolbar can cover the middle of a short heading).
+
 ### P2b — Social media: share buttons, WhatsApp, product feeds, Facebook & Instagram posting
 
 #### Added

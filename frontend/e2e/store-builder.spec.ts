@@ -1633,3 +1633,137 @@ test('P2a: makes a campaign page from the order template for a product, then add
     }, { timeout: 6000 })
     .toEqual({ product_id: HAT, quantity: { default: 1, max: 3 }, button_label: 'Order with cash on delivery', fields: { email: 'hidden', note: 'optional' }, payment: 'cod_only' })
 })
+
+/* ----------------------------------------------------------------------------------------------
+ * B9 (editor A): global sections and copy & paste across documents
+ * -------------------------------------------------------------------------------------------- */
+
+const GLOBAL_ID = '01a1c9d9-0000-7000-8000-0000000000a9'
+const globalHeading = { id: 'e_gl_head', type: 'heading', props: { text: 'Free delivery over 1000 taka', level: 2, link: null }, style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null, translations: {} }
+const globalSection = (elements: AnyNode[] = [globalHeading as unknown as AnyNode]) => ({
+  id: 's_gl', type: 'section', props: { layout: 'boxed', anchor: null }, style: {}, visibility: { desktop: true, tablet: true, mobile: true }, hidden: false, schedule: null, translations: {},
+  columns: [{ id: 'c_gl', type: 'column', width: { base: 100 }, style: {}, elements }],
+})
+const GLOBAL_USED_IN = [{ id: DOC_ID, title: 'Home', kind: 'page', key: 'home' }, { id: 'doc-about', title: 'About us', kind: 'page', key: 'cms:about' }]
+
+type GlobalBackend = { revision: number; content: { schema_version: 1; sections: AnyNode[] }; puts: { revision: number; content: { sections: AnyNode[] } }[]; creates: Record<string, unknown>[]; publishes: number }
+
+async function mockGlobals(page: Page): Promise<GlobalBackend> {
+  const g: GlobalBackend = { revision: 1, content: { schema_version: 1, sections: [globalSection() as unknown as AnyNode] }, puts: [], creates: [], publishes: 0 }
+  const summary = () => ({
+    id: GLOBAL_ID, kind: 'global', key: `global:${GLOBAL_ID}`, title: 'Delivery promise', context: 'page', schema_version: 1, draft_revision: g.revision,
+    has_unpublished_changes: false, draft_updated_at: '2026-11-13T08:00:00+00:00', published: { version_id: 'gv-1', number: 1, published_at: '2026-11-12T08:00:00+00:00' },
+    path: null, preview_url: null, usage_count: 2, used_in: GLOBAL_USED_IN,
+  })
+  const detail = () => ({ ...summary(), content: g.content, global: { usage_count: 2, used_in: GLOBAL_USED_IN } })
+  await page.route('**/api/v1/storefront/builder/globals', (route) => route.fulfill({ json: envelope([summary()]) }))
+  await page.route(`**/api/v1/storefront/builder/documents/${GLOBAL_ID}`, (route) => route.fulfill({ json: envelope(detail()) }))
+  await page.route(`**/api/v1/storefront/builder/documents/${GLOBAL_ID}/draft`, (route) => {
+    const body = route.request().postDataJSON() as GlobalBackend['puts'][number]
+    g.puts.push(body)
+    g.revision += 1
+    g.content = body.content as GlobalBackend['content']
+    return route.fulfill({ json: envelope(detail()) })
+  })
+  await page.route(`**/api/v1/storefront/builder/documents/${GLOBAL_ID}/publish`, (route) => {
+    g.publishes += 1
+    return route.fulfill({ json: envelope(detail()) })
+  })
+  return g
+}
+
+function withGlobalRef(): { schema_version: 1; sections: AnyNode[] } {
+  const content = structuredClone(sample)
+  content.sections.splice(1, 0, { id: 's_glref', type: 'global_section', ref: GLOBAL_ID, hidden: false, schedule: null } as unknown as AnyNode)
+  return content
+}
+
+const allElements = (sections: AnyNode[]): AnyNode[] => sections.flatMap((s) => (s.columns ?? []).flatMap((c) => c.elements.flatMap((e) => [e, ...allElements([e])])))
+
+test('B9: a global section on the page is drawn from its draft; its panel opens its own editor with the usage banner', async ({ page }) => {
+  const b = await mockBackend(page, { exists: true })
+  b.content = withGlobalRef()
+  await mockGlobals(page)
+  await openEditor(page, b)
+  await expect(canvas(page).getByRole('heading', { name: 'Free delivery over 1000 taka' })).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  await page.getByRole('tree', { name: 'Page layers' }).getByRole('button', { name: /^Global section\s*Delivery promise/ }).click()
+  const panel = page.getByTestId('global-ref-panel')
+  await expect(panel).toContainText('Used on 2 pages')
+  await expect(panel).toContainText('Also on: About us')
+  await expect(page.getByTestId('mini-toolbar')).toContainText('Global section · Delivery promise')
+
+  await panel.getByRole('button', { name: 'Edit global section' }).click()
+  await expect(page).toHaveURL(new RegExp(`/admin/storefront/builder/${GLOBAL_ID}$`))
+  const banner = page.getByTestId('global-usage-banner')
+  await expect(banner).toContainText('Used on 2 pages: Home, About us.')
+  await expect(canvas(page).getByRole('heading', { name: 'Free delivery over 1000 taka' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('tab', { name: 'Templates' })).toHaveCount(0)
+  await banner.getByRole('link', { name: 'Back to Home' }).click()
+  await expect(page).toHaveURL(new RegExp(`/admin/storefront/builder/${DOC_ID}$`))
+  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible({ timeout: 30_000 })
+})
+
+test('B9: copies a heading with Ctrl+C and pastes it into a global section with Ctrl+V (new id, one undo step)', async ({ page }) => {
+  const b = await mockBackend(page, { exists: true })
+  const g = await mockGlobals(page)
+  await openEditor(page, b)
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  await page.getByRole('tree', { name: 'Page layers' }).getByRole('button', { name: /^Heading\s*Made fresh every morning/ }).click()
+  await page.keyboard.press('ControlOrMeta+c')
+  await expect(page.getByText('Heading copied. Paste it on any page with Ctrl+V.')).toBeVisible()
+
+  // The other document: the global section, opened from the Global tab.
+  await page.getByRole('tab', { name: 'Global' }).click()
+  await page.getByRole('button', { name: 'Edit Delivery promise' }).click()
+  await expect(page).toHaveURL(new RegExp(`/admin/storefront/builder/${GLOBAL_ID}$`))
+  await expect(canvas(page).getByRole('heading', { name: 'Free delivery over 1000 taka' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  await page.getByRole('tree', { name: 'Page layers' }).getByRole('button', { name: /^Heading\s*Free delivery/ }).click()
+  await page.keyboard.press('ControlOrMeta+v')
+  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+  await expect
+    .poll(() => {
+      const saved = g.puts.at(-1)?.content.sections ?? []
+      return { sections: saved.length, headings: allElements(saved).filter((e) => e.type === 'heading').map((e) => (e.props as { text: string }).text) }
+    }, { timeout: 6000 })
+    .toEqual({ sections: 1, headings: ['Free delivery over 1000 taka', 'Made fresh every morning'] })
+  const pasted = allElements(g.puts.at(-1)!.content.sections).find((e) => (e.props as { text?: string }).text === 'Made fresh every morning')!
+  expect(pasted.id).not.toBe('e_heading')
+
+  // Ctrl+Z takes the paste back.
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toHaveCount(0)
+})
+
+test('B9: makes a section global from the Layers menu; the page keeps a reference to it', async ({ page }) => {
+  const b = await mockBackend(page, { exists: true })
+  const g = await mockGlobals(page)
+  await page.route('**/api/v1/storefront/builder/documents', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postDataJSON() as Record<string, unknown>
+    g.creates.push(body)
+    g.content = { schema_version: 1, sections: [body.section as AnyNode] }
+    return route.fulfill({
+      status: 201,
+      json: envelope({ id: GLOBAL_ID, kind: 'global', key: `global:${GLOBAL_ID}`, title: body.title, context: body.context, schema_version: 1, draft_revision: 1, has_unpublished_changes: true, draft_updated_at: null, published: null, path: null, preview_url: null, content: g.content, global: { usage_count: 0, used_in: [] } }),
+    })
+  })
+  await openEditor(page, b)
+  await page.getByRole('tab', { name: 'Layers' }).click()
+  const tree = page.getByRole('tree', { name: 'Page layers' })
+  await tree.getByRole('button', { name: /^More actions for Section · Heading: Made fresh/ }).click()
+  await page.getByRole('menuitem', { name: 'Make global…' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Make this section global' })
+  await dialog.getByLabel('Name').fill('Our story')
+  await dialog.getByRole('button', { name: 'Make global' }).click()
+  await expect(dialog).toBeHidden()
+  expect(g.creates[0]).toMatchObject({ kind: 'global', title: 'Our story', context: 'page', from: 'section', section: { id: 's_story', type: 'section' } })
+  expect(g.publishes).toBe(1)
+  await expect
+    .poll(() => (b.puts.at(-1)?.content.sections ?? []).find((s) => s.id === 's_story'), { timeout: 6000 })
+    .toEqual({ id: 's_story', type: 'global_section', ref: GLOBAL_ID, hidden: false, schedule: null })
+  // The canvas still shows the section, now drawn from the global.
+  await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+})

@@ -31,6 +31,15 @@ async function shopper(browser: Browser, width = 1366) {
   return { context, page: await context.newPage() }
 }
 
+/**
+ * Selects a canvas node by clicking near its lower-right corner: the editor's mini toolbar (drawn over
+ * the canvas above the selected node's top edge) can cover the middle of a short heading.
+ */
+async function clickNode(node: import('@playwright/test').Locator) {
+  const box = (await node.boundingBox())!
+  await node.click({ position: { x: Math.max(1, box.width - 6), y: Math.max(1, box.height - 4) } })
+}
+
 test.skip(({ isMobile }) => isMobile, 'The builder is a desktop tool; phones are checked with their own viewport')
 
 test('§L1, §L7, §L8 — the client starts from the Classic demo look; drafts stay private until "Publish all"', async ({ page, browser }) => {
@@ -99,7 +108,7 @@ test('§L2–§L6, §L8 — drag, duplicate, delete, reorder, gradient and a pho
   await toolbar.getByRole('button', { name: 'Delete' }).click()
   await page.getByRole('alertdialog', { name: 'Delete this heading?' }).getByRole('button', { name: 'Delete' }).click()
   await expect(welcome).toHaveCount(1)
-  await welcome.click()
+  await clickNode(welcome)
   await toolbar.getByRole('button', { name: /^Select the / }).click()
   await toolbar.getByRole('button', { name: /^Select the / }).click()
   await toolbar.getByRole('button', { name: 'Move down' }).click()
@@ -114,13 +123,13 @@ test('§L2–§L6, §L8 — drag, duplicate, delete, reorder, gradient and a pho
   await expect(section).toHaveCSS('background-image', /linear-gradient/)
 
   // §L5 the heading is 48 px on computers and 22 px on phones only.
-  await welcome.click()
+  await clickNode(welcome)
   await page.getByRole('tab', { name: 'Style' }).click()
   await page.getByLabel('Text size', { exact: true }).fill('48')
   await expect(welcome).toHaveCSS('font-size', '48px')
   await page.getByRole('button', { name: 'Mobile view' }).click()
   await expect(page.getByTestId('builder-canvas')).toHaveCSS('width', '375px')
-  await welcome.click()
+  await clickNode(welcome)
   await expect(page.getByTestId('style-device-banner')).toContainText('Styling for Mobile')
   await page.getByLabel('Text size', { exact: true }).fill('22')
   await expect(welcome).toHaveCSS('font-size', '22px')

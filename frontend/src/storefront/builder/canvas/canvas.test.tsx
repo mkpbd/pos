@@ -12,10 +12,14 @@ import { POPUP_DEFAULTS } from '../validate'
 const ORIGIN = window.location.origin
 
 // B6: the canvas replays an entrance through the motion runtime's playMotion.
-const motion = vi.hoisted(() => ({ played: [] as string[] }))
+// B9: with the node's whole motion (entrance, staggered children, loop) from the last frame.
+const motion = vi.hoisted(() => ({ played: [] as string[], targets: [] as unknown[] }))
 vi.mock('../motion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../motion')>()),
-  playMotion: (el: HTMLElement) => void motion.played.push(el.dataset.b ?? ''),
+  playMotion: (el: HTMLElement, target?: unknown) => {
+    motion.played.push(el.dataset.b ?? '')
+    motion.targets.push(target)
+  },
 }))
 
 function message(data: unknown, init: { origin?: string; source?: MessageEventSource | null } = {}) {
@@ -42,7 +46,11 @@ describe('builder canvas protocol', () => {
     expect(isEditorShortcut({ key: 'Z', ctrlKey: false, metaKey: true })).toBe(true)
     expect(isEditorShortcut({ key: 'Delete', ctrlKey: false, metaKey: false })).toBe(true)
     expect(isEditorShortcut({ key: 'a', ctrlKey: false, metaKey: false })).toBe(false)
-    expect(isEditorShortcut({ key: 'c', ctrlKey: true, metaKey: false })).toBe(false)
+    // B9: copy and paste of nodes reach the editor too; select-all and plain letters stay in the canvas.
+    expect(isEditorShortcut({ key: 'c', ctrlKey: true, metaKey: false })).toBe(true)
+    expect(isEditorShortcut({ key: 'V', ctrlKey: false, metaKey: true })).toBe(true)
+    expect(isEditorShortcut({ key: 'a', ctrlKey: true, metaKey: false })).toBe(false)
+    expect(isEditorShortcut({ key: 'c', ctrlKey: false, metaKey: false })).toBe(false)
   })
 
   it('cleans unsaved rich text before drawing it', () => {
@@ -120,6 +128,49 @@ describe('builder canvas app', () => {
     send({ type: 'play-motion', id: 'e_missing' })
     send({ type: 'play-motion', id: '"]*' })
     expect(motion.played).toEqual(['e_heading'])
+  })
+
+  it('B9: plays a node’s B9 motion (stagger, loop) when the editor asks', async () => {
+    const { send } = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    const sections = structuredClone(page.sections)
+    sections[0]!.style = { base: { motion: { entrance: 'none', stagger_children: 120, loop: 'glow' } } }
+    send(frame({ sections }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    motion.played.length = 0
+    motion.targets.length = 0
+    send({ type: 'play-motion', id: sections[0]!.id })
+    expect(motion.played).toEqual([sections[0]!.id])
+    expect(motion.targets[0]).toMatchObject({ id: sections[0]!.id, motion: { stagger_children: 120, loop: 'glow', loop_forever: false } })
+  })
+
+  it('B9: a global section is one selectable block with a badge; an unavailable one shows where it sits', async () => {
+    const { posted, send } = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    const story = page.sections.find((section) => section.id === 's_story')!
+    const global = { ...story, id: 'g_story', global: { id: '0199a5c1-0000-7000-8000-0000000000a1', title: 'Our story', section_id: story.id, version: null } }
+    const unavailable = {
+      id: 'g_gone',
+      type: 'global_section' as const,
+      ref: '0199a5c1-0000-7000-8000-0000000000a2',
+      state: 'unavailable' as const,
+      global: { id: '0199a5c1-0000-7000-8000-0000000000a2', title: 'Old offer', section_id: null, version: null },
+    }
+    send(frame({ sections: [global, unavailable] }))
+    const heading = await screen.findByRole('heading', { name: 'Made fresh every morning' })
+    const block = heading.closest('[data-b-global]')!
+    expect(block).toHaveAttribute('data-b', 'g_story')
+    expect(block).toHaveAttribute('data-b-global-title', 'Our story')
+    expect(screen.getByTestId('canvas-editor-css').textContent).toContain('content:"Global section · " attr(data-b-global-title)')
+    // A click anywhere inside selects the reference, never an inner node.
+    heading.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(posted.at(-1)).toMatchObject({ type: 'click', id: 'g_story' })
+    fireEvent.mouseOver(heading)
+    expect(posted.at(-1)).toMatchObject({ type: 'hover', id: 'g_story' })
+    await waitFor(() => expect(posted.some((m) => m.type === 'rects')).toBe(true))
+    const rects = posted.filter((m) => m.type === 'rects').at(-1) as unknown as { nodes: Record<string, unknown> }
+    expect(Object.keys(rects.nodes).sort()).toEqual(['g_gone', 'g_story'])
+    expect(screen.getByTestId('builder-global-unavailable')).toHaveTextContent('Global section “Old offer” is not available')
   })
 
   it('ignores messages from another origin and shows skeletons for pending sections', async () => {

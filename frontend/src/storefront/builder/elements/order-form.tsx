@@ -49,7 +49,7 @@ import { customerKeys, localized } from '../../store-keys'
 import type { CheckoutPreview, Customer, GeoDistrict, GeoDivision, ProductDetail, ShippingMethod } from '../../types'
 import { DraftPlaceholder, PreviewMark } from '../preview-mark'
 import { NODE_ID } from '../registry'
-import { usePage } from '../render-context'
+import { useOwnerDocumentId, usePage } from '../render-context'
 import type { OrderFormData } from '../types'
 import { isUuid, oneOf, ORDER_FORM_ENUMS } from '../validate'
 import { useB8aData } from './b8a-shared'
@@ -138,7 +138,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   const p = (element.props ?? {}) as Partial<El<'order_form'>['props']>
   const product: ProductDetail = data.product
   const canvas = page.document?.key === 'canvas'
-  const documentId = page.document?.id
+  // B9: inside a global section, the global document (the server finds the element there).
+  const documentId = useOwnerDocumentId()
   // Placing needs the published document (its uuid) and an element id the server can find.
   const inactive = draft || canvas || !isUuid(documentId) || !NODE_ID.test(element.id)
 

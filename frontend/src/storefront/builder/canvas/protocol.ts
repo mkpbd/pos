@@ -1,5 +1,5 @@
 import type { StorefrontBootstrap } from '../../types'
-import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderSection } from '../types'
+import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderPageSection } from '../types'
 import type { CanvasThemeSettings } from './theme-override'
 
 /*
@@ -57,7 +57,8 @@ export type ParentMessage =
   | { type: 'init'; bootstrap: StorefrontBootstrap; locale: string }
   | {
       type: 'render'
-      sections: RenderSection[]
+      /** B9: sections, a section drawn from a global (with `global`), or an unavailable global reference. */
+      sections: RenderPageSection[]
       data: Record<string, BuilderData>
       media: Record<string, BuilderMedia>
       selection: string | null
@@ -153,6 +154,7 @@ export function readCanvasProduct(value: unknown): CanvasProduct | null {
 export function isEditorShortcut(event: { key: string; ctrlKey: boolean; metaKey: boolean; altKey?: boolean }): boolean {
   const mod = event.ctrlKey || event.metaKey
   const key = event.key.toLowerCase()
-  if (mod && (key === 'z' || key === 'y' || key === 'd')) return true
+  // B9: c / v (copy and paste nodes) too, so they work while focus is in the canvas.
+  if (mod && ['z', 'y', 'd', 'c', 'v'].includes(key)) return true
   return !mod && ['delete', 'backspace', 'escape', 'arrowup', 'arrowdown'].includes(key)
 }

@@ -18,6 +18,18 @@ export function usePage(): PageContext {
   return value
 }
 
+/**
+ * B9: the global document a node belongs to when it sits in a section drawn from a global section
+ * (`section.global.id`), else null. Forms and order forms inside a global submit to that document.
+ */
+export const GlobalDocumentCtx = createContext<string | null>(null)
+
+/** The document a form or order form submits to: the enclosing global section's document, else the page's. */
+export function useOwnerDocumentId(): string | undefined {
+  const { page } = usePage()
+  return useContext(GlobalDocumentCtx) ?? page.document?.id
+}
+
 /** The column an element sits in (image `sizes`). */
 export const ColumnWidthCtx = createContext<{ base: number; tablet?: number; mobile?: number }>({ base: 100 })
 

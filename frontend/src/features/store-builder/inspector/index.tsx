@@ -7,6 +7,7 @@ export { Inspector } from './inspector'
 export { createElement } from './create-element'
 export { validateNode } from './validate'
 export { ElementSetupHost } from './setup-dialog'
+export { withSeo, type SeoValue } from './seo-panel-model'
 export type {
   BuilderContent,
   BuilderNode,

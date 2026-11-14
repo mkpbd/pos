@@ -38,7 +38,9 @@ export function targetedZoneKey(zone: ProductZoneKey, type: ZoneTarget['type'], 
 }
 
 /** The element context of a document: CMS pages (`cms:<uuid>`) have their own (FAQ list, contact form). */
-export function elementContext(doc: { kind: DocumentKind; key: string }): ElementContext {
+export function elementContext(doc: { kind: DocumentKind; key: string; context?: 'page' | 'header' | 'footer' | null }): ElementContext {
+  // B9: a global section holds what its context allows (page: pages, CMS pages and shop areas alike).
+  if (doc.kind === 'global') return doc.context ?? 'page'
   if (doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'zone' || doc.kind === 'popup') return doc.kind
   return documentContext(doc.key)
 }
@@ -143,6 +145,13 @@ export function kindInfo(doc: { kind: DocumentKind; key: string; target?: ZoneTa
         sample: zone ? ZONE_SAMPLE[zone] : 'above',
       }
     }
+    case 'global':
+      return {
+        noun: 'global section',
+        placement: 'A global section shows the same on every page that uses it. Publish it to update all of them at once.',
+        empty: 'This global section is empty. Drag an element from the Add panel onto it.',
+        sample: 'none',
+      }
     case 'popup':
       return {
         noun: 'popup',

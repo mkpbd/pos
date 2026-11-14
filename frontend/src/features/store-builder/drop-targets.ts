@@ -1,5 +1,6 @@
 import type { Rect } from '@/storefront/builder/canvas/protocol'
 import type { BuilderContent, Column, Element } from '@/storefront/builder/types'
+import { GLOBAL_SECTION } from './global-sections'
 import { ancestors, canDropInto, findNode, type DropTarget } from './tree'
 
 /*
@@ -78,7 +79,7 @@ function inColumn(content: BuilderContent, column: Column, rects: Record<string,
 
 export function computeDropTarget(content: BuilderContent, rects: Record<string, Rect>, point: { x: number; y: number }, dragged: Dragged, width: number): DropResult | null {
   const { x, y } = point
-  if (dragged.type === 'section') return betweenSections(content, rects, y, width)
+  if (dragged.type === 'section' || dragged.type === GLOBAL_SECTION) return betweenSections(content, rects, y, width)
 
   const section = content.sections.find((s) => visible(rects[s.id]) && y >= rects[s.id]!.y && y <= rects[s.id]!.y + rects[s.id]!.h)
   if (!section) return betweenSections(content, rects, y, width)
@@ -88,6 +89,8 @@ export function computeDropTarget(content: BuilderContent, rects: Record<string,
     if (y - rect.y < SECTION_EDGE) return { target: { kind: 'new-section', index }, indicator: { kind: 'line', rect: { x: 0, y: rect.y, w: width, h: 0 } } }
     if (rect.y + rect.h - y < SECTION_EDGE) return { target: { kind: 'new-section', index: index + 1 }, indicator: { kind: 'line', rect: { x: 0, y: rect.y + rect.h, w: width, h: 0 } } }
   }
+  // B9: a global section can't take elements here (it is edited in its own document): above or below it.
+  if (!Array.isArray(section.columns)) return betweenSections(content, rects, y, width)
   const column = pickColumn(section.columns, rects, x, y)
   if (!column) return betweenSections(content, rects, y, width)
   return inColumn(content, column, rects, x, y, dragged)
@@ -108,7 +111,7 @@ export function layerDropTarget(content: BuilderContent, overId: string, half: '
   const info = findNode(content, overId)
   if (!info) return null
   if (dragged.kind === 'node' && dragged.id === overId) return null
-  if (dragged.type === 'section') {
+  if (dragged.type === 'section' || dragged.type === GLOBAL_SECTION) {
     const index = content.sections.findIndex((section) => section.id === info.sectionId)
     if (info.kind === 'section') return { target: { kind: 'new-section', index: half === 'top' ? index : index + 1 }, position: half === 'top' ? 'before' : 'after', rowId: overId }
     return { target: { kind: 'new-section', index: index + 1 }, position: 'after', rowId: info.sectionId }
@@ -126,8 +129,9 @@ export function layerDropTarget(content: BuilderContent, overId: string, half: '
     if (dragged.kind === 'node' && ancestors(content, overId).includes(dragged.id)) return null
     return { target: { kind: 'column', columnId: overId, index: (info.node as Column).elements.length }, position: 'inside', rowId: overId }
   }
-  const first = (info.node as { columns: Column[] }).columns[0]
-  if (!first) return null
+  const first = (info.node as { columns?: Column[] }).columns?.[0]
+  // B9: beside a global section, never into it.
+  if (!first) return { target: { kind: 'new-section', index: half === 'top' ? info.index : info.index + 1 }, position: half === 'top' ? 'before' : 'after', rowId: overId }
   if (half === 'top') return { target: { kind: 'new-section', index: info.index }, position: 'before', rowId: overId }
   return { target: { kind: 'column', columnId: first.id, index: 0 }, position: 'inside', rowId: overId }
 }

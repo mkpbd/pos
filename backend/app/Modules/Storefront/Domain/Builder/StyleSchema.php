@@ -46,13 +46,31 @@ final class StyleSchema
 
     public const HOVER_TRANSFORMS = ['none', 'lift', 'grow'];
 
-    /** B6: entrance animations of the `motion` group (base only). */
-    public const MOTION_ENTRANCES = ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom'];
+    /** B6: entrance animations of the `motion` group (base only); B9 adds the flip, bounce, blur and rotate kinds. */
+    public const MOTION_ENTRANCES = ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'flip-up', 'flip-left', 'bounce-in', 'blur-in', 'rotate-in'];
 
     /** B6: entrance duration and delay, milliseconds. */
     public const MOTION_DURATION = [200, 2000];
 
     public const MOTION_DELAY = [0, 2000];
+
+    /** B9: play the entrance once, or every time the node scrolls back into view. */
+    public const MOTION_REPEATS = ['once', 'every_time'];
+
+    /** B9: children of a section / inner row enter one after another, this many ms apart. */
+    public const MOTION_STAGGER = [0, 500];
+
+    /** B9: attention loops (3 cycles unless `loop_forever`). */
+    public const MOTION_LOOPS = ['none', 'pulse', 'float', 'shake', 'glow'];
+
+    /** B9: the `hover` group's effects (desktop pointer and focus-visible). */
+    public const HOVER_EFFECTS = ['none', 'lift', 'grow', 'shrink', 'tilt', 'glow', 'underline'];
+
+    /** B9: hover transition, milliseconds. */
+    public const HOVER_DURATION = [100, 600];
+
+    /** B9: section background image parallax. */
+    public const PARALLAX = ['none', 'slow', 'medium'];
 
     public const MAX_SHADOWS = 3;
 
@@ -70,9 +88,12 @@ final class StyleSchema
      * B6: `motion` is kept at `base` only; `background.video` only at `base` and only where
      * `$backgroundVideo` allows it (sections and inner rows).
      *
+     * B9: `hover` (base only, any node); `motion.stagger_children` only where `$backgroundVideo`
+     * (containers: sections and inner rows); `background.parallax` at `base` of sections only.
+     *
      * @return array<string, array<string, mixed>>
      */
-    public static function normalize(mixed $style, bool $backgroundVideo = false): array
+    public static function normalize(mixed $style, bool $backgroundVideo = false, bool $parallax = false): array
     {
         if (! is_array($style)) {
             return [];
@@ -80,7 +101,7 @@ final class StyleSchema
 
         $result = [];
         foreach (self::BREAKPOINTS as $breakpoint) {
-            $groups = self::groups($style[$breakpoint] ?? null, $breakpoint === 'base', $backgroundVideo && $breakpoint === 'base');
+            $groups = self::groups($style[$breakpoint] ?? null, $breakpoint === 'base', $backgroundVideo && $breakpoint === 'base', $parallax && $breakpoint === 'base', $backgroundVideo);
             if ($groups !== []) {
                 $result[$breakpoint] = $groups;
             }
@@ -113,14 +134,14 @@ final class StyleSchema
     /**
      * @return array<string, mixed>
      */
-    private static function groups(mixed $groups, bool $base, bool $video): array
+    private static function groups(mixed $groups, bool $base, bool $video, bool $parallax = false, bool $container = false): array
     {
         if (! is_array($groups)) {
             return [];
         }
 
         return self::compact([
-            'background' => self::background($groups['background'] ?? null, $video),
+            'background' => self::background($groups['background'] ?? null, $video, $parallax),
             'color' => self::color($groups['color'] ?? null),
             'typography' => self::typography($groups['typography'] ?? null),
             'spacing' => self::spacing($groups['spacing'] ?? null),
@@ -128,7 +149,8 @@ final class StyleSchema
             'layout' => self::layout($groups['layout'] ?? null),
             'border' => self::border($groups['border'] ?? null),
             'effects' => self::effects($groups['effects'] ?? null),
-            'motion' => $base ? self::motion($groups['motion'] ?? null) : null,
+            'motion' => $base ? self::motion($groups['motion'] ?? null, $container) : null,
+            'hover' => $base ? self::hover($groups['hover'] ?? null) : null,
         ]) ?? [];
     }
 
@@ -136,9 +158,12 @@ final class StyleSchema
      * B6: `{entrance, duration?, delay?}` — an entrance animation played once when the node
      * scrolls into view (the storefront skips it under reduced motion).
      *
+     * B9: `repeat?` (once | every_time), `stagger_children?` (0–500 ms, containers only),
+     * `loop?` (none | pulse | float | shake | glow) and `loop_forever?` (bool).
+     *
      * @return array<string, mixed>|null
      */
-    private static function motion(mixed $value): ?array
+    private static function motion(mixed $value, bool $container = false): ?array
     {
         if (! is_array($value) || ($entrance = self::enum($value['entrance'] ?? null, self::MOTION_ENTRANCES)) === null) {
             return null;
@@ -149,6 +174,28 @@ final class StyleSchema
             'entrance' => $entrance,
             'duration' => $int($value['duration'] ?? null, self::MOTION_DURATION),
             'delay' => $int($value['delay'] ?? null, self::MOTION_DELAY),
+            'repeat' => self::enum($value['repeat'] ?? null, self::MOTION_REPEATS),
+            'stagger_children' => $container ? $int($value['stagger_children'] ?? null, self::MOTION_STAGGER) : null,
+            'loop' => self::enum($value['loop'] ?? null, self::MOTION_LOOPS),
+            'loop_forever' => is_bool($value['loop_forever'] ?? null) ? $value['loop_forever'] : null,
+        ]);
+    }
+
+    /**
+     * B9: `{effect, duration?}` — a hover effect for pointer devices (focus-visible gets the same).
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function hover(mixed $value): ?array
+    {
+        if (! is_array($value) || ($effect = self::enum($value['effect'] ?? null, self::HOVER_EFFECTS)) === null) {
+            return null;
+        }
+        $duration = $value['duration'] ?? null;
+
+        return self::compact([
+            'effect' => $effect,
+            'duration' => is_int($duration) && $duration >= self::HOVER_DURATION[0] && $duration <= self::HOVER_DURATION[1] ? $duration : null,
         ]);
     }
 
@@ -230,7 +277,7 @@ final class StyleSchema
     /**
      * @return array<string, mixed>|null
      */
-    private static function background(mixed $value, bool $video = false): ?array
+    private static function background(mixed $value, bool $video = false, bool $parallax = false): ?array
     {
         if (! is_array($value) || ($type = self::enum($value['type'] ?? null, self::BACKGROUND_TYPES)) === null) {
             return null;
@@ -253,6 +300,8 @@ final class StyleSchema
             'image' => $image,
             'overlay' => self::color($value['overlay'] ?? null) ?? self::gradient($value['overlay'] ?? null),
             'video' => $video ? self::video($value['video'] ?? null) : null,
+            // B9: sections only, base only.
+            'parallax' => $parallax ? self::enum($value['parallax'] ?? null, self::PARALLAX) : null,
         ]);
     }
 

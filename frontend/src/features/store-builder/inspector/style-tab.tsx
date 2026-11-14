@@ -10,7 +10,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRightIcon, MonitorIcon, SmartphoneIcon, TabletIcon } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import type { Background, BackgroundVideo, Breakpoint, Column, Device, ResponsiveStyle, Shadow, Sides, Typography } from '@/storefront/builder/types'
+import type { Background, BackgroundParallax, BackgroundVideo, Breakpoint, HoverStyle, Column, Device, ResponsiveStyle, Shadow, Sides, Typography } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
 import {
   BackgroundControl,
@@ -32,7 +32,9 @@ import {
   type TypographyKey,
 } from '../controls'
 import { HelpTip } from '../controls/control-label'
-import { BackgroundVideoControl, MotionControl } from './b6-style'
+import { BackgroundVideoControl } from './b6-style'
+import { MotionControl } from './b9-motion-control'
+import { canParallax } from './b9-motion'
 import { DeviceStatus } from './device-status'
 import { GROUP_TIPS, GROUP_TITLES, groupsFor, type GroupId } from './style-groups'
 import { BREAKPOINT, CASCADE, DEVICE_LABEL, effectiveGroup, getAt, resolveStyleValue, sameJson, styleIsValid, widthAt, writeStyleValue, type Resolved, type StylePath } from './style-model'
@@ -128,7 +130,7 @@ const GROUP_PATHS: Record<GroupId, StylePath[]> = {
   effects: [['effects', 'shadow'], ['effects', 'opacity']],
   'text-effects': [['effects', 'text_shadow'], ['effects', 'opacity'], ['effects', 'hover', 'color']],
   hover: [['effects', 'hover', 'transform'], ['effects', 'hover', 'shadow']],
-  motion: [['motion']],
+  motion: [['motion'], ['hover'], ['background', 'parallax']],
   'background-video': [['background', 'video']],
 }
 
@@ -165,10 +167,27 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
     onChange({ ...node, style: next } as BuilderNode, { coalesceKey: `${node.id}:style:base:${path.join('.')}`, ...(media ? { media } : {}) })
   }
   const baseVideo = style.base?.background?.video
-  /** Writes the background at this breakpoint, keeping the desktop background video (the background controls don't know it). */
+  const baseParallax = style.base?.background?.parallax
+  /**
+   * Writes the background at this breakpoint, keeping the desktop background video and (B9) the
+   * parallax while the background is still a picture (the background controls know neither).
+   */
   const setBackground = (bg: Background | undefined, media?: Record<string, MediaRef>) => {
-    if (bp !== 'base' || !baseVideo) return set(['background'], bg, media)
-    set(['background'], bg ? { ...bg, video: baseVideo } : { type: 'none', video: baseVideo }, media)
+    if (bp !== 'base' || (!baseVideo && !baseParallax)) return set(['background'], bg, media)
+    const keep: Partial<Background> = {}
+    if (baseVideo) keep.video = baseVideo
+    if (baseParallax && bg?.type === 'image') keep.parallax = baseParallax
+    if (!bg && !baseVideo) return set(['background'], undefined, media)
+    set(['background'], bg ? { ...bg, ...keep } : { type: 'none', ...keep }, media)
+  }
+  /** B9: the section background picture's scrolling (desktop background, every device). */
+  const setParallax = (parallax: BackgroundParallax | undefined) => {
+    const current = style.base?.background
+    if (!current || current.type !== 'image') return
+    if (parallax) return setBase(['background'], { ...current, parallax })
+    const { parallax: _old, ...rest } = current
+    void _old
+    setBase(['background'], rest)
   }
   const setVideo = (video: BackgroundVideo | undefined, media?: Record<string, MediaRef>) => {
     const current = style.base?.background
@@ -343,9 +362,13 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
     ),
     motion: () => (
       <MotionControl
+        nodeType={node.type}
         value={style.base?.motion}
         onChange={(motion) => setBase(['motion'], motion)}
         onPreview={() => onCommand({ type: 'preview-motion', nodeId: node.id })}
+        hover={style.base?.hover}
+        onHover={(hover: HoverStyle | undefined) => setBase(['hover'], hover)}
+        parallax={canParallax(node.type) ? { value: baseParallax, available: style.base?.background?.type === 'image', onChange: setParallax } : undefined}
       />
     ),
     'background-video': () => (
@@ -377,11 +400,12 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
   )
 }
 
-/** The background without the B6 video (edited in its own group). */
+/** The background without the B6 video and the B9 parallax (edited in their own groups). */
 function withoutVideo(bg: Background | undefined): Background | undefined {
-  if (!bg?.video) return bg
-  const { video: _video, ...rest } = bg
+  if (!bg?.video && !bg?.parallax) return bg
+  const { video: _video, parallax: _parallax, ...rest } = bg
   void _video
+  void _parallax
   return rest
 }
 

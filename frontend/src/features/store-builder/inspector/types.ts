@@ -6,6 +6,7 @@
 import type { MediaRef } from '@/storefront/types'
 import type { ElementMeta } from '@/storefront/builder/registry'
 import type { BuilderDocument, Column, Device, Element, PopupSettings, Section } from '@/storefront/builder/types'
+import type { SeoValue } from './seo-panel-model'
 
 /** The whole draft content (schema v1). */
 export type BuilderContent = BuilderDocument
@@ -50,6 +51,8 @@ export type InspectorCommand =
   | { type: 'set-popup'; settings: PopupSettings; coalesceKey?: string }
   /** B8b: switch the popup on or off on the store (not versioned; needs `storefront.publish`). */
   | { type: 'set-popup-active'; active: boolean }
+  /** B9: the page's Search & sharing settings (`content.seo`; null removes them; one undo step per coalesce key). Apply with `withSeo`. */
+  | { type: 'set-seo'; seo: SeoValue | null; coalesceKey?: string }
 
 export type InspectorChangeOptions = {
   /** Edits with the same key within a short time are one undo step (typing). */
@@ -75,6 +78,8 @@ export type InspectorDocument = {
   activePending?: boolean
   /** P1b: the category or product a product zone version is for (null: all products). */
   target?: { type: 'category' | 'product'; id: string; name: string | null } | null
+  /** B9: the store's address (`https://…`), for the search and sharing previews; null when unknown. */
+  storeUrl?: string | null
 }
 
 export type InspectorProps = {

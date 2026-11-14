@@ -10,6 +10,8 @@ export const content: Translations<typeof en> = {
   'content.builder.empty': 'দেখানোর মতো কিছু নেই — ভিজিটররা এটি দেখেন না',
   'content.builder.inactive': 'অফার চালু নেই — ভিজিটররা এটি দেখেন না',
   'content.builder.unavailable': 'পাওয়া যাচ্ছে না — ভিজিটররা এটি দেখেন না',
+  'content.builder.global.unavailable': 'গ্লোবাল সেকশন “{title}” পাওয়া যাচ্ছে না — এটি মুছে ফেলা হয়েছে বা এখনো প্রকাশ করা হয়নি। ভিজিটররা এটি দেখেন না।',
+  'content.builder.global.unnamed': 'গ্লোবাল সেকশন',
   'content.builder.noData': 'এখনো কিছু সেট করা হয়নি — ভিজিটররা এটি দেখেন না',
   'content.builder.video.play': 'ভিডিও চালান: {title}',
   'content.builder.video.source': '{provider} থেকে ভিডিও। প্লে চাপলে লোড হবে।',

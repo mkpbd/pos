@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "seo": {
+    "title": "Eid sale — fresh picks at Green Basket",
+    "description": "Up to 30% off fresh vegetables, fruit and spices this Eid. Order today, delivered in Dhaka.",
+    "image": {
+      "media_id": "0199a5c1-0000-7000-8000-000000000b91"
+    },
+    "noindex": false,
+    "translations": {
+      "bn": {
+        "title": "ঈদ সেল — গ্রিন বাস্কেটে তাজা পণ্য",
+        "description": "এই ঈদে তাজা সবজি, ফল ও মসলায় ৩০% পর্যন্ত ছাড়। আজই অর্ডার করুন।"
+      }
+    }
+  },
+  "sections": [
+    {
+      "id": "g_banner",
+      "type": "global_section",
+      "ref": "0199a5c1-0000-7000-8000-00000000dd01",
+      "hidden": false,
+      "schedule": null
+    },
+    {
+      "id": "s_b9",
+      "type": "section",
+      "props": {
+        "layout": "full",
+        "anchor": "eid-offers"
+      },
+      "style": {
+        "base": {
+          "background": {
+            "type": "image",
+            "image": {
+              "media_id": "0199a5c1-0000-7000-8000-000000000b92",
+              "position": "center",
+              "size": "cover"
+            },
+            "overlay": "#00000066",
+            "parallax": "slow"
+          },
+          "motion": {
+            "entrance": "flip-up",
+            "duration": 700,
+            "delay": 0,
+            "repeat": "every_time",
+            "stagger_children": 120
+          }
+        },
+        "mobile": {
+          "spacing": {
+            "padding": {
+              "top": "24px",
+              "bottom": "24px"
+            }
+          }
+        }
+      },
+      "visibility": {
+        "desktop": true,
+        "tablet": true,
+        "mobile": true
+      },
+      "hidden": false,
+      "schedule": null,
+      "translations": {},
+      "columns": [
+        {
+          "id": "c_b9",
+          "type": "column",
+          "width": {
+            "base": 100
+          },
+          "style": {},
+          "elements": [
+            {
+              "id": "e_heading",
+              "type": "heading",
+              "props": {
+                "text": "Eid offers",
+                "level": 2,
+                "link": null
+              },
+              "style": {
+                "base": {
+                  "motion": {
+                    "entrance": "blur-in",
+                    "duration": 500
+                  },
+                  "hover": {
+                    "effect": "underline",
+                    "duration": 200
+                  }
+                }
+              },
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {
+                "bn": {
+                  "text": "ঈদ অফার"
+                }
+              }
+            },
+            {
+              "id": "e_row",
+              "type": "inner_row",
+              "props": {},
+              "style": {
+                "base": {
+                  "motion": {
+                    "entrance": "bounce-in",
+                    "stagger_children": 80
+                  }
+                }
+              },
+              "visibility": {
+                "desktop": true,
+                "tablet": true,
+                "mobile": true
+              },
+              "hidden": false,
+              "schedule": null,
+              "translations": {},
+              "columns": [
+                {
+                  "id": "c_row_a",
+                  "type": "column",
+                  "width": {
+                    "base": 50,
+                    "mobile": 100
+                  },
+                  "style": {},
+                  "elements": [
+                    {
+                      "id": "e_button",
+                      "type": "button",
+                      "props": {
+                        "label": "Shop the sale",
+                        "link": {
+                          "url": "/shop"
+                        },
+                        "variant": "primary",
+                        "size": "lg",
+                        "full_width": false
+                      },
+                      "style": {
+                        "base": {
+                          "motion": {
+                            "entrance": "none",
+                            "loop": "pulse",
+                            "loop_forever": false
+                          },
+                          "hover": {
+                            "effect": "lift",
+                            "duration": 250
+                          }
+                        }
+                      },
+                      "visibility": {
+                        "desktop": true,
+                        "tablet": true,
+                        "mobile": true
+                      },
+                      "hidden": false,
+                      "schedule": null,
+                      "translations": {
+                        "bn": {
+                          "label": "সেল দেখুন"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "c_row_b",
+                  "type": "column",
+                  "width": {
+                    "base": 50,
+                    "mobile": 100
+                  },
+                  "style": {},
+                  "elements": [
+                    {
+                      "id": "e_icon",
+                      "type": "icon",
+                      "props": {
+                        "name": "gift",
+                        "size": 48,
+                        "color": "theme:accent",
+                        "label": "Gift wrapping",
+                        "link": null
+                      },
+                      "style": {
+                        "base": {
+                          "motion": {
+                            "entrance": "rotate-in",
+                            "delay": 200,
+                            "repeat": "once",
+                            "loop": "float",
+                            "loop_forever": true
+                          },
+                          "hover": {
+                            "effect": "tilt"
+                          }
+                        }
+                      },
+                      "visibility": {
+                        "desktop": true,
+                        "tablet": true,
+                        "mobile": true
+                      },
+                      "hidden": false,
+                      "schedule": null,
+                      "translations": {}
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s_footer_note",
+      "type": "global_section",
+      "ref": "0199a5c1-0000-7000-8000-00000000dd02",
+      "hidden": true,
+      "schedule": {
+        "starts_at": "2026-12-01T00:00:00+06:00",
+        "ends_at": null
+      }
+    }
+  ]
+}

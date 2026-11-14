@@ -402,3 +402,23 @@ Original questions:
   → queued bell notification + optional e-mail (failures logged). Templates may use `promotion_ref: "coupon"`
   (`PromotionShowcase::runningCouponPromotion()`).
 - **Admin:** Content → Form submissions (`/content/forms[/:id]`); `/content` redirects forms-only staff there.
+
+### As built — B9 global sections, AI writer, copy & paste, page SEO, more animation (2026-11-15)
+
+- **Global sections:** kind `global` with a stored `context` column (a restore can't change it); one section per global; reference
+  node `global_section` in `sections[]`; `BuilderGlobals` expands references at render (published for live pages, draft for drafts),
+  keeps the reference id and adds a `global` marker; usage = drafts and live versions that reference it; publishing a global bumps
+  the content version. The editor expands references locally for the canvas (badge, clicks select the reference, inner nodes edited
+  in the global's own document), lists globals in a **Global** tab and on the start screen; *Make global* publishes the new global
+  at once when the user may publish (no page uses it yet).
+- **AI writer:** `WriteBuilderTexts` through `Shared\AiTextWriter` (feature `builder_writer`), field keys from the element registry,
+  clamped and sanitized; no template fallback (every failure is `AI_UNAVAILABLE` with a reason). Editor: review with per-text tick
+  boxes, applied as one undo step; Bangla always into `translations.bn`.
+- **Copy & paste:** editor-only (`clipboard.ts`): system clipboard JSON with a marker plus `pos.builder.clipboard.<org>`; new ids;
+  refused with reasons for elements a context can't hold, custom HTML without permission, another store's copy, sections into a
+  global, globals that don't fit; copy/paste style replaces the whole style (all devices, motion, hover).
+- **SEO:** content `seo` (page and cms only); shell + SPA meta (`withPageSeo`) use the published seo with per-field fallback.
+- **Animation:** CSS keyframes for the new entrances and loops; `every_time` resets on leaving the viewport; stagger driven by the
+  parent; loops pause on hover/focus and stop after three cycles; hover under `(hover:hover) and (pointer:fine)` and on focus-visible;
+  parallax as an aria-hidden layer (≤20 % of the section height) on desktop pointers only; all under
+  `prefers-reduced-motion: no-preference`.

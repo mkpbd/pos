@@ -82,6 +82,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         ])));
         // B5: applying templates / starting from a demo imports photos into the media library.
         RateLimiter::for('builder-templates', fn (Request $request) => Limit::perMinute(30)->by('user:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        // B9: the builder's AI writer, per staff member.
+        RateLimiter::for('builder-ai', fn (Request $request) => Limit::perMinute(20)->by('builder-ai:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
         // B8b: builder form submissions per visitor (like the contact form; POS_FORM_RATE_LIMIT).
         RateLimiter::for('forms', fn (Request $request) => Limit::perHour(max(1, (int) config('pos.form_rate_limit', 10)))->by('forms:'.$request->ip()));
 

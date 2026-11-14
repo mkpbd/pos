@@ -24,6 +24,7 @@ import { elementMeta, isWrappedSectionType } from '@/storefront/builder/registry
 import type { ButtonElement, DividerElement, Element, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, TextElement, WrappedElement } from '@/storefront/builder/types'
 import { elementContext, kindInfo } from '../document-kind'
 import { AdvancedTab } from './advanced-tab'
+import { AiWriterBar } from './ai-writer'
 import { B4Form, type B4FormProps } from './b4-forms'
 import { B6Form } from './b6-forms'
 import { B8aForm } from './b8a-forms'
@@ -34,6 +35,8 @@ import { errorMap, isInlineProblem } from './errors'
 import { PopupSettingsPanel } from './popup-settings'
 import { readPopupSettings } from '../popup-model'
 import { ElementSetupHost } from './setup-dialog'
+import { SeoPanel } from './seo-panel'
+import { hasSeo } from './seo-panel-model'
 import { StyleTab } from './style-tab'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
@@ -123,7 +126,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   return <p className="text-sm text-muted-foreground">This element has no settings.</p>
 }
 
-function PageSettings({ document, content, locales, onCommand }: Pick<InspectorProps, 'document' | 'content' | 'locales' | 'onCommand'>) {
+function PageSettings({ document, content, locales, onCommand, errors }: Pick<InspectorProps, 'document' | 'content' | 'locales' | 'onCommand' | 'errors'>) {
   const published = document.published
   const sections = content.sections.length
   const kind = document.kind ?? 'page'
@@ -172,8 +175,8 @@ function PageSettings({ document, content, locales, onCommand }: Pick<InspectorP
       <p className="text-sm text-muted-foreground">Changes are saved as a draft automatically. Visitors see them only after you publish.</p>
       {cms && (
         <p className="text-sm text-muted-foreground">
-          The page’s title, address, search texts and whether it is published are set on the{' '}
-          <Link to="/content/pages" className="underline underline-offset-2">Content pages</Link> screen. Deleting this design brings the classic page back.
+          The page’s title, address and whether it is published are set on the{' '}
+          <Link to="/content/pages" className="underline underline-offset-2">Content pages</Link> screen; search texts set there are used when Search & sharing below is empty. Deleting this design brings the classic page back.
         </p>
       )}
       {(kind === 'header' || kind === 'footer') && (
@@ -183,6 +186,7 @@ function PageSettings({ document, content, locales, onCommand }: Pick<InspectorP
           <Link to="/storefront/menus" className="underline underline-offset-2">Menus</Link>.
         </p>
       )}
+      {hasSeo({ kind, key: document.key }) && <SeoPanel content={content} document={document} bangla={locales.includes('bn')} problems={errors} onCommand={onCommand} />}
       <div className="flex flex-col gap-2 rounded-md border p-3">
         <h3 className="text-sm font-semibold">Site styles</h3>
         <p className="text-sm text-muted-foreground">
@@ -229,7 +233,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
         {document.kind === 'popup' ? (
           <PopupSettingsPanel settings={readPopupSettings(content.popup)} document={document} problems={serverProblems} bangla={locales.includes('bn')} onCommand={onCommand} />
         ) : (
-          <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} />
+          <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} errors={serverProblems} />
         )}
       </aside>
     )
@@ -298,6 +302,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
           )}
         </TabsList>
         <TabsContent value="content" className="pt-4">
+          <AiWriterBar key={node.id} node={node} documentId={document.id} bangla={bangla} onChange={onChange} labelOf={(type) => nodeLabel({ type } as BuilderNode, registry)} />
           <ContentForm
             node={node}
             onChange={onChange}

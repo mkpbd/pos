@@ -22,8 +22,31 @@ final class BuilderJson
         if (is_array($document['popup'] ?? null)) {
             $document['popup'] = PopupSettings::present($document['popup']);
         }
+        // B9: search & sharing in its canonical key order (jsonb storage sorts keys).
+        if (is_array($document['seo'] ?? null)) {
+            $document['seo'] = self::seo($document['seo']);
+        }
 
         return $document;
+    }
+
+    /**
+     * B9: `{title, description, image, noindex, translations}` (`{}` without translations).
+     *
+     * @param  array<string, mixed>  $seo  normalized
+     * @return array<string, mixed>
+     */
+    public static function seo(array $seo): array
+    {
+        $translations = is_array($seo['translations'] ?? null) ? $seo['translations'] : [];
+
+        return [
+            'title' => $seo['title'] ?? null,
+            'description' => $seo['description'] ?? null,
+            'image' => $seo['image'] ?? null,
+            'noindex' => (bool) ($seo['noindex'] ?? false),
+            'translations' => $translations === [] ? new stdClass : $translations,
+        ];
     }
 
     /**

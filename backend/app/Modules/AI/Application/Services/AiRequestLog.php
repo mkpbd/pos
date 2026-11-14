@@ -12,8 +12,11 @@ use App\Modules\AI\Infrastructure\Models\AiRequest;
  */
 final class AiRequestLog
 {
-    /** P2b: `social_captions` (Social module, through Shared's AiTextWriter). */
-    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions'];
+    /**
+     * P2b: `social_captions` (Social module, through Shared's AiTextWriter). B9: `builder_writer`
+     * (the store builder's AI writer, Storefront module, same contract).
+     */
+    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions', 'builder_writer'];
 
     /**
      * @param  list<array{name: string, params: array<string, mixed>, ok: bool}>  $tools

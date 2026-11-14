@@ -5,7 +5,7 @@ import { MenuLink } from '../components/menu-link'
 import { RichText } from '../components/rich-text'
 import { SectionItem } from '../sections/section-renderer'
 import type { SectionPreviewState, StoreSection } from '../types'
-import { aspectRatioCss, colorCss, compileStyles, motionTargets, scopePrefix } from './compile-styles'
+import { aspectRatioCss, colorCss, compileStyles, motionTargets, parallaxOf, scopePrefix } from './compile-styles'
 import { B4ElementContent } from './elements'
 import { isB4Type } from './elements/b4-types'
 import { B6ElementContent } from './elements/b6'
@@ -17,12 +17,14 @@ import { OrderFormElement } from './elements/order-form'
 import { useMotionRuntime } from './motion'
 import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
-import { BackgroundVideoLayer, ShapeDivider } from './section-layers'
+import { BackgroundVideoLayer, ParallaxLayer, ShapeDivider } from './section-layers'
 import { isWrappedSectionType, NODE_ID } from './registry'
-import { ColumnWidthCtx, PageCtx, usePage } from './render-context'
+import { ColumnWidthCtx, GlobalDocumentCtx, PageCtx, usePage } from './render-context'
 import { PreviewMark } from './preview-mark'
-import type { BuilderPage, NodeState, RenderColumn, RenderElement, RenderSection } from './types'
+import { useLocale } from '../i18n/locale'
+import type { BuilderPage, NodeState, RenderColumn, RenderElement, RenderPageSection, RenderSection } from './types'
 import { buttonAction, ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
+import { globalInfo, isUnavailableGlobalSection } from './global-sections'
 
 /*
  * Draws a builder render payload: sections → columns (flex rows that wrap) → elements, styled by
@@ -59,6 +61,27 @@ function visibility(node: { id: unknown; hidden?: boolean; state?: NodeState }, 
 
 const LAYOUT_CLASSES = { boxed: 'b-boxed', full: 'b-full', 'full-bleed': 'b-bleed' } as const
 
+/** B9: a global section that cannot be drawn. Visitors never get one; a draft preview and the canvas show where it sits. */
+function UnavailableGlobal({ section }: { section: RenderPageSection }) {
+  const { draft } = usePage()
+  const { t } = useLocale()
+  if (!draft || typeof section.id !== 'string' || !NODE_ID.test(section.id)) return null
+  const info = globalInfo(section)
+  const title = info?.title ?? t('content.builder.global.unnamed')
+  return (
+    <PreviewMark state="unavailable">
+      <section data-b={section.id} data-b-global={info?.id} data-b-global-state="unavailable" className="b-section" data-testid="builder-global-unavailable">
+        <p className="mx-auto max-w-sf px-4 pt-12 pb-8 text-center text-sm text-sf-text">{t('content.builder.global.unavailable', { title })}</p>
+      </section>
+    </PreviewMark>
+  )
+}
+
+function PageSection({ section, sticky }: { section: RenderPageSection; sticky: boolean }) {
+  if (isUnavailableGlobalSection(section)) return <UnavailableGlobal section={section} />
+  return <SectionNode section={section as RenderSection} sticky={sticky} />
+}
+
 function SectionNode({ section, sticky }: { section: RenderSection; sticky: boolean }) {
   const { draft } = usePage()
   const visible = visibility(section, draft)
@@ -69,7 +92,12 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
   // B6 layers: shape dividers and a background video (absent on pre-B6 sections: unchanged markup).
   const shapes = sectionShapes(section.props)
   const video = backgroundVideoOf(section.style)
-  const layered = Boolean(shapes.top || shapes.bottom || video)
+  // B9: a background image that scrolls slower than the page.
+  const parallax = video ? null : parallaxOf(section.style)
+  const layered = Boolean(shapes.top || shapes.bottom || video || parallax)
+  // B9: a section drawn from a global section: its forms submit to the global document; drafts (and the canvas) mark it.
+  const owner = globalInfo(section)
+  const global = draft ? owner : null
 
   return (
     <PreviewMark state={visible.state}>
@@ -79,12 +107,17 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
         className={cn('b-section', layered && 'b-layered', sticky && 'b-sticky')}
         data-layout={layout}
         data-sticky={sticky || undefined}
+        data-b-global={global?.id}
+        data-b-global-title={global?.title ?? undefined}
         style={sticky ? ({ '--b-sticky-top': `${stickyTop}px` } as CSSProperties) : undefined}
       >
+        {parallax && <ParallaxLayer speed={parallax} />}
         {video && <BackgroundVideoLayer video={video} />}
         {shapes.top && <ShapeDivider shape={shapes.top} edge="top" />}
         <div className={cn('b-container', LAYOUT_CLASSES[layout])}>
-          <Columns columns={section.columns} rowId={section.id} nested={false} />
+          <GlobalDocumentCtx value={owner?.id ?? null}>
+            <Columns columns={section.columns} rowId={section.id} nested={false} />
+          </GlobalDocumentCtx>
         </div>
         {shapes.bottom && <ShapeDivider shape={shapes.bottom} edge="bottom" />}
       </section>
@@ -351,7 +384,8 @@ export function PageRenderer({
 }) {
   const draft = page.document?.source === 'draft'
   const rootRef = useRef<HTMLDivElement>(null)
-  const sections = useMemo(() => (Array.isArray(page.sections) ? page.sections : []), [page.sections])
+  // B9: draft payloads may hold unavailable global section references besides sections.
+  const sections = useMemo<RenderPageSection[]>(() => (Array.isArray(page.sections) ? page.sections : []), [page.sections])
   const validScope = scopePrefix(scope) ? scope : undefined
   const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope }), [sections, page.media, validScope])
   const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
@@ -361,7 +395,7 @@ export function PageRenderer({
   const stickyId = useMemo(() => {
     const key = page.document?.key
     if (key === 'header' || key === 'footer') return null
-    return sections.find((section) => section.props?.sticky === true)?.id ?? null
+    return sections.find((section) => section.type !== 'global_section' && section.props?.sticky === true)?.id ?? null
   }, [sections, page.document?.key])
 
   return (
@@ -369,7 +403,7 @@ export function PageRenderer({
       <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
         <style data-testid="builder-styles">{css}</style>
         {sections.map((section) => (
-          <SectionNode key={section.id} section={section} sticky={section.id === stickyId} />
+          <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
         ))}
       </div>
     </PageCtx.Provider>

@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
+use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,9 +37,10 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  * @property ?string $draft_updated_by
  * @property ?string $published_version_id
  * @property bool $active B8b: a popup's on / off switch (not versioned)
+ * @property ?string $context B9: a global section's context (page | header | footer); null otherwise
  * @property ?BuilderVersion $publishedVersion
  */
-#[Fillable(['organization_id', 'kind', 'key', 'title', 'schema_version', 'draft', 'draft_revision', 'draft_updated_at', 'draft_updated_by', 'published_version_id', 'active'])]
+#[Fillable(['organization_id', 'kind', 'key', 'title', 'schema_version', 'draft', 'draft_revision', 'draft_updated_at', 'draft_updated_by', 'published_version_id', 'active', 'context'])]
 class BuilderDocument extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids;
@@ -57,8 +59,19 @@ class BuilderDocument extends Model
 
     public const POPUP_PREFIX = 'popup:';
 
+    /**
+     * B9: a global section (`global:<uuid>`) — one section shown wherever a `global_section` node
+     * refers to it; `context` (page | header | footer) says where it may be used.
+     */
+    public const KIND_GLOBAL = 'global';
+
+    public const GLOBAL_PREFIX = 'global:';
+
+    /** B9: where a global section may be used: page → pages, content pages and shop areas. */
+    public const GLOBAL_CONTEXTS = ['page', 'header', 'footer'];
+
     /** The kinds of the builder documents API (everything but the theme draft). */
-    public const BUILDER_KINDS = [self::KIND_PAGE, self::KIND_HEADER, self::KIND_FOOTER, self::KIND_ZONE, self::KIND_POPUP];
+    public const BUILDER_KINDS = [self::KIND_PAGE, self::KIND_HEADER, self::KIND_FOOTER, self::KIND_ZONE, self::KIND_POPUP, self::KIND_GLOBAL];
 
     /** B3: the theme draft (one per organization, key `theme`); not a page of the builder API. */
     public const KIND_THEME = 'theme';
@@ -254,6 +267,27 @@ class BuilderDocument extends Model
             is_string($ends) && CarbonImmutable::parse($ends)->lte($now) => 'expired',
             default => 'live',
         };
+    }
+
+    /**
+     * B9: a global section.
+     */
+    public function isGlobal(): bool
+    {
+        return $this->kind === self::KIND_GLOBAL;
+    }
+
+    /**
+     * B9: the validation context of the document's content — a global's own context, else the
+     * context of its key (BuilderDocumentSchema::contextOf).
+     */
+    public function contentContext(): string
+    {
+        if ($this->isGlobal()) {
+            return in_array($this->context, self::GLOBAL_CONTEXTS, true) ? $this->context : 'page';
+        }
+
+        return BuilderDocumentSchema::contextOf($this->key);
     }
 
     /**

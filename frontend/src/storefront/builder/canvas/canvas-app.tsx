@@ -11,9 +11,10 @@ import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars 
 import type { StorefrontBootstrap, StorefrontTheme } from '../../types'
 import { PageRenderer } from '../page-renderer'
 import { PopupFrame } from '../popups/popup-frame'
+import { motionTargets } from '../compile-styles'
 import { playMotion } from '../motion'
 import { NODE_ID } from '../registry'
-import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
+import type { BuilderPage, RenderColumn, RenderElement, RenderPageSection, RenderSection } from '../types'
 import { normalizeStorePopupSettings } from '../validate'
 import {
   CANVAS_SURROUNDINGS,
@@ -44,14 +45,17 @@ type InitFrame = Extract<ParentMessage, { type: 'init' }>
 const noop = () => {}
 
 /** Text and custom HTML elements from the unsaved draft are cleaned here too (the canvas shares the admin's origin). */
-function cleanSections(sections: RenderSection[]): RenderSection[] {
+function cleanSections(sections: RenderPageSection[]): RenderPageSection[] {
   const element = (node: RenderElement): RenderElement => {
     if (node.type === 'text' || node.type === 'custom_html') return { ...node, props: { ...node.props, html: sanitizeHtml(String(node.props?.html ?? ''), { dropClassAndId: node.type === 'custom_html' }) } } as RenderElement
     if ('columns' in node && Array.isArray(node.columns)) return { ...node, columns: node.columns.map(column) } as RenderElement
     return node
   }
   const column = (col: RenderColumn): RenderColumn => ({ ...col, elements: Array.isArray(col.elements) ? col.elements.map(element) : [] })
-  return (Array.isArray(sections) ? sections : []).map((section) => ({ ...section, columns: Array.isArray(section.columns) ? section.columns.map(column) : [] }))
+  // B9: an unavailable global section reference has no columns (drawn as a placeholder).
+  return (Array.isArray(sections) ? sections : []).map((section) =>
+    section.type === 'global_section' ? section : { ...section, columns: Array.isArray(section.columns) ? section.columns.map(column) : [] },
+  )
 }
 
 const safeIds = (ids: readonly (string | null | undefined)[]) => ids.filter((id): id is string => typeof id === 'string' && NODE_ID.test(id))
@@ -73,6 +77,10 @@ const EDITOR_CSS = `
 .b-col:empty{min-height:72px;outline:1px dashed #94a3b8;outline-offset:-6px;background:repeating-linear-gradient(135deg,transparent 0 8px,rgba(148,163,184,.12) 8px 16px)}
 .b-page a,.b-page button,.b-page input,.b-page label{cursor:default}
 html{scroll-behavior:auto}
+.b-page [data-b-global]:not(.b-sticky){position:relative}
+.b-page [data-b-global]::before{content:"Global section";position:absolute;top:6px;right:6px;z-index:40;max-width:60%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border-radius:4px;background:#4c1d95;color:#fff;font:600 11px/1.4 system-ui,sans-serif;padding:2px 8px;pointer-events:none}
+.b-page [data-b-global][data-b-global-title]::before{content:"Global section · " attr(data-b-global-title)}
+.b-page [data-b-global]{box-shadow:inset 0 0 0 1px #8b5cf6}
 `
 
 const PRODUCT_TYPES = new Set(['product_grid', 'product_carousel', 'product_tabs', 'hot_deals', 'category_strip', 'brand_strip', 'blog_posts'])
@@ -407,6 +415,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const [frame, setFrame] = useState<RenderFrame | null>(null)
   const [themeDraft, setThemeDraft] = useState<CanvasThemeSettings | null>(null)
   const pendingRects = useRef(false)
+  const sectionsRef = useRef<readonly unknown[]>([])
   const queryClient = useQueryClient()
 
   const post = useCallback((message: CanvasMessage) => parent.postMessage(envelope(message), origin), [parent, origin])
@@ -420,6 +429,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-b]'))) {
         const id = el.dataset.b
         if (!id || Object.hasOwn(nodes, id)) continue
+        // B9: a global section's inner nodes are not the document's (only the reference is).
+        if (el.parentElement?.closest('[data-b-global]')) continue
         const r = el.getBoundingClientRect()
         nodes[id] = { x: r.x, y: r.y, w: r.width, h: r.height }
       }
@@ -451,7 +462,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       else if (message.type === 'play-motion') {
         if (!NODE_ID.test(message.id)) return
         const el = document.querySelector<HTMLElement>(`[data-b="${message.id}"]`)
-        if (el) playMotion(el)
+        // B9: the node's whole motion (entrance, staggered children, loop) as the last frame describes it.
+        if (el) playMotion(el, motionTargets(sectionsRef.current).find((target) => target.id === message.id))
       }
     }
     window.addEventListener('message', onMessage)
@@ -462,7 +474,9 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   // Display only: pointer input selects, links and forms do nothing, editor shortcuts go to the editor.
   useEffect(() => {
     let hovered: string | null = null
-    const idAt = (target: EventTarget | null) => (target instanceof Element ? (target.closest<HTMLElement>('[data-b]')?.dataset.b ?? null) : null)
+    // B9: anything inside a global section selects the reference (its nodes are edited in the global itself).
+    const idAt = (target: EventTarget | null) =>
+      target instanceof Element ? ((target.closest<HTMLElement>('[data-b-global]') ?? target.closest<HTMLElement>('[data-b]'))?.dataset.b ?? null) : null
     const swallow = (event: Event) => {
       event.preventDefault()
       event.stopPropagation()
@@ -552,8 +566,15 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   )
 
   const sections = useMemo(() => (frame ? cleanSections(frame.sections) : []), [frame])
+  useLayoutEffect(() => {
+    sectionsRef.current = sections
+  }, [sections])
   const page = useMemo<BuilderPage | null>(
-    () => (frame ? { document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' }, sections, media: frame.media ?? {}, data: frame.data ?? {} } : null),
+    () =>
+      frame
+        ? // B9: unavailable global references ride along in `sections` (BuilderPage types them as sections).
+          { document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' }, sections: sections as RenderSection[], media: frame.media ?? {}, data: frame.data ?? {} }
+        : null,
     [frame, sections],
   )
   const pending = useMemo(() => new Set(frame?.pending ?? []), [frame])

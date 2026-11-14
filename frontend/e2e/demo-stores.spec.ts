@@ -807,3 +807,91 @@ test('P2b: Little Sprouts posts to Facebook and Instagram in practice mode, serv
   await expect(order).toHaveAttribute('href', /^https:\/\/wa\.me\/8801700000004\?text=/)
   await expect(page.getByRole('link', { name: /Share on Facebook/ }).first()).toHaveAttribute('href', /facebook\.com\/sharer/)
 })
+
+test('B9: a global section shows on a campaign page and updates everywhere when published; page SEO reaches the HTML', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { type?: string; props?: Record<string, unknown>; columns?: { elements: Node[] }[] }
+  const firstHeading = (node: Node): Node | null => {
+    for (const column of node.columns ?? []) for (const element of column.elements) {
+      if (element.type === 'heading') return element
+      const inner = firstHeading(element)
+      if (inner) return inner
+    }
+    return null
+  }
+
+  // A global section made from a section template, published.
+  const made = await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })
+  const section = made.body.data.nodes[0] as Node
+  const heading = firstHeading(section)!
+  heading.props!.text = 'Shop the Green Basket way'
+  const global = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'global', title: 'How it works (global)', context: 'page', from: 'section', section })
+  expect(global.status).toBe(201)
+  const globalId = global.body.data.id as string
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${globalId}/publish`, { note: 'B9' })).status).toBe(200)
+
+  // A campaign page that uses it, with its own search and sharing texts.
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b9-global', title: 'B9 global', from: 'blank' })
+  if (doc.status === 409) {
+    // A rerun on the same database: reuse the page.
+    const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === 'landing:b9-global')
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const content = { schema_version: 1, seo: { title: 'Green Basket — how it works', description: 'Three easy steps to fresh food at your door.', image: null, noindex: false, translations: {} }, sections: [{ id: 'g_ref_1', type: 'global_section', ref: globalId, hidden: false, schedule: null }] }
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${doc.body.data.id}/draft`, { revision: doc.body.data.draft_revision, content })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${doc.body.data.id}/publish`, { note: 'B9' })).status).toBe(200)
+
+  // Deleting a global that a page uses is refused.
+  const refused = await call('DELETE', `/api/v1/storefront/builder/documents/${globalId}`)
+  expect(refused.status).toBe(409)
+  expect(refused.body.error.code).toBe('GLOBAL_IN_USE')
+
+  // Shoppers see the global's content; the server-rendered HTML carries the page's own title and description.
+  await page.goto(`${base}/p/b9-global`)
+  await expect(page.getByRole('heading', { name: 'Shop the Green Basket way' })).toBeVisible({ timeout: 30_000 })
+  await expect(page).toHaveTitle('Green Basket — how it works')
+  // The server-rendered shell (Laravel), asked directly: in development Vite answers page requests with its own HTML.
+  const shell = async (path: string) => (await fetch(`${process.env.VITE_BACKEND_ORIGIN ?? 'http://127.0.0.1:8000'}${path}`, { headers: { 'X-Forwarded-Host': `vegan.shop.localhost:${port}` } })).text()
+  const html = await shell('/p/b9-global')
+  expect(html).toContain('<title>Green Basket — how it works</title>')
+  expect(html).toContain('content="Three easy steps to fresh food at your door."')
+
+  // The global changes once; the page shows it without being republished.
+  const draft = await call('GET', `/api/v1/storefront/builder/documents/${globalId}`)
+  const globalContent = draft.body.data.content
+  firstHeading(globalContent.sections[0])!.props!.text = 'Fresh food in three steps'
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${globalId}/draft`, { revision: draft.body.data.draft_revision, content: globalContent })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${globalId}/publish`, { note: 'B9 update' })).status).toBe(200)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Fresh food in three steps' })).toBeVisible({ timeout: 30_000 })
+
+  // A content page designed in the builder takes its search title from the design's SEO.
+  const pages = await call('GET', '/api/v1/cms/pages?per_page=100')
+  const about = pages.body.data.find((p: { slug: string }) => p.slug === 'about-us')
+  const docs = await call('GET', '/api/v1/storefront/builder/documents')
+  let aboutDoc = docs.body.data.find((d: { key: string }) => d.key === `cms:${about.id}`)
+  if (!aboutDoc) aboutDoc = (await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: `cms:${about.id}`, title: about.title, from: 'blank' })).body.data
+  const aboutDetail = await call('GET', `/api/v1/storefront/builder/documents/${aboutDoc.id}`)
+  const aboutContent = { ...aboutDetail.body.data.content, seo: { title: 'About Green Basket — our farms', description: null, image: null, noindex: false, translations: {} } }
+  if (!aboutContent.sections?.length) aboutContent.sections = content.sections
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${aboutDoc.id}/draft`, { revision: aboutDetail.body.data.draft_revision, content: aboutContent })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${aboutDoc.id}/publish`, { note: 'B9 SEO' })).status).toBe(200)
+  const aboutHtml = await shell('/pages/about-us')
+  expect(aboutHtml).toContain('<title>About Green Basket — our farms</title>')
+  await adminContext.close()
+})

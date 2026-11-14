@@ -123,7 +123,7 @@ export function wrappedElements(content: BuilderContent): Element[] {
       }
     }
   }
-  for (const section of content.sections) visit(section.columns)
+  for (const section of content.sections) if (Array.isArray(section.columns)) visit(section.columns)
   return result
 }
 

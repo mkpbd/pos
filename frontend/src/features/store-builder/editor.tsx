@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useBlocker } from 'react-router'
+import { useBlocker, useNavigate } from 'react-router'
 import {
   closestCenter,
   DndContext,
@@ -22,8 +22,10 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { useCurrentUserQuery } from '@/features/auth/api'
 import { useCan } from '@/features/auth/use-auth'
 import { ApiError } from '@/lib/api/client'
+import { cn } from '@/lib/utils'
 import type { CanvasProduct, CanvasSurroundings } from '@/storefront/builder/canvas/protocol'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { RenderSection } from '@/storefront/builder/types'
@@ -49,10 +51,14 @@ import type { ResizePhase, ResizeRow } from './column-handles'
 import { resetColumnWidth, resizeColumns, setColumnWidth } from './column-resize'
 import { EditorUiContext, nodeLabel, nodeName, useCommands, useEditorUi, type EditorUi } from './commands'
 import { ElementIcon } from './element-icon'
+import { globalKeys, useGlobalEntries, useGlobalsQuery } from './global-api'
+import { DetachConfirm, MakeGlobalDialog } from './global-dialogs'
+import { GlobalDocBar, GlobalDocPanel, GlobalRefPanel, GlobalSectionsPanel } from './global-panel'
+import { expandGlobals, globalContextFor, globalRefOf, referencedGlobals } from './global-sections'
 import { ConflictDialog, LeaveDialog, PublishDialog, VersionHistoryDialog } from './dialogs'
 import { elementContext, isProductZone, kindInfo, parseZoneKey } from './document-kind'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
-import { Inspector } from './inspector'
+import { Inspector, withSeo } from './inspector'
 import { BREAKPOINT, widthAt } from './inspector/style-model'
 import { flattenLayers } from './layers'
 import { LayersPanel, type LayerIndicator } from './layers-panel'
@@ -131,10 +137,48 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
 
   const documentKind = useEditor((s) => s.document.kind)
   const documentKey = useEditor((s) => s.document.key)
-  const ui = useMemo<EditorUi>(
-    () => ({ registry, canvas, requestDelete: setDeleteId, canCustomHtml, context: elementContext({ kind: documentKind, key: documentKey }), requestSaveTemplate: setSaveTemplateId }),
-    [registry, canCustomHtml, documentKind, documentKey],
+  const documentId = useEditor((s) => s.document.id)
+  const documentTitle = useEditor((s) => s.document.title)
+  const globalContext = useEditor((s) => s.document.context)
+  // B9: the store (clipboard), the globals this draft shows (drawn from their drafts) and the global dialogs.
+  const org = useCurrentUserQuery().data?.organization?.id ?? ''
+  const refKey = useEditor((s) => referencedGlobals(s.content).join(','))
+  const refIds = useMemo(() => (refKey ? refKey.split(',') : []), [refKey])
+  const globals = useGlobalEntries(refIds)
+  // Leaving a global's own editor: pages that show it draw its latest draft next time.
+  useEffect(() => {
+    if (documentKind !== 'global') return
+    return () => {
+      void queryClient.invalidateQueries({ queryKey: globalKeys.content(documentId) })
+      void queryClient.invalidateQueries({ queryKey: globalKeys.list })
+    }
+  }, [documentKind, documentId, queryClient])
+  const [makeGlobalId, setMakeGlobalId] = useState<string | null>(null)
+  const [detachId, setDetachId] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const openGlobal = useCallback(
+    (id: string) => void navigate(`/storefront/builder/${id}`, { state: { back: { id: documentId, title: documentTitle } } }),
+    [navigate, documentId, documentTitle],
   )
+  const ui = useMemo<EditorUi>(() => {
+    const single = documentKind === 'global'
+    const context = elementContext({ kind: documentKind, key: documentKey, context: globalContext })
+    return {
+      registry,
+      canvas,
+      requestDelete: setDeleteId,
+      canCustomHtml,
+      context,
+      requestSaveTemplate: setSaveTemplateId,
+      org,
+      single,
+      noun: kindInfo({ kind: documentKind, key: documentKey }).noun,
+      globals,
+      requestMakeGlobal: single || !globalContextFor(context) ? undefined : setMakeGlobalId,
+      requestDetach: setDetachId,
+      openGlobal,
+    }
+  }, [registry, canCustomHtml, documentKind, documentKey, globalContext, org, globals, openGlobal])
 
   return (
     <EditorUiContext value={ui}>
@@ -143,6 +187,8 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
         <EditorLayout autosave={autosave} canPublish={canPublish} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
         <DeleteConfirm id={deleteId} onClose={() => setDeleteId(null)} />
         <SaveTemplate id={saveTemplateId} onClose={() => setSaveTemplateId(null)} />
+        <MakeGlobalDialog sectionId={makeGlobalId} onClose={() => setMakeGlobalId(null)} />
+        <DetachConfirm refId={detachId} onClose={() => setDetachId(null)} />
       </TooltipProvider>
     </EditorUiContext>
   )
@@ -158,9 +204,15 @@ function DeleteConfirm({ id, onClose }: { id: string | null; onClose: () => void
     <ConfirmDialog
       open={id !== null && info !== null}
       onOpenChange={(open) => !open && onClose()}
-      title={`Delete this ${label.toLowerCase()}?`}
-      description={info?.kind === 'section' ? 'The section and everything in it is removed. You can undo this.' : 'It is removed from the page. You can undo this.'}
-      confirmLabel="Delete"
+      title={globalRefOf(info?.node) ? 'Remove this global section from the page?' : `Delete this ${label.toLowerCase()}?`}
+      description={
+        globalRefOf(info?.node)
+          ? 'It is removed from this page only. The global section itself and the other pages that use it stay as they are. You can undo this.'
+          : info?.kind === 'section'
+            ? 'The section and everything in it is removed. You can undo this.'
+            : 'It is removed from the page. You can undo this.'
+      }
+      confirmLabel={globalRefOf(info?.node) ? 'Remove' : 'Delete'}
       onConfirm={() => {
         if (id) commands.remove(id)
         onClose()
@@ -198,7 +250,9 @@ function livePath(doc: { kind: string; key: string; path: string | null; preview
 }
 
 /** The canvas kind of a document; a product zone's version is drawn as its zone (P1b). */
-function canvasSurroundings(doc: { kind: string; key: string }): CanvasSurroundings {
+function canvasSurroundings(doc: { kind: string; key: string; context?: string | null }): CanvasSurroundings {
+  // B9: a header or footer global is drawn where the header or footer sits.
+  if (doc.kind === 'global') return doc.context === 'header' || doc.context === 'footer' ? doc.context : 'page'
   if (doc.kind === 'zone') return parseZoneKey(doc.key)?.zone ?? 'page'
   return doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'popup' ? doc.kind : 'page'
 }
@@ -216,7 +270,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const saveStatus = useEditor((s) => s.saveState.status)
   const select = useEditor((s) => s.select)
   const setHover = useEditor((s) => s.setHover)
-  const { canvas } = useEditorUi()
+  const { canvas, globals, single = false } = useEditorUi()
   // B4: what this document is (page, header, footer, zone) and which elements it may hold.
   const info = useMemo(() => kindInfo(documentInfo), [documentInfo])
   const context = elementContext(documentInfo)
@@ -233,7 +287,10 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const popupSettings = useMemo(() => (isPopup ? readPopupSettings(content.popup) : undefined), [isPopup, content.popup])
   const [activePending, setActivePending] = useState(false)
 
-  const [tab, setTab] = useState<'add' | 'layers' | 'templates'>('add')
+  const [tab, setTab] = useState<'add' | 'layers' | 'templates' | 'global'>('add')
+  // B9: the Global tab where global sections fit (not in popups or in a global itself); no templates inside a global.
+  const showGlobalTab = !single && globalContextFor(context) !== null
+  const showTemplatesTab = !single
   const templates = useTemplateInserter()
   const [publishOpen, setPublishOpen] = useState(false)
   const [publishPending, setPublishPending] = useState(false)
@@ -278,14 +335,23 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   )
 
   /* ---------------------------------------------------------------- canvas data ------------ */
-  const preview = usePreviewData(content, { locale: EDITOR_LOCALE, localMedia, enabled: true })
+  // B9: each global section reference is drawn as its global's draft (see global-sections.ts).
+  const expanded = useMemo(() => expandGlobals(content, globals ?? new Map(), context), [content, globals, context])
+  const preview = usePreviewData(expanded.content, { locale: EDITOR_LOCALE, localMedia, enabled: true })
   // Scheduled nodes change state with time: the clock the canvas tree is computed with ticks each minute.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000)
     return () => clearInterval(timer)
   }, [])
-  const sections = useMemo<RenderSection[]>(() => toRenderTree(content, { locale: EDITOR_LOCALE, now, reveal: selection }), [content, selection, now])
+  const sections = useMemo<RenderSection[]>(() => toRenderTree(expanded.content, { locale: EDITOR_LOCALE, now, reveal: selection }), [expanded, selection, now])
+  // The inspector looks things up in the drawn document; nodes it can't show (unavailable globals) are left out.
+  const inspectorContent = useMemo(
+    () => (expanded.content === content ? content : { ...expanded.content, sections: expanded.content.sections.filter((s) => Array.isArray(s.columns)) }),
+    [expanded, content],
+  )
+  /** A canvas id inside a drawn global section is its reference's. */
+  const ownerOf = useCallback((id: string | null) => (id ? (expanded.owners.get(id) ?? id) : null), [expanded])
   const errorIds = useMemo(() => [...Object.keys(errors), ...Object.keys(preview.errors)].filter((id) => id !== ''), [errors, preview.errors])
   const selectedInfo = findNode(content, selection)
 
@@ -306,6 +372,15 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       }
       if (mod && k === 'd' && state.selection) {
         commands.duplicate(state.selection)
+        return true
+      }
+      // B9: from the canvas (the editor's own copy / paste events handle the rest of the window).
+      if (mod && k === 'c') {
+        if (state.selection) commands.copy(state.selection)
+        return true
+      }
+      if (mod && k === 'v') {
+        commands.paste(null)
         return true
       }
       if (mod) return false
@@ -337,6 +412,8 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isTypingTarget(event.target)) return
+      // B9: Ctrl/Cmd + C, X and V go on to the browser's copy / paste events (below).
+      if ((event.ctrlKey || event.metaKey) && ['c', 'v', 'x'].includes(event.key.toLowerCase())) return
       const target = event.target as HTMLElement | null
       // Arrows move focus inside menus, tabs and the layers tree; only plain page focus moves the selection.
       if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && target && target !== document.body && !target.closest('[data-canvas-keys]')) return
@@ -346,6 +423,31 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [handleKey])
+
+  /* ---------------------------------------------------------------- copy & paste (B9) ------ */
+  useEffect(() => {
+    const busy = (event: ClipboardEvent) => isTypingTarget(event.target) || (window.getSelection()?.toString() ?? '') !== ''
+    const onCopy = (event: ClipboardEvent) => {
+      if (busy(event)) return
+      const selected = store.getState().selection
+      if (!selected) return
+      const text = commands.copy(selected, { system: false })
+      if (!text) return
+      event.clipboardData?.setData('text/plain', text)
+      event.preventDefault()
+    }
+    const onPaste = (event: ClipboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      event.preventDefault()
+      commands.paste(event.clipboardData?.getData('text/plain') ?? null)
+    }
+    window.addEventListener('copy', onCopy)
+    window.addEventListener('paste', onPaste)
+    return () => {
+      window.removeEventListener('copy', onCopy)
+      window.removeEventListener('paste', onPaste)
+    }
+  }, [commands, store])
 
   /* ---------------------------------------------------------------- saving & leaving ------- */
   useEffect(() => {
@@ -389,7 +491,11 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       .finally(() => setConflictPending(false))
   }
 
-  const refreshList = () => void queryClient.invalidateQueries({ queryKey: builderAdminKeys.documents })
+  const refreshList = () => {
+    void queryClient.invalidateQueries({ queryKey: builderAdminKeys.documents })
+    void queryClient.invalidateQueries({ queryKey: globalKeys.list })
+  }
+  const globalsList = useGlobalsQuery(referencedGlobals(content).length > 0)
 
   const rename = async (title: string) => {
     try {
@@ -444,7 +550,13 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       const version = detail.published ? ` — version ${detail.published.number}` : ''
       // A popup is live only while it is switched on (B8b).
       if (state.document.kind === 'popup' && !state.document.active) toast.success(`Published${version}. Switch it on in Popup settings to show it on your shop.`)
-      else toast.success(detail.published ? `Published${version} is live.` : 'Published.')
+      else if (state.document.kind === 'global') {
+        const count = state.document.usage?.usage_count ?? 0
+        toast.success(`Published${version}. ${count === 0 ? 'Add it to a page from the Global tab to show it.' : `Every page that uses it (${count}) now shows this version.`}`)
+      } else toast.success(detail.published ? `Published${version} is live.` : 'Published.')
+      // B9: a page shows a global section only once the global itself is published.
+      const unpublished = (globalsList.data ?? []).filter((g) => !g.published && referencedGlobals(state.content).includes(g.id))
+      if (unpublished.length > 0) toast.warning(`${unpublished.map((g) => `“${g.title}”`).join(', ')} ${unpublished.length === 1 ? 'isn’t' : 'aren’t'} published yet, so shoppers don’t see ${unpublished.length === 1 ? 'it' : 'them'} on this page.`)
       refreshList()
     } catch (error) {
       if (error instanceof ApiError && error.status === 422) {
@@ -559,6 +671,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     resetDrag()
     if (!item || !target) return
     if (item.kind === 'template') {
+      if (single) return
       // Templates are whole sections: they only go between sections.
       if (target.kind === 'new-section') void templates.insert({ id: item.id, name: item.name }, target.index)
     } else if (item.kind === 'new') void commands.insert(item.type, target)
@@ -574,9 +687,12 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   })()) : ''
 
   const selectedNode = selectedInfo?.node ?? null
+  const selectedRef = globalRefOf(selectedNode)
+  const globalSettings = single && selectedNode === null
   const inspectorDocument = {
     id: documentInfo.id,
-    kind: documentInfo.kind,
+    // B9: inside a global the inspector treats it as the context it is made for.
+    kind: documentInfo.kind === 'global' ? (documentInfo.context ?? 'page') : documentInfo.kind,
     key: documentInfo.key,
     title: documentInfo.title,
     path: documentInfo.path,
@@ -585,11 +701,12 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     target: documentInfo.target,
     canPublish,
     activePending,
+    storeUrl: canvasContext.store_url,
   }
   const labelOf = useCallback((id: string) => {
-    const info = findNode(store.getState().content, id)
-    return info ? nodeName(info.node, registry) : ''
-  }, [registry, store])
+    const info = findNode(store.getState().content, ownerOf(id))
+    return info ? nodeName(info.node, registry, globals) : ''
+  }, [registry, store, ownerOf, globals])
 
   return (
     <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={(e) => onDragMove(e as unknown as DragMoveEvent)} onDragEnd={onDragEnd} onDragCancel={resetDrag} autoScroll={{ layoutShiftCompensation: false }}>
@@ -609,10 +726,11 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
         <div className="flex min-h-0 flex-1">
           <nav aria-label="Add elements, page layers and templates" className="flex w-72 shrink-0 flex-col border-r bg-background">
             <Tabs value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
-              <TabsList className="m-2 grid w-auto grid-cols-3">
+              <TabsList className={cn('m-2 grid w-auto', showGlobalTab && showTemplatesTab ? 'grid-cols-4' : showGlobalTab || showTemplatesTab ? 'grid-cols-3' : 'grid-cols-2')}>
                 <TabsTrigger value="add">Add</TabsTrigger>
                 <TabsTrigger value="layers">Layers</TabsTrigger>
-                <TabsTrigger value="templates">Templates</TabsTrigger>
+                {showTemplatesTab && <TabsTrigger value="templates">Templates</TabsTrigger>}
+                {showGlobalTab && <TabsTrigger value="global">Global</TabsTrigger>}
               </TabsList>
               <TabsContent value="add" className="flex min-h-0 flex-1 flex-col">
                 <AddPanel registry={registry} context={context} canCustomHtml={canCustomHtml} />
@@ -620,13 +738,18 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
               <TabsContent value="layers" className="flex min-h-0 flex-1 flex-col">
                 <LayersPanel indicator={layerDrop?.indicator ?? null} />
               </TabsContent>
+              {showGlobalTab && (
+                <TabsContent value="global" className="flex min-h-0 flex-1 flex-col">
+                  <GlobalSectionsPanel context={context} enabled={tab === 'global'} />
+                </TabsContent>
+              )}
               <TabsContent value="templates" className="flex min-h-0 flex-1 flex-col">
                 <TemplatesPanel context={context} currentPreset={themeSettings?.preset ?? null} inserter={templates} enabled={tab === 'templates'} />
               </TabsContent>
             </Tabs>
           </nav>
           <main aria-label="Page canvas" className="flex min-w-0 flex-1 flex-col" data-canvas-keys>
-            {info.placement && (
+            {documentInfo.kind === 'global' ? <GlobalDocBar /> : info.placement && (
               <div className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-2">
                 <p role="note" data-testid="document-placement" className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
                   <InfoIcon className="size-4 shrink-0" aria-hidden />
@@ -663,8 +786,8 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
               device={device}
               dragging={dragged !== null && pointerDrag}
               indicator={canvasDrop?.indicator ?? null}
-              onSelect={select}
-              onHover={setHover}
+              onSelect={(id) => select(ownerOf(id))}
+              onHover={(id) => setHover(ownerOf(id))}
               onKey={handleKey}
               toolbar={() => <MiniToolbar />}
               hoverLabel={labelOf}
@@ -675,58 +798,68 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
-            <Inspector
-              content={content}
-              node={selectedNode}
-              document={inspectorDocument}
-              registry={registry}
-              locales={canvasContext.locales}
-              errors={errors[selection ?? ''] ?? []}
-              onChange={(next, options) => store.getState().apply((c) => setNode(c, next), { coalesceKey: options?.coalesceKey, media: options?.media })}
-              device={device}
-              theme={inspectorTheme}
-              canCustomHtml={canCustomHtml}
-              onCommand={(command) => {
-                const state = store.getState()
-                switch (command.type) {
-                  case 'select':
-                    return state.select(command.nodeId)
-                  case 'set-column-preset':
-                    return void state.apply((c) => setColumnPreset(c, command.nodeId, command.preset))
-                  case 'set-device':
-                    return state.setDevice(command.device)
-                  case 'set-column-width': {
-                    const bp = BREAKPOINT[command.device]
-                    if (command.width === null) {
-                      if (bp !== 'base') state.apply((c) => resetColumnWidth(c, command.columnId, bp))
-                      return
+            {/* B9: a global section reference has its own panel; so does a global's document with nothing selected. */}
+            {selectedRef ? <GlobalRefPanel node={selectedRef} /> : globalSettings && <GlobalDocPanel onOpenSiteStyles={() => setStylesOpen(true)} />}
+            {/* The inspector stays mounted (it hosts the new-element setup dialog). */}
+            <div hidden={selectedRef !== null || globalSettings} className="flex min-h-0 flex-1 flex-col">
+              <Inspector
+                content={inspectorContent}
+                node={selectedRef ? null : selectedNode}
+                document={inspectorDocument}
+                registry={registry}
+                locales={canvasContext.locales}
+                errors={errors[selection ?? ''] ?? []}
+                onChange={(next, options) => store.getState().apply((c) => setNode(c, next), { coalesceKey: options?.coalesceKey, media: options?.media })}
+                device={device}
+                theme={inspectorTheme}
+                canCustomHtml={canCustomHtml}
+                onCommand={(command) => {
+                  const state = store.getState()
+                  switch (command.type) {
+                    case 'select':
+                      return state.select(command.nodeId)
+                    case 'set-column-preset':
+                      return void state.apply((c) => setColumnPreset(c, command.nodeId, command.preset))
+                    case 'set-device':
+                      return state.setDevice(command.device)
+                    case 'set-column-width': {
+                      const bp = BREAKPOINT[command.device]
+                      if (command.width === null) {
+                        if (bp !== 'base') state.apply((c) => resetColumnWidth(c, command.columnId, bp))
+                        return
+                      }
+                      const width = command.width
+                      return void state.apply((c) => setColumnWidth(c, command.columnId, bp, width))
                     }
-                    const width = command.width
-                    return void state.apply((c) => setColumnWidth(c, command.columnId, bp, width))
-                  }
-                  case 'open-site-styles':
-                    return setStylesOpen(true)
-                  case 'preview-motion':
-                    canvas.current?.scrollTo(command.nodeId)
-                    return canvas.current?.playMotion(command.nodeId)
-                  case 'set-popup': {
-                    const settings = command.settings
-                    return void state.apply((c) => ({ ...c, popup: settings }), { coalesceKey: command.coalesceKey })
-                  }
-                  case 'set-popup-active':
-                    return void switchPopup(command.active)
-                  case 'banner-edited': {
-                    // A copy: this draft shows it instead of the original (one undo step, autosaved as usual).
-                    if (command.replaced) {
-                      const { old_id, new_id } = command.replaced
-                      state.apply((c) => replaceBanner(c, old_id, new_id))
+                    case 'open-site-styles':
+                      return setStylesOpen(true)
+                    case 'preview-motion':
+                      canvas.current?.scrollTo(command.nodeId)
+                      return canvas.current?.playMotion(command.nodeId)
+                    case 'set-popup': {
+                      const settings = command.settings
+                      return void state.apply((c) => ({ ...c, popup: settings }), { coalesceKey: command.coalesceKey })
                     }
-                    const ids = command.replaced ? [command.replaced.old_id, command.replaced.new_id] : [command.bannerId]
-                    return preview.refresh(elementsShowingBanners(store.getState().content, ids))
+                    case 'set-popup-active':
+                      return void switchPopup(command.active)
+                    case 'set-seo': {
+                      // B9 (editor B): the page's Search & sharing settings.
+                      const seo = command.seo
+                      return void state.apply((c) => withSeo(c, seo), { coalesceKey: command.coalesceKey })
+                    }
+                    case 'banner-edited': {
+                      // A copy: this draft shows it instead of the original (one undo step, autosaved as usual).
+                      if (command.replaced) {
+                        const { old_id, new_id } = command.replaced
+                        state.apply((c) => replaceBanner(c, old_id, new_id))
+                      }
+                      const ids = command.replaced ? [command.replaced.old_id, command.replaced.new_id] : [command.bannerId]
+                      return preview.refresh(elementsShowingBanners(store.getState().content, ids))
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -739,7 +872,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       </DragOverlay>
 
       <SiteStylesDrawer open={stylesOpen} onOpenChange={setStylesOpen} styles={siteStyles} canPublish={canPublish} />
-      <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} pending={publishPending} error={publishError} onPublish={(note) => void publish(note)} popup={isPopup} />
+      <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} pending={publishPending} error={publishError} onPublish={(note) => void publish(note)} popup={isPopup} usedOn={documentInfo.kind === 'global' ? (documentInfo.usage?.usage_count ?? 0) : null} />
       <ConflictDialog open={saveStatus === 'conflict'} pending={conflictPending} onChoose={chooseConflict} />
       <VersionHistoryDialog
         documentId={documentInfo.id}

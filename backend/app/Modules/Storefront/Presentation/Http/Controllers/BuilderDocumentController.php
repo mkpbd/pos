@@ -45,7 +45,22 @@ class BuilderDocumentController
      */
     public function index(): JsonResponse
     {
-        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->builder()->with('publishedVersion')->orderBy('kind')->orderBy('key')->get()));
+        // B9: global sections have their own list (GET /storefront/builder/globals).
+        return ApiResponse::success(BuilderPresenter::summaries(BuilderDocument::query()->builder()->where('kind', '!=', BuilderDocument::KIND_GLOBAL)
+            ->with('publishedVersion')->orderBy('kind')->orderBy('key')->get()));
+    }
+
+    /**
+     * List global sections
+     *
+     * B9: every global section (by title) — the document summary (with `context`: page | header
+     * | footer) plus `usage_count` and `used_in` `[{id, title, kind, key}]`: the documents whose
+     * draft or live version shows it.
+     */
+    public function globals(): JsonResponse
+    {
+        return ApiResponse::success(BuilderPresenter::globals(BuilderDocument::query()->where('kind', BuilderDocument::KIND_GLOBAL)
+            ->with('publishedVersion')->orderBy('title')->orderBy('id')->get()));
     }
 
     /**
@@ -61,7 +76,10 @@ class BuilderDocumentController
      * or contact form; 422 CMS_PAGE_NOT_FOUND for an unknown page), `current` (header / footer:
      * today's default layout with the store's menus). B8b: popup — `{kind: popup, title,
      * template?}` (no key: the server makes `popup:<uuid>`; blank with the default settings, or a
-     * built-in popup template), created switched off.
+     * built-in popup template), created switched off. B9: global section — `{kind: global, title,
+     * context: page|header|footer, from?: blank|section, section?}` (no key: the server makes
+     * `global:<uuid>`; blank = one empty section; `section` = a section from a draft, validated
+     * as the global's content in that context).
      */
     public function store(CreateBuilderDocumentRequest $request, ManageBuilderDocuments $documents): JsonResponse
     {
@@ -178,7 +196,8 @@ class BuilderDocumentController
      *
      * With its versions: a landing page, or (B4) a CMS page design, the header, the footer or a
      * zone — the store goes back to the classic rendering. The home page cannot be deleted (422
-     * CANNOT_DELETE_HOME).
+     * CANNOT_DELETE_HOME). B9: a global section only while unused (409 GLOBAL_IN_USE with
+     * `details.used_in` `[{id, title, kind, key}]`).
      */
     public function destroy(BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
     {

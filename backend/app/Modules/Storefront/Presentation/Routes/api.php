@@ -2,6 +2,7 @@
 
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderAiController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
@@ -105,6 +106,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
     Route::middleware('can:storefront.view')->group(function () {
         Route::get('elements', [BuilderDocumentController::class, 'elements']);
         Route::get('documents', [BuilderDocumentController::class, 'index']);
+        // B9: global sections with where they are used.
+        Route::get('globals', [BuilderDocumentController::class, 'globals']);
         Route::get('documents/{document}', [BuilderDocumentController::class, 'show'])->whereUuid('document');
         Route::get('documents/{document}/versions', [BuilderDocumentController::class, 'versions'])->whereUuid('document');
         Route::get('documents/{document}/render', [BuilderDocumentController::class, 'render'])->whereUuid('document');
@@ -136,5 +139,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('start-from-demo/{preset}', [BuilderTemplateController::class, 'startFromDemo'])
             ->whereIn('preset', ['default', 'vegan', 'handmade', 'classic', 'kids'])->middleware('throttle:builder-templates');
         Route::post('publish-all', [BuilderTemplateController::class, 'publishAll'])->middleware('can:storefront.publish');
+        // B9: the AI writer (through the AI module's gate and budget; nothing is saved).
+        Route::post('ai/write', BuilderAiController::class)->middleware('throttle:builder-ai');
     });
 });

@@ -1,6 +1,7 @@
 import { BUILDER_LIMITS, elementMeta, NODE_ID } from '@/storefront/builder/registry'
 import type { BuilderContent, Column, Element, Section } from '@/storefront/builder/types'
 import { normalizeStyle, normalizeWidthValue } from '@/storefront/builder/validate'
+import { globalRefOf } from './global-sections'
 
 /*
  * The structural rules of the server's BuilderDocumentSchema, checked on the client with the B1
@@ -81,6 +82,16 @@ export function checkDocument(content: BuilderContent): string[] {
   content.sections.forEach((section, i) => {
     const p = `sections.${i}`
     id(section.id, p)
+    // B9: a global section reference: exactly {id, type, ref, hidden, schedule}.
+    const ref = globalRefOf(section)
+    if (ref) {
+      if (typeof ref.ref !== 'string' || ref.ref === '') problems.push(`${p}.ref`)
+      if (typeof ref.hidden !== 'boolean') problems.push(`${p}.hidden`)
+      if (ref.schedule !== null && typeof ref.schedule !== 'object') problems.push(`${p}.schedule`)
+      const extra = Object.keys(ref).filter((key) => !['id', 'type', 'ref', 'hidden', 'schedule'].includes(key))
+      if (extra.length > 0) problems.push(`${p}: unexpected ${extra.join(', ')}`)
+      return
+    }
     if (section.type !== 'section') problems.push(`${p}.type`)
     if (!['boxed', 'full', 'full-bleed'].includes(section.props?.layout)) problems.push(`${p}.props.layout`)
     const anchor = section.props?.anchor

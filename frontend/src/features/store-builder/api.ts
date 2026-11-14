@@ -13,7 +13,7 @@ import type { ElementsMetadata, Problem } from './inspector'
 
 export type PublishedRef = { version_id: string; number: number; published_at: string | null }
 
-export type DocumentKind = 'page' | 'header' | 'footer' | 'theme' | 'zone' | 'popup'
+export type DocumentKind = 'page' | 'header' | 'footer' | 'theme' | 'zone' | 'popup' | 'global'
 
 /** The CMS page a `cms:<uuid>` document designs (B4; title, slug and status stay in the Cms module). */
 export type CmsPageRef = { id: string; title: string; slug: string; status: 'draft' | 'published'; template?: 'default' | 'faq' | 'contact' }
@@ -44,6 +44,8 @@ export type DocumentSummary = {
   zone?: string | null
   /** P1b: what a targeted zone version is for; null for the version for all products and other documents. */
   target?: ZoneTarget | null
+  /** B9 global sections: where the global may be used (`page`, `header` or `footer`); absent for other documents. */
+  context?: 'page' | 'header' | 'footer' | null
 }
 
 /** P1b: the category or product a zone version is for; `name` is null when that record is gone. */
@@ -63,8 +65,13 @@ export type PopupSummary = {
   ends_at?: string | null
 }
 
+/** B9: a document that shows a global section (GET /globals `used_in`, 409 GLOBAL_IN_USE `details.used_in`). */
+export type GlobalUsage = { id: string; title: string; kind: DocumentKind; key: string }
+
 export type DocumentDetail = DocumentSummary & {
   content: BuilderContent
+  /** B9: globals only — where it is used (drafts and live versions); null for other documents. */
+  global?: { usage_count: number; used_in: GlobalUsage[] } | null
   /** P1b: product zones only — the matching live product (null when none). */
   preview_product?: PreviewProduct | null
 }
@@ -213,6 +220,9 @@ export type CreateDocumentInput =
   | { kind: 'zone'; key: ZoneDocumentKey | TargetedZoneKey; title: string; from: 'blank' }
   /** B8b: the server makes the key (`popup:<uuid>`); `template` = a popup template's id (null = blank). */
   | { kind: 'popup'; key?: undefined; from?: undefined; title: string; template: string | null }
+  /** B9: a global section (key `global:<uuid>` made by the server), empty or from a section of a draft. */
+  | { kind: 'global'; key?: undefined; title: string; context: 'page' | 'header' | 'footer'; from: 'blank' }
+  | { kind: 'global'; key?: undefined; title: string; context: 'page' | 'header' | 'footer'; from: 'section'; section: unknown }
 
 /** P1b: the product page zones (each may have versions for a category or a product). */
 export type ProductZoneKey = 'zone:product.below_price' | 'zone:product.after' | 'zone:product.bottom'

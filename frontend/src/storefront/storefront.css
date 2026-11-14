@@ -396,3 +396,31 @@ header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
 @keyframes b-motion-slide-left { from { opacity: 0; transform: translateX(2rem); } }
 @keyframes b-motion-slide-right { from { opacity: 0; transform: translateX(-2rem); } }
 @keyframes b-motion-zoom { from { opacity: 0; transform: scale(0.92); } }
+
+/* B9 entrances, attention loops (compiled rules use them only under prefers-reduced-motion: no-preference) and parallax. */
+@keyframes b-motion-flip-up { from { opacity: 0; transform: perspective(800px) rotateX(35deg) translateY(1rem); } }
+@keyframes b-motion-flip-left { from { opacity: 0; transform: perspective(800px) rotateY(-35deg) translateX(1rem); } }
+@keyframes b-motion-bounce-in {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { opacity: 1; transform: scale(1.04); }
+  80% { transform: scale(0.98); }
+}
+@keyframes b-motion-blur-in { from { opacity: 0; filter: blur(12px); } }
+@keyframes b-motion-rotate-in { from { opacity: 0; transform: rotate(-8deg) scale(0.94); } }
+@keyframes b-loop-pulse { 50% { transform: scale(1.05); } }
+@keyframes b-loop-float { 50% { transform: translateY(-6px); } }
+@keyframes b-loop-shake {
+  0%, 60%, 100% { transform: translateX(0); }
+  10%, 30%, 50% { transform: translateX(-4px); }
+  20%, 40% { transform: translateX(4px); }
+}
+@keyframes b-loop-glow {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sf-primary) 45%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--sf-primary) 0%, transparent); }
+}
+/* The parallax layer inherits its section's background (image, overlay, position, size) and moves it; shown by the compiled rule. */
+.b-parallax { display: none; position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: inherit; }
+.b-parallax > div { position: absolute; inset: -20% 0; background: inherit; will-change: transform; transform: translate3d(0, var(--b-parallax-y, 0px), 0); }
+@media (prefers-reduced-motion: reduce) {
+  .b-parallax { display: none !important; }
+}

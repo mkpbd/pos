@@ -30,6 +30,13 @@ use Illuminate\Support\Facades\Validator;
  * B8b: context `popup` (popup documents) — the document gains a `popup` settings object
  * (PopupSettings; `{schema_version, popup, sections}`), buttons there may have `action: dismiss`;
  * the `form` element (B8ElementFormProps).
+ *
+ * B9: a section-level `global_section` reference `{id, type: "global_section", ref, hidden,
+ * schedule}` in pages, content pages, shop areas, the header and the footer (whether the global
+ * exists, is the organization's and fits the context is BuilderReferences' check); a global
+ * section's own content (`$global`) is exactly one section, without references, `seo` or
+ * `sticky`. Pages and content pages may carry `seo` (search & sharing, see seo()), kept only
+ * when set so older documents normalize unchanged.
  */
 final class BuilderDocumentSchema
 {
@@ -72,6 +79,20 @@ final class BuilderDocumentSchema
 
     private const MAX_ERRORS = 50;
 
+    /** B9: the section-level reference to a global section. */
+    public const GLOBAL_SECTION = 'global_section';
+
+    /** B9: the contexts whose documents may refer to global sections. */
+    public const GLOBAL_SECTION_CONTEXTS = ['page', 'cms', 'zone', 'header', 'footer'];
+
+    /** B9: the contexts whose documents have search & sharing settings (`seo`). */
+    public const SEO_CONTEXTS = ['page', 'cms'];
+
+    /** B9: `seo` text limits (characters). */
+    public const SEO_TITLE_MAX = 70;
+
+    public const SEO_DESCRIPTION_MAX = 160;
+
     /** @var list<array{path: string, node_id: ?string, message: string}> */
     private array $errors = [];
 
@@ -86,23 +107,27 @@ final class BuilderDocumentSchema
     /** B6: the id of the document's sticky section, once one is found. */
     private ?string $sticky = null;
 
-    /** B4: the document context (ElementRegistry::CONTEXTS) — which element types are allowed. */
-    private function __construct(private readonly string $context) {}
+    /**
+     * B4: the document context (ElementRegistry::CONTEXTS) — which element types are allowed.
+     * B9: `$global` — the content of a global section (one section, no references, no seo).
+     */
+    private function __construct(private readonly string $context, private readonly bool $global = false) {}
 
     /**
      * @param  array<string, mixed>  $document
      * @param  string  $context  B4: `page` (home / landing), `cms`, `header`, `footer` or `zone`
+     * @param  bool  $global  B9: the content of a global section used in `$context`
      * @return array{schema_version: int, sections: list<array<string, mixed>>}
      *
      * @throws InvalidBuilderDocument
      */
-    public static function normalize(array $document, string $context = 'page'): array
+    public static function normalize(array $document, string $context = 'page', bool $global = false): array
     {
         if (! in_array($context, ElementRegistry::CONTEXTS, true)) {
             throw new \InvalidArgumentException("Unknown builder document context \"{$context}\".");
         }
 
-        return (new self($context))->document($document);
+        return (new self($context, $global))->document($document);
     }
 
     /**
@@ -142,8 +167,42 @@ final class BuilderDocumentSchema
     }
 
     /**
+     * B9: a global section's blank content — one empty boxed section with one full-width column.
+     *
+     * @return array{schema_version: int, sections: list<array<string, mixed>>}
+     */
+    public static function blankGlobal(string $sectionId, string $columnId): array
+    {
+        return ['schema_version' => self::SCHEMA_VERSION, 'sections' => [[
+            'id' => $sectionId,
+            'type' => 'section',
+            'props' => ['layout' => 'boxed', 'anchor' => null],
+            'columns' => [['id' => $columnId, 'type' => 'column', 'width' => ['base' => 100], 'style' => [], 'elements' => []]],
+        ]]];
+    }
+
+    /**
+     * B9: the global section ids a (normalized) document refers to.
+     *
+     * @param  array<string, mixed>  $document
+     * @return list<string>
+     */
+    public static function globalRefs(array $document): array
+    {
+        $refs = [];
+        foreach ($document['sections'] ?? [] as $section) {
+            if (is_array($section) && ($section['type'] ?? null) === self::GLOBAL_SECTION && is_string($section['ref'] ?? null) && $section['ref'] !== '') {
+                $refs[] = $section['ref'];
+            }
+        }
+
+        return array_values(array_unique($refs));
+    }
+
+    /**
      * Calls `$visit(node, path, kind)` for every node of a (normalized) document, parents
-     * before children; kind is `section`, `column` or `element`.
+     * before children; kind is `section`, `column` or `element` (B9: `global_section` for a
+     * reference to a global section, which has no children here).
      *
      * @param  array<string, mixed>  $document
      * @param  callable(array<string, mixed>, string, string): void  $visit
@@ -151,6 +210,11 @@ final class BuilderDocumentSchema
     public static function walk(array $document, callable $visit): void
     {
         foreach ($document['sections'] ?? [] as $s => $section) {
+            if (($section['type'] ?? null) === self::GLOBAL_SECTION) {
+                $visit($section, "sections.{$s}", self::GLOBAL_SECTION);
+
+                continue;
+            }
             $visit($section, "sections.{$s}", 'section');
             self::walkColumns($section['columns'] ?? [], "sections.{$s}.columns", $visit);
         }
@@ -196,12 +260,19 @@ final class BuilderDocumentSchema
             $this->error('sections', null, 'A page can have at most '.self::MAX_SECTIONS.' sections.');
         } else {
             foreach ($raw as $i => $section) {
-                $normalized = $this->section($section, "sections.{$i}");
+                $normalized = is_array($section) && ($section['type'] ?? null) === self::GLOBAL_SECTION
+                    ? $this->globalSection($section, "sections.{$i}")
+                    : $this->section($section, "sections.{$i}");
                 if ($normalized !== null) {
                     $sections[] = $normalized;
                 }
             }
+            if ($this->global && count($raw) !== 1) {
+                $this->error('sections', null, 'A global section holds exactly one section.');
+            }
         }
+        // B9: search & sharing (pages and content pages; kept only when set).
+        $seo = array_key_exists('seo', $document) && $document['seo'] !== null ? $this->seo($document['seo']) : null;
 
         if ($this->nodes > self::MAX_NODES) {
             $this->error('sections', null, 'A page can have at most '.self::MAX_NODES.' sections, columns and elements in all ('.$this->nodes.' given).');
@@ -214,9 +285,129 @@ final class BuilderDocumentSchema
             throw new InvalidBuilderDocument($this->errors);
         }
 
-        return $popup === null
+        if ($popup !== null) {
+            return ['schema_version' => self::SCHEMA_VERSION, 'popup' => $popup, 'sections' => $sections];
+        }
+
+        return $seo === null
             ? ['schema_version' => self::SCHEMA_VERSION, 'sections' => $sections]
-            : ['schema_version' => self::SCHEMA_VERSION, 'popup' => $popup, 'sections' => $sections];
+            : ['schema_version' => self::SCHEMA_VERSION, 'seo' => $seo, 'sections' => $sections];
+    }
+
+    /**
+     * B9: a reference to a global section `{id, type, ref, hidden, schedule}` (sections[] only).
+     *
+     * @param  array<string, mixed>  $node
+     * @return array<string, mixed>|null
+     */
+    private function globalSection(array $node, string $path): ?array
+    {
+        $this->nodes++;
+        $id = $this->id($node, $path);
+        if ($this->global || ! in_array($this->context, self::GLOBAL_SECTION_CONTEXTS, true)) {
+            $this->error("{$path}.type", $id, $this->global ? 'A global section cannot contain another global section.' : 'Global sections cannot be used here.', 'GLOBAL_NOT_ALLOWED');
+
+            return null;
+        }
+        $ref = $node['ref'] ?? null;
+        if (! is_string($ref) || preg_match(self::UUID, strtolower($ref)) !== 1) {
+            $this->error("{$path}.ref", $id, 'Choose a global section.');
+            $ref = '';
+        }
+        $hidden = $node['hidden'] ?? false;
+        if (! is_bool($hidden)) {
+            $this->error("{$path}.hidden", $id, 'Hidden is true or false.');
+            $hidden = false;
+        }
+
+        return [
+            'id' => $id,
+            'type' => self::GLOBAL_SECTION,
+            'ref' => strtolower($ref),
+            'hidden' => $hidden,
+            'schedule' => $this->schedule($node['schedule'] ?? null, "{$path}.schedule", $id),
+        ];
+    }
+
+    /**
+     * B9: search & sharing settings `{title, description, image: {media_id}|null, noindex,
+     * translations: {bn?: {title?, description?}}}` — pages and content pages only. Blank texts
+     * are null (other texts kept as sent); the image's owner is checked by BuilderReferences.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function seo(mixed $value): ?array
+    {
+        if ($this->global || ! in_array($this->context, self::SEO_CONTEXTS, true)) {
+            $this->error('seo', null, 'Only pages and content pages have search and sharing settings.');
+
+            return null;
+        }
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
+            $this->error('seo', null, 'The search and sharing settings must be an object.');
+
+            return null;
+        }
+        $limits = ['title' => self::SEO_TITLE_MAX, 'description' => self::SEO_DESCRIPTION_MAX];
+        $text = function (mixed $text, string $path, int $max): ?string {
+            if ($text === null || (is_string($text) && trim($text) === '')) {
+                return null;
+            }
+            if (! is_string($text) || mb_strlen($text) > $max) {
+                $this->error($path, null, "At most {$max} characters.");
+
+                return null;
+            }
+
+            return $text;
+        };
+
+        $result = [];
+        foreach ($limits as $field => $max) {
+            $result[$field] = $text($value[$field] ?? null, "seo.{$field}", $max);
+        }
+        $image = $value['image'] ?? null;
+        if ($image !== null) {
+            $mediaId = is_array($image) ? ($image['media_id'] ?? null) : null;
+            if (! is_string($mediaId) || preg_match(self::UUID, strtolower($mediaId)) !== 1) {
+                $this->error('seo.image', null, 'Choose an image from the media library.');
+                $image = null;
+            } else {
+                $image = ['media_id' => strtolower($mediaId)];
+            }
+        }
+        $result['image'] = $image;
+        $noindex = $value['noindex'] ?? false;
+        if (! is_bool($noindex)) {
+            $this->error('seo.noindex', null, 'Hide from search engines is true or false.');
+            $noindex = false;
+        }
+        $result['noindex'] = $noindex;
+
+        $translations = [];
+        $raw = $value['translations'] ?? null;
+        if ($raw !== null && ! is_array($raw)) {
+            $this->error('seo.translations', null, 'The translations must be an object.');
+            $raw = null;
+        }
+        foreach (LocaleContext::TRANSLATABLE as $locale) {
+            if (! is_array($raw[$locale] ?? null)) {
+                continue;
+            }
+            $texts = [];
+            foreach ($limits as $field => $max) {
+                $translated = $text($raw[$locale][$field] ?? null, "seo.translations.{$locale}.{$field}", $max);
+                if ($translated !== null) {
+                    $texts[$field] = $translated;
+                }
+            }
+            if ($texts !== []) {
+                $translations[$locale] = $texts;
+            }
+        }
+        $result['translations'] = $translations;
+
+        return $result;
     }
 
     /**
@@ -260,7 +451,10 @@ final class BuilderDocumentSchema
         if (! is_bool($sticky)) {
             $this->error("{$path}.props.sticky", $id, 'Sticky is true or false.');
         } elseif ($sticky) {
-            if (! in_array($this->context, self::STICKY_CONTEXTS, true)) {
+            if ($this->global) {
+                // B9: a page could otherwise end up with two sticky sections.
+                $this->error("{$path}.props.sticky", $id, 'A global section cannot stick to the top.');
+            } elseif (! in_array($this->context, self::STICKY_CONTEXTS, true)) {
                 $this->error("{$path}.props.sticky", $id, 'Only sections of pages, content pages and shop areas can stick to the top.');
             } elseif ($this->sticky !== null) {
                 $this->error("{$path}.props.sticky", $id, 'Only one section of a page can stick to the top.');
@@ -280,7 +474,8 @@ final class BuilderDocumentSchema
             'id' => $id,
             'type' => 'section',
             'props' => $sectionProps,
-            ...$this->common($node, $path, $id, [], true),
+            // B9: sections may have a parallax background.
+            ...$this->common($node, $path, $id, [], true, true),
             'columns' => $this->columns($node['columns'] ?? null, "{$path}.columns", $id, false),
         ];
     }
@@ -465,9 +660,10 @@ final class BuilderDocumentSchema
      * @param  array<string, mixed>  $node
      * @param  array<string, int>  $translatable  field => max length
      * @param  bool  $backgroundVideo  B6: sections and inner rows may have a background video
+     * @param  bool  $parallax  B9: sections may have a parallax background
      * @return array<string, mixed>
      */
-    private function common(array $node, string $path, ?string $id, array $translatable, bool $backgroundVideo = false): array
+    private function common(array $node, string $path, ?string $id, array $translatable, bool $backgroundVideo = false, bool $parallax = false): array
     {
         $visibility = [];
         $raw = is_array($node['visibility'] ?? null) ? $node['visibility'] : [];
@@ -487,7 +683,7 @@ final class BuilderDocumentSchema
         }
 
         return [
-            'style' => StyleSchema::normalize($node['style'] ?? null, $backgroundVideo),
+            'style' => StyleSchema::normalize($node['style'] ?? null, $backgroundVideo, $parallax),
             'visibility' => $visibility,
             'hidden' => $hidden,
             'schedule' => $this->schedule($node['schedule'] ?? null, "{$path}.schedule", $id),

@@ -51,6 +51,7 @@ class BuilderPageRenderer
         private readonly MediaLibrary $media,
         private readonly LocaleContext $locale,
         private readonly BuilderElementData $elementData,
+        private readonly BuilderGlobals $globals,
     ) {}
 
     /**
@@ -62,6 +63,8 @@ class BuilderPageRenderer
     {
         $preview = $source === 'draft';
         $now = CarbonImmutable::now();
+        // B9: global sections in place of their references (published: the globals' live versions).
+        $content = $this->globals->expand($content, $source, $document->contentContext());
 
         /** @var list<array<string, mixed>> $wrapped */
         $wrapped = [];
@@ -69,8 +72,29 @@ class BuilderPageRenderer
         $dataElements = [];
         $sections = [];
         foreach ($content['sections'] ?? [] as $section) {
+            if (($section['unavailable'] ?? false) === true) {
+                // B9: a reference to a missing / unpublished / misplaced global section.
+                if ($preview) {
+                    unset($section['unavailable']);
+                    $sections[] = $section + ['state' => 'unavailable'];
+                }
+
+                continue;
+            }
+            $refState = 'live';
+            if (isset($section['global_ref'])) {
+                // B9: the reference's own hidden / schedule come first.
+                $refState = $this->state($section['global_ref'], $now);
+                unset($section['global_ref']);
+                if ($refState !== 'live' && ! $preview) {
+                    continue;
+                }
+            }
             $node = $this->node($section, $preview, $now, $wrapped, $dataElements);
             if ($node !== null) {
+                if ($refState !== 'live') {
+                    $node['state'] = $refState;
+                }
                 $sections[] = $node;
             }
         }
@@ -95,6 +119,11 @@ class BuilderPageRenderer
                 array_push($mediaIds, ...ElementRegistry::mediaIds($node['type'], $node['props'] ?? []));
             }
         });
+        // B9: the search & sharing image.
+        $seoImage = is_array($content['seo'] ?? null) ? ($content['seo']['image']['media_id'] ?? null) : null;
+        if (is_string($seoImage)) {
+            $mediaIds[] = $seoImage;
+        }
         $media = [];
         foreach ($this->media->refs(array_values(array_unique($mediaIds))) as $id => $ref) {
             unset($ref['id']);
@@ -108,10 +137,36 @@ class BuilderPageRenderer
                 'title' => $document->title,
                 'version' => $version,
                 'source' => $source,
+                'seo' => $this->seo($content['seo'] ?? null, $media),
             ],
             'sections' => BuilderJson::present(['sections' => $sections])['sections'],
             'media' => $media === [] ? new stdClass : $media,
             'data' => $data === [] ? new stdClass : $data,
+        ];
+    }
+
+    /**
+     * B9: the document's search & sharing settings in the request's language (per-field fallback
+     * to the base text) with the image's media ref; null without settings.
+     *
+     * @param  array<string, array<string, mixed>>  $media
+     * @return array{title: ?string, description: ?string, image: ?array<string, mixed>, noindex: bool}|null
+     */
+    private function seo(mixed $seo, array $media): ?array
+    {
+        if (! is_array($seo)) {
+            return null;
+        }
+        $locale = $this->locale->current();
+        $translations = is_array($seo['translations'] ?? null) ? $seo['translations'] : [];
+        $mediaId = $seo['image']['media_id'] ?? null;
+        $image = is_string($mediaId) && isset($media[$mediaId]) ? ['media_id' => $mediaId, ...$media[$mediaId]] : null;
+
+        return [
+            'title' => Translations::value($translations, 'title', $locale, $seo['title'] ?? null),
+            'description' => Translations::value($translations, 'description', $locale, $seo['description'] ?? null),
+            'image' => $image,
+            'noindex' => ($seo['noindex'] ?? false) === true,
         ];
     }
 

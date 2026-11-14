@@ -66,7 +66,7 @@ export function insertionIndex(content: BuilderContent, selection: string | null
 }
 
 function anchors(content: BuilderContent): Set<string> {
-  return new Set(content.sections.map((s) => s.props.anchor).filter((a): a is string => typeof a === 'string' && a !== ''))
+  return new Set(content.sections.map((s) => s.props?.anchor).filter((a): a is string => typeof a === 'string' && a !== ''))
 }
 
 const prefixOf = (id: string, fallback: string) => /^([a-z][a-z0-9]*)_/.exec(id)?.[1] ?? fallback

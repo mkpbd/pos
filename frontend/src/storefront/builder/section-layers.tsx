@@ -1,8 +1,8 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { REDUCED_MOTION_QUERY, TABLET_UP_QUERY, useMediaQuery } from '../components/use-media-query'
-import { colorCss } from './compile-styles'
+import { colorCss, PARALLAX_FACTORS } from './compile-styles'
 import { usePage } from './render-context'
-import { SHAPE_PATHS } from './section-layer-utils'
+import { parallaxOffset, SHAPE_PATHS } from './section-layer-utils'
 import type { BackgroundVideo, SectionShape } from './types'
 import { backgroundVideoEmbedUrl } from './validate'
 
@@ -65,6 +65,54 @@ export function BackgroundVideoLayer({ video }: { video: { video: BackgroundVide
         />
       )}
       {video.overlay && <div className="b-bg-overlay" style={{ backgroundImage: video.overlay } as CSSProperties} />}
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------------------------- */
+
+const PARALLAX_POINTER = '(hover: hover) and (pointer: fine)'
+
+/**
+ * B9 background parallax (sections with an image background): a layer that inherits the section's
+ * background and moves it slower than the page. Shown by the compiled CSS only for desktop
+ * pointers that allow motion; the scroll listener runs only then too (off on touch and under
+ * reduced motion, where the section's own background stays put).
+ */
+export function ParallaxLayer({ speed }: { speed: keyof typeof PARALLAX_FACTORS }) {
+  const reduced = useMediaQuery(REDUCED_MOTION_QUERY)
+  const pointer = useMediaQuery(PARALLAX_POINTER)
+  const ref = useRef<HTMLDivElement>(null)
+  const active = pointer && !reduced
+
+  useEffect(() => {
+    const layer = ref.current
+    const host = layer?.parentElement?.parentElement
+    if (!active || !layer || !host) return
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const rect = host.getBoundingClientRect()
+      const offset = parallaxOffset(rect.top + rect.height / 2, window.innerHeight / 2, rect.height, PARALLAX_FACTORS[speed])
+      layer.style.setProperty('--b-parallax-y', `${offset}px`)
+    }
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    return () => {
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      if (frame) cancelAnimationFrame(frame)
+      layer.style.removeProperty('--b-parallax-y')
+    }
+  }, [active, speed])
+
+  return (
+    <div className="b-parallax" aria-hidden data-testid="builder-parallax" data-speed={speed}>
+      <div ref={ref} />
     </div>
   )
 }

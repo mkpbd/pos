@@ -11,6 +11,7 @@ import { OrderNowBar } from '../landing/order-now'
 import { firstPageImage } from '../social/links'
 import { ShareBar } from '../social/share-bar'
 import { PageRenderer } from './page-renderer'
+import { withPageSeo } from './seo-meta'
 import type { BuilderPage } from './types'
 
 type Props = {
@@ -31,7 +32,8 @@ export function BuilderPageView({ pageKey, notFound, meta, children, shareUrl }:
   const draft = useDraftPreview()
   const { t } = useLocale()
   const { store } = useStorefront()
-  useDocumentMeta(page.data ? meta(page.data, draft) : null)
+  // B9: the page's own SEO (title, description, image, noindex) over the page's defaults.
+  useDocumentMeta(page.data ? withPageSeo(meta(page.data, draft), page.data) : null)
 
   if (page.isPending) {
     return (

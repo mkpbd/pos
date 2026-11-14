@@ -36,16 +36,55 @@ export type Background = {
    * Read from the `base` breakpoint only.
    */
   video?: BackgroundVideo
+  /** B9: the background image scrolls slower than the page (sections, `base` only). */
+  parallax?: BackgroundParallax
 }
 
 /** B6 `background.video` (sections and inner rows). */
 /** `poster` is absent when none was chosen (never null). Kept on the `base` breakpoint of sections and inner rows only. */
 export type BackgroundVideo = { url: string; provider: VideoProvider; video_id: string; poster?: { media_id: string } }
 
-/** B6 style group `motion` (any node, `base` only): an entrance animation played once on entering the viewport. */
-export type MotionEntrance = 'none' | 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'zoom'
-/** `duration` 200–2000 ms (default 600), `delay` 0–2000 ms (default 0). */
-export type Motion = { entrance: MotionEntrance; duration?: number; delay?: number }
+/** B6 style group `motion` (any node, `base` only): an entrance animation played on entering the viewport. B9 adds five kinds. */
+export type MotionEntrance =
+  | 'none'
+  | 'fade'
+  | 'slide-up'
+  | 'slide-down'
+  | 'slide-left'
+  | 'slide-right'
+  | 'zoom'
+  | 'flip-up'
+  | 'flip-left'
+  | 'bounce-in'
+  | 'blur-in'
+  | 'rotate-in'
+/** B9: `once` (default) or `every_time` the node re-enters the viewport. */
+export type MotionRepeat = 'once' | 'every_time'
+/** B9 attention loops (buttons, badges, icons): pause on hover / focus; 3 cycles then stop unless `loop_forever`. */
+export type MotionLoop = 'none' | 'pulse' | 'float' | 'shake' | 'glow'
+/**
+ * `duration` 200–2000 ms (default 600), `delay` 0–2000 ms (default 0). B9 (all optional, sparse;
+ * absent = the default): `repeat` (default once), `stagger_children` 0–500 ms (sections and inner
+ * rows: their columns' elements enter one after another; default 0), `loop` (default none),
+ * `loop_forever` (default false). `entrance: 'none'` with a loop is valid.
+ */
+export type Motion = {
+  entrance: MotionEntrance
+  duration?: number
+  delay?: number
+  repeat?: MotionRepeat
+  stagger_children?: number
+  loop?: MotionLoop
+  loop_forever?: boolean
+}
+
+/** B9 style group `hover` (any node, `base` only): desktop pointers on hover, everyone on `:focus-visible`. */
+export type HoverEffect = 'none' | 'lift' | 'grow' | 'shrink' | 'tilt' | 'glow' | 'underline'
+/** `duration` 100–600 ms (default 250). */
+export type HoverStyle = { effect: HoverEffect; duration?: number }
+
+/** B9 `background.parallax` (sections only, `base` only, image backgrounds): off under reduced motion and on touch. */
+export type BackgroundParallax = 'none' | 'slow' | 'medium'
 
 export type Typography = {
   font?: 'theme:heading' | 'theme:body'
@@ -88,6 +127,8 @@ export type Style = {
   }
   /** B6: `base` breakpoint only (normalize drops it from tablet / mobile). */
   motion?: Motion
+  /** B9: `base` breakpoint only (normalize drops it from tablet / mobile). */
+  hover?: HoverStyle
 }
 
 export type ResponsiveStyle = Partial<Record<Breakpoint, Style>>
@@ -681,8 +722,46 @@ export type PopupSettings = {
 /** Settings as GET /store/builder/popups serves them: no schedule or translations; `label` in the request language. */
 export type StorePopupSettings = Omit<PopupSettings, 'starts_at' | 'ends_at' | 'translations'>
 
-/** A stored document (draft or published version content). B8b: `popup` on popup documents only. */
-export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings }
+/* ----------------------------------------------------------------------------------------------
+ * B9: global sections and page SEO (contract §1, §4)
+ * -------------------------------------------------------------------------------------------- */
+
+/**
+ * A `global:<uuid>` document's context, chosen at creation: `page` (usable in page, cms and zone
+ * documents), `header` or `footer`. Its content is `{schema_version: 1, sections: [one Section]}`.
+ */
+export type GlobalContext = 'page' | 'header' | 'footer'
+
+/**
+ * B9: a reference to a global section, placed in a document's `sections[]` (page, cms, zone, header,
+ * footer; never in a global or a popup). `ref` = the global document's uuid.
+ */
+export type GlobalSectionNode = { id: string; type: 'global_section'; ref: string; hidden: boolean; schedule: Schedule }
+
+/** What a document's `sections[]` may hold (B9): sections and global section references. */
+export type DocumentSection = Section | GlobalSectionNode
+
+/**
+ * B9 page SEO (page and cms documents only, versioned with the content). `title` ≤ 70 ✱ and
+ * `description` ≤ 160 ✱ (null = the fallback: the page title / store description; the server
+ * turns blank into null); `image` a media id (og:image) or null; `translations.bn.title|description`
+ * (always present, `{}` when empty).
+ */
+export type PageSeo = {
+  title: string | null
+  description: string | null
+  image: { media_id: string } | null
+  noindex: boolean
+  translations: Record<string, { title?: string; description?: string }>
+}
+
+/**
+ * A stored document (draft or published version content). B8b: `popup` on popup documents only.
+ * B9: `seo` on page and cms documents (absent = no SEO settings); `sections` may hold
+ * GlobalSectionNode entries (see DocumentSection) — typed `Section[]` for older code, check with
+ * `isGlobalSectionNode`.
+ */
+export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo }
 
 /** The editor's names (B2): the whole draft, and any node of it (section, column or element). */
 export type BuilderContent = BuilderDocument
@@ -701,7 +780,53 @@ type Rendered<N> = N extends unknown ? Omit<N, 'translations' | 'hidden' | 'sche
 export type RenderColumn = Omit<Column, 'elements'> & { elements: RenderElement[] }
 export type RenderInnerRow = Rendered<Omit<InnerRowElement, 'columns'>> & { columns: RenderColumn[] }
 export type RenderElement = Rendered<Exclude<Element, InnerRowElement>> | RenderInnerRow
-export type RenderSection = Rendered<Omit<Section, 'columns'>> & { columns: RenderColumn[] }
+/**
+ * B9: a section drawn from a global section reference (`type: 'section'`, `id` = the reference
+ * node's id; props, style and columns are the global section's, inner ids the global's own) carries
+ * `global`. Published pages draw the global's published version, drafts and the canvas its draft.
+ */
+export type RenderGlobalInfo = {
+  /** The global document's uuid. */
+  id: string
+  /** The global's name (null when unknown, e.g. a missing global). */
+  title: string | null
+  /** The global's own section id (null when unavailable). */
+  section_id: string | null
+  /** The published version drawn (null in drafts and when unavailable). */
+  version: number | null
+}
+
+export type RenderSection = Rendered<Omit<Section, 'columns'>> & { columns: RenderColumn[]; global?: RenderGlobalInfo }
+
+/**
+ * B9, draft renders only: a reference whose global is missing, unpublished or in the wrong context
+ * (published renders drop it). No columns; `global.id` = the ref. The editor's local expansion may
+ * also send a section with `global` and `columns: []`.
+ */
+export type RenderUnavailableGlobal = {
+  id: string
+  type: 'global_section'
+  ref: string
+  hidden?: boolean
+  schedule?: Schedule
+  state: 'unavailable'
+  global: RenderGlobalInfo
+}
+
+/**
+ * What a payload's `sections` may hold. `BuilderPage.sections` stays typed `RenderSection[]` for
+ * older code; draft payloads may contain RenderUnavailableGlobal entries (see isUnavailableGlobal).
+ */
+export type RenderPageSection = RenderSection | RenderUnavailableGlobal
+
+/** B9 `document.seo` of a render payload: the published SEO in the request language; image resolved. */
+export type RenderSeo = {
+  /** null = the fallback (page title). Set: used verbatim as the document title (no store suffix). */
+  title: string | null
+  description: string | null
+  image: { media_id?: string; url: string; width?: number; height?: number; alt?: string | null } | null
+  noindex: boolean
+}
 
 export type BuilderMedia = Omit<MediaRef, 'id'>
 
@@ -820,7 +945,8 @@ export type ElementData =
 export type BuilderData = StoreSection | ElementData
 
 export type BuilderPage = {
-  document: { id: string; key: string; title: string; version: number | null; source: 'published' | 'draft' }
+  /** B9: `seo` on page and cms documents (null / absent = none set). */
+  document: { id: string; key: string; title: string; version: number | null; source: 'published' | 'draft'; seo?: RenderSeo | null }
   sections: RenderSection[]
   media: Record<string, BuilderMedia>
   /**

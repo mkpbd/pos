@@ -12,10 +12,14 @@ import type { Locale } from './i18n/runtime'
 export type DocumentMeta = {
   /** Page title without the store name ("Kids Tee" → "Kids Tee | Store"); omitted = the store name alone. */
   title?: string
+  /** B9: a page's own SEO title, used verbatim (no store suffix, as the HTML shell does); wins over `title`. */
+  fullTitle?: string
   /** Falls back to the store description. */
   description?: string | null
   /** og:image; a path is made absolute. */
   image?: string | null
+  /** B9: og:image:alt / twitter:image:alt (with an image only; default: the page title). */
+  imageAlt?: string | null
   /** Path or absolute URL; default: the current path, with `?page=N` past page 1 and every other parameter dropped. */
   canonical?: string
   /** `noindex, follow` (filtered/sorted listings, search, private pages, previews). */
@@ -106,7 +110,7 @@ function setCanonical(href: string) {
 
 /** Writes title, description, canonical, robots and og:* for a page (or the store defaults for `{}`). */
 export function applyDocumentMeta(meta: DocumentMeta, defaults: Defaults, location: { pathname: string; search: string }) {
-  const title = meta.title ? `${meta.title} | ${defaults.storeName}` : defaults.storeName
+  const title = meta.fullTitle ? meta.fullTitle : meta.title ? `${meta.title} | ${defaults.storeName}` : defaults.storeName
   const description = meta.description || defaults.description
   const language = defaults.language
   const base = meta.canonical ? absolute(meta.canonical) : canonicalFor(location.pathname, location.search)
@@ -120,7 +124,17 @@ export function applyDocumentMeta(meta: DocumentMeta, defaults: Defaults, locati
   setMeta('property', 'og:title', title)
   setMeta('property', 'og:description', description)
   setMeta('property', 'og:url', canonical)
-  setMeta('property', 'og:image', meta.image ? absolute(meta.image) : null)
+  const image = meta.image ? absolute(meta.image) : null
+  // The image's own alt, else the page title (as the shell does).
+  const imageAlt = image ? meta.imageAlt || meta.fullTitle || meta.title || defaults.storeName : null
+  setMeta('property', 'og:image', image)
+  setMeta('property', 'og:image:alt', imageAlt)
+  // B9: the share card tags the HTML shell writes on every page, kept in step during in-app navigation.
+  setMeta('name', 'twitter:card', image ? 'summary_large_image' : 'summary')
+  setMeta('name', 'twitter:title', title)
+  setMeta('name', 'twitter:description', description)
+  setMeta('name', 'twitter:image', image)
+  setMeta('name', 'twitter:image:alt', imageAlt)
   setMeta('property', 'og:locale', language && language.locales.length > 1 ? OG_LOCALES[language.locale] : null)
   setAlternates(base, language)
 }

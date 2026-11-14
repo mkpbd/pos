@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from '@/lib/utils'
 import { nodeLabel, nodeName, nodeSummary, useCommands, useEditorUi } from './commands'
 import type { Dragged, LayerPosition } from './drop-targets'
+import { NodeClipboardItems } from './clipboard-menu'
 import { useEditor } from './store'
 import { ElementIcon } from './element-icon'
 import { flattenLayers, type LayerRow } from './layers'
@@ -20,12 +21,12 @@ import { flattenLayers, type LayerRow } from './layers'
 export type LayerIndicator = { rowId: string; position: LayerPosition } | null
 
 function LayerItem({ row, selected, tabbable, hasErrors, indicator, onSelectRow }: { row: LayerRow; selected: boolean; tabbable: boolean; hasErrors: boolean; indicator: LayerPosition | null; onSelectRow: (id: string) => void }) {
-  const { registry } = useEditorUi()
+  const { registry, globals } = useEditorUi()
   const commands = useCommands()
   const { node, kind } = row
   const label = row.kind === 'column' ? `Column ${row.columnNumber} of ${row.count}` : nodeLabel(node, registry)
-  const summary = nodeSummary(node, registry)
-  const name = row.kind === 'column' ? label : nodeName(node, registry)
+  const summary = nodeSummary(node, registry, globals)
+  const name = row.kind === 'column' ? label : nodeName(node, registry, globals)
   const hidden = kind !== 'column' && (node as { hidden?: boolean }).hidden === true
   const dragged: Dragged | null = kind === 'column' ? null : { kind: 'node', id: node.id, type: node.type }
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: `layer-drag:${node.id}`, data: { dragged }, disabled: dragged === null })
@@ -116,6 +117,8 @@ function LayerItem({ row, selected, tabbable, hasErrors, indicator, onSelectRow 
                   <BookmarkPlusIcon /> Save as template
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <NodeClipboardItems id={node.id} kind={kind} />
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onSelect={() => commands.requestDelete(node.id)}>
                 <Trash2Icon /> Delete

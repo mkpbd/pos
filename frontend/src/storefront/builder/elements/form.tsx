@@ -9,7 +9,7 @@ import { storeApi } from '../../http'
 import { useLocale } from '../../i18n/locale'
 import { usePopupActions } from '../popups/popup-context'
 import { NODE_ID } from '../registry'
-import { usePage } from '../render-context'
+import { useOwnerDocumentId, usePage } from '../render-context'
 import type { FormField, FormFieldKind, FormSubmitRequest, FormSubmitResponse } from '../types'
 import { isUuid, safeLink } from '../validate'
 import { formErrors, initialValues, maxLengthOf, readFields, submitValues, type FieldError, type FormValues } from './form-values'
@@ -44,7 +44,8 @@ export function FormElement({ element }: { element: El<'form'> }) {
   const submitLabel = str(p.submit_label) || t('content.builder.form.send')
   const consent = isObject(p.consent) && str(p.consent.text) ? { text: str(p.consent.text), url: safeLink(p.consent.link) } : null
   const twoColumns = p.layout === 'two_columns'
-  const documentId = page.document?.id
+  // B9: inside a global section, the global document (the server finds the element there).
+  const documentId = useOwnerDocumentId()
   // Sending needs the published document (its uuid) and an element id the server can find.
   const disabled = draft || page.document?.key === 'canvas' || !isUuid(documentId) || !NODE_ID.test(element.id)
 

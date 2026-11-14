@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import type { BuilderContent, BuilderMedia, Device } from '@/storefront/builder/types'
-import { documentPath, type CmsPageRef, type DocumentDetail, type DocumentKind, type PreviewProduct, type Problem, type PublishedRef, type ZoneTarget } from './api'
+import { documentPath, type CmsPageRef, type DocumentDetail, type DocumentKind, type GlobalUsage, type PreviewProduct, type Problem, type PublishedRef, type ZoneTarget } from './api'
 
 /*
  * The editor's state (one store per open document). Content edits go through `apply` with a pure
@@ -32,6 +32,10 @@ export type EditorDocument = {
   target: ZoneTarget | null
   /** P1b: the live product a product zone is previewed on in the canvas (null: none matches). */
   preview_product: PreviewProduct | null
+  /** B9 globals: where the global may be used (null for other documents). */
+  context: 'page' | 'header' | 'footer' | null
+  /** B9 globals: the documents that show it (drafts and live versions; null for other documents). */
+  usage: { usage_count: number; used_in: GlobalUsage[] } | null
 }
 
 export type Snapshot = { content: BuilderContent; selection: string | null }
@@ -93,7 +97,7 @@ export type EditorActions = {
 export type EditorStore = StoreApi<EditorState & EditorActions>
 
 export function documentFromDetail(
-  detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page' | 'active' | 'target' | 'preview_product'>>,
+  detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page' | 'active' | 'target' | 'preview_product' | 'context' | 'global'>>,
 ): EditorDocument {
   const kind = detail.kind ?? 'page'
   return {
@@ -108,6 +112,8 @@ export function documentFromDetail(
     active: detail.active === true,
     target: detail.target ?? null,
     preview_product: detail.preview_product ?? null,
+    context: kind === 'global' ? (detail.context ?? 'page') : null,
+    usage: kind === 'global' ? (detail.global ?? { usage_count: 0, used_in: [] }) : null,
   }
 }
 
