@@ -8,6 +8,7 @@ import { CardPrice } from '../../catalog/card-parts'
 import { useCardPricing } from '../../catalog/card-pricing'
 import { ProductCard } from '../../catalog/product-card'
 import { ProductGallery } from '../../catalog/product-gallery'
+import { galleryVideoOf } from '../../catalog/product-video'
 import { ProductImage } from '../../catalog/product-image'
 import { PRODUCT_RAIL_ITEM, Rail } from '../../catalog/product-rail'
 import { ProductSummary } from '../../catalog/product-summary'
@@ -105,7 +106,7 @@ function SpotlightBody({ element, product: data }: { element: El<'product_spotli
   return (
     <article data-b={element.id} aria-labelledby={headingId} className="b-spotlight grid gap-8 md:grid-cols-2" data-layout={imageRight ? 'image-right' : 'image-left'} data-testid="builder-spotlight">
       <div className={cn('relative min-w-0', imageRight && 'md:order-2')}>
-        <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} />
+        <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} video={galleryVideoOf(product)} />
         {badge && (
           <span aria-hidden className="pointer-events-none absolute top-3 left-3 rounded-full bg-sf-sale px-3 py-1 text-xs font-bold tracking-wide text-white uppercase">
             {badge}

@@ -31,11 +31,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property ?string $max_discount_percent
  * @property ?list<array{name: string, values: list<string>}> $options
  * @property bool $is_active
+ * @property ?string $photo_option P1a: the option whose values own photos
+ * @property ?array<string, string> $option_styles P1a: option name => color|image|button
  */
 #[UseFactory(ProductFactory::class)]
 #[Fillable([
     'organization_id', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'name', 'description', 'type',
     'track_stock', 'track_batches', 'track_serials', 'max_discount_percent', 'options', 'is_active',
+    'photo_option', 'option_styles',
 ])]
 class Product extends Model
 {
@@ -60,7 +63,18 @@ class Product extends Model
             'max_discount_percent' => 'decimal:2',
             'options' => 'array',
             'is_active' => 'boolean',
+            'option_styles' => 'array',
         ];
+    }
+
+    /**
+     * P1a: photos of the photo option's values, in order.
+     *
+     * @return HasMany<ProductOptionImage, $this>
+     */
+    public function optionImages(): HasMany
+    {
+        return $this->hasMany(ProductOptionImage::class)->orderBy('option_value')->orderBy('sort_order');
     }
 
     /**

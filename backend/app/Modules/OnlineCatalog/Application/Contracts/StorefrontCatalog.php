@@ -157,15 +157,19 @@ interface StorefrontCatalog
 
     /**
      * B4: the slug of the live product whose listing changed last, or null when nothing is on
-     * sale online (the store builder previews the product page zone on it).
+     * sale online (the store builder previews the product page zone on it). P1b: with
+     * `$categoryId`, only products of that category and its subcategories (a category-targeted
+     * product zone); an unknown category gives null.
      */
-    public function latestProductSlug(): ?string;
+    public function latestProductSlug(?string $categoryId = null): ?string;
 
     /**
      * B6: product page objects (exactly what GET /store/products/{slug} returns) keyed by
      * product id, in the given order. Live products only; `$preview` also opens drafts,
      * scheduled and ended listings (with `preview_state`, as the staff product preview does).
-     * Other organizations' and unknown ids are left out.
+     * Other organizations' and unknown ids are left out. P1b: without what only the product
+     * page itself shows — `delivery`, `zones` (a zone could otherwise hold itself) and
+     * `questions_count`; `video` and `badges` are included.
      *
      * @param  list<string>  $productIds
      * @return array<string, array<string, mixed>>

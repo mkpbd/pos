@@ -42,6 +42,26 @@ export function liveUrl(summary: DocumentSummary): string | null {
 /** "Last edited 12 Nov 2026, 10:00" of a document, in the screen's language. */
 export const lastEdited = (summary: DocumentSummary, lang: ScreenLang = 'en') => translate(lang, 'row.lastEdited', { date: formatDate(lang, summary.draft_updated_at, true) })
 
+/* P1b: the category picker of the product zone versions */
+
+export type CategoryRow = { id: string; name: string; depth: number; path: string }
+
+/** Categories in tree order with their depth and path ("Clothing › Shoes"); unknown parents are skipped. */
+export function categoryRows(categories: readonly { id: string; name: string; parent_id?: string | null; depth?: number }[]): CategoryRow[] {
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  return categories.map((category) => {
+    const names = [category.name]
+    const seen = new Set([category.id])
+    let parent = category.parent_id ? byId.get(category.parent_id) : undefined
+    while (parent && !seen.has(parent.id)) {
+      seen.add(parent.id)
+      names.unshift(parent.name)
+      parent = parent.parent_id ? byId.get(parent.parent_id) : undefined
+    }
+    return { id: category.id, name: category.name, depth: category.depth ?? names.length - 1, path: names.join(' › ') }
+  })
+}
+
 /* B7: the 3-step guide */
 
 export const LOOKS_ANCHOR = 'choose-look'

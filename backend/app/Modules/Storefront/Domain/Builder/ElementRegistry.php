@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Domain\Builder;
 
+use App\Modules\Shared\Domain\VideoUrl;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Domain\ThemeSchema;
 
@@ -115,12 +116,12 @@ final class ElementRegistry
 
     public const VIDEO_ASPECTS = ['16:9', '4:3', '1:1', '9:16'];
 
-    public const VIDEO_PROVIDERS = ['youtube', 'vimeo'];
+    public const VIDEO_PROVIDERS = VideoUrl::PROVIDERS;
 
     /** Start offset of a video, seconds. */
     public const VIDEO_START = [0, 86400];
 
-    public const VIDEO_URL_MAX = 500;
+    public const VIDEO_URL_MAX = VideoUrl::MAX_LENGTH;
 
     public const ICON_SIZE = [16, 128];
 
@@ -620,32 +621,13 @@ final class ElementRegistry
     /**
      * B4: `{provider, video_id}` of a supported video URL — YouTube `youtube.com/watch?v=`,
      * `youtu.be/`, `youtube.com/shorts/` (id 6–20 of `[A-Za-z0-9_-]`) or Vimeo `vimeo.com/<digits>`
-     * — or null.
+     * — or null. P1b: the rule lives in Shared (`VideoUrl`), also used by product listings.
      *
      * @return array{provider: string, video_id: string}|null
      */
     public static function parseVideoUrl(mixed $url): ?array
     {
-        if (! is_string($url) || mb_strlen($url) > self::VIDEO_URL_MAX) {
-            return null;
-        }
-        $patterns = [
-            'youtube' => [
-                '#^https?://(?:www\.|m\.)?youtube\.com/watch\?(?:[^\s\#]*&)?v=([A-Za-z0-9_-]{6,20})(?:[&\#][^\s]*)?$#',
-                '#^https?://youtu\.be/([A-Za-z0-9_-]{6,20})(?:[?\#][^\s]*)?$#',
-                '#^https?://(?:www\.|m\.)?youtube\.com/shorts/([A-Za-z0-9_-]{6,20})(?:[?\#][^\s]*)?$#',
-            ],
-            'vimeo' => ['#^https?://(?:www\.)?vimeo\.com/(\d{1,20})(?:[/?\#][^\s]*)?$#'],
-        ];
-        foreach ($patterns as $provider => $list) {
-            foreach ($list as $pattern) {
-                if (preg_match($pattern, $url, $m) === 1) {
-                    return ['provider' => $provider, 'video_id' => $m[1]];
-                }
-            }
-        }
-
-        return null;
+        return VideoUrl::parse($url);
     }
 
     /**

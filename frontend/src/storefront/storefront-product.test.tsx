@@ -38,7 +38,8 @@ describe('product page', () => {
 
     const page = screen.getByTestId('product-page')
     expect(within(page).getAllByTestId('price')[0]).toHaveTextContent('৳450.00')
-    expect(within(page).getByText('৳500.00', { exact: false }).tagName).toBe('S')
+    // The summary's struck price (P1b: "Frequently bought together" repeats it for this item).
+    expect(within(screen.getByTestId('product-summary')).getByText('৳500.00', { exact: false }).tagName).toBe('S')
     expect(within(page).getByText('−10 %')).toBeInTheDocument()
     expect(screen.getByTestId('availability')).toHaveTextContent('In stock')
     expect(screen.getByTestId('sku')).toHaveTextContent('TEE-RM')
@@ -65,16 +66,16 @@ describe('product page', () => {
     const selector = await screen.findByTestId('variant-selector')
     const sizes = within(selector).getByRole('group', { name: /Size/ })
     const colours = within(selector).getByRole('group', { name: /Colour/ })
-    expect(within(colours).getByRole('radio', { name: 'Red' })).toBeChecked()
+    expect(within(colours).getByRole('radio', { name: 'Colour: Red' })).toBeChecked()
     // Red L exists but is sold out: selectable, marked.
-    expect(within(sizes).getByRole('radio', { name: 'L (out of stock)' })).toBeEnabled()
+    expect(within(sizes).getByRole('radio', { name: 'L (sold out)' })).toBeEnabled()
 
-    await user.click(within(sizes).getByRole('radio', { name: 'L (out of stock)' }))
+    await user.click(within(sizes).getByRole('radio', { name: 'L (sold out)' }))
     expect(screen.getByTestId('availability')).toHaveTextContent('Out of stock')
     expect(router.state.location.search).toBe('?variant=v-red-l')
 
     // Blue exists only in L: choosing it keeps L; M is impossible with Blue.
-    await user.click(within(colours).getByRole('radio', { name: 'Blue' }))
+    await user.click(within(colours).getByRole('radio', { name: 'Colour: Blue' }))
     expect(screen.getByTestId('sku')).toHaveTextContent('TEE-BL')
     expect(screen.getAllByTestId('price')[0]).toHaveTextContent('৳480.00')
     expect(screen.getByTestId('availability')).toHaveTextContent('Only a few left')
@@ -162,7 +163,7 @@ describe('quick view', () => {
     expect(within(dialog).getByRole('button', { name: 'Add to cart' })).toBeEnabled()
     expect(within(dialog).getByRole('button', { name: 'Add to wishlist' })).toHaveAttribute('aria-pressed', 'false')
 
-    await user.click(within(dialog).getByRole('radio', { name: 'Blue' }))
+    await user.click(within(dialog).getByRole('radio', { name: 'Colour: Blue' }))
     expect(within(dialog).getAllByTestId('price')[0]).toHaveTextContent('৳480.00')
     const details = within(dialog).getByRole('link', { name: 'View full details' })
     expect(details).toHaveAttribute('href', '/product/kids-tee?variant=v-blue-l')

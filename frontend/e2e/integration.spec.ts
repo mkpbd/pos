@@ -64,7 +64,7 @@ test('organization admin creates a product and finds it by barcode', async ({ pa
   await page.getByRole('button', { name: 'Create product' }).click()
 
   await expect(page.getByRole('heading', { name: `E2E Tea ${ean}` })).toBeVisible()
-  await expect(page.getByLabel('SKU')).toHaveValue(/^SKU-\d{6}$/)
+  await expect(page.getByLabel('SKU for Default')).toHaveValue(/^SKU-\d{6}$/)
 
   await page.getByRole('link', { name: 'Back to products' }).click()
   await page.getByLabel('Search products').fill(ean)
@@ -361,9 +361,10 @@ test('a product created and repriced in the admin shows its current price everyw
   await page.goto('/admin/products')
   await page.getByLabel('Search products').fill(name)
   await page.getByRole('link', { name }).click()
-  await page.getByLabel('Selling price').fill('499.99')
-  await page.getByRole('button', { name: 'Save changes' }).click()
-  await expect(page.getByText(/saved/i).first()).toBeVisible()
+  // P1a: prices live in the variant grid (one row for a product without options).
+  await page.getByLabel(/^Selling price for /).first().fill('499.99')
+  await page.getByRole('button', { name: 'Save variants' }).click()
+  await expect(page.getByText('Variants saved.').first()).toBeVisible()
 
   // Brief check 10: the new price on the product page, the listing, the search suggestions and the homepage.
   await page.goto(productUrl)

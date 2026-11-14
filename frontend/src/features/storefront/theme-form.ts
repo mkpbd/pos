@@ -20,6 +20,7 @@ import {
 } from '@/features/storefront/api'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
+import { normalizeProductLayout, productLayoutSchema } from '@/features/storefront/theme/product-layout'
 import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
 import { resolveTypeScale, TYPE_LIMITS } from '@/storefront/type-scale'
 
@@ -70,6 +71,8 @@ export const themeSchema = z
       hero_style: z.enum(LAYOUT_OPTIONS.hero_style),
       heading_case: z.enum(LAYOUT_OPTIONS.heading_case),
       top_bar: z.enum(LAYOUT_OPTIONS.top_bar),
+      /** P1b: the product page layout; undefined while the API doesn't send `layout.product`. */
+      product: productLayoutSchema.optional(),
     }),
     logo_media_id: z.string().nullable(),
     favicon_media_id: z.string().nullable(),
@@ -105,7 +108,10 @@ export const THEME_FIELDS = ['colors', 'palette', 'preset', 'typography', 'shape
 /** Today's look: the layout variants of a document from before T1. */
 export const DEFAULT_LAYOUT: LayoutVariants = Object.fromEntries(LAYOUT_VARIANT_KEYS.map((key) => [key, LAYOUT_OPTIONS[key][0]])) as LayoutVariants
 
-/** Every layout key, unknown or missing variants as today's look (the API fills them the same way). */
+/**
+ * The layout keys this form edits, unknown or missing variants as today's look (the API fills them
+ * the same way). `product` (P1b) only when the document has it.
+ */
 export function layoutValues(layout: ThemeDocument['layout']): ThemeFormValues['layout'] {
   const variants = Object.fromEntries(
     LAYOUT_VARIANT_KEYS.map((key) => {
@@ -113,7 +119,21 @@ export function layoutValues(layout: ThemeDocument['layout']): ThemeFormValues['
       return [key, value !== undefined && (LAYOUT_OPTIONS[key] as readonly string[]).includes(value) ? value : DEFAULT_LAYOUT[key]]
     }),
   ) as LayoutVariants
-  return { container_width: layout.container_width, sticky_header: layout.sticky_header, ...variants }
+  const product = (layout as { product?: unknown }).product
+  return { container_width: layout.container_width, sticky_header: layout.sticky_header, ...variants, ...(product !== undefined ? { product: normalizeProductLayout(product) } : {}) }
+}
+
+/**
+ * The layout to save: the base document's layout with the form's keys over it, so keys this form
+ * doesn't edit (e.g. `listing_columns`, set on the Page builder screen) go back unchanged — the API
+ * resets a missing key to its default.
+ */
+function mergeLayout(base: ThemeDocument['layout'] | undefined, form: ThemeFormValues['layout']): ThemeDocument['layout'] {
+  const layout: Record<string, unknown> = { ...base }
+  for (const [key, value] of Object.entries(form)) {
+    if (value !== undefined) layout[key] = value
+  }
+  return layout as ThemeDocument['layout']
 }
 
 /** The colours with every B3 role set (null = follows another role), as the editor holds them. */
@@ -162,8 +182,10 @@ export function toFormValues(doc: ThemeDocument): ThemeFormValues {
  * The complete document the API expects (PUT replaces the whole theme: a missing key falls back
  * to its default, so `preset` and every layout variant are always sent).
  * `before`: the announcement's translations as loaded, so clearing them is still sent.
+ * `base`: the document being edited (the draft as loaded, or the latest one when keeping mine
+ * after a conflict); its layout keys outside this form are kept.
  */
-export function toDocument(v: ThemeFormValues, before?: TranslationsMap): ThemeDocument {
+export function toDocument(v: ThemeFormValues, before?: TranslationsMap, base?: ThemeDocument): ThemeDocument {
   const blank = (s: string) => s.trim() || null
 
   return {
@@ -173,7 +195,7 @@ export function toDocument(v: ThemeFormValues, before?: TranslationsMap): ThemeD
     preset: v.preset,
     typography: { ...v.typography },
     shape: { ...v.shape },
-    layout: { ...v.layout },
+    layout: mergeLayout(base?.layout, v.layout),
     logo_media_id: v.logo_media_id,
     favicon_media_id: v.favicon_media_id,
     announcement: {

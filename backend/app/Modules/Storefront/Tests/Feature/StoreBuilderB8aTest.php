@@ -152,7 +152,8 @@ class StoreBuilderB8aTest extends TestCase
         $this->assertSame([$mug['id'], $tea['id']], array_keys($page['data']['e_bundle']['products']));
         $this->assertSame(['b1', 'b3'], array_column($elements['e_bundle']['props']['items'], 'id'));
         $detail = $this->getJson(self::STORE.'/products/'.$page['data']['e_bundle']['products'][$mug['id']]['slug'])->assertOk()->json('data');
-        $this->assertSame($detail, $page['data']['e_bundle']['products'][$mug['id']]);
+        // P1b: the product page object without what only the page itself shows.
+        $this->assertSame(array_diff_key($detail, array_flip(['delivery', 'zones', 'questions_count'])), $page['data']['e_bundle']['products'][$mug['id']]);
         // Flash sale: the running countdown promotion ending first, its products, the usage limit.
         $this->assertSame(['id' => $flash->id, 'name' => 'Kettle flash sale', 'ends_at' => $flash->ends_at->toIso8601String(), 'state' => 'active'], $page['data']['e_flash']['promotion']);
         $this->assertEqualsCanonicalizing([$kettle['id'], $smart['id']], array_column($page['data']['e_flash']['products'], 'id'));

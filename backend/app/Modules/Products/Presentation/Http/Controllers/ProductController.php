@@ -6,14 +6,21 @@ use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
 use App\Modules\Products\Application\Actions\ArchiveProduct;
 use App\Modules\Products\Application\Actions\FindSellableVariant;
 use App\Modules\Products\Application\Actions\ManageProductImages;
+use App\Modules\Products\Application\Actions\SaveOptionImages;
 use App\Modules\Products\Application\Actions\SaveProduct;
+use App\Modules\Products\Application\Actions\SaveVariantGrid;
+use App\Modules\Products\Application\Contracts\VariantStock;
+use App\Modules\Products\Application\Contracts\VariantWebData;
 use App\Modules\Products\Application\DTOs\ProductData;
 use App\Modules\Products\Domain\ProductType;
 use App\Modules\Products\Infrastructure\Models\Product;
 use App\Modules\Products\Infrastructure\Models\ProductImage;
 use App\Modules\Products\Presentation\Http\Exports\ProductsExport;
+use App\Modules\Products\Presentation\Http\Requests\SaveOptionImagesRequest;
 use App\Modules\Products\Presentation\Http\Requests\SaveProductRequest;
+use App\Modules\Products\Presentation\Http\Requests\SaveVariantGridRequest;
 use App\Modules\Products\Presentation\Http\Resources\ProductResource;
+use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
@@ -32,6 +39,8 @@ class ProductController
     public function __construct(
         private readonly CatalogDirectory $catalog,
         private readonly TenantContext $tenant,
+        private readonly VariantWebData $webData,
+        private readonly VariantStock $stock,
     ) {}
 
     /**
@@ -147,15 +156,55 @@ class ProductController
         return ApiResponse::success($this->present($request, $product));
     }
 
+    /**
+     * Save the variant grid
+     *
+     * P1a: options and every variant row in one transaction. Rows without an id are matched to
+     * existing variants by option values; `opening_stock` of new variants needs
+     * `inventory.adjust` and `stock_store_id` (posted as opening stock, note "Variant grid");
+     * `compare_at_price` is saved only for users with `online_catalog.manage`.
+     */
+    public function saveVariants(SaveVariantGridRequest $request, Product $product, SaveVariantGrid $save): JsonResponse
+    {
+        /** @var TenantUser $user */
+        $user = $request->user();
+        $product = $save($product, $request->gridData(), $user, (bool) $request->user()?->can('online_catalog.manage'));
+
+        return ApiResponse::success($this->present($request, $product->refresh()));
+    }
+
+    /**
+     * Save photos by colour
+     *
+     * P1a: the photo option, its values' ordered product image ids and the options' swatch
+     * styles (`color`, `image`, `button`; null removes a style). Values not sent lose their photos.
+     */
+    public function saveOptionImages(SaveOptionImagesRequest $request, Product $product, SaveOptionImages $save): JsonResponse
+    {
+        $product = $save($product, $request->optionData());
+
+        return ApiResponse::success($this->present($request, $product->refresh()));
+    }
+
     private function present(Request $request, Product $product, bool $loadVariants = true): ProductResource
     {
-        if ($loadVariants) {
-            $product->load(['variants.barcodes', 'images']);
-        } else {
+        if (! $loadVariants) {
             $product->loadMissing('images');
+
+            return ($this->presenter($request, collect([$product])))($product);
         }
 
-        return ($this->presenter($request, collect([$product])))($product);
+        $product->load(['variants.barcodes', 'images', 'optionImages']);
+        $ids = $product->variants->pluck('id')->all();
+        /** @var TenantUser $user */
+        $user = $request->user();
+        $extras = [
+            'compare_at' => $this->webData->compareAtPrices($ids),
+            'back_in_stock' => $this->webData->openBackInStockRequests($ids),
+            'stock' => $this->stock->levels($user, $ids),
+        ];
+
+        return ($this->presenter($request, collect([$product]), $extras))($product);
     }
 
     /**
@@ -164,7 +213,7 @@ class ProductController
      * @param  Collection<int, Product>  $products
      * @return callable(Product): ProductResource
      */
-    private function presenter(Request $request, Collection $products): callable
+    private function presenter(Request $request, Collection $products, ?array $extras = null): callable
     {
         $catalog = $this->catalog->describe($this->tenant->requireOrganization(), [
             'categories' => $products->pluck('category_id')->filter()->all(),
@@ -174,6 +223,6 @@ class ProductController
         ]);
         $withCost = (bool) $request->user()?->can('products.view_cost');
 
-        return fn (Product $product) => new ProductResource($product, $catalog, $withCost);
+        return fn (Product $product) => new ProductResource($product, $catalog, $withCost, $extras);
     }
 }

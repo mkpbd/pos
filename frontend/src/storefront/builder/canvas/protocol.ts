@@ -17,11 +17,40 @@ export type Rect = { x: number; y: number; w: number; h: number }
 /**
  * B4 (additive, v stays 1): what kind of document the canvas draws. A page fills the canvas; a
  * header, footer or zone is drawn where it sits on the store, next to a faded sample of the page
- * around it. Absent = `page`.
+ * around it. Absent = `page`; a value the canvas doesn't know draws as a page.
+ * P1b (additive): the product page zones `product.below_price` (in the summary column, under the
+ * price) and `product.bottom` (the end of the page). A targeted zone version
+ * (`zone:<zone>@category:<id>`) is drawn as its zone.
  */
-export type CanvasSurroundings = 'page' | 'header' | 'footer' | 'zone:listing.top' | 'zone:listing.bottom' | 'zone:product.after' | 'popup'
+export type CanvasSurroundings =
+  | 'page'
+  | 'header'
+  | 'footer'
+  | 'zone:listing.top'
+  | 'zone:listing.bottom'
+  | 'zone:product.below_price'
+  | 'zone:product.after'
+  | 'zone:product.bottom'
+  | 'popup'
 
-export const CANVAS_SURROUNDINGS: readonly CanvasSurroundings[] = ['page', 'header', 'footer', 'zone:listing.top', 'zone:listing.bottom', 'zone:product.after', 'popup']
+export const CANVAS_SURROUNDINGS: readonly CanvasSurroundings[] = [
+  'page',
+  'header',
+  'footer',
+  'zone:listing.top',
+  'zone:listing.bottom',
+  'zone:product.below_price',
+  'zone:product.after',
+  'zone:product.bottom',
+  'popup',
+]
+
+/**
+ * P1b (additive, v stays 1): the product a product page zone is previewed with — for a version
+ * targeted to a category or a product, a matching product. The faded sample around the zone
+ * shows its photo, name and price instead of grey blocks. `price` is a decimal string ("120.00").
+ */
+export type CanvasProduct = { name: string; price: string | null; image_url: string | null }
 
 /** Parent → canvas. */
 export type ParentMessage =
@@ -47,6 +76,8 @@ export type ParentMessage =
        * document inside that layout over a dimmed sample page (no triggers; forms don't submit).
        */
       popup?: PopupSettings
+      /** P1b (additive): with a product page zone, the product its sample shows (absent = grey blocks). */
+      product?: CanvasProduct
     }
   | { type: 'scroll-to'; id: string }
   /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */
@@ -90,6 +121,32 @@ export function readParentMessage(event: MessageEvent, origin: string, from?: Me
 /** A message for the editor, or null. `from`: the canvas iframe's window. */
 export function readCanvasMessage(event: MessageEvent, origin: string, from?: MessageEventSource | null): CanvasMessage | null {
   return accepted(event, origin, from, CANVAS_TYPES) ? (event.data as CanvasMessage) : null
+}
+
+const PRICE = /^\d{1,12}(\.\d{1,4})?$/
+
+/** An image the canvas may load: a path on this origin or an http(s) URL. */
+function isImageUrl(url: string): boolean {
+  if (url.length > 2048) return false
+  if (url.startsWith('/')) return !url.startsWith('//') && !url.startsWith('/\\')
+  try {
+    const { protocol } = new URL(url)
+    return protocol === 'https:' || protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+/** P1b: the `product` of a render message as the canvas may draw it, or null (absent or not well-formed). */
+export function readCanvasProduct(value: unknown): CanvasProduct | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  const { name, price, image_url: image } = value as Record<string, unknown>
+  if (typeof name !== 'string' || name.trim() === '' || name.length > 255) return null
+  return {
+    name: name.trim(),
+    price: typeof price === 'string' && PRICE.test(price) ? price : null,
+    image_url: typeof image === 'string' && isImageUrl(image) ? image : null,
+  }
 }
 
 /** Shortcut keys the canvas hands to the editor (so they work while focus is in the iframe). */

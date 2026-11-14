@@ -31,6 +31,8 @@ class ThemePresetsTest extends TestCase
         'top_bar' => 'none',
         // B4: products per row on listings (today's grid).
         'listing_columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2],
+        // P1b: today's product page.
+        'product' => ['gallery' => 'left', 'thumbnails' => 'bottom', 'sticky_summary' => false, 'details' => 'tabs'],
     ];
 
     public function test_a_theme_stored_before_presets_reads_as_todays_look(): void
@@ -76,6 +78,7 @@ class ThemePresetsTest extends TestCase
                 'header_style' => 'commerce', 'footer_style' => 'widgets', 'card_style' => 'minimal',
                 'hero_style' => 'tiles', 'heading_case' => 'uppercase', 'top_bar' => 'ticker',
                 'listing_columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2],
+                'product' => ['gallery' => 'left', 'thumbnails' => 'bottom', 'sticky_summary' => false, 'details' => 'tabs'],
             ]);
 
         $this->putJson('/api/v1/storefront/theme', ['typography' => ['heading_font' => 'jost', 'body_font' => 'jost']])->assertOk();
@@ -89,6 +92,9 @@ class ThemePresetsTest extends TestCase
             'layout.hero_style' => ['layout' => ['hero_style' => 'video']],
             'layout.heading_case' => ['layout' => ['heading_case' => 'capitalize']],
             'layout.top_bar' => ['layout' => ['top_bar' => 'banner']],
+            // P1b: the product page layout.
+            'layout.product.gallery' => ['layout' => ['product' => ['gallery' => 'center']]],
+            'layout.product.details' => ['layout' => ['product' => ['details' => 'popup']]],
         ];
         foreach ($invalid as $field => $body) {
             $this->putJson('/api/v1/storefront/theme', $body)

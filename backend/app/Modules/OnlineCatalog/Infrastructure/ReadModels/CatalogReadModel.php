@@ -19,6 +19,7 @@ use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Domain\VideoUrl;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -43,8 +44,8 @@ use Illuminate\Support\Facades\DB;
  * their listings' translations the same way. Listing texts are read with
  * Translations::pick(). Search matches base and Bangla names.
  *
- * @phpstan-type VariantRecord array{id: string, sku: string, name: ?string, option_values: array<string, string>, price: string, compare_at_price: ?string, raw_compare_at_price: ?string, image_id: ?string, is_active: bool, tracked: bool, in_stock: bool, low_stock: bool}
- * @phpstan-type ProductRecord array{id: string, name: string, base_name?: string, category_id: ?string, brand_id: ?string, unit_id: ?string, options: list<array{name: string, values: list<string>}>, is_active: bool, listing: ProductListing, variants: list<VariantRecord>, images: list<array{id: string, url: string}>, units_sold_30d: string, units_sold_total: string, rating?: array{average: string, count: int}|null}
+ * @phpstan-type VariantRecord array{id: string, sku: string, name: ?string, option_values: array<string, string>, price: string, compare_at_price: ?string, raw_compare_at_price: ?string, image_id: ?string, is_active: bool, tracked: bool, in_stock: bool, low_stock: bool, stock_left: ?int}
+ * @phpstan-type ProductRecord array{id: string, name: string, base_name?: string, category_id: ?string, brand_id: ?string, unit_id: ?string, options: list<array{name: string, values: list<string>}>, is_active: bool, listing: ProductListing, variants: list<VariantRecord>, images: list<array{id: string, url: string}>, photo_option: ?string, option_styles: array<string, string>, option_images: array<string, array<string, list<string>>>, units_sold_30d: string, units_sold_total: string, rating?: array{average: string, count: int}|null}
  */
 class CatalogReadModel
 {
@@ -191,11 +192,20 @@ class CatalogReadModel
 
     /**
      * B4: the slug of the live product whose listing changed last, or null (store builder
-     * preview of the product page zone).
+     * preview of the product page zone). P1b: `$categoryId` limits it to that category and its
+     * subcategories (preview of a category-targeted zone).
      */
-    public function latestProductSlug(): ?string
+    public function latestProductSlug(?string $categoryId = null): ?string
     {
-        $slug = $this->liveListings()->orderByDesc('pl.updated_at')->orderBy('pl.slug')->value('pl.slug');
+        $query = $this->liveListings();
+        if ($categoryId !== null) {
+            $ids = $this->categoryTree()->withDescendants($categoryId);
+            if ($ids === []) {
+                return null;
+            }
+            $query->whereIn('p.category_id', $ids);
+        }
+        $slug = $query->orderByDesc('pl.updated_at')->orderBy('pl.slug')->value('pl.slug');
 
         return $slug === null ? null : (string) $slug;
     }
@@ -259,7 +269,8 @@ class CatalogReadModel
             ->where('p.organization_id', $org)
             ->whereNull('p.deleted_at')
             ->select('product_listings.*', 'p.name as p_name', 'p.category_id as p_category_id', 'p.brand_id as p_brand_id',
-                'p.unit_id as p_unit_id', 'p.type as p_type', 'p.track_stock as p_track_stock', 'p.options as p_options', 'p.is_active as p_is_active');
+                'p.unit_id as p_unit_id', 'p.type as p_type', 'p.track_stock as p_track_stock', 'p.options as p_options', 'p.is_active as p_is_active',
+                'p.photo_option as p_photo_option', 'p.option_styles as p_option_styles');
 
         if ($live) {
             $now = now();
@@ -297,6 +308,7 @@ class CatalogReadModel
         $productIds = $listings->pluck('product_id')->all();
         $variants = $this->variants($productIds, ! ($options['include_inactive_variants'] ?? false));
         $images = $this->images($productIds);
+        $optionImages = $this->optionImages($productIds);
         $stats = $this->stats($productIds);
         // E10b: approved-review ratings of all candidates in one query (cards, "top rated" sort).
         $ratings = $this->ratings->summaries($productIds);
@@ -324,6 +336,9 @@ class CatalogReadModel
                 $row['tracked'] = $isTracked;
                 $row['in_stock'] = ! $isTracked || Decimal::compare($qty, '0') > 0;
                 $row['low_stock'] = $isTracked && Decimal::compare($qty, '0') > 0 && Decimal::compare($qty, self::LOW_STOCK_THRESHOLD) <= 0;
+                // P1a: whole units left, only when few are left (never the exact stock of well-stocked items).
+                $whole = (int) Decimal::floor($qty, 0);
+                $row['stock_left'] = $row['low_stock'] && $whole > 0 ? $whole : null;
                 $productVariants[] = $row;
             }
             if ($live && $productVariants === []) {
@@ -332,6 +347,7 @@ class CatalogReadModel
             }
 
             $options = $listing->getAttribute('p_options');
+            $styles = $listing->getAttribute('p_option_styles');
             $records[] = [
                 'id' => $listing->product_id,
                 'name' => (string) $listing->getAttribute('p_name'),
@@ -343,6 +359,10 @@ class CatalogReadModel
                 'listing' => $listing,
                 'variants' => $productVariants,
                 'images' => $images[$listing->product_id] ?? [],
+                // P1a: photos by colour and swatch styles.
+                'photo_option' => $listing->getAttribute('p_photo_option'),
+                'option_styles' => is_string($styles) ? (json_decode($styles, true) ?: []) : ($styles ?? []),
+                'option_images' => $optionImages[$listing->product_id] ?? [],
                 'units_sold_30d' => $stats[$listing->product_id]['30d'] ?? '0.000',
                 'units_sold_total' => $stats[$listing->product_id]['total'] ?? '0.000',
                 'rating' => $ratings[$listing->product_id] ?? null,
@@ -392,7 +412,46 @@ class CatalogReadModel
             'promotion' => $variants === [] ? null : $this->promotion($record, $pricing['price']),
             // E10b: {average (one decimal), count} of the approved reviews, null when unrated.
             'rating' => $record['rating'] ?? null,
+            // P1a: colour chips (≤ 5, `more` = the rest) with each value's first photo.
+            'swatches' => $this->swatches($record),
+            // P1b: the listing's custom badges [{text, tone}] in the request's language.
+            'badges' => $this->badges($listing),
         ];
+    }
+
+    /**
+     * P1b: a listing's custom badges (≤ 2) as shoppers see them: `[{text, tone}]`, the text in
+     * the request's language (per-field fallback to the base text).
+     *
+     * @return list<array{text: string, tone: string}>
+     */
+    public function badges(ProductListing $listing): array
+    {
+        $locale = $this->locale->current();
+        $result = [];
+        foreach (array_slice(array_values(is_array($listing->badges) ? $listing->badges : []), 0, ProductListing::MAX_BADGES) as $badge) {
+            if (! is_array($badge) || ! is_string($badge['text'] ?? null) || trim($badge['text']) === '' || ! in_array($badge['tone'] ?? null, ProductListing::BADGE_TONES, true)) {
+                continue;
+            }
+            $result[] = [
+                'text' => (string) Translations::value($badge['translations'] ?? null, 'text', $locale, $badge['text']),
+                'tone' => $badge['tone'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * P1b: the listing's video `{provider, id, url}` (YouTube / Vimeo), or null.
+     *
+     * @return array{provider: string, id: string, url: string}|null
+     */
+    public function video(ProductListing $listing): ?array
+    {
+        $parsed = VideoUrl::parse($listing->video_url);
+
+        return $parsed === null ? null : ['provider' => $parsed['provider'], 'id' => $parsed['video_id'], 'url' => (string) $listing->video_url];
     }
 
     /**
@@ -834,6 +893,170 @@ class CatalogReadModel
         }
 
         return $result;
+    }
+
+    /**
+     * P1a: ordered image ids per option value, keyed by lower-case option name and value.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array<string, array<string, list<string>>>>
+     */
+    private function optionImages(array $productIds): array
+    {
+        $result = [];
+        foreach (array_chunk($productIds, self::CHUNK) as $chunk) {
+            $rows = DB::table('product_option_images')
+                ->where('organization_id', $this->organizationId())
+                ->whereIn('product_id', $chunk)
+                ->orderBy('sort_order')->orderBy('id')
+                ->get(['product_id', 'option_name', 'option_value', 'image_id']);
+            foreach ($rows as $row) {
+                $result[$row->product_id][mb_strtolower($row->option_name)][mb_strtolower($row->option_value)][] = $row->image_id;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * P1a: the product's options with the values its active variants use, in dictionary order
+     * (a linked attribute gives slug, display, value order and swatch colours). `display` is the
+     * product's own style (color → swatch, image, button) or else the attribute's display.
+     * Values of the photo option carry their photos (`image` is the first).
+     *
+     * @param  ProductRecord  $record
+     * @return list<array{name: string, slug: ?string, display: string, values: list<array{value: string, swatch_hex: ?string, image: array{id: string, url: string, alt: string}|null, image_ids: list<string>}>}>
+     */
+    public function productOptions(array $record): array
+    {
+        $attributes = [];
+        foreach ($this->attributes() as $attribute) {
+            $attributes[mb_strtolower($attribute['name'])] = $attribute;
+        }
+        $styles = array_change_key_case($record['option_styles'] ?? [], CASE_LOWER);
+        $photoOption = mb_strtolower((string) ($record['photo_option'] ?? ''));
+        $imagesById = array_column($record['images'], null, 'id');
+        $variants = $this->activeVariants($record);
+
+        $result = [];
+        foreach ($record['options'] as $option) {
+            $name = (string) ($option['name'] ?? '');
+            $key = mb_strtolower($name);
+            $used = [];
+            foreach ($variants as $variant) {
+                foreach ($variant['option_values'] as $optionName => $value) {
+                    if (mb_strtolower((string) $optionName) === $key) {
+                        $used[mb_strtolower((string) $value)] = true;
+                    }
+                }
+            }
+            $values = array_values(array_filter((array) ($option['values'] ?? []), fn ($v) => isset($used[mb_strtolower((string) $v)])));
+
+            $attribute = $attributes[$key] ?? null;
+            $swatches = [];
+            if ($attribute !== null) {
+                $order = [];
+                foreach ($attribute['values'] as $position => $known) {
+                    $order[mb_strtolower($known['value'])] = $position;
+                    $swatches[mb_strtolower($known['value'])] = $known['swatch_hex'];
+                }
+                $fallback = count($order);
+                $indexed = array_map(null, $values, array_keys($values));
+                usort($indexed, fn (array $a, array $b) => [$order[mb_strtolower((string) $a[0])] ?? $fallback, $a[1]] <=> [$order[mb_strtolower((string) $b[0])] ?? $fallback, $b[1]]);
+                $values = array_column($indexed, 0);
+            }
+
+            $photos = $photoOption !== '' && $photoOption === $key ? ($record['option_images'][$key] ?? []) : [];
+            $result[] = [
+                'name' => $name,
+                'slug' => $attribute['slug'] ?? null,
+                'display' => match ($styles[$key] ?? null) {
+                    'color' => 'swatch',
+                    'image' => 'image',
+                    'button' => 'button',
+                    default => $attribute['display'] ?? 'button',
+                },
+                'values' => array_map(function ($v) use ($swatches, $photos, $imagesById, $record) {
+                    $ids = array_values(array_filter($photos[mb_strtolower((string) $v)] ?? [], fn (string $id) => isset($imagesById[$id])));
+
+                    return [
+                        'value' => (string) $v,
+                        'swatch_hex' => $swatches[mb_strtolower((string) $v)] ?? null,
+                        'image' => $ids === [] ? null : ['id' => $ids[0], 'url' => $imagesById[$ids[0]]['url'], 'alt' => $record['name'].' — '.$v],
+                        'image_ids' => $ids,
+                    ];
+                }, $values),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * P1a: the photo option, or else the first option drawn as colour chips, for product cards:
+     * at most five values (with their first photo) and how many more there are.
+     *
+     * @param  ProductRecord  $record
+     * @return array{option: string, values: list<array{value: string, swatch_hex: ?string, image: array{url: string, alt: string}|null}>, more: int}|null
+     */
+    public function swatches(array $record): ?array
+    {
+        if (($record['options'] ?? []) === []) {
+            return null;
+        }
+        $options = $this->productOptions($record);
+        $photoOption = mb_strtolower((string) ($record['photo_option'] ?? ''));
+        $chosen = null;
+        foreach ($options as $option) {
+            if ($photoOption !== '' && mb_strtolower($option['name']) === $photoOption) {
+                $chosen = $option;
+                break;
+            }
+        }
+        foreach ($chosen === null ? $options : [] as $option) {
+            if ($option['display'] === 'swatch') {
+                $chosen = $option;
+                break;
+            }
+        }
+        if ($chosen === null || $chosen['values'] === []) {
+            return null;
+        }
+
+        return [
+            'option' => $chosen['name'],
+            'values' => array_map(fn (array $v) => [
+                'value' => $v['value'],
+                'swatch_hex' => $v['swatch_hex'],
+                'image' => $v['image'] === null ? null : ['url' => $v['image']['url'], 'alt' => $v['image']['alt']],
+            ], array_slice($chosen['values'], 0, 5)),
+            'more' => max(0, count($chosen['values']) - 5),
+        ];
+    }
+
+    /**
+     * A variant's label: its own name, else its option values ("Red / L"), else the product's name.
+     *
+     * @param  array<string, mixed>  $variant
+     */
+    public static function variantLabel(string $productName, array $variant): string
+    {
+        if (is_string($variant['name'] ?? null) && $variant['name'] !== '') {
+            return $variant['name'];
+        }
+        $values = (array) ($variant['option_values'] ?? []);
+
+        return $values !== [] ? implode(' / ', array_map('strval', array_values($values))) : $productName;
+    }
+
+    /**
+     * The storefront's site name (e-mails), or null before it is set up.
+     */
+    public function siteName(): ?string
+    {
+        $name = DB::table('storefront_settings')->where('organization_id', $this->organizationId())->value('site_name');
+
+        return is_string($name) && $name !== '' ? $name : null;
     }
 
     /**

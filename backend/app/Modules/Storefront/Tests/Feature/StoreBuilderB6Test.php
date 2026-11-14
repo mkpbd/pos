@@ -165,7 +165,8 @@ class StoreBuilderB6Test extends TestCase
         $this->assertSame(['e_jams', 'e_spot', 'e_look', 'e_gallery', 'e_recent'], array_keys($elements));
         $this->assertSame(['name' => 'Jams', 'url' => '/category/jams', 'image' => null, 'product_count' => 2], $page['data']['e_jams']);
         $product = $this->getJson(self::STORE.'/products/'.$page['data']['e_spot']['slug'])->assertOk()->json('data');
-        $this->assertSame($product, $page['data']['e_spot']);
+        // P1b: the product page object without what only the page itself shows.
+        $this->assertSame(array_diff_key($product, array_flip(['delivery', 'zones', 'questions_count'])), $page['data']['e_spot']);
         $this->assertSame(['Small', 'Large'], array_column($page['data']['e_spot']['options'][0]['values'], 'value'));
         $this->assertCount(2, $page['data']['e_spot']['variants']);
         // Shop the look: the cards of the products on sale; the hidden one's spot is gone.

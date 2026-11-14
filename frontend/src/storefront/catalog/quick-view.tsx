@@ -10,8 +10,7 @@ import { isNotFound, useProductQuery } from './api'
 import { ProductGallery } from './product-gallery'
 import { ProductSummary } from './product-summary'
 import { QuickViewContext } from './quick-view-context'
-import { imageIndexOf, useVariantSelection } from './use-variant-selection'
-import { initialVariant } from './variant-selection'
+import { galleryPhotos, useProductGallery, useVariantSelection } from './use-variant-selection'
 
 /**
  * One quick view dialog for every product card on the page. Focus moves into the dialog,
@@ -72,16 +71,17 @@ function QuickViewBody({ slug, onNavigate }: { slug: string; onNavigate: () => v
 
 function QuickViewProduct({ product, onNavigate }: { product: ProductDetail; onNavigate: () => void }) {
   const { t } = useLocale()
-  const [imageIndex, setImageIndex] = useState(() => Math.max(0, imageIndexOf(product, initialVariant(product)?.image_id)))
-  const { selection, variant, choose } = useVariantSelection(product, null, (next) => {
-    const i = imageIndexOf(product, next?.image_id)
-    if (i >= 0) setImageIndex(i)
-  })
+  const { selection, variant, choose: pick } = useVariantSelection(product, null)
+  const gallery = useProductGallery(product, selection, variant)
+  const choose = (optionName: string, value: string) => {
+    const next = pick(optionName, value)
+    gallery.follow(next.variant, next.selection)
+  }
   const href = variant && product.variants.length > 1 ? `${product.url}?variant=${encodeURIComponent(variant.id)}` : product.url
 
   return (
     <div className="grid gap-6 md:grid-cols-2" data-testid="quick-view">
-      <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} zoom={false} />
+      <ProductGallery images={gallery.images} name={product.name} index={gallery.index} onIndexChange={gallery.setIndex} zoom={false} photos={galleryPhotos(product, gallery)} video={gallery.video} />
       <div className="flex flex-col gap-4">
         <DialogTitle className="pr-8 font-heading text-2xl leading-tight font-extrabold text-sf-heading">{product.name}</DialogTitle>
         <ProductSummary product={product} variant={variant} selection={selection} onChoose={choose} />

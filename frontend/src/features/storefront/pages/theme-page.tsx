@@ -50,6 +50,7 @@ import { ColorField } from '@/features/storefront/components/color-field'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { contrastRatio, meetsAA } from '@/features/storefront/contrast'
 import { GlobalStylesPanel } from '@/features/storefront/theme/global-styles'
+import { ProductLayoutFields } from '@/features/storefront/theme/product-layout-card'
 import { ThemeConflictDialog, ThemePublishDialog, ThemeVersionsDialog } from '@/features/storefront/theme/theme-dialogs'
 import { FONT_FAMILIES, FONT_LABELS } from '@/features/storefront/theme/theme-options'
 import { ANNOUNCEMENT_TEXT_MAX, THEME_FIELDS, themeSchema, toDocument, toFormValues, type ThemeFormValues } from '@/features/storefront/theme-form'
@@ -163,10 +164,13 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
     return mapped
   }
 
-  /** Saves the values as the draft; false when it did not (conflict, invalid, network). */
-  const saveValues = async (values: ThemeFormValues, rev = draft.draft_revision): Promise<boolean> => {
+  /**
+   * Saves the values as the draft; false when it did not (conflict, invalid, network). `base`: the
+   * draft the values apply to — its layout keys outside this form (listing_columns) are kept.
+   */
+  const saveValues = async (values: ThemeFormValues, rev = draft.draft_revision, base: ThemeSettings = draft.settings): Promise<boolean> => {
     try {
-      await save.mutateAsync({ revision: rev, settings: toDocument(values, draft.settings.announcement.translations as TranslationsMap) })
+      await save.mutateAsync({ revision: rev, settings: toDocument(values, base.announcement.translations as TranslationsMap, base) })
       return true
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) setConflict(values)
@@ -207,7 +211,7 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
         toast.success('Loaded the latest draft.')
       } else {
         setConflict(null)
-        if (await saveValues(mine, latest.draft_revision)) toast.success('Draft saved. Publish to show it on your store.')
+        if (await saveValues(mine, latest.draft_revision, latest.settings)) toast.success('Draft saved. Publish to show it on your store.')
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not load the latest draft.')
@@ -275,9 +279,9 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
   }, [isDirty])
   const blocker = useBlocker(useCallback(({ currentLocation, nextLocation }) => isDirty && currentLocation.pathname !== nextLocation.pathname, [isDirty]))
 
-  const [colors, palette, typography, shape, announcementEnabled, announcementText, announcementForeground, announcementBackground] = useWatch({
+  const [colors, palette, typography, shape, announcementEnabled, announcementText, announcementForeground, announcementBackground, productLayout] = useWatch({
     control,
-    name: ['colors', 'palette', 'typography', 'shape', 'announcement.enabled', 'announcement.text', 'announcement.foreground', 'announcement.background'],
+    name: ['colors', 'palette', 'typography', 'shape', 'announcement.enabled', 'announcement.text', 'announcement.foreground', 'announcement.background', 'layout.product'],
   })
   const panelSettings: ThemeSettings = { ...draft.settings, colors, palette, typography, shape }
   const panelErrors = Object.assign({}, ...GLOBAL_STYLE_KEYS.map((key) => flattenErrors(errors[key] as FieldErrors | undefined, key)), errors.palette?.message ? { palette: errors.palette.message } : {}) as Record<string, string>
@@ -363,6 +367,24 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
               ))}
             </CardContent>
           </Card>
+
+          {productLayout !== undefined && (
+            <div className="xl:col-span-2">
+              <Controller control={control} name="layout.product" render={({ field }) => (
+                <ProductLayoutFields
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={!canManage}
+                  errors={{
+                    gallery: errors.layout?.product?.gallery?.message,
+                    thumbnails: errors.layout?.product?.thumbnails?.message,
+                    sticky_summary: errors.layout?.product?.sticky_summary?.message,
+                    details: errors.layout?.product?.details?.message,
+                  }}
+                />
+              )} />
+            </div>
+          )}
 
           <Card>
             <CardHeader>

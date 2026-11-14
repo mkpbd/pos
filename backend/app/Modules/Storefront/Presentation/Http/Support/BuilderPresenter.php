@@ -26,11 +26,18 @@ final class BuilderPresenter
      * `preview_url` of the header and footer is the home page, of the listing zones `/shop`, of
      * the product zone the product changed last (null when nothing is on sale online).
      *
+     * P1b: `zone` (the zone of a zone document, else null) and `target` (`{type: category|product,
+     * id, name}` of a product zone's version, name null when the record is gone; else null). A
+     * product zone's `preview_url` is a matching live product: the product changed last for the
+     * all-products version, the product itself for a product version (when live), the product
+     * changed last in the category or a subcategory for a category version (null when none).
+     *
      * @param  string|false|null  $storeUrl  the primary store URL when already known (false: look it up)
      * @param  array<string, array<string, mixed>>|null  $cmsPages  CMS page summaries by id when already known
+     * @param  array{names: array<string, array<string, string>>, slugs: array<string, ?string>}|null  $zones  P1b: target names and matching product slugs when already known (zoneContext())
      * @return array<string, mixed>
      */
-    public static function summary(BuilderDocument $document, string|false|null $storeUrl = false, ?array $cmsPages = null): array
+    public static function summary(BuilderDocument $document, string|false|null $storeUrl = false, ?array $cmsPages = null, ?array $zones = null): array
     {
         $published = $document->publishedVersion;
         $storeUrl = $storeUrl === false ? self::storeUrl() : $storeUrl;
@@ -40,13 +47,19 @@ final class BuilderPresenter
             $cmsPages ??= app(PageContent::class)->summaries([$pageId]);
             $cmsPage = $cmsPages[$pageId] ?? null;
         }
+        $zone = $document->zone();
+        $target = $document->zoneTarget();
+        if ($zone !== null && ($target !== null || in_array($zone, BuilderDocument::PRODUCT_ZONES, true))) {
+            $zones ??= self::zoneContext([$document], $storeUrl !== null);
+        }
         $path = $cmsPage !== null ? '/pages/'.$cmsPage['slug'] : $document->storePath();
         // B4: where the draft of a page part shows — header / footer on the home page, listing
-        // zones on /shop, the product zone on the product changed last (none: null).
-        $previewPath = $path ?? match ($document->key) {
-            BuilderDocument::HEADER, BuilderDocument::FOOTER => '/',
-            BuilderDocument::ZONE_PREFIX.'listing.top', BuilderDocument::ZONE_PREFIX.'listing.bottom' => '/shop',
-            BuilderDocument::ZONE_PREFIX.'product.after' => $storeUrl === null ? null : self::latestProductPath(),
+        // zones on /shop, the product zones on a matching product (P1b; none: null).
+        $productSlug = $zones['slugs'][$document->key] ?? null;
+        $previewPath = $path ?? match (true) {
+            in_array($document->key, [BuilderDocument::HEADER, BuilderDocument::FOOTER], true) => '/',
+            in_array($zone, ['listing.top', 'listing.bottom'], true) => '/shop',
+            in_array($zone, BuilderDocument::PRODUCT_ZONES, true) => $productSlug === null ? null : '/product/'.$productSlug,
             default => null,
         };
         $previewUrl = $storeUrl === null || $previewPath === null ? null : $storeUrl.$previewPath.'?preview=draft';
@@ -64,6 +77,9 @@ final class BuilderPresenter
             'path' => $path,
             'cms_page' => $cmsPage,
             'preview_url' => $previewUrl,
+            // P1b: the zone of a zone document; a product zone version's target {type, id, name|null}.
+            'zone' => $zone,
+            'target' => $target === null ? null : $target + ['name' => $zones['names'][$target['type']][$target['id']] ?? null],
             // B8b: popups' on / off switch, status (draft | off | scheduled | expired | live) and draft settings summary.
             'active' => $document->isPopup() ? $document->active : null,
             'status' => $document->popupStatus(),
@@ -96,18 +112,81 @@ final class BuilderPresenter
         $storeUrl = self::storeUrl();
         $documents = collect($documents);
         $cmsPages = app(PageContent::class)->summaries($documents->map(fn (BuilderDocument $d) => $d->cmsPageId())->filter()->values()->all());
+        $zones = self::zoneContext($documents->all(), $storeUrl !== null);
 
-        return $documents->map(fn (BuilderDocument $d) => self::summary($d, $storeUrl, $cmsPages))->values()->all();
+        return $documents->map(fn (BuilderDocument $d) => self::summary($d, $storeUrl, $cmsPages, $zones))->values()->all();
     }
 
     /**
-     * B4: `/product/<slug>` of the live product whose listing changed last, or null.
+     * P1b: for the product zone documents among these, the names of their targets (by type and
+     * id; records that are gone are absent) and — when `$withSlugs` — the slug of a matching live
+     * product per document key (null when none): the product changed last for an all-products
+     * zone, the product itself for a product version, the product changed last in the category
+     * or below it for a category version.
+     *
+     * @param  iterable<BuilderDocument>  $documents
+     * @return array{names: array<string, array<string, string>>, slugs: array<string, ?string>}
      */
-    private static function latestProductPath(): ?string
+    public static function zoneContext(iterable $documents, bool $withSlugs = true): array
     {
-        $slug = app(StorefrontCatalog::class)->latestProductSlug();
+        $catalog = app(StorefrontCatalog::class);
+        $targets = [BuilderDocument::TARGET_CATEGORY => [], BuilderDocument::TARGET_PRODUCT => []];
+        $productZones = [];
+        foreach ($documents as $document) {
+            $target = $document->zoneTarget();
+            if ($target !== null) {
+                $targets[$target['type']][] = $target['id'];
+            }
+            if (in_array($document->zone(), BuilderDocument::PRODUCT_ZONES, true)) {
+                $productZones[] = $document;
+            }
+        }
+        $names = [];
+        foreach ($targets as $type => $ids) {
+            $names[$type] = array_map(fn (array $s) => (string) $s['name'], $ids === [] ? [] : $catalog->itemSummaries($type, array_values(array_unique($ids))));
+        }
 
-        return $slug === null ? null : '/product/'.$slug;
+        $slugs = [];
+        if ($withSlugs && $productZones !== []) {
+            $productSlugs = $targets[BuilderDocument::TARGET_PRODUCT] === [] ? []
+                : array_map(fn (array $s) => $s['slug'], $catalog->productSummaries(array_values(array_unique($targets[BuilderDocument::TARGET_PRODUCT]))));
+            $latest = [];
+            foreach ($productZones as $document) {
+                $target = $document->zoneTarget();
+                $slugs[$document->key] = match ($target['type'] ?? null) {
+                    BuilderDocument::TARGET_PRODUCT => $productSlugs[$target['id']] ?? null,
+                    BuilderDocument::TARGET_CATEGORY => $latest[$target['id']] ??= $catalog->latestProductSlug($target['id']),
+                    default => $latest[''] ??= $catalog->latestProductSlug(),
+                };
+            }
+        }
+
+        return ['names' => $names, 'slugs' => $slugs];
+    }
+
+    /**
+     * P1b: `{id, slug, name, price, image_url}` of the live product a product zone document is
+     * previewed on (zoneContext()), or null — for the editor's canvas.
+     *
+     * @return array{id: string, slug: string, name: string, price: string, image_url: ?string}|null
+     */
+    public static function previewProduct(BuilderDocument $document): ?array
+    {
+        if (! in_array($document->zone(), BuilderDocument::PRODUCT_ZONES, true)) {
+            return null;
+        }
+        $catalog = app(StorefrontCatalog::class);
+        $slug = self::zoneContext([$document])['slugs'][$document->key] ?? null;
+        $id = $slug === null ? null : $catalog->liveProductId($slug);
+        $card = $id === null ? null : ($catalog->productCards([$id])[0] ?? null);
+
+        return $card === null ? null : [
+            'id' => (string) $card['id'],
+            'slug' => (string) $card['slug'],
+            'name' => (string) $card['name'],
+            'price' => (string) $card['price'],
+            'image_url' => $card['image']['url'] ?? null,
+        ];
     }
 
     /**

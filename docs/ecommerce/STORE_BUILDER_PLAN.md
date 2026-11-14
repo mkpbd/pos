@@ -386,3 +386,19 @@ Original questions:
 - **Editor:** setup dialogs for before/after, bundle and photo grid; comparison grid; store-hours week editor (Saturday first, copy to
   all, after-midnight and 24-hour hints); chart "Numbers come from" with a read-only store preview; prices accept "১,২৫০" / "৳ 99.50".
 - **Templates:** 10 neutral sections with thumbnails (76 built-ins).
+
+### As built — B8b popups & bars, form builder (2026-11-13)
+
+- **Popups:** kind `popup`, key `popup:<uuid>`; content `{schema_version, popup, sections}` (`PopupSettings` normalizer; the
+  schedule is inside the settings and versioned; `active` is a column, not versioned). Live = published + active + in schedule.
+  `BuilderPopups` serves `GET /store/builder/popups` (priority order, cache expiring at the next schedule change); settings key order
+  is restored after jsonb storage. Context `popup` allows a fixed element list; button `action: "dismiss"` only there.
+- **Storefront:** `builder/popups/` (`PopupHost` in the store layout, rules, triggers, frame). Frequency in localStorage
+  `sf.popup.<id>` (memory fallback when storage is blocked). One modal-like popup at a time, one bar per edge; a modal waits while
+  another dialog is open. Canvas draws a popup over a faded sample page with nothing running.
+- **Forms:** `B8ElementFormProps`; `SubmitBuilderForm` validates against the published element (document live, CMS page published,
+  popup live, element and ancestors shown and in schedule) → `builder_form_submissions` (answers as base-language labels; `fields`
+  snapshot for stable export columns; `document_id` is not a foreign key, so deleting a page keeps its messages). `FormSubmitted`
+  → queued bell notification + optional e-mail (failures logged). Templates may use `promotion_ref: "coupon"`
+  (`PromotionShowcase::runningCouponPromotion()`).
+- **Admin:** Content → Form submissions (`/content/forms[/:id]`); `/content` redirects forms-only staff there.

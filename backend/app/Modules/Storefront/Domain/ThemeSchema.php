@@ -47,6 +47,21 @@ final class ThemeSchema
     public const LISTING_COLUMNS_DEFAULT = ['desktop' => 3, 'tablet' => 3, 'mobile' => 2];
 
     /**
+     * P1b: the product page layout — gallery on the left or right, thumbnails below the photo or
+     * in a strip beside it (desktop; below on phones), the summary column sticking while the
+     * gallery scrolls (desktop), and the details as tabs, an accordion or stacked sections. The
+     * first choice of each (and `sticky_summary` false) is today's page. Owner content like
+     * `listing_columns`: applying a preset keeps it.
+     */
+    public const PRODUCT_LAYOUT = [
+        'gallery' => ['left', 'right'],
+        'thumbnails' => ['bottom', 'side'],
+        'details' => ['tabs', 'accordion', 'stacked'],
+    ];
+
+    public const PRODUCT_LAYOUT_DEFAULT = ['gallery' => 'left', 'thumbnails' => 'bottom', 'sticky_summary' => false, 'details' => 'tabs'];
+
+    /**
      * The base colour roles (always `#rrggbb`). They are also the `theme:<role>` colour tokens of
      * store builder styles (StyleSchema; mirrored by the editor), so this list only grows together
      * with the builder's token list.
@@ -156,6 +171,8 @@ final class ThemeSchema
                 'top_bar' => self::TOP_BARS[0],
                 // B4: products per row on listings (LISTING_COLUMNS).
                 'listing_columns' => self::LISTING_COLUMNS_DEFAULT,
+                // P1b: the product page layout (PRODUCT_LAYOUT).
+                'product' => self::PRODUCT_LAYOUT_DEFAULT,
             ],
             'logo_media_id' => null,
             'favicon_media_id' => null,
@@ -216,6 +233,20 @@ final class ThemeSchema
                 $value = is_int($value) || (is_string($value) && ctype_digit($value)) ? (int) $value : null;
                 $result['layout']['listing_columns'][$device] = in_array($value, $choices, true) ? $value : self::LISTING_COLUMNS_DEFAULT[$device];
             }
+        }
+
+        // P1b: a value outside its choices falls back to today's layout; `sticky_summary` is a real boolean.
+        if (is_array($result['layout'])) {
+            $product = is_array($result['layout']['product'] ?? null) ? $result['layout']['product'] : [];
+            $layout = [];
+            foreach (self::PRODUCT_LAYOUT_DEFAULT as $key => $default) {
+                $value = $product[$key] ?? null;
+                $layout[$key] = match (true) {
+                    $key === 'sticky_summary' => is_bool($value) ? $value : (in_array($value, [1, '1', 'true'], true) ? true : $default),
+                    default => in_array($value, self::PRODUCT_LAYOUT[$key], true) ? $value : $default,
+                };
+            }
+            $result['layout']['product'] = $layout;
         }
 
         return $result;

@@ -217,7 +217,7 @@ class StoreBuilderPopupsTest extends TestCase
         $templates = $this->getJson('/api/v1/storefront/builder/templates?scope=popup')->assertOk()->json('data');
         $this->assertSame(['popup-newsletter', 'popup-exit-offer', 'popup-free-delivery-bar', 'popup-eid-sale', 'popup-cookie-notice', 'popup-contact-form'], array_column($templates, 'id'));
         foreach ($templates as $template) {
-            $this->assertSame([['popup'], null, 'popup'], [$template['allowed_in'], $template['thumbnail_url'], $template['scope']]);
+            $this->assertSame([['popup'], "/builder-templates/{$template['id']}.png", 'popup'], [$template['allowed_in'], $template['thumbnail_url'], $template['scope']]);
         }
         $this->assertSame(array_column($templates, 'id'), array_column($this->getJson('/api/v1/storefront/builder/templates?context=popup&source=builtin')->json('data'), 'id'));
 

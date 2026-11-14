@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Domain\Builder;
 
 use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Domain\VideoUrl;
 use App\Modules\Storefront\Domain\LinkTarget;
 use App\Modules\Storefront\Domain\SectionConfigRules;
 use App\Modules\Storefront\Domain\SectionType;
@@ -880,7 +881,7 @@ final class BuilderDocumentSchema
     {
         $parsed = ElementRegistry::parseVideoUrl($url);
         if ($parsed === null) {
-            $this->error("{$path}.url", $id, 'Paste a YouTube link (youtube.com/watch?v=…, youtu.be/…, youtube.com/shorts/…) or a Vimeo link (vimeo.com/…).');
+            $this->error("{$path}.url", $id, VideoUrl::INVALID_MESSAGE);
         }
 
         return [

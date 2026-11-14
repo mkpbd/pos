@@ -29,6 +29,12 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Store builder upgrade (B1–B4):** run `php artisan migrate` (B1 adds `builder_documents`, `builder_versions` and `builder_templates`) and `php artisan pos:permissions:sync`. The sync adds `storefront.publish` (builder and theme publishing; Organization Admin and Online Store Manager) and `storefront.custom_html` (custom HTML elements; Organization Admin only) to the built-in roles. Without the sync, nobody can publish on an existing database.
 
+**Store builder upgrade (B8b):** `php artisan migrate` adds `builder_documents.active` (popups) and `builder_form_submissions`; `php artisan pos:permissions:sync` adds `forms.view` and `forms.manage` (Organization Admin; Online Store Manager gets both). Optional `POS_FORM_RATE_LIMIT` (form submissions per hour per IP, default 10). Form e-mails go through the queue, so keep the queue worker running.
+
+**Product variants upgrade (P1a):** `php artisan migrate` (colour photos, back-in-stock requests, size guides). Demo stores seeded before P1a get their sample colour photos and size guides with `php artisan db:seed --class=DemoVariantsSeeder` (idempotent). Back-in-stock e-mails are queued: keep the queue worker running. No new permissions.
+
+**Product page upgrade (P1b):** `php artisan migrate` (product affinities, product questions); run `php artisan pos:affinities:compute` once; demo databases seeded earlier: `php artisan db:seed --class=DemoProductPageSeeder`. The scheduler must run (`php artisan schedule:run` every minute) for the nightly *frequently bought together* scores (`pos:affinities:compute --nightly`, hourly, effective once per organization per day from 03:00), and the queue worker for question notifications and answer e-mails. Optional `POS_QUESTION_RATE_LIMIT` (default 5 questions per hour per visitor).
+
 The store builder's canvas (B2) is a third built page that the admin editor loads in an iframe from the same origin. Map it before the `/admin/` fallback:
 
 ```nginx

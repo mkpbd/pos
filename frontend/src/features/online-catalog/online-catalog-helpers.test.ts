@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { applyListingError, listingFormSchema, toListingFormValues, toListingInput, type ListingFormValues } from '@/features/online-catalog/listing-form'
+import { applyListingError, listingFormSchema, newBadge, toListingFormValues, toListingInput, type ListingFormValues } from '@/features/online-catalog/listing-form'
 import { moveItem } from '@/features/online-catalog/move'
 import { webStatus } from '@/features/online-catalog/taxonomy-form'
 import { listingResponse } from '@/features/online-catalog/test-data'
@@ -55,6 +55,57 @@ describe('online listing form', () => {
     expect(paths).toEqual(expect.arrayContaining(['slug', 'seo_title']))
   })
 
+  it('P1b: maps the video and badges both ways only when the API offers them', () => {
+    // Not offered (older API): nothing is added to the form or the request.
+    const plain = toListingFormValues(listingResponse())
+    expect(plain).not.toHaveProperty('video_url')
+    expect(plain).not.toHaveProperty('badges')
+    expect(toListingInput(plain).listing).not.toHaveProperty('video_url')
+    expect(toListingInput(plain).listing).not.toHaveProperty('badges')
+
+    const values = toListingFormValues(listingResponse({
+      video_url: null,
+      badges: [
+        { text: 'Handmade', tone: 'dark', translations: { bn: { text: 'হাতে তৈরি' } } },
+        { text: 'Gift', tone: 'mystery' as never, translations: { bn: {} } },
+      ],
+    }))
+    expect(values.video_url).toBe('')
+    expect(values.badges).toEqual([
+      { text: 'Handmade', tone: 'dark', translations: { bn: { text: 'হাতে তৈরি' } } },
+      // An unknown tone from a newer server reads as info.
+      { text: 'Gift', tone: 'info', translations: { bn: { text: '' } } },
+    ])
+
+    const { listing } = toListingInput({ ...values, video_url: ' https://youtu.be/dQw4w9WgXcQ ', badges: [{ text: ' Free gift ', tone: 'sale', translations: { bn: { text: ' উপহার ' } } }] })
+    expect(listing.video_url).toBe('https://youtu.be/dQw4w9WgXcQ')
+    expect(listing.badges).toEqual([{ text: 'Free gift', tone: 'sale', translations: { bn: { text: 'উপহার' } } }])
+    // An emptied link removes the video; no badges clears them.
+    expect(toListingInput({ ...values, video_url: '  ', badges: [] }).listing).toMatchObject({ video_url: null, badges: [] })
+  })
+
+  it('P1b: accepts only YouTube and Vimeo links and short badge texts', () => {
+    const base = toListingFormValues(listingResponse({ video_url: null, badges: [] }))
+    const paths = (patch: Partial<ListingFormValues>) => listingFormSchema.safeParse({ ...base, ...patch }).error?.issues.map((i) => i.path.join('.')) ?? []
+
+    for (const url of ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ', 'https://youtube.com/shorts/dQw4w9WgXcQ', 'https://vimeo.com/76979871', '']) {
+      expect(paths({ video_url: url })).toEqual([])
+    }
+    for (const url of ['https://example.com/clip.mp4', 'youtube.com/watch?v=dQw4w9WgXcQ', 'https://vimeo.com/channels/staff']) {
+      expect(paths({ video_url: url })).toEqual(['video_url'])
+    }
+    expect(paths({ badges: [{ text: ' ', tone: 'new', translations: { bn: { text: '' } } }] })).toEqual(['badges.0.text'])
+    expect(paths({ badges: [{ text: 'x'.repeat(25), tone: 'new', translations: { bn: { text: 'ক'.repeat(25) } } }] })).toEqual(['badges.0.text', 'badges.0.translations.bn.text'])
+    const badge = { text: 'A', tone: 'new' as const, translations: { bn: { text: '' } } }
+    expect(paths({ badges: [badge, badge, badge] })).toEqual(['badges'])
+  })
+
+  it('P1b: a new badge takes the first colour the product does not use yet', () => {
+    expect(newBadge([]).tone).toBe('info')
+    expect(newBadge([{ tone: 'info' }]).tone).toBe('dark')
+    expect(newBadge([{ tone: 'info' }, { tone: 'dark' }]).tone).toBe('sale')
+  })
+
   it('puts business errors on the right field', () => {
     const setError = vi.fn()
     applyListingError(new ApiError(422, 'COMPARE_AT_NOT_ABOVE_PRICE', 'Must be above 150.00.', { variant_id: 'v-2' }), setError, ['v-1', 'v-2'])
@@ -65,6 +116,11 @@ describe('online listing form', () => {
 
     applyListingError(new ApiError(422, 'VALIDATION_FAILED', 'Invalid.', { 'specifications.0.label': ['Too long.'] }), setError, [])
     expect(setError).toHaveBeenLastCalledWith('specifications.0.label', { type: 'server', message: 'Too long.' })
+
+    // P1b keys land on their rows.
+    applyListingError(new ApiError(422, 'VALIDATION_FAILED', 'Invalid.', { video_url: ['Not a video.'], 'badges.1.tone': ['Pick a colour.'] }), setError, [])
+    expect(setError).toHaveBeenCalledWith('video_url', { type: 'server', message: 'Not a video.' })
+    expect(setError).toHaveBeenLastCalledWith('badges.1.tone', { type: 'server', message: 'Pick a colour.' })
   })
 })
 

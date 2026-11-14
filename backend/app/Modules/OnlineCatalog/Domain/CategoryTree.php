@@ -112,6 +112,24 @@ final class CategoryTree
     }
 
     /**
+     * P1b: the category and its ancestors in the real tree (visible or not), nearest first —
+     * the order in which category-targeted product page zones apply.
+     *
+     * @return list<string>
+     */
+    public function selfAndAncestors(string $id): array
+    {
+        $ids = [];
+        $cursor = isset($this->nodes[$id]) ? $id : null;
+        while ($cursor !== null && isset($this->nodes[$cursor]) && ! in_array($cursor, $ids, true)) {
+            $ids[] = $cursor;
+            $cursor = $this->nodes[$cursor]['parent_id'];
+        }
+
+        return $ids;
+    }
+
+    /**
      * Visible ancestors from the root down to (excluding) the category.
      *
      * @return list<string>

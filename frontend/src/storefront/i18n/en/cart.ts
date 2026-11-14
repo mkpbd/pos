@@ -18,6 +18,8 @@ export const cart = {
   'cart.add.chooseOptionsFirst': 'Choose the options above to add this product to your cart.',
   'cart.add.optionOutOfStock': 'This option is out of stock.',
   'cart.add.quantityOf': 'Quantity of {name}',
+  'cart.add.buyNow': 'Buy now',
+  'cart.add.buying': 'Going to checkout…',
   'cart.card.chooseOptions': 'Choose options',
   'cart.card.chooseOptionsLabel': 'Choose options: {name}',
   'cart.card.addLabel': 'Add {name} to the cart',

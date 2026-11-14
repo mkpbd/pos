@@ -69,11 +69,18 @@ class StoreCatalogController
      *
      * Live products only. `?preview=1` from signed-in staff of this store holding storefront.view
      * also opens drafts, scheduled and ended listings and adds `preview_state`.
+     *
+     * P1b: `video` {provider, id, url} | null, custom `badges` [{text, tone}], the store's
+     * `delivery` note ({options: [{zone, method, min_days, max_days, fee, free_over}],
+     * cod_available} | null), the builder `zones` resolved for this product
+     * ({"product.below_price", "product.after", "product.bottom"}: render payload | null — the
+     * product's own version, else its category's or an ancestor's, else the all-products one) and
+     * `questions_count`. `?preview=draft` (staff, as above) resolves the zones over their drafts.
      */
     public function product(Request $request, string $slug, ProductPage $page): JsonResponse
     {
         $preview = $this->isPreview($request);
-        $response = ApiResponse::success($page->show($slug, $preview));
+        $response = ApiResponse::success($page->show($slug, $preview, $preview && $request->query('preview') === 'draft'));
 
         return $preview ? $response->header('Cache-Control', 'no-store, private') : $response;
     }
@@ -81,8 +88,10 @@ class StoreCatalogController
     /**
      * Related products
      *
-     * Hand-picked related products, else up to 8 newest products of the same category;
-     * frequently bought together (no fallback).
+     * Hand-picked related products, else (P1b) up to 8 other products: in stock first, the same
+     * category before the same brand, newest first. Frequently bought together: the hand-picked
+     * ones (`frequently_bought_source: manual`), else up to 4 products most often bought with
+     * this one in the last 180 days, live and in stock (`automatic`), else none (null).
      */
     public function related(Request $request, string $slug, ProductPage $page): JsonResponse
     {
@@ -101,11 +110,19 @@ class StoreCatalogController
         return ApiResponse::success($navigation->suggest((string) ($data['q'] ?? '')));
     }
 
+    /**
+     * `?preview=1`, or (P1b) the builder's `?preview=draft`, from staff of this store.
+     */
     private function isPreview(Request $request): bool
     {
-        if (! $request->boolean('preview')) {
-            return false;
-        }
+        return ($request->boolean('preview') || $request->query('preview') === 'draft') && $this->isStaff($request);
+    }
+
+    /**
+     * A signed-in, active staff member of this store's organization holding storefront.view.
+     */
+    private function isStaff(Request $request): bool
+    {
         $user = $request->user();
 
         return $user instanceof TenantUser

@@ -475,3 +475,214 @@ test('B8a: Little Sprouts publishes a page of selling, people and data blocks; s
   await bundle.getByTestId('bundle-add').click()
   await expect(bundle.getByTestId('bundle-status')).toHaveText(/added/i, { timeout: 30_000 })
 })
+
+test('B8b: Green Basket switches on a newsletter popup and a contact form; a shopper sees the popup once and the owner reads the message', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: Record<string, unknown> & { id: string; nodes: unknown[]; draft_revision: number } } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // A popup from its template: published, then switched on.
+  const popup = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'popup', title: 'Newsletter', template: 'popup-newsletter' })
+  expect(popup.status).toBe(201)
+  expect((await call('PATCH', `/api/v1/storefront/builder/documents/${popup.body.data.id}`, { active: true })).status).toBe(422)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${popup.body.data.id}/publish`, { note: 'B8b' })).status).toBe(200)
+  expect((await call('PATCH', `/api/v1/storefront/builder/documents/${popup.body.data.id}`, { active: true })).status).toBe(200)
+
+  // A page with the contact form section.
+  const made = await call('POST', '/api/v1/storefront/builder/templates/neutral-contact-form/instantiate', { context: 'page' })
+  expect(made.status).toBe(200)
+  const doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:ask-us', title: 'Ask us', from: 'blank' })
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${doc.body.data.id}/draft`, { revision: doc.body.data.draft_revision, content: { schema_version: 1, sections: made.body.data.nodes } })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${doc.body.data.id}/publish`, { note: 'B8b' })).status).toBe(200)
+
+  // The shopper: the popup opens after its delay, closes, and stays closed after a reload.
+  await page.goto(`${base}/`)
+  const dialog = page.getByRole('dialog', { name: 'Newsletter sign-up' })
+  await expect(dialog).toBeVisible({ timeout: 20_000 })
+  await dialog.getByTestId('popup-close').click()
+  await expect(dialog).toHaveCount(0)
+  await page.reload()
+  await page.waitForTimeout(10_000)
+  await expect(dialog).toHaveCount(0)
+
+  // Never on the cart.
+  await page.goto(`${base}/cart`)
+  await page.waitForTimeout(1_000)
+  await expect(page.getByRole('dialog', { name: 'Newsletter sign-up' })).toHaveCount(0)
+
+  // The contact form: a missing answer is pointed out, then the message is sent.
+  await page.goto(`${base}/p/ask-us`)
+  const form = page.getByTestId('builder-form')
+  await form.getByLabel(/Your name/).fill('Nadia Rahman')
+  await form.getByRole('button', { name: 'Send message' }).click()
+  await expect(form.getByTestId('form-error-summary')).toBeVisible()
+  await form.getByLabel(/E-mail/).fill('nadia@example.com')
+  await form.getByLabel(/Topic/).selectOption({ label: 'A product' })
+  await form.getByLabel(/Message/).fill('Is the granola gluten free?')
+  await form.getByRole('button', { name: 'Send message' }).click()
+  await expect(form.getByTestId('form-status')).toContainText('Your message is on its way')
+
+  // The owner reads it in Content → Form submissions.
+  await admin.goto(`${base}/admin/content/forms`)
+  await expect(admin.getByText(/Nadia Rahman/).first()).toBeVisible({ timeout: 30_000 })
+  await admin.getByText(/Nadia Rahman/).first().click()
+  await expect(admin.getByText('Is the granola gluten free?')).toBeVisible()
+  await adminContext.close()
+})
+
+test('P1a: Classic Shop — photos per colour, a size guide, and "notify me" that e-mails once stock is back', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(180_000)
+  const base = origin('classic.shop.localhost')
+
+  // Photos per colour: choosing Black shows Black's photo.
+  await page.goto(`${base}/product/leather-tote`)
+  const gallery = page.getByTestId('product-page')
+  const mainImage = () => gallery.locator('img').first().getAttribute('src')
+  const tan = await mainImage()
+  await gallery.locator('label[title="Black"]').first().click()
+  await expect.poll(mainImage).not.toBe(tan)
+
+  // Size guide from the category.
+  await page.goto(`${base}/product/oxford-shirt`)
+  await page.getByRole('button', { name: /Size guide/ }).click()
+  const guide = page.getByRole('dialog', { name: /Clothing size guide/ })
+  await expect(guide.getByRole('table')).toBeVisible()
+  await expect(guide.getByRole('rowheader', { name: 'M' })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // Notify me on a sold-out product.
+  await page.goto(`${base}/product/wrist-watch`)
+  await page.getByRole('button', { name: /Notify me when it.s back/ }).click()
+  const notify = page.getByRole('form', { name: /Back-in-stock e-mail for/ })
+  await notify.getByLabel('E-mail address').fill('rafi@example.com')
+  await notify.getByRole('button', { name: 'Notify me', exact: true }).click()
+  await expect(page.getByText(/We will e-mail you once when it is back in stock/).first()).toBeVisible()
+
+  // The owner adds stock at the store that ships online orders; the request is e-mailed and marked.
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@classicshop.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const settings = await call('GET', '/api/v1/storefront/settings')
+  let storeId: string | null = settings.body.data.fulfilment_store_id
+  if (!storeId) {
+    // No store chosen for online orders: the storefront ships from the first store of the first branch.
+    const branches = await call('GET', '/api/v1/branches')
+    storeId = (await call('GET', `/api/v1/branches/${branches.body.data[0].id}/stores`)).body.data[0].id
+  }
+  expect(storeId).toBeTruthy()
+  const products = await call('GET', `/api/v1/products?search=${encodeURIComponent('Minimal Wrist Watch')}`)
+  const product = products.body.data.find((p: { name: string }) => p.name === 'Minimal Wrist Watch')
+  const detail = await call('GET', `/api/v1/products/${product.id}`)
+  const variantId = detail.body.data.variants[0].id
+  const open = await call('GET', `/api/v1/products/${product.id}/back-in-stock-requests?status=open`)
+  expect(open.body.data.map((r: { email: string }) => r.email)).toContain('rafi@example.com')
+  const adjusted = await call('POST', '/api/v1/inventory/adjustments', { store_id: storeId, reason: 'correction', note: 'Restock', lines: [{ variant_id: variantId, quantity: '3' }] })
+  expect(adjusted.status).toBe(201)
+  await expect
+    .poll(async () => (await call('GET', `/api/v1/products/${product.id}/back-in-stock-requests?status=notified`)).body.data.map((r: { email: string }) => r.email))
+    .toContain('rafi@example.com')
+  await adminContext.close()
+})
+
+test('P1b: Classic Shop product page — delivery note, buy now, quick-buy bar, a product-only zone and questions answered by the owner', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('classic.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@classicshop.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; meta?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // A "below the price" zone only for the Oxford shirt.
+  const products = await call('GET', `/api/v1/products?search=${encodeURIComponent('Oxford Button-down Shirt')}`)
+  const shirt = products.body.data.find((p: { name: string }) => p.name === 'Oxford Button-down Shirt')
+  const made = await call('POST', '/api/v1/storefront/builder/templates/neutral-trust-strip/instantiate', { context: 'zone' })
+  expect(made.status).toBe(200)
+  const key = `zone:product.below_price@product:${shirt.id}`
+  let zone = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'zone', key, title: 'Under the price · Oxford', from: 'blank' })
+  if (zone.status === 409) {
+    // A rerun on the same database: the version exists already.
+    const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === key)
+    zone = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  expect(zone.body.data.target).toMatchObject({ type: 'product', id: shirt.id })
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${zone.body.data.id}/draft`, { revision: zone.body.data.draft_revision, content: { schema_version: 1, sections: made.body.data.nodes } })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${zone.body.data.id}/publish`, { note: 'P1b' })).status).toBe(200)
+
+  // The shopper: delivery and cash-on-delivery note, the product-only zone, the published questions (one in Bangla).
+  await page.goto(`${base}/product/oxford-shirt`)
+  const productPage = page.getByTestId('product-page')
+  await expect(productPage.getByTestId('delivery-note')).toBeVisible()
+  await expect(productPage.getByTestId('builder-zone-product.below_price')).toBeVisible()
+  await page.getByRole('tab', { name: /^Questions/ }).click()
+  const questions = page.getByTestId('product-questions')
+  await expect(questions.getByTestId('question')).toHaveCount(2)
+  await expect(questions).toContainText('Does the shirt shrink after washing?')
+
+  // Ask a question; the owner answers and publishes it; the shopper sees it.
+  await questions.getByRole('button', { name: 'Ask a question' }).click()
+  const ask = page.getByTestId('ask-question')
+  await ask.getByLabel('Your name').fill('Tania Akter')
+  await ask.getByLabel('E-mail').fill('tania@example.com')
+  await ask.getByLabel('Your question').fill('Is there a slim-fit version of this shirt?')
+  await ask.getByRole('button', { name: 'Send question' }).click()
+  await expect(questions.getByTestId('question-thanks')).toBeVisible()
+  const pending = await call('GET', '/api/v1/reviews/questions?status=pending&search=slim-fit')
+  expect(pending.body.data).toHaveLength(1)
+  expect((await call('POST', `/api/v1/reviews/questions/${pending.body.data[0].id}/answer`, { answer: 'Not yet — the regular fit runs slightly slim.', publish: true })).status).toBe(200)
+  await page.reload()
+  await page.getByRole('tab', { name: /^Questions/ }).click()
+  await expect(page.getByTestId('product-questions')).toContainText('Is there a slim-fit version of this shirt?')
+  await expect(page.getByTestId('product-questions')).toContainText('Tania A.')
+
+  // Another product has no product-only zone.
+  await page.goto(`${base}/product/white-sneakers`)
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByTestId('builder-zone-product.below_price')).toHaveCount(0)
+
+  // Quick-buy bar once the buy buttons scroll away; Buy now goes to checkout with the item in the cart.
+  await page.goto(`${base}/product/oxford-shirt`)
+  const sizeM = page.getByTestId('product-page').getByRole('radio', { name: 'M', exact: true })
+  await page.getByTestId('product-page').locator(`label[for="${await sizeM.getAttribute('id')}"]`).click()
+  await expect(sizeM).toBeChecked()
+  await page.mouse.wheel(0, 2500)
+  await expect(page.getByTestId('quick-buy')).toBeVisible()
+  await page.mouse.wheel(0, -5000)
+  await page.getByRole('button', { name: 'Buy now' }).first().click()
+  await expect(page).toHaveURL(/\/checkout/)
+  await expect(page.getByText('Oxford Button-down Shirt').first()).toBeVisible()
+  await adminContext.close()
+})

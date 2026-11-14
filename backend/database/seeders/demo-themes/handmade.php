@@ -151,6 +151,13 @@ return [
         ]],
     ],
 
+    // P1b: answered shopper questions (DemoProductPageSeeder): [product, name, e-mail, language, question, answer].
+    'questions' => [
+        ['stoneware-mug', 'Nadia Chowdhury', 'nadia@mati.test', 'en', 'Is the mug dishwasher safe?', 'Yes, the glaze is food safe and fine in the dishwasher. Please keep it out of the microwave because of the hand-painted rim.'],
+        ['stoneware-mug', 'তানিয়া সুলতানা', 'tania@mati.test', 'bn', 'মগে কতটুকু ধরে?', 'প্রায় ৩৫০ মিলি — বড় এক কাপ চা বা কফি।'],
+        ['soy-candle', 'Ayesha Siddiqua', 'ayesha@mati.test', 'en', 'How long does the candle burn?', 'About 40 hours. Trim the wick to 5 mm before each lighting and let the top melt evenly the first time.'],
+    ],
+
     'features' => [
         ['icon' => 'heart', 'title' => 'Made by hand', 'text' => 'In our Mirpur studio'],
         ['icon' => 'gift', 'title' => 'Gift wrapping', 'text' => 'Free on every order'],

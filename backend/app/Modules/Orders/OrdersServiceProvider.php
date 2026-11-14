@@ -5,6 +5,7 @@ namespace App\Modules\Orders;
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
 use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
+use App\Modules\Orders\Application\Contracts\OrderBaskets;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Contracts\PurchaseVerifier;
 use App\Modules\Orders\Application\Events\OrderCancelledByCustomer;
@@ -15,6 +16,7 @@ use App\Modules\Orders\Application\Events\OrderReturnUpdated;
 use App\Modules\Orders\Application\Services\NoOrderLineReviews;
 use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
 use App\Modules\Orders\Infrastructure\EloquentCustomerWebOrders;
+use App\Modules\Orders\Infrastructure\EloquentOrderBaskets;
 use App\Modules\Orders\Infrastructure\EloquentPurchaseVerifier;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledWithRefundNotifications;
@@ -48,6 +50,8 @@ class OrdersServiceProvider extends ModuleServiceProvider
         $this->app->bind(CustomerWebOrders::class, EloquentCustomerWebOrders::class);
         // Replaced by the Reviews module when it is installed.
         $this->app->bindIf(OrderLineReviews::class, NoOrderLineReviews::class);
+        // P1b: web orders as baskets for "frequently bought together" (OnlineCatalog).
+        $this->app->bind(OrderBaskets::class, EloquentOrderBaskets::class);
     }
 
     public function boot(): void

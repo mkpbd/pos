@@ -158,6 +158,13 @@ return [
         ]],
     ],
 
+    // P1b: answered shopper questions (DemoProductPageSeeder): [product, name, e-mail, language, question, answer].
+    'questions' => [
+        ['avocado', 'Sabrina Islam', 'sabrina@greenbasket.test', 'en', 'How ripe are the avocados when they arrive?', 'They arrive firm and ripen in two to three days on the counter. Move them to the fridge once they give a little when pressed.'],
+        ['avocado', 'রাশেদ করিম', 'rashed@greenbasket.test', 'bn', 'ঢাকার বাইরে কি অ্যাভোকাডো পাঠান?', 'হ্যাঁ, কুরিয়ারে ৩–৫ দিনে পাঠাই। কাঁচা অবস্থায় পাঠাই, যাতে পৌঁছে পাকে।'],
+        ['oat-milk', 'Imran Hossain', 'imran@greenbasket.test', 'en', 'Is the oat milk sweetened?', 'No sugar is added: just oats, water, sunflower oil and a pinch of salt. The natural oat sweetness is all you taste.'],
+    ],
+
     'features' => [
         ['icon' => 'leaf', 'title' => '100 % plant-based', 'text' => 'Nothing from animals, ever'],
         ['icon' => 'truck', 'title' => 'Free delivery', 'text' => 'Inside Dhaka over ৳1,500'],

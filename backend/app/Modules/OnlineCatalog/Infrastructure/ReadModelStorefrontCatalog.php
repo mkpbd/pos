@@ -279,9 +279,9 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         return $this->catalog->nextScheduledChange();
     }
 
-    public function latestProductSlug(): ?string
+    public function latestProductSlug(?string $categoryId = null): ?string
     {
-        return $this->catalog->latestProductSlug();
+        return $this->catalog->latestProductSlug($categoryId);
     }
 
     public function sitemapEntries(string $type): array

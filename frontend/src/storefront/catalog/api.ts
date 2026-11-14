@@ -16,10 +16,13 @@ import type {
   StoreCategory,
 } from '../types'
 
+/** A staff preview of the product page: `true` = `?preview=1` (unpublished listings), `draft` = `?preview=draft` (P1b: builder zone drafts too). */
+export type ProductPreview = boolean | 'draft'
+
 export const catalogKeys = {
   products: (query: string) => ['store', 'products', query] as const,
   productsBySlugs: (slugs: string[]) => ['store', 'products', { slugs }] as const,
-  product: (slug: string, preview: boolean) => ['store', 'product', slug, { preview }] as const,
+  product: (slug: string, preview: ProductPreview) => ['store', 'product', slug, { preview }] as const,
   related: (slug: string) => ['store', 'product', slug, 'related'] as const,
   category: (slug: string) => ['store', 'category', slug] as const,
   brand: (slug: string) => ['store', 'brand', slug] as const,
@@ -110,15 +113,22 @@ export function useAllProductsBySlugsQuery(slugs: string[]) {
   })
 }
 
-export function useProductQuery(slug: string, preview = false) {
-  const { locale } = useLocale()
-  return useQuery({
+/** The product detail query (shared by the product page, quick view and "Frequently bought together" options). */
+export function productQueryOptions(slug: string, preview: ProductPreview, locale: string) {
+  return {
     queryKey: localized(catalogKeys.product(slug, preview), locale),
-    queryFn: ({ signal }) =>
-      storeApi.get<ProductDetail>(`/store/products/${encodeURIComponent(slug)}`, { signal, query: preview ? { preview: 1 } : undefined }).then((r) => r.data),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      storeApi
+        .get<ProductDetail>(`/store/products/${encodeURIComponent(slug)}`, { signal, query: preview === 'draft' ? { preview: 'draft' } : preview ? { preview: 1 } : undefined })
+        .then((r) => r.data),
     retry: retryUnlessNotFound,
     staleTime: preview ? 0 : 30_000,
-  })
+  }
+}
+
+export function useProductQuery(slug: string, preview: ProductPreview = false) {
+  const { locale } = useLocale()
+  return useQuery(productQueryOptions(slug, preview, locale))
 }
 
 export function useRelatedProductsQuery(slug: string, enabled = true) {

@@ -1,5 +1,22 @@
 import type { Review } from '@/features/reviews/api'
+import type { ProductQuestion } from '@/features/reviews/questions-api'
 import { makeCurrentUser } from '@/test/fixtures'
+
+/** P1b: a shopper's question as GET /reviews/questions lists it (used by Vitest only). */
+export const question = (overrides: Partial<ProductQuestion> = {}): ProductQuestion => ({
+  id: 'q-1',
+  product: { id: 'p-1', name: 'Pran Mango Juice 1L', slug: 'pran-mango-juice-1l' },
+  name: 'Rina Akter',
+  email: 'rina@example.com',
+  question: 'Is it made with real mangoes?',
+  answer: null,
+  status: 'pending',
+  locale: 'en',
+  created_at: '2026-11-10T04:30:00Z',
+  answered_at: null,
+  answered_by_name: null,
+  ...overrides,
+})
 
 export const reviewModerator = () => makeCurrentUser({ permissions: ['reviews.view', 'reviews.moderate', 'web_orders.view'] })
 export const reviewViewer = () => makeCurrentUser({ permissions: ['reviews.view'] })

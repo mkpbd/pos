@@ -88,6 +88,7 @@ const pages = {
   storeBuilderEditor: page(() => import('@/features/store-builder/pages/editor-page'), 'StoreBuilderEditorPage'),
   webCategories: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebCategoriesPage'),
   webBrands: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebBrandsPage'),
+  sizeGuides: page(() => import('@/features/storefront/pages/size-guides-page'), 'SizeGuidesPage'),
   productListing: page(() => import('@/features/online-catalog/pages/product-listing-page'), 'ProductListingPage'),
   contentPages: page(() => import('@/features/content/pages/pages-page'), 'PagesPage'),
   contentPage: page(() => import('@/features/content/pages/page-editor-page'), 'PageEditorPage'),
@@ -118,6 +119,7 @@ const pages = {
   promotions: page(() => import('@/features/promotions/pages/promotions-page'), 'PromotionsPage'),
   promotion: page(() => import('@/features/promotions/pages/promotion-editor-page'), 'PromotionEditorPage'),
   reviews: page(() => import('@/features/reviews/pages/reviews-page'), 'ReviewsPage'),
+  productQuestions: page(() => import('@/features/reviews/pages/questions-page'), 'QuestionsPage'),
   storefrontShipping: page(() => import('@/features/shipping/pages/shipping-page'), 'ShippingPage'),
   storefrontCouriers: page(() => import('@/features/shipping/pages/couriers-page'), 'CouriersPage'),
   storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
@@ -191,6 +193,8 @@ export const routes: RouteObject[] = [
               guarded('promotions.view', 'promotions/:promotionId', pages.promotion),
               // Moderators and viewers share the page; approve / reject / delete need reviews.moderate.
               guarded('reviews.view', 'reviews', pages.reviews),
+              // P1b: shoppers' questions; answering, rejecting and deleting need reviews.moderate (bell link ?status=pending).
+              guarded('reviews.view', 'reviews/questions', pages.productQuestions),
               guarded('returns.view', 'returns', pages.returns),
               guarded('returns.view', 'returns/:returnId', pages.saleReturn),
               guarded(REGISTER_PERMISSIONS, 'cash-registers', pages.cashRegisters),
@@ -257,6 +261,8 @@ export const routes: RouteObject[] = [
               guarded('payment_gateways.manage', 'storefront/payments', pages.storefrontPayments),
               guarded('online_catalog.view', 'storefront/categories', pages.webCategories),
               guarded('online_catalog.view', 'storefront/brands', pages.webBrands),
+              // P1a: viewers see guides read-only; creating, editing and deleting need online_catalog.manage.
+              guarded('online_catalog.view', 'storefront/size-guides', pages.sizeGuides),
               { path: 'content', element: <ContentRedirect /> },
               guarded('cms.manage', 'content/pages', pages.contentPages),
               guarded('cms.manage', 'content/pages/new', pages.contentPage),

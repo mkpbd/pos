@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated } from '@/lib/api/client'
-import type { Banner, BannerInput } from '@/features/storefront/api'
+import { storefrontKeys, type Banner, type BannerInput, type LinkTargets } from '@/features/storefront/api'
 import type { BuilderContent, BuilderData, BuilderMedia } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { ElementsMetadata, Problem } from './inspector'
@@ -40,7 +40,17 @@ export type DocumentSummary = {
   status?: PopupStatus
   /** B8b popups: a little of the published (else draft) settings, for the list. */
   popup?: PopupSummary | null
+  /** P1b: a zone document's zone (`product.after`, …); null for other documents. */
+  zone?: string | null
+  /** P1b: what a targeted zone version is for; null for the version for all products and other documents. */
+  target?: ZoneTarget | null
 }
+
+/** P1b: the category or product a zone version is for; `name` is null when that record is gone. */
+export type ZoneTarget = { type: 'category' | 'product'; id: string; name: string | null }
+
+/** P1b: the live product a product zone document is previewed on (GET /documents/{id}, product zones only). */
+export type PreviewProduct = { id: string; slug: string; name: string; price: string | null; image_url: string | null }
 
 /** B8b: a popup's state on the store. */
 export type PopupStatus = 'draft' | 'live' | 'off' | 'scheduled' | 'expired'
@@ -53,7 +63,11 @@ export type PopupSummary = {
   ends_at?: string | null
 }
 
-export type DocumentDetail = DocumentSummary & { content: BuilderContent }
+export type DocumentDetail = DocumentSummary & {
+  content: BuilderContent
+  /** P1b: product zones only — the matching live product (null when none). */
+  preview_product?: PreviewProduct | null
+}
 
 export type VersionSummary = {
   id: string
@@ -191,11 +205,36 @@ export function useVersionsQuery(id: string, enabled: boolean) {
 export type CreateDocumentInput =
   | { kind: 'page'; key: string; title: string; from: 'blank' | 'homepage' | 'cms' }
   | { kind: 'header' | 'footer'; key: 'header' | 'footer'; title: string; from: 'blank' | 'current' }
-  | { kind: 'zone'; key: ZoneDocumentKey; title: string; from: 'blank' }
+  | { kind: 'zone'; key: ZoneDocumentKey | TargetedZoneKey; title: string; from: 'blank' }
   /** B8b: the server makes the key (`popup:<uuid>`); `template` = a popup template's id (null = blank). */
   | { kind: 'popup'; key?: undefined; from?: undefined; title: string; template: string | null }
 
-export type ZoneDocumentKey = 'zone:listing.top' | 'zone:listing.bottom' | 'zone:product.after'
+/** P1b: the product page zones (each may have versions for a category or a product). */
+export type ProductZoneKey = 'zone:product.below_price' | 'zone:product.after' | 'zone:product.bottom'
+
+export type ZoneDocumentKey = 'zone:listing.top' | 'zone:listing.bottom' | ProductZoneKey
+
+/** P1b: a product zone's version for one category or one product (lower-case uuid). */
+export type TargetedZoneKey = `${ProductZoneKey}@${ZoneTarget['type']}:${string}`
+
+/** P1b: create errors of a targeted zone version (besides 409 DOCUMENT_EXISTS). */
+export const ZONE_ERRORS = { targetNotFound: 'ZONE_TARGET_NOT_FOUND', limit: 'ZONE_VERSION_LIMIT' } as const
+
+/** P1b: at most this many targeted zone versions per organization (the server's ZONE_VERSION_LIMIT). */
+export const ZONE_VERSION_LIMIT = 100
+
+/** The store's categories in tree order (GET /storefront/link-targets; shares its cache with the menu editor). */
+export type CategoryTarget = { id: string; name: string; url: string | null; parent_id?: string | null; depth?: number }
+
+export function useCategoryTargetsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: storefrontKeys.linkTargets,
+    queryFn: ({ signal }) => api.get<LinkTargets>('/storefront/link-targets', { signal }).then((r) => r.data),
+    staleTime: 60_000,
+    enabled,
+    select: (targets): CategoryTarget[] => (targets.categories ?? []) as CategoryTarget[],
+  })
+}
 
 export function useCreateDocumentMutation() {
   const queryClient = useQueryClient()

@@ -5,8 +5,11 @@ import { CardCartAction } from '../cart/add-to-cart'
 import { useLocale } from '../i18n/locale'
 import { Countdown } from '../promotions/countdown-timer'
 import { WishlistButton } from '../wishlist/wishlist-button'
-import { CardPrice, CardRating } from './card-parts'
+import { customBadgesOf } from './badge-colors'
+import { CardPrice, CardRating, CardSwatchRow } from './card-parts'
+import { useCardSwatches } from './card-swatches'
 import { useCardPricing } from './card-pricing'
+import { CustomBadgeItems } from './custom-badges'
 import type { ProductCardProps } from './product-card'
 import { ProductImage } from './product-image'
 import { useQuickView } from './quick-view-context'
@@ -19,6 +22,7 @@ import { useQuickView } from './quick-view-context'
 export function MinimalProductCard({ product, eager = false, actions }: ProductCardProps) {
   const { t } = useLocale()
   const pricing = useCardPricing(product)
+  const swatch = useCardSwatches(product)
   const discount = pricing.promotionLabel ?? (product.on_sale && product.discount_percent ? t('catalog.badges.discount', { percent: product.discount_percent }) : null)
 
   return (
@@ -30,7 +34,7 @@ export function MinimalProductCard({ product, eager = false, actions }: ProductC
       <div className="relative overflow-hidden rounded-sf-card bg-sf-canvas">
         <div aria-hidden>
           <ProductImage
-            image={product.image}
+            image={swatch.image}
             alt=""
             eager={eager}
             fit="cover"
@@ -38,8 +42,8 @@ export function MinimalProductCard({ product, eager = false, actions }: ProductC
             imgClassName="transition-transform duration-700 ease-out group-hover:scale-[1.04] motion-reduce:transition-none"
           />
         </div>
-        {(discount || !product.in_stock) && (
-          <ul className="pointer-events-none absolute top-3 left-3 flex flex-col items-start gap-1.5" aria-label={t('catalog.badges.label')}>
+        {(discount || !product.in_stock || customBadgesOf(product.badges).length > 0) && (
+          <ul className="pointer-events-none absolute top-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col items-start gap-1.5" aria-label={t('catalog.badges.label')}>
             {discount && (
               <li className="rounded-sf-button bg-sf-sale px-2.5 py-1 text-xs font-semibold tracking-wide text-white" data-testid="discount-badge">
                 {pricing.promotionLabel && <span className="sr-only">{t('catalog.badges.offer')}</span>}
@@ -47,6 +51,7 @@ export function MinimalProductCard({ product, eager = false, actions }: ProductC
               </li>
             )}
             {!product.in_stock && <li className="rounded-sf-button bg-sf-surface/90 px-2.5 py-1 text-xs font-semibold tracking-wide text-sf-heading">{t('catalog.stock.out')}</li>}
+            <CustomBadgeItems badges={product.badges} className="rounded-sf-button px-2.5 py-1 text-xs font-semibold tracking-wide" />
           </ul>
         )}
       </div>
@@ -58,6 +63,7 @@ export function MinimalProductCard({ product, eager = false, actions }: ProductC
           </Link>
         </h3>
         <CardPrice product={product} pricing={pricing} from className="justify-center [&_[data-testid=price]]:font-medium" />
+        <CardSwatchRow {...swatch.row} className="justify-center" />
         {actions && <div className="relative z-10 w-full pt-2">{actions}</div>}
       </div>
     </article>
@@ -73,6 +79,7 @@ export function CommerceProductCard({ product, eager = false, actions, countdown
   const quickView = useQuickView()
   const { t } = useLocale()
   const pricing = useCardPricing(product)
+  const swatch = useCardSwatches(product)
   const { promotion, promotionLabel } = pricing
   const saleLabel = promotionLabel ?? (product.on_sale ? (product.discount_percent ? t('catalog.badges.discount', { percent: product.discount_percent }) : t('catalog.badges.sale')) : null)
   const badge = 'rounded-sm px-2 py-1 text-[0.7rem] leading-none font-bold tracking-wide text-white uppercase'
@@ -88,14 +95,14 @@ export function CommerceProductCard({ product, eager = false, actions, countdown
       <div className="relative">
         <Link to={product.url} tabIndex={-1} aria-hidden className="block overflow-hidden">
           <ProductImage
-            image={product.image}
+            image={swatch.image}
             alt={product.name}
             eager={eager}
             fit="cover"
             className="aspect-[3/4]"
-            imgClassName={cn('transition duration-500 motion-reduce:transition-none', product.hover_image ? 'group-hover:opacity-0' : 'group-hover:scale-105')}
+            imgClassName={cn('transition duration-500 motion-reduce:transition-none', product.hover_image && !swatch.swapped ? 'group-hover:opacity-0' : 'group-hover:scale-105')}
           />
-          {product.hover_image && (
+          {product.hover_image && !swatch.swapped && (
             <ProductImage
               image={product.hover_image}
               alt=""
@@ -105,8 +112,8 @@ export function CommerceProductCard({ product, eager = false, actions, countdown
           )}
         </Link>
 
-        {(saleLabel || product.is_new || !product.in_stock) && (
-          <ul className="pointer-events-none absolute top-2.5 left-2.5 flex flex-col items-start gap-1" aria-label={t('catalog.badges.label')}>
+        {(saleLabel || product.is_new || !product.in_stock || customBadgesOf(product.badges).length > 0) && (
+          <ul className="pointer-events-none absolute top-2.5 left-2.5 flex max-w-[calc(100%-4rem)] flex-col items-start gap-1" aria-label={t('catalog.badges.label')}>
             {saleLabel && (
               <li className={cn(badge, 'bg-sf-sale')} data-testid="sale-badge">
                 {promotionLabel && <span className="sr-only">{t('catalog.badges.offer')}</span>}
@@ -115,6 +122,7 @@ export function CommerceProductCard({ product, eager = false, actions, countdown
             )}
             {product.is_new && <li className={cn(badge, 'bg-sf-highlight')}>{t('catalog.badges.new')}</li>}
             {!product.in_stock && <li className={cn(badge, 'bg-sf-heading')}>{t('catalog.stock.out')}</li>}
+            <CustomBadgeItems badges={product.badges} className="rounded-sm px-2 py-1 text-[0.7rem] leading-none font-bold tracking-wide uppercase" />
           </ul>
         )}
         {countdown && promotion?.show_countdown && <Countdown endsAt={promotion.ends_at} variant="chip" prefix="" className="absolute bottom-2.5 left-2.5" />}
@@ -142,6 +150,7 @@ export function CommerceProductCard({ product, eager = false, actions, countdown
           </Link>
         </h3>
         <CardRating rating={product.rating} />
+        <CardSwatchRow {...swatch.row} />
         <CardPrice product={product} pricing={pricing} className="mt-auto pt-1" />
         <div className="pt-3">{actions ?? <CardCartAction product={product} appearance="solid" />}</div>
       </div>

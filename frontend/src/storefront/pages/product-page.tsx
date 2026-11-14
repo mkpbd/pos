@@ -1,23 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { AddToCartForm } from '../cart/add-to-cart'
-import { isNotFound, useProductQuery, useProductsBySlugsQuery, useRelatedProductsQuery } from '../catalog/api'
-import { BuilderZone } from '../builder/zone'
+import { cn } from '@/lib/utils'
+import { BuyForm } from '../cart/add-to-cart'
+import { useBuyBox } from '../cart/buy-box'
+import { isNotFound, useProductQuery, useProductsBySlugsQuery, useRelatedProductsQuery, type ProductPreview } from '../catalog/api'
+import { ProductZone } from '../builder/zone'
 import { Breadcrumbs } from '../catalog/breadcrumbs'
+import { FrequentlyBought } from '../catalog/frequently-bought'
 import { ProductBadges, ProductCard } from '../catalog/product-card'
+import { ProductDetails, type DetailSection } from '../catalog/product-details'
 import { ProductGallery } from '../catalog/product-gallery'
+import { detailSectionId, useProductLayout } from '../catalog/product-layout'
 import { PRODUCT_RAIL_ITEM, Rail } from '../catalog/product-rail'
 import { ProductSummary } from '../catalog/product-summary'
-import { Tabs, type TabItem } from '../catalog/product-tabs'
+import { QuickBuyBar } from '../catalog/quick-buy-bar'
 import { readRecentlyViewed, recordRecentlyViewed } from '../catalog/recently-viewed'
-import { imageIndexOf, useVariantSelection } from '../catalog/use-variant-selection'
-import { initialVariant } from '../catalog/variant-selection'
+import { useStickySummaryTop } from '../catalog/use-sticky-summary'
+import { galleryPhotos, useProductGallery, useVariantSelection } from '../catalog/use-variant-selection'
+import { REDUCED_MOTION_QUERY, useMediaQuery } from '../components/use-media-query'
 import { usePromotionPricing } from '../promotions/display'
 import { RichText } from '../components/rich-text'
-import { REVIEWS_SECTION_ID, REVIEWS_TAB_ID, reviewsTabLabel } from '../reviews/display'
+import { QUESTIONS_TAB_ID, questionsTabLabel, REVIEWS_SECTION_ID, REVIEWS_TAB_ID, reviewsTabLabel } from '../reviews/display'
+import { ProductQuestions } from '../reviews/product-questions'
 import { ProductReviews, RatingSummaryLink } from '../reviews/product-reviews'
-import type { ProductCard as Card, ProductDetail } from '../types'
+import type { ProductCard as Card, ProductDetail, ProductVariant } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { useDocumentMeta } from '../use-document-meta'
 import { useLocale } from '../i18n/locale'
@@ -36,7 +43,9 @@ export function ProductPage() {
 
 function ProductPageContent({ slug }: { slug: string }) {
   const [params] = useSearchParams()
-  const preview = params.get('preview') === '1'
+  // Staff previews: `?preview=1` opens an unpublished listing, `?preview=draft` (P1b) also shows builder zone drafts.
+  const previewParam = params.get('preview')
+  const preview: ProductPreview = previewParam === 'draft' ? 'draft' : previewParam === '1'
   const product = useProductQuery(slug, preview)
   const data = product.data
   const { t } = useLocale()
@@ -50,7 +59,7 @@ function ProductPageContent({ slug }: { slug: string }) {
           image: data.seo.image_url ?? data.images[0]?.url,
           canonical: data.url,
           type: 'product',
-          noindex: preview || Boolean(data.preview_state),
+          noindex: Boolean(preview) || Boolean(data.preview_state),
         }
       : null,
   )
@@ -80,13 +89,18 @@ function ProductPageContent({ slug }: { slug: string }) {
   return <ProductView product={data} />
 }
 
+/**
+ * The product page. P1b: the theme's product layout (gallery side, thumbnail position, sticky
+ * summary, details as tabs, accordion or stacked), "Buy now" next to "Add to cart" with a quick-buy
+ * bar once the buy area scrolls away, the delivery note and the `product.below_price` zone under the
+ * price, questions & answers next to the reviews, "Frequently bought together" to add in one go, and
+ * the `product.after` / `product.bottom` zones — each resolved by the server for this product.
+ */
 function ProductView({ product }: { product: ProductDetail }) {
   const [params, setParams] = useSearchParams()
   const variantParam = params.get('variant')
-  // The variant from the URL shows its own image first.
-  const [imageIndex, setImageIndex] = useState(() => Math.max(0, imageIndexOf(product, initialVariant(product, variantParam)?.image_id)))
 
-  const { selection, variant, choose } = useVariantSelection(product, variantParam, (next) => {
+  const { selection, variant, choose: pick } = useVariantSelection(product, variantParam, (next) => {
     setParams(
       (current) => {
         const updated = new URLSearchParams(current)
@@ -96,22 +110,52 @@ function ProductView({ product }: { product: ProductDetail }) {
       },
       { replace: true },
     )
-    const i = imageIndexOf(product, next?.image_id)
-    if (i >= 0) setImageIndex(i)
   })
+  // The variant from the URL shows its own image first; its colour's photos when it has them (P1a).
+  const gallery = useProductGallery(product, selection, variant)
+  const choose = (optionName: string, value: string) => {
+    const next = pick(optionName, value)
+    gallery.follow(next.variant, next.selection)
+  }
   const promo = usePromotionPricing(product, variant)
-  const [tab, setTab] = useState<string | undefined>(undefined)
+  const layout = useProductLayout()
+  const box = useBuyBox(product, variant)
+  // The detail part shown (tabs) or asked for (`request` counts the asks: the rating link opens the reviews each time).
+  const [section, setSection] = useState<{ id?: string; request: number }>({ request: 0 })
   const { t } = useLocale()
+  const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY)
+  const pageRef = useRef<HTMLElement>(null)
+  const buyRef = useRef<HTMLDivElement>(null)
+  const summaryRef = useRef<HTMLDivElement>(null)
+  const stickyTop = useStickySummaryTop(summaryRef, layout.sticky_summary)
+  const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth'
 
-  const openReviews = () => {
-    setTab(REVIEWS_TAB_ID)
-    document.getElementById(REVIEWS_SECTION_ID)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  const openSection = (id: string) => {
+    setSection((current) => ({ id, request: current.request + 1 }))
+    const target = layout.details === 'tabs' ? document.getElementById(REVIEWS_SECTION_ID) : document.getElementById(detailSectionId(id))
+    target?.scrollIntoView?.({ behavior, block: 'start' })
   }
 
-  const tabs: TabItem[] = []
-  if (product.description_html) tabs.push({ id: 'description', label: t('catalog.product.description'), content: <RichText html={product.description_html} className="max-w-3xl" /> })
+  /** The quick-buy bar and "Frequently bought together" send the shopper to the first option still to choose. */
+  const chooseOptions = () => {
+    const selector = pageRef.current?.querySelector<HTMLElement>('[data-testid="variant-selector"]')
+    if (!selector) return buyRef.current?.scrollIntoView?.({ behavior, block: 'center' })
+    const missing = Math.max(0, product.options.findIndex((option) => selection[option.name] === undefined))
+    const group = selector.children[missing] ?? selector
+    group.querySelector<HTMLElement>('input:not([disabled]), select')?.focus({ preventScroll: true })
+    group.scrollIntoView?.({ behavior, block: 'center' })
+  }
+
+  /** The bar's "Notify me" for a sold-out variant: the back-in-stock form in the buy area. */
+  const notify = () => {
+    buyRef.current?.querySelector<HTMLElement>('[data-testid="notify-me"] button')?.focus({ preventScroll: true })
+    buyRef.current?.scrollIntoView?.({ behavior, block: 'center' })
+  }
+
+  const sections: DetailSection[] = []
+  if (product.description_html) sections.push({ id: 'description', label: t('catalog.product.description'), content: <RichText html={product.description_html} className="max-w-3xl" /> })
   if (product.specifications.length > 0) {
-    tabs.push({
+    sections.push({
       id: 'specifications',
       label: t('catalog.product.specifications'),
       content: (
@@ -128,14 +172,20 @@ function ProductView({ product }: { product: ProductDetail }) {
       ),
     })
   }
-
-  if (!product.preview_state) tabs.push({ id: REVIEWS_TAB_ID, label: reviewsTabLabel(product.rating, t), content: <ProductReviews slug={product.slug} /> })
+  if (!product.preview_state) {
+    sections.push({ id: REVIEWS_TAB_ID, label: reviewsTabLabel(product.rating, t), content: <ProductReviews slug={product.slug} /> })
+    // P1b: only stores whose catalog reports questions (the count) have the questions & answers part.
+    if (typeof product.questions_count === 'number') {
+      sections.push({ id: QUESTIONS_TAB_ID, label: questionsTabLabel(product.questions_count, t), content: <ProductQuestions product={product} /> })
+    }
+  }
 
   const previewKey = product.preview_state ? PREVIEW_STATES[product.preview_state as keyof typeof PREVIEW_STATES] : undefined
   const notice = previewKey ? t(previewKey) : undefined
+  const barImage = gallery.images[gallery.index] ?? product.images[0] ?? null
 
   return (
-    <article data-testid="product-page">
+    <article ref={pageRef} data-testid="product-page" data-gallery={layout.gallery} data-details={layout.details}>
       {notice && (
         <p role="status" className="bg-neutral-900 px-4 py-1.5 text-center text-xs font-semibold text-white">
           {notice}
@@ -148,26 +198,48 @@ function ProductView({ product }: { product: ProductDetail }) {
       </div>
 
       <div className="mx-auto max-w-sf px-4 pt-8">
-        <div className="grid gap-8 rounded-sf-card bg-sf-surface p-4 md:grid-cols-2 md:p-8 lg:gap-12">
-          <div className="relative">
-            <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} />
-            <ProductBadges
-              onSale={variant ? variant.on_sale : product.on_sale}
-              discountPercent={null}
-              isNew={product.is_new}
-              inStock={variant ? variant.in_stock : product.in_stock}
-              promotionLabel={promo?.label}
-              className="absolute top-3 left-3"
+        <div className={cn('grid gap-8 rounded-sf-card bg-sf-surface p-4 md:grid-cols-2 md:p-8 lg:gap-12', layout.sticky_summary && 'md:items-start')}>
+          <div className={cn('relative min-w-0', layout.gallery === 'right' && 'md:order-last')}>
+            <ProductGallery
+              images={gallery.images}
+              name={product.name}
+              index={gallery.index}
+              onIndexChange={gallery.setIndex}
+              photos={galleryPhotos(product, gallery)}
+              video={gallery.video}
+              thumbnails={layout.thumbnails}
+              overlay={
+                <ProductBadges
+                  onSale={variant ? variant.on_sale : product.on_sale}
+                  discountPercent={null}
+                  isNew={product.is_new}
+                  inStock={variant ? variant.in_stock : product.in_stock}
+                  promotionLabel={promo?.label}
+                  custom={product.badges}
+                  className="absolute top-3 left-3 max-w-[calc(100%-1.5rem)]"
+                />
+              }
             />
           </div>
-          <div className="flex flex-col gap-5">
+          <div
+            ref={summaryRef}
+            className={cn('flex min-w-0 flex-col gap-5', layout.sticky_summary && 'md:sticky md:self-start')}
+            style={stickyTop === null ? undefined : { top: `calc(var(--sf-popup-bar-top, 0px) + ${stickyTop}px)` }}
+            data-testid="product-summary"
+          >
             <div className="flex flex-col gap-2">
               <h1 className="text-3xl leading-tight font-extrabold lg:text-4xl">{product.name}</h1>
-              <RatingSummaryLink rating={product.rating} onOpen={openReviews} />
+              <RatingSummaryLink rating={product.rating} onOpen={() => openSection(REVIEWS_TAB_ID)} />
             </div>
-            <ProductSummary product={product} variant={variant} selection={selection} onChoose={choose} />
-            <div className="flex flex-col gap-3 border-t pt-5">
-              <AddToCartForm key={variant?.id ?? 'none'} product={product} variant={variant} />
+            <ProductSummary
+              product={product}
+              variant={variant}
+              selection={selection}
+              onChoose={choose}
+              belowPrice={<ProductZone zone="product.below_price" product={product} inline />}
+            />
+            <div ref={buyRef} className="flex flex-col gap-3 border-t pt-5" data-testid="buy-area">
+              <BuyForm key={variant?.id ?? 'none'} product={product} variant={variant} box={box} buyNow />
               <WishlistButton product={product} name={product.name} appearance="text" />
             </div>
             {product.category?.slug && (
@@ -181,20 +253,32 @@ function ProductView({ product }: { product: ProductDetail }) {
           </div>
         </div>
 
-        {tabs.length > 0 && (
+        {sections.length > 0 && (
           <section id={REVIEWS_SECTION_ID} aria-label={t('catalog.product.information')} className="mt-8 scroll-mt-24 rounded-sf-card bg-sf-surface p-4 md:p-8">
-            <Tabs tabs={tabs} label={t('catalog.product.information')} selectedId={tab} onSelect={setTab} />
+            <ProductDetails
+              sections={sections}
+              mode={layout.details}
+              label={t('catalog.product.information')}
+              active={section.id}
+              request={section.request}
+              onActivate={(id) => setSection((current) => ({ ...current, id }))}
+            />
           </section>
         )}
       </div>
 
-      {/* B4: the store builder's "product page" zone, full width below the details and tabs. */}
-      <BuilderZone zone="product.after" />
+      {/* B4: the store builder's "after the details" zone, full width below the details and tabs. */}
+      <ProductZone zone="product.after" product={product} />
 
       <div className="mx-auto max-w-sf px-4 pb-8">
-        <RelatedSections slug={product.slug} />
+        <RelatedSections product={product} variant={variant} onChooseOptions={chooseOptions} />
         <RecentlyViewed currentSlug={product.slug} />
       </div>
+
+      {/* P1b: the very end of the product page. */}
+      <ProductZone zone="product.bottom" product={product} />
+
+      <QuickBuyBar product={product} variant={variant} box={box} image={barImage} watch={buyRef} onChooseOptions={chooseOptions} onNotify={notify} />
     </article>
   )
 }
@@ -214,15 +298,22 @@ function ProductRow({ title, products }: { title: string; products: Card[] }) {
   )
 }
 
-function RelatedSections({ slug }: { slug: string }) {
-  const related = useRelatedProductsQuery(slug)
+/** "Frequently bought together" (P1b: hand-picked, else from co-purchases) and the related products (hand-picked, else same category / brand). */
+function RelatedSections({ product, variant, onChooseOptions }: { product: ProductDetail; variant: ProductVariant | null; onChooseOptions: () => void }) {
+  const related = useRelatedProductsQuery(product.slug)
   const { t } = useLocale()
   if (!related.data) return null
 
   return (
     <>
-      <ProductRow title={t('catalog.product.frequentlyBought')} products={related.data.frequently_bought} />
-      <ProductRow title={t('catalog.product.related')} products={related.data.related} />
+      <FrequentlyBought
+        product={product}
+        variant={variant}
+        cards={Array.isArray(related.data.frequently_bought) ? related.data.frequently_bought : []}
+        source={related.data.frequently_bought_source ?? null}
+        onChooseOptions={onChooseOptions}
+      />
+      <ProductRow title={t('catalog.product.related')} products={Array.isArray(related.data.related) ? related.data.related : []} />
     </>
   )
 }

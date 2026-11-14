@@ -253,7 +253,14 @@ class StoreCatalogTest extends TestCase
         $this->assertSame([['label' => 'Material', 'value' => 'Cotton']], $page['specifications']);
         $this->assertSame([['name' => 'Home', 'url' => '/'], ['name' => 'Apparel', 'url' => '/category/apparel'], ['name' => 'Polo Shirt', 'url' => null]], $page['breadcrumbs']);
         // Dictionary order (S, M, L) and only values of active variants.
-        $this->assertSame([['name' => 'Size', 'slug' => 'size', 'display' => 'button', 'values' => [['value' => 'M', 'swatch_hex' => null], ['value' => 'L', 'swatch_hex' => null]]]], $page['options']);
+        $this->assertSame([['name' => 'Size', 'slug' => 'size', 'display' => 'button', 'values' => [
+            ['value' => 'M', 'swatch_hex' => null, 'image' => null, 'image_ids' => []],
+            ['value' => 'L', 'swatch_hex' => null, 'image' => null, 'image_ids' => []],
+        ]]], $page['options']);
+        $this->assertNull($page['photo_option']);
+        $this->assertNull($page['size_guide']);
+        // P1a: 3 left of POLO-M (at or below the low-stock threshold); none of POLO-L.
+        $this->assertSame([3, null], array_column($page['variants'], 'stock_left'));
         $this->assertSame(['POLO-M', 'POLO-L'], array_column($page['variants'], 'sku'));
         $this->assertSame([true, false], array_column($page['variants'], 'in_stock'));
         $this->assertSame([true, false], array_column($page['variants'], 'low_stock'));
@@ -283,8 +290,10 @@ class StoreCatalogTest extends TestCase
         $this->fixture();
 
         $related = $this->getJson('http://berry.test/api/v1/store/products/mango-juice/related')->assertOk()->json('data');
-        $this->assertSame(['Orange Juice'], array_column($related['related'], 'name'));
+        // P1b: in stock first (Rice Bag, same brand) before the same category (Orange Juice, sold out).
+        $this->assertSame(['Rice Bag', 'Orange Juice'], array_column($related['related'], 'name'));
         $this->assertSame([], $related['frequently_bought']);
+        $this->assertNull($related['frequently_bought_source']);
 
         $this->actingAsUser($this->tenant['admin']);
         $this->putJson("/api/v1/online-catalog/products/{$this->ids['mango']}/related", [
@@ -296,6 +305,7 @@ class StoreCatalogTest extends TestCase
         $related = $this->getJson('http://berry.test/api/v1/store/products/mango-juice/related')->assertOk()->json('data');
         $this->assertSame(['Polo Shirt'], array_column($related['related'], 'name'), 'Unpublished picks drop out.');
         $this->assertSame(['Rice Bag'], array_column($related['frequently_bought'], 'name'));
+        $this->assertSame('manual', $related['frequently_bought_source']);
 
         $this->getJson('http://berry.test/api/v1/store/products/secret/related')->assertNotFound();
     }

@@ -29,20 +29,32 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $sort_weight
  * @property ?CarbonImmutable $created_at
  * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
+ * @property ?string $size_guide_id P1a: the product's own size guide (NULL = its category's)
+ * @property ?string $video_url P1b: a YouTube / Vimeo link (the gallery's last slide)
+ * @property list<array{text: string, tone: string, translations?: array<string, array<string, string>>|null}> $badges P1b: ≤ 2 custom badges
  */
 #[Fillable([
     'organization_id', 'product_id', 'slug', 'is_published', 'published_at', 'unpublished_at', 'is_featured',
     'is_new_until', 'short_description', 'description_html', 'specifications', 'seo_title', 'seo_description', 'sort_weight', 'translations',
+    'size_guide_id', 'video_url', 'badges',
 ])]
 class ProductListing extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
+
+    /** P1b: custom badge colours (each meets text contrast on the storefront). */
+    public const BADGE_TONES = ['sale', 'new', 'info', 'dark'];
+
+    public const MAX_BADGES = 2;
+
+    public const BADGE_TEXT_MAX = 24;
 
     protected $attributes = [
         'is_published' => false,
         'is_featured' => false,
         'specifications' => '[]',
         'sort_weight' => 0,
+        'badges' => '[]',
     ];
 
     protected function casts(): array
@@ -57,6 +69,7 @@ class ProductListing extends Model
             'sort_weight' => 'integer',
             'created_at' => 'immutable_datetime',
             'translations' => 'array',
+            'badges' => 'array',
         ];
     }
 

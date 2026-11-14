@@ -6,8 +6,11 @@ use App\Modules\OnlineCatalog\Application\Actions\SaveProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Slug;
+use App\Modules\Shared\Domain\VideoUrl;
 use App\Modules\Shared\Infrastructure\Validation\TenantUnique;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * A product's web listing. Omitted optional fields keep their stored value; `variants`
@@ -50,6 +53,20 @@ class SaveProductListingRequest extends FormRequest
             'variants.*.variant_id' => ['required', 'uuid', 'distinct'],
             'variants.*.compare_at_price' => ['sometimes', 'nullable', 'regex:/^\d{1,16}(\.\d{1,2})?$/'],
             'variants.*.image_id' => ['sometimes', 'nullable', 'uuid'],
+            // P1a: the product's own size guide; null = the category's.
+            'size_guide_id' => ['sometimes', 'nullable', 'uuid'],
+            // P1b: a YouTube / Vimeo link (the builder video element's rule), the gallery's last slide.
+            'video_url' => ['sometimes', 'nullable', 'string', 'max:'.VideoUrl::MAX_LENGTH, function (string $attribute, mixed $value, Closure $fail) {
+                if (is_string($value) && trim($value) !== '' && VideoUrl::parse(trim($value)) === null) {
+                    $fail(VideoUrl::INVALID_MESSAGE);
+                }
+            }],
+            // P1b: at most two custom badges [{text, tone, translations: {bn: {text}}}].
+            'badges' => ['sometimes', 'nullable', 'array', 'list', 'max:'.ProductListing::MAX_BADGES],
+            'badges.*' => ['array:text,tone,translations'],
+            'badges.*.text' => ['required', 'string', 'max:'.ProductListing::BADGE_TEXT_MAX],
+            'badges.*.tone' => ['required', Rule::in(ProductListing::BADGE_TONES)],
+            ...TranslationInput::rules(['text' => ['max:'.ProductListing::BADGE_TEXT_MAX]], 'badges.*.translations'),
             // E12b: {bn: {name, short_description, description_html, seo_title, seo_description}}.
             ...TranslationInput::rules(SaveProductListing::TRANSLATABLE),
         ];
@@ -61,6 +78,11 @@ class SaveProductListingRequest extends FormRequest
             'slug.regex' => 'Use lower-case letters, digits and single hyphens only.',
             'unpublished_at.after' => 'The end of the publishing window must be after its start.',
             'variants.*.compare_at_price.regex' => 'Enter an amount such as 140 or 140.50.',
+            'badges.max' => 'A product can have at most two badges.',
+            'badges.*.text.required' => 'Write the badge text.',
+            'badges.*.text.max' => 'Keep the badge text to 24 characters.',
+            'badges.*.translations.bn.text.max' => 'Keep the badge text to 24 characters.',
+            'badges.*.tone.in' => 'Choose one of the badge colours: sale, new, info or dark.',
         ];
     }
 
@@ -72,7 +94,7 @@ class SaveProductListingRequest extends FormRequest
     public function listingData(): array
     {
         $data = $this->validated();
-        foreach (['specifications', 'variants'] as $key) {
+        foreach (['specifications', 'variants', 'badges'] as $key) {
             if (isset($data[$key])) {
                 ksort($data[$key]);
                 $data[$key] = array_values($data[$key]);

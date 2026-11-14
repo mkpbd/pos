@@ -73,6 +73,8 @@ export type InspectorDocument = {
   canPublish?: boolean
   /** B8b popups: the on / off switch is waiting for the server. */
   activePending?: boolean
+  /** P1b: the category or product a product zone version is for (null: all products). */
+  target?: { type: 'category' | 'product'; id: string; name: string | null } | null
 }
 
 export type InspectorProps = {

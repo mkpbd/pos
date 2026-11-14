@@ -21,6 +21,54 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### P1b — Product page: buy now, quick-buy bar, delivery note, richer gallery, designable layout, more to sell
+
+#### Added
+- **Buy now** (to checkout) and a **quick-buy bar** that docks at the bottom once the buy buttons scroll away (above popup/cookie bars, safe-area aware); a **delivery & cash-on-delivery note** under the price built from the shipping zones and methods.
+- **Gallery:** product **video** slide (YouTube/Vimeo, nothing loads before play), swipe, pinch/double-tap/wheel zoom with pan, thumbnails at the side or bottom, and up to two **custom badges** per product (Bangla, contrast-safe colours) on the gallery and every card style.
+- **Designable product page:** theme `layout.product` (gallery side, thumbnails, sticky summary, details as tabs / accordion / one after another) on the Theme page and in the builder's Site styles; builder zones **under the price**, **under product details** (unchanged place) and **at the bottom**, each with versions for a **category** or a **product** (most specific wins; ≤100), previewed on a matching product in the editor.
+- **More to sell:** automatic **frequently bought together** from nightly co-purchase scores (online orders + POS sales, 180 days) with *Add selected to cart*; related-products fallback (in stock, same category, same brand); **questions & answers** (shoppers ask, staff answer and publish in *Reviews → Questions*, bell + one e-mail to the asker).
+- Demo data: answered questions (one in Bangla) on two products per demo store; affinities computed by the demo seeder.
+
+#### Fixed
+- Saving the Theme page no longer resets *Products per row* (`layout.listing_columns`) or other layout keys the form doesn't edit.
+
+#### Upgrade
+- `php artisan migrate`; `php artisan pos:affinities:compute` once; existing demo databases `php artisan db:seed --class=DemoProductPageSeeder`; keep the scheduler (hourly `pos:affinities:compute --nightly`) and a queue worker running. Optional `POS_QUESTION_RATE_LIMIT`.
+
+#### Tests
+- Backend 1096 on PostgreSQL (1095 pass, 1 opt-in skip), Pint clean; vitest 1686; mocked Playwright `storefront-product-page.spec.ts`, `product-admin-p1b.spec.ts`, store builder; full-stack integration 24 + demo stores 14 (+1 P1b: delivery note, product-only zone, questions asked → answered → shown, quick-buy bar, buy now → checkout) + builder acceptance 5.
+
+### P1a — Product variants: photos per colour, variant grid, back in stock, size guides
+
+#### Added
+- **Variant grid** in the product editor: options → *Generate* all combinations (≤200, existing variants kept by option values), a spreadsheet-like table (arrow keys, paste from Excel) for SKU, barcodes, cost/selling/wholesale/compare-at prices, reorder level and active; bulk edit by selection or "all Red" (exact decimal %); opening stock for new variants and *Adjust stock* through the Inventory module; *Save details* and *Save variants* are separate.
+- **Photos per colour:** one option owns photos (≤8 per value); swatch style colour / photo / button; the storefront gallery switches to the chosen colour's photos ("All photos" keeps everything reachable); cards show up to 5 colour chips that preview the colour's photo.
+- **Stock per option:** sold-out choices crossed out (still selectable), "Only N left" when 5 or fewer, **Notify me when it's back** — one e-mail per request when the fulfilment store gets stock again (`StockBecameAvailable`), with the waiting count in the grid and a requests card.
+- **Size guides:** *Online store → Size guides* (ready tables, paste from Excel, Bangla, category assignment, product override); a *Size guide* dialog with a real table on the product page.
+- Demo data: Classic Shop leather tote Tan/Black photos and clothing/shoe guides; Little Sprouts night light Peach/Mint photos and baby clothing/shoe guides (`DemoVariantsSeeder` for existing demo stores).
+
+#### Upgrade
+- `php artisan migrate`; for demo stores created earlier `php artisan db:seed --class=DemoVariantsSeeder`; keep the queue worker running (back-in-stock e-mails). No new permissions.
+
+#### Tests
+- Backend 1071 on PostgreSQL (1070 pass, 1 opt-in skip), Pint clean; vitest 1605; mocked Playwright `storefront-variants.spec.ts`, `products-variants.spec.ts`; full-stack integration 24 + demo stores 13 (+1 P1a: colour photo switch, size guide, notify me → restock → notified) + builder acceptance 5.
+
+### B8b — Store builder: popups & bars, form builder
+
+#### Added
+- **Popups & bars:** builder document kind `popup` (modal, full screen, corner slide-in, top/bottom bar) with triggers (after a delay, on scroll, on exit intent with a touch fallback), frequency (every page view, once per visit, every N days, once), stop after the shopper acts, page / device / audience rules, priority and schedule. Published + switched on (`PATCH {active}`, `storefront.publish`) = live. Never shown on cart, checkout, account or order pages (server-enforced). Accessible dialogs (focus in, trapped, restored; Esc; overlay click optional), bars push the page instead of covering it; reduced motion respected. Buttons in popups can close them. Public `GET /store/builder/popups`; staff draft preview `?preview=draft&popup=`.
+- **Start screen:** *Popups & bars* group (English / বাংলা) with status, *Show on shop* switch, preview and delete; popup editor with a *Popup settings* panel and the popup drawn in its layout on the canvas.
+- **6 popup templates** — newsletter, exit offer with the store's running coupon, free-delivery bar, Eid sale slide-in, cookie notice (informational: there are no tracking cookies), contact form — and a contact-form section template (83 built-ins).
+- **Form builder:** `form` element with 10 field kinds, required fields, choices, number range, length, reply-to e-mail, consent box, success message, extra notification e-mail; Bangla for every text; no file uploads. Public `POST /store/forms/{document}/{element}` checks every answer against the **published** form (honeypot, `POS_FORM_RATE_LIMIT`, 32 KB) and stores it in `builder_form_submissions`.
+- **Content → Form submissions** (`forms.view` / `forms.manage`): forms with new counts, filters, detail drawer with *Reply by e-mail*, read / archive / delete, CSV / Excel / PDF export; bell notification per submission; optional e-mail to the form's address. The sidebar *Content* entry opens form submissions for staff who may only read those.
+
+#### Upgrade
+- `php artisan migrate` (`builder_documents.active`, `builder_form_submissions`), then `php artisan pos:permissions:sync`.
+
+#### Tests
+- Backend 1059 on PostgreSQL (1058 pass, 1 opt-in skip), Pint clean; vitest 1574; mocked Playwright (store builder, `storefront-popups-forms.spec.ts`, `forms-admin.spec.ts`); full-stack integration 24 + demo stores 12 (+1 B8b: popup from template → publish → switched on → shown once, never on the cart; contact form error → sent → read by the owner) + builder acceptance 5.
+
 ### B8a — Store builder: selling blocks, trust & people, more visualization
 
 Ten new page-builder elements and store-data charts. Popups/bars and forms follow in B8b.

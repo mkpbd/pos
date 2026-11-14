@@ -1,5 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated } from '@/lib/api/client'
+import { inventoryKeys, type AdjustmentReason } from '@/features/inventory/api'
 import { onlineCatalogKeys } from '@/features/online-catalog/api'
 
 export type ProductType = 'standard' | 'service'
@@ -16,7 +17,18 @@ export type ProductVariant = {
   reorder_level: string
   barcodes: string[]
   is_active: boolean
+  /** Online compare-at ("was") price (P1a variant grid). */
+  compare_at_price?: string | null
+  /** Stock on hand (P1a); null for services and products without stock tracking. */
+  stock?: VariantStock | null
+  /** Shoppers waiting for a back-in-stock e-mail (P1a §3). */
+  back_in_stock_open?: number
 }
+
+export type VariantStock = { total: string; by_store: { store_id: string; branch_id: string; quantity: string }[] }
+
+/** How a product option is shown to shoppers (P1a §1). */
+export type OptionStyle = 'color' | 'image' | 'button'
 
 export type ProductOption = { name: string; values: string[] }
 
@@ -38,6 +50,12 @@ export type Product = {
   archived_at: string | null
   variants: ProductVariant[]
   images: { id: string; url: string; original_name: string }[]
+  /** The option whose values own photos ("Colour"), or null (P1a §1). */
+  photo_option?: string | null
+  /** Swatch style per option name; missing = from the attribute's display. */
+  option_styles?: Record<string, OptionStyle>
+  /** Photo ids per value of the photo option, in order. */
+  option_images?: Record<string, string[]>
 }
 
 export type ProductInput = {
@@ -68,6 +86,44 @@ export type ProductInput = {
   }[]
 }
 
+/** PUT /products/{id}/variants (P1a §2): the whole grid, matched by id; idempotent. */
+export type VariantGridInput = {
+  options: ProductOption[] | null
+  variants: {
+    id?: string
+    option_values: Record<string, string>
+    sku: string | null
+    barcodes: string[]
+    purchase_price: string
+    selling_price: string
+    wholesale_price: string | null
+    compare_at_price: string | null
+    reorder_level: string
+    is_active: boolean
+    /** New variants only: put in stock through Inventory's opening stock (note "Variant grid"). */
+    opening_stock?: string
+  }[]
+  /** Store receiving the opening stock; required when any variant has some. */
+  stock_store_id?: string
+}
+
+export type OptionImagesInput = {
+  photo_option: string | null
+  /** null removes an explicit style (back to the attribute's display). */
+  styles: Record<string, OptionStyle | null>
+  values: { value: string; image_ids: string[] }[]
+}
+
+export type BackInStockRequest = {
+  id: string
+  variant_id: string
+  variant_label: string
+  email: string
+  locale: string
+  created_at: string
+  notified_at: string | null
+}
+
 export type ProductListParams = {
   page: number
   search?: string
@@ -81,6 +137,7 @@ export const productKeys = {
   all: ['products'] as const,
   list: (params: ProductListParams) => ['products', 'list', params] as const,
   detail: (id: string) => ['products', 'detail', id] as const,
+  backInStock: (id: string, params: BackInStockParams) => ['products', 'back-in-stock', id, params] as const,
 }
 
 /** Query string of GET /products — shared by the list and its export. */
@@ -191,4 +248,50 @@ export function useProductNames(ids: string[]): Map<string, { name: string; imag
     if (r.data) map.set(r.data.id, { name: r.data.name, image_url: r.data.images[0]?.url ?? null })
   })
   return map
+}
+
+export function useSaveVariantGridMutation(productId: string) {
+  const update = useProductCache()
+
+  return useMutation({
+    mutationFn: (input: VariantGridInput) => api.put<Product>(`/products/${productId}/variants`, input).then((r) => r.data),
+    onSuccess: (product) => update(product),
+  })
+}
+
+/** Photos by colour and swatch styles (P1a §1). */
+export function useSaveOptionImagesMutation(productId: string) {
+  const update = useProductCache()
+
+  return useMutation({
+    mutationFn: (input: OptionImagesInput) => api.put<Product>(`/products/${productId}/option-images`, input).then((r) => r.data),
+    onSuccess: (product) => update(product),
+  })
+}
+
+/**
+ * Stock changes from the variant grid go through Inventory's adjustment use case (audited,
+ * in a transaction); the product is refetched for the new stock figures.
+ */
+export function useGridStockAdjustmentMutation(productId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: { store_id: string; reason: AdjustmentReason; lines: { variant_id: string; quantity: string }[] }) =>
+      api.post<{ id: string; number: string }>('/inventory/adjustments', { ...input, note: 'Variant grid' }).then((r) => r.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: productKeys.detail(productId) })
+      void queryClient.invalidateQueries({ queryKey: inventoryKeys.all })
+    },
+  })
+}
+
+export type BackInStockParams = { page: number; status?: 'open' | 'notified' }
+
+export function useBackInStockQuery(productId: string, params: BackInStockParams) {
+  return useQuery({
+    queryKey: productKeys.backInStock(productId, params),
+    queryFn: ({ signal }) => api.get<BackInStockRequest[]>(`/products/${productId}/back-in-stock-requests`, { signal, query: params }).then(toPaginated),
+    placeholderData: (previous) => previous,
+  })
 }

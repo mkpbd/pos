@@ -15,7 +15,8 @@ use App\Modules\Products\Application\DTOs\ProductData;
  */
 final class ProductDefinitionRules
 {
-    public const MAX_VARIANTS = 100;
+    /** P1a: raised from 100 for the variant grid (e.g. 10 colours × 20 sizes). */
+    public const MAX_VARIANTS = 200;
 
     /**
      * @return array<string, string> field path => message

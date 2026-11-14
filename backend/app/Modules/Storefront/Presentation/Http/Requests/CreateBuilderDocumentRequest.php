@@ -14,7 +14,9 @@ use Illuminate\Validation\Validator;
  * - `page`: `home`, `landing:<slug>` (2–60 lower-case letters, digits and dashes;
  *   `landing:home` is reserved) or (B4) `cms:<cms page uuid>`;
  * - `header`: `header`; `footer`: `footer` (B4);
- * - `zone`: `zone:listing.top`, `zone:listing.bottom`, `zone:product.after` (B4);
+ * - `zone`: `zone:listing.top`, `zone:listing.bottom`, `zone:product.after` (B4); P1b:
+ *   `zone:product.below_price`, `zone:product.bottom`, and a product zone's version for a
+ *   category or a product, `zone:<product zone>@category:<uuid>` / `@product:<uuid>` (lower-case);
  * - `popup` (B8b): no key (the server makes `popup:<uuid>`; `key` and `from` are ignored), an
  *   optional `template` (a built-in popup template id).
  *
@@ -24,6 +26,16 @@ use Illuminate\Validation\Validator;
 class CreateBuilderDocumentRequest extends FormRequest
 {
     private const PAGE_KEY = '/^(home|landing:[a-z0-9-]{2,60}|cms:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/';
+
+    protected function prepareForValidation(): void
+    {
+        // P1b: the target id of a zone version is stored lower-case, whatever the client sent.
+        $key = $this->input('key');
+        if ($this->input('kind') === BuilderDocument::KIND_ZONE && is_string($key) && str_contains($key, '@')) {
+            [$zone, $target] = explode('@', $key, 2);
+            $this->merge(['key' => $zone.'@'.strtolower($target)]);
+        }
+    }
 
     public function rules(): array
     {
@@ -71,14 +83,15 @@ class CreateBuilderDocumentRequest extends FormRequest
                 BuilderDocument::KIND_PAGE => preg_match(self::PAGE_KEY, $key) === 1,
                 BuilderDocument::KIND_HEADER => $key === BuilderDocument::HEADER,
                 BuilderDocument::KIND_FOOTER => $key === BuilderDocument::FOOTER,
-                BuilderDocument::KIND_ZONE => in_array($key, array_map(fn (string $z) => BuilderDocument::ZONE_PREFIX.$z, BuilderDocument::ZONES), true),
+                BuilderDocument::KIND_ZONE => in_array($key, array_map(fn (string $z) => BuilderDocument::ZONE_PREFIX.$z, BuilderDocument::ZONES), true)
+                    || BuilderDocument::parseTargetedZone($key) !== null,
                 default => false,
             };
             if (! $valid) {
                 $validator->errors()->add('key', match ($kind) {
                     BuilderDocument::KIND_HEADER => 'The key of the header is "header".',
                     BuilderDocument::KIND_FOOTER => 'The key of the footer is "footer".',
-                    BuilderDocument::KIND_ZONE => 'The key of an area is zone:listing.top, zone:listing.bottom or zone:product.after.',
+                    BuilderDocument::KIND_ZONE => 'The key of an area is zone:listing.top, zone:listing.bottom, zone:product.below_price, zone:product.after or zone:product.bottom; a product area\'s version for a category or a product adds @category:<id> or @product:<id>.',
                     default => 'The key is "home", "landing:" followed by 2–60 lower-case letters, digits and dashes, or "cms:" followed by a content page id.',
                 });
 

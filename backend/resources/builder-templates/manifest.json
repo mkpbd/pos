@@ -1033,7 +1033,7 @@
       "category": "contact",
       "name": "Contact form",
       "description": "A heading and a short promise beside a form for name, e-mail, phone, topic and message; replies go to the visitor’s e-mail.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/neutral-contact-form.png",
       "allowed_in": [
         "page",
         "cms",
@@ -1226,7 +1226,7 @@
       "category": "newsletter",
       "name": "Newsletter popup",
       "description": "A centred window asking new visitors to join the newsletter, 8 seconds after a page opens, at most once a week.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/popup-newsletter.png",
       "allowed_in": [
         "popup"
       ],
@@ -1239,7 +1239,7 @@
       "category": "offer",
       "name": "Exit offer with coupon",
       "description": "Shows your running coupon when a visitor is about to leave (on phones after 20 seconds), with a “No, thanks” button.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/popup-exit-offer.png",
       "allowed_in": [
         "popup"
       ],
@@ -1254,7 +1254,7 @@
       "category": "bar",
       "name": "Free delivery bar",
       "description": "A coloured bar at the top of every page announcing free delivery, with a Shop now button.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/popup-free-delivery-bar.png",
       "allowed_in": [
         "popup"
       ],
@@ -1267,7 +1267,7 @@
       "category": "sale",
       "name": "Eid sale slide-in",
       "description": "A small card that slides in at the bottom corner when a visitor scrolls 40% down a page, once per visit.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/popup-eid-sale.png",
       "allowed_in": [
         "popup"
       ],
@@ -1280,7 +1280,7 @@
       "category": "cookie",
       "name": "Cookie notice",
       "description": "A bar at the bottom explaining the shop’s cookies with a link to the privacy policy and an OK button; shown until the visitor clicks OK.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/popup-cookie-notice.png",
       "allowed_in": [
         "popup"
       ],
@@ -1293,7 +1293,7 @@
       "category": "contact",
       "name": "Contact form popup",
       "description": "A window with a short question form on shop and product pages, shown once a month when a visitor scrolls down.",
-      "thumbnail": null,
+      "thumbnail": "/builder-templates/popup-contact-form.png",
       "allowed_in": [
         "popup"
       ],

@@ -4,6 +4,7 @@ namespace App\Modules\OnlineCatalog\Application\Actions;
 
 use App\Modules\OnlineCatalog\Application\Queries\ListingEditor;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
+use App\Modules\OnlineCatalog\Infrastructure\Models\SizeGuide;
 use App\Modules\OnlineCatalog\Infrastructure\Models\VariantListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
@@ -50,6 +51,10 @@ class SaveProductListing
         unset($data['variants']);
         $this->checkVariants($product, $variantData ?? []);
 
+        if (($data['size_guide_id'] ?? null) !== null && ! SizeGuide::query()->whereKey($data['size_guide_id'])->exists()) {
+            throw ValidationException::withMessages(['size_guide_id' => ['This size guide does not exist.']]);
+        }
+
         if (($data['is_published'] ?? false) && ! $product['is_active']) {
             throw new BusinessRuleViolation('PRODUCT_NOT_SELLABLE', 'Only active products can be published. Activate the product first.');
         }
@@ -62,10 +67,16 @@ class SaveProductListing
         if (array_key_exists('specifications', $data)) {
             $data['specifications'] = array_values(array_map(fn (array $s) => ['label' => trim($s['label']), 'value' => trim($s['value'])], $data['specifications'] ?? []));
         }
-        foreach (['short_description', 'seo_title', 'seo_description'] as $key) {
+        foreach (['short_description', 'seo_title', 'seo_description', 'video_url'] as $key) {
             if (array_key_exists($key, $data) && is_string($data[$key]) && trim($data[$key]) === '') {
                 $data[$key] = null;
             }
+        }
+        if (is_string($data['video_url'] ?? null)) {
+            $data['video_url'] = trim($data['video_url']);
+        }
+        if (array_key_exists('badges', $data)) {
+            $data['badges'] = self::badges($data['badges']);
         }
 
         return DB::transaction(function () use ($productId, $product, $data, $variantData) {
@@ -111,6 +122,26 @@ class SaveProductListing
 
             return $listing;
         });
+    }
+
+    /**
+     * P1b: badges as stored — `[{text, tone, translations: {bn: {text}}|null}]` (texts trimmed,
+     * blank translations removed); null or [] clears them.
+     *
+     * @return list<array{text: string, tone: string, translations: array<string, array<string, string>>|null}>
+     */
+    private static function badges(mixed $badges): array
+    {
+        $result = [];
+        foreach (is_array($badges) ? array_values($badges) : [] as $badge) {
+            $result[] = [
+                'text' => trim((string) $badge['text']),
+                'tone' => (string) $badge['tone'],
+                'translations' => TranslationInput::apply(null, $badge['translations'] ?? null, ['text']),
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -170,7 +201,11 @@ class SaveProductListing
             'seo_title' => $l->seo_title,
             'seo_description' => $l->seo_description,
             'sort_weight' => $l->sort_weight,
+            'size_guide_id' => $l->size_guide_id,
             'translations_hash' => $l->translations === null ? null : hash('xxh128', (string) json_encode($l->translations)),
+            // P1b
+            'video_url' => $l->video_url,
+            'badges' => $l->badges ?? [],
         ];
     }
 }

@@ -24,4 +24,15 @@ interface ShippingRates
      * @return ShippingOption|null
      */
     public function methodForDistrict(string $methodId, int $districtId): ?array;
+
+    /**
+     * P1b: the product page's delivery note — one entry per active zone that covers at least one
+     * district and has an active method, in zone order (Domain\DeliveryOverview: method name when
+     * the zone has one, fastest / slowest days, the fee and free-over threshold when its methods
+     * agree, else null, and whether any method allows cash on delivery). Method names in the
+     * request's language. [] when shipping is not set up.
+     *
+     * @return list<array{zone: string, method: ?string, min_days: int, max_days: int, fee: ?string, free_over: ?string, cod_allowed: bool}>
+     */
+    public function zoneOverview(): array;
 }

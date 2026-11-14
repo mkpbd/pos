@@ -18,6 +18,8 @@ export const cart: Translations<typeof en> = {
   'cart.add.chooseOptionsFirst': 'পণ্যটি কার্টে যোগ করতে ওপরের অপশনগুলো বেছে নিন।',
   'cart.add.optionOutOfStock': 'এই অপশনটি স্টকে নেই।',
   'cart.add.quantityOf': '{name}-এর পরিমাণ',
+  'cart.add.buyNow': 'এখনই কিনুন',
+  'cart.add.buying': 'চেকআউটে নেওয়া হচ্ছে…',
   'cart.card.chooseOptions': 'অপশন বেছে নিন',
   'cart.card.chooseOptionsLabel': 'অপশন বেছে নিন: {name}',
   'cart.card.addLabel': '{name} কার্টে যোগ করুন',

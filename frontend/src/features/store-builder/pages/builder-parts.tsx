@@ -1,49 +1,29 @@
 import type { ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { FileTextIcon, Loader2Icon, PaintbrushIcon, PanelBottomIcon, PanelTopIcon, PlusIcon, Trash2Icon, Undo2Icon } from 'lucide-react'
-import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
-import { ApiError } from '@/lib/api/client'
-import { builderAdminKeys, useCmsPagesQuery, useCreateDocumentMutation, type BuilderCmsPage, type CreateDocumentInput, type DocumentSummary, type ZoneDocumentKey } from '../api'
-import { ZONE_DOCUMENT_KEYS, ZONE_TITLES } from '../document-kind'
+import { useCmsPagesQuery, type BuilderCmsPage, type DocumentSummary, type ZoneDocumentKey } from '../api'
+import { LISTING_ZONE_KEYS, ZONE_TITLES } from '../document-kind'
 import type { MessageKey } from './messages'
 import { lastEdited } from './page-helpers'
 import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
 import { useScreenText } from './screen-language'
+import { useStartDocument } from './use-start-document'
 
 /*
  * B4 groups of the pages list: CMS pages designed with the builder, the store's header and
  * footer, and the content areas of the shop and product pages. Deleting any of these documents
  * brings back the classic rendering (the CMS text, the theme's header / footer, nothing).
  * B7: plain words in the screen's language; the group headings name the cards.
+ * P1b: this card keeps the shop page (listing) areas; the product page areas and their versions
+ * are in ./product-zones-card.tsx.
  */
 
 /** What the delete confirmation says for a document. */
 export type RemoveRequest = { summary: DocumentSummary; title: string; description: string; confirmLabel: string; done: string }
-
-/** Creates a document and opens the editor; a document that already exists refreshes the list. */
-function useStartDocument() {
-  const { t } = useScreenText()
-  const create = useCreateDocumentMutation()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const start = (input: CreateDocumentInput) =>
-    create.mutate(input, {
-      onSuccess: (created) => void navigate(`/storefront/builder/${created.id}`),
-      onError: (error) => {
-        if (error instanceof ApiError && error.code === 'DOCUMENT_EXISTS') {
-          toast.info(t('start.elsewhere'))
-          void queryClient.invalidateQueries({ queryKey: builderAdminKeys.documents })
-        } else toast.error(error.message)
-      },
-    })
-  const pendingKey = create.isPending ? create.variables?.key : undefined
-  return { start, pendingKey, pending: create.isPending }
-}
 
 const TEMPLATE_HINT: Record<string, MessageKey> = { faq: 'cms.hint.faq', contact: 'cms.hint.contact' }
 
@@ -238,7 +218,7 @@ export function ZonesCard({ documents, canManage, onRemove, children }: { docume
       <CardContent className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">{t('zones.text')}</p>
         <ul className="divide-y" aria-label={t('zones.listLabel')}>
-          {ZONE_DOCUMENT_KEYS.map((key: ZoneDocumentKey) => {
+          {LISTING_ZONE_KEYS.map((key: ZoneDocumentKey) => {
             const doc = documents.find((d) => d.key === key)
             const title = t(`zone.${key}` as MessageKey)
             const placement = t(`zone.${key}.detail` as MessageKey)

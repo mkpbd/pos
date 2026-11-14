@@ -34,6 +34,12 @@ export const reviewKeys = {
   product: (slug: string, query: { sort: string; rating: number | null; page: number }) => ['store', 'reviews', slug, query] as const,
 }
 
+/** P1b: published questions & answers of a product (public). */
+export const questionKeys = {
+  all: ['store', 'questions'] as const,
+  product: (slug: string, page: number) => ['store', 'questions', slug, page] as const,
+}
+
 /**
  * A query key for the current language: every storefront query caches per locale (ADR-011), so
  * switching the language refetches. The locale goes last, so the keys above stay prefixes that

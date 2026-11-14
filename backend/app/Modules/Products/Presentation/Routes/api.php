@@ -11,6 +11,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::put('products/{product}', [ProductController::class, 'update'])->middleware('can:products.manage');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->middleware('can:products.manage');
     Route::post('products/{productId}/restore', [ProductController::class, 'restore'])->whereUuid('productId')->middleware('can:products.manage');
+    // P1a: the variant grid and photos by colour.
+    Route::put('products/{product}/variants', [ProductController::class, 'saveVariants'])->middleware('can:products.manage');
+    Route::put('products/{product}/option-images', [ProductController::class, 'saveOptionImages'])->middleware('can:products.manage');
     Route::post('products/{product}/images', [ProductController::class, 'addImage'])->middleware('can:products.manage');
     Route::delete('products/{product}/images/{imageId}', [ProductController::class, 'removeImage'])->whereUuid('imageId')->middleware('can:products.manage');
 });

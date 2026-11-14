@@ -86,7 +86,8 @@ use RuntimeException;
  * application actions as the API: organization, catalog, listings, opening stock (stock
  * adjustment), checkout, promotions, content, theme, delivered orders of three shoppers per
  * store whose approved reviews show on the products, and one cash sale at the shop counter
- * (popularity — "best sellers" — counts completed POS sales).
+ * (popularity — "best sellers" — counts completed POS sales). P1b: answered shopper questions
+ * and "frequently bought together" scores (DemoProductPageSeeder).
  *
  * Sale prices: the variant's selling price is the catalog's sale price and its compare-at
  * price the regular one (struck through, "−N %", on-sale sources). The flash sale is an
@@ -180,6 +181,8 @@ class DemoThemesSeeder extends Seeder
         app(TenantContext::class)->runAs($result['organization']->id, function () {
             $this->catalog();
             $this->openingStock();
+            // P1a: photos per colour, swatch styles and size guides (Classic Shop, Little Sprouts).
+            DemoVariantsSeeder::apply($this->key, $this->data);
             $this->storefront();
             $this->checkout();
             $promotions = $this->promotions();
@@ -192,6 +195,8 @@ class DemoThemesSeeder extends Seeder
 
             // Best sellers and the popularity sort come from the counter sale.
             app()->call([new RefreshProductStats(app(TenantContext::class)->requireOrganization()), 'handle']);
+            // P1b: answered shopper questions and "frequently bought together" from the orders and the counter sale.
+            DemoProductPageSeeder::apply($this->data, $this->adminId);
         });
     }
 

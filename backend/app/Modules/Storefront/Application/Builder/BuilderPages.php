@@ -7,6 +7,7 @@ use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Application\Queries\ContentSchedule;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Builder pages as the storefront reads them (B1): the published render payload of the home
@@ -71,7 +72,9 @@ class BuilderPages
     {
         $payload = fn (string $key) => $draft ? $this->draft($key) : $this->published($key);
         $zones = [];
-        foreach (BuilderDocument::ZONES as $zone) {
+        // P1b: the listing zones and the all-products `product.after` (as before); product pages get
+        // their zones resolved with the product (productZones()).
+        foreach (BuilderDocument::BOOTSTRAP_ZONES as $zone) {
             $zones[$zone] = $payload(BuilderDocument::ZONE_PREFIX.$zone);
         }
 
@@ -88,7 +91,75 @@ class BuilderPages
      */
     public function partsNextChange(): ?CarbonImmutable
     {
-        return $this->nextChange([BuilderDocument::HEADER, BuilderDocument::FOOTER, ...array_map(fn (string $z) => BuilderDocument::ZONE_PREFIX.$z, BuilderDocument::ZONES)], false);
+        return $this->nextChange([BuilderDocument::HEADER, BuilderDocument::FOOTER, ...array_map(fn (string $z) => BuilderDocument::ZONE_PREFIX.$z, BuilderDocument::BOOTSTRAP_ZONES)], false);
+    }
+
+    /**
+     * P1b: the product page zones of one product, keyed by zone — for each, the most specific
+     * version: the product's own (`zone:<zone>@product:<id>`), else the first of its categories
+     * that has one (`@category:<id>`, nearest first), else the all-products one (`zone:<zone>`);
+     * null when none. Published versions only (each render cached like other builder pages);
+     * `$draft` (staff preview): any existing document counts, with its draft.
+     *
+     * @param  list<string>  $categoryIds  the product's category and its ancestors, nearest first
+     * @return array<string, array<string, mixed>|null>
+     */
+    public function productZones(string $productId, array $categoryIds, bool $draft): array
+    {
+        $available = array_flip($draft ? $this->existingZoneKeys() : $this->publishedZoneKeys());
+        $result = [];
+        foreach (BuilderDocument::PRODUCT_ZONES as $zone) {
+            $candidates = [
+                BuilderDocument::zoneKey($zone, BuilderDocument::TARGET_PRODUCT, $productId),
+                ...array_map(fn (string $id) => BuilderDocument::zoneKey($zone, BuilderDocument::TARGET_CATEGORY, $id), $categoryIds),
+                BuilderDocument::zoneKey($zone),
+            ];
+            $result[$zone] = null;
+            foreach ($candidates as $key) {
+                if (isset($available[$key])) {
+                    $result[$zone] = $draft ? $this->draft($key) : $this->published($key);
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * P1b: keys of the organization's published product zone documents (all products and
+     * versions), cached per content version (publishing or deleting bumps it).
+     *
+     * @return list<string>
+     */
+    private function publishedZoneKeys(): array
+    {
+        return $this->version->remember(
+            $this->tenant->requireOrganization(),
+            'builder:product-zone-keys',
+            fn () => $this->productZoneKeys()->whereNotNull('published_version_id')->pluck('key')->all(),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function existingZoneKeys(): array
+    {
+        return $this->productZoneKeys()->pluck('key')->all();
+    }
+
+    /**
+     * @return Builder<BuilderDocument>
+     */
+    private function productZoneKeys(): Builder
+    {
+        return BuilderDocument::query()->where('kind', BuilderDocument::KIND_ZONE)
+            ->where(function (Builder $q) {
+                foreach (BuilderDocument::PRODUCT_ZONES as $zone) {
+                    $q->orWhere('key', BuilderDocument::zoneKey($zone))->orWhere('key', 'like', BuilderDocument::zoneKey($zone).'@%');
+                }
+            });
     }
 
     /**

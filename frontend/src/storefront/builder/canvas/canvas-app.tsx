@@ -1,19 +1,32 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { BootstrapContext, storefrontKeys } from '../../api'
 import { NoticeProvider } from '../../components/notice-provider'
 import { useDictionary } from '../../i18n/dictionaries'
 import { buildLocaleValue, LocaleContext } from '../../i18n/locale'
 import { parseLocale, setLocaleRuntime, type Locale } from '../../i18n/runtime'
+import { formatPrice } from '../../money'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../../theme'
-import type { StorefrontBootstrap } from '../../types'
+import type { StorefrontBootstrap, StorefrontTheme } from '../../types'
 import { PageRenderer } from '../page-renderer'
 import { PopupFrame } from '../popups/popup-frame'
 import { playMotion } from '../motion'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, RenderColumn, RenderElement, RenderSection } from '../types'
 import { normalizeStorePopupSettings } from '../validate'
-import { CANVAS_SURROUNDINGS, envelope, isEditorShortcut, readParentMessage, type CanvasMessage, type CanvasSurroundings, type ParentMessage, type Rect } from './protocol'
+import {
+  CANVAS_SURROUNDINGS,
+  envelope,
+  isEditorShortcut,
+  readCanvasProduct,
+  readParentMessage,
+  type CanvasMessage,
+  type CanvasProduct,
+  type CanvasSurroundings,
+  type ParentMessage,
+  type Rect,
+} from './protocol'
 import { sanitizeHtml } from './sanitize'
 import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
 
@@ -90,12 +103,15 @@ function Skeleton({ element }: { element: RenderElement }) {
  * -------------------------------------------------------------------------------------------- */
 
 const block = 'rounded bg-neutral-300'
+const faded = 'pointer-events-none select-none opacity-50'
+const sampleLabel = 'text-xs font-semibold tracking-wide text-neutral-500 uppercase'
 
-function Sample({ label, children }: { label: string; children: ReactNode }) {
+/** A faded band of the page around the document; `testId` tells tests the parts before and after it apart. */
+function Sample({ label, children, testId = 'canvas-sample' }: { label: string; children: ReactNode; testId?: string }) {
   return (
-    <div aria-hidden="true" data-testid="canvas-sample" className="pointer-events-none select-none bg-neutral-50 py-8 opacity-50">
+    <div aria-hidden="true" data-testid={testId} className={`${faded} bg-neutral-50 py-8`}>
       <div className="mx-auto max-w-sf px-4">
-        <p className="mb-4 text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</p>
+        <p className={`mb-4 ${sampleLabel}`}>{label}</p>
         {children}
       </div>
     </div>
@@ -139,19 +155,218 @@ function PopupPageSample() {
   )
 }
 
-function ProductSample() {
+/* ----------------------------------------------------------------------------------------------
+ * P1b: the product page around its zones — in the theme's product layout (gallery side,
+ * thumbnails, details style), with the product the editor previews the zone on (a targeted
+ * version: a matching product), else grey blocks
+ * -------------------------------------------------------------------------------------------- */
+
+type ProductSampleLayout = { gallery: 'left' | 'right'; thumbnails: 'bottom' | 'side'; details: 'tabs' | 'accordion' | 'stacked' }
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** The theme's `layout.product` (the Site styles draft before the bootstrap theme); unknown values = today's look. */
+function productSampleLayout(draft: CanvasThemeSettings | null, theme: StorefrontTheme | undefined): ProductSampleLayout {
+  const draftLayout: unknown = draft?.layout
+  const themeLayout: unknown = theme?.layout
+  const fromDraft = isRecord(draftLayout) ? draftLayout.product : undefined
+  const fromTheme = isRecord(themeLayout) ? themeLayout.product : undefined
+  const source = isRecord(fromDraft) ? fromDraft : isRecord(fromTheme) ? fromTheme : {}
+  const pick = <T extends string>(value: unknown, options: readonly T[]): T => (options.includes(value as T) ? (value as T) : options[0]!)
+  return {
+    gallery: pick(source.gallery, ['left', 'right'] as const),
+    thumbnails: pick(source.thumbnails, ['bottom', 'side'] as const),
+    details: pick(source.details, ['tabs', 'accordion', 'stacked'] as const),
+  }
+}
+
+type ProductSampleProps = { product: CanvasProduct | null; layout: ProductSampleLayout; currency: string | null }
+
+function GallerySample({ product, layout }: Pick<ProductSampleProps, 'product' | 'layout'>) {
+  const photo = product?.image_url ? (
+    <img src={product.image_url} alt="" data-testid="canvas-product-image" className="aspect-square w-full rounded bg-white object-cover" />
+  ) : (
+    <div className={`${block} aspect-square w-full`} />
+  )
+  const thumbs = [0, 1, 2, 3].map((i) => <div key={i} className={`${block} size-12 shrink-0`} />)
+  // Side thumbnails: a strip beside the photo from tablets up, under it on phones (as on the store).
+  return layout.thumbnails === 'side' ? (
+    <div className="flex flex-col-reverse gap-2 md:flex-row" data-thumbnails="side">
+      <div className="flex gap-2 md:flex-col">{thumbs}</div>
+      <div className="min-w-0 flex-1">{photo}</div>
+    </div>
+  ) : (
+    <div className="flex flex-col gap-2" data-thumbnails="bottom">
+      {photo}
+      <div className="flex gap-2">{thumbs}</div>
+    </div>
+  )
+}
+
+/** Name, price and the delivery note line. */
+function HeadSample({ product, currency }: Pick<ProductSampleProps, 'product' | 'currency'>) {
   return (
-    <Sample label="Product details (filled in for each product)">
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className={`${block} aspect-square`} />
-        <div className="space-y-3"><div className={`${block} h-7 w-3/4`} /><div className={`${block} h-6 w-1/4`} /><div className={`${block} h-4 w-full`} /><div className={`${block} h-4 w-5/6`} /><div className={`${block} h-11 w-40`} /></div>
+    <div className="space-y-3">
+      {product ? (
+        <p data-testid="canvas-product-name" className="text-2xl leading-tight font-extrabold text-neutral-800">
+          {product.name}
+        </p>
+      ) : (
+        <div className={`${block} h-7 w-3/4`} />
+      )}
+      {product?.price ? (
+        <p data-testid="canvas-product-price" className="text-lg font-bold text-neutral-700">
+          {formatPrice(product.price, currency)}
+        </p>
+      ) : (
+        <div className={`${block} h-6 w-1/4`} />
+      )}
+      <div className={`${block} h-4 w-2/3`} />
+    </div>
+  )
+}
+
+/** Quantity, Add to cart and Buy now. */
+function BuySample() {
+  return (
+    <div className="space-y-3 border-t border-neutral-200 pt-4">
+      <div className="flex gap-3">
+        <div className={`${block} h-11 w-28`} />
+        <div className={`${block} h-11 flex-1`} />
       </div>
+      <div className={`${block} h-11 w-full`} />
+    </div>
+  )
+}
+
+/** Description, specifications and reviews as tabs, an accordion or one after another. */
+function DetailsSample({ details }: { details: ProductSampleLayout['details'] }) {
+  if (details === 'accordion') {
+    return (
+      <div data-details="accordion" className="divide-y divide-neutral-200 rounded border border-neutral-200">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center justify-between p-3">
+            <div className={`${block} h-4 w-40`} />
+            <div className={`${block} size-4`} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+  if (details === 'stacked') {
+    return (
+      <div data-details="stacked" className="space-y-5">
+        {[0, 1].map((i) => (
+          <div key={i} className="space-y-2">
+            <div className={`${block} h-5 w-32`} />
+            <div className={`${block} h-4 w-full`} />
+            <div className={`${block} h-4 w-5/6`} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div data-details="tabs" className="space-y-3">
+      <div className="flex gap-6 border-b border-neutral-200 pb-2">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={`${block} h-5 w-24`} />
+        ))}
+      </div>
+      <div className={`${block} h-4 w-full`} />
+      <div className={`${block} h-4 w-5/6`} />
+    </div>
+  )
+}
+
+function RelatedRow() {
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="space-y-2">
+          <div className={`${block} aspect-square`} />
+          <div className={`${block} h-4 w-3/4`} />
+          <div className={`${block} h-4 w-1/3`} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const productLabel = (product: CanvasProduct | null) => (product ? `Product page, previewed with “${product.name}”` : 'Product details (filled in for each product)')
+
+/** The product's photos, summary and details; `related`: the related products row under them. */
+function ProductSample({ product, layout, currency, related = false }: ProductSampleProps & { related?: boolean }) {
+  return (
+    <Sample label={productLabel(product)}>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className={layout.gallery === 'right' ? 'md:order-2' : undefined}>
+          <GallerySample product={product} layout={layout} />
+        </div>
+        <div className="space-y-4">
+          <HeadSample product={product} currency={currency} />
+          <BuySample />
+        </div>
+      </div>
+      <div className="mt-8">
+        <DetailsSample details={layout.details} />
+      </div>
+      {related && (
+        <div className="mt-8 space-y-3">
+          <p className={sampleLabel}>Related products and recently viewed</p>
+          <RelatedRow />
+        </div>
+      )}
     </Sample>
   )
 }
 
+function RelatedSample() {
+  return (
+    <Sample label="Related products (filled in by your shop)" testId="canvas-sample-after">
+      <RelatedRow />
+    </Sample>
+  )
+}
+
+/**
+ * `product.below_price`: the zone sits in the summary column, under the name, price and delivery
+ * note and above Add to cart; the photos sit beside it (on the theme's side) and the details
+ * below. Only the parts around the zone are faded.
+ */
+function SummaryColumnFrame({ product, layout, currency, children }: ProductSampleProps & { children: ReactNode }) {
+  return (
+    <div className="bg-neutral-50 py-8" data-canvas-part="product-summary">
+      <div className="mx-auto max-w-sf px-4">
+        <p aria-hidden="true" className={cn(faded, 'mb-4', sampleLabel)}>
+          {productLabel(product)}
+        </p>
+        <div className="grid gap-6 rounded-sf-card bg-white p-4 md:grid-cols-2 md:p-6">
+          <div aria-hidden="true" data-testid="canvas-sample-gallery" className={cn(faded, layout.gallery === 'right' && 'md:order-2')}>
+            <GallerySample product={product} layout={layout} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <div aria-hidden="true" data-testid="canvas-sample" className={faded}>
+              <HeadSample product={product} currency={currency} />
+            </div>
+            <div className="min-w-0" data-canvas-part="zone">
+              {children}
+            </div>
+            <div aria-hidden="true" data-testid="canvas-sample-after" className={faded}>
+              <BuySample />
+            </div>
+          </div>
+        </div>
+        <div aria-hidden="true" className={cn(faded, 'mt-8')}>
+          <DetailsSample details={layout.details} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Where the document sits: the sample before it, the sample after it. */
-function surroundingSamples(surroundings: CanvasSurroundings): { before: ReactNode; after: ReactNode } {
+function surroundingSamples(surroundings: CanvasSurroundings, product: ProductSampleProps): { before: ReactNode; after: ReactNode } {
   switch (surroundings) {
     case 'header':
       return { before: null, after: <PageSample /> }
@@ -162,8 +377,13 @@ function surroundingSamples(surroundings: CanvasSurroundings): { before: ReactNo
     case 'zone:listing.bottom':
       return { before: <GridSample />, after: null }
     case 'zone:product.after':
-      return { before: <ProductSample />, after: null }
+      // Full width after the details and tabs, before the related products.
+      return { before: <ProductSample {...product} />, after: <RelatedSample /> }
+    case 'zone:product.bottom':
+      // P1b: the very end of the product page, after related and recently viewed products.
+      return { before: <ProductSample {...product} related />, after: null }
     default:
+      // `zone:product.below_price` draws its own frame around the zone (SummaryColumnFrame).
       return { before: null, after: null }
   }
 }
@@ -338,7 +558,12 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   )
   const pending = useMemo(() => new Set(frame?.pending ?? []), [frame])
   const surroundings: CanvasSurroundings = frame?.surroundings && CANVAS_SURROUNDINGS.includes(frame.surroundings) ? frame.surroundings : 'page'
-  const samples = useMemo(() => surroundingSamples(surroundings), [surroundings])
+  // P1b: product page zones show the product they are previewed with, in the theme's product layout.
+  const productSample = useMemo<ProductSampleProps>(
+    () => ({ product: readCanvasProduct(frame?.product), layout: productSampleLayout(themeDraft, initial?.theme), currency: initial?.store.currency ?? null }),
+    [frame?.product, themeDraft, initial],
+  )
+  const samples = useMemo(() => surroundingSamples(surroundings, productSample), [surroundings, productSample])
   const placeholder = useCallback((element: RenderElement) => (pending.has(element.id) ? <Skeleton element={element} /> : null), [pending])
   const popupSettings = useMemo(() => (surroundings === 'popup' ? normalizeStorePopupSettings(frame?.popup) : null), [surroundings, frame?.popup])
 
@@ -355,6 +580,25 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       </div>
     )
   }
+
+  const emptyText = typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT
+  // The document being edited (not named `document`: the effects above use the global one).
+  const drawn =
+    page.sections.length === 0 ? (
+      <div data-testid="canvas-empty" className={`grid place-items-center p-8 text-center text-neutral-500 ${surroundings === 'page' ? 'min-h-[60vh]' : 'min-h-40 border-y border-dashed border-neutral-300'}`}>
+        <p className="max-w-sm text-sm">{emptyText}</p>
+      </div>
+    ) : surroundings === 'header' ? (
+      <header data-canvas-part="header">
+        <PageRenderer page={page} placeholder={placeholder} />
+      </header>
+    ) : surroundings === 'footer' ? (
+      <footer data-canvas-part="footer">
+        <PageRenderer page={page} placeholder={placeholder} />
+      </footer>
+    ) : (
+      <PageRenderer page={page} placeholder={placeholder} />
+    )
 
   return (
     <LocaleContext value={localeValue}>
@@ -376,24 +620,15 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
                 <PopupFrame id="canvas" settings={popupSettings} page={page} mode="canvas" />
                 {page.sections.length === 0 && (
                   <p data-testid="canvas-empty" className="absolute inset-x-0 top-4 z-[70] mx-auto max-w-sm rounded bg-white/90 p-3 text-center text-sm text-neutral-600 shadow">
-                    {typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT}
+                    {emptyText}
                   </p>
                 )}
               </div>
-            ) : page.sections.length === 0 ? (
-              <div data-testid="canvas-empty" className={`grid place-items-center p-8 text-center text-neutral-500 ${surroundings === 'page' ? 'min-h-[60vh]' : 'min-h-40 border-y border-dashed border-neutral-300'}`}>
-                <p className="max-w-sm text-sm">{typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT}</p>
-              </div>
-            ) : surroundings === 'header' ? (
-              <header data-canvas-part="header">
-                <PageRenderer page={page} placeholder={placeholder} />
-              </header>
-            ) : surroundings === 'footer' ? (
-              <footer data-canvas-part="footer">
-                <PageRenderer page={page} placeholder={placeholder} />
-              </footer>
+            ) : surroundings === 'zone:product.below_price' ? (
+              // P1b: in the summary column, between the price and Add to cart.
+              <SummaryColumnFrame {...productSample}>{drawn}</SummaryColumnFrame>
             ) : (
-              <PageRenderer page={page} placeholder={placeholder} />
+              drawn
             )}
             {samples.after}
           </main>

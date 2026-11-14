@@ -15,6 +15,10 @@ Schedule::command('model:prune', ['--model' => [IdempotencyKey::class]])->daily(
 // Storefront popularity ("best sellers", popularity sort) from completed sales.
 Schedule::command('storefront:refresh-product-stats')->hourly()->withoutOverlapping();
 
+// P1b: "frequently bought together" from 180 days of web orders and POS sales, nightly from 03:00
+// in each organization's timezone (hourly runs; once per organization and local day).
+Schedule::command('pos:affinities:compute --nightly')->hourly()->withoutOverlapping();
+
 // Guest carts expire 30 days after their last change.
 Schedule::command('cart:prune')->daily();
 

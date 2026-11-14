@@ -97,7 +97,7 @@ describe('promotions on cards and product pages', () => {
     expect(within(block).getByTestId('countdown-time')).toHaveTextContent(/^Ends in 2d 01:00:0\d$/)
 
     // Blue / L is not part of the promotion: its own price, no promotion.
-    await user.click(summary.getByRole('radio', { name: 'Blue' }))
+    await user.click(summary.getByRole('radio', { name: 'Colour: Blue' }))
     await waitFor(() => expect(summary.getAllByTestId('price')[0]).toHaveTextContent('৳480.00'))
     expect(summary.queryByTestId('product-promotion')).not.toBeInTheDocument()
     expect(summary.queryByTestId('promotion-badge')).not.toBeInTheDocument()

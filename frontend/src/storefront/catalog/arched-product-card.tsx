@@ -5,8 +5,11 @@ import { CardCartAction } from '../cart/add-to-cart'
 import { useLocale } from '../i18n/locale'
 import { Countdown } from '../promotions/countdown-timer'
 import { WishlistButton } from '../wishlist/wishlist-button'
-import { CardPrice } from './card-parts'
+import { customBadgesOf } from './badge-colors'
+import { CardPrice, CardSwatchRow } from './card-parts'
+import { useCardSwatches } from './card-swatches'
 import { useCardPricing } from './card-pricing'
+import { CustomBadgeItems } from './custom-badges'
 import type { ProductCardProps } from './product-card'
 import { ProductImage } from './product-image'
 import { useQuickView } from './quick-view-context'
@@ -42,6 +45,7 @@ export function ArchedProductCard({ product, eager = false, actions, countdown =
   const quickView = useQuickView()
   const { t } = useLocale()
   const pricing = useCardPricing(product)
+  const swatch = useCardSwatches(product)
   const { promotion, promotionLabel } = pricing
   const ribbon = promotionLabel ?? (product.on_sale ? (product.discount_percent ? t('catalog.badges.discount', { percent: product.discount_percent }) : t('catalog.badges.sale')) : null)
   const badge = 'rounded-full px-2.5 py-0.5 text-xs font-bold text-white'
@@ -55,13 +59,13 @@ export function ArchedProductCard({ product, eager = false, actions, countdown =
       <div className="relative">
         <Link to={product.url} tabIndex={-1} aria-hidden className="block overflow-hidden">
           <ProductImage
-            image={product.image}
+            image={swatch.image}
             alt={product.name}
             eager={eager}
             fit="cover"
-            imgClassName={cn('transition duration-500 motion-reduce:transition-none', product.hover_image ? 'group-hover:opacity-0' : 'group-hover:scale-105')}
+            imgClassName={cn('transition duration-500 motion-reduce:transition-none', product.hover_image && !swatch.swapped ? 'group-hover:opacity-0' : 'group-hover:scale-105')}
           />
-          {product.hover_image && (
+          {product.hover_image && !swatch.swapped && (
             <ProductImage
               image={product.hover_image}
               alt=""
@@ -71,7 +75,7 @@ export function ArchedProductCard({ product, eager = false, actions, countdown =
           )}
         </Link>
 
-        {(ribbon || product.is_new || !product.in_stock) && (
+        {(ribbon || product.is_new || !product.in_stock || customBadgesOf(product.badges).length > 0) && (
           <ul className="pointer-events-none absolute inset-0" aria-label={t('catalog.badges.label')}>
             {ribbon && (
               // A band across the top-left corner; the box clips its ends.
@@ -84,6 +88,12 @@ export function ArchedProductCard({ product, eager = false, actions, countdown =
             )}
             {product.is_new && <li className={cn(badge, 'absolute top-3 right-3 bg-sf-highlight')}>{t('catalog.badges.new')}</li>}
             {!product.in_stock && <li className={cn(badge, 'absolute right-3 bg-sf-heading', product.is_new ? 'top-10' : 'top-3')}>{t('catalog.stock.out')}</li>}
+            {/* P1b: the owner's labels continue the right-hand column, 1.75rem apart like New and Out of stock. */}
+            <CustomBadgeItems
+              badges={product.badges}
+              className={cn(badge, 'absolute right-3 max-w-[60%]')}
+              style={(i) => ({ top: `${0.75 + ((product.is_new ? 1 : 0) + (product.in_stock ? 0 : 1) + i) * 1.75}rem` })}
+            />
           </ul>
         )}
         {countdown && promotion?.show_countdown && <Countdown endsAt={promotion.ends_at} variant="chip" prefix="" className="absolute bottom-9 left-3" />}
@@ -102,6 +112,7 @@ export function ArchedProductCard({ product, eager = false, actions, countdown =
             </Link>
           </h3>
           {product.category && <p className="text-xs font-medium">{product.category.name}</p>}
+          <CardSwatchRow {...swatch.row} className="justify-center [&_[aria-pressed=true]]:border-current" />
           <CardPrice
             product={product}
             pricing={pricing}

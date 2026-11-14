@@ -3,6 +3,7 @@
 namespace App\Modules\Shipping\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,7 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A delivery zone: a named set of districts with its delivery methods.
+ * A delivery zone: a named set of districts with its delivery methods. P1b: the product page's
+ * delivery note shows the zones, so writes refresh the storefront cache.
  *
  * @property string $id
  * @property string $organization_id
@@ -21,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['organization_id', 'name', 'is_active', 'sort_order'])]
 class ShippingZone extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'is_active' => true,

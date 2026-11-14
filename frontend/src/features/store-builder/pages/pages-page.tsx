@@ -13,10 +13,12 @@ import { StorefrontHeader } from '@/features/storefront/components/storefront-he
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { documentPath, useCreateDocumentMutation, useDeleteDocumentMutation, useDocumentsQuery, type DocumentSummary } from '../api'
+import { isProductZone, parseZoneKey } from '../document-kind'
 import { CmsPagesCard, SitePartsCard, ZonesCard, type RemoveRequest } from './builder-parts'
 import { DemoLooksCard } from './demo-looks'
 import { ListingColumnsCard } from './listing-columns-card'
 import { PopupsCard } from './popups-card'
+import { ProductZonesCard } from './product-zones-card'
 import type { ScreenLang } from './messages'
 import { lastEdited, slugify, slugProblemKey } from './page-helpers'
 import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
@@ -28,8 +30,9 @@ import { StartGuide } from './start-guide'
  * Online store → Page builder (/admin/storefront/pages), in three groups (B4):
  *  - Your pages: the home page, campaign (landing) pages and content pages (CMS) designed with the builder;
  *  - Header & footer: the store's header and footer;
- *  - Shop pages: the areas around the product grid / below the product details, and the products
- *    per row of the listings (theme `layout.listing_columns`).
+ *  - Shop pages: the areas around the product grid, the products per row of the listings (theme
+ *    `layout.listing_columns`) and, P1b, the product page areas with their versions for one
+ *    category or one product.
  * Status, creating, editing and deleting (back to the classic rendering) for each. B5: above the
  * groups, the demo looks (drafts → review → publish all).
  * B7: English / বাংলা for this screen (remembered in the browser), a state-aware 3-step guide on
@@ -247,6 +250,11 @@ function PagesScreen() {
   const cmsDocs = pages.filter((d) => d.key.startsWith('cms:'))
   const parts = all.filter((d) => d.kind === 'header' || d.kind === 'footer')
   const zones = all.filter((d) => d.kind === 'zone')
+  // P1b: the product page areas and their versions for a category or a product.
+  const productZones = zones.filter((d) => {
+    const parsed = parseZoneKey(d.key)
+    return parsed !== null && isProductZone(parsed.zone)
+  })
   const popups = all.filter((d) => d.kind === 'popup')
 
   const deleteLanding = (summary: DocumentSummary) =>
@@ -318,6 +326,7 @@ function PagesScreen() {
               <ZonesCard documents={zones} canManage={canManage} onRemove={setRemoving}>
                 <ListingColumnsCard canManage={canManage} canPublish={canPublish} />
               </ZonesCard>
+              <ProductZonesCard documents={productZones} canManage={canManage} onRemove={setRemoving} />
             </section>
             <section aria-labelledby="group-popups" className="flex flex-col gap-4">
               <GroupHeading id="group-popups" title={t('group.popups.title')} description={t('group.popups.text')} />

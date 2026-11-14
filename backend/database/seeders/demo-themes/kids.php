@@ -172,6 +172,13 @@ return [
         ]],
     ],
 
+    // P1b: answered shopper questions (DemoProductPageSeeder): [product, name, e-mail, language, question, answer].
+    'questions' => [
+        ['cotton-bodysuit', 'Farhana Yasmin', 'farhana@littlesprouts.test', 'en', 'Is the cotton organic?', 'Yes, it is 100 % organic cotton with nickel-free snaps, gentle on sensitive skin.'],
+        ['cotton-bodysuit', 'সুমাইয়া আক্তার', 'sumaiya@littlesprouts.test', 'bn', 'নবজাতকের জন্য কোন সাইজ নেব?', 'জন্মের পর প্রথম কয়েক মাসের জন্য ছোট সাইজটি নিন; একটু বড় বাচ্চার জন্য পরের সাইজ।'],
+        ['plush-bunny', 'Kamal Uddin', 'kamal@littlesprouts.test', 'en', 'Can the bunny go in the washing machine?', 'Yes, on a gentle cycle inside a laundry bag. Let it dry in the air, not in a dryer.'],
+    ],
+
     'features' => [
         ['icon' => 'shield-check', 'title' => 'Safety guarantee', 'text' => 'Tested for little hands'],
         ['icon' => 'truck', 'title' => 'Free delivery', 'text' => 'Inside Dhaka over ৳2,000'],
@@ -196,5 +203,57 @@ return [
         ['type' => 'testimonials', 'title' => 'Happy parents'],
         ['type' => 'banner_grid', 'banners' => ['banner-girls', 'banner-kids', 'banner-boys'], 'config' => ['layout' => '3-col']],
         ['type' => 'features_strip', 'features' => true],
+    ],
+
+    // P1a (DemoVariantsSeeder): photos per colour (the Mint photo is a tinted copy of the
+    // product photo, made at seed time), option swatch styles and size guides with Bangla.
+    'option_photos' => [
+        'dino-night-light' => ['option' => 'Colour', 'style' => 'color', 'values' => [
+            'Peach' => ['dino-night-light.jpg'],
+            'Mint' => [['tint' => 'dino-night-light.jpg', 'colour' => [-40, 30, 0], 'name' => 'dino-night-light-mint.jpg']],
+        ]],
+    ],
+    'size_guides' => [
+        [
+            'name' => 'Baby & kids clothing', 'title' => 'Baby and kids size guide', 'categories' => ['baby-girls', 'baby-boys'],
+            'intro' => 'Ages are a guide: babies grow at their own pace, so check height and weight too.',
+            'note' => 'Our clothes are cut with room to grow. Between sizes? Choose the larger one.',
+            'columns' => ['age' => 'Age', 'height' => 'Height (cm)', 'weight' => 'Weight (kg)'],
+            'rows' => [
+                ['age' => '0–3 m', 'height' => '56–62', 'weight' => '3.5–6'],
+                ['age' => '3–6 m', 'height' => '62–68', 'weight' => '6–8'],
+                ['age' => '6–12 m', 'height' => '68–80', 'weight' => '8–10'],
+                ['age' => '1–2 y', 'height' => '80–92', 'weight' => '10–13'],
+                ['age' => '2–3 y', 'height' => '92–98', 'weight' => '13–15'],
+                ['age' => '3–4 y', 'height' => '98–104', 'weight' => '15–17'],
+                ['age' => '4–5 y', 'height' => '104–110', 'weight' => '17–19'],
+            ],
+            'bn' => [
+                'title' => 'শিশুদের পোশাকের মাপের গাইড',
+                'intro' => 'বয়স শুধু একটি ধারণা: প্রতিটি শিশু নিজের গতিতে বাড়ে, তাই উচ্চতা ও ওজনও দেখে নিন।',
+                'note' => 'আমাদের পোশাকে বেড়ে ওঠার জায়গা রাখা আছে। দুই মাপের মাঝামাঝি হলে বড়টি বেছে নিন।',
+                'columns' => ['age' => 'বয়স', 'height' => 'উচ্চতা (সেমি)', 'weight' => 'ওজন (কেজি)'],
+                'cells' => ['age' => ['০–৩ মাস', '৩–৬ মাস', '৬–১২ মাস', '১–২ বছর', '২–৩ বছর', '৩–৪ বছর', '৪–৫ বছর']],
+            ],
+        ],
+        [
+            'name' => 'Little shoes', 'title' => 'Little shoes size guide', 'categories' => ['shoes'],
+            'intro' => 'Measure your child\'s foot standing, from heel to the longest toe, and add about 1 cm of growing room.',
+            'note' => 'First shoes should feel soft and roomy at the toes.',
+            'columns' => ['eu' => 'EU', 'foot' => 'Foot length (cm)', 'age' => 'Approx. age'],
+            'rows' => [
+                ['eu' => '18', 'foot' => '10.5', 'age' => '6–9 m'],
+                ['eu' => '19', 'foot' => '11.5', 'age' => '9–12 m'],
+                ['eu' => '20', 'foot' => '12.0', 'age' => '12–15 m'],
+                ['eu' => '21', 'foot' => '12.5', 'age' => '15–18 m'],
+                ['eu' => '22', 'foot' => '13.5', 'age' => '18–24 m'],
+            ],
+            'bn' => [
+                'title' => 'ছোটদের জুতার মাপের গাইড',
+                'intro' => 'শিশুকে দাঁড় করিয়ে গোড়ালি থেকে সবচেয়ে লম্বা আঙুল পর্যন্ত মাপুন, আর বেড়ে ওঠার জন্য প্রায় ১ সেমি যোগ করুন।',
+                'note' => 'প্রথম জুতা নরম আর আঙুলের দিকে খোলামেলা হওয়া উচিত।',
+                'columns' => ['foot' => 'পায়ের দৈর্ঘ্য (সেমি)', 'age' => 'আনুমানিক বয়স'],
+            ],
+        ],
     ],
 ];

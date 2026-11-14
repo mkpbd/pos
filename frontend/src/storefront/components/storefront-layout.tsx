@@ -55,7 +55,7 @@ export function StorefrontLayout() {
 function StoreFrame({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
   const { t } = useLocale()
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="sf-frame flex min-h-screen flex-col">
       <a href="#main" className="sr-only z-50 bg-sf-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
         {t('common.skipToContent')}
       </a>

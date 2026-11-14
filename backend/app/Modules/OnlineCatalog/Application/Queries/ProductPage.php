@@ -3,13 +3,17 @@
 namespace App\Modules\OnlineCatalog\Application\Queries;
 
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
+use App\Modules\OnlineCatalog\Application\Contracts\ProductPageZones;
+use App\Modules\OnlineCatalog\Application\Contracts\ProductQuestionCounts;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\OnlineCatalog\Domain\CatalogItem;
 use App\Modules\OnlineCatalog\Domain\CatalogSort;
+use App\Modules\OnlineCatalog\Domain\CoPurchaseCounter;
 use App\Modules\OnlineCatalog\Domain\Pricing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\ProductListing;
 use App\Modules\OnlineCatalog\Infrastructure\Models\RelatedProduct;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
+use App\Modules\OnlineCatalog\Infrastructure\ReadModels\ProductAffinityProjection;
 use App\Modules\Shared\Application\Localization\FixedText;
 use App\Modules\Shared\Domain\PlainText;
 use App\Modules\Shared\Domain\Translations;
@@ -26,6 +30,9 @@ class ProductPage
 {
     public const RELATED_FALLBACK = 8;
 
+    /** P1b: automatic "frequently bought together" — the product plus up to this many others. */
+    public const FREQUENTLY_BOUGHT_AUTOMATIC = 4;
+
     /** Product descriptions in structured data are cut to this many characters. */
     public const STRUCTURED_DESCRIPTION_LENGTH = 5000;
 
@@ -34,14 +41,93 @@ class ProductPage
         private readonly CatalogDirectory $directory,
         private readonly BrowseCatalog $browse,
         private readonly ProductRatings $ratings,
+        private readonly SizeGuides $sizeGuides,
+        private readonly DeliveryNote $delivery,
+        private readonly ProductQuestionCounts $questions,
+        private readonly ProductAffinityProjection $affinities,
     ) {}
 
     /**
+     * P1b: resolved on use — the builder's implementation reaches back into the catalog (its
+     * elements read product cards through StorefrontCatalog, which builds this class).
+     */
+    private function zones(): ProductPageZones
+    {
+        return app(ProductPageZones::class);
+    }
+
+    /**
+     * P1a: the photo option's name as the product defines it, or null.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function photoOption(array $record): ?string
+    {
+        $photoOption = mb_strtolower((string) ($record['photo_option'] ?? ''));
+        foreach ($record['options'] as $option) {
+            if ($photoOption !== '' && mb_strtolower((string) ($option['name'] ?? '')) === $photoOption) {
+                return (string) $option['name'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * P1a: a variant without its own image shows the first photo of its photo-option value.
+     *
+     * @param  array<string, mixed>  $record
+     * @param  array<string, mixed>  $variant
+     */
+    private function firstOptionPhoto(array $record, array $variant): ?string
+    {
+        $photoOption = mb_strtolower((string) ($record['photo_option'] ?? ''));
+        if ($photoOption === '') {
+            return null;
+        }
+        $imageIds = array_column($record['images'], 'id');
+        foreach ($variant['option_values'] as $name => $value) {
+            if (mb_strtolower((string) $name) === $photoOption) {
+                foreach ($record['option_images'][$photoOption][mb_strtolower((string) $value)] ?? [] as $id) {
+                    if (in_array($id, $imageIds, true)) {
+                        return $id;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The product page. P1b adds what only the page itself shows (not the builder's product
+     * spotlight, so a zone can never contain itself): the store's `delivery` note, the builder
+     * `zones` resolved for this product (product → nearest category → all products; `$draftZones`
+     * for a staff draft preview) and the published `questions_count`.
+     *
      * @return array<string, mixed>
      */
-    public function show(string $slug, bool $preview = false): array
+    public function show(string $slug, bool $preview = false, bool $draftZones = false): array
     {
-        return $this->detail($this->find($slug, $preview), $preview);
+        $record = $this->find($slug, $preview);
+        $data = $this->detail($record, $preview);
+        // {options: [{zone, method, min_days, max_days, fee, free_over}], cod_available} | null.
+        $data['delivery'] = $this->delivery->current();
+        // {"product.below_price": page|null, "product.after": page|null, "product.bottom": page|null}.
+        $data['zones'] = $this->zones()->forProduct($record['id'], $this->categoryChain($record['category_id']), $draftZones);
+        $data['questions_count'] = $this->questions->publishedCount($record['id']);
+
+        return $data;
+    }
+
+    /**
+     * P1b: the product's category and its ancestors, nearest first ([] without a category).
+     *
+     * @return list<string>
+     */
+    private function categoryChain(?string $categoryId): array
+    {
+        return $categoryId === null ? [] : $this->catalog->categoryTree()->selfAndAncestors($categoryId);
     }
 
     /**
@@ -111,7 +197,9 @@ class ProductPage
                 ['name' => $record['name'], 'url' => null],
             ],
             'images' => array_map(fn (array $i) => ['id' => $i['id'], 'url' => $i['url'], 'alt' => $record['name']], $record['images']),
-            'options' => $this->options($record),
+            // P1a: display button|swatch|image|text; values carry swatch_hex, image (first photo) and image_ids.
+            'options' => $this->catalog->productOptions($record),
+            'photo_option' => $this->photoOption($record),
             'variants' => array_map(fn (array $v) => [
                 'id' => $v['id'],
                 'sku' => $v['sku'],
@@ -125,7 +213,9 @@ class ProductPage
                 'promo_price' => $this->catalog->promotion($record, $v['price'])['price'] ?? null,
                 'in_stock' => $v['in_stock'],
                 'low_stock' => $v['low_stock'],
-                'image_id' => $v['image_id'],
+                // P1a: whole units left when few are left (at or below the low-stock threshold), else null.
+                'stock_left' => $v['stock_left'] ?? null,
+                'image_id' => $v['image_id'] ?? $this->firstOptionPhoto($record, $v),
             ], $variants),
             'price' => $pricing['price'],
             'price_max' => $pricing['price_max'],
@@ -139,6 +229,11 @@ class ProductPage
             'allow_decimal' => (bool) ($unitInfo['allow_decimal'] ?? false),
             // Approved reviews (E9): {average: "4.5", count: 12}, null without any.
             'rating' => $this->ratings->summary($record['id']),
+            // P1a: the listing's own size guide, else its category's (nearest ancestor), localized.
+            'size_guide' => $this->sizeGuides->forProduct($listing->size_guide_id, $record['category_id']),
+            // P1b: the gallery's video {provider, id, url} (YouTube / Vimeo) and custom badges [{text, tone}].
+            'video' => $this->catalog->video($listing),
+            'badges' => $this->catalog->badges($listing),
             'seo' => [
                 'title' => $text['seo_title'] ?? $record['name'],
                 'description' => $text['seo_description'] ?? $text['short_description'],
@@ -206,10 +301,14 @@ class ProductPage
 
     /**
      * Hand-picked related and frequently-bought-together products (live only, in order).
-     * Without live related picks, up to eight other products of the same category follow,
-     * newest first; frequently bought has no fallback.
      *
-     * @return array{related: list<array<string, mixed>>, frequently_bought: list<array<string, mixed>>}
+     * - Related: without live picks, up to eight other live products — P1b: in stock first, then
+     *   the same category before the same brand, newest first within each group.
+     * - Frequently bought together (P1b): the live picks (`frequently_bought_source: manual`), else
+     *   the products most often bought with this one (web orders and POS sales of the last 180
+     *   days, at least twice; live and in stock; up to four — `automatic`), else none (null).
+     *
+     * @return array{related: list<array<string, mixed>>, frequently_bought: list<array<string, mixed>>, frequently_bought_source: 'manual'|'automatic'|null}
      */
     public function related(string $slug, bool $preview = false): array
     {
@@ -220,25 +319,76 @@ class ProductPage
             ->orderBy('sort_order')->get()->groupBy('kind');
 
         $related = $this->browse->cards(($picks['related'] ?? collect())->pluck('related_product_id')->all());
-        if ($related === [] && $record['category_id'] !== null) {
-            $items = [];
-            $byId = [];
-            foreach ($this->catalog->products(['category_ids' => [$record['category_id']]]) as $candidate) {
-                if ($candidate['id'] !== $record['id']) {
-                    $byId[$candidate['id']] = $candidate;
-                    $items[] = $this->catalog->item($candidate);
-                }
-            }
-            $related = array_map(
-                fn (CatalogItem $i) => $this->catalog->card($byId[$i->id]),
-                array_slice(CatalogSort::Latest->sort($items), 0, self::RELATED_FALLBACK),
-            );
+        if ($related === []) {
+            $related = $this->relatedFallback($record);
+        }
+
+        $frequently = $this->browse->cards(($picks['frequently_bought'] ?? collect())->pluck('related_product_id')->all());
+        $source = $frequently === [] ? null : 'manual';
+        if ($frequently === []) {
+            $frequently = $this->automaticFrequentlyBought($record['id']);
+            $source = $frequently === [] ? null : 'automatic';
         }
 
         return [
             'related' => $related,
-            'frequently_bought' => $this->browse->cards(($picks['frequently_bought'] ?? collect())->pluck('related_product_id')->all()),
+            'frequently_bought' => $frequently,
+            'frequently_bought_source' => $source,
         ];
+    }
+
+    /**
+     * P1b: other live products of the same category, then of the same brand; in stock first,
+     * category before brand, newest first; never the product itself.
+     *
+     * @param  array<string, mixed>  $record
+     * @return list<array<string, mixed>>
+     */
+    private function relatedFallback(array $record): array
+    {
+        $candidates = [];
+        $tier = [];
+        if ($record['category_id'] !== null) {
+            foreach ($this->catalog->products(['category_ids' => [$record['category_id']]]) as $candidate) {
+                $candidates[$candidate['id']] = $candidate;
+                $tier[$candidate['id']] = 0;
+            }
+        }
+        if ($record['brand_id'] !== null) {
+            foreach ($this->catalog->products() as $candidate) {
+                if ($candidate['brand_id'] === $record['brand_id'] && ! isset($candidates[$candidate['id']])) {
+                    $candidates[$candidate['id']] = $candidate;
+                    $tier[$candidate['id']] = 1;
+                }
+            }
+        }
+        unset($candidates[$record['id']]);
+        if ($candidates === []) {
+            return [];
+        }
+
+        $items = CatalogSort::Latest->sort(array_values(array_map(fn (array $c) => $this->catalog->item($c), $candidates)));
+        // usort is stable: newest first stays the order inside each group.
+        usort($items, fn (CatalogItem $a, CatalogItem $b) => [$a->inStock ? 0 : 1, $tier[$a->id]] <=> [$b->inStock ? 0 : 1, $tier[$b->id]]);
+
+        return array_map(fn (CatalogItem $i) => $this->catalog->card($candidates[$i->id]), array_slice($items, 0, self::RELATED_FALLBACK));
+    }
+
+    /**
+     * P1b: the products most often bought together with this one (score ≥ 2), live and in stock,
+     * up to FREQUENTLY_BOUGHT_AUTOMATIC, best first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function automaticFrequentlyBought(string $productId): array
+    {
+        $ids = $this->affinities->relatedIds($this->catalog->organizationId(), $productId, CoPurchaseCounter::MIN_SCORE, CoPurchaseCounter::MAX_PER_PRODUCT);
+        $cards = array_values(array_filter(
+            $this->browse->cards(array_values(array_diff($ids, [$productId]))),
+            fn (array $card) => $card['in_stock'] === true,
+        ));
+
+        return array_slice($cards, 0, self::FREQUENTLY_BOUGHT_AUTOMATIC);
     }
 
     /**
@@ -280,58 +430,6 @@ class ProductPage
             'name' => $tree->node($id)['name'],
             'url' => '/category/'.$this->catalog->categoryListings()[$id]->slug,
         ], $ids);
-    }
-
-    /**
-     * The product's options with the values its active variants use. A linked attribute
-     * gives the slug, display and value order (dictionary order, unknown values after).
-     *
-     * @param  array<string, mixed>  $record
-     * @return list<array{name: string, slug: ?string, display: string, values: list<array{value: string, swatch_hex: ?string}>}>
-     */
-    private function options(array $record): array
-    {
-        $attributes = [];
-        foreach ($this->catalog->attributes() as $attribute) {
-            $attributes[mb_strtolower($attribute['name'])] = $attribute;
-        }
-
-        $result = [];
-        foreach ($record['options'] as $option) {
-            $name = (string) ($option['name'] ?? '');
-            $used = [];
-            foreach ($this->catalog->activeVariants($record) as $variant) {
-                foreach ($variant['option_values'] as $key => $value) {
-                    if (mb_strtolower((string) $key) === mb_strtolower($name)) {
-                        $used[mb_strtolower((string) $value)] = true;
-                    }
-                }
-            }
-            $values = array_values(array_filter((array) ($option['values'] ?? []), fn ($v) => isset($used[mb_strtolower((string) $v)])));
-
-            $attribute = $attributes[mb_strtolower($name)] ?? null;
-            $swatches = [];
-            if ($attribute !== null) {
-                $order = [];
-                foreach ($attribute['values'] as $position => $known) {
-                    $order[mb_strtolower($known['value'])] = $position;
-                    $swatches[mb_strtolower($known['value'])] = $known['swatch_hex'];
-                }
-                $fallback = count($order);
-                $indexed = array_map(null, $values, array_keys($values));
-                usort($indexed, fn (array $a, array $b) => [$order[mb_strtolower($a[0])] ?? $fallback, $a[1]] <=> [$order[mb_strtolower($b[0])] ?? $fallback, $b[1]]);
-                $values = array_column($indexed, 0);
-            }
-
-            $result[] = [
-                'name' => $name,
-                'slug' => $attribute['slug'] ?? null,
-                'display' => $attribute['display'] ?? 'button',
-                'values' => array_map(fn (string $v) => ['value' => $v, 'swatch_hex' => $swatches[mb_strtolower($v)] ?? null], $values),
-            ];
-        }
-
-        return $result;
     }
 
     /**

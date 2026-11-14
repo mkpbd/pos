@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import type { BuilderContent, BuilderMedia, Device } from '@/storefront/builder/types'
-import { documentPath, type CmsPageRef, type DocumentDetail, type DocumentKind, type Problem, type PublishedRef } from './api'
+import { documentPath, type CmsPageRef, type DocumentDetail, type DocumentKind, type PreviewProduct, type Problem, type PublishedRef, type ZoneTarget } from './api'
 
 /*
  * The editor's state (one store per open document). Content edits go through `apply` with a pure
@@ -28,6 +28,10 @@ export type EditorDocument = {
   published: PublishedRef | null
   /** B8b popups: switched on on the store (not versioned). */
   active: boolean
+  /** P1b: the category or product a product zone version is for (null: all products, other documents). */
+  target: ZoneTarget | null
+  /** P1b: the live product a product zone is previewed on in the canvas (null: none matches). */
+  preview_product: PreviewProduct | null
 }
 
 export type Snapshot = { content: BuilderContent; selection: string | null }
@@ -88,7 +92,9 @@ export type EditorActions = {
 
 export type EditorStore = StoreApi<EditorState & EditorActions>
 
-export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page' | 'active'>>): EditorDocument {
+export function documentFromDetail(
+  detail: Pick<DocumentDetail, 'id' | 'key' | 'title' | 'path' | 'preview_url' | 'published'> & Partial<Pick<DocumentDetail, 'kind' | 'cms_page' | 'active' | 'target' | 'preview_product'>>,
+): EditorDocument {
   const kind = detail.kind ?? 'page'
   return {
     id: detail.id,
@@ -100,6 +106,8 @@ export function documentFromDetail(detail: Pick<DocumentDetail, 'id' | 'key' | '
     preview_url: detail.preview_url ?? null,
     published: detail.published,
     active: detail.active === true,
+    target: detail.target ?? null,
+    preview_product: detail.preview_product ?? null,
   }
 }
 

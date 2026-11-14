@@ -1400,3 +1400,171 @@ test('B8b: adds a form and builds it with three fields; the canvas shows it and 
       ['phone', 'Phone', true],
     ])
 })
+
+/* ------------------------------------------------------------------------------------------------
+ * P1b: product page areas, their versions for a category or a product, the product layout
+ * ---------------------------------------------------------------------------------------------- */
+
+const CLOTHING_ID = '0a000000-0000-4000-8000-000000000001'
+const SHOES_ID = '0a000000-0000-4000-8000-000000000002'
+const SNEAKER_ID = '0b000000-0000-4000-8000-000000000001'
+const RED_SNEAKER = { id: SNEAKER_ID, slug: 'red-sneaker', name: 'Red sneaker', price: '1250.00', image_url: '/favicon.svg' }
+const PRODUCT_LAYOUT = { gallery: 'left', thumbnails: 'bottom', sticky_summary: false, details: 'tabs' }
+const CATEGORY_NAMES: Record<string, string> = { [CLOTHING_ID]: 'Clothing', [SHOES_ID]: 'Shoes' }
+
+type P1bBackend = B4Backend & { deletes: string[]; themePuts: { revision: number; settings: { layout: { product?: Record<string, unknown> } } }[] }
+
+async function mockP1bBackend(page: Page, seed: { key: string; title: string; published?: boolean }[] = []): Promise<P1bBackend> {
+  const b: P1bBackend = Object.assign(await mockB4Backend(page), { deletes: [], themePuts: [] })
+  const targetOf = (key: string) => {
+    const match = /@(category|product):([0-9a-f-]{36})$/.exec(key)
+    if (!match) return null
+    return { type: match[1]!, id: match[2]!, name: match[1] === 'category' ? (CATEGORY_NAMES[match[2]!] ?? null) : match[2] === SNEAKER_ID ? 'Red sneaker' : null }
+  }
+  const summary = (d: B4Doc) => {
+    const zone = d.key.startsWith('zone:') ? d.key.slice('zone:'.length).split('@')[0]! : null
+    const product = zone?.startsWith('product.') ? RED_SNEAKER : null
+    return {
+      id: d.id, kind: d.kind, key: d.key, title: d.title, schema_version: 1, draft_revision: d.revision, has_unpublished_changes: true,
+      draft_updated_at: '2026-11-14T08:00:00+00:00', published: d.published, path: null, cms_page: null,
+      preview_url: product ? `http://shop.test/product/${product.slug}?preview=draft` : null, zone, target: targetOf(d.key),
+    }
+  }
+  const detailOf = (d: B4Doc) => ({ ...summary(d), content: d.content, preview_product: d.key.startsWith('zone:product.') ? RED_SNEAKER : null })
+  seed.forEach((s, i) => {
+    const id = `01a1c9d9-0000-7000-8000-0000000001${String(i).padStart(2, '0')}`
+    b.docs.set(id, { id, kind: 'zone', key: s.key, title: s.title, path: null, revision: 1, content: { schema_version: 1, sections: [] }, published: s.published ? { version_id: 'v-1', number: 1, published_at: '2026-11-13T09:00:00+00:00' } : null })
+  })
+
+  await page.route('**/api/v1/storefront/link-targets*', (route) =>
+    route.fulfill({
+      json: envelope({
+        pages: [],
+        categories: [
+          { id: CLOTHING_ID, name: 'Clothing', url: '/category/clothing', parent_id: null, depth: 0 },
+          { id: SHOES_ID, name: 'Shoes', url: '/category/shoes', parent_id: CLOTHING_ID, depth: 1 },
+        ],
+        brands: [],
+        blog_categories: [],
+        blog_posts: [],
+      }),
+    }),
+  )
+  // The theme draft keeps what Site styles saves (layout.product included).
+  let theme: Record<string, unknown> = { ...bootstrap.theme, layout: { ...bootstrap.theme.layout, product: PRODUCT_LAYOUT }, logo_media_id: null, favicon_media_id: null }
+  let themeRevision = 0
+  await page.route('**/api/v1/storefront/theme/draft', (route) => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON() as P1bBackend['themePuts'][number]
+      b.themePuts.push(body)
+      theme = body.settings
+      themeRevision += 1
+    }
+    return route.fulfill({ json: envelope({ settings: theme, draft_revision: themeRevision, has_unpublished_changes: themeRevision > 0, published: null, preview_url: null, custom_css: null, has_custom_css: false }) })
+  })
+  await page.route('**/api/v1/storefront/builder/documents', (route) => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: envelope([...b.docs.values()].map(summary)) })
+    const input = route.request().postDataJSON() as { kind: string; key: string; title: string; from: string }
+    b.creates.push(input)
+    const id = `01a1c9d9-0000-7000-8000-0000000002${String(b.docs.size).padStart(2, '0')}`
+    const doc: B4Doc = { id, kind: input.kind, key: input.key, title: input.title, path: null, revision: 1, content: { schema_version: 1, sections: [] }, published: null }
+    b.docs.set(id, doc)
+    return route.fulfill({ status: 201, json: envelope(detailOf(doc)) })
+  })
+  const docOf = (url: string) => b.docs.get(new URL(url).pathname.split('/documents/')[1]!.split('/')[0]!)
+  await page.route('**/api/v1/storefront/builder/documents/*', (route) => {
+    const doc = docOf(route.request().url())
+    if (!doc) return route.fallback()
+    if (route.request().method() === 'DELETE') {
+      b.deletes.push(doc.key)
+      b.docs.delete(doc.id)
+      return route.fulfill({ status: 204 })
+    }
+    return route.fulfill({ json: envelope(detailOf(doc)) })
+  })
+  await page.route('**/api/v1/storefront/builder/documents/*/draft', (route) => {
+    const doc = docOf(route.request().url())!
+    const body = route.request().postDataJSON() as { revision: number; content: B4Doc['content'] }
+    ;(b.puts[doc.id] ??= []).push(body.content)
+    doc.revision += 1
+    doc.content = body.content
+    return route.fulfill({ json: envelope(detailOf(doc)) })
+  })
+  return b
+}
+
+test('P1b: adds a version of “Under the price” for a category; the canvas previews it on a matching product in the theme’s layout', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockP1bBackend(page)
+  await page.goto('/admin/storefront/pages')
+  const area = page.getByRole('region', { name: 'Under the price' })
+  await area.getByRole('button', { name: 'Under the price: add a version for a category' }).click()
+  await page.getByRole('combobox', { name: 'Choose a category' }).fill('sho')
+  await page.getByRole('option', { name: 'Clothing › Shoes' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates[0]).toEqual({ kind: 'zone', key: `zone:product.below_price@category:${SHOES_ID}`, title: 'Under the price · Shoes', from: 'blank' })
+
+  await expect(page.getByTestId('document-placement')).toContainText('Under the price on product pages in “Shoes” and its subcategories.')
+  await expect(page.getByTestId('preview-product-note')).toHaveText('The canvas shows it on “Red sneaker”.')
+  const frame = canvas(page)
+  await expect(frame.getByTestId('canvas-product-name')).toHaveText('Red sneaker', { timeout: 30_000 })
+  await expect(frame.getByTestId('canvas-product-price')).toContainText('1,250.00')
+  await expect(frame.locator('[data-canvas-part="zone"]').getByTestId('canvas-empty')).toContainText('This area is empty')
+  // Today's layout: the photos sit left of the area's column.
+  const zoneBox = async () => (await frame.locator('[data-canvas-part="zone"]').boundingBox())!
+  const galleryBox = async () => (await frame.getByTestId('canvas-sample-gallery').boundingBox())!
+  expect((await galleryBox()).x).toBeLessThan((await zoneBox()).x)
+
+  // Site styles → photos on the right: the canvas follows at once, the theme draft saves it.
+  await page.getByRole('button', { name: 'Site styles' }).click()
+  const drawer = page.getByTestId('site-styles-drawer')
+  await drawer.getByTestId('site-styles-product-layout').getByText('Photos on the right').click()
+  await expect.poll(async () => (await galleryBox()).x > (await zoneBox()).x).toBe(true)
+  await expect.poll(() => b.themePuts.at(-1)?.settings.layout.product, { timeout: 6000 }).toEqual({ ...PRODUCT_LAYOUT, gallery: 'right' })
+  expect(b.themePuts.at(-1)?.settings.layout).toMatchObject({ container_width: 1170, sticky_header: true })
+
+  // A heading lands in the summary column: under the name and price, above Add to cart.
+  await page.getByTestId('add-heading').click()
+  const added = frame.locator('[data-canvas-part="zone"] h2')
+  await expect(added).toBeVisible()
+  const head = (await frame.getByTestId('canvas-sample').boundingBox())!
+  const buy = (await frame.getByTestId('canvas-sample-after').boundingBox())!
+  const box = (await added.boundingBox())!
+  expect(box.y).toBeGreaterThanOrEqual(head.y + head.height - 1)
+  expect(box.y + box.height).toBeLessThanOrEqual(buy.y + 1)
+  const id = [...b.docs.values()].find((d) => d.key.includes('@category:'))!.id
+  await expect.poll(() => savedTypes(b.puts[id]?.at(-1)), { timeout: 6000 }).toContain('heading')
+})
+
+test('P1b: lists the versions of the product page areas, deletes one after confirming and adds one for a product', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockP1bBackend(page, [
+    { key: 'zone:product.after', title: 'Product page', published: true },
+    { key: `zone:product.after@category:${SHOES_ID}`, title: 'Product page · Shoes' },
+  ])
+  await page.route('**/api/v1/products*', (route) =>
+    route.fulfill({ json: envelope([{ id: SNEAKER_ID, name: 'Red sneaker', variants: [{ sku: 'RS-1' }], images: [], is_active: true }], { pagination: { current_page: 1, per_page: 24, total: 1, last_page: 1 } }) }),
+  )
+  await page.goto('/admin/storefront/pages')
+  const area = page.getByRole('region', { name: 'Under product details' })
+  await expect(area.getByTestId('page-row-zone:product.after')).toContainText('All products')
+  await expect(area.getByTestId('page-row-zone:product.after')).toContainText('Published v1')
+  const shoes = area.getByTestId(`page-row-zone:product.after@category:${SHOES_ID}`)
+  await expect(shoes).toContainText('Category: Shoes')
+  await expect(shoes).toContainText('Also on its subcategories.')
+  await expect(page.getByTestId('zone-version-count')).toHaveText('1 of 100 versions used (all three places together).')
+
+  await shoes.getByRole('button', { name: 'Delete Under product details for Shoes' }).click()
+  const confirm = page.getByRole('alertdialog', { name: 'Delete “Under product details for Shoes”?' })
+  await confirm.getByRole('button', { name: 'Delete version' }).click()
+  await expect(shoes).toHaveCount(0)
+  expect(b.deletes).toEqual([`zone:product.after@category:${SHOES_ID}`])
+
+  await page.getByRole('region', { name: 'Bottom of product pages' }).getByRole('button', { name: 'Bottom of product pages: add a version for a product' }).click()
+  await page.getByRole('option', { name: /Red sneaker/ }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates.at(-1)).toEqual({ kind: 'zone', key: `zone:product.bottom@product:${SNEAKER_ID}`, title: 'Product page bottom · Red sneaker', from: 'blank' })
+  await expect(page.getByTestId('document-placement')).toContainText('At the bottom of the “Red sneaker” product page only.')
+  // The bottom of the page: details, tabs and related products sit above the area.
+  await expect(canvas(page).getByTestId('canvas-sample')).toContainText('Related products and recently viewed', { timeout: 30_000 })
+})

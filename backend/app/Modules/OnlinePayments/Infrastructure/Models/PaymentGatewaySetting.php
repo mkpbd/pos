@@ -3,6 +3,7 @@
 namespace App\Modules\OnlinePayments\Infrastructure\Models;
 
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\BelongsToOrganization;
+use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontContent;
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
@@ -25,7 +26,8 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['organization_id', 'code', 'is_enabled', 'display_name', 'instructions', 'settings', 'sort_order', 'translations'])]
 class PaymentGatewaySetting extends Model
 {
-    use BelongsToOrganization, HasUuids, TracksAuthor;
+    // P1b: "cash on delivery available" on the product page follows the COD switch (cached per content version).
+    use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
 
     protected function casts(): array
     {

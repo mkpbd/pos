@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useCan } from '@/features/auth/use-auth'
 import { ApiError } from '@/lib/api/client'
+import type { CanvasProduct, CanvasSurroundings } from '@/storefront/builder/canvas/protocol'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { RenderSection } from '@/storefront/builder/types'
 import { AddPanel } from './add-panel'
@@ -49,7 +50,7 @@ import { resetColumnWidth, resizeColumns, setColumnWidth } from './column-resize
 import { EditorUiContext, nodeLabel, nodeName, useCommands, useEditorUi, type EditorUi } from './commands'
 import { ElementIcon } from './element-icon'
 import { ConflictDialog, LeaveDialog, PublishDialog, VersionHistoryDialog } from './dialogs'
-import { elementContext, kindInfo } from './document-kind'
+import { elementContext, isProductZone, kindInfo, parseZoneKey } from './document-kind'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector } from './inspector'
 import { BREAKPOINT, widthAt } from './inspector/style-model'
@@ -187,11 +188,19 @@ type LayoutProps = {
 }
 
 /** Where a published header, footer or zone can be seen on the store (version history's "View"). */
-function livePath(doc: { kind: string; key: string; path: string | null }): string | null {
+function livePath(doc: { kind: string; key: string; path: string | null; preview_product?: { slug: string } | null }): string | null {
   if (doc.path) return doc.path
   if (doc.kind === 'header' || doc.kind === 'footer') return '/'
   if (doc.key === 'zone:listing.top' || doc.key === 'zone:listing.bottom') return '/shop'
+  // P1b: a product zone (or one of its versions) on the matching live product.
+  if (doc.kind === 'zone' && doc.preview_product?.slug) return `/product/${encodeURIComponent(doc.preview_product.slug)}`
   return null
+}
+
+/** The canvas kind of a document; a product zone's version is drawn as its zone (P1b). */
+function canvasSurroundings(doc: { kind: string; key: string }): CanvasSurroundings {
+  if (doc.kind === 'zone') return parseZoneKey(doc.key)?.zone ?? 'page'
+  return doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'popup' ? doc.kind : 'page'
 }
 
 function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, registry, queryClient }: LayoutProps) {
@@ -211,7 +220,14 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   // B4: what this document is (page, header, footer, zone) and which elements it may hold.
   const info = useMemo(() => kindInfo(documentInfo), [documentInfo])
   const context = elementContext(documentInfo)
-  const surroundings = documentInfo.kind === 'zone' ? (documentInfo.key as 'zone:listing.top') : documentInfo.kind === 'header' || documentInfo.kind === 'footer' || documentInfo.kind === 'popup' ? documentInfo.kind : 'page'
+  const surroundings = canvasSurroundings(documentInfo)
+  // P1b: a product page zone is previewed on a matching live product (a version: one of its category's, or that product).
+  const productZone = documentInfo.kind === 'zone' && isProductZone(surroundings)
+  const previewProduct = documentInfo.preview_product
+  const canvasProduct = useMemo<CanvasProduct | null>(
+    () => (productZone && previewProduct ? { name: previewProduct.name, price: previewProduct.price ?? null, image_url: previewProduct.image_url ?? null } : null),
+    [productZone, previewProduct],
+  )
   // B8b: a popup is drawn in its layout over a dimmed sample page.
   const isPopup = documentInfo.kind === 'popup'
   const popupSettings = useMemo(() => (isPopup ? readPopupSettings(content.popup) : undefined), [isPopup, content.popup])
@@ -566,6 +582,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     path: documentInfo.path,
     published: documentInfo.published ? { number: documentInfo.published.number, published_at: documentInfo.published.published_at ?? '' } : null,
     active: documentInfo.active,
+    target: documentInfo.target,
     canPublish,
     activePending,
   }
@@ -612,7 +629,15 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
             {info.placement && (
               <div className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-2">
                 <p role="note" data-testid="document-placement" className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
-                  <InfoIcon className="size-4 shrink-0" aria-hidden /> {info.placement}
+                  <InfoIcon className="size-4 shrink-0" aria-hidden />
+                  <span className="min-w-0">
+                    {info.placement}
+                    {productZone && (
+                      <span className="block text-xs" data-testid="preview-product-note">
+                        {canvasProduct ? `The canvas shows it on “${canvasProduct.name}”.` : 'No live product matches yet, so the canvas shows grey placeholders.'}
+                      </span>
+                    )}
+                  </span>
                 </p>
                 {isPopup && (
                   <Button type="button" variant="outline" size="sm" onClick={() => select(null)} aria-pressed={selection === null}>
@@ -624,6 +649,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
             <CanvasFrame
               surroundings={surroundings}
               popup={popupSettings}
+              product={canvasProduct}
               emptyText={info.empty}
               bootstrap={canvasContext.bootstrap}
               locale={EDITOR_LOCALE}

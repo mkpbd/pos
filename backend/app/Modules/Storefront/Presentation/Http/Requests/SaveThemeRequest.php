@@ -68,6 +68,12 @@ class SaveThemeRequest extends FormRequest
             "{$p}layout.listing_columns.desktop" => ['sometimes', 'integer', Rule::in(ThemeSchema::LISTING_COLUMNS['desktop'])],
             "{$p}layout.listing_columns.tablet" => ['sometimes', 'integer', Rule::in(ThemeSchema::LISTING_COLUMNS['tablet'])],
             "{$p}layout.listing_columns.mobile" => ['sometimes', 'integer', Rule::in(ThemeSchema::LISTING_COLUMNS['mobile'])],
+            // P1b: the product page layout.
+            "{$p}layout.product" => ['sometimes', 'array'],
+            "{$p}layout.product.gallery" => ['sometimes', Rule::in(ThemeSchema::PRODUCT_LAYOUT['gallery'])],
+            "{$p}layout.product.thumbnails" => ['sometimes', Rule::in(ThemeSchema::PRODUCT_LAYOUT['thumbnails'])],
+            "{$p}layout.product.sticky_summary" => ['sometimes', 'boolean'],
+            "{$p}layout.product.details" => ['sometimes', Rule::in(ThemeSchema::PRODUCT_LAYOUT['details'])],
             "{$p}logo_media_id" => ['sometimes', 'nullable', 'uuid'],
             "{$p}favicon_media_id" => ['sometimes', 'nullable', 'uuid'],
             "{$p}announcement" => ['sometimes', 'array'],

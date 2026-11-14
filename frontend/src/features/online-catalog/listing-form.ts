@@ -1,12 +1,23 @@
 import type { UseFormSetError } from 'react-hook-form'
 import { z } from 'zod'
 import { SLUG_PATTERN } from '@/features/content/slug'
-import type { ListingState, ProductListingInput, ProductListingResponse, RelatedInput, RelatedProduct } from '@/features/online-catalog/api'
+import {
+  BADGE_TONES,
+  type BadgeTone,
+  type ListingBadge,
+  type ListingBadgeInput,
+  type ListingState,
+  type ProductListingInput,
+  type ProductListingResponse,
+  type RelatedInput,
+  type RelatedProduct,
+} from '@/features/online-catalog/api'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
 import { handleFormError } from '@/lib/forms'
 import { compareDecimal, MONEY_PATTERN } from '@/lib/money'
+import { parseVideoUrl, VIDEO_URL_MAX } from '@/storefront/builder/validate'
 
 export const MAX_SPECIFICATIONS = 30
 export const MAX_RELATED = 12
@@ -41,6 +52,43 @@ export const optionalSlug = z.union([z.literal(''), z.string().max(SLUG_MAX, `At
 
 const pickedProduct = z.object({ id: z.string(), name: z.string(), image_url: z.string().nullable(), sku: z.string().nullable() })
 
+/** P1b: custom badges per product and the length of their text (English and Bangla). */
+export const MAX_BADGES = 2
+export const BADGE_TEXT_MAX = 24
+
+/** The links the product video accepts: the builder video element's (YouTube and Vimeo). */
+export const VIDEO_URL_MESSAGE = 'Use a YouTube link (youtube.com/watch?v=…, youtu.be/…, Shorts) or a Vimeo link (vimeo.com/123456).'
+
+const badgeSchema = z.object({
+  text: z.string().trim().min(1, 'Enter the badge text.').max(BADGE_TEXT_MAX, `At most ${BADGE_TEXT_MAX} characters.`),
+  tone: z.enum(BADGE_TONES),
+  translations: z.object({ bn: z.object({ text: z.string().trim().max(BADGE_TEXT_MAX, `At most ${BADGE_TEXT_MAX} characters.`) }) }),
+})
+
+export type BadgeFormValues = z.infer<typeof badgeSchema>
+
+/** Tones offered to a new badge, best first: the automatic badges already say “Sale” and “New”. */
+const NEW_BADGE_TONES: readonly BadgeTone[] = ['info', 'dark', 'sale', 'new']
+
+/** A new, empty badge row in the first tone the product doesn't use yet. */
+export function newBadge(used: readonly { tone: BadgeTone }[]): BadgeFormValues {
+  const tone = NEW_BADGE_TONES.find((t) => !used.some((b) => b.tone === t)) ?? 'info'
+  return { text: '', tone, translations: { bn: { text: '' } } }
+}
+
+function toBadgeValues(badge: ListingBadge): BadgeFormValues {
+  return {
+    text: badge.text,
+    tone: (BADGE_TONES as readonly string[]).includes(badge.tone) ? badge.tone : 'info',
+    translations: { bn: { text: readBn(badge.translations, ['text']).text ?? '' } },
+  }
+}
+
+/** Every badge with its Bangla text ("" removes it), so a badge never keeps a stale translation. */
+function toBadgeInput(badge: BadgeFormValues): ListingBadgeInput {
+  return { text: badge.text.trim(), tone: badge.tone, translations: { bn: { text: badge.translations.bn.text.trim() } } }
+}
+
 export const listingFormSchema = z
   .object({
     is_published: z.boolean(),
@@ -71,6 +119,17 @@ export const listingFormSchema = z
     related: z.array(pickedProduct).max(MAX_RELATED, `At most ${MAX_RELATED} products.`),
     frequently_bought: z.array(pickedProduct).max(MAX_RELATED, `At most ${MAX_RELATED} products.`),
     translations: translationsSchema(LISTING_TRANSLATIONS),
+    /** P1a: own size guide; null = from the category; undefined = not offered by the API. */
+    size_guide_id: z.string().nullable().optional(),
+    /** P1b: "" = no video; undefined = not offered by the API. */
+    video_url: z
+      .string()
+      .trim()
+      .max(VIDEO_URL_MAX, `At most ${VIDEO_URL_MAX} characters.`)
+      .refine((url) => url === '' || parseVideoUrl(url) !== null, VIDEO_URL_MESSAGE)
+      .optional(),
+    /** P1b: undefined = not offered by the API. */
+    badges: z.array(badgeSchema).max(MAX_BADGES, `At most ${MAX_BADGES} badges.`).optional(),
   })
   .superRefine((form, ctx) => {
     if (form.published_at && form.unpublished_at && form.unpublished_at <= form.published_at) {
@@ -114,6 +173,9 @@ export function toListingFormValues(data: ProductListingResponse): ListingFormVa
     related: data.related.related.map(toPicked),
     frequently_bought: data.related.frequently_bought.map(toPicked),
     translations: { bn: readBn(listing.translations, LISTING_TRANSLATION_NAMES) },
+    ...(listing.size_guide_id !== undefined ? { size_guide_id: listing.size_guide_id } : {}),
+    ...(listing.video_url !== undefined ? { video_url: listing.video_url ?? '' } : {}),
+    ...(listing.badges !== undefined ? { badges: (listing.badges ?? []).map(toBadgeValues) } : {}),
   }
 }
 
@@ -136,6 +198,9 @@ export function toListingInput(form: ListingFormValues, before?: TranslationsMap
       sort_weight: Number(form.sort_weight),
       variants: form.variants.map((v) => ({ variant_id: v.variant_id, compare_at_price: v.compare_at_price.trim() || null, image_id: v.image_id })),
       translations: toTranslationsInput(form.translations.bn, LISTING_TRANSLATION_NAMES, before),
+      ...(form.size_guide_id !== undefined ? { size_guide_id: form.size_guide_id } : {}),
+      ...(form.video_url !== undefined ? { video_url: form.video_url.trim() || null } : {}),
+      ...(form.badges !== undefined ? { badges: form.badges.map(toBadgeInput) } : {}),
     },
     related: { related: form.related.map((p) => p.id), frequently_bought: form.frequently_bought.map((p) => p.id) },
   }
@@ -143,7 +208,8 @@ export function toListingInput(form: ListingFormValues, before?: TranslationsMap
 
 const LISTING_FIELDS = [
   'is_published', 'published_at', 'unpublished_at', 'slug', 'is_featured', 'is_new_until', 'short_description', 'description_html',
-  'specifications', 'seo_title', 'seo_description', 'sort_weight', 'variants', 'related', 'frequently_bought', 'translations',
+  'specifications', 'seo_title', 'seo_description', 'sort_weight', 'variants', 'related', 'frequently_bought', 'translations', 'size_guide_id',
+  'video_url', 'badges',
 ] as const
 
 /**

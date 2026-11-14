@@ -73,7 +73,11 @@ describe('reviews moderation list', () => {
     renderRoutes(routes, '/reviews')
 
     const item = await screen.findByRole('listitem', { name: 'Review of Pran Mango Juice 1L by Ayesha Rahman' })
-    expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/reviews')
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/reviews')
+    // P1b: reviews and shoppers' questions are two tabs of the same area.
+    const sections = screen.getByRole('navigation', { name: 'Reviews and questions' })
+    expect(within(sections).getByRole('link', { name: 'Reviews' })).toHaveAttribute('aria-current', 'page')
+    expect(within(sections).getByRole('link', { name: 'Questions' })).toHaveAttribute('href', '/reviews/questions')
     expect(screen.getByRole('tab', { name: 'Pending' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Pending', 'Approved', 'Rejected', 'All'])
     expect(queries[0]?.toString()).toBe('page=1&status=pending')
@@ -241,7 +245,7 @@ describe('reviews moderation list', () => {
     renderRoutes(routes, '/reviews')
 
     const item = await screen.findByRole('listitem', { name: /Ayesha Rahman/ })
-    expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/reviews')
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/reviews')
     expect(screen.getByTestId('reviews-read-only')).toBeInTheDocument()
     expect(within(item).queryByRole('group', { name: 'Moderation actions' })).not.toBeInTheDocument()
     expect(within(item).queryByRole('button')).not.toBeInTheDocument()

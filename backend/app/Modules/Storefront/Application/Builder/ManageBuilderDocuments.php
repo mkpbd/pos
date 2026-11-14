@@ -3,8 +3,10 @@
 namespace App\Modules\Storefront\Application\Builder;
 
 use App\Modules\Cms\Application\Contracts\PageContent;
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\StaffActor;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Builder\Templates\ManageBuilderTemplates;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
@@ -31,6 +33,8 @@ class ManageBuilderDocuments
         private readonly SitePartsImporter $siteParts,
         private readonly PageContent $cmsPages,
         private readonly ManageBuilderTemplates $templates,
+        private readonly StorefrontCatalog $catalog,
+        private readonly TenantContext $tenant,
     ) {}
 
     /**
@@ -57,6 +61,13 @@ class ManageBuilderDocuments
         if ($pageId !== null && $page === null) {
             throw new BusinessRuleViolation('CMS_PAGE_NOT_FOUND', 'This content page does not exist.', ['key' => $key]);
         }
+        // P1b: a product zone's version for a category or a product of this organization.
+        $target = BuilderDocument::parseTargetedZone($key);
+        if ($target !== null && $this->catalog->existing($target['type'], [$target['id']]) === []) {
+            throw new BusinessRuleViolation('ZONE_TARGET_NOT_FOUND', $target['type'] === BuilderDocument::TARGET_CATEGORY
+                ? 'This category does not exist. Choose one of your categories.'
+                : 'This product does not exist. Choose one of your products.', ['key' => $key, 'target_type' => $target['type'], 'target_id' => $target['id']]);
+        }
 
         $content = $content !== null ? ($this->prepare)($content, $context) : match ($attributes['from'] ?? 'blank') {
             'homepage' => ($this->prepare)($this->importer->document(), $context),
@@ -65,16 +76,30 @@ class ManageBuilderDocuments
             default => BuilderDocumentSchema::blank(),
         };
 
-        return DB::transaction(function () use ($attributes, $content) {
+        return DB::transaction(function () use ($attributes, $content, $target) {
+            if ($target !== null) {
+                // P1b: counted under a per-organization lock, so two editors cannot both add the 101st version.
+                $this->lockZoneVersions();
+            }
             if (BuilderDocument::query()->where('key', $attributes['key'])->lockForUpdate()->exists()) {
                 throw new BusinessRuleViolation('DOCUMENT_EXISTS', match (true) {
                     $attributes['key'] === BuilderDocument::HOME => 'The store already has a builder home page.',
                     $attributes['kind'] === BuilderDocument::KIND_HEADER => 'The store already has a builder header.',
                     $attributes['kind'] === BuilderDocument::KIND_FOOTER => 'The store already has a builder footer.',
+                    $target !== null => $target['type'] === BuilderDocument::TARGET_CATEGORY
+                        ? 'This area already has a version for this category.'
+                        : 'This area already has a version for this product.',
                     $attributes['kind'] === BuilderDocument::KIND_ZONE => 'This area already has a builder design.',
                     str_starts_with($attributes['key'], BuilderDocument::CMS_PREFIX) => 'This content page is already designed with the builder.',
                     default => 'Another landing page already uses this address.',
                 }, ['key' => $attributes['key']], 409);
+            }
+            if ($target !== null && $this->targetedZoneCount() >= BuilderDocument::MAX_TARGETED_ZONES) {
+                throw new BusinessRuleViolation(
+                    'ZONE_VERSION_LIMIT',
+                    'Your store already has '.BuilderDocument::MAX_TARGETED_ZONES.' area versions for categories and products. Delete one you no longer need first.',
+                    ['limit' => BuilderDocument::MAX_TARGETED_ZONES],
+                );
             }
 
             $document = BuilderDocument::query()->create([
@@ -338,6 +363,26 @@ class ManageBuilderDocuments
     private function lock(BuilderDocument $document): BuilderDocument
     {
         return BuilderDocument::query()->whereKey($document->id)->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * P1b: how many product zone versions (for a category or a product) the organization has.
+     */
+    public function targetedZoneCount(): int
+    {
+        return BuilderDocument::query()->where('kind', BuilderDocument::KIND_ZONE)
+            ->where('key', 'like', BuilderDocument::ZONE_PREFIX.'%@%')->count();
+    }
+
+    /**
+     * P1b: serializes adding zone versions in this organization until the transaction ends
+     * (SQLite serializes writers anyway).
+     */
+    private function lockZoneVersions(): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['builder-zone-versions:'.$this->tenant->requireOrganization()]);
+        }
     }
 
     /**

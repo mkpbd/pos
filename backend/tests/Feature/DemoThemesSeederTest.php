@@ -11,9 +11,11 @@ use App\Modules\Products\Infrastructure\Models\ProductVariant;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoCatalogSeeder;
 use Database\Seeders\DemoCheckoutSeeder;
+use Database\Seeders\DemoProductPageSeeder;
 use Database\Seeders\DemoPromotionsSeeder;
 use Database\Seeders\DemoStockSeeder;
 use Database\Seeders\DemoThemesSeeder;
+use Database\Seeders\DemoVariantsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -68,6 +70,33 @@ class DemoThemesSeederTest extends TestCase
         $totals = $this->totals();
         $this->seed(DemoThemesSeeder::class);
         $this->assertSame($totals, $this->totals());
+
+        // P1a: photos per colour and size guides on Classic Shop and Little Sprouts.
+        $this->seed(DemoVariantsSeeder::class);
+        $this->assertSame($totals, $this->totals(), 'DemoVariantsSeeder skips stores that already have them.');
+        $this->assertSame(4, DB::table('size_guides')->count());
+        $tote = $this->getJson('http://classic.shop.localhost/api/v1/store/products/leather-tote')->assertOk()->json('data');
+        $this->assertSame(['Colour', 'image'], [$tote['photo_option'], $tote['options'][0]['display']]);
+        $this->assertSame([1, 1], array_map(fn (array $v) => count($v['image_ids']), $tote['options'][0]['values']));
+        $this->assertSame('Clothing size guide', $this->getJson('http://classic.shop.localhost/api/v1/store/products/oxford-shirt')->json('data.size_guide.title'));
+        $dino = $this->getJson('http://kids.shop.localhost/api/v1/store/products/dino-night-light')->assertOk()->json('data');
+        $this->assertSame(['Peach', 'Mint'], array_column($dino['options'][0]['values'], 'value'));
+        $this->assertNotNull($dino['options'][0]['values'][1]['image'], 'The mint photo is a tinted copy.');
+        $guide = $this->getJson('http://kids.shop.localhost/api/v1/store/products/strawberry-dress?lang=bn')->json('data.size_guide');
+        $this->assertSame('শিশুদের পোশাকের মাপের গাইড', $guide['title']);
+        $this->assertSame('৬–১২ মাস', $guide['rows'][2]['cells']['age']);
+
+        // P1b: answered questions on two products per store, and "frequently bought together" from the demo orders and counter sale.
+        $this->assertSame(12, DB::table('product_questions')->where('status', 'published')->whereNotNull('answer')->count());
+        $this->seed(DemoProductPageSeeder::class);
+        $this->assertSame(12, DB::table('product_questions')->count(), 'DemoProductPageSeeder adds questions only to stores without any.');
+        $avocado = $this->getJson('http://vegan.shop.localhost/api/v1/store/products/avocado')->assertOk()->json('data');
+        $this->assertSame(2, $avocado['questions_count']);
+        $this->assertSame('রাশেদ ক.', collect($this->getJson('http://vegan.shop.localhost/api/v1/store/products/avocado/questions')->assertOk()->json('data'))->firstWhere('question', 'ঢাকার বাইরে কি অ্যাভোকাডো পাঠান?')['name']);
+        $together = $this->getJson('http://vegan.shop.localhost/api/v1/store/products/avocado/related')->assertOk()->json('data');
+        $this->assertSame('automatic', $together['frequently_bought_source']);
+        $this->assertSame(['oat-milk', 'plant-protein'], collect($together['frequently_bought'])->pluck('slug')->sort()->values()->all());
+        $this->assertSame('automatic', $this->getJson('http://kids.shop.localhost/api/v1/store/products/cotton-bodysuit/related')->json('data.frequently_bought_source'));
 
         // The gallery lists the four stores in configured order.
         config(['storefront.demo_gallery' => true]);

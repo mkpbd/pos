@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { CheckCircle2Icon, CircleAlertIcon, TagIcon, XCircleIcon } from 'lucide-react'
 import { compareDecimal } from '@/lib/money'
@@ -7,17 +8,21 @@ import { Countdown } from '../promotions/countdown-timer'
 import { useLocale } from '../i18n/locale'
 import { usePromotionPricing } from '../promotions/display'
 import type { ProductDetail, ProductVariant } from '../types'
+import { DeliveryNote } from './delivery-note'
 import { Price } from './price'
 import { VariantSelector } from './variant-selector'
 import type { Selection } from './variant-selection'
 
-function Availability({ inStock, lowStock }: { inStock: boolean; lowStock: boolean }) {
+/** In stock / out of stock / low stock — "Only 2 left" when the server tells how many (P1a `stock_left`). */
+function Availability({ inStock, lowStock, stockLeft }: { inStock: boolean; lowStock: boolean; stockLeft: number | null }) {
   const { t } = useLocale()
   const [Icon, text, tone] = !inStock
     ? [XCircleIcon, t('catalog.stock.out'), 'text-sf-sale']
-    : lowStock
-      ? [CircleAlertIcon, t('catalog.stock.low'), 'text-sf-primary-foreground']
-      : [CheckCircle2Icon, t('catalog.stock.in'), 'text-sf-highlight']
+    : stockLeft !== null && stockLeft > 0
+      ? [CircleAlertIcon, t('catalog.stock.onlyLeft', { count: stockLeft }), 'text-sf-primary-foreground']
+      : lowStock
+        ? [CircleAlertIcon, t('catalog.stock.low'), 'text-sf-primary-foreground']
+        : [CheckCircle2Icon, t('catalog.stock.in'), 'text-sf-highlight']
 
   return (
     <p className={cn('flex items-center gap-1.5 text-sm font-semibold', tone)} data-testid="availability">
@@ -30,17 +35,21 @@ function Availability({ inStock, lowStock }: { inStock: boolean; lowStock: boole
 /**
  * Brand, price, availability, SKU and the variant selector — the product page and quick
  * view share it. Price, SKU and availability follow the selected variant (announced politely).
+ * P1b: the delivery estimate and cash-on-delivery note follow the price, then `belowPrice` (the
+ * product page's `product.below_price` builder zone).
  */
 export function ProductSummary({
   product,
   variant,
   selection,
   onChoose,
+  belowPrice,
 }: {
   product: ProductDetail
   variant: ProductVariant | null
   selection: Selection
   onChoose: (optionName: string, value: string) => void
+  belowPrice?: ReactNode
 }) {
   const { store } = useStorefront()
   const { t } = useLocale()
@@ -85,7 +94,7 @@ export function ProductSummary({
           {store.prices_include_tax === false && <span className="text-sm">{t('catalog.summary.exclVat')}</span>}
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-          <Availability inStock={inStock} lowStock={variant?.low_stock ?? false} />
+          <Availability inStock={inStock} lowStock={variant?.low_stock ?? false} stockLeft={variant?.stock_left ?? null} />
           {variant && (
             <p className="text-sm">
               {t('catalog.summary.sku')} <span className="font-medium text-sf-heading" data-testid="sku">{variant.sku}</span>
@@ -104,6 +113,9 @@ export function ProductSummary({
           {promo.promotion.show_countdown && <Countdown endsAt={promo.promotion.ends_at} />}
         </div>
       )}
+
+      <DeliveryNote delivery={product.delivery} />
+      {belowPrice}
 
       <VariantSelector product={product} selection={selection} onChoose={onChoose} />
 

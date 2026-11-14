@@ -5,9 +5,11 @@ namespace App\Modules\Shipping\Infrastructure;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shipping\Application\Contracts\ShippingRates;
+use App\Modules\Shipping\Domain\DeliveryOverview;
 use App\Modules\Shipping\Infrastructure\Models\ShippingMethod;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZoneDistrict;
+use Illuminate\Database\Query\Builder;
 
 class EloquentShippingRates implements ShippingRates
 {
@@ -40,6 +42,34 @@ class EloquentShippingRates implements ShippingRates
         }
 
         return null;
+    }
+
+    public function zoneOverview(): array
+    {
+        $locale = $this->locale->current();
+        $zones = ShippingZone::query()
+            ->where('is_active', true)
+            ->whereExists(fn (Builder $q) => $q->from('shipping_zone_districts as d')->whereColumn('d.zone_id', 'shipping_zones.id'))
+            ->with(['methods' => fn ($q) => $q->where('is_active', true)])
+            ->orderBy('sort_order')->orderBy('name')->orderBy('id')
+            ->get();
+
+        $result = [];
+        foreach ($zones as $zone) {
+            $methods = $zone->methods->map(fn (ShippingMethod $m) => self::option($m, $locale))->values()->all();
+            if ($methods !== []) {
+                $result[] = DeliveryOverview::zone($zone->name, array_map(fn (array $m) => [
+                    'name' => (string) $m['name'],
+                    'fee' => $m['fee'],
+                    'free_over' => $m['free_over'],
+                    'cod_allowed' => $m['cod_allowed'],
+                    'eta_min_days' => $m['eta_min_days'],
+                    'eta_max_days' => $m['eta_max_days'],
+                ], $methods));
+            }
+        }
+
+        return $result;
     }
 
     /**

@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { bootstrapFixture } from '../../test-fixtures'
 import { samplePage } from '../test-payload'
 import { CanvasApp } from './canvas-app'
-import { BUILDER_SOURCE, envelope, isEditorShortcut, PROTOCOL_VERSION, readCanvasMessage, readParentMessage, type ParentMessage } from './protocol'
+import { BUILDER_SOURCE, envelope, isEditorShortcut, PROTOCOL_VERSION, readCanvasMessage, readCanvasProduct, readParentMessage, type ParentMessage } from './protocol'
 import { createCanvasQueryClient } from './query-client'
 import { sanitizeHtml } from './sanitize'
 import { POPUP_DEFAULTS } from '../validate'
@@ -219,5 +219,104 @@ describe('builder canvas: headers, footers and zones (B4)', () => {
   it('cleans custom HTML like the server: no scripts, iframes, handlers, classes or ids', () => {
     expect(sanitizeHtml('<div class="x" id="y" onclick="z()"><script>1</script><iframe src="https://evil.test"></iframe><b>Hi</b></div>', { dropClassAndId: true })).toBe('<div><b>Hi</b></div>')
     expect(sanitizeHtml('<p class="x">a</p>')).toBe('<p class="x">a</p>')
+  })
+})
+
+describe('builder canvas: product page zones (P1b)', () => {
+  function mount() {
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    render(
+      <QueryClientProvider client={createCanvasQueryClient()}>
+        <MemoryRouter>
+          <CanvasApp parent={window} origin={ORIGIN} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    return (data: ParentMessage) => act(() => void window.dispatchEvent(message(envelope(data))))
+  }
+  const page = samplePage({ source: 'draft' })
+  const render$ = (overrides: Partial<Extract<ParentMessage, { type: 'render' }>> = {}): ParentMessage => ({
+    type: 'render', sections: page.sections, data: page.data, media: page.media, selection: null, hover: null, errors: [], device: 'desktop', pending: [], ...overrides,
+  })
+  const shoe = { name: 'Red sneaker', price: '1250.00', image_url: '/media/red-sneaker.jpg' }
+  const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
+  it('reads only a well-formed product from the editor', () => {
+    expect(readCanvasProduct(shoe)).toEqual(shoe)
+    expect(readCanvasProduct({ name: '  Tea  ', price: null, image_url: 'https://cdn.test/tea.jpg' })).toEqual({ name: 'Tea', price: null, image_url: 'https://cdn.test/tea.jpg' })
+    // Not a decimal price, an unsafe or protocol-relative image: dropped; no name: no product at all.
+    expect(readCanvasProduct({ name: 'Tea', price: '12,50', image_url: 'javascript:alert(1)' })).toEqual({ name: 'Tea', price: null, image_url: null })
+    expect(readCanvasProduct({ name: 'Tea', price: 12.5, image_url: '//evil.test/x.jpg' })).toEqual({ name: 'Tea', price: null, image_url: null })
+    expect(readCanvasProduct({ name: '', price: '1.00' })).toBeNull()
+    expect(readCanvasProduct('Tea')).toBeNull()
+    expect(readCanvasProduct(undefined)).toBeNull()
+  })
+
+  it('draws the under-the-price zone in the summary column with the product it is previewed on', async () => {
+    const send = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(render$({ surroundings: 'zone:product.below_price', product: shoe }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveAttribute('data-surroundings', 'zone:product.below_price')
+
+    // Name and price above the zone, Add to cart below it, the photos beside it.
+    const zone = screen.getByRole('main').querySelector('[data-canvas-part="zone"]')!
+    expect(zone.querySelector('[data-b="e_heading"]')).not.toBeNull()
+    const head = screen.getByTestId('canvas-sample')
+    expect(head).toHaveAttribute('aria-hidden', 'true')
+    expect(follows(head, zone)).toBe(true)
+    expect(follows(zone, screen.getByTestId('canvas-sample-after'))).toBe(true)
+    expect(screen.getByTestId('canvas-product-name')).toHaveTextContent('Red sneaker')
+    expect(screen.getByTestId('canvas-product-price')).toHaveTextContent('1,250.00')
+    expect(screen.getByTestId('canvas-product-image')).toHaveAttribute('src', '/media/red-sneaker.jpg')
+    expect(screen.getByText('Product page, previewed with “Red sneaker”')).toBeInTheDocument()
+    // Today's layout: photos on the left with thumbnails under them, details in tabs.
+    expect(screen.getByTestId('canvas-sample-gallery')).not.toHaveClass('md:order-2')
+    expect(screen.getByTestId('canvas-sample-gallery').querySelector('[data-thumbnails="bottom"]')).not.toBeNull()
+    expect(screen.getByRole('main').querySelector('[data-details="tabs"]')).not.toBeNull()
+
+    // The Site styles draft moves the photos and changes the details at once.
+    send({ type: 'theme', settings: { layout: { container_width: 1170, product: { gallery: 'right', thumbnails: 'side', sticky_summary: true, details: 'accordion' } } } })
+    await waitFor(() => expect(screen.getByTestId('canvas-sample-gallery')).toHaveClass('md:order-2'))
+    expect(screen.getByTestId('canvas-sample-gallery').querySelector('[data-thumbnails="side"]')).not.toBeNull()
+    expect(screen.getByRole('main').querySelector('[data-details="accordion"]')).not.toBeNull()
+
+    // Empty: the empty note sits in the column.
+    send(render$({ surroundings: 'zone:product.below_price', product: shoe, sections: [], emptyText: 'This area is empty.' }))
+    expect(await screen.findByTestId('canvas-empty')).toHaveTextContent('This area is empty.')
+    expect(screen.getByRole('main').querySelector('[data-canvas-part="zone"] [data-testid="canvas-empty"]')).not.toBeNull()
+  })
+
+  it('without a product (an older editor, or the version for all products) the samples stay grey', async () => {
+    const send = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(render$({ surroundings: 'zone:product.below_price' }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    expect(screen.queryByTestId('canvas-product-name')).toBeNull()
+    expect(screen.queryByTestId('canvas-product-image')).toBeNull()
+    expect(screen.getByText('Product details (filled in for each product)')).toBeInTheDocument()
+
+    // A malformed product is ignored the same way.
+    send(render$({ surroundings: 'zone:product.after', product: { name: 42 } as never }))
+    await waitFor(() => expect(screen.getByRole('main')).toHaveAttribute('data-surroundings', 'zone:product.after'))
+    expect(screen.queryByTestId('canvas-product-name')).toBeNull()
+  })
+
+  it('draws the product.after zone between the details and related products, product.bottom after them', async () => {
+    const send = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(render$({ surroundings: 'zone:product.after', product: shoe }))
+    const heading = await screen.findByRole('heading', { name: 'Made fresh every morning' })
+    expect(follows(screen.getByTestId('canvas-sample'), heading)).toBe(true)
+    expect(follows(heading, screen.getByTestId('canvas-sample-after'))).toBe(true)
+    expect(screen.getByTestId('canvas-sample-after')).toHaveTextContent('Related products')
+    expect(screen.getByTestId('canvas-product-name')).toHaveTextContent('Red sneaker')
+
+    send(render$({ surroundings: 'zone:product.bottom' }))
+    await waitFor(() => expect(screen.getByRole('main')).toHaveAttribute('data-surroundings', 'zone:product.bottom'))
+    const sample = screen.getByTestId('canvas-sample')
+    expect(sample).toHaveTextContent('Related products and recently viewed')
+    expect(follows(sample, screen.getByRole('heading', { name: 'Made fresh every morning' }))).toBe(true)
+    expect(screen.queryByTestId('canvas-sample-after')).toBeNull()
   })
 })

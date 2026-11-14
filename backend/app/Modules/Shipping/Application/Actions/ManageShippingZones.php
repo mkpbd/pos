@@ -4,6 +4,7 @@ namespace App\Modules\Shipping\Application\Actions;
 
 use App\Modules\Geography\Application\Contracts\GeoDirectory;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZoneDistrict;
@@ -20,6 +21,7 @@ class ManageShippingZones
     public function __construct(
         private readonly GeoDirectory $geo,
         private readonly AuditTrail $audit,
+        private readonly StorefrontContentVersion $contentVersion,
     ) {}
 
     /**
@@ -94,5 +96,7 @@ class ManageShippingZones
         foreach (array_diff($districtIds, $existing) as $districtId) {
             ShippingZoneDistrict::query()->create(['zone_id' => $zone->id, 'district_id' => $districtId]);
         }
+        // P1b: the product page's delivery note lists zones that cover a district (cached per content version).
+        $this->contentVersion->bump($zone->organization_id);
     }
 }

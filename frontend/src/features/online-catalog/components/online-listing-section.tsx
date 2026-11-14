@@ -16,7 +16,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
 import { RichTextEditor } from '@/features/content/components/rich-text-editor'
 import { useProductListingQuery, useSaveProductListingMutation, type ProductListingResponse } from '@/features/online-catalog/api'
+import { ListingBadgesField } from '@/features/online-catalog/components/listing-badges-field'
 import { ProductPicker } from '@/features/online-catalog/components/ordered-picker'
+import { ProductVideoField } from '@/features/online-catalog/components/product-video-field'
 import {
   applyListingError,
   counter,
@@ -32,11 +34,29 @@ import {
   toListingInput,
   type ListingFormValues,
 } from '@/features/online-catalog/listing-form'
+import { useSizeGuidesQuery } from '@/features/storefront/size-guides'
 import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
 import { rhfBnErrors } from '@/features/translations/translations'
 import { formatMoney } from '@/lib/money'
 
 const NO_IMAGE = '__none__'
+const FROM_CATEGORY = '__category__'
+
+/** P1a: the product's size guide, or the one its category gives it. */
+function SizeGuideSelect({ id, value, onChange, inherited, disabled }: { id: string; value: string | null; onChange: (id: string | null) => void; inherited: { name: string } | null | undefined; disabled: boolean }) {
+  const guides = useSizeGuidesQuery()
+  const list = guides.data ?? []
+  return (
+    <Select value={value ?? FROM_CATEGORY} onValueChange={(v) => onChange(v === FROM_CATEGORY ? null : v)} disabled={disabled}>
+      <SelectTrigger id={id} className="w-full sm:w-80"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value={FROM_CATEGORY}>From the category ({inherited ? inherited.name : 'none'})</SelectItem>
+        {list.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+        {value && !list.some((g) => g.id === value) && <SelectItem value={value}>{guides.isPending ? 'Loading…' : 'Current guide'}</SelectItem>}
+      </SelectContent>
+    </Select>
+  )
+}
 
 function SwitchRow({ id, label, hint, checked, onChange, disabled, error }: { id: string; label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; error?: string }) {
   return (
@@ -153,6 +173,22 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
               </div>
             </section>
 
+            {listing.video_url !== undefined && (
+              <section className="flex flex-col gap-3">
+                <Heading>Product video</Heading>
+                <Controller control={form.control} name="video_url" render={({ field }) => (
+                  <ProductVideoField value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} error={errors.video_url?.message} disabled={disabled} />
+                )} />
+              </section>
+            )}
+
+            {listing.badges !== undefined && (
+              <section className="flex flex-col gap-3">
+                <Heading>Badges</Heading>
+                <ListingBadgesField control={form.control} register={form.register} errors={errors.badges} canManage={canManage} disabled={disabled} />
+              </section>
+            )}
+
             <section className="flex flex-col gap-3">
               <Heading>Specifications</Heading>
               {specs.fields.length === 0 && <p className="text-sm text-muted-foreground">No specifications. Add rows such as “Material: Cotton”.</p>}
@@ -243,6 +279,18 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
                 </table>
               </div>
             </section>
+
+            {listing.size_guide_id !== undefined && (
+              <section className="flex flex-col gap-2">
+                <Heading>Size guide</Heading>
+                <Label htmlFor={`${ids}-size-guide`}>Size guide on the product page</Label>
+                <Controller control={form.control} name="size_guide_id" render={({ field }) => (
+                  <SizeGuideSelect id={`${ids}-size-guide`} value={field.value ?? null} onChange={field.onChange} inherited={listing.inherited_size_guide} disabled={disabled} />
+                )} />
+                <p className="text-xs text-muted-foreground">Manage the guides under Online store → Size guides.</p>
+                {errors.size_guide_id?.message && <p className="text-sm text-destructive">{errors.size_guide_id.message}</p>}
+              </section>
+            )}
 
             <section className="grid gap-6 md:grid-cols-2">
               <Controller control={form.control} name="related" render={({ field }) => (

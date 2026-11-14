@@ -23,6 +23,7 @@ class ListingEditor
     public function __construct(
         private readonly CatalogReadModel $catalog,
         private readonly MediaLibrary $media,
+        private readonly SizeGuides $sizeGuides,
     ) {}
 
     /**
@@ -86,6 +87,16 @@ class ListingEditor
                 'state' => ($listing?->state() ?? ListingState::Draft)->value,
                 // E12b: {bn: {name, short_description, description_html, seo_title, seo_description}}.
                 'translations' => TranslationInput::present($listing?->translations),
+                // P1a: the product's own size guide (null = its category's, shown as inherited_size_guide).
+                'size_guide_id' => $listing?->size_guide_id,
+                'inherited_size_guide' => $this->sizeGuides->inherited($product['category_id']),
+                // P1b: a YouTube / Vimeo link and ≤ 2 custom badges [{text, tone, translations: {bn: {text}}}].
+                'video_url' => $listing?->video_url,
+                'badges' => array_map(fn (array $b) => [
+                    'text' => (string) ($b['text'] ?? ''),
+                    'tone' => (string) ($b['tone'] ?? 'info'),
+                    'translations' => TranslationInput::present($b['translations'] ?? null),
+                ], array_values($listing->badges ?? [])),
                 'updated_at' => $listing?->updated_at?->toIso8601String(),
             ],
             'variants' => array_map(fn (array $v) => [

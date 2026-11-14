@@ -1,6 +1,6 @@
 /** GET /api/v1/store/bootstrap — see backend Storefront\Application\Queries\StorefrontBootstrap. */
 
-import type { BootstrapBuilder, BuilderPage } from './builder/types'
+import type { BootstrapBuilder, BuilderPage, ProductZoneKey } from './builder/types'
 
 /**
  * B4: products per row on shop, category, brand and search listings. Desktop ≥ 1024 px, tablet
@@ -88,11 +88,24 @@ export type Announcement = {
   foreground: string
 }
 
+/**
+ * P1b: the product page layout (theme `layout.product`): gallery on the left or right, thumbnails
+ * under the photo or in a strip beside it (desktop), the summary column sticking while the gallery
+ * scrolls (desktop), and the details as tabs, an accordion or stacked sections. Absent or invalid
+ * keys = DEFAULT_PRODUCT_LAYOUT (today's page).
+ */
+export type ProductLayout = {
+  gallery: 'left' | 'right'
+  thumbnails: 'bottom' | 'side'
+  sticky_summary: boolean
+  details: 'tabs' | 'accordion' | 'stacked'
+}
+
 export type StorefrontTheme = {
   colors: ThemeColors
   typography: { heading_font: HeadingFont; body_font: BodyFont } & TypeScaleSettings
   shape: { button_style: ButtonStyle; card_radius: number }
-  layout: { container_width: number; sticky_header: boolean; listing_columns?: ListingColumns } & Partial<LayoutVariants>
+  layout: { container_width: number; sticky_header: boolean; listing_columns?: ListingColumns; product?: Partial<ProductLayout> | null } & Partial<LayoutVariants>
   /** The preset the theme was last set from (absent before T1 = `default`). */
   preset?: ThemePreset
   logo: MediaRef | null
@@ -293,6 +306,53 @@ export type ProductCard = {
   promotion: DisplayPromotion | null
   /** Approved reviews (E10b): average as a one-decimal string; null (or absent) without reviews. */
   rating?: { average: string; count: number } | null
+  /** P1a: the photo option's colour chips (the card shows 5 + "+N"); null or absent when none. */
+  swatches?: CardSwatches | null
+  /** P1b: the owner's own labels (≤ 2, request language), after the automatic ones; [] or absent when none. */
+  badges?: CustomBadge[]
+}
+
+/** P1b: the colour family of an owner's label; the storefront picks a text colour that keeps AA contrast. */
+export type BadgeTone = 'sale' | 'new' | 'info' | 'dark'
+
+/** P1b: an owner's label on the product's photo and cards ("Best seller", "Eid offer"), ≤ 24 characters. */
+export type CustomBadge = { text: string; tone: BadgeTone }
+
+/** P1b: the product video (YouTube or Vimeo), embedded from provider + id only after the shopper presses play. */
+export type ProductVideo = { provider: 'youtube' | 'vimeo'; id: string; url: string }
+
+/**
+ * P1b: one delivery zone near the price. `method`: the zone's only method's name, null with several;
+ * `fee` null = it depends on the method; `free_over` = the common free-delivery threshold, else null.
+ */
+export type DeliveryOption = { zone: string; method: string | null; min_days: number; max_days: number; fee: string | null; free_over: string | null }
+
+/** P1b: the store's delivery estimate (store-level, same on every product); null when shipping is not set up. */
+export type ProductDelivery = { options: DeliveryOption[]; cod_available: boolean }
+
+/** P1b: the product page's builder zones, already resolved for the product (product → category → all products). */
+export type ProductZones = Partial<Record<ProductZoneKey, BuilderPage | null>>
+
+/** P1b: a published shopper question with the store's answer (GET /store/products/{slug}/questions). */
+export type ProductQuestion = {
+  id: string
+  /** The asker's first name and initial ("Rina A."), "Customer" when blank. */
+  name: string
+  question: string
+  answer: string | null
+  asked_at: string
+  answered_at: string | null
+}
+
+/** POST /store/products/{slug}/questions — `website` is the honeypot (empty for people). */
+export type ProductQuestionInput = { name: string; email: string; question: string; website: string }
+
+/** P1a: a card's colour chips (≤ 5) — the photo option's or a colour option's values, each with the photo the card swaps to. */
+export type CardSwatches = {
+  option: string
+  values: { value: string; swatch_hex: string | null; image: CatalogImage | null }[]
+  /** Values not listed ("+N"). */
+  more: number
 }
 
 /** `rating` (E10b): average desc, then review count desc, unrated last. */
@@ -339,11 +399,36 @@ export type StoreCategory = {
 
 export type StoreBrand = { slug: string; name: string; description: string | null; logo: MediaRef | null; seo: Seo }
 
+/**
+ * How an option's values are drawn on the product page: `swatch` round colour chips, `image` round
+ * photo chips (P1a: the value's first photo), `button` pills, `text` a select.
+ */
+export type OptionDisplay = AttributeDisplay | 'image'
+
+export type ProductOptionValue = {
+  value: string
+  swatch_hex: string | null
+  /** P1a: the value's first photo (a product image), null without photos; absent before P1a. */
+  image?: (CatalogImage & { id: string }) | null
+  /** P1a: ids from `images`, in order — the gallery shows them when this value is chosen (photo option only). */
+  image_ids?: string[]
+}
+
 export type ProductOption = {
   name: string
   slug: string | null
-  display: AttributeDisplay
-  values: { value: string; swatch_hex: string | null }[]
+  display: OptionDisplay
+  values: ProductOptionValue[]
+}
+
+/** P1a: the size guide shown from the product page, in the request language (≤ 12 columns × 40 rows). */
+export type SizeGuide = {
+  title: string
+  intro: string | null
+  columns: { id: string; label: string }[]
+  rows: { id: string; cells: Record<string, string> }[]
+  note: string | null
+  image: MediaRef | null
 }
 
 export type ProductVariant = {
@@ -358,6 +443,8 @@ export type ProductVariant = {
   in_stock: boolean
   low_stock: boolean
   image_id: string | null
+  /** P1a: the whole sellable quantity when 0 < qty ≤ the low-stock threshold (5), else null; absent before P1a. */
+  stock_left?: number | null
   /** The unit price after the product's promotion (E8b); null when none applies to this variant. */
   promo_price: string | null
 }
@@ -376,6 +463,10 @@ export type ProductDetail = {
   breadcrumbs: Breadcrumb[]
   images: (CatalogImage & { id: string })[]
   options: ProductOption[]
+  /** P1a: the option whose values own photos (e.g. "Colour"); null or absent when none does. */
+  photo_option?: string | null
+  /** P1a: the product's (or its nearest category's) size guide; null or absent when none applies. */
+  size_guide?: SizeGuide | null
   variants: ProductVariant[]
   price: string
   price_max: string
@@ -393,10 +484,20 @@ export type ProductDetail = {
   rating?: { average: string; count: number } | null
   /** Staff preview only (?preview=1). */
   preview_state?: 'draft' | 'scheduled' | 'live' | 'expired'
+  /** P1b: the product video, the gallery's last slide; null or absent when none. */
+  video?: ProductVideo | null
+  /** P1b: the owner's own labels on the photo (≤ 2); [] or absent when none. */
+  badges?: CustomBadge[]
+  /** P1b: delivery estimate and cash on delivery near the price; null or absent when shipping is not set up. */
+  delivery?: ProductDelivery | null
+  /** P1b: the product zones' payloads for this product. Absent (before P1b) = the bootstrap's store-wide `product.after`. */
+  zones?: ProductZones | null
+  /** P1b: published questions; absent = the store has no questions & answers (no Questions tab). */
+  questions_count?: number
 }
 
-/** GET /store/products/{slug}/related */
-export type RelatedProducts = { related: ProductCard[]; frequently_bought: ProductCard[] }
+/** GET /store/products/{slug}/related — `frequently_bought_source` (P1b): hand-picked, from co-purchases, or null when empty. */
+export type RelatedProducts = { related: ProductCard[]; frequently_bought: ProductCard[]; frequently_bought_source?: 'manual' | 'automatic' | null }
 
 /** GET /store/search/suggest */
 export type SearchSuggestions = {

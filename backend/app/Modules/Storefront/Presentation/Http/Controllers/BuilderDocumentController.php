@@ -53,7 +53,10 @@ class BuilderDocumentController
      *
      * `kind` + `key`: page — `home` (once), `landing:<slug>` or (B4) `cms:<content page id>`;
      * header — `header`; footer — `footer`; zone — `zone:listing.top`, `zone:listing.bottom`,
-     * `zone:product.after`. One per key (409 DOCUMENT_EXISTS). `from`: `blank`, `homepage`
+     * `zone:product.after`; P1b: `zone:product.below_price`, `zone:product.bottom`, and a product
+     * zone's version for a category or a product — `zone:<product zone>@category:<id>` /
+     * `@product:<id>` (422 ZONE_TARGET_NOT_FOUND when the category or product is not this
+     * organization's; 422 ZONE_VERSION_LIMIT beyond 100 versions). One per key (409 DOCUMENT_EXISTS). `from`: `blank`, `homepage`
      * (home: the current homepage sections), `cms` (a content page: its title, body and FAQ list
      * or contact form; 422 CMS_PAGE_NOT_FOUND for an unknown page), `current` (header / footer:
      * today's default layout with the store's menus). B8b: popup — `{kind: popup, title,
@@ -68,11 +71,16 @@ class BuilderDocumentController
     /**
      * Show a builder document
      *
-     * The summary with the draft as `content`.
+     * The summary with the draft as `content`. P1b: product page zones (and their versions for a
+     * category or a product) add `preview_product` `{id, slug, name, price, image_url}` — the live
+     * product the canvas shows around the zone (the product itself, a product of the category or
+     * below it, or the product changed last) — null when there is none; other documents: null.
      */
     public function show(BuilderDocument $document): JsonResponse
     {
-        return ApiResponse::success(BuilderPresenter::document($document->load('publishedVersion')));
+        $document->load('publishedVersion');
+
+        return ApiResponse::success(BuilderPresenter::document($document) + ['preview_product' => BuilderPresenter::previewProduct($document)]);
     }
 
     /**

@@ -41,4 +41,7 @@ return [
     // Store builder form submissions per hour per visitor IP (B8b).
     'form_rate_limit' => (int) env('POS_FORM_RATE_LIMIT', 10),
 
+    // Shopper questions about products per hour per visitor IP (P1b).
+    'question_rate_limit' => (int) env('POS_QUESTION_RATE_LIMIT', 5),
+
 ];

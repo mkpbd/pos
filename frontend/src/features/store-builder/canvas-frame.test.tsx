@@ -94,6 +94,16 @@ describe('canvas frame (editor side)', () => {
     fromCanvas({ type: 'ready' })
     expect(posted.at(-1)).toMatchObject({ type: 'render', surroundings: 'popup', popup: { layout: 'slide_in' } })
   })
+
+  it('P1b: a product page zone sends the product it is previewed on; without one, no product field', () => {
+    const product = { name: 'Red sneaker', price: '1250.00', image_url: '/media/red.jpg' }
+    const { posted, fromCanvas, view, props } = setup({ surroundings: 'zone:product.below_price', product })
+    fromCanvas({ type: 'ready' })
+    expect(posted.at(-1)).toMatchObject({ type: 'render', surroundings: 'zone:product.below_price', product })
+    view.rerender(<CanvasFrame {...props} surroundings="zone:product.bottom" product={null} />)
+    expect(posted.at(-1)).toMatchObject({ type: 'render', surroundings: 'zone:product.bottom' })
+    expect(posted.at(-1)).not.toHaveProperty('product')
+  })
 })
 
 describe('canvas frame (B3)', () => {

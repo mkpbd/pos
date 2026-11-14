@@ -4,6 +4,7 @@ namespace App\Modules\Inventory\Infrastructure\Ledger;
 
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
+use App\Modules\Inventory\Application\Events\StockBecameAvailable;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
@@ -305,16 +306,29 @@ class EloquentStockLedger implements StockLedger
      */
     private function detectReorderCrossings(string $organizationId, array $totalsBefore): void
     {
+        /** @var array<string, array{store: array<string, mixed>, variant_ids: list<string>}> $available */
+        $available = [];
         foreach ($totalsBefore as [$store, $variant, $before]) {
+            $after = $this->storeTotal($store['id'], $variant['variant_id']);
+
+            // P1a: back in stock (none or less before, some now).
+            if (Decimal::compare($before, '0') <= 0 && Decimal::compare($after, '0') > 0) {
+                $available[$store['id']]['store'] = $store;
+                $available[$store['id']]['variant_ids'][] = $variant['variant_id'];
+            }
+
             $reorder = (string) $variant['reorder_level'];
             if (Decimal::compare($reorder, '0') <= 0) {
                 continue; // reorder level 0 = alerts off
             }
 
-            $after = $this->storeTotal($store['id'], $variant['variant_id']);
             if (Decimal::compare($before, $reorder) > 0 && Decimal::compare($after, $reorder) <= 0) {
                 event(new StockFellBelowReorderLevel($organizationId, $store['branch_id'], $store['id'], $variant['variant_id'], $after, Decimal::round($reorder, 3)));
             }
+        }
+
+        foreach ($available as $storeId => $entry) {
+            event(new StockBecameAvailable($organizationId, $entry['store']['branch_id'], $storeId, $entry['variant_ids']));
         }
     }
 }

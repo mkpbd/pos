@@ -4,7 +4,6 @@ import { CheckIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { ExportMenu } from '@/components/common/export-menu'
-import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useModerateReviewMutation, useReviewsQuery, type ModerationInput, type Review } from '@/features/reviews/api'
 import { RejectReviewDialog } from '@/features/reviews/components/reject-review-dialog'
+import { ReviewsHeader } from '@/features/reviews/components/reviews-header'
 import { StarRating } from '@/features/reviews/components/star-rating'
 import {
   RATINGS,
@@ -179,7 +179,7 @@ export function ReviewsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
+      <ReviewsHeader
         title="Reviews"
         description="Product reviews from customers with a delivered order. Only approved reviews are shown in the store."
         actions={<ExportMenu list="reviews" query={params} disabled={!reviews.data?.items.length} />}

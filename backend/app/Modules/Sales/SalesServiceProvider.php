@@ -3,7 +3,9 @@
 namespace App\Modules\Sales;
 
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
+use App\Modules\Sales\Application\Contracts\SaleBaskets;
 use App\Modules\Sales\Application\Services\NoLoyaltyProgram;
+use App\Modules\Sales\Infrastructure\EloquentSaleBaskets;
 use App\Modules\Sales\Infrastructure\Models\ReturnReason;
 use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Sales\Infrastructure\Models\SaleReturn;
@@ -21,6 +23,8 @@ class SalesServiceProvider extends ModuleServiceProvider
     {
         // Replaced by the Loyalty module when it is installed.
         $this->app->bindIf(LoyaltyProgram::class, NoLoyaltyProgram::class);
+        // P1b: POS sales as baskets for "frequently bought together" (OnlineCatalog).
+        $this->app->bind(SaleBaskets::class, EloquentSaleBaskets::class);
     }
 
     public function boot(): void

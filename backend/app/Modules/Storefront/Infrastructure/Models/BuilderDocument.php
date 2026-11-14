@@ -17,7 +17,9 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  * A store builder document (B1): an editable draft and a pointer to its published version.
  * `key` is `home`, `landing:<slug>` or (B4) `cms:<cms page id>` for pages (kind `page`), `header`
  * and `footer` (kinds `header`, `footer`) and `zone:<listing.top|listing.bottom|product.after>`
- * (kind `zone`); `theme` for the theme draft (kind `theme`, B3).
+ * (kind `zone`; P1b adds `product.below_price` and `product.bottom`, and product zone versions for
+ * a category or a product: `zone:<product zone>@category:<uuid>` / `@product:<uuid>`); `theme` for
+ * the theme draft (kind `theme`, B3).
  *
  * Only what shoppers can see bumps the storefront content version: publishing (the pointer),
  * the title of a published document, deleting a published document. Draft saves do not.
@@ -77,8 +79,82 @@ class BuilderDocument extends Model
     /** B4: `zone:<zone>`. */
     public const ZONE_PREFIX = 'zone:';
 
-    /** Above / below the product grid on shop, category, brand and search; below product details. */
-    public const ZONES = ['listing.top', 'listing.bottom', 'product.after'];
+    /**
+     * Above / below the product grid on shop, category, brand and search; below product details.
+     * P1b: under the product's price and at the very end of the product page.
+     */
+    public const ZONES = ['listing.top', 'listing.bottom', 'product.below_price', 'product.after', 'product.bottom'];
+
+    /** P1b: the zones the bootstrap carries (product pages get theirs resolved with the product). */
+    public const BOOTSTRAP_ZONES = ['listing.top', 'listing.bottom', 'product.after'];
+
+    /**
+     * P1b: the product page zones; each may also have versions for a category
+     * (`zone:<zone>@category:<uuid>`) or one product (`zone:<zone>@product:<uuid>`).
+     */
+    public const PRODUCT_ZONES = ['product.below_price', 'product.after', 'product.bottom'];
+
+    public const TARGET_CATEGORY = 'category';
+
+    public const TARGET_PRODUCT = 'product';
+
+    /** P1b: at most this many targeted zone versions per organization. */
+    public const MAX_TARGETED_ZONES = 100;
+
+    /** P1b: `zone:<product zone>@<category|product>:<uuid>` (lower-case uuid). */
+    public const TARGETED_ZONE_PATTERN = '/^zone:(product\.below_price|product\.after|product\.bottom)@(category|product):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/';
+
+    /**
+     * P1b: the document key of a zone, or of its version for a category or a product.
+     *
+     * @param  'category'|'product'|null  $targetType
+     */
+    public static function zoneKey(string $zone, ?string $targetType = null, ?string $targetId = null): string
+    {
+        return self::ZONE_PREFIX.$zone.($targetType === null || $targetId === null ? '' : '@'.$targetType.':'.strtolower($targetId));
+    }
+
+    /**
+     * P1b: `{zone, type, id}` of a targeted zone key, or null for any other key.
+     *
+     * @return array{zone: string, type: 'category'|'product', id: string}|null
+     */
+    public static function parseTargetedZone(string $key): ?array
+    {
+        if (preg_match(self::TARGETED_ZONE_PATTERN, $key, $m) !== 1) {
+            return null;
+        }
+
+        /** @var 'category'|'product' $type */
+        $type = $m[2];
+
+        return ['zone' => $m[1], 'type' => $type, 'id' => $m[3]];
+    }
+
+    /**
+     * P1b: the zone of a zone document (`product.after` for `zone:product.after@category:…`), else null.
+     */
+    public function zone(): ?string
+    {
+        if (! str_starts_with($this->key, self::ZONE_PREFIX)) {
+            return null;
+        }
+        $zone = explode('@', substr($this->key, strlen(self::ZONE_PREFIX)), 2)[0];
+
+        return in_array($zone, self::ZONES, true) ? $zone : null;
+    }
+
+    /**
+     * P1b: `{type, id}` of a targeted zone version, else null.
+     *
+     * @return array{type: 'category'|'product', id: string}|null
+     */
+    public function zoneTarget(): ?array
+    {
+        $parsed = self::parseTargetedZone($this->key);
+
+        return $parsed === null ? null : ['type' => $parsed['type'], 'id' => $parsed['id']];
+    }
 
     protected $attributes = [
         'draft' => '{}',

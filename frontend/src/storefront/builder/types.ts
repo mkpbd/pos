@@ -791,6 +791,16 @@ export type ZoneKey = 'listing.top' | 'listing.bottom' | 'product.after'
 
 export const ZONE_KEYS = ['listing.top', 'listing.bottom', 'product.after'] as const satisfies readonly ZoneKey[]
 
+/**
+ * P1b: the product page's zones — under the price (summary column), after the details (full width,
+ * B4's `product.after`) and at the very end of the page. Their payloads come with the product
+ * (GET /store/products/{slug} `zones`), resolved per product: the product's own version, else the
+ * nearest category's, else the all-products one.
+ */
+export type ProductZoneKey = 'product.below_price' | 'product.after' | 'product.bottom'
+
+export const PRODUCT_ZONE_KEYS = ['product.below_price', 'product.after', 'product.bottom'] as const satisfies readonly ProductZoneKey[]
+
 /** bootstrap `builder`: published documents (staff `?preview=draft`: drafts); null / absent = the classic rendering. */
 export type BootstrapBuilder = {
   home: boolean

@@ -1,5 +1,5 @@
-import type { BuilderPage, RenderColumn, RenderSection, ZoneKey } from './types'
-import type { StorefrontBootstrap } from '../types'
+import type { BuilderPage, ProductZoneKey, RenderColumn, RenderSection, ZoneKey } from './types'
+import type { ProductDetail, StorefrontBootstrap } from '../types'
 
 /** A render payload worth drawing: an object with a sections list. Anything else (null, absent, malformed) = the classic rendering. */
 export function isBuilderPayload(value: unknown): value is BuilderPage {
@@ -11,6 +11,20 @@ export function zonePayload(bootstrap: Pick<StorefrontBootstrap, 'builder'>, key
   const zones = bootstrap.builder?.zones
   const page = zones && Object.hasOwn(zones, key) ? zones[key] : null
   return isBuilderPayload(page) ? page : null
+}
+
+/**
+ * P1b: a product page zone for this product. The product payload's `zones` are already resolved
+ * (product → nearest category → all products, drafts in a staff `?preview=draft`) and are the only
+ * source when present; a payload from before P1b keeps the bootstrap's store-wide `product.after`.
+ */
+export function productZonePayload(product: Pick<ProductDetail, 'zones'>, bootstrap: Pick<StorefrontBootstrap, 'builder'>, key: ProductZoneKey): BuilderPage | null {
+  const zones: unknown = product.zones
+  if (typeof zones === 'object' && zones !== null) {
+    const page = Object.hasOwn(zones, key) ? (zones as Record<string, unknown>)[key] : null
+    return isBuilderPayload(page) ? page : null
+  }
+  return key === 'product.after' ? zonePayload(bootstrap, key) : null
 }
 
 /** Whether a payload contains an element of this type that visitors see (the header's announcement replaces the top bar's). */

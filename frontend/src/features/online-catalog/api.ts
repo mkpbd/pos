@@ -1,12 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated } from '@/lib/api/client'
 import type { ProductOption } from '@/features/products/api'
+import { storefrontKeys, type ThemeResponse } from '@/features/storefront/api'
 import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 
 /** Web state of a listing, computed by the server from the publish switch and schedule. */
 export type ListingState = 'draft' | 'scheduled' | 'live' | 'expired'
 
 export type Specification = { label: string; value: string }
+
+/** P1b: colour family of a custom badge (the store draws each in a theme colour that keeps the text readable). */
+export const BADGE_TONES = ['sale', 'new', 'info', 'dark'] as const
+export type BadgeTone = (typeof BADGE_TONES)[number]
+
+/** P1b: a custom badge on the product's photos and cards; Bangla text in `translations.bn.text`. */
+export type ListingBadge = { text: string; tone: BadgeTone; translations?: TranslationsMap }
+export type ListingBadgeInput = { text: string; tone: BadgeTone; translations: TranslationsInput }
 
 export type ListingProduct = {
   id: string
@@ -37,6 +46,14 @@ export type ProductListing = {
   state: ListingState
   /** Bangla texts (E12b): name, short_description, description_html, seo_title, seo_description. */
   translations?: TranslationsMap
+  /** P1a: the product's own size guide (null = the category's guide). */
+  size_guide_id?: string | null
+  /** P1a: the guide the product gets from its category (nearest ancestor), if any. */
+  inherited_size_guide?: { id: string; name: string } | null
+  /** P1b: a YouTube or Vimeo link shown as the last gallery slide (absent = not offered by the API). */
+  video_url?: string | null
+  /** P1b: up to two custom badges (absent = not offered by the API). */
+  badges?: ListingBadge[]
 }
 
 export type VariantListing = { variant_id: string; compare_at_price: string | null; image_id: string | null }
@@ -67,6 +84,12 @@ export type ProductListingInput = {
   sort_weight: number
   variants: VariantListing[]
   translations?: TranslationsInput
+  /** P1a: null = use the category's size guide. */
+  size_guide_id?: string | null
+  /** P1b: null removes the video. */
+  video_url?: string | null
+  /** P1b: replaces the list (≤ 2). */
+  badges?: ListingBadgeInput[]
 }
 
 export type RelatedInput = { related: string[]; frequently_bought: string[] }
@@ -211,6 +234,20 @@ export function useSaveBrandListingMutation() {
       queryClient.setQueryData(onlineCatalogKeys.brand(saved.brand.id), saved)
       return queryClient.invalidateQueries({ queryKey: onlineCatalogKeys.brands, exact: true })
     },
+  })
+}
+
+/**
+ * P1b: the live theme's colours for the badge preview (GET /storefront/theme, storefront.view;
+ * shares the Theme page's cache). `enabled` false (no permission) = the preview's default colours.
+ */
+export function useStoreThemeColorsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: storefrontKeys.theme,
+    queryFn: ({ signal }) => api.get<ThemeResponse>('/storefront/theme', { signal }).then((r) => r.data),
+    select: (theme) => theme.settings.colors,
+    enabled,
+    staleTime: 5 * 60_000,
   })
 }
 

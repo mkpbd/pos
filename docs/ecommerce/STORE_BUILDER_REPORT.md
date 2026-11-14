@@ -101,3 +101,12 @@ preview per look, *See live demo*, *Use and publish now* (with a confirm), a 3-s
 
 Tests: backend 1035 (PostgreSQL 1034 + 1 skip), vitest 1496, mocked Playwright green; full-stack integration 24/24, demo stores
 11/11 (including a B8a page on Little Sprouts using its real reviews, flash sale and cart), builder acceptance 5/5 (including B7).
+
+## Addendum — B8b (2026-11-13)
+
+**Popups & bars** (newsletter, exit offer with coupon, free-delivery bar, Eid slide-in, cookie notice, contact form) with
+triggers, frequency, page/device/audience rules, a schedule and an on/off switch — never on cart, checkout, account or order pages.
+**Form builder** with 10 field kinds; submissions in Content → Form submissions with bell and e-mail notices and export.
+
+Tests: backend 1059 (PostgreSQL 1058 + 1 skip), vitest 1574, mocked Playwright green; full-stack integration 24/24, demo stores
+12/12 (including the B8b popup and form flow), builder acceptance 5/5. Upgrade: `php artisan migrate`, `php artisan pos:permissions:sync`.

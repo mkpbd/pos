@@ -307,6 +307,39 @@ html:lang(bn) body {
 .b-popup .b-boxed { max-width: none; }
 header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
 
+/*
+ * P1b product page. The `product.below_price` zone sits in the summary column: its sections take
+ * the column's width (no container padding of their own). The quick-buy bar is fixed to the bottom,
+ * above a B8b bottom bar (--sf-popup-bar-bottom) and clear of the home indicator; it slides in and
+ * out (not with reduced motion), and while it shows the store frame is padded by its height
+ * (--sf-quick-buy-space) so the end of the page stays reachable.
+ */
+.b-zone-inline .b-boxed,
+.b-zone-inline .b-full { padding-inline: 0; max-width: none; }
+.sf-frame { padding-bottom: var(--sf-quick-buy-space, 0px); }
+.sf-quick-buy {
+  bottom: var(--sf-popup-bar-bottom, 0px);
+  transform: translateY(calc(100% + var(--sf-popup-bar-bottom, 0px)));
+  visibility: hidden;
+  transition: transform 220ms ease, visibility 0s linear 220ms;
+}
+.sf-quick-buy[data-state="open"] {
+  transform: none;
+  visibility: visible;
+  transition: transform 220ms ease, visibility 0s;
+}
+@starting-style {
+  .sf-quick-buy[data-state="open"] { transform: translateY(100%); }
+}
+.sf-quick-buy-inner { padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 48rem) {
+  .sf-quick-buy-inner { padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf-quick-buy,
+  .sf-quick-buy[data-state="open"] { transition: none; }
+}
+
 .b-layered { position: relative; isolation: isolate; }
 .b-layered > .b-container, .b-layered > .b-row { position: relative; z-index: 1; }
 .b-sticky { position: sticky; top: var(--b-sticky-top, 0px); z-index: 30; }

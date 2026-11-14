@@ -158,6 +158,13 @@ return [
         ]],
     ],
 
+    // P1b: answered shopper questions (DemoProductPageSeeder): [product, name, e-mail, language, question, answer].
+    'questions' => [
+        ['oxford-shirt', 'Arif Rahman', 'arif@classicshop.test', 'en', 'Does the shirt shrink after washing?', 'It is pre-washed, so it keeps its size. Wash at 30 °C and hang it to dry for the best fit.'],
+        ['oxford-shirt', 'মাহমুদ হাসান', 'mahmud@classicshop.test', 'bn', 'কোন সাইজ নেব বুঝতে পারছি না।', 'সাইজ গাইডে বুকের মাপ দেওয়া আছে। দুই সাইজের মাঝামাঝি হলে বড়টি নিন।'],
+        ['white-sneakers', 'Priya Das', 'priya@classicshop.test', 'en', 'Are the sneakers true to size?', 'Yes, they fit true to size. If you are between two sizes, choose the larger one.'],
+    ],
+
     'features' => [
         ['icon' => 'truck', 'title' => 'Free delivery', 'text' => 'Inside Dhaka over ৳5,000'],
         ['icon' => 'rotate-ccw', 'title' => '7-day exchange', 'text' => 'Unworn, with tags'],
@@ -179,5 +186,50 @@ return [
         ['type' => 'product_grid', 'title' => 'Best sellers', 'config' => ['source' => 'best_sellers', 'limit' => 8, 'columns' => 4, 'view_all_url' => '/shop']],
         ['type' => 'testimonials', 'title' => 'Customer reviews'],
         ['type' => 'blog_posts', 'title' => 'Style notes', 'config' => ['limit' => 3, 'view_all_url' => '/blog']],
+    ],
+
+    // P1a (DemoVariantsSeeder): photos per colour (product photo files by value), option swatch
+    // styles and size guides with Bangla.
+    'option_photos' => [
+        'leather-tote' => ['option' => 'Colour', 'style' => 'image', 'values' => ['Tan' => ['leather-tote.jpg'], 'Black' => ['leather-tote-2.jpg']]],
+    ],
+    'size_guides' => [
+        [
+            'name' => 'Clothing sizes', 'title' => 'Clothing size guide', 'categories' => ['men', 'women'],
+            'intro' => 'Measure over a thin T-shirt with a soft tape. Measurements are of the body, in centimetres.',
+            'note' => 'Between two sizes? Choose the larger one for a relaxed fit.',
+            'columns' => ['size' => 'Size', 'chest' => 'Chest (cm)', 'waist' => 'Waist (cm)', 'hip' => 'Hip (cm)'],
+            'rows' => [
+                ['size' => 'S', 'chest' => '86–91', 'waist' => '71–76', 'hip' => '86–91'],
+                ['size' => 'M', 'chest' => '96–101', 'waist' => '81–86', 'hip' => '96–101'],
+                ['size' => 'L', 'chest' => '106–111', 'waist' => '91–96', 'hip' => '106–111'],
+                ['size' => 'XL', 'chest' => '116–121', 'waist' => '101–106', 'hip' => '116–121'],
+            ],
+            'bn' => [
+                'title' => 'পোশাকের মাপের গাইড',
+                'intro' => 'পাতলা টি-শার্টের ওপর নরম ফিতা দিয়ে মাপুন। মাপগুলো শরীরের, সেন্টিমিটারে।',
+                'note' => 'দুই মাপের মাঝামাঝি হলে আরামদায়ক ফিটের জন্য বড়টি বেছে নিন।',
+                'columns' => ['size' => 'মাপ', 'chest' => 'বুক (সেমি)', 'waist' => 'কোমর (সেমি)', 'hip' => 'নিতম্ব (সেমি)'],
+            ],
+        ],
+        [
+            'name' => 'Shoe sizes', 'title' => 'Shoe size guide', 'categories' => ['shoes'],
+            'intro' => 'Stand on a sheet of paper, mark your heel and longest toe, and measure the distance.',
+            'note' => 'Sizes run true to EU sizing.',
+            'columns' => ['eu' => 'EU', 'uk' => 'UK', 'foot' => 'Foot length (cm)'],
+            'rows' => [
+                ['eu' => '39', 'uk' => '6', 'foot' => '24.6'],
+                ['eu' => '40', 'uk' => '6.5', 'foot' => '25.3'],
+                ['eu' => '41', 'uk' => '7', 'foot' => '26.0'],
+                ['eu' => '42', 'uk' => '8', 'foot' => '26.6'],
+                ['eu' => '43', 'uk' => '9', 'foot' => '27.3'],
+            ],
+            'bn' => [
+                'title' => 'জুতার মাপের গাইড',
+                'intro' => 'একটি কাগজের ওপর দাঁড়িয়ে গোড়ালি আর সবচেয়ে লম্বা আঙুল চিহ্নিত করুন, তারপর দূরত্ব মাপুন।',
+                'note' => 'মাপগুলো ইউরোপীয় (EU) মাপ অনুযায়ী।',
+                'columns' => ['foot' => 'পায়ের দৈর্ঘ্য (সেমি)'],
+            ],
+        ],
     ],
 ];

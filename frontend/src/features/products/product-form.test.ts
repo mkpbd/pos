@@ -1,25 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { emptyVariant, generateVariants, productFormSchema, toFormValues, toProductInput, type VariantFormValues } from '@/features/products/product-form'
+import type { Product } from '@/features/products/api'
+import { emptyVariant, productFormSchema, toFormValues, toProductInput, type VariantFormValues } from '@/features/products/product-form'
 
 const priced = (overrides: Partial<VariantFormValues>): VariantFormValues => ({ ...emptyVariant(), purchase_price: '10', selling_price: '15', ...overrides })
 
 describe('product form', () => {
-  it('generates the option matrix and keeps existing rows', () => {
-    const existing = [priced({ id: 'v-m', sku: 'POLO-M', option_values: { Size: 'M' }, selling_price: '450' })]
-
-    const rows = generateVariants([{ name: 'Size', values: 'M, L' }, { name: 'Color', values: 'Red' }], existing)
-
-    expect(rows.map((r) => r.option_values)).toEqual([{ Size: 'M', Color: 'Red' }, { Size: 'L', Color: 'Red' }])
-    // M/Red is a new combination (Color added), so it copies prices from the template row.
-    expect(rows[0]?.selling_price).toBe('450')
-    expect(rows[0]?.id).toBeUndefined()
-
-    const again = generateVariants([{ name: 'Size', values: 'M, L' }], [priced({ id: 'v-m', option_values: { size: 'm' }, selling_price: '450' })])
-    expect(again[0]?.id).toBe('v-m')
-    expect(again[1]?.id).toBeUndefined()
-  })
-
-  it('builds the API payload with trimmed values, parsed barcodes and nulls for blanks', () => {
+  it('builds the create payload with trimmed values, parsed barcodes and nulls for blanks', () => {
     const form = {
       ...toFormValues(),
       name: '  Juice ',
@@ -36,6 +22,23 @@ describe('product form', () => {
       sku: null, name: null, option_values: {}, purchase_price: '10', selling_price: '15',
       wholesale_price: null, reorder_level: '0', barcodes: ['96385074', '4006381333931'], is_active: true,
     })
+  })
+
+  it('sends the saved variants unchanged when editing details (the grid owns them)', () => {
+    const product = {
+      id: 'p-1', name: 'Polo', description: null, type: 'standard', category: null, brand: null, unit: { id: 'u-1', name: 'Piece', code: 'pcs', allow_decimal: false },
+      tax_rate: null, track_stock: true, track_batches: false, track_serials: false, max_discount_percent: null, is_active: true, archived_at: null,
+      options: [{ name: 'Size', values: ['M'] }], images: [],
+      variants: [{ id: 'v-m', sku: 'POLO-M', name: null, option_values: { Size: 'M' }, purchase_price: '300.00', selling_price: '450.00', wholesale_price: null, reorder_level: '2.000', barcodes: ['111'], is_active: true }],
+    } satisfies Product
+
+    const form = toFormValues(product)
+    expect(form.variants).toEqual([])
+    const input = toProductInput({ ...form, name: 'Polo Shirt' }, product)
+
+    expect(input.name).toBe('Polo Shirt')
+    expect(input.options).toEqual([{ name: 'Size', values: ['M'] }])
+    expect(input.variants).toEqual([{ id: 'v-m', sku: 'POLO-M', name: null, option_values: { Size: 'M' }, purchase_price: '300.00', selling_price: '450.00', wholesale_price: null, reorder_level: '2.000', barcodes: ['111'], is_active: true }])
   })
 
   it('services never track stock', () => {

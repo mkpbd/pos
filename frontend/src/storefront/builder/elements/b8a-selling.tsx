@@ -4,21 +4,19 @@ import { CheckIcon, ChevronsLeftRightIcon, ChevronsUpDownIcon, Loader2Icon, Minu
 import { sumDecimals } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { CardCartAction } from '../../cart/add-to-cart'
-import { useAddToCartMutation } from '../../cart/api'
-import { useCartDrawer } from '../../cart/cart-drawer-context'
-import { cartErrorMessage } from '../../cart/quantity'
+import { currentPrice, startVariant, useAddSeveral } from '../../cart/add-several'
+import { AddSeveralStatus } from '../../cart/add-several-status'
 import { CardPrice } from '../../catalog/card-parts'
 import { useCardPricing } from '../../catalog/card-pricing'
 import { Price } from '../../catalog/price'
 import { ProductCard } from '../../catalog/product-card'
 import { ProductImage } from '../../catalog/product-image'
-import { initialVariant } from '../../catalog/variant-selection'
 import { MenuLink } from '../../components/menu-link'
 import { useLocale } from '../../i18n/locale'
 import { usePriceFormat } from '../../money'
 import { Countdown } from '../../promotions/countdown-timer'
 import { useDeadline } from '../../promotions/countdown'
-import type { ProductCard as Card, ProductDetail, ProductVariant } from '../../types'
+import type { ProductCard as Card, ProductDetail } from '../../types'
 import { DraftPlaceholder, PreviewMark } from '../preview-mark'
 import { MARK_LABELS, type MarkState } from '../render-context'
 import type { BundleData, ComparisonCellKind, FlashSaleBarData } from '../types'
@@ -495,16 +493,6 @@ function FlashSaleBody({ element, data, draft, marked }: { element: El<'flash_sa
 
 /* -------------------------------------------------------------------------------------------- */
 
-/** The variant a bundle item starts with: the product's initial variant when in stock, else the first in stock. */
-function startVariant(product: ProductDetail): ProductVariant | null {
-  const first = initialVariant(product)
-  return first?.in_stock ? first : (product.variants.find((variant) => variant.in_stock) ?? first)
-}
-
-const currentPrice = (variant: ProductVariant) => variant.promo_price ?? variant.price
-
-type BundleResult = { added: number; count: number; failures: { name: string; reason: string }[] } | 'choose' | null
-
 /**
  * Products bought together: each with its option and a checkbox (on by default), the total of the
  * chosen items' current prices, and one button that adds them to the cart one after another. The
@@ -524,8 +512,7 @@ export function BundleElement({ element }: { element: El<'bundle'> }) {
 function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: BundleData; draft: boolean }) {
   const { t } = useLocale()
   const format = usePriceFormat()
-  const add = useAddToCartMutation()
-  const drawer = useCartDrawer()
+  const { busy, result, addAll } = useAddSeveral()
   const p = element.props ?? {}
   const L = B8A_TEXT_LIMITS.bundle
   const products: Record<string, ProductDetail> = isObject(data.products) ? (data.products as Record<string, ProductDetail>) : {}
@@ -539,8 +526,6 @@ function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: Bun
   })
   const [excluded, setExcluded] = useState<Record<string, boolean>>({})
   const [chosenVariants, setChosenVariants] = useState<Record<string, string>>({})
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<BundleResult>(null)
   const titleId = useId()
   const base = useId()
 
@@ -555,30 +540,7 @@ function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: Bun
   const title = str(p.title).slice(0, L.title).trim()
   const text = str(p.text).slice(0, L.text).trim()
   const label = str(p.button_label).slice(0, L.button_label).trim() || t('content.builder.bundle.button')
-
-  const addAll = async (button: HTMLElement) => {
-    if (busy) return
-    if (chosen.length === 0) {
-      setResult('choose')
-      return
-    }
-    setBusy(true)
-    setResult(null)
-    let added = 0
-    const failures: { name: string; reason: string }[] = []
-    // One after another: the cart answers each add with the whole repriced cart.
-    for (const { item, variant } of chosen) {
-      try {
-        await add.mutateAsync({ variant_id: variant.id, quantity: '1' })
-        added += 1
-      } catch (error) {
-        failures.push({ name: item.product.name, reason: cartErrorMessage(error, t) })
-      }
-    }
-    setBusy(false)
-    setResult({ added, count: chosen.length, failures })
-    if (failures.length === 0) drawer?.open(button)
-  }
+  const addChosen = (button: HTMLElement) => addAll(chosen.map(({ item, variant }) => ({ name: item.product.name, variantId: variant.id })), button)
 
   return (
     <section data-b={element.id} aria-labelledby={title ? titleId : undefined} aria-label={title ? undefined : label} className="b-bundle flex flex-col gap-5" data-testid="builder-bundle">
@@ -662,27 +624,21 @@ function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: Bun
           <p className="text-xs">{t('content.builder.bundle.totalNote')}</p>
         </div>
         {/* Not disabled while adding (a disabled button would lose focus). */}
-        <button type="button" className={PRIMARY_BUTTON} aria-disabled={busy || undefined} onClick={(event) => void addAll(event.currentTarget)} data-testid="bundle-add">
+        <button type="button" className={PRIMARY_BUTTON} aria-disabled={busy || undefined} onClick={(event) => void addChosen(event.currentTarget)} data-testid="bundle-add">
           {busy ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
           {busy ? t('content.builder.bundle.adding') : label}
         </button>
       </div>
-      <div role="status" aria-live="polite" className="text-sm empty:hidden" data-testid="bundle-status">
-        {result === 'choose' && <p>{t('content.builder.bundle.chooseOne')}</p>}
-        {result && result !== 'choose' && result.failures.length === 0 && <p className="font-semibold">{t('content.builder.bundle.added', { count: result.added })}</p>}
-        {result && result !== 'choose' && result.failures.length > 0 && (
-          <div className="flex flex-col gap-1 rounded-md border border-sf-sale p-3">
-            <p className="font-semibold">{result.added > 0 ? t('content.builder.bundle.partial', { added: result.added, count: result.count }) : t('content.builder.bundle.none')}</p>
-            <ul className="list-disc pl-5">
-              {result.failures.map((failure) => (
-                <li key={failure.name}>
-                  {failure.name} — {failure.reason}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+      <AddSeveralStatus
+        result={result}
+        testId="bundle-status"
+        messages={{
+          chooseOne: t('content.builder.bundle.chooseOne'),
+          added: (count) => t('content.builder.bundle.added', { count }),
+          partial: (added, count) => t('content.builder.bundle.partial', { added, count }),
+          none: t('content.builder.bundle.none'),
+        }}
+      />
     </section>
   )
 }

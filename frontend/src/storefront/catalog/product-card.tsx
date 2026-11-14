@@ -11,7 +11,8 @@ import { WishlistButton } from '../wishlist/wishlist-button'
 import { Price } from './price'
 import { ProductImage } from './product-image'
 import { useQuickView } from './quick-view-context'
-import { CardRating, ProductBadges } from './card-parts'
+import { CardRating, CardSwatchRow, ProductBadges } from './card-parts'
+import { useCardSwatches } from './card-swatches'
 import { useCardPricing } from './card-pricing'
 import { ArchedProductCard } from './arched-product-card'
 import { CommerceProductCard, MinimalProductCard } from './product-card-variants'
@@ -56,6 +57,7 @@ function StandardProductCard({
   const quickView = useQuickView()
   const { t } = useLocale()
   const { promotion, range, priceMax, compareAt, promoPrice, promotionLabel } = useCardPricing(product)
+  const swatch = useCardSwatches(product)
 
   return (
     <article
@@ -67,8 +69,8 @@ function StandardProductCard({
     >
       <div className={cn('relative shrink-0', layout === 'list' && 'sm:w-56')}>
         <Link to={product.url} tabIndex={-1} aria-hidden className="block">
-          <ProductImage image={product.image} alt={product.name} eager={eager} imgClassName="transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none" />
-          {product.hover_image && (
+          <ProductImage image={swatch.image} alt={product.name} eager={eager} imgClassName="transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none" />
+          {product.hover_image && !swatch.swapped && (
             <ProductImage
               image={product.hover_image}
               alt={product.name}
@@ -82,6 +84,7 @@ function StandardProductCard({
           isNew={product.is_new}
           inStock={product.in_stock}
           promotionLabel={promotionLabel}
+          custom={product.badges}
           className="absolute top-3 left-3"
         />
         {countdown && promotion?.show_countdown && <Countdown endsAt={promotion.ends_at} variant="chip" prefix="" className="absolute bottom-3 left-3" />}
@@ -108,6 +111,7 @@ function StandardProductCard({
           </Link>
         </h3>
         <CardRating rating={product.rating} />
+        <CardSwatchRow {...swatch.row} />
         {layout === 'list' && product.short_description && <p className="line-clamp-3 text-sm">{product.short_description}</p>}
         {promoPrice ? (
           <Price price={promoPrice} compareAt={product.price} from={range} size="sm" className="mt-auto pt-1" />

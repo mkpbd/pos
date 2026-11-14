@@ -152,7 +152,7 @@ describe('add to cart', () => {
     expect(within(drawer).getByRole('link', { name: 'Kids Tee' })).toHaveAttribute('href', '/product/kids-tee')
   })
 
-  it('is disabled for an out-of-stock variant and explains stock errors', async () => {
+  it('offers a back-in-stock e-mail for a sold-out variant and explains stock errors', async () => {
     serveProduct({ 'POST /store/cart/items': fail(422, 'INSUFFICIENT_STOCK', 'Not enough stock', { max_quantity: '3.000' }) })
     renderRoutes(storefrontRoutes, '/product/kids-tee')
     const user = userEvent.setup()
@@ -166,10 +166,10 @@ describe('add to cart', () => {
     // The stock hint caps the stepper.
     expect(within(form).getByRole('button', { name: 'Increase: Quantity of Kids Tee' })).toBeDisabled()
 
-    await user.click(within(screen.getByTestId('variant-selector')).getByRole('radio', { name: 'L (out of stock)' }))
-    const fresh = screen.getByRole('form', { name: 'Add to cart' })
-    expect(within(fresh).getByRole('button', { name: 'Add to cart' })).toBeDisabled()
-    expect(within(fresh).getByText('This option is out of stock.')).toBeInTheDocument()
+    await user.click(within(screen.getByTestId('variant-selector')).getByRole('radio', { name: 'L (sold out)' }))
+    // P1a: the buy button becomes "Notify me when it's back".
+    expect(screen.queryByRole('form', { name: 'Add to cart' })).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('notify-me')).getByRole('button', { name: 'Notify me when it’s back' })).toBeEnabled()
   })
 
   it('adds from the quick view, which gives way to the mini-cart', async () => {

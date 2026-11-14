@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArchiveIcon, ArrowLeftIcon, ImagePlusIcon, Loader2Icon, PlusIcon, Trash2Icon, WandSparklesIcon, XIcon } from 'lucide-react'
+import { ArchiveIcon, ArrowLeftIcon, ImagePlusIcon, Loader2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
-import { flattenCategoryTree, useAttributesQuery, useCatalogList } from '@/features/catalog/api'
+import { flattenCategoryTree, useCatalogList } from '@/features/catalog/api'
 import { OnlineListingSection } from '@/features/online-catalog/components/online-listing-section'
 import {
   useArchiveProductMutation,
@@ -25,16 +25,19 @@ import {
   useUploadProductImageMutation,
   type Product,
 } from '@/features/products/api'
+import { BackInStockCard } from '@/features/products/components/back-in-stock-card'
+import { OptionPhotosCard } from '@/features/products/components/option-photos-card'
 import { VariantFields } from '@/features/products/components/variant-fields'
+import { VariantGrid } from '@/features/products/components/variant-grid'
 import { VariantSupplySection } from '@/features/supply-chain/components/variant-supply-section'
-import { generateVariants, productFormSchema, toFormValues, toProductInput, type ProductFormValues } from '@/features/products/product-form'
+import { productFormSchema, toFormValues, toProductInput, type ProductFormValues } from '@/features/products/product-form'
 import { handleFormError } from '@/lib/forms'
 import { trimDecimal } from '@/lib/money'
 
 const NONE = '__none__'
 const FIELDS = [
   'name', 'description', 'type', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'track_stock',
-  'track_batches', 'track_serials', 'max_discount_percent', 'is_active', 'options', 'variants',
+  'track_batches', 'track_serials', 'max_discount_percent', 'is_active', 'variants',
 ] as const
 
 function NullableSelect({ value, onChange, placeholder, options, ariaLabel }: {
@@ -129,16 +132,7 @@ function ProductForm({ product }: { product?: Product }) {
 
   const form = useForm<ProductFormValues>({ resolver: zodResolver(productFormSchema), defaultValues: toFormValues(product) })
   const { errors, isDirty } = form.formState
-  const options = useFieldArray({ control: form.control, name: 'options' })
-  const variants = useFieldArray({ control: form.control, name: 'variants' })
-  const [type, hasVariants, trackStock, optionNames] = useWatch({ control: form.control, name: ['type', 'has_variants', 'track_stock', 'options'] })
-  // Attribute dictionary: suggests option names and shows the known values of a matching option.
-  const attributes = useAttributesQuery(hasVariants)
-  const attributeNames = (attributes.data ?? []).map((a) => a.name)
-  const attributeHint = (name: string | undefined) => {
-    const match = (attributes.data ?? []).find((a) => a.name.toLowerCase() === name?.trim().toLowerCase())
-    return match && match.values.length > 0 ? `Comma separated. Known ${match.name} values: ${match.values.map((v) => v.value).join(', ')}` : undefined
-  }
+  const [type, trackStock] = useWatch({ control: form.control, name: ['type', 'track_stock'] })
 
   // Active records, plus whatever the product already references (even if since deactivated).
   const activeOr = <T extends { id: string; is_active: boolean }>(rows: T[] | undefined, current: string | null | undefined) =>
@@ -146,7 +140,7 @@ function ProductForm({ product }: { product?: Product }) {
 
   const onSubmit = form.handleSubmit((values) =>
     save.mutate(
-      { id: product?.id, input: toProductInput(values) },
+      { id: product?.id, input: toProductInput(values, product) },
       {
         onSuccess: (saved) => {
           toast.success(product ? `${saved.name} saved.` : `${saved.name} created.`)
@@ -158,11 +152,6 @@ function ProductForm({ product }: { product?: Product }) {
       },
     ),
   )
-
-  const regenerate = () => {
-    const current = form.getValues()
-    form.setValue('variants', generateVariants(current.options, current.variants), { shouldDirty: true })
-  }
 
   return (
     <form onSubmit={onSubmit} noValidate className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -181,7 +170,7 @@ function ProductForm({ product }: { product?: Product }) {
           )}
           <Button type="submit" disabled={save.isPending || (!!product && !isDirty)}>
             {save.isPending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
-            {product ? 'Save changes' : 'Create product'}
+            {product ? 'Save details' : 'Create product'}
           </Button>
         </div>
       </div>
@@ -264,78 +253,27 @@ function ProductForm({ product }: { product?: Product }) {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pricing & variants</CardTitle>
-          <CardDescription>Prices are stored exactly as entered. Leave SKU empty to number it automatically.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Controller control={form.control} name="has_variants" render={({ field }) => (
-            <SwitchRow id="has-variants" label="This product has variants" hint="Sizes, colours, pack sizes… each with its own SKU, price and barcodes."
-              checked={field.value}
-              onChange={(v) => {
-                field.onChange(v)
-                if (!v) form.setValue('variants', form.getValues('variants').slice(0, 1).map((row) => ({ ...row, option_values: {} })))
-                if (v && form.getValues('options').length === 0) options.append({ name: '', values: '' })
-              }} />
-          )} />
-
-          {hasVariants && (
-            <div className="flex flex-col gap-3 rounded-md border p-3">
-              {options.fields.map((option, i) => (
-                <div key={option.id} className="grid gap-2 sm:grid-cols-[12rem_1fr_auto] sm:items-start">
-                  <FormField label={`Option ${i + 1}`} error={errors.options?.[i]?.name?.message}>
-                    <Input placeholder="e.g. Size" list={attributeNames.length ? 'attribute-names' : undefined} {...form.register(`options.${i}.name`)} />
-                  </FormField>
-                  <FormField label="Values" error={errors.options?.[i]?.values?.message} hint={attributeHint(optionNames?.[i]?.name) ?? 'Comma separated, e.g. S, M, L'}>
-                    <Input {...form.register(`options.${i}.values`)} />
-                  </FormField>
-                  <Button type="button" variant="ghost" size="icon" className="sm:mt-6" aria-label={`Remove option ${i + 1}`} onClick={() => options.remove(i)}>
-                    <Trash2Icon />
-                  </Button>
-                </div>
-              ))}
-              {attributeNames.length > 0 && (
-                <datalist id="attribute-names">
-                  {attributeNames.map((n) => <option key={n} value={n} />)}
-                </datalist>
-              )}
-              {errors.options?.message && <p className="text-sm text-destructive">{errors.options.message}</p>}
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={options.fields.length >= 3} onClick={() => options.append({ name: '', values: '' })}>
-                  <PlusIcon data-icon="inline-start" /> Add option
-                </Button>
-                <Button type="button" size="sm" onClick={regenerate}>
-                  <WandSparklesIcon data-icon="inline-start" /> Generate variants
-                </Button>
+      {!product && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Price</CardTitle>
+            <CardDescription>
+              Prices are stored exactly as entered. Leave SKU empty to number it automatically. Selling in sizes or colours? Create the product
+              first, then add its options in the variant grid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <div className="grid min-w-3xl grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.6fr)_3rem] items-start gap-2 text-xs font-medium text-muted-foreground">
+                <span>SKU</span><span>Cost</span><span>Selling</span><span>Wholesale</span><span>Reorder at</span><span>Barcodes</span><span>Active</span>
+              </div>
+              <div className="grid min-w-3xl grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.6fr)_3rem] items-start gap-2 border-t py-2">
+                <VariantFields index={0} register={form.register} control={form.control} errors={errors} />
               </div>
             </div>
-          )}
-
-          <div className="overflow-x-auto">
-            <div className="grid min-w-4xl grid-cols-[10rem_repeat(5,minmax(0,1fr))_minmax(0,1.6fr)_3rem_2.5rem] items-start gap-2 text-xs font-medium text-muted-foreground">
-              <span>{hasVariants ? 'Variant' : ''}</span>
-              <span>SKU</span><span>Cost</span><span>Selling</span><span>Wholesale</span><span>Reorder at</span><span>Barcodes</span><span>Active</span><span />
-            </div>
-            {variants.fields.slice(0, hasVariants ? undefined : 1).map((variant, i) => (
-              <div key={variant.id} className="grid min-w-4xl grid-cols-[10rem_repeat(5,minmax(0,1fr))_minmax(0,1.6fr)_3rem_2.5rem] items-start gap-2 border-t py-2">
-                <span className="self-center truncate text-sm font-medium">
-                  {hasVariants ? Object.values(form.getValues(`variants.${i}.option_values`)).join(' / ') || '—' : 'Default'}
-                </span>
-                <VariantFields index={i} register={form.register} control={form.control} errors={errors} />
-                {hasVariants && variants.fields.length > 1 ? (
-                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove variant ${i + 1}`} onClick={() => variants.remove(i)}><Trash2Icon /></Button>
-                ) : <span />}
-              </div>
-            ))}
-            {(errors.variants?.message || errors.variants?.root?.message) && (
-              <p className="text-sm text-destructive">{errors.variants?.message ?? errors.variants?.root?.message}</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {product && <ImagesCard product={product} />}
+          </CardContent>
+        </Card>
+      )}
 
       {product && (
         <ConfirmDialog
@@ -373,6 +311,15 @@ export function ProductEditorPage() {
   return (
     <div className="flex flex-col gap-6">
       <ProductForm key={data.id} product={data} />
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+        <VariantGrid key={data.id} product={data} />
+        <ImagesCard product={data} />
+        {!!data.options?.length && data.images.length > 0 && (
+          // Remount when the options or photos change so every value and photo is listed.
+          <OptionPhotosCard key={`${JSON.stringify(data.options)}|${data.images.map((i) => i.id).join(',')}`} product={data} />
+        )}
+        {can('online_catalog.view') && <BackInStockCard productId={data.id} />}
+      </div>
       <VariantSupplySection product={data} />
       {can('online_catalog.view') && (
         <div className="mx-auto w-full max-w-5xl">

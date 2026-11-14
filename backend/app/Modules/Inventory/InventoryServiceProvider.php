@@ -16,7 +16,9 @@ use App\Modules\Inventory\Infrastructure\Models\StockAdjustment;
 use App\Modules\Inventory\Infrastructure\Models\StockReorderRule;
 use App\Modules\Inventory\Infrastructure\Models\StockTransfer;
 use App\Modules\Inventory\Infrastructure\Notifications\NotifyLowStock;
+use App\Modules\Inventory\Infrastructure\Products\InventoryVariantStock;
 use App\Modules\Inventory\Infrastructure\Replenishment\EloquentReplenishmentData;
+use App\Modules\Products\Application\Contracts\VariantStock;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +36,8 @@ class InventoryServiceProvider extends ModuleServiceProvider
         $this->app->bind(StockLevels::class, EloquentStockLevels::class);
         $this->app->bind(StockValuation::class, EloquentStockValuation::class);
         $this->app->bind(ReplenishmentData::class, EloquentReplenishmentData::class);
+        // P1a: stock in the product variant grid (the contract is declared by Products).
+        $this->app->bind(VariantStock::class, InventoryVariantStock::class);
     }
 
     public function boot(): void

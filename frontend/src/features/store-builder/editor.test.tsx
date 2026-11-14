@@ -170,6 +170,41 @@ describe('store builder editor: document kinds (B4)', () => {
   })
 })
 
+describe('store builder editor: product zone versions (P1b)', () => {
+  const SHOES = '0a000000-0000-4000-8000-000000000002'
+  const sneaker = { id: 'p-1', slug: 'red-sneaker', name: 'Red sneaker', price: '1250.00', image_url: '/media/red.jpg' }
+
+  it('a version for a category says where it shows and which product the canvas uses', async () => {
+    const user = userEvent.setup()
+    mockKind({
+      kind: 'zone', key: `zone:product.below_price@category:${SHOES}`, title: 'Under the price · Shoes', path: null,
+      preview_url: 'https://shop.test/product/red-sneaker?preview=draft', zone: 'product.below_price', target: { type: 'category', id: SHOES, name: 'Shoes' }, preview_product: sneaker,
+      published: { version_id: 'v-1', number: 1, published_at: '2026-11-13T08:00:00+00:00' },
+    }, undefined, {
+      'GET /storefront/builder/documents/doc-1/versions': ok([{ id: 'v-1', number: 1, note: null, published_at: '2026-11-13T08:00:00+00:00', created_by: null, created_at: '2026-11-13T08:00:00+00:00' }]),
+    })
+    renderRoutes(routes, '/storefront/builder/doc-1')
+    const placement = await screen.findByTestId('document-placement')
+    expect(placement).toHaveTextContent('Under the price on product pages in “Shoes” and its subcategories. A product’s own version wins over this one.')
+    expect(screen.getByTestId('preview-product-note')).toHaveTextContent('The canvas shows it on “Red sneaker”.')
+    // Zone elements only, and the inspector says where it shows.
+    expect(addable()).toEqual(expect.arrayContaining(['add-heading', 'add-cta']))
+    expect(addable()).not.toContain('add-logo')
+    expect(screen.getByRole('complementary', { name: 'Inspector' })).toHaveTextContent('“Shoes” and its subcategories')
+    // Version history's View opens the live version on the matching product.
+    await user.click(within(screen.getByRole('banner', { name: 'Editor toolbar' })).getByRole('button', { name: 'More page actions' }))
+    await user.click(await screen.findByRole('menuitem', { name: /Version history/ }))
+    expect(await screen.findByRole('link', { name: 'View version 1 on your store (opens in a new tab)' })).toHaveAttribute('href', 'https://shop.test/product/red-sneaker')
+  })
+
+  it('without a matching live product the canvas keeps its grey sample', async () => {
+    mockKind({ kind: 'zone', key: 'zone:product.bottom', title: 'Product page bottom', path: null, preview_url: null, zone: 'product.bottom', target: null, preview_product: null })
+    renderRoutes(routes, '/storefront/builder/doc-1')
+    expect(await screen.findByTestId('document-placement')).toHaveTextContent('At the very bottom of every product page, after related products.')
+    expect(screen.getByTestId('preview-product-note')).toHaveTextContent('No live product matches yet')
+  })
+})
+
 describe('store builder editor: popups (B8b)', () => {
   const popupDoc = { kind: 'popup' as const, key: 'popup:0b6f2e3c-1a2b-4c3d-8e9f-0123456789ab', title: 'Newsletter', path: null, preview_url: 'https://shop.test/?preview=draft&popup=doc-1', active: false }
 

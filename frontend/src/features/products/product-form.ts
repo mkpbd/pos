@@ -33,15 +33,13 @@ export const productFormSchema = z
     track_serials: z.boolean(),
     max_discount_percent: z.union([z.string().trim().regex(decimalPattern(2), 'A percentage.').refine((v) => Number(v) <= 100, 'At most 100.'), z.literal('')]),
     is_active: z.boolean(),
-    has_variants: z.boolean(),
-    /** Option values separated by commas. */
-    options: z.array(z.object({ name: z.string().trim().min(1, 'Name the option.').max(50), values: z.string().trim().min(1, 'List at least one value.') })).max(3),
-    variants: z.array(variantSchema).min(1, 'Add at least one variant.'),
+    /**
+     * New products: the single price row. Existing products edit their variants in the
+     * variant grid (P1a), so this is empty and the saved variants are sent unchanged.
+     */
+    variants: z.array(variantSchema).max(1),
   })
   .superRefine((form, ctx) => {
-    if (form.has_variants && form.options.length === 0) {
-      ctx.addIssue({ code: 'custom', path: ['options'], message: 'Add at least one option, e.g. Size.' })
-    }
     if ((form.track_batches || form.track_serials) && !form.track_stock && form.type === 'standard') {
       ctx.addIssue({ code: 'custom', path: ['track_stock'], message: 'Batch or serial tracking requires stock tracking.' })
     }
@@ -62,8 +60,7 @@ export function toFormValues(product?: Product): ProductFormValues {
   if (!product) {
     return {
       name: '', description: '', type: 'standard', category_id: null, brand_id: null, unit_id: '', tax_rate_id: null,
-      track_stock: true, track_batches: false, track_serials: false, max_discount_percent: '', is_active: true,
-      has_variants: false, options: [], variants: [emptyVariant()],
+      track_stock: true, track_batches: false, track_serials: false, max_discount_percent: '', is_active: true, variants: [emptyVariant()],
     }
   }
 
@@ -80,61 +77,16 @@ export function toFormValues(product?: Product): ProductFormValues {
     track_serials: product.track_serials,
     max_discount_percent: product.max_discount_percent ?? '',
     is_active: product.is_active,
-    has_variants: !!product.options?.length,
-    options: (product.options ?? []).map((o) => ({ name: o.name, values: o.values.join(', ') })),
-    variants: product.variants.map((v) => ({
-      id: v.id,
-      sku: v.sku,
-      name: v.name ?? '',
-      option_values: { ...v.option_values },
-      purchase_price: v.purchase_price ?? '',
-      selling_price: v.selling_price,
-      wholesale_price: v.wholesale_price ?? '',
-      reorder_level: v.reorder_level.replace(/\.?0+$/, '') || '0',
-      barcodes: v.barcodes.join(', '),
-      is_active: v.is_active,
-    })),
+    variants: [],
   }
-}
-
-function comboKey(values: Record<string, string>): string {
-  return JSON.stringify(Object.keys(values).sort().map((k) => [k.toLowerCase(), (values[k] ?? '').toLowerCase()]))
 }
 
 /**
- * Cartesian product of the option values. Rows that already exist for a combination are kept
- * (with their id, SKU, prices and barcodes); new combinations copy prices from the first row.
+ * The POST/PUT /products body. `current` (editing): the product as last loaded — its options and
+ * variants are sent unchanged, since the variant grid saves those (PUT /products/{id}/variants).
  */
-export function generateVariants(options: ProductFormValues['options'], existing: VariantFormValues[]): VariantFormValues[] {
-  const parsed = options.map((o) => ({ name: o.name.trim(), values: splitList(o.values) })).filter((o) => o.name && o.values.length)
-  if (parsed.length === 0) return existing.length ? existing.slice(0, 1).map((v) => ({ ...v, option_values: {} })) : [emptyVariant()]
-
-  let combos: Record<string, string>[] = [{}]
-  for (const option of parsed) {
-    combos = combos.flatMap((combo) => option.values.map((value) => ({ ...combo, [option.name]: value })))
-  }
-
-  const byCombo = new Map(existing.map((v) => [comboKey(v.option_values), v]))
-  const template = existing[0]
-
-  return combos.map((combo) => {
-    const match = byCombo.get(comboKey(combo))
-    if (match) return { ...match, option_values: combo }
-    return {
-      ...emptyVariant(combo),
-      purchase_price: template?.purchase_price ?? '',
-      selling_price: template?.selling_price ?? '',
-      wholesale_price: template?.wholesale_price ?? '',
-      reorder_level: template?.reorder_level ?? '',
-    }
-  })
-}
-
-export function toProductInput(form: ProductFormValues): ProductInput {
-  const options = form.has_variants ? form.options.map((o) => ({ name: o.name.trim(), values: splitList(o.values) })) : null
-  const variants = form.has_variants ? form.variants : form.variants.slice(0, 1)
-
-  return {
+export function toProductInput(form: ProductFormValues, current?: Product): ProductInput {
+  const details = {
     name: form.name.trim(),
     description: form.description.trim() || null,
     type: form.type,
@@ -147,12 +99,34 @@ export function toProductInput(form: ProductFormValues): ProductInput {
     track_serials: form.type === 'standard' && form.track_serials,
     max_discount_percent: form.max_discount_percent || null,
     is_active: form.is_active,
-    options,
-    variants: variants.map((v) => ({
-      ...(v.id ? { id: v.id } : {}),
+  }
+
+  if (current) {
+    return {
+      ...details,
+      options: current.options?.length ? current.options : null,
+      variants: current.variants.map((v) => ({
+        id: v.id,
+        sku: v.sku,
+        name: v.name,
+        option_values: v.option_values,
+        purchase_price: v.purchase_price ?? '0',
+        selling_price: v.selling_price,
+        wholesale_price: v.wholesale_price,
+        reorder_level: v.reorder_level,
+        barcodes: v.barcodes,
+        is_active: v.is_active,
+      })),
+    }
+  }
+
+  return {
+    ...details,
+    options: null,
+    variants: form.variants.slice(0, 1).map((v) => ({
       sku: v.sku.trim() || null,
       name: v.name.trim() || null,
-      option_values: options ? v.option_values : {},
+      option_values: {},
       purchase_price: v.purchase_price,
       selling_price: v.selling_price,
       wholesale_price: v.wholesale_price || null,

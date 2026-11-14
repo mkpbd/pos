@@ -125,7 +125,7 @@ function PageSettings({ document, content, locales, onCommand }: Pick<InspectorP
   const published = document.published
   const sections = content.sections.length
   const kind = document.kind ?? 'page'
-  const info = kindInfo({ kind, key: document.key ?? '' })
+  const info = kindInfo({ kind, key: document.key ?? '', target: document.target })
   const heading = kind === 'header' ? 'Header' : kind === 'footer' ? 'Footer' : kind === 'zone' ? 'Area' : 'Page'
   const cms = (document.key ?? '').startsWith('cms:')
   return (
@@ -183,7 +183,12 @@ function PageSettings({ document, content, locales, onCommand }: Pick<InspectorP
       )}
       <div className="flex flex-col gap-2 rounded-md border p-3">
         <h3 className="text-sm font-semibold">Site styles</h3>
-        <p className="text-sm text-muted-foreground">Colours, fonts, text sizes and buttons for the whole store. Changes show here at once and go live when you publish them.</p>
+        <p className="text-sm text-muted-foreground">
+          {kind === 'zone' && (document.key ?? '').startsWith('zone:product.')
+            ? 'Colours, fonts and buttons for the whole store, and the product page layout: photos left or right, small photos, a buy box that stays in view, tabs or sections for the details.'
+            : 'Colours, fonts, text sizes, buttons and the product page layout for the whole store.'}{' '}
+          Changes show here at once and go live when you publish them.
+        </p>
         <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => onCommand({ type: 'open-site-styles' })}>
           <PaletteIcon data-icon="inline-start" /> Site styles
         </Button>

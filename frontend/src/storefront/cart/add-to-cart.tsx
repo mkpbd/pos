@@ -1,64 +1,82 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { Loader2Icon, ShoppingCartIcon, SlidersHorizontalIcon } from 'lucide-react'
+import { Loader2Icon, ShoppingCartIcon, SlidersHorizontalIcon, ZapIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { primaryButtonClass } from '../account/form-controls'
 import { useLocale } from '../i18n/locale'
 import type { ProductCard, ProductDetail, ProductVariant } from '../types'
+import { NotifyMeForm } from '../catalog/notify-me'
 import { useAddToCartMutation } from './api'
+import { prefetchCheckout, useBuyBox, type BuyBox } from './buy-box'
 import { useCartDrawer } from './cart-drawer-context'
-import { cartErrorMessage, maxQuantityHint } from './quantity'
+import { cartErrorMessage } from './quantity'
 import { QuantityStepper } from './quantity-stepper'
 
+/** P1b "Buy now": the theme's primary pair (its own AA foreground), set apart from the accent "Add to cart". */
+export const buyNowButtonClass =
+  'inline-flex items-center justify-center gap-2 rounded-sf-button border-2 border-sf-primary bg-sf-primary px-6 py-3 text-sm font-bold text-sf-primary-foreground transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-accent disabled:cursor-not-allowed disabled:opacity-60'
+
 /**
- * Quantity + "Add to cart" on the product page and in quick view. Disabled until a variant is
- * chosen and while it is out of stock; a stock error narrows the stepper to what is left.
- * Success opens the mini-cart. Remount per variant (key) so the limit does not carry over.
+ * Quantity + "Add to cart" in quick view and the builder's product spotlight, with its own buy
+ * state. Disabled until a variant is chosen and while it is out of stock; a stock error narrows the
+ * stepper to what is left. Success opens the mini-cart.
  */
 export function AddToCartForm({ product, variant, onAdded }: { product: ProductDetail; variant: ProductVariant | null; onAdded?: () => void }) {
-  const add = useAddToCartMutation()
-  const drawer = useCartDrawer()
+  const box = useBuyBox(product, variant, { onAdded })
+  return <BuyForm product={product} variant={variant} box={box} />
+}
+
+/**
+ * The buy form over a shared buy state (the product page shares it with its quick-buy bar). With
+ * `buyNow` (P1b, the product page) a "Buy now" button adds the line and goes straight to the
+ * checkout; it is disabled like "Add to cart" and gone for a sold-out variant, where a live product
+ * offers the back-in-stock e-mail (P1a) instead.
+ */
+export function BuyForm({ product, variant, box, buyNow = false }: { product: ProductDetail; variant: ProductVariant | null; box: BuyBox; buyNow?: boolean }) {
   const { t } = useLocale()
-  const [quantity, setQuantity] = useState('1')
-  const [max, setMax] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const allowDecimal = product.allow_decimal ?? false
-  const unavailable = !variant || !variant.in_stock
-  const reason = !variant ? t('cart.add.chooseOptionsFirst') : !variant.in_stock ? t('cart.add.optionOutOfStock') : null
+
+  // P1a: a sold-out variant of a live product offers a back-in-stock e-mail instead (previews keep the disabled button).
+  if (variant && !variant.in_stock && !product.preview_state) return <NotifyMeForm product={product} variant={variant} />
 
   const submit = (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!variant || unavailable || add.isPending) return
-    const button = event.nativeEvent.submitter instanceof HTMLElement ? event.nativeEvent.submitter : null
-    setError(null)
-    add.mutate(
-      { variant_id: variant.id, quantity },
-      {
-        onSuccess: () => {
-          setMax(null)
-          onAdded?.()
-          drawer?.open(button)
-        },
-        onError: (e) => {
-          setError(cartErrorMessage(e, t))
-          const hint = maxQuantityHint(e)
-          if (hint && hint !== '0') setMax(hint)
-        },
-      },
-    )
+    box.addToCart('form', event.nativeEvent.submitter instanceof HTMLElement ? event.nativeEvent.submitter : null)
   }
+  const error = box.errorFor('form')
+  const adding = box.pending('cart', 'form')
+  const buying = box.pending('buy', 'form')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2" aria-label={t('cart.add.formLabel')} data-testid="add-to-cart">
       <div className="flex flex-wrap items-center gap-3">
-        <QuantityStepper value={quantity} onChange={setQuantity} allowDecimal={allowDecimal} max={max} disabled={unavailable || add.isPending} label={t('cart.add.quantityOf', { name: product.name })} />
+        <QuantityStepper value={box.quantity} onChange={box.setQuantity} allowDecimal={box.allowDecimal} max={box.max} disabled={box.unavailable || box.busy} label={t('cart.add.quantityOf', { name: product.name })} />
         {/* Not disabled while adding: a disabled button would lose focus, which returns to it from the mini-cart. */}
-        <button type="submit" className={cn(primaryButtonClass, 'min-w-44 flex-1 sm:flex-none')} disabled={unavailable} aria-disabled={add.isPending || undefined}>
-          {add.isPending ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
-          {add.isPending ? t('cart.add.adding') : t('cart.add.button')}
+        <button
+          type="submit"
+          className={cn(primaryButtonClass, buyNow ? 'min-w-0 flex-1 basis-32 px-4 sm:px-6' : 'min-w-44 flex-1 sm:flex-none')}
+          disabled={box.unavailable}
+          aria-disabled={box.busy || undefined}
+        >
+          {adding ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
+          {adding ? t('cart.add.adding') : t('cart.add.button')}
         </button>
+        {buyNow && !box.soldOut && (
+          <button
+            type="button"
+            className={cn(buyNowButtonClass, 'min-w-0 flex-1 basis-full px-4 sm:basis-40 sm:px-6')}
+            disabled={box.unavailable}
+            aria-disabled={box.busy || undefined}
+            onClick={(event) => box.buyNow('form', event.currentTarget)}
+            onPointerEnter={prefetchCheckout}
+            onFocus={prefetchCheckout}
+            data-testid="buy-now"
+          >
+            {buying ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ZapIcon aria-hidden className="size-4" />}
+            {buying ? t('cart.add.buying') : t('cart.add.buyNow')}
+          </button>
+        )}
       </div>
-      {reason && <p className="text-sm">{reason}</p>}
+      {box.reason && <p className="text-sm">{box.reason}</p>}
       {error && (
         <p role="alert" className="text-sm font-medium text-sf-sale">
           {error}
