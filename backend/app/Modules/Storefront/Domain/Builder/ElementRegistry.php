@@ -47,6 +47,22 @@ final class ElementRegistry
     /** B8b: the form builder element (pages, content pages, shop areas and popups). */
     public const B8B = ['form'];
 
+    /** P2a: the one-product order form of landing pages (pages, content pages and shop areas). */
+    public const P2A = ['order_form'];
+
+    /** P2a: whether the order form asks for an e-mail address / a note. */
+    public const ORDER_FORM_EMAIL = ['hidden', 'optional', 'required'];
+
+    public const ORDER_FORM_NOTE = ['hidden', 'optional'];
+
+    /** P2a: `cod_only` — cash on delivery only; `store_methods` — the store's enabled methods. */
+    public const ORDER_FORM_PAYMENT = ['cod_only', 'store_methods'];
+
+    /** P2a: the order form's preselected quantity and its largest quantity. */
+    public const ORDER_FORM_QUANTITY_DEFAULT = [1, 10];
+
+    public const ORDER_FORM_QUANTITY_MAX = [1, 20];
+
     /**
      * B4: the document contexts an element can be placed in: home / landing pages, CMS pages
      * (`cms:<uuid>`), the store header and footer, and the shop / product zones. B8b: popups and
@@ -97,6 +113,8 @@ final class ElementRegistry
         'countdown', 'discount', 'promo_card', 'menu', 'faq_list', 'category_card', 'product_spotlight', 'shop_the_look',
         // B8a.
         'comparison_table', 'flash_sale_bar', 'bundle', 'review_wall', 'store_hours',
+        // P2a.
+        'order_form',
     ];
 
     /**
@@ -428,6 +446,8 @@ final class ElementRegistry
         'store_hours' => ['title' => 80, 'note' => 200],
         // B8b (fields: LIST_TRANSLATABLE, options: NESTED_LIST_TRANSLATABLE).
         'form' => ['title' => 120, 'text' => 400, 'submit_label' => 30, 'success_message' => 300, 'consent.text' => 300],
+        // P2a (`upsell.label` is a nested prop, see TRANSLATION_PATHS).
+        'order_form' => ['title' => 120, 'text' => 400, 'button_label' => 60, 'success_message' => 400, 'upsell.label' => 120],
     ];
 
     /** Translatable fields stored in a nested prop (dot keys in `translations`): field => [prop, key]. */
@@ -439,6 +459,8 @@ final class ElementRegistry
         'photo_grid' => ['profile.label' => ['profile', 'label']],
         // B8b.
         'form' => ['consent.text' => ['consent', 'text']],
+        // P2a.
+        'order_form' => ['upsell.label' => ['upsell', 'label']],
     ];
 
     public const HEADING_LEVELS = [1, 6];
@@ -470,7 +492,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A];
     }
 
     public static function exists(mixed $type): bool
@@ -484,6 +506,7 @@ final class ElementRegistry
     public static function sectionType(string $type): ?SectionType
     {
         return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true) || in_array($type, self::B8B, true)
+            || in_array($type, self::P2A, true)
             ? null
             : SectionType::tryFrom($type);
     }
@@ -545,7 +568,7 @@ final class ElementRegistry
             'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
             'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
-            'pricing_table', 'comparison_table', 'bundle' => 'commerce',
+            'pricing_table', 'comparison_table', 'bundle', 'order_form' => 'commerce',
             'logo', 'menu', 'account_link', 'wishlist_link', 'cart_icon', 'language_switch', 'announcement',
             'social_icons', 'payment_icons', 'contact_block', 'copyright' => 'site',
             default => 'marketing',
@@ -614,6 +637,7 @@ final class ElementRegistry
             'store_hours' => 'Store hours',
             'progress_bars' => 'Progress bars',
             'form' => 'Form',
+            'order_form' => 'Order form',
             default => SectionType::from($type)->label(),
         };
     }
@@ -1089,6 +1113,20 @@ final class ElementRegistry
                 'notify_email' => null,
                 'layout' => 'stacked',
             ],
+            // P2a: a one-product order form; the product is chosen in the editor's setup dialog.
+            'order_form' => [
+                'product_id' => null,
+                'title' => 'Order now',
+                'text' => '',
+                'show_variants' => true,
+                'quantity' => ['default' => 1, 'max' => 10],
+                'fields' => ['email' => 'optional', 'note' => 'optional'],
+                'payment' => 'cod_only',
+                'button_label' => 'Confirm order',
+                'success_message' => 'Thank you! Your order has been placed. We will call you soon to confirm it.',
+                'upsell' => null,
+                'layout' => 'stacked',
+            ],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
     }
@@ -1189,6 +1227,11 @@ final class ElementRegistry
                 'form_max_length' => ['min' => self::FORM_MAX_LENGTH[0], 'max' => self::FORM_MAX_LENGTH[1], 'defaults' => self::FORM_DEFAULT_MAX_LENGTH],
                 'form_number' => ['max_abs' => self::FORM_NUMBER_BOUND, 'decimals' => 2],
                 'popup' => PopupSettings::limits(),
+                // P2a.
+                'order_form_quantity' => [
+                    'default' => ['min' => self::ORDER_FORM_QUANTITY_DEFAULT[0], 'max' => self::ORDER_FORM_QUANTITY_DEFAULT[1]],
+                    'max' => ['min' => self::ORDER_FORM_QUANTITY_MAX[0], 'max' => self::ORDER_FORM_QUANTITY_MAX[1]],
+                ],
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
             'data_when' => ['chart' => 'data_source!=manual'],
@@ -1290,6 +1333,10 @@ final class ElementRegistry
                 'popup_devices' => PopupSettings::DEVICES,
                 'popup_audiences' => PopupSettings::AUDIENCES,
                 'popup_never_on' => PopupSettings::NEVER_ON,
+                // P2a.
+                'order_form_email' => self::ORDER_FORM_EMAIL,
+                'order_form_note' => self::ORDER_FORM_NOTE,
+                'order_form_payment' => self::ORDER_FORM_PAYMENT,
             ],
             // B8b: the settings a new popup starts with.
             'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),

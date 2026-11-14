@@ -26,6 +26,15 @@ interface ShippingRates
     public function methodForDistrict(string $methodId, int $districtId): ?array;
 
     /**
+     * P2a: every active delivery method of the active zones (request's language) and, per
+     * district a zone covers, the ids of its methods in display order — the order form's
+     * district → delivery method hints (the checkout preview stays authoritative).
+     *
+     * @return array{methods: list<ShippingOption>, districts: array<string, list<string>>}
+     */
+    public function districtMethods(): array;
+
+    /**
      * P1b: the product page's delivery note — one entry per active zone that covers at least one
      * district and has an active method, in zone order (Domain\DeliveryOverview: method name when
      * the zone has one, fastest / slowest days, the fee and free-over threshold when its methods

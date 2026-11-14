@@ -9,9 +9,11 @@ use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Actions\PlaceOrder;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
+use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\BangladeshMobile;
+use App\Modules\Shared\Domain\CampaignAttribution;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
@@ -112,6 +114,9 @@ class StoreCheckoutController
      * Errors: `CART_EMPTY`, `CART_HAS_ISSUES` (details.cart), `CHECKOUT_UNAVAILABLE`,
      * `SHIPPING_UNAVAILABLE`, `PAYMENT_METHOD_UNAVAILABLE`, `INSUFFICIENT_STOCK`,
      * `GUEST_CHECKOUT_DISABLED`, `TOTAL_CHANGED` (409), field errors.
+     *
+     * P2a: `attribution` (optional) — the campaign the shopper came from (UTM parameters,
+     * short link, first landing path, referrer host); sanitized and stored on the order.
      */
     public function place(Request $request, PlaceOrder $place, OrderPresenter $presenter): JsonResponse
     {
@@ -145,6 +150,8 @@ class StoreCheckoutController
             'payment_method' => ['required', 'string', Rule::in(['cod', 'bank_transfer'])],
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
             'expected_total' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
+            // P2a: campaign attribution (sanitized; invalid parts dropped, never an error).
+            'attribution' => ['sometimes', 'nullable'],
         ], [
             'contact.phone.regex' => 'Enter a Bangladeshi mobile number, e.g. 01712345678.',
             'address.phone.regex' => 'Enter a Bangladeshi mobile number, e.g. 01712345678.',
@@ -155,6 +162,8 @@ class StoreCheckoutController
         $data['contact'] = array_map('trim', $data['contact']);
         $data['save_address'] = $request->boolean('save_address');
         $data['notes'] = filled($data['notes'] ?? null) ? trim($data['notes']) : null;
+        $data['attribution'] = CampaignAttribution::sanitize($data['attribution'] ?? null);
+        $data['source'] = Order::SOURCE_STOREFRONT;
         foreach (['recipient_name', 'area', 'address_line', 'postcode'] as $key) {
             if (isset($data['address'][$key]) && is_string($data['address'][$key])) {
                 $data['address'][$key] = trim($data['address'][$key]) === '' ? null : trim($data['address'][$key]);

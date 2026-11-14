@@ -8,7 +8,8 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 const BUILDER_CANVAS_PATH = '/admin/builder-canvas'
 
 /** Paths served by Laravel (proxied in development), never by either SPA. */
-const BACKEND_PATHS = ['/api', '/sanctum', '/storage']
+// P2a: `/go/<code>` short links (302 to the campaign page); P2b: `/feeds/<channel>/<token>.xml|csv` product feeds.
+const BACKEND_PATHS = ['/api', '/sanctum', '/storage', '/go', '/feeds']
 
 /**
  * Two apps (plus the builder canvas), one dev server — mirrors the production routing (ADR-007):

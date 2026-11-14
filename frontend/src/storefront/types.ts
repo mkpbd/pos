@@ -1,6 +1,7 @@
 /** GET /api/v1/store/bootstrap — see backend Storefront\Application\Queries\StorefrontBootstrap. */
 
 import type { BootstrapBuilder, BuilderPage, ProductZoneKey } from './builder/types'
+import type { Attribution } from './landing/attribution'
 
 /**
  * B4: products per row on shop, category, brand and search listings. Desktop ≥ 1024 px, tablet
@@ -152,6 +153,14 @@ export type StorefrontBootstrap = {
     default_locale?: string
     /** E12b: Bengali digits for amounts and numbers in Bangla. */
     bangla_digits?: boolean
+    /** P2b: the share bar on product, campaign and blog pages; absent = on. */
+    share_buttons?: boolean
+    /** P2b: the store's WhatsApp number for wa.me — the international number in digits, no "+" ("8801712345678"); null = none. */
+    whatsapp_number?: string | null
+    /** P2b: "Order on WhatsApp" on product pages. Effective: false without a number; absent = off. */
+    whatsapp_order_button?: boolean
+    /** P2b: the floating WhatsApp chat button on every store page. Effective: false without a number; absent = off. */
+    whatsapp_chat_button?: boolean
   }
   /** E12b: the language this payload was resolved in (`?lang=`, else the store default). */
   locale?: string
@@ -162,6 +171,8 @@ export type StorefrontBootstrap = {
   popup?: StorePopup | null
   /** Store builder (B1): `home` = a published builder front page replaces the homepage sections; absent = false. */
   builder?: BootstrapBuilder
+  /** P2a: the requesting host's entry page (`/p/eid-sale`): its `/` shows that page; null / absent = the front page. */
+  entry_path?: string | null
 }
 
 /** GET /api/v1/store/homepage — see backend Storefront\Application\Queries\StorefrontHomepage. */
@@ -691,6 +702,8 @@ export type PlaceOrderInput = {
   payment_method: PaymentMethodCode
   notes?: string
   expected_total: string
+  /** P2a: the visitor's last campaign touch (UTM / short link) of the past 30 days. */
+  attribution?: Attribution
 }
 
 /** The pricing part of the place body; the preview tolerates partial input. */

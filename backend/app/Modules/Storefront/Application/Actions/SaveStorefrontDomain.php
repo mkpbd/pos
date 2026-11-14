@@ -15,7 +15,7 @@ class SaveStorefrontDomain
     public function __construct(private readonly AuditTrail $audit) {}
 
     /**
-     * @param  array{host?: string, is_primary?: bool}  $attributes
+     * @param  array{host?: string, is_primary?: bool, entry_path?: ?string}  $attributes
      */
     public function __invoke(StorefrontDomain $domain, array $attributes): StorefrontDomain
     {
@@ -40,6 +40,7 @@ class SaveStorefrontDomain
             $this->audit->record($creating ? 'storefront.domain_added' : 'storefront.domain_updated', $domain, new: [
                 'host' => $domain->host,
                 'is_primary' => $domain->is_primary,
+                'entry_path' => $domain->entry_path,
             ]);
 
             return $domain;

@@ -5,12 +5,8 @@ import { toast } from 'sonner'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useCan } from '@/features/auth/use-auth'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
-import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
 import { documentPath, useCreateDocumentMutation, useDeleteDocumentMutation, useDocumentsQuery, type DocumentSummary } from '../api'
 import { isProductZone, parseZoneKey } from '../document-kind'
@@ -20,7 +16,8 @@ import { ListingColumnsCard } from './listing-columns-card'
 import { PopupsCard } from './popups-card'
 import { ProductZonesCard } from './product-zones-card'
 import type { ScreenLang } from './messages'
-import { lastEdited, slugify, slugProblemKey } from './page-helpers'
+import { NewLandingDialog } from './new-landing-dialog'
+import { lastEdited } from './page-helpers'
 import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
 import { rememberScreenLang, ScreenLangContext, storedScreenLang, useScreenText } from './screen-language'
 import { LanguageToggle, ScreenConfirm } from './screen-ui'
@@ -38,6 +35,7 @@ import { StartGuide } from './start-guide'
  * B7: English / বাংলা for this screen (remembered in the browser), a state-aware 3-step guide on
  * top, the looks with a preview, live demos and "use and publish now", and plain wording.
  * B8b: Popups & bars (list, on / off, new from a template, delete).
+ * P2a: a new campaign page may start from a landing page template (new-landing-dialog.tsx).
  */
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
@@ -62,101 +60,6 @@ function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; c
         </Button>
       )}
     </ListRow>
-  )
-}
-
-function NewLandingDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { t, lang } = useScreenText()
-  const create = useCreateDocumentMutation()
-  const navigate = useNavigate()
-  const [title, setTitle] = useState('')
-  const [slug, setSlug] = useState('')
-  const [slugTouched, setSlugTouched] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const effectiveSlug = slugTouched ? slug : slugify(title)
-  const titleProblem = title.trim() ? null : t('landing.titleProblem')
-  const slugKey = slugProblemKey(effectiveSlug)
-  const slugError = slugKey ? t(slugKey) : null
-  const serverError = create.error instanceof ApiError ? create.error : null
-
-  const close = (next: boolean) => {
-    if (!next) {
-      setTitle('')
-      setSlug('')
-      setSlugTouched(false)
-      setSubmitted(false)
-      create.reset()
-    }
-    onOpenChange(next)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={close}>
-      <DialogContent lang={lang}>
-        <DialogHeader>
-          <DialogTitle>{t('landing.new')}</DialogTitle>
-          <DialogDescription>{t('landing.dialogText')}</DialogDescription>
-        </DialogHeader>
-        <form
-          id="new-landing"
-          className="flex flex-col gap-4"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault()
-            setSubmitted(true)
-            if (titleProblem || slugError) return
-            create.mutate(
-              { kind: 'page', key: `landing:${effectiveSlug}`, title: title.trim(), from: 'blank' },
-              {
-                onSuccess: (created) => {
-                  toast.success(t('landing.created'))
-                  close(false)
-                  void navigate(`/storefront/builder/${created.id}`)
-                },
-              },
-            )
-          }}
-        >
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="landing-title">{t('landing.titleLabel')}</Label>
-            <Input id="landing-title" value={title} maxLength={160} onChange={(e) => setTitle(e.target.value)} aria-invalid={submitted && !!titleProblem} placeholder={t('landing.titlePlaceholder')} />
-            {submitted && titleProblem && <p className="text-sm text-destructive">{titleProblem}</p>}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="landing-slug">{t('landing.addressLabel')}</Label>
-            <Input
-              id="landing-slug"
-              value={effectiveSlug}
-              maxLength={60}
-              onChange={(e) => {
-                setSlugTouched(true)
-                setSlug(e.target.value.toLowerCase())
-              }}
-              aria-invalid={submitted && !!slugError}
-              aria-describedby="landing-slug-preview"
-            />
-            <p id="landing-slug-preview" className="text-sm text-muted-foreground">
-              {t('landing.addressHelp')} <span className="font-mono text-foreground">/p/{effectiveSlug || '…'}</span>
-            </p>
-            {(submitted || slugTouched) && slugError && <p className="text-sm text-destructive">{slugError}</p>}
-          </div>
-          {serverError && (
-            <p role="alert" className="text-sm text-destructive">
-              {serverError.code === 'DOCUMENT_EXISTS' ? t('landing.exists') : serverError.message}
-            </p>
-          )}
-        </form>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => close(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button type="submit" form="new-landing" disabled={create.isPending}>
-            {create.isPending && <Loader2Icon className="animate-spin" aria-hidden />}
-            {t('landing.create')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 

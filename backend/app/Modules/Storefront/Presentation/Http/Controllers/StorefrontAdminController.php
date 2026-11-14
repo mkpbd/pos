@@ -40,10 +40,19 @@ class StorefrontAdminController
      * E12b languages: `bangla_enabled` (default true), `default_locale` `en|bn` (must be
      * enabled: Bangla off + default `bn` -> 422 on `default_locale`), `bangla_digits` (default
      * false: Bengali digits for amounts and numbers when reading in Bangla).
+     * P2b: `share_buttons` (default true: the share bar on product, campaign and blog pages);
+     * `whatsapp_number` — "01712345678", "+8801712345678", "8801712345678" or any "+<8–15 digits>",
+     * stored as digits without "+" ("8801712345678"); null or "" clears it; anything else → 422
+     * `whatsapp_number`. `whatsapp_order_button` / `whatsapp_chat_button` (default true) only show
+     * while a number is set.
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save): JsonResponse
     {
         $data = $request->validate([
+            'share_buttons' => ['sometimes', 'boolean'],
+            'whatsapp_number' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'whatsapp_order_button' => ['sometimes', 'boolean'],
+            'whatsapp_chat_button' => ['sometimes', 'boolean'],
             'is_enabled' => ['sometimes', 'boolean'],
             'site_name' => ['sometimes', 'required', 'string', 'max:120'],
             'meta_description' => ['sometimes', 'nullable', 'string', 'max:300'],
@@ -75,19 +84,48 @@ class StorefrontAdminController
         $data = $request->validate([
             'host' => ['required', 'string', 'max:253', 'regex:'.self::HOST_PATTERN, Rule::unique('storefront_domains', 'host')],
             'is_primary' => ['sometimes', 'boolean'],
+            'entry_path' => $this->entryPathRules(),
         ], ['host.regex' => 'Enter a host name such as shop.example.com (no http://, port or path).']);
 
         return ApiResponse::created(StorefrontPresenter::domain($save(new StorefrontDomain, $data)));
     }
 
     /**
-     * Make a domain primary
+     * Change a domain
+     *
+     * `{is_primary?: true}` makes it the primary domain; P2a: `{entry_path?: null | "/p/eid-sale"}`
+     * — the page the address opens on (a store path; null = the home page). At least one of them.
      */
     public function updateDomain(Request $request, StorefrontDomain $domain, SaveStorefrontDomain $save): JsonResponse
     {
-        $data = $request->validate(['is_primary' => ['required', 'accepted']]);
+        $data = $request->validate([
+            'is_primary' => [$request->exists('entry_path') ? 'sometimes' : 'required', 'accepted'],
+            'entry_path' => $this->entryPathRules(),
+        ]);
+        $attributes = [];
+        if (isset($data['is_primary'])) {
+            $attributes['is_primary'] = (bool) $data['is_primary'];
+        }
+        if (array_key_exists('entry_path', $data)) {
+            $attributes['entry_path'] = $data['entry_path'];
+        }
 
-        return ApiResponse::success(StorefrontPresenter::domain($save($domain, ['is_primary' => (bool) $data['is_primary']])));
+        return ApiResponse::success(StorefrontPresenter::domain($save($domain, $attributes)));
+    }
+
+    /**
+     * P2a: an entry page — null, or a store path ("/p/eid-sale"): starts with one "/", not "/"
+     * itself, no query, fragment, spaces or backslashes, at most 255 characters.
+     *
+     * @return list<mixed>
+     */
+    private function entryPathRules(): array
+    {
+        return ['sometimes', 'nullable', 'string', 'max:255', 'regex:#^/(?!/)[^\s?\#\\\\]+$#', function (string $attribute, mixed $value, \Closure $fail) {
+            if (is_string($value) && (rtrim($value, '/') === '' || preg_match('#^/(api|go|admin|sanctum|storage)(/|$)#', $value) === 1)) {
+                $fail('Choose a page of your store, such as /p/eid-sale.');
+            }
+        }];
     }
 
     public function destroyDomain(StorefrontDomain $domain, DeleteStorefrontDomain $delete): JsonResponse

@@ -1,0 +1,306 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "A special offer for you",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আপনার জন্য বিশেষ অফার"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Leave your name and phone number — we will call you with the details of this offer.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>আপনার নাম ও ফোন নম্বর দিন — এই অফারের বিস্তারিত জানাতে আমরা আপনাকে ফোন করব।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "theme:primary",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "theme:accent",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "boxed",
+                "anchor": "offer"
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "icon_list",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "i1",
+                                        "icon": "check",
+                                        "text": "Personal advice by phone",
+                                        "link": null
+                                    },
+                                    {
+                                        "id": "i2",
+                                        "icon": "check",
+                                        "text": "No obligation to buy",
+                                        "link": null
+                                    },
+                                    {
+                                        "id": "i3",
+                                        "icon": "check",
+                                        "text": "Your number is only used to call you about this offer",
+                                        "link": null
+                                    }
+                                ],
+                                "layout": "vertical"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.i1.text": "ফোনে ব্যক্তিগত পরামর্শ",
+                                    "items.i2.text": "কেনার কোনো বাধ্যবাধকতা নেই",
+                                    "items.i3.text": "আপনার নম্বর শুধু এই অফারের জন্য ফোন করতে ব্যবহার হবে"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "form",
+                            "props": {
+                                "title": "Call me back",
+                                "text": "",
+                                "fields": [
+                                    {
+                                        "id": "f_name",
+                                        "kind": "text",
+                                        "label": "Your name",
+                                        "placeholder": "",
+                                        "help": "",
+                                        "required": true,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": null,
+                                        "reply_to": false
+                                    },
+                                    {
+                                        "id": "f_phone",
+                                        "kind": "phone",
+                                        "label": "Mobile number",
+                                        "placeholder": "01XXXXXXXXX",
+                                        "help": "",
+                                        "required": true,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": null,
+                                        "reply_to": false
+                                    },
+                                    {
+                                        "id": "f_district",
+                                        "kind": "text",
+                                        "label": "District",
+                                        "placeholder": "",
+                                        "help": "",
+                                        "required": false,
+                                        "options": [],
+                                        "min": null,
+                                        "max": null,
+                                        "max_length": null,
+                                        "reply_to": false
+                                    }
+                                ],
+                                "submit_label": "Call me",
+                                "success_message": "Thank you! We will call you soon.",
+                                "consent": null,
+                                "notify_email": null,
+                                "layout": "stacked"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আমাকে ফোন করুন",
+                                    "submit_label": "ফোন করুন",
+                                    "success_message": "ধন্যবাদ! আমরা শিগগিরই আপনাকে ফোন করব।",
+                                    "fields.f_name.label": "আপনার নাম",
+                                    "fields.f_phone.label": "মোবাইল নম্বর",
+                                    "fields.f_district.label": "জেলা"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_5",
+                            "type": "trust_badges",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "i1",
+                                        "icon": "truck",
+                                        "title": "Delivery across Bangladesh",
+                                        "text": "At your door in 2–5 days"
+                                    },
+                                    {
+                                        "id": "i2",
+                                        "icon": "shield-check",
+                                        "title": "Cash on delivery",
+                                        "text": "Pay when it arrives"
+                                    },
+                                    {
+                                        "id": "i3",
+                                        "icon": "rotate-ccw",
+                                        "title": "Easy exchange",
+                                        "text": "Within 7 days"
+                                    }
+                                ],
+                                "style": "row"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.i1.title": "সারা বাংলাদেশে ডেলিভারি",
+                                    "items.i1.text": "২–৫ দিনের মধ্যে আপনার দরজায়",
+                                    "items.i2.title": "ক্যাশ অন ডেলিভারি",
+                                    "items.i2.text": "পণ্য হাতে পেয়ে টাকা দিন",
+                                    "items.i3.title": "সহজ এক্সচেঞ্জ",
+                                    "items.i3.text": "৭ দিনের মধ্যে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

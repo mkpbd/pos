@@ -21,6 +21,37 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### P2b — Social media: share buttons, WhatsApp, product feeds, Facebook & Instagram posting
+
+#### Added
+- **Share bar** on product pages, campaign pages and blog posts: the phone's own share sheet on touch screens, otherwise Facebook, Messenger (phones), WhatsApp, X, Pinterest and Copy link; shared links are tagged (`utm_source=<network>`, `copy_link`, `native_share`; `utm_medium=share`) so campaign stats count them. Better link previews (`twitter:card`, campaign page `og:image` / `og:description`, image alt texts).
+- **WhatsApp:** store number in *Online store → Settings*; **Order on WhatsApp** on the product page (prefilled product, option, quantity, price and link in the shopper's language) and an optional floating chat button that never covers the quick-buy bar, popups or the footer.
+- **Product feeds** for the Facebook/Instagram Shop (Meta), TikTok and Pinterest (*Marketing → Product feeds*): one item per live variant, XML and CSV, Bangla variant, private rotatable addresses, step-by-step "where to paste this".
+- **Facebook & Instagram posting** (*Marketing → Social posts*, new `Social` module): practice (sandbox) mode out of the box, live mode with a Meta app (Facebook Login, encrypted tokens, `appsecret_proof`, the secret never in a URL); posts from a product with photos, caption suggestions (AI when on, ready-made otherwise; English or Bangla), a tracked short link per network, post now / schedule / draft, per-network results with retry of failed networks only.
+- Permissions `social.view`, `social.manage`. Demo: Little Sprouts is connected in practice mode with feeds on, two posts and one scheduled.
+
+#### Upgrade
+- `php artisan migrate`; `php artisan pos:permissions:sync`; demo stores created earlier: `php artisan db:seed --class=DemoSocialSeeder`; keep the scheduler (`social:publish-due` every minute) and a queue worker running. For live posting add `<APP_URL>/api/v1/social/meta/callback` to the Meta app's redirect URIs and enter the app id and secret in *Marketing → Social posts*. Instagram needs product photos at a public https address.
+
+#### Tests
+- Backend 1148 on PostgreSQL (1147 pass, 1 opt-in skip), Pint clean; vitest 1804; mocked Playwright `storefront-social.spec.ts`, `social-admin.spec.ts`; full-stack integration 24 + demo stores 16 (+1 P2b: practice post to Facebook + Instagram with short links, a rejected post, the Meta feed with BDT prices and a rotated address that stops at once, Order on WhatsApp and the share bar) + builder acceptance 5.
+
+### P2a — Landing pages: one-product order page, campaign tracking, short links, campaign domains
+
+#### Added
+- **One-product order page:** builder element *Order form* — variant, quantity, optional add-on, name, mobile number (Bangla digits accepted), division/district/area, full address, delivery method, live total (shipping + COD fee) and *Confirm order*; placed through the new **direct checkout** (same place-order transaction as the cart checkout, idempotent, server-recomputed totals with a "new total" confirmation, the shopper's cart untouched, no coupons). Thank-you view with the order link; a sticky *Order now* button on phones.
+- **Landing templates** (single-product order page, Eid sale, new arrival, lead form) and *New campaign page* in the Page builder (template, page name, address, product).
+- **Campaign tracking:** UTM tags and short-link codes remembered for 30 days and saved on orders from both checkouts (`source`, `attribution`); privacy-safe visit counts (daily salted hashes, deleted after two days, bots ignored).
+- **Marketing → Campaigns** (visits, unique visitors, orders, revenue, conversion, average order, by campaign incl. "Direct / other", by source/medium, by day chart + table, top landing pages) and **Short links** (`/go/<code>`, QR code, clicks); web orders show a *Campaign page* badge, a source filter and *Where it came from*.
+- **Campaign domains:** a store domain can open on a campaign page (*Settings & domains → Opens on*).
+- New `Marketing` module; permissions `marketing.view`, `marketing.manage`. Demo stores get `/p/order-now`, the campaign "Facebook order page", the short link `/go/fb-order`, visits and three order-form orders.
+
+#### Upgrade
+- `php artisan migrate`; `php artisan pos:permissions:sync`; for demo stores created earlier `php artisan db:seed --class=DemoLandingSeeder`; keep the scheduler running (daily `marketing:prune-visitor-hashes`). Nginx needs nothing new: `/go/*` already reaches Laravel.
+
+#### Tests
+- Backend 1118 on PostgreSQL (1117 pass, 1 opt-in skip), Pint clean; vitest 1752; mocked Playwright `storefront-landing.spec.ts`, `marketing-admin.spec.ts`, store builder; full-stack integration 24 + demo stores 15 (+1 P2a: short link → order page → COD order without a cart → counted for the campaign) + builder acceptance 5.
+
 ### P1b — Product page: buy now, quick-buy bar, delivery note, richer gallery, designable layout, more to sell
 
 #### Added

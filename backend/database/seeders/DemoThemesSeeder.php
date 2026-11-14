@@ -87,7 +87,10 @@ use RuntimeException;
  * adjustment), checkout, promotions, content, theme, delivered orders of three shoppers per
  * store whose approved reviews show on the products, and one cash sale at the shop counter
  * (popularity — "best sellers" — counts completed POS sales). P1b: answered shopper questions
- * and "frequently bought together" scores (DemoProductPageSeeder).
+ * and "frequently bought together" scores (DemoProductPageSeeder). P2a: a Facebook campaign with
+ * a one-product order page, a short link, visits and three attributed orders (DemoLandingSeeder).
+ * P2b: Little Sprouts in social sandbox mode — "Demo Page" connected, product feeds on, two
+ * published posts and one scheduled (DemoSocialSeeder).
  *
  * Sale prices: the variant's selling price is the catalog's sale price and its compare-at
  * price the regular one (struck through, "−N %", on-sale sources). The flash sale is an
@@ -197,6 +200,12 @@ class DemoThemesSeeder extends Seeder
             app()->call([new RefreshProductStats(app(TenantContext::class)->requireOrganization()), 'handle']);
             // P1b: answered shopper questions and "frequently bought together" from the orders and the counter sale.
             DemoProductPageSeeder::apply($this->data, $this->adminId);
+            // P2a: a Facebook campaign with an order page, a short link, visits and attributed orders.
+            DemoLandingSeeder::apply($this->data);
+            // P2b: Little Sprouts gets the sandbox Facebook Page, posts and product feeds.
+            if ($this->key === DemoSocialSeeder::STORE) {
+                DemoSocialSeeder::apply($this->data, $this->adminId);
+            }
         });
     }
 

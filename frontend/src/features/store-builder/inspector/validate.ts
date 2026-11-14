@@ -23,6 +23,9 @@ import {
   b6PropProblems,
   b8aPropProblems,
   ENUMS,
+  ORDER_FORM_LIMITS,
+  ORDER_FORM_TEXT_LIMITS,
+  orderFormPropProblems,
   isUuid,
   normalizeColor,
   normalizeSectionShape,
@@ -87,10 +90,13 @@ export const B8A_TYPES: ReadonlySet<string> = new Set(B8A_TYPE_LIST)
 /** B8b element types (contract §2). */
 export const B8B_TYPES: ReadonlySet<string> = new Set(['form'])
 
+/** P2a element types: the one-product order form. */
+export const P2A_TYPES: ReadonlySet<string> = new Set(['order_form'])
+
 /** B6 / B8a props that are not translated although they have a text limit (a person's name isn't). */
 const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'], team: ['members.*.name'] }
 
-const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form } as Record<string, Record<string, number>>
+const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form, order_form: ORDER_FORM_TEXT_LIMITS } as Record<string, Record<string, number>>
 
 /**
  * Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable).
@@ -509,7 +515,37 @@ function validateB8b(node: Element, add: (path: string, message: string) => void
   for (const problem of b8bPropProblems(node.type, node.props, context)) add(`props.${problem.path}`, b8bMessage(node.type, problem))
 }
 
+/** P2a: the order form's messages. */
+export function orderFormMessage(problem: PropProblem): string {
+  const { path, code } = problem
+  const { quantityDefault, quantityMax } = ORDER_FORM_LIMITS
+  switch (path) {
+    case 'product_id':
+      return 'Choose the product this form sells.'
+    case 'quantity.default':
+      return `Use a whole number from ${quantityDefault.min} to ${quantityDefault.max}.`
+    case 'quantity.max':
+      return `Use a whole number from ${quantityMax.min} to ${quantityMax.max}, not below the starting quantity.`
+    case 'upsell.product_id':
+      return code === 'duplicate' ? 'Choose another product than the one the form sells.' : 'Choose the add-on product.'
+  }
+  if (code === 'required') {
+    if (path === 'button_label') return 'Enter the button text.'
+    if (path === 'success_message') return 'Enter the thank-you message.'
+    if (path === 'upsell.label') return 'Enter the text next to the tick box.'
+  }
+  if (code === 'too_long') {
+    const max = (ORDER_FORM_TEXT_LIMITS as Record<string, number>)[path]
+    return max ? `At most ${max} characters.` : 'This is too long.'
+  }
+  return 'Choose one of the options.'
+}
+
 function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[], context?: DocumentContext) {
+  if (P2A_TYPES.has(node.type)) {
+    for (const problem of orderFormPropProblems(node.props)) add(`props.${problem.path}`, orderFormMessage(problem))
+    return
+  }
   if (B8B_TYPES.has(node.type)) return validateB8b(node, add, context)
   if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)
   if (B6_TYPES.has(node.type)) return validateB6(node, add)

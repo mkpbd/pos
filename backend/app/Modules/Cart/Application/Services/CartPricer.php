@@ -70,12 +70,31 @@ class CartPricer
      */
     public function quote(?Cart $cart, ?string $email = null, string|false|null $coupon = false): array
     {
-        $items = $cart === null ? [] : $cart->items()->orderBy('created_at')->orderBy('id')->get()->all();
+        $items = $cart === null ? [] : array_map(fn (CartItem $i) => [
+            'id' => $i->id,
+            'variant_id' => $i->variant_id,
+            'quantity' => (string) $i->quantity,
+        ], $cart->items()->orderBy('created_at')->orderBy('id')->get()->all());
+        $couponCode = $coupon === false ? $cart?->coupon_code : $coupon;
+
+        return $this->quoteItems($items, $cart?->customer_id, $email, $couponCode, $cart?->id);
+    }
+
+    /**
+     * P2a: the same pricing for lines that are not in a cart (a landing page's order form): each
+     * `{id, variant_id, quantity}` in the given order, priced exactly like cart lines (live
+     * catalog data, stock at the fulfilment store, promotions, tax) — the cart path reuses it.
+     *
+     * @param  list<array{id: string, variant_id: string, quantity: string}>  $items
+     * @return array{cart: array<string, mixed>, lines: list<array<string, mixed>>, tax_mode: TaxMode, promotions: PromotionQuote}
+     */
+    public function quoteItems(array $items, ?string $customerId, ?string $email, ?string $couponCode, ?string $cartId = null): array
+    {
         $organization = $this->organizations->summary($this->tenant->requireOrganization()) ?? [];
         $currency = (string) ($organization['base_currency'] ?? config('pos.default_currency'));
         $taxMode = TaxMode::tryFrom((string) ($organization['tax_mode'] ?? '')) ?? TaxMode::Exclusive;
 
-        $variants = $this->catalog->variantsForCart(array_map(fn (CartItem $i) => $i->variant_id, $items));
+        $variants = $this->catalog->variantsForCart(array_values(array_unique(array_column($items, 'variant_id'))));
 
         $lines = [];
         $calc = [];
@@ -83,8 +102,8 @@ class CartPricer
         $issues = [];
         $itemCount = '0';
         foreach ($items as $i => $item) {
-            $variant = $variants[$item->variant_id] ?? null;
-            $quantity = Decimal::round((string) $item->quantity, 3);
+            $variant = $variants[$item['variant_id']] ?? null;
+            $quantity = Decimal::round((string) $item['quantity'], 3);
             $purchasable = $variant !== null && $variant['purchasable'];
             $inStock = $variant !== null && $variant['in_stock'];
             $max = $variant['max_quantity'] ?? null;
@@ -119,8 +138,8 @@ class CartPricer
             }
 
             $lines[$i] = [
-                'id' => $item->id,
-                'variant_id' => $item->variant_id,
+                'id' => $item['id'],
+                'variant_id' => $item['variant_id'],
                 'product' => [
                     'id' => $variant['product_id'] ?? null,
                     'slug' => $variant['product_slug'] ?? null,
@@ -145,8 +164,7 @@ class CartPricer
             ];
         }
 
-        $couponCode = $coupon === false ? $cart?->coupon_code : $coupon;
-        $promotions = $this->promotions->price($promoLines, $couponCode, $cart?->customer_id, $email, $currency);
+        $promotions = $this->promotions->price($promoLines, $couponCode, $customerId, $email, $currency);
         foreach (array_keys($calc) as $i) {
             $discount = Discount::amount($promotions->lineDiscount($i));
             $calc[$i]['discount'] = $discount->isZero() ? null : $discount;
@@ -163,7 +181,7 @@ class CartPricer
             $lines[$i]['discount_amount'] = $lineDiscount;
             $lines[$i]['promotion'] = $promotions->linePromotion($i);
 
-            $variant = $variants[$items[$i]->variant_id];
+            $variant = $variants[$items[$i]['variant_id']];
             $counted[] = [
                 'variant_id' => $variant['variant_id'],
                 'product_id' => $variant['product_id'],
@@ -187,7 +205,7 @@ class CartPricer
         }
 
         $view = [
-            'id' => $lines === [] ? null : $cart?->id,
+            'id' => $lines === [] ? null : $cartId,
             'items' => array_values($lines),
             'item_count' => CartRules::display($itemCount),
             'subtotal' => $totals['subtotal'],

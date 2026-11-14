@@ -11,8 +11,10 @@ use App\Modules\Products\Infrastructure\Models\ProductVariant;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoCatalogSeeder;
 use Database\Seeders\DemoCheckoutSeeder;
+use Database\Seeders\DemoLandingSeeder;
 use Database\Seeders\DemoProductPageSeeder;
 use Database\Seeders\DemoPromotionsSeeder;
+use Database\Seeders\DemoSocialSeeder;
 use Database\Seeders\DemoStockSeeder;
 use Database\Seeders\DemoThemesSeeder;
 use Database\Seeders\DemoVariantsSeeder;
@@ -44,6 +46,8 @@ class DemoThemesSeederTest extends TestCase
         parent::setUp();
         Storage::fake('public');
         Storage::fake((string) config('media.disk'));
+        // P2b: generated product feeds.
+        Storage::fake('local');
         Notification::fake();
         config(['pos.checkout_rate_limit' => 1000]);
     }
@@ -97,6 +101,29 @@ class DemoThemesSeederTest extends TestCase
         $this->assertSame('automatic', $together['frequently_bought_source']);
         $this->assertSame(['oat-milk', 'plant-protein'], collect($together['frequently_bought'])->pluck('slug')->sort()->values()->all());
         $this->assertSame('automatic', $this->getJson('http://kids.shop.localhost/api/v1/store/products/cotton-bodysuit/related')->json('data.frequently_bought_source'));
+
+        // P2a: a Facebook campaign per store — the order page, its short link, visits and three attributed orders.
+        $this->assertSame(4, DB::table('campaigns')->count());
+        $this->assertSame(12, DB::table('orders')->where('source', 'landing_page')->count());
+        $this->assertSame([12, 12, 12, 12], DB::table('short_links')->where('code', DemoLandingSeeder::CODE)->pluck('clicks')->map(fn ($c) => (int) $c)->all());
+        $this->assertSame(48, (int) DB::table('campaign_daily_stats')->sum('visits'));
+        $page = $this->getJson('http://kids.shop.localhost/api/v1/store/builder/pages/'.DemoLandingSeeder::SLUG)->assertOk()->json('data');
+        $this->assertNotEmpty(array_filter($page['data'], fn ($d) => isset($d['product'], $d['payment_methods'])), 'The order page shows its order form.');
+        $this->get('http://kids.shop.localhost/go/'.DemoLandingSeeder::CODE, ['User-Agent' => 'Mozilla/5.0 Chrome/131'])->assertRedirect();
+        $this->seed(DemoLandingSeeder::class);
+        $this->assertSame(4, DB::table('campaigns')->count(), 'DemoLandingSeeder skips stores that already have a campaign.');
+        $this->assertSame(12, DB::table('orders')->where('source', 'landing_page')->count());
+
+        // P2b: Little Sprouts in social sandbox mode — Demo Page connected, three feeds on, two posts out and one scheduled.
+        $sprouts = DB::table('storefront_domains')->where('host', 'kids.shop.localhost')->value('organization_id');
+        $this->assertSame(['sandbox'], DB::table('social_settings')->pluck('mode')->all());
+        $account = DB::table('social_accounts')->first();
+        $this->assertSame([$sprouts, 'Demo Page', 'demo_shop', true], [$account->organization_id, $account->page_name, $account->instagram_username, (bool) $account->sandbox]);
+        $this->assertSame(3, DB::table('product_feeds')->where('organization_id', $sprouts)->where('enabled', true)->where('item_count', '>', 0)->count());
+        $this->assertSame(['published' => 2, 'scheduled' => 1], DB::table('social_posts')->selectRaw('status, count(*) as n')->groupBy('status')->orderBy('status')->pluck('n', 'status')->map(fn ($n) => (int) $n)->all());
+        $this->assertSame(0, DB::table('social_post_results')->where('status', '!=', 'published')->whereIn('post_id', DB::table('social_posts')->where('status', 'published')->pluck('id'))->count());
+        $this->seed(DemoSocialSeeder::class);
+        $this->assertSame(3, DB::table('social_posts')->count(), 'DemoSocialSeeder skips a store that already has social settings.');
 
         // The gallery lists the four stores in configured order.
         config(['storefront.demo_gallery' => true]);

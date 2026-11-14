@@ -25,6 +25,15 @@ interface MediaLibrary
     public function refs(array $ids): array;
 
     /**
+     * P2b: the original files of media items (current organization; unknown ids absent), keyed
+     * by id — what a social network downloads: the original's URL, type, size in pixels and alt.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{id: string, url: string, mime_type: string, width: int, height: int, alt: ?string}>
+     */
+    public function originals(array $ids): array;
+
+    /**
      * A small rendition (the narrowest at least $minWidth wide, else the original) as a
      * `data:` URI, for documents rendered without network access (PDF letterhead, X1).
      * Null when unknown, unreadable or larger than $maxBytes.

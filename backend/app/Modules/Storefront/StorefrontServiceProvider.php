@@ -5,15 +5,19 @@ namespace App\Modules\Storefront;
 use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Contracts\PageDesigns;
 use App\Modules\Cms\Application\Contracts\PageReferences;
+use App\Modules\Marketing\Application\Contracts\LandingPages;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Media\Application\Contracts\MediaReferences;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductPageZones;
+use App\Modules\Orders\Application\Contracts\OrderForms;
 use App\Modules\Shared\Application\Contracts\DocumentLetterhead;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Application\Builder\BuilderLandingPages;
 use App\Modules\Storefront\Application\Builder\BuilderProductZones;
+use App\Modules\Storefront\Application\Builder\PublishedOrderForms;
 use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
 use App\Modules\Storefront\Application\Events\FormSubmitted;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
@@ -58,6 +62,9 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         // B5: the built-in templates are files read once per process (the same for every organization).
         $this->app->singleton(BuilderTemplateLibrary::class);
         $this->app->tag([MenuBlogReferences::class, SectionBlogReferences::class, BuilderBlogReferences::class], BlogReferences::TAG);
+        // P2a: landing page order forms (declared by Orders) and landing pages (declared by Marketing).
+        $this->app->bind(OrderForms::class, PublishedOrderForms::class);
+        $this->app->bind(LandingPages::class, BuilderLandingPages::class);
     }
 
     public function boot(): void

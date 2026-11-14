@@ -110,6 +110,12 @@ class StorefrontBootstrap
                 'locales' => $settings->bangla_enabled ? LocaleContext::SUPPORTED : [LocaleContext::EN],
                 'default_locale' => $settings->bangla_enabled ? $settings->default_locale : LocaleContext::EN,
                 'bangla_digits' => $settings->bangla_enabled && $settings->bangla_digits,
+                // P2b: the share bar; WhatsApp (wa.me/<number>) — the button flags are effective
+                // (false while no number is set), so the storefront checks only the flag.
+                'share_buttons' => (bool) ($settings->share_buttons ?? true),
+                'whatsapp_number' => $settings->whatsapp_number,
+                'whatsapp_order_button' => $settings->showsWhatsAppOrderButton(),
+                'whatsapp_chat_button' => $settings->showsWhatsAppChatButton(),
             ],
             // E12b: the language of this payload (and of the page the shell serves).
             'locale' => $locale,

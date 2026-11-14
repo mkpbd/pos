@@ -35,8 +35,10 @@ class SendOrderCancelledNotifications
             $view = $this->presenter->storefront($order);
             $siteUrl = rtrim($event->siteUrl, '/');
 
-            Notification::route('mail', $order->contact_email)
-                ->notify(new OrderCancellationConfirmation($this->storefront->settings()->site_name, $view, $siteUrl.'/account/orders/'.$order->number));
+            if ($order->contact_email !== null) {
+                Notification::route('mail', $order->contact_email)
+                    ->notify(new OrderCancellationConfirmation($this->storefront->settings()->site_name, $view, $siteUrl.'/account/orders/'.$order->number));
+            }
 
             $recipients = $this->users->withPermission($event->organizationId, 'web_orders.view');
             if ($recipients->isNotEmpty()) {

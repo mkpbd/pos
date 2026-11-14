@@ -13,6 +13,7 @@ use App\Modules\Expenses\ExpensesServiceProvider;
 use App\Modules\Geography\GeographyServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Loyalty\LoyaltyServiceProvider;
+use App\Modules\Marketing\MarketingServiceProvider;
 use App\Modules\Media\MediaServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\OnlineCatalog\OnlineCatalogServiceProvider;
@@ -28,6 +29,7 @@ use App\Modules\Reports\ReportsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Shipping\ShippingServiceProvider;
+use App\Modules\Social\SocialServiceProvider;
 use App\Modules\Storefront\StorefrontServiceProvider;
 use App\Modules\Suppliers\SuppliersServiceProvider;
 use App\Modules\System\SystemServiceProvider;
@@ -71,6 +73,10 @@ return [
     ReportsServiceProvider::class,
     // Phase 8: optional AI module (reads through the Reports registry; off unless AI_ENABLED).
     AIServiceProvider::class,
+    // P2a: campaigns, short links (/go/<code>, registered before the storefront catch-all) and visits.
+    MarketingServiceProvider::class,
+    // P2b: Facebook & Instagram posting and catalog feeds (/feeds/*, before the storefront catch-all).
+    SocialServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

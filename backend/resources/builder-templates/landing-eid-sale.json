@@ -1,0 +1,412 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Eid sale is on",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ঈদ সেল চলছে"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Special Eid prices for a few days only. Order today and get it before Eid.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>মাত্র কয়েক দিনের জন্য ঈদের বিশেষ দাম। আজই অর্ডার করুন, ঈদের আগেই পেয়ে যান।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "theme:primary",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "theme:accent",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "flash_sale_bar",
+                            "props": {
+                                "promotion_id": null,
+                                "title": "Offer ends in",
+                                "text": "",
+                                "show_products": false,
+                                "product_limit": 4,
+                                "style": "card",
+                                "button": {
+                                    "label": "Order now",
+                                    "url": "/shop"
+                                }
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "অফার শেষ হতে বাকি",
+                                    "button.label": "এখনই অর্ডার করুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_4",
+                            "type": "discount",
+                            "props": {
+                                "promotion_ref": "coupon",
+                                "title": "Extra Eid discount",
+                                "text": "Use this code at checkout.",
+                                "show_code": true,
+                                "button_label": "Shop now",
+                                "link": {
+                                    "url": "/shop"
+                                }
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ঈদের বাড়তি ছাড়",
+                                    "text": "চেকআউটে এই কোডটি ব্যবহার করুন।",
+                                    "button_label": "কেনাকাটা করুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_4",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_5",
+                            "type": "product_spotlight",
+                            "props": {
+                                "product_ref": {
+                                    "source": "landing",
+                                    "index": 0
+                                },
+                                "layout": "image-left",
+                                "show_description": true,
+                                "badge": "Eid special"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "badge": "ঈদ স্পেশাল"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_5",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_5",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_6",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "More Eid offers",
+                                "subtitle": null,
+                                "config": {
+                                    "source": "on_sale",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "columns": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আরও ঈদ অফার"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "s_6",
+            "type": "section",
+            "props": {
+                "layout": "boxed",
+                "anchor": "order"
+            },
+            "columns": [
+                {
+                    "id": "c_6",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_7",
+                            "type": "order_form",
+                            "props": {
+                                "product_ref": {
+                                    "source": "landing",
+                                    "index": 0
+                                },
+                                "title": "Order before Eid",
+                                "text": "Cash on delivery all over Bangladesh.",
+                                "show_variants": true,
+                                "quantity": {
+                                    "default": 1,
+                                    "max": 10
+                                },
+                                "fields": {
+                                    "email": "optional",
+                                    "note": "optional"
+                                },
+                                "payment": "cod_only",
+                                "button_label": "Confirm order",
+                                "success_message": "Thank you! Your order has been placed. We will call you soon to confirm it.",
+                                "upsell": null,
+                                "layout": "stacked"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ঈদের আগেই অর্ডার করুন",
+                                    "text": "সারা বাংলাদেশে ক্যাশ অন ডেলিভারি।",
+                                    "button_label": "অর্ডার নিশ্চিত করুন",
+                                    "success_message": "ধন্যবাদ! আপনার অর্ডারটি নেওয়া হয়েছে। নিশ্চিত করতে আমরা শিগগিরই আপনাকে ফোন করব।"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_7",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_7",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_8",
+                            "type": "trust_badges",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "i1",
+                                        "icon": "truck",
+                                        "title": "Delivery across Bangladesh",
+                                        "text": "At your door in 2–5 days"
+                                    },
+                                    {
+                                        "id": "i2",
+                                        "icon": "shield-check",
+                                        "title": "Cash on delivery",
+                                        "text": "Pay when it arrives"
+                                    },
+                                    {
+                                        "id": "i3",
+                                        "icon": "rotate-ccw",
+                                        "title": "Easy exchange",
+                                        "text": "Within 7 days"
+                                    }
+                                ],
+                                "style": "row"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.i1.title": "সারা বাংলাদেশে ডেলিভারি",
+                                    "items.i1.text": "২–৫ দিনের মধ্যে আপনার দরজায়",
+                                    "items.i2.title": "ক্যাশ অন ডেলিভারি",
+                                    "items.i2.text": "পণ্য হাতে পেয়ে টাকা দিন",
+                                    "items.i3.title": "সহজ এক্সচেঞ্জ",
+                                    "items.i3.text": "৭ দিনের মধ্যে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

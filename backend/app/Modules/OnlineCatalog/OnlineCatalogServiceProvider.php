@@ -4,6 +4,7 @@ namespace App\Modules\OnlineCatalog;
 
 use App\Modules\Inventory\Application\Events\StockBecameAvailable;
 use App\Modules\Media\Application\Contracts\MediaReferences;
+use App\Modules\OnlineCatalog\Application\Contracts\CatalogFeed;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductPageZones;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductQuestionCounts;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
@@ -16,6 +17,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Console\RefreshProductStatsCommand;
 use App\Modules\OnlineCatalog\Infrastructure\ListingMediaReferences;
 use App\Modules\OnlineCatalog\Infrastructure\ListingVariantWebData;
 use App\Modules\OnlineCatalog\Infrastructure\Notifications\NotifyBackInStock;
+use App\Modules\OnlineCatalog\Infrastructure\ReadModelCatalogFeed;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModelStorefrontCatalog;
 use App\Modules\Products\Application\Contracts\VariantWebData;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
@@ -35,6 +37,8 @@ class OnlineCatalogServiceProvider extends ModuleServiceProvider
     public function register(): void
     {
         $this->app->bind(StorefrontCatalog::class, ReadModelStorefrontCatalog::class);
+        // P2b: product feeds for Meta, TikTok and Pinterest catalogs (Social).
+        $this->app->bind(CatalogFeed::class, ReadModelCatalogFeed::class);
         $this->app->tag([ListingMediaReferences::class], MediaReferences::TAG);
         // Replaced by the Reviews module when it is installed.
         $this->app->bindIf(ProductRatings::class, NoProductRatings::class);

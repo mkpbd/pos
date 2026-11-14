@@ -72,7 +72,7 @@ describe('page builder: pages list', () => {
     renderRoutes(routes, '/storefront/pages')
     await user.click(await screen.findByRole('button', { name: 'New campaign page' }))
     const dialog = await screen.findByRole('dialog', { name: 'New campaign page' })
-    await user.type(within(dialog).getByLabelText('Title'), 'Eid Sale 2026!')
+    await user.type(within(dialog).getByLabelText('Page name'), 'Eid Sale 2026!')
     expect(within(dialog).getByText('/p/eid-sale-2026')).toBeInTheDocument()
 
     const address = within(dialog).getByLabelText('Address')

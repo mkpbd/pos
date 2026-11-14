@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
 import { HomeRedirect } from '@/app/home-redirect'
 import { ContentRedirect } from '@/app/content-redirect'
+import { MarketingRedirect } from '@/app/marketing-redirect'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { NotFoundPage, RouteError } from '@/app/route-error'
 import { LoadingState } from '@/components/common/state-views'
@@ -123,6 +124,11 @@ const pages = {
   storefrontShipping: page(() => import('@/features/shipping/pages/shipping-page'), 'ShippingPage'),
   storefrontCouriers: page(() => import('@/features/shipping/pages/couriers-page'), 'CouriersPage'),
   storefrontPayments: page(() => import('@/features/online-payments/pages/payment-methods-page'), 'PaymentMethodsPage'),
+  campaigns: page(() => import('@/features/marketing/pages/campaigns-page'), 'CampaignsPage'),
+  campaign: page(() => import('@/features/marketing/pages/campaigns-page'), 'CampaignPage'),
+  shortLinks: page(() => import('@/features/marketing/pages/short-links-page'), 'ShortLinksPage'),
+  socialPosts: page(() => import('@/features/marketing/pages/social-page'), 'SocialPage'),
+  productFeeds: page(() => import('@/features/marketing/pages/feeds-page'), 'ProductFeedsPage'),
 }
 
 /** Landed cost vouchers (SC3): creating, editing and posting. Mirrors LANDED_COST_PERMISSIONS.manage. */
@@ -192,6 +198,14 @@ export const routes: RouteObject[] = [
               // Viewers see the same page read-only; write actions need promotions.manage.
               guarded('promotions.view', 'promotions/:promotionId', pages.promotion),
               // Moderators and viewers share the page; approve / reject / delete need reviews.moderate.
+              // P2a: campaigns, their results and short links; changes need marketing.manage (checked on the page and by the API).
+              { path: 'marketing', element: <MarketingRedirect /> },
+              guarded('marketing.view', 'marketing/campaigns', pages.campaigns),
+              guarded('marketing.view', 'marketing/campaigns/:campaignId', pages.campaign),
+              guarded('marketing.view', 'marketing/short-links', pages.shortLinks),
+              // P2b: Facebook & Instagram posting and product feeds; changes need social.manage (page and API).
+              guarded('social.view', 'marketing/social', pages.socialPosts),
+              guarded('social.view', 'marketing/feeds', pages.productFeeds),
               guarded('reviews.view', 'reviews', pages.reviews),
               // P1b: shoppers' questions; answering, rejecting and deleting need reviews.moderate (bell link ?status=pending).
               guarded('reviews.view', 'reviews/questions', pages.productQuestions),

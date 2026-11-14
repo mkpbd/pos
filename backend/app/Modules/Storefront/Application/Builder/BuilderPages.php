@@ -4,7 +4,11 @@ namespace App\Modules\Storefront\Application\Builder;
 
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\PlainText;
 use App\Modules\Storefront\Application\Queries\ContentSchedule;
+use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
+use App\Modules\Storefront\Domain\Builder\ElementRegistry;
+use App\Modules\Storefront\Domain\Builder\StyleSchema;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -219,6 +223,56 @@ class BuilderPages
         }
 
         return $query->value('title');
+    }
+
+    /**
+     * P2b: share card data of a landing page the shell may serve (published, or any existing one
+     * for a staff draft preview): its title, the first text element as a plain-text excerpt
+     * (≤ 160 characters, null without one) and the first image of the page (image elements,
+     * galleries, section backgrounds… in document order) with its alt text — from the same render
+     * payload shoppers get (the published one is cached).
+     *
+     * @return array{title: string, description: ?string, image_url: ?string, image_alt: ?string}|null
+     */
+    public function landingMeta(string $slug, bool $draft): ?array
+    {
+        $title = $this->landingTitle($slug, $draft);
+        if ($title === null) {
+            return null;
+        }
+        $key = self::key($slug);
+        $payload = $draft ? $this->draft($key) : $this->published($key);
+        $media = (array) ($payload['media'] ?? []);
+        $description = null;
+        $image = null;
+        BuilderDocumentSchema::walk(['sections' => $payload['sections'] ?? []], function (array $node) use ($media, &$description, &$image) {
+            $type = $node['type'] ?? null;
+            $ids = [...StyleSchema::mediaIds(is_array($node['style'] ?? null) ? $node['style'] : [])];
+            if (is_string($type) && $type !== 'section' && $type !== 'column') {
+                array_push($ids, ...ElementRegistry::mediaIds($type, is_array($node['props'] ?? null) ? $node['props'] : []));
+            }
+            foreach ($ids as $id) {
+                $ref = $media[$id] ?? null;
+                if ($image === null && is_array($ref) && is_string($ref['url'] ?? null)) {
+                    $image = $ref;
+                    // An image element's own alt text wins over the library's.
+                    $own = $type === 'image' ? ($node['props']['alt'] ?? null) : null;
+                    if (is_string($own) && trim($own) !== '') {
+                        $image['alt'] = trim($own);
+                    }
+                }
+            }
+            if ($description === null && $type === 'text' && is_string($node['props']['html'] ?? null)) {
+                $description = PlainText::excerpt($node['props']['html'], 160);
+            }
+        });
+
+        return [
+            'title' => $title,
+            'description' => $description,
+            'image_url' => $image['url'] ?? null,
+            'image_alt' => is_string($image['alt'] ?? null) && $image['alt'] !== '' ? $image['alt'] : ($image === null ? null : $title),
+        ];
     }
 
     /**

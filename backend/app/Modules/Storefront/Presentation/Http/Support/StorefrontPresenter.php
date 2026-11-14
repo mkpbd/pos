@@ -33,6 +33,11 @@ final class StorefrontPresenter
             'bangla_enabled' => $s->bangla_enabled,
             'default_locale' => $s->default_locale,
             'bangla_digits' => $s->bangla_digits,
+            // P2b: share bar and WhatsApp.
+            'share_buttons' => $s->share_buttons,
+            'whatsapp_number' => $s->whatsapp_number,
+            'whatsapp_order_button' => $s->whatsapp_order_button,
+            'whatsapp_chat_button' => $s->whatsapp_chat_button,
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }
@@ -46,6 +51,8 @@ final class StorefrontPresenter
             'id' => $d->id,
             'host' => $d->host,
             'is_primary' => $d->is_primary,
+            // P2a: the page this address opens on (null = the home page).
+            'entry_path' => $d->entry_path,
             'created_at' => $d->created_at?->toIso8601String(),
         ];
     }

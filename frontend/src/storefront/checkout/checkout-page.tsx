@@ -26,6 +26,7 @@ import { changedPreview, placementProblem, type PlacementProblem } from './place
 import { checkoutSchema, formFieldFor, initialCheckoutValues, NEW_ADDRESS, toPlaceInput, toPreviewInput, type CheckoutValues, type GeoIdLookup } from './schema'
 import { SummaryLines, SummaryTotals } from './summary-totals'
 import { useDebouncedValue } from './use-debounced-value'
+import { readAttribution } from '../landing/attribution'
 
 /** How long the form must be still before the summary is recomputed. */
 export const PREVIEW_DEBOUNCE_MS = 250
@@ -204,6 +205,9 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       setProblem(null)
       const signedIn = customer !== null
       const input = toPlaceInput(values, current.total, { signedIn, geoId })
+      // P2a: the campaign that brought the shopper (last touch of the past 30 days).
+      const attribution = readAttribution()
+      if (attribution) input.attribution = attribution
       const idempotencyKey = attempts.keyFor(input)
       place.mutate(
         { input, idempotencyKey },

@@ -41,6 +41,11 @@ use Illuminate\Http\Response;
  *
  * B3: `?preview=draft` from staff of the store (storefront.view) inlines the bootstrap with the
  * draft theme (`theme_source: "draft"`); such pages are `no-store` and noindex.
+ *
+ * P2b: share cards — `twitter:card` (`summary_large_image` with an image, else `summary`),
+ * `twitter:title|description|image(:alt)` on every page, `og:image:alt` with the image (product
+ * name, post title, the landing image's alt text); campaign pages (`/p/<slug>`) get the first
+ * image of the page and its first text as `og:image` / `og:description`.
  */
 class StorefrontShellController
 {
@@ -99,10 +104,16 @@ class StorefrontShellController
         $builderPreview = false;
         if (preg_match('#^/p/([a-z0-9-]{2,60})$#', $path, $m) === 1) {
             $builderPreview = $draftPreview;
-            $title = $builder->landingTitle($m[1], $builderPreview);
-            if ($title !== null) {
+            // P2b: share cards — the page's first image and first text.
+            $landing = $builder->landingMeta($m[1], $builderPreview);
+            if ($landing !== null) {
                 $status = 200;
-                $meta['title'] = $title.' | '.$store;
+                $meta = [
+                    'title' => $landing['title'].' | '.$store,
+                    'description' => $landing['description'] ?? $data['store']['description'],
+                    'image' => $ld->absolute($landing['image_url']),
+                    'image_alt' => $landing['image_alt'],
+                ];
             }
         }
         // The blog (E11): index, category pages and posts (staff may preview unpublished posts).
@@ -131,6 +142,7 @@ class StorefrontShellController
                     'title' => ($post['seo_title'] ?? $post['title']).' | '.$store,
                     'description' => $post['description'] ?? $data['store']['description'],
                     'image' => $ld->absolute($post['image_url']),
+                    'image_alt' => $post['title'],
                     'type' => 'article',
                 ];
                 $postUrl = $request->getSchemeAndHttpHost().'/blog/'.$post['slug'];
@@ -170,6 +182,8 @@ class StorefrontShellController
                 'title' => $found['title'].' | '.$store,
                 'description' => $found['description'] ?? $data['store']['description'],
                 'image' => $ld->absolute($found['image_url']),
+                // P2b: what the share card's image shows.
+                'image_alt' => $found['name'],
                 'type' => $m[1] === 'product' ? 'product' : 'website',
             ];
             if ($m[1] === 'product' && isset($found['product'])) {
@@ -257,7 +271,7 @@ class StorefrontShellController
 
     /**
      * @param  array<string, mixed>  $data
-     * @param  array{title: string, description: ?string, image?: ?string, type?: string}  $meta
+     * @param  array{title: string, description: ?string, image?: ?string, image_alt?: ?string, type?: string}  $meta
      * @param  list<array<string, mixed>>  $documents  JSON-LD
      * @param  array{current: string, others: list<string>, alternates: array<string, string>}  $languages
      */
@@ -289,6 +303,21 @@ class StorefrontShellController
         }
         if (! empty($meta['image'])) {
             $head[] = '<meta property="og:image" content="'.$e($meta['image']).'">';
+            if (! empty($meta['image_alt'])) {
+                $head[] = '<meta property="og:image:alt" content="'.$e($meta['image_alt']).'">';
+            }
+        }
+        // P2b: X (Twitter) cards — a large image card when the page has an image.
+        $head[] = '<meta name="twitter:card" content="'.(empty($meta['image']) ? 'summary' : 'summary_large_image').'">';
+        $head[] = '<meta name="twitter:title" content="'.$e($title).'">';
+        if ($description) {
+            $head[] = '<meta name="twitter:description" content="'.$e($description).'">';
+        }
+        if (! empty($meta['image'])) {
+            $head[] = '<meta name="twitter:image" content="'.$e($meta['image']).'">';
+            if (! empty($meta['image_alt'])) {
+                $head[] = '<meta name="twitter:image:alt" content="'.$e($meta['image_alt']).'">';
+            }
         }
         if ($data['theme']['favicon']) {
             $head[] = '<link rel="icon" href="'.$e($data['theme']['favicon']['url']).'">';

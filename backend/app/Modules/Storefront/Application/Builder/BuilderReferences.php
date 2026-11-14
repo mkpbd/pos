@@ -105,6 +105,8 @@ class BuilderReferences
                 'flash_sale_bar' => $use('PROMOTION_NOT_FOUND', "{$path}.props.promotion_id", $node['id'], [$props['promotion_id']]),
                 'review_wall' => $use('PRODUCT_NOT_FOUND', "{$path}.props.product_id", $node['id'], $props['source'] === 'product' ? [$props['product_id']] : []),
                 'chart' => $use('PRODUCT_NOT_FOUND', "{$path}.props.source_product_id", $node['id'], [$props['source_product_id'] ?? null]),
+                // P2a: the product the order form sells and its add-on.
+                'order_form' => $use('PRODUCT_NOT_FOUND', "{$path}.props.product_id", $node['id'], [$props['product_id'], $props['upsell']['product_id'] ?? null]),
                 default => null,
             };
             $type = ElementRegistry::sectionType($node['type']);

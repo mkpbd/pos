@@ -2,7 +2,7 @@
 
 import { isWrappedSectionType } from '@/storefront/builder/registry'
 import type { BuilderNode } from './types'
-import { B6_TYPES, B8A_TYPES } from './validate'
+import { B6_TYPES, B8A_TYPES, P2A_TYPES } from './validate'
 
 export type GroupId = 'background' | 'button-colors' | 'color' | 'typography' | 'spacing' | 'size' | 'layout' | 'border' | 'shadow' | 'effects' | 'text-effects' | 'hover' | 'motion' | 'background-video'
 
@@ -43,6 +43,8 @@ export function groupsFor(node: BuilderNode): GroupSpec[] {
 }
 
 function baseGroups(node: BuilderNode): GroupSpec[] {
+  // P2a: the order form's fields and summary follow the theme; its box can be styled.
+  if (P2A_TYPES.has(node.type)) return [{ id: 'spacing', open: true }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]
   if (B8A_TYPES.has(node.type)) {
     if (B8A_MEDIA.has(node.type)) return [{ id: 'spacing', open: true }, { id: 'size' }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]
     if (node.type === 'progress_bars') return [{ id: 'spacing', open: true }, { id: 'background' }, { id: 'border' }, { id: 'effects' }]

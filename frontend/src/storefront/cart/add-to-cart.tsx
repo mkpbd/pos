@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Loader2Icon, ShoppingCartIcon, SlidersHorizontalIcon, ZapIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -30,9 +30,22 @@ export function AddToCartForm({ product, variant, onAdded }: { product: ProductD
  * The buy form over a shared buy state (the product page shares it with its quick-buy bar). With
  * `buyNow` (P1b, the product page) a "Buy now" button adds the line and goes straight to the
  * checkout; it is disabled like "Add to cart" and gone for a sold-out variant, where a live product
- * offers the back-in-stock e-mail (P1a) instead.
+ * offers the back-in-stock e-mail (P1a) instead. `extra` (P2b "Order on WhatsApp") takes its own row
+ * under the buttons and goes with them.
  */
-export function BuyForm({ product, variant, box, buyNow = false }: { product: ProductDetail; variant: ProductVariant | null; box: BuyBox; buyNow?: boolean }) {
+export function BuyForm({
+  product,
+  variant,
+  box,
+  buyNow = false,
+  extra,
+}: {
+  product: ProductDetail
+  variant: ProductVariant | null
+  box: BuyBox
+  buyNow?: boolean
+  extra?: ReactNode
+}) {
   const { t } = useLocale()
 
   // P1a: a sold-out variant of a live product offers a back-in-stock e-mail instead (previews keep the disabled button).
@@ -75,6 +88,7 @@ export function BuyForm({ product, variant, box, buyNow = false }: { product: Pr
             {buying ? t('cart.add.buying') : t('cart.add.buyNow')}
           </button>
         )}
+        {extra}
       </div>
       {box.reason && <p className="text-sm">{box.reason}</p>}
       {error && (

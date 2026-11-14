@@ -37,8 +37,11 @@ class SendOrderPlacedNotifications
             $view = $this->presenter->storefront($order);
             $url = rtrim($event->siteUrl, '/').'/order/'.$order->number.($event->accessToken === null ? '' : '?token='.$event->accessToken);
 
-            Notification::route('mail', $order->contact_email)
-                ->notify(new OrderConfirmation($this->storefront->settings()->site_name, $view, $url, $this->organizations->summary($event->organizationId)['timezone'] ?? 'UTC'));
+            // P2a: a landing page order may have no e-mail address (phone only).
+            if ($order->contact_email !== null) {
+                Notification::route('mail', $order->contact_email)
+                    ->notify(new OrderConfirmation($this->storefront->settings()->site_name, $view, $url, $this->organizations->summary($event->organizationId)['timezone'] ?? 'UTC'));
+            }
 
             $recipients = $this->users->withPermission($event->organizationId, 'web_orders.view');
             if ($recipients->isNotEmpty()) {

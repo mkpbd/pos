@@ -62,7 +62,8 @@ export function isIconName(value: unknown): value is IconName {
 
 const h = createElement
 
-function glyph(name: string, paint: 'fill' | 'stroke', ...body: ReactNode[]): IconComponent {
+/** A single-colour glyph (`currentColor`) drawn on a 24 px grid; P2b's share and WhatsApp marks use it too. */
+export function glyph(name: string, paint: 'fill' | 'stroke', ...body: ReactNode[]): IconComponent {
   function Glyph({ size = 24, strokeWidth = 2, color = 'currentColor', absoluteStrokeWidth, ...props }: LucideProps) {
     void absoluteStrokeWidth
     return h(

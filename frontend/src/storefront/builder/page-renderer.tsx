@@ -13,6 +13,7 @@ import { isB6Type } from './elements/b6-types'
 import { B8aElementContent } from './elements/b8a'
 import { isB8aType } from './elements/b8a-types'
 import { FormElement } from './elements/form'
+import { OrderFormElement } from './elements/order-form'
 import { useMotionRuntime } from './motion'
 import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
@@ -139,6 +140,8 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
       return <InnerRow element={element} />
     case 'form':
       return <FormElement element={element} />
+    case 'order_form':
+      return <OrderFormElement element={element} />
     default:
       if (isB4Type(element.type)) return <B4ElementContent element={element} />
       if (isB6Type(element.type)) return <B6ElementContent element={element} />

@@ -85,7 +85,10 @@ class SubmitBuilderForm
         return ['submission' => $submission, 'message' => $message];
     }
 
-    private function documentLive(BuilderDocument $document): bool
+    /**
+     * Whether a document with a published version is on the store now (P2a: also used for order forms).
+     */
+    public function documentLive(BuilderDocument $document): bool
     {
         if ($document->isPopup()) {
             return $document->active && BuilderPopups::inSchedule($document->publishedVersion->content['popup'] ?? [], CarbonImmutable::now());
@@ -99,12 +102,13 @@ class SubmitBuilderForm
     }
 
     /**
-     * The form element with this id when it and every node above it are shown now.
+     * The form element with this id when it and every node above it are shown now (P2a: or an
+     * element of another `$type`, e.g. `order_form`).
      *
      * @param  array<string, mixed>  $content  a published version's content
      * @return array<string, mixed>|null
      */
-    public static function liveElement(array $content, string $elementId): ?array
+    public static function liveElement(array $content, string $elementId, string $type = 'form'): ?array
     {
         $now = CarbonImmutable::now();
         $live = function (array $node) use ($now): bool {
@@ -117,11 +121,11 @@ class SubmitBuilderForm
             return ! (is_string($starts) && CarbonImmutable::parse($starts)->gt($now))
                 && ! (is_string($ends) && CarbonImmutable::parse($ends)->lte($now));
         };
-        $search = function (array $columns) use (&$search, $live, $elementId): ?array {
+        $search = function (array $columns) use (&$search, $live, $elementId, $type): ?array {
             foreach ($columns as $column) {
                 foreach ($column['elements'] ?? [] as $element) {
                     if (($element['id'] ?? null) === $elementId) {
-                        return ($element['type'] ?? null) === 'form' && $live($element) ? $element : null;
+                        return ($element['type'] ?? null) === $type && $live($element) ? $element : null;
                     }
                     if (isset($element['columns']) && $live($element) && ($found = $search($element['columns'])) !== null) {
                         return $found;

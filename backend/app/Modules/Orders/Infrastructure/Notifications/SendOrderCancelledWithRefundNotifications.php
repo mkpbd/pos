@@ -34,6 +34,10 @@ class SendOrderCancelledWithRefundNotifications
             }
             $site = $this->storefront->primaryUrl();
             $url = $site === null || $order->customer_id === null ? null : $site.'/account/orders/'.$order->number;
+            if ($order->contact_email === null) {
+                // P2a: a landing page order placed without an e-mail address.
+                return;
+            }
 
             Notification::route('mail', $order->contact_email)->notify(new OrderCancelledWithRefundEmail(
                 $this->storefront->settings()->site_name,

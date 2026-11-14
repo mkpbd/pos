@@ -46,4 +46,13 @@ interface ProductDirectory
      * @return array{items: list<VariantInfo&array{image_url: ?string}>, total: int}
      */
     public function sellablePage(string $organizationId, array $filters, int $page, int $perPage): array;
+
+    /**
+     * P2b: product photos of the organization by id (unknown and other organizations' ids left
+     * out), keyed by id: the product, the same-origin URL (`/storage/…`) and the file's type.
+     *
+     * @param  list<string>  $imageIds
+     * @return array<string, array{id: string, product_id: string, url: string, mime_type: string}>
+     */
+    public function images(string $organizationId, array $imageIds): array;
 }

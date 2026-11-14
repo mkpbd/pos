@@ -24,6 +24,8 @@ import { RichText } from '../components/rich-text'
 import { QUESTIONS_TAB_ID, questionsTabLabel, REVIEWS_SECTION_ID, REVIEWS_TAB_ID, reviewsTabLabel } from '../reviews/display'
 import { ProductQuestions } from '../reviews/product-questions'
 import { ProductReviews, RatingSummaryLink } from '../reviews/product-reviews'
+import { ShareBar } from '../social/share-bar'
+import { WhatsAppOrderButton } from '../social/whatsapp'
 import type { ProductCard as Card, ProductDetail, ProductVariant } from '../types'
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { useDocumentMeta } from '../use-document-meta'
@@ -95,6 +97,7 @@ function ProductPageContent({ slug }: { slug: string }) {
  * bar once the buy area scrolls away, the delivery note and the `product.below_price` zone under the
  * price, questions & answers next to the reviews, "Frequently bought together" to add in one go, and
  * the `product.after` / `product.bottom` zones — each resolved by the server for this product.
+ * P2b: "Order on WhatsApp" under "Buy now" and the share bar at the end of the summary.
  */
 function ProductView({ product }: { product: ProductDetail }) {
   const [params, setParams] = useSearchParams()
@@ -239,7 +242,14 @@ function ProductView({ product }: { product: ProductDetail }) {
               belowPrice={<ProductZone zone="product.below_price" product={product} inline />}
             />
             <div ref={buyRef} className="flex flex-col gap-3 border-t pt-5" data-testid="buy-area">
-              <BuyForm key={variant?.id ?? 'none'} product={product} variant={variant} box={box} buyNow />
+              <BuyForm
+                key={variant?.id ?? 'none'}
+                product={product}
+                variant={variant}
+                box={box}
+                buyNow
+                extra={<WhatsAppOrderButton product={product} variant={variant} quantity={box.quantity} />}
+              />
               <WishlistButton product={product} name={product.name} appearance="text" />
             </div>
             {product.category?.slug && (
@@ -249,6 +259,14 @@ function ProductView({ product }: { product: ProductDetail }) {
                   {product.category.name}
                 </Link>
               </p>
+            )}
+            {/* P2b: never for a staff preview (its address is not for sharing). */}
+            {!product.preview_state && (
+              <ShareBar
+                target={{ url: product.url, title: product.name, image: product.seo.image_url ?? product.images[0]?.url ?? null }}
+                label={t('social.share.product')}
+                className={product.category?.slug ? undefined : 'border-t pt-4'}
+              />
             )}
           </div>
         </div>

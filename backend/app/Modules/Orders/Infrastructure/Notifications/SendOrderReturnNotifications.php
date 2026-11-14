@@ -55,7 +55,8 @@ class SendOrderReturnNotifications
         $this->tenant->runAs($event->organizationId, function () use ($event) {
             /** @var OrderReturn|null $return */
             $return = OrderReturn::query()->with('order')->find($event->returnId);
-            if ($return === null) {
+            if ($return === null || $return->order->contact_email === null) {
+                // P2a: a landing page order may have no e-mail address.
                 return;
             }
             $site = $this->storefront->primaryUrl();

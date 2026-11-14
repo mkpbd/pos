@@ -6,6 +6,7 @@ use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Actions\CancelOrder;
 use App\Modules\Orders\Application\Actions\CancelOwnOrder;
+use App\Modules\Orders\Application\Contracts\OrderCampaigns;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Services\ReturnPolicy;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
@@ -42,6 +43,7 @@ class OrderPresenter
         private readonly CourierDirectory $couriers,
         private readonly ReturnPolicy $returnPolicy,
         private readonly ReturnPresenter $returns,
+        private readonly OrderCampaigns $campaigns,
     ) {}
 
     /**
@@ -255,6 +257,10 @@ class OrderPresenter
             'returns' => ReturnPresenter::summaries($returns),
             'customer' => $customer === null ? null : ['id' => $customer['id'], 'name' => $customer['name'], 'code' => $customer['code']],
             'customer_account_id' => $order->customer_account_id,
+            // P2a: where it was placed and the campaign the shopper came from.
+            'source' => $order->source,
+            'attribution' => $order->attribution,
+            'campaign' => $this->campaigns->campaignsFor(['o' => $order->attribution])['o'] ?? null,
             'ip' => $order->ip,
             'user_agent' => $order->user_agent,
             'notes' => $order->notes,
@@ -432,6 +438,8 @@ class OrderPresenter
             'tracking_number' => $order->tracking_number,
             'shipment_status' => $order->shipment?->status->value,
             'delivered_at' => $order->delivered_at?->toIso8601String(),
+            // P2a: cart checkout or landing page (the campaign is added by the list endpoint).
+            'source' => $order->source,
         ];
     }
 

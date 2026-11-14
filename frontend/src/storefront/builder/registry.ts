@@ -533,7 +533,34 @@ const B8B: BaseMeta[] = [
   },
 ]
 
-const ALL: readonly DocumentContext[] = ['page', 'cms', 'header', 'footer', 'zone']
+/**
+ * P2a: the one-product order form (cash on delivery straight from a landing page). Invalid until
+ * a product is chosen; the editor's setup dialog asks for it.
+ */
+const P2A: BaseMeta[] = [
+  {
+    type: 'order_form',
+    group: 'commerce',
+    label: 'Order form',
+    translatable: ['title', 'text', 'button_label', 'success_message', 'upsell.label'],
+    props: {
+      product_id: null,
+      title: 'Order now',
+      text: '',
+      show_variants: true,
+      quantity: { default: 1, max: 10 },
+      fields: { email: 'optional', note: 'optional' },
+      payment: 'cod_only',
+      button_label: 'Confirm order',
+      success_message: 'Thank you! We will call you soon to confirm your order.',
+      upsell: null,
+      layout: 'stacked',
+    },
+    children: null,
+  },
+]
+
+const ALL: readonly DocumentContext[] =['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 /** B8b: what may sit in a popup (contract §1): simple content, offers and forms; never shop grids, sliders, charts, maps or site parts. */
 const IN_POPUP = (contexts: readonly DocumentContext[]): readonly DocumentContext[] => [...contexts, 'popup']
@@ -600,6 +627,7 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   store_hours: ['page', 'cms', 'zone', 'footer'],
   progress_bars: PAGES,
   form: IN_POPUP(PAGES),
+  order_form: PAGES,
 }
 
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
@@ -617,6 +645,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...B6,
   ...B8A,
   ...B8B,
+  ...P2A,
 ].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */

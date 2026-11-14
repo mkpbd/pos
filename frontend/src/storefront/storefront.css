@@ -340,6 +340,21 @@ header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
   .sf-quick-buy[data-state="open"] { transition: none; }
 }
 
+/*
+ * P2b floating WhatsApp chat button: the bottom corner, above the quick-buy / "Order now" bar
+ * (--sf-quick-buy-space) and a B8b bottom bar (--sf-popup-bar-bottom), clear of the home indicator;
+ * it moves with them. While it shows (<html data-sf-chat>), the store footer ends with room for
+ * it, so it never hides the footer's last links.
+ */
+.sf-whatsapp-chat {
+  bottom: calc(var(--sf-popup-bar-bottom, 0px) + var(--sf-quick-buy-space, 0px) + max(1rem, env(safe-area-inset-bottom, 0px)));
+  transition: bottom 220ms ease, filter 150ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf-whatsapp-chat { transition: none; }
+}
+:root[data-sf-chat] [data-testid="site-footer"]::after { content: ""; display: block; height: 5rem; }
+
 .b-layered { position: relative; isolation: isolate; }
 .b-layered > .b-container, .b-layered > .b-row { position: relative; z-index: 1; }
 .b-sticky { position: sticky; top: var(--b-sticky-top, 0px); z-index: 30; }

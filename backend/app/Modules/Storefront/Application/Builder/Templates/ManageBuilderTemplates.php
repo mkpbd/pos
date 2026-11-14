@@ -156,6 +156,31 @@ class ManageBuilderTemplates
     }
 
     /**
+     * P2a: a built-in page template (scope `page`, usable on pages) as the content of a new
+     * landing page (`{schema_version, sections}`, references resolved, fresh ids — not yet
+     * validated); `$productId` is the product the campaign page is made for (product
+     * references with source `landing`). Unknown or non-page template: 422 TEMPLATE_NOT_ALLOWED.
+     *
+     * @return array{content: array<string, mixed>, imported: array{media: int, banners: int, banners_reused: int}}
+     */
+    public function pageContent(string $id, ?string $productId): array
+    {
+        $template = $this->library->find($id);
+        if ($template === null || $template['scope'] !== 'page' || ! in_array('page', $template['allowed_in'], true)) {
+            throw new BusinessRuleViolation('TEMPLATE_NOT_ALLOWED', 'This template cannot be used for a campaign page.', ['template' => $id]);
+        }
+        /** @var TemplateReferences $references */
+        $references = app(TemplateReferences::class);
+        $references->useLandingProduct($productId);
+        $sections = PortableTemplate::concrete($this->library->sections($id, 'page'), $references, $this->idGenerator());
+
+        return [
+            'content' => ['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'sections' => $sections],
+            'imported' => $references->summary(),
+        ];
+    }
+
+    /**
      * Saves a section as an organization template. The section is validated (and sanitized,
      * references checked) in `context`; the contexts it is valid in become its `allowed_in`.
      * At most 100 per organization (422 TEMPLATE_LIMIT_REACHED) and 256 KB each (422

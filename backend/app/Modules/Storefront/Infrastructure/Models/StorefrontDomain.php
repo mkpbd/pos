@@ -14,8 +14,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $organization_id
  * @property string $host lower-case, without port
  * @property bool $is_primary
+ * @property ?string $entry_path P2a: the store path the host's `/` shows (e.g. `/p/eid-sale`), null = home
  */
-#[Fillable(['organization_id', 'host', 'is_primary'])]
+#[Fillable(['organization_id', 'host', 'is_primary', 'entry_path'])]
 class StorefrontDomain extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;

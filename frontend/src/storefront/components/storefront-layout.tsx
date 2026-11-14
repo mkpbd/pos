@@ -7,7 +7,9 @@ import { QuickViewProvider } from '../catalog/quick-view'
 import { LocaleContext, useLocale } from '../i18n/locale'
 import { useLocaleController } from '../i18n/use-locale-controller'
 import { PopupHost } from '../builder/popups/popup-host'
+import { CampaignTracker } from '../landing/campaign-tracker'
 import { PopupBanner } from '../popup/popup-banner'
+import { WhatsAppChatButton } from '../social/whatsapp'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
 import { PreviewRibbon } from './announcement-bar'
@@ -29,11 +31,14 @@ export function StorefrontLayout() {
       <LocaleContext value={locale}>
         <BootstrapContext value={query.data}>
           <ThemeEffects bootstrap={query.data} />
+          <CampaignTracker />
           <NoticeProvider>
             <CartDrawerProvider>
               <StoreFrame bootstrap={query.data} />
               <PopupBanner />
               <PopupHost />
+              {/* P2b: the floating WhatsApp chat button, when the owner turned it on. */}
+              <WhatsAppChatButton />
             </CartDrawerProvider>
           </NoticeProvider>
         </BootstrapContext>

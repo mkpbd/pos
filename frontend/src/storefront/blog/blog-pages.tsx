@@ -9,6 +9,7 @@ import { Pagination } from '../catalog/listing-toolbar'
 import { MediaImage } from '../components/media-image'
 import { RichText } from '../components/rich-text'
 import { NotFoundPage } from '../pages/not-found-page'
+import { ShareBar } from '../social/share-bar'
 import { useLocale } from '../i18n/locale'
 import { rich } from '../i18n/rich'
 import type { BlogCategory, Breadcrumb } from '../types'
@@ -156,7 +157,7 @@ function AdjacentLink({ post, direction }: { post: { slug: string; title: string
   )
 }
 
-/** /blog/:slug — one published post (`?preview=1` lets staff see a draft or scheduled post). */
+/** /blog/:slug — one published post (`?preview=1` lets staff see a draft or scheduled post), with its share bar (P2b). */
 export function BlogPostPage() {
   const { slug = '' } = useParams()
   const [params] = useSearchParams()
@@ -203,6 +204,10 @@ export function BlogPostPage() {
           <MediaImage media={post.cover} alt="" priority sizes="(min-width: 768px) 768px, 100vw" className="mt-8 aspect-[16/9] w-full rounded-sf-card object-cover" />
         )}
         <RichText html={post.body_html} className="mt-8" />
+        {/* P2b: not on a staff preview of a draft or scheduled post. */}
+        {!preview && (
+          <ShareBar target={{ url: blogPostUrl(post.slug), title: post.title, image: post.cover?.url ?? null }} label={t('social.share.post')} className="mt-10" />
+        )}
         {post.category && (
           <p className="mt-10 border-t pt-6 text-sm">
             {rich(t('blog.filedUnder'), {

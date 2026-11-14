@@ -204,6 +204,11 @@ export function useVersionsQuery(id: string, enabled: boolean) {
  */
 export type CreateDocumentInput =
   | { kind: 'page'; key: string; title: string; from: 'blank' | 'homepage' | 'cms' }
+  /**
+   * P2a: a campaign page (`landing:<slug>`) made from a landing page template; `product_id` is the
+   * product an order template sells (its product placeholders resolve to it).
+   */
+  | { kind: 'page'; key: `landing:${string}`; title: string; from: 'template'; template: string; product_id?: string }
   | { kind: 'header' | 'footer'; key: 'header' | 'footer'; title: string; from: 'blank' | 'current' }
   | { kind: 'zone'; key: ZoneDocumentKey | TargetedZoneKey; title: string; from: 'blank' }
   /** B8b: the server makes the key (`popup:<uuid>`); `template` = a popup template's id (null = blank). */

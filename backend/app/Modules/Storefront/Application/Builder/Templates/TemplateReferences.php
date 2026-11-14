@@ -49,6 +49,9 @@ class TemplateReferences implements TemplateReferenceResolver
     /** @var array<string, ?string> promotion ids by reference */
     private array $promotions = [];
 
+    /** P2a: the campaign page's product (`product_ref` source `landing`). */
+    private ?string $landingProduct = null;
+
     public function __construct(
         private readonly BuilderTemplateLibrary $library,
         private readonly MediaLibrary $mediaLibrary,
@@ -56,6 +59,14 @@ class TemplateReferences implements TemplateReferenceResolver
         private readonly StorefrontCatalog $catalog,
         private readonly PromotionShowcase $showcase,
     ) {}
+
+    /**
+     * P2a: the product a new campaign page is made for (product reference source `landing`).
+     */
+    public function useLandingProduct(?string $productId): void
+    {
+        $this->landingProduct = $productId;
+    }
 
     /**
      * B8b: `coupon` — the running coupon promotion with a usable code that ends first, or null.
@@ -74,6 +85,19 @@ class TemplateReferences implements TemplateReferenceResolver
      */
     public function product(string $source, int $index): ?string
     {
+        if ($source === PortableTemplate::LANDING_SOURCE) {
+            // P2a: the campaign page's product, else the store's first featured / best-selling / newest one.
+            if ($this->landingProduct !== null) {
+                return $this->landingProduct;
+            }
+            foreach (['featured', 'best_sellers', 'new_arrivals'] as $fallback) {
+                if (($id = $this->product($fallback, $index)) !== null) {
+                    return $id;
+                }
+            }
+
+            return null;
+        }
         if (! in_array($source, PortableTemplate::PRODUCT_SOURCES, true)) {
             return null;
         }

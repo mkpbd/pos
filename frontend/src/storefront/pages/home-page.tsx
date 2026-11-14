@@ -1,9 +1,10 @@
-import { useSearchParams } from 'react-router'
+import { Navigate, useLocation, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useHomepageQuery, useStorefront } from '../api'
 import { useDraftPreview } from '../builder/api'
-import { BuilderHomePage } from '../builder/builder-page'
+import { BuilderHomePage, EntryLandingPage } from '../builder/builder-page'
 import { useLocale } from '../i18n/locale'
+import { entryPathOf, landingSlugOf } from '../landing/entry-path'
 import { SectionList } from '../sections/section-renderer'
 import { useDocumentMeta } from '../use-document-meta'
 
@@ -13,6 +14,19 @@ import { useDocumentMeta } from '../use-document-meta'
  * none). Otherwise the homepage sections.
  */
 export function HomePage() {
+  const bootstrap = useStorefront()
+  const { search } = useLocation()
+  const entry = entryPathOf(bootstrap)
+  if (entry) {
+    // P2a: this host opens on its entry page — a landing page in place, any other store page by redirect.
+    const slug = landingSlugOf(entry)
+    if (slug) return <EntryLandingPage slug={slug} fallback={<FrontPage />} />
+    return <Navigate to={{ pathname: entry, search }} replace />
+  }
+  return <FrontPage />
+}
+
+function FrontPage() {
   const { builder } = useStorefront()
   const draft = useDraftPreview()
   if (builder?.home === true || draft) return <BuilderHomePage fallback={<SectionsHomePage />} />

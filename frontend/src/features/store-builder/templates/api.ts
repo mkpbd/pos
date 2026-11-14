@@ -43,6 +43,8 @@ export type BuilderTemplate = {
   /** B7: a tall picture of the look's whole home page (site templates; null when there is none yet). */
   preview_url?: string | null
   allowed_in: DocumentContext[]
+  /** What the template needs from the store (banners, menus, promotions, blog, products; P2a: `product` = one product chosen when it is applied). */
+  requires?: string[]
   source: 'builtin' | 'mine'
   created_at?: string | null
 }
@@ -101,6 +103,29 @@ export function usePopupTemplatesQuery(enabled = true) {
     queryFn: ({ signal }) => listTemplates({ scope: 'popup' }, signal),
     enabled,
     staleTime: 5 * 60_000,
+  })
+}
+
+/**
+ * P2a: the landing page templates (whole campaign pages: one-product order page, Eid / sale, new
+ * arrival, lead form), applied as a new `landing:<slug>` page.
+ */
+export function isLandingTemplate(template: Pick<BuilderTemplate, 'id' | 'scope' | 'category'>): boolean {
+  return template.scope === 'page' && (template.category === 'landing' || template.id.startsWith('landing-'))
+}
+
+/** P2a: an order template sells one product, chosen when the page is made. */
+export function templateNeedsProduct(template: Pick<BuilderTemplate, 'requires'>): boolean {
+  return (template.requires ?? []).includes('product')
+}
+
+export function useLandingTemplatesQuery(enabled = true) {
+  return useQuery({
+    queryKey: templateKeys.list({ scope: 'page' }),
+    queryFn: ({ signal }) => listTemplates({ scope: 'page' }, signal),
+    enabled,
+    staleTime: 5 * 60_000,
+    select: (list) => list.filter(isLandingTemplate),
   })
 }
 

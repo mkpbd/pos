@@ -69,6 +69,12 @@ class ManageBuilderDocuments
                 : 'This product does not exist. Choose one of your products.', ['key' => $key, 'target_type' => $target['type'], 'target_id' => $target['id']]);
         }
 
+        if (($attributes['from'] ?? null) === 'template' && $content === null) {
+            // P2a: a new campaign page from a built-in page template (photos imported, product
+            // references resolved to the chosen product), validated like any draft.
+            $productId = is_string($attributes['product_id'] ?? null) ? strtolower($attributes['product_id']) : null;
+            $content = $this->templates->pageContent((string) $attributes['template'], $productId)['content'];
+        }
         $content = $content !== null ? ($this->prepare)($content, $context) : match ($attributes['from'] ?? 'blank') {
             'homepage' => ($this->prepare)($this->importer->document(), $context),
             'cms' => ($this->prepare)($this->cmsImporter->document($page), $context),
@@ -115,7 +121,7 @@ class ManageBuilderDocuments
             $this->audit->record('storefront.builder_created', $document, [], [
                 'key' => $document->key,
                 'title' => $document->title,
-                'from' => $attributes['from'] ?? 'blank',
+                'from' => ($attributes['from'] ?? 'blank') === 'template' ? 'template:'.$attributes['template'] : ($attributes['from'] ?? 'blank'),
             ]);
 
             return $document;

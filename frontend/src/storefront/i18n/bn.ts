@@ -8,10 +8,12 @@ import { checkout } from './bn/checkout'
 import { common } from './bn/common'
 import { content } from './bn/content'
 import { demos } from './bn/demos'
+import { landing } from './bn/landing'
 import { orders } from './bn/orders'
 import { promo } from './bn/promo'
 import { reviews } from './bn/reviews'
 import { shell } from './bn/shell'
+import { social } from './bn/social'
 import { theme } from './bn/theme'
 import { wishlist } from './bn/wishlist'
 
@@ -31,4 +33,6 @@ export const bn: Translations<typeof en> = {
   ...orders,
   ...theme,
   ...demos,
+  ...landing,
+  ...social,
 }

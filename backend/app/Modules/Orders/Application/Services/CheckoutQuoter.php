@@ -56,7 +56,36 @@ class CheckoutQuoter
     public function quote(?Cart $cart, array $input, ?string $customerId, bool $autoPickMethod = false): array
     {
         $email = is_string($input['contact']['email'] ?? null) ? $input['contact']['email'] : null;
-        $quote = $this->pricer->quote($cart, $email);
+
+        return $this->complete($this->pricer->quote($cart, $email), $input, $customerId, $autoPickMethod);
+    }
+
+    /**
+     * P2a: the same quote for lines that are not in a cart (a landing page's order form):
+     * `[{variant_id, quantity}]`, priced through the cart's pricing path without a coupon.
+     *
+     * @param  list<array{variant_id: string, quantity: string}>  $lines
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed> as quote()
+     */
+    public function quoteLines(array $lines, array $input, ?string $customerId, bool $autoPickMethod = false): array
+    {
+        $email = is_string($input['contact']['email'] ?? null) ? $input['contact']['email'] : null;
+        $items = [];
+        foreach (array_values($lines) as $i => $line) {
+            $items[] = ['id' => 'line-'.$i, 'variant_id' => $line['variant_id'], 'quantity' => (string) $line['quantity']];
+        }
+
+        return $this->complete($this->pricer->quoteItems($items, $customerId, $email, null), $input, $customerId, $autoPickMethod);
+    }
+
+    /**
+     * @param  array<string, mixed>  $quote  CartPricer quote
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function complete(array $quote, array $input, ?string $customerId, bool $autoPickMethod): array
+    {
         $promotions = $quote['promotions'];
         $view = $quote['cart'];
         $currency = $view['currency'];

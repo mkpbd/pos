@@ -47,8 +47,10 @@ use LogicException;
  * @property string $refunded_total refunds booked on returns (E10b)
  * @property string $cost_total
  * @property string $contact_name
- * @property string $contact_email
+ * @property ?string $contact_email null for landing page orders placed without one (P2a)
  * @property string $contact_phone
+ * @property string $source storefront | landing_page (P2a)
+ * @property ?array<string, string> $attribution campaign attribution (P2a, CampaignAttribution)
  * @property ?string $notes
  * @property ?string $access_token_hash
  * @property ?string $courier_name
@@ -71,11 +73,19 @@ use LogicException;
     'currency', 'tax_mode', 'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'paid_total', 'refunded_total', 'cost_total',
     'contact_name', 'contact_email', 'contact_phone', 'notes', 'access_token_hash', 'courier_name', 'tracking_number',
     'placed_at', 'expires_at', 'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by',
-    'cancel_reason', 'ip', 'user_agent', 'locale',
+    'cancel_reason', 'ip', 'user_agent', 'locale', 'source', 'attribution',
 ])]
 class Order extends Model
 {
     use BelongsToOrganization, HasUuids;
+
+    /** P2a: placed through the cart checkout. */
+    public const SOURCE_STOREFRONT = 'storefront';
+
+    /** P2a: placed through a landing page's order form. */
+    public const SOURCE_LANDING_PAGE = 'landing_page';
+
+    public const SOURCES = [self::SOURCE_STOREFRONT, self::SOURCE_LANDING_PAGE];
 
     /** What the workflow may change after placement. */
     private const MUTABLE = [
@@ -102,6 +112,7 @@ class Order extends Model
             'paid_total' => 'decimal:2',
             'refunded_total' => 'decimal:2',
             'cost_total' => 'decimal:2',
+            'attribution' => 'array',
             'placed_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
             'confirmed_at' => 'immutable_datetime',

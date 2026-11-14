@@ -6,10 +6,12 @@ import { checkout } from './en/checkout'
 import { common } from './en/common'
 import { content } from './en/content'
 import { demos } from './en/demos'
+import { landing } from './en/landing'
 import { orders } from './en/orders'
 import { promo } from './en/promo'
 import { reviews } from './en/reviews'
 import { shell } from './en/shell'
+import { social } from './en/social'
 import { theme } from './en/theme'
 import { wishlist } from './en/wishlist'
 
@@ -33,6 +35,8 @@ export const en = {
   ...orders,
   ...theme,
   ...demos,
+  ...landing,
+  ...social,
 }
 
 export type MessageKey = keyof typeof en

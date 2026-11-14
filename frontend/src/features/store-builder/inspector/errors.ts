@@ -5,7 +5,7 @@
  */
 
 import { isWrappedSectionType } from '@/storefront/builder/registry'
-import { B4_TYPES, B6_TYPES, B8A_TYPES } from './validate'
+import { B4_TYPES, B6_TYPES, B8A_TYPES, P2A_TYPES } from './validate'
 import type { BuilderNode, Problem } from './types'
 
 /** Drops the `sections.0.columns.1.elements.2.` chain of a document path. */
@@ -28,7 +28,8 @@ export function formKey(node: BuilderNode, path: string): string {
     return prop
   }
   // B6: list items keep their path (`items.2.title`, `hotspots.0.product_id`, `columns.base`); a link is its field (`items.2.link`).
-  if (B6_TYPES.has(node.type) || B8A_TYPES.has(node.type)) return prop.replace(/\.link\.url$/, '.link').replace(/^link\.url$/, 'link')
+  // P2a: the order form's nested props keep their path too (`quantity.max`, `upsell.label`).
+  if (B6_TYPES.has(node.type) || B8A_TYPES.has(node.type) || P2A_TYPES.has(node.type)) return prop.replace(/\.link\.url$/, '.link').replace(/^link\.url$/, 'link')
   const parts = prop.split('.')
   // B4: a video's derived provider / id belong to its URL field; a call to action's buttons have a label and a link each.
   if (node.type === 'video' && (parts[0] === 'provider' || parts[0] === 'video_id')) return 'url'
@@ -73,6 +74,6 @@ export function isInlineProblem(node: BuilderNode, problem: Problem, bangla: boo
     return key === 'banner_ids' || key === 'item_ids' || key.startsWith('config.')
   }
   // B4 elements show every prop's problem next to its field.
-  if (B4_TYPES.has(node.type) || B6_TYPES.has(node.type) || B8A_TYPES.has(node.type)) return key !== '' && key !== 'id' && key !== 'type'
+  if (B4_TYPES.has(node.type) || B6_TYPES.has(node.type) || B8A_TYPES.has(node.type) || P2A_TYPES.has(node.type)) return key !== '' && key !== 'id' && key !== 'type'
   return (BASIC_FIELDS[node.type] ?? []).includes(key)
 }

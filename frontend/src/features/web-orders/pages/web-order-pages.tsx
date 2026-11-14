@@ -13,12 +13,14 @@ import { ShipmentCard } from '@/features/web-orders/components/shipment-card'
 import { OrderReturnsCard } from '@/features/web-returns/components/order-returns-card'
 import {
   ACTION_LABELS,
+  attributionSourceLabel,
   customerCancellation,
   etaLabel,
   formatDateTime,
   historyActor,
   historyLabel,
   isCustomerCancellation,
+  orderSourceLabel,
   PAYMENT_METHOD_LABELS,
   paymentBadge,
   paymentRecorder,
@@ -118,6 +120,38 @@ function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | 
             ))}
           </ul>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Where the order came from (P2a): the page it was placed on, its campaign and the link tags. */
+function OriginCard({ order }: { order: WebOrder }) {
+  const canMarketing = useCan()('marketing.view')
+  const a = order.attribution ?? null
+  const placedOn = orderSourceLabel(order.source)
+  const source = attributionSourceLabel(order)
+  if (!placedOn && !order.campaign && !a) return null
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Where it came from</CardTitle></CardHeader>
+      <CardContent>
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4" data-testid="order-origin">
+          {placedOn && <Field label="Placed on">{placedOn}</Field>}
+          <Field label="Campaign">
+            {order.campaign ? (
+              canMarketing ? <Link to={`/marketing/campaigns/${order.campaign.id}`} className="underline-offset-4 hover:underline">{order.campaign.name}</Link> : order.campaign.name
+            ) : (
+              <span className="font-normal text-muted-foreground">None (direct / other)</span>
+            )}
+          </Field>
+          {source && <Field label="Source / medium">{source}</Field>}
+          {a?.utm_content && <Field label="Ad or post">{a.utm_content}</Field>}
+          {a?.short_link && <Field label="Short link"><span className="font-mono">/go/{a.short_link}</span></Field>}
+          {a?.landing_path && <Field label="First page"><span className="font-mono text-xs">{a.landing_path}</span></Field>}
+          {a?.referrer_host && <Field label="Came from site">{a.referrer_host}</Field>}
+        </dl>
       </CardContent>
     </Card>
   )
@@ -233,6 +267,8 @@ export function WebOrderPage() {
         </Card>
         <PaymentCard order={order} timeZone={timeZone} />
       </div>
+
+      <OriginCard order={order} />
 
       {order.shipment && <ShipmentCard order={order} shipment={order.shipment} timeZone={timeZone} canManage={can('web_orders.manage')} />}
 

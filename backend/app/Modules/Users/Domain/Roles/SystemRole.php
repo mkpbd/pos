@@ -97,6 +97,10 @@ enum SystemRole: string
                 'promotions.*', 'shipping.*', 'web_orders.*', 'reviews.*',
                 // B8b: what visitors send with store builder forms.
                 'forms.*',
+                // P2a: campaigns, short links and their stats.
+                'marketing.*',
+                // P2b: Facebook & Instagram posts and product feeds.
+                'social.*',
                 'branches.view', 'products.view', 'inventory.view', 'customers.view',
             ],
         };

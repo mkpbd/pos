@@ -7,6 +7,9 @@ import { useLocale } from '../i18n/locale'
 import { NotFoundPage } from '../pages/not-found-page'
 import { useDocumentMeta, type DocumentMeta } from '../use-document-meta'
 import { useDraftPreview, usePageQuery } from './api'
+import { OrderNowBar } from '../landing/order-now'
+import { firstPageImage } from '../social/links'
+import { ShareBar } from '../social/share-bar'
 import { PageRenderer } from './page-renderer'
 import type { BuilderPage } from './types'
 
@@ -18,13 +21,16 @@ type Props = {
   meta: (page: BuilderPage, draft: boolean) => DocumentMeta
   /** Above the page (the front page's screen-reader title). */
   children?: ReactNode
+  /** P2b: a campaign page's share bar after the page — its canonical address (never on a draft preview). */
+  shareUrl?: string
 }
 
 /** A builder page with the storefront's loading and error states. */
-export function BuilderPageView({ pageKey, notFound, meta, children }: Props) {
+export function BuilderPageView({ pageKey, notFound, meta, children, shareUrl }: Props) {
   const page = usePageQuery(pageKey)
   const draft = useDraftPreview()
   const { t } = useLocale()
+  const { store } = useStorefront()
   useDocumentMeta(page.data ? meta(page.data, draft) : null)
 
   if (page.isPending) {
@@ -57,6 +63,17 @@ export function BuilderPageView({ pageKey, notFound, meta, children }: Props) {
         </p>
       )}
       <PageRenderer page={page.data} scope="page" />
+      {shareUrl && !draft && page.data.document?.source !== 'draft' && (
+        <div className="mx-auto max-w-sf px-4 py-8">
+          <ShareBar
+            target={{ url: shareUrl, title: page.data.document?.title || store.name, image: firstPageImage(page.data) }}
+            label={t('social.share.page')}
+            align="center"
+          />
+        </div>
+      )}
+      {/* P2a: on phones, a page with an order form gets a sticky "Order now". */}
+      <OrderNowBar page={page.data} />
     </>
   )
 }
@@ -73,7 +90,7 @@ export function BuilderHomePage({ fallback }: { fallback: ReactNode }) {
 
 const LANDING_SLUG = /^[a-z0-9-]{2,60}$/
 
-/** A landing page (/p/:slug) built in the store builder. */
+/** A landing page (/p/:slug) built in the store builder, with its share bar (P2b). */
 export function LandingPage() {
   const { slug = '' } = useParams()
   const { search } = useLocation()
@@ -86,6 +103,23 @@ export function LandingPage() {
       pageKey={slug}
       notFound={<NotFoundPage />}
       meta={(page, draft) => ({ title: page.document?.title || undefined, canonical: `/p/${slug}`, noindex: draft })}
+      shareUrl={`/p/${slug}`}
+    />
+  )
+}
+
+/**
+ * P2a: a host's entry page shown at `/` (a landing page opened on its own campaign address). The
+ * address stays `/`; without that page (404) the front page shows. Its share bar shares `/` of that host.
+ */
+export function EntryLandingPage({ slug, fallback }: { slug: string; fallback: ReactNode }) {
+  return (
+    <BuilderPageView
+      key={slug}
+      pageKey={slug}
+      notFound={fallback}
+      meta={(page, draft) => ({ title: page.document?.title || undefined, canonical: '/', noindex: draft })}
+      shareUrl="/"
     />
   )
 }

@@ -2,8 +2,10 @@
 
 namespace App\Modules\Storefront\Application\Builder;
 
+use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Cms\Application\Contracts\PageContent;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
+use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Promotions\Application\Contracts\PromotionShowcase;
@@ -11,7 +13,9 @@ use App\Modules\Reviews\Application\Contracts\ReviewShowcase;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shipping\Application\Contracts\ShippingRates;
 use App\Modules\Storefront\Application\Queries\MenuTrees;
+use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use Carbon\CarbonImmutable;
@@ -79,6 +83,10 @@ class BuilderElementData
         private readonly OrganizationDirectory $organizations,
         private readonly TenantContext $tenant,
         private readonly LocaleContext $locale,
+        private readonly CheckoutPaymentMethods $payments,
+        private readonly ShippingRates $shipping,
+        private readonly BranchDirectory $branches,
+        private readonly StorefrontConfig $storefront,
     ) {}
 
     /**
@@ -136,6 +144,19 @@ class BuilderElementData
         }
         $compareCards = $compareIds === [] ? [] : array_column($this->catalog->productCards(array_values(array_unique($compareIds))), null, 'id');
         $bundleDetails = $bundleIds === [] ? [] : $this->catalog->productDetails(array_values(array_unique($bundleIds)));
+
+        // P2a: order forms' products and add-ons (product pages), and what checkout offers.
+        $orderIds = [];
+        foreach ($elements as $element) {
+            if ($element['type'] === 'order_form') {
+                array_push($orderIds, ...array_filter([$element['props']['product_id'] ?? null, $element['props']['upsell']['product_id'] ?? null], 'is_string'));
+            }
+        }
+        $orderIds = array_values(array_unique($orderIds));
+        $orderDetails = $orderIds === [] ? [] : $this->catalog->productDetails($orderIds);
+        $orderMissing = array_values(array_diff($orderIds, array_keys($orderDetails)));
+        $orderPreview = $preview && $orderMissing !== [] ? $this->catalog->productDetails($orderMissing, true) : [];
+        $checkout = $orderIds === [] ? null : $this->checkoutOptions();
 
         $now = CarbonImmutable::now();
         $result = [];
@@ -217,6 +238,9 @@ class BuilderElementData
                     break;
                 case 'chart':
                     $data = ElementRegistry::needsData('chart', $props) ? $this->storeChart($props) : null;
+                    break;
+                case 'order_form':
+                    [$data, $state] = $this->orderForm($props, $orderDetails, $orderPreview, $checkout ?? $this->checkoutOptions());
                     break;
             }
 
@@ -558,6 +582,68 @@ class BuilderElementData
     private function ratingCounts(array $scope, string $key): array
     {
         return $this->ratingCounts[$key] ??= $this->reviews->ratingCounts($scope);
+    }
+
+    /**
+     * P2a: order form data — the product page object of the product on sale (draft: a draft /
+     * scheduled / ended one with state `unavailable`), the add-on's (null unless on sale) and
+     * what checkout offers (payment methods — cash on delivery only for `cod_only` — guest
+     * checkout, whether online ordering is on, and the district → delivery method hints).
+     *
+     * @param  array<string, mixed>  $props
+     * @param  array<string, array<string, mixed>>  $details
+     * @param  array<string, array<string, mixed>>  $previewDetails
+     * @param  array<string, mixed>  $checkout
+     * @return array{0: array<string, mixed>|null, 1: ?string}
+     */
+    private function orderForm(array $props, array $details, array $previewDetails, array $checkout): array
+    {
+        $product = $details[$props['product_id']] ?? null;
+        $state = null;
+        if ($product === null && isset($previewDetails[$props['product_id']])) {
+            $product = $previewDetails[$props['product_id']];
+            unset($product['preview_state']);
+            $state = 'unavailable';
+        }
+        if ($product === null) {
+            return [null, null];
+        }
+        $upsellId = $props['upsell']['product_id'] ?? null;
+        $methods = $props['payment'] === 'cod_only'
+            ? array_values(array_filter($checkout['payment_methods'], fn (array $m) => $m['code'] === 'cod'))
+            : $checkout['payment_methods'];
+
+        return [[
+            'product' => $product,
+            'upsell' => is_string($upsellId) ? ($details[$upsellId] ?? null) : null,
+            'payment_methods' => $methods,
+            'cod_enabled' => $checkout['cod_enabled'],
+            'guest_checkout' => $checkout['guest_checkout'],
+            'checkout_available' => $checkout['checkout_available'],
+            'shipping' => $checkout['shipping'],
+        ], $state];
+    }
+
+    /**
+     * P2a: what checkout offers now (once per render).
+     *
+     * @return array{payment_methods: list<array{code: string, display_name: string}>, cod_enabled: bool, guest_checkout: bool, checkout_available: bool, shipping: array<string, mixed>}
+     */
+    private function checkoutOptions(): array
+    {
+        $settings = $this->storefront->settings();
+        $storeId = $settings->fulfilment_store_id;
+        $store = $storeId === null ? null : $this->branches->store($storeId, $this->tenant->requireOrganization());
+        $methods = array_map(fn (array $m) => ['code' => $m['code'], 'display_name' => $m['display_name']], $this->payments->enabled());
+        $shipping = $this->shipping->districtMethods();
+
+        return [
+            'payment_methods' => $methods,
+            'cod_enabled' => in_array('cod', array_column($methods, 'code'), true),
+            'guest_checkout' => (bool) $settings->guest_checkout_enabled,
+            'checkout_available' => $store !== null && $store['is_active'] && $store['branch_is_active'],
+            'shipping' => ['methods' => $shipping['methods'], 'districts' => $shipping['districts'] === [] ? new \stdClass : $shipping['districts']],
+        ];
     }
 
     /**

@@ -12,7 +12,8 @@ use App\Modules\AI\Infrastructure\Models\AiRequest;
  */
 final class AiRequestLog
 {
-    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights'];
+    /** P2b: `social_captions` (Social module, through Shared's AiTextWriter). */
+    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions'];
 
     /**
      * @param  list<array{name: string, params: array<string, mixed>, ok: bool}>  $tools

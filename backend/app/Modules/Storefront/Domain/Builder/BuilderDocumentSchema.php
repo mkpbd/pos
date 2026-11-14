@@ -630,6 +630,9 @@ final class BuilderDocumentSchema
         if (in_array($type, ElementRegistry::B8B, true)) {
             return (new B8ElementFormProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
         }
+        if (in_array($type, ElementRegistry::P2A, true)) {
+            return (new P2ElementOrderFormProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
+        }
 
         // Optional texts (alt, html) may arrive as null (empty strings become null on input).
         $value = fn (string $key) => array_key_exists($key, $props)

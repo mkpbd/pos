@@ -265,7 +265,7 @@ class BuilderDocumentSchemaTest extends TestCase
     public function test_the_registry_describes_every_element_type(): void
     {
         $meta = ElementRegistry::metadata();
-        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6) + count(ElementRegistry::B8A) + count(ElementRegistry::B8B), $meta['types']);
+        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6) + count(ElementRegistry::B8A) + count(ElementRegistry::B8B) + count(ElementRegistry::P2A), $meta['types']);
         $byType = array_column($meta['types'], null, 'type');
         $this->assertSame('columns', $byType['inner_row']['children']);
         $this->assertSame(['text'], $byType['heading']['translatable']);
@@ -284,7 +284,9 @@ class BuilderDocumentSchemaTest extends TestCase
                 // B6: images, an address or a catalogue record first.
                 'gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look',
                 // B8a: photos or products first.
-                'before_after', 'bundle', 'photo_grid'], true)) {
+                'before_after', 'bundle', 'photo_grid',
+                // P2a: the product the order form sells.
+                'order_form'], true)) {
                 continue;
             }
             $element = ['id' => 'e_x', 'type' => $type, 'props' => ElementRegistry::defaults($type)] + ($type === 'inner_row' ? ['columns' => [['id' => 'c_x', 'width' => ['base' => 100], 'elements' => []]]] : []);

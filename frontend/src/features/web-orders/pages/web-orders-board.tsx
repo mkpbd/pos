@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { BanknoteIcon, Loader2Icon, PackageIcon, PrinterIcon, XIcon } from 'lucide-react'
+import { BanknoteIcon, Loader2Icon, MegaphoneIcon, PackageIcon, PrinterIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
@@ -19,7 +19,7 @@ import { useAuth, useCan } from '@/features/auth/use-auth'
 import { isRetryable, useIdempotencyKey } from '@/features/returns/api'
 import { useCouriersQuery, useDistrictsQuery } from '@/features/shipping/api'
 import { sortCouriers } from '@/features/shipping/shipping'
-import { useBulkProcessMutation, useWebOrdersQuery, type BulkResult, type WebOrderRow, type WebPaymentMethod } from '@/features/web-orders/api'
+import { useBulkProcessMutation, useWebOrdersQuery, type BulkResult, type WebOrderRow, type WebOrderSource, type WebPaymentMethod } from '@/features/web-orders/api'
 import {
   BOARD_TABS,
   boardTabCount,
@@ -30,6 +30,7 @@ import {
   filtersToSearchParams,
   formatDateTime,
   hasFilters,
+  ORDER_SOURCE_LABELS,
   PAYMENT_METHOD_LABELS,
   paymentBadge,
   printPath,
@@ -42,6 +43,17 @@ import { formatMoney } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
 const ALL = 'all'
+
+/** Campaign-page orders and campaign-credited orders say so under the order number (P2a). */
+function OrderOriginLine({ order }: { order: WebOrderRow }) {
+  if (order.source !== 'landing_page' && !order.campaign) return null
+  return (
+    <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs" data-testid={`order-origin-${order.id}`}>
+      {order.source === 'landing_page' && <Badge variant="soft">Campaign page</Badge>}
+      {order.campaign && <span className="text-muted-foreground"><span className="sr-only">Campaign: </span><MegaphoneIcon className="mr-0.5 inline size-3" aria-hidden />{order.campaign.name}</span>}
+    </div>
+  )
+}
 
 /** Per-order outcome of "Mark processing"; refused orders say why. */
 function BulkResultDialog({ results, onClose }: { results: BulkResult[]; onClose: () => void }) {
@@ -177,6 +189,13 @@ export function WebOrdersPage() {
             {(Object.keys(PAYMENT_METHOD_LABELS) as WebPaymentMethod[]).map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABELS[m]}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={filters.source ?? ALL} onValueChange={(v) => update({ source: v === ALL ? null : (v as WebOrderSource) })}>
+          <SelectTrigger className="w-44" aria-label="Filter by where the order was placed"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Store and campaign pages</SelectItem>
+            {(Object.keys(ORDER_SOURCE_LABELS) as WebOrderSource[]).map((s) => <SelectItem key={s} value={s}>{s === 'storefront' ? 'Online store only' : 'Campaign pages only'}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Select value={filters.districtId ? String(filters.districtId) : ALL} onValueChange={(v) => update({ districtId: v === ALL ? null : Number(v) })}>
           <SelectTrigger className="w-40" aria-label="Filter by district"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -197,7 +216,7 @@ export function WebOrdersPage() {
             variant="ghost"
             onClick={() => {
               setSearch('')
-              setSearchParams(filtersToSearchParams({ ...filters, courierId: null, paymentMethod: null, districtId: null, search: '', from: '', to: '', page: 1 }), { replace: true })
+              setSearchParams(filtersToSearchParams({ ...filters, courierId: null, paymentMethod: null, districtId: null, source: null, search: '', from: '', to: '', page: 1 }), { replace: true })
             }}
           >
             <XIcon data-icon="inline-start" /> Clear filters
@@ -273,6 +292,7 @@ export function WebOrdersPage() {
                       <TableCell>
                         <Link to={`/web-orders/${o.id}`} className="font-mono text-sm underline-offset-4 hover:underline">{o.number}</Link>
                         <div className="text-xs text-muted-foreground">{o.item_count} {o.item_count === 1 ? 'item' : 'items'}</div>
+                        <OrderOriginLine order={o} />
                       </TableCell>
                       <TableCell className="hidden text-sm whitespace-nowrap md:table-cell">{formatDateTime(o.placed_at, timeZone)}</TableCell>
                       <TableCell className="text-sm">

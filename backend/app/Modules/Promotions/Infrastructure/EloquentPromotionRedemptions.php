@@ -28,7 +28,7 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
         return $locked;
     }
 
-    public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, string $email, array $redemptions): void
+    public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, ?string $email, array $redemptions): void
     {
         $now = now();
         $coupons = [];
@@ -40,7 +40,7 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
                 'order_number' => $orderNumber,
                 'customer_id' => $customerId,
                 'customer_account_id' => $customerAccountId,
-                'email' => mb_strtolower(trim($email)),
+                'email' => $email === null || trim($email) === '' ? null : mb_strtolower(trim($email)),
                 'kind' => $redemption['kind'],
                 'amount' => $redemption['amount'],
                 'created_at' => $now,

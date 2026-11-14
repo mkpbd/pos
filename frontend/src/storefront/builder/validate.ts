@@ -1234,7 +1234,7 @@ export function b8aPropProblems(type: string, props: unknown): PropProblem[] {
 
 /** Every problem with an element's props, B6, B8a and B8b rules (empty = valid; unknown types []). */
 export function elementPropProblems(type: string, props: unknown): PropProblem[] {
-  return [...b6PropProblems(type, props), ...b8bPropProblems(type, props)]
+  return [...b6PropProblems(type, props), ...b8bPropProblems(type, props), ...(type === 'order_form' ? orderFormPropProblems(props) : [])]
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -1533,5 +1533,69 @@ export function b8bPropProblems(type: string, props: unknown, context?: string):
       break
     }
   }
+  return problems
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * P2a: the one-product order form (`order_form`)
+ * -------------------------------------------------------------------------------------------- */
+
+export const ORDER_FORM_ENUMS = {
+  email: ['hidden', 'optional', 'required'],
+  note: ['hidden', 'optional'],
+  payment: ['cod_only', 'store_methods'],
+  layout: ['stacked', 'two_columns'],
+} as const
+
+/** Quantity bounds (min / max inclusive): the starting quantity and the most one order may take. */
+export const ORDER_FORM_LIMITS = {
+  quantityDefault: { min: 1, max: 10 },
+  quantityMax: { min: 1, max: 20 },
+} as const
+
+/** Maximum length of each order form text (✱ translatable). */
+export const ORDER_FORM_TEXT_LIMITS = {
+  title: 120,
+  text: 400,
+  button_label: 60,
+  success_message: 400,
+  'upsell.label': 120,
+} as const
+
+/**
+ * The client mirror of the server's order_form prop rules (empty = valid). `product_id` is
+ * required (the element is invalid until a product is chosen); the add-on must be another product.
+ */
+export function orderFormPropProblems(props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const T = ORDER_FORM_TEXT_LIMITS
+  uuid(problems, 'product_id', p.product_id)
+  text(problems, 'title', p.title, T.title)
+  text(problems, 'text', p.text, T.text)
+  flag(problems, 'show_variants', p.show_variants)
+  if (!isObject(p.quantity)) problems.push({ path: 'quantity', code: 'invalid' })
+  else {
+    int(problems, 'quantity.default', p.quantity.default, ORDER_FORM_LIMITS.quantityDefault)
+    int(problems, 'quantity.max', p.quantity.max, ORDER_FORM_LIMITS.quantityMax)
+    if (isNumber(p.quantity.default) && isNumber(p.quantity.max) && p.quantity.default > p.quantity.max) problems.push({ path: 'quantity.max', code: 'out_of_range' })
+  }
+  if (!isObject(p.fields)) problems.push({ path: 'fields', code: 'invalid' })
+  else {
+    enumOf(problems, 'fields.email', p.fields.email, ORDER_FORM_ENUMS.email)
+    enumOf(problems, 'fields.note', p.fields.note, ORDER_FORM_ENUMS.note)
+  }
+  enumOf(problems, 'payment', p.payment, ORDER_FORM_ENUMS.payment)
+  text(problems, 'button_label', p.button_label, T.button_label, true)
+  text(problems, 'success_message', p.success_message, T.success_message, true)
+  if (p.upsell !== null) {
+    if (!isObject(p.upsell)) problems.push({ path: 'upsell', code: 'invalid' })
+    else {
+      uuid(problems, 'upsell.product_id', p.upsell.product_id)
+      if (isUuid(p.upsell.product_id) && p.upsell.product_id === p.product_id) problems.push({ path: 'upsell.product_id', code: 'duplicate' })
+      text(problems, 'upsell.label', p.upsell.label, T['upsell.label'], true)
+    }
+  }
+  enumOf(problems, 'layout', p.layout, ORDER_FORM_ENUMS.layout)
   return problems
 }

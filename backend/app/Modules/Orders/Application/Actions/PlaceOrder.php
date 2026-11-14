@@ -5,7 +5,6 @@ namespace App\Modules\Orders\Application\Actions;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Cart\Application\Actions\ShoppingCart;
 use App\Modules\Cart\Domain\CartOwner;
-use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Customers\Application\Actions\CustomerAddressBook;
 use App\Modules\Geography\Application\Contracts\GeoDirectory;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
@@ -94,16 +93,36 @@ class PlaceOrder
     {
         $locale = $this->locale->current();
 
-        return $this->locale->runAs(LocaleContext::BASE, fn () => $this->place($owner, $customer, $data, $client, $locale));
+        return $this->locale->runAs(LocaleContext::BASE, fn () => $this->place($owner, null, $customer, $data, $client, $locale));
     }
 
     /**
+     * P2a: places an order for lines that are not in a cart (a landing page's order form) —
+     * the same transaction, pricing, promotion locks, stock posting, numbering, payment and
+     * notifications as the cart checkout, without touching any cart and without a coupon.
+     * Unavailable or short lines → ITEMS_UNAVAILABLE (details.issues, details.preview).
+     *
+     * @param  list<array{variant_id: string, quantity: string}>  $lines
+     * @param  array{customer_id: string, account_id: string}|null  $customer
+     * @param  array<string, mixed>  $data  validated body (address inline; `source`, `attribution`)
+     * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
+     * @return array{order: Order, access_token: ?string}
+     */
+    public function direct(array $lines, ?array $customer, array $data, array $client): array
+    {
+        $locale = $this->locale->current();
+
+        return $this->locale->runAs(LocaleContext::BASE, fn () => $this->place(null, $lines, $customer, $data, $client, $locale));
+    }
+
+    /**
+     * @param  list<array{variant_id: string, quantity: string}>|null  $lines  direct lines (no cart) or null
      * @param  array{customer_id: string, account_id: string}|null  $customer
      * @param  array<string, mixed>  $data
      * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
      * @return array{order: Order, access_token: ?string}
      */
-    private function place(CartOwner $owner, ?array $customer, array $data, array $client, string $locale): array
+    private function place(?CartOwner $owner, ?array $lines, ?array $customer, array $data, array $client, string $locale): array
     {
         $organizationId = $this->tenant->requireOrganization();
         $settings = $this->storefront->settings();
@@ -112,15 +131,28 @@ class PlaceOrder
         }
         $store = $this->fulfilmentStore($organizationId, $settings->fulfilment_store_id);
 
-        [$order, $token] = DB::transaction(function () use ($owner, $customer, $data, $client, $organizationId, $store, $locale) {
-            $cart = $this->carts->lockForCheckout($owner);
-            if ($cart === null || ! $cart->items()->exists()) {
-                throw new BusinessRuleViolation('CART_EMPTY', 'Your cart is empty.');
+        [$order, $token] = DB::transaction(function () use ($owner, $lines, $customer, $data, $client, $organizationId, $store, $locale) {
+            $customerId = $customer['customer_id'] ?? null;
+            $cart = null;
+            if ($owner !== null) {
+                $cart = $this->carts->lockForCheckout($owner);
+                if ($cart === null || ! $cart->items()->exists()) {
+                    throw new BusinessRuleViolation('CART_EMPTY', 'Your cart is empty.');
+                }
+                $price = fn () => $this->quoter->quote($cart, $data, $customerId);
+            } else {
+                $price = fn () => $this->quoter->quoteLines($lines ?? [], $data, $customerId);
             }
 
-            $quote = $this->quoteUnderPromotionLocks($cart, $data, $customer['customer_id'] ?? null);
+            $quote = $this->quoteUnderPromotionLocks($price);
             $preview = $quote['preview'];
             if ($preview['issues'] !== [] || $quote['lines'] === []) {
+                if ($cart === null) {
+                    throw new BusinessRuleViolation('ITEMS_UNAVAILABLE', 'Sorry, this product is not available in the quantity you chose right now.', [
+                        'issues' => $preview['issues'],
+                        'preview' => $preview,
+                    ]);
+                }
                 throw new BusinessRuleViolation('CART_HAS_ISSUES', 'Some products in your cart are no longer available in the quantity you chose. Please review your cart.', [
                     'cart' => $quote['cart'],
                 ]);
@@ -201,7 +233,7 @@ class PlaceOrder
                 'paid_total' => '0.00',
                 'cost_total' => array_reduce($costs, fn (Money $sum, array $c) => $sum->plus($c['cost_total']), Money::zero($currency))->amount(),
                 'contact_name' => $data['contact']['name'],
-                'contact_email' => $data['contact']['email'],
+                'contact_email' => $data['contact']['email'] ?? null,
                 'contact_phone' => $data['contact']['phone'],
                 'notes' => $data['notes'] ?? null,
                 'access_token_hash' => $token === null ? null : hash('sha256', $token),
@@ -211,6 +243,9 @@ class PlaceOrder
                 'ip' => $client['ip'],
                 'user_agent' => $client['user_agent'] === null ? null : mb_substr($client['user_agent'], 0, 255),
                 'locale' => $locale,
+                // P2a.
+                'source' => $data['source'] ?? Order::SOURCE_STOREFRONT,
+                'attribution' => $data['attribution'] ?? null,
             ]);
 
             foreach ($quote['lines'] as $i => $line) {
@@ -263,14 +298,14 @@ class PlaceOrder
                 ]);
             }
             if ($quote['redemptions'] !== []) {
-                $this->redemptions->record($orderId, $number, $customer['customer_id'] ?? null, $customer['account_id'] ?? null, $data['contact']['email'], $quote['redemptions']);
+                $this->redemptions->record($orderId, $number, $customer['customer_id'] ?? null, $customer['account_id'] ?? null, $data['contact']['email'] ?? null, $quote['redemptions']);
             }
 
             OrderAddress::query()->create($address + [
                 'organization_id' => $organizationId,
                 'order_id' => $orderId,
                 'kind' => 'shipping',
-                'email' => $data['contact']['email'],
+                'email' => $data['contact']['email'] ?? null,
                 'created_at' => $now,
             ]);
             OrderStatusChange::query()->create([
@@ -284,7 +319,9 @@ class PlaceOrder
                 'created_at' => $now,
             ]);
 
-            $this->carts->markConverted($cart, $orderId);
+            if ($cart !== null) {
+                $this->carts->markConverted($cart, $orderId);
+            }
 
             return [$order, $token];
         });
@@ -308,12 +345,12 @@ class PlaceOrder
      * prices again under those locks (at most three rounds, in case the second pricing picks
      * another limited promotion).
      *
-     * @param  array<string, mixed>  $data
+     * @param  callable(): array<string, mixed>  $price  the CheckoutQuoter call (cart or direct lines)
      * @return array<string, mixed> the CheckoutQuoter quote
      */
-    private function quoteUnderPromotionLocks(Cart $cart, array $data, ?string $customerId): array
+    private function quoteUnderPromotionLocks(callable $price): array
     {
-        $quote = $this->quoter->quote($cart, $data, $customerId);
+        $quote = $price();
         $lockedPromotions = [];
         $lockedCoupons = [];
         for ($round = 0; $round < 3; $round++) {
@@ -328,7 +365,7 @@ class PlaceOrder
             if (! $locked) {
                 break;
             }
-            $quote = $this->quoter->quote($cart, $data, $customerId);
+            $quote = $price();
         }
 
         return $quote;

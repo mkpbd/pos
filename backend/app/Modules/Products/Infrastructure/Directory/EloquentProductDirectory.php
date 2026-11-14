@@ -44,6 +44,21 @@ class EloquentProductDirectory implements ProductDirectory
             ->all();
     }
 
+    public function images(string $organizationId, array $imageIds): array
+    {
+        $ids = array_values(array_unique(array_filter($imageIds, fn ($id) => is_string($id) && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1)));
+        if ($ids === []) {
+            return [];
+        }
+
+        return ProductImage::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $organizationId)
+            ->whereKey(array_map('strtolower', $ids))
+            ->get(['id', 'product_id', 'path', 'mime_type'])
+            ->mapWithKeys(fn (ProductImage $i) => [$i->id => ['id' => $i->id, 'product_id' => $i->product_id, 'url' => $i->url(), 'mime_type' => $i->mime_type]])
+            ->all();
+    }
+
     public function searchVariantIds(string $organizationId, string $search, int $limit = 500): array
     {
         $like = '%'.addcslashes($search, '%_\\').'%';

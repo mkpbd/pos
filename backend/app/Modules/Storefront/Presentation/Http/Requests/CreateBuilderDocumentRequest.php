@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Requests;
 
+use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use Illuminate\Foundation\Http\FormRequest;
@@ -21,7 +22,9 @@ use Illuminate\Validation\Validator;
  *   optional `template` (a built-in popup template id).
  *
  * `from`: `blank` (default), `homepage` (home only: convert the homepage sections), `cms`
- * (cms keys only: import the CMS page) or `current` (header / footer only: today's layout).
+ * (cms keys only: import the CMS page) or `current` (header / footer only: today's layout);
+ * P2a: `template` (landing pages only) with `template` (a built-in page template id) and an
+ * optional `product_id` (one of the store's products) the campaign page is made for.
  */
 class CreateBuilderDocumentRequest extends FormRequest
 {
@@ -52,8 +55,21 @@ class CreateBuilderDocumentRequest extends FormRequest
             'kind' => ['required', Rule::in(BuilderDocument::BUILDER_KINDS)],
             'key' => ['required', 'string', 'max:120', Rule::notIn(['landing:home'])],
             'title' => ['required', 'string', 'max:160'],
-            'from' => ['sometimes', 'nullable', Rule::in(['blank', 'homepage', 'cms', 'current'])],
+            'from' => ['sometimes', 'nullable', Rule::in(['blank', 'homepage', 'cms', 'current', 'template'])],
+            // P2a: a new campaign page from a built-in page template, for a product.
+            'template' => ['required_if:from,template', 'nullable', 'string', Rule::in($this->pageTemplates())],
+            'product_id' => ['sometimes', 'nullable', 'uuid'],
         ];
+    }
+
+    /**
+     * P2a: built-in page templates usable on pages.
+     *
+     * @return list<string>
+     */
+    private function pageTemplates(): array
+    {
+        return array_column(array_filter(app(BuilderTemplateLibrary::class)->all(), fn (array $t) => $t['scope'] === 'page' && in_array('page', $t['allowed_in'], true)), 'id');
     }
 
     /**
@@ -103,14 +119,24 @@ class CreateBuilderDocumentRequest extends FormRequest
                 'homepage' => $key === BuilderDocument::HOME,
                 'cms' => str_starts_with($key, BuilderDocument::CMS_PREFIX),
                 'current' => in_array($kind, [BuilderDocument::KIND_HEADER, BuilderDocument::KIND_FOOTER], true),
+                'template' => str_starts_with($key, BuilderDocument::LANDING_PREFIX),
                 default => true,
             };
             if (! $allowed) {
                 $validator->errors()->add('from', match ($from) {
                     'homepage' => 'Only the home page can start from the current homepage.',
                     'cms' => 'Only a content page design can start from the content page.',
+                    'template' => 'Only a campaign page (landing:<address>) can start from a page template.',
                     default => 'Only the header and the footer can start from the current design.',
                 });
+
+                return;
+            }
+            // P2a: the campaign page's product must be one of the store's products.
+            $productId = $this->input('product_id');
+            if ($from === 'template' && is_string($productId)
+                && app(StorefrontCatalog::class)->existing('product', [strtolower($productId)]) === []) {
+                $validator->errors()->add('product_id', 'This product does not exist. Choose one of your products.');
             }
         }];
     }

@@ -1,4 +1,4 @@
-import { BULK_MAX, type BulkResult, type PrintKind, type Shipment, type ShipmentEvent, type ShipmentEventInput, type ShipmentStatus, type StatusCounts, type WebOrder, type WebOrderAction, type WebOrderActorKind, type WebOrderPromotionKind, type WebOrderHistoryEntry, type WebOrderPayment, type WebOrdersListParams, type WebOrderStatus, type WebPaymentMethod, type WebPaymentStatus } from '@/features/web-orders/api'
+import { BULK_MAX, type BulkResult, type PrintKind, type Shipment, type ShipmentEvent, type ShipmentEventInput, type ShipmentStatus, type StatusCounts, type WebOrder, type WebOrderAction, type WebOrderActorKind, type WebOrderPromotionKind, type WebOrderHistoryEntry, type WebOrderPayment, type WebOrdersListParams, type WebOrderSource, type WebOrderStatus, type OrderOrigin, type WebPaymentMethod, type WebPaymentStatus } from '@/features/web-orders/api'
 import { ApiError } from '@/lib/api/client'
 import { compareDecimal, subtractDecimal } from '@/lib/money'
 
@@ -83,6 +83,27 @@ export type WebOrderFilters = {
   search: string
   from: string
   to: string
+  /** P2a: where the order was placed; absent = everywhere. */
+  source?: WebOrderSource | null
+}
+
+export const ORDER_SOURCE_LABELS: Record<WebOrderSource, string> = {
+  storefront: 'Online store',
+  landing_page: 'Campaign page',
+}
+
+/** "Campaign page" / "Online store"; null for older orders without a source. */
+export function orderSourceLabel(source: string | null | undefined): string | null {
+  if (!source) return null
+  return ORDER_SOURCE_LABELS[source as WebOrderSource] ?? source.replaceAll('_', ' ')
+}
+
+/** "facebook / paid" from the order's tags; null without any. */
+export function attributionSourceLabel(origin: OrderOrigin): string | null {
+  const a = origin.attribution
+  if (!a) return null
+  const parts = [a.utm_source, a.utm_medium].map((v) => v?.trim()).filter(Boolean)
+  return parts.length > 0 ? parts.join(' / ') : null
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -95,6 +116,7 @@ export function filtersFromSearchParams(params: URLSearchParams): WebOrderFilter
   const district = Number(params.get('district_id'))
   const from = params.get('from') ?? ''
   const to = params.get('to') ?? ''
+  const source = params.get('source')
   const tab: BoardTab = params.get('cod_unremitted') === '1' ? 'cod_unremitted' : status && (FILTER_STATUSES as string[]).includes(status) ? (status as WebOrderStatus) : 'all'
   return {
     page: Number.isInteger(page) && page > 0 ? page : 1,
@@ -105,6 +127,7 @@ export function filtersFromSearchParams(params: URLSearchParams): WebOrderFilter
     search: params.get('search') ?? '',
     from: DATE.test(from) ? from : '',
     to: DATE.test(to) ? to : '',
+    ...(source && source in ORDER_SOURCE_LABELS ? { source: source as WebOrderSource } : {}),
   }
 }
 
@@ -118,13 +141,14 @@ export function filtersToSearchParams(filters: WebOrderFilters): URLSearchParams
   if (filters.search) params.set('search', filters.search)
   if (filters.from) params.set('from', filters.from)
   if (filters.to) params.set('to', filters.to)
+  if (filters.source) params.set('source', filters.source)
   if (filters.page > 1) params.set('page', String(filters.page))
   return params
 }
 
 /** Whether anything besides the tab narrows the list (the tab counts follow these). */
 export function hasFilters(filters: WebOrderFilters, search: string): boolean {
-  return !!(filters.courierId || filters.paymentMethod || filters.districtId || filters.from || filters.to || search)
+  return !!(filters.courierId || filters.paymentMethod || filters.districtId || filters.from || filters.to || filters.source || search)
 }
 
 /** GET /web-orders query for the filters; `search` is the debounced, trimmed term. */
@@ -138,6 +162,7 @@ export function toListParams(filters: WebOrderFilters, search: string): WebOrder
   if (search) params.search = search
   if (filters.from) params.date_from = filters.from
   if (filters.to) params.date_to = filters.to
+  if (filters.source) params.source = filters.source
   return params
 }
 

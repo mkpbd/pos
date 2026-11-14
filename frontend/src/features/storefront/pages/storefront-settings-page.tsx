@@ -23,13 +23,16 @@ import {
   useMakeDomainPrimaryMutation,
   useRemoveDomainMutation,
   useSaveStorefrontSettingsMutation,
+  useSetDomainEntryPathMutation,
   useStorefrontDomainsQuery,
   useStorefrontSettingsQuery,
   type StoreLocale,
   type StorefrontDomain,
   type StorefrontSettings,
 } from '@/features/storefront/api'
+import { SharingCard } from '@/features/storefront/components/sharing-card'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
+import { documentPath, useDocumentsQuery } from '@/features/store-builder/api'
 import { fieldErrorMap, handleFormError } from '@/lib/forms'
 
 const schema = z.object({
@@ -351,6 +354,45 @@ function AvailabilityCard({ settings, canManage }: { settings: StorefrontSetting
   )
 }
 
+const HOME = '__home__'
+
+/**
+ * P2a "Opens on": the page a domain shows at its home address — a campaign page gives a promotion
+ * its own address. The rest of the store keeps working on that domain.
+ */
+function EntryPathCell({ domain, canManage, pages }: { domain: StorefrontDomain; canManage: boolean; pages: { path: string; title: string }[] }) {
+  const setEntry = useSetDomainEntryPathMutation()
+  const current = domain.entry_path ?? null
+  const options = current && !pages.some((p) => p.path === current) ? [...pages, { path: current, title: current }] : pages
+  const label = current ? (options.find((p) => p.path === current)?.title ?? current) : 'Home page'
+
+  if (!canManage) {
+    return <span className={current ? '' : 'text-muted-foreground'}>{label}{current && <span className="block font-mono text-xs text-muted-foreground">{current}</span>}</span>
+  }
+  return (
+    <Select
+      value={current ?? HOME}
+      disabled={setEntry.isPending}
+      onValueChange={(v) => {
+        const entryPath = v === HOME ? null : v
+        setEntry.mutate(
+          { id: domain.id, entryPath },
+          {
+            onSuccess: () => toast.success(entryPath ? `${domain.host} now opens on ${entryPath}.` : `${domain.host} now opens on the home page.`),
+            onError: (e) => toast.error(fieldErrorMap(e).entry_path ?? e.message),
+          },
+        )
+      }}
+    >
+      <SelectTrigger className="w-full min-w-40 sm:w-56" aria-label={`Page ${domain.host} opens on`}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value={HOME}>Home page</SelectItem>
+        {options.map((p) => <SelectItem key={p.path} value={p.path}>{p.title} ({p.path})</SelectItem>)}
+      </SelectContent>
+    </Select>
+  )
+}
+
 function DomainsCard({ domains, canManage }: { domains: StorefrontDomain[]; canManage: boolean }) {
   const add = useAddDomainMutation()
   const makePrimary = useMakeDomainPrimaryMutation()
@@ -358,6 +400,13 @@ function DomainsCard({ domains, canManage }: { domains: StorefrontDomain[]; canM
   const [host, setHost] = useState('')
   const [error, setError] = useState<string | undefined>()
   const [removing, setRemoving] = useState<StorefrontDomain | null>(null)
+  const documents = useDocumentsQuery()
+  // Campaign pages (`/p/<slug>`) that a domain can open on.
+  const campaignPages = (documents.data ?? [])
+    .filter((d) => d.kind === 'page' && d.key.startsWith('landing:'))
+    .map((d) => ({ path: documentPath(d) ?? '', title: d.title || d.key, published: d.published !== null }))
+    .filter((p) => p.path !== '')
+    .map((p) => ({ path: p.path, title: p.published ? p.title : `${p.title} — not published` }))
 
   const onAdd = (e: FormEvent) => {
     e.preventDefault()
@@ -378,7 +427,10 @@ function DomainsCard({ domains, canManage }: { domains: StorefrontDomain[]; canM
     <Card>
       <CardHeader>
         <CardTitle>Domains</CardTitle>
-        <CardDescription>Host names that open this store. Point their DNS at your server; the primary domain is used in links and search results.</CardDescription>
+        <CardDescription>
+          Host names that open this store. Point their DNS at your server; the primary domain is used in links and search results. “Opens on” picks the page a
+          domain shows first — give a campaign its own address, such as eid-offer.com opening your Eid page. The rest of the store still works there.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {domains.length === 0 ? (
@@ -390,6 +442,7 @@ function DomainsCard({ domains, canManage }: { domains: StorefrontDomain[]; canM
                 <TableRow>
                   <TableHead>Host</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Opens on</TableHead>
                   {canManage && <TableHead className="w-48"><span className="sr-only">Actions</span></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -398,6 +451,7 @@ function DomainsCard({ domains, canManage }: { domains: StorefrontDomain[]; canM
                   <TableRow key={d.id}>
                     <TableCell className="font-medium">{d.host}</TableCell>
                     <TableCell>{d.is_primary ? <Badge variant="soft">Primary</Badge> : <span className="text-muted-foreground">Alias</span>}</TableCell>
+                    <TableCell><EntryPathCell domain={d} canManage={canManage} pages={campaignPages} /></TableCell>
                     {canManage && (
                       <TableCell className="text-right">
                         {!d.is_primary && (
@@ -475,6 +529,8 @@ export function StorefrontSettingsPage() {
             <LanguagesCard settings={settings.data} canManage={canManage} />
             <AvailabilityCard settings={settings.data} canManage={canManage} />
             <CheckoutCard settings={settings.data} canManage={canManage} />
+            {/* P2b: keyed by the saved number so the field shows the server's form after saving. */}
+            <SharingCard key={settings.data.whatsapp_number ?? ''} settings={settings.data} canManage={canManage} />
           </div>
           <DomainsCard domains={domains.data} canManage={canManage} />
         </div>

@@ -46,6 +46,25 @@ class EloquentMediaLibrary implements MediaLibrary
             ->all();
     }
 
+    public function originals(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, fn ($id) => is_string($id) && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1)));
+        if ($ids === []) {
+            return [];
+        }
+
+        return Media::query()->whereIn('id', array_map('strtolower', $ids))->get()
+            ->mapWithKeys(fn (Media $m) => [$m->id => [
+                'id' => $m->id,
+                'url' => $m->url(),
+                'mime_type' => $m->mime_type,
+                'width' => $m->width,
+                'height' => $m->height,
+                'alt' => $m->alt,
+            ]])
+            ->all();
+    }
+
     public function dataUri(string $id, int $minWidth = 240, int $maxBytes = 524288): ?string
     {
         $media = Media::query()->find($id);

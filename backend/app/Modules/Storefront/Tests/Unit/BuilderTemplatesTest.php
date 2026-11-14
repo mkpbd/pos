@@ -152,8 +152,9 @@ class BuilderTemplatesTest extends TestCase
             }
             $this->assertNotEmpty($t['allowed_in'], $t['id']);
             $this->assertSame([], array_diff($t['allowed_in'], ElementRegistry::CONTEXTS), $t['id']);
-            // B6: `products` — hotspots of a shop-the-look template need live products.
-            $this->assertSame([], array_diff($t['requires'], ['banners', 'menus', 'promotions', 'blog', 'products']), $t['id']);
+            // B6: `products` — hotspots of a shop-the-look template need live products. P2a: `product`
+            // — a campaign page made for one product (chosen when it is created).
+            $this->assertSame([], array_diff($t['requires'], ['banners', 'menus', 'promotions', 'blog', 'products', 'product']), $t['id']);
         }
 
         // The library: ≥ 24 section templates, 6+ per preset and neutral ones; the five pages; one site per preset.
@@ -169,7 +170,8 @@ class BuilderTemplatesTest extends TestCase
             $this->assertContains($category, $kids, "kids {$category}");
         }
         $pages = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'page'));
-        $this->assertEqualsCanonicalizing(['about', 'contact', 'faq', 'sale', 'collection'], array_column($pages, 'category'));
+        // P2a: four campaign page templates (category `landing`).
+        $this->assertEqualsCanonicalizing(['about', 'contact', 'faq', 'sale', 'collection', 'landing', 'landing', 'landing', 'landing'], array_column($pages, 'category'));
         $sites = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'site'));
         // B7: one site per preset, the original look included, in the order the demo looks are shown.
         $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($sites, 'id'));
@@ -279,6 +281,8 @@ class BuilderTemplatesTest extends TestCase
         $this->assertSame(str_contains($json, '"type":"hot_deals"') || str_contains($json, '"type":"flash_sale_bar"') || str_contains($json, '"promotion_ref"'), in_array('promotions', $meta['requires'], true), "{$id} promotions");
         $this->assertSame(str_contains($json, '"type":"blog_posts"'), in_array('blog', $meta['requires'], true), "{$id} blog");
         $this->assertSame(str_contains($json, '"product_ref"'), in_array('products', $meta['requires'], true), "{$id} products");
+        // P2a: made for one product (product references to the campaign page's product).
+        $this->assertSame(str_contains($json, '"source":"landing"'), in_array('product', $meta['requires'], true), "{$id} product");
     }
 
     public function test_menu_references_are_resolved_or_left_out(): void

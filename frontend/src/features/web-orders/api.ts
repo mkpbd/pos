@@ -10,7 +10,30 @@ export type WebPaymentMethod = 'cod' | 'bank_transfer'
 export const WEB_ORDER_ACTIONS = ['confirm_payment', 'process', 'ship', 'deliver', 'record_cod_payment', 'cancel'] as const
 export type WebOrderAction = (typeof WEB_ORDER_ACTIONS)[number]
 
-export type WebOrderRow = {
+/** Where the order was placed (P2a): the shop's cart checkout or a campaign page's order form. */
+export type WebOrderSource = 'storefront' | 'landing_page'
+
+/** Campaign tags the shopper arrived with (P2a §3); keys are omitted when unknown. */
+export type OrderAttribution = {
+  utm_source?: string | null
+  utm_medium?: string | null
+  utm_campaign?: string | null
+  utm_content?: string | null
+  utm_term?: string | null
+  short_link?: string | null
+  landing_path?: string | null
+  referrer_host?: string | null
+  first_seen_at?: string | null
+}
+
+/** Source, tags and campaign of an order (P2a); absent on servers before P2a. */
+export type OrderOrigin = {
+  source?: WebOrderSource | null
+  attribution?: OrderAttribution | null
+  campaign?: { id: string; name: string } | null
+}
+
+export type WebOrderRow = OrderOrigin & {
   id: string
   number: string
   placed_at: string
@@ -89,7 +112,7 @@ export type WebOrderPayment = {
   recorded_by: string | { id: string; name: string | null } | null
 }
 
-export type WebOrder = {
+export type WebOrder = OrderOrigin & {
   id: string
   number: string
   status: WebOrderStatus
@@ -188,6 +211,8 @@ export type WebOrdersListParams = {
   district_id?: number
   /** Delivered COD orders whose cash the courier still owes (E10a). */
   cod_unremitted?: 1
+  /** P2a: only orders from the cart checkout or from campaign-page order forms. */
+  source?: WebOrderSource
   search?: string
   date_from?: string
   date_to?: string

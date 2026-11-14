@@ -72,6 +72,7 @@ import {
   ClockIcon,
   ChartBarIcon,
   ClipboardListIcon,
+  ShoppingBagIcon,
   type LucideIcon,
 } from 'lucide-react'
 import type { ElementGroup } from '@/storefront/builder/registry'
@@ -154,6 +155,8 @@ export const ELEMENT_ICONS: Record<string, LucideIcon> = {
   progress_bars: ChartBarIcon,
   // B8b
   form: ClipboardListIcon,
+  // P2a
+  order_form: ShoppingBagIcon,
 }
 
 export function elementIcon(type: string): LucideIcon {
@@ -233,6 +236,7 @@ export const ELEMENT_HINTS: Record<string, string> = {
   store_hours: 'Your opening hours, with “Open now” for shoppers.',
   progress_bars: 'Bars or rings that show percentages.',
   form: 'Your own form with the questions you choose. Answers arrive under Content → Form submissions.',
+  order_form: 'One product ordered right on the page: name, phone and address, cash on delivery — no cart.',
 }
 
 /** B4: the server may group the header / footer parts as `site`. */

@@ -1568,3 +1568,68 @@ test('P1b: lists the versions of the product page areas, deletes one after confi
   // The bottom of the page: details, tabs and related products sit above the area.
   await expect(canvas(page).getByTestId('canvas-sample')).toContainText('Related products and recently viewed', { timeout: 30_000 })
 })
+
+/* ------------------------------------------------------------------------------------------------
+ * P2a: a campaign page from a landing template, and the one-product order form
+ * ---------------------------------------------------------------------------------------------- */
+
+const ORDER_FORM_META = b4Meta('order_form', 'commerce', 'Order form', ['title', 'text', 'button_label', 'success_message', 'upsell.label'], {
+  product_id: null, title: 'Order now', text: '', show_variants: true, quantity: { default: 1, max: 10 }, fields: { email: 'optional', note: 'optional' },
+  payment: 'cod_only', button_label: 'Confirm order', success_message: 'Thank you! We will call you soon to confirm your order.', upsell: null, layout: 'stacked',
+}, PAGES)
+const landingTemplate = (id: string, name: string, description: string, requires: string[]) => ({
+  id, scope: 'page', preset: null, category: 'landing', name, description, thumbnail_url: null, preview_url: null, allowed_in: ['page'], requires, source: 'builtin',
+})
+const LANDING_TEMPLATES = [
+  landingTemplate('landing-order', 'Single product order page', 'Hero, benefits, reviews, FAQ and the order form.', ['product']),
+  landingTemplate('landing-eid-sale', 'Eid / sale campaign', 'Countdown, discount, product grid and an order button.', ['product', 'promotions']),
+  landingTemplate('landing-new-arrival', 'New arrival launch', 'Hero, gallery, spotlight and the order form.', ['product']),
+  landingTemplate('landing-lead', 'Lead / contact campaign', 'An offer and a form.', []),
+]
+
+async function mockP2aBackend(page: Page): Promise<B4Backend> {
+  const b = await mockB6Backend(page)
+  await page.route('**/api/v1/storefront/builder/elements', (route) => route.fulfill({ json: envelope({ types: [...B4_ELEMENTS, ...B6_ELEMENTS, ORDER_FORM_META], limits: {}, enums: {} }) }))
+  await page.route('**/api/v1/storefront/builder/templates*', (route) => route.fulfill({ json: envelope(LANDING_TEMPLATES) }))
+  return b
+}
+
+test('P2a: makes a campaign page from the order template for a product, then adds an order form and sets it up', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockP2aBackend(page)
+  await page.goto('/admin/storefront/pages')
+  await page.getByRole('button', { name: 'New campaign page' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New campaign page' })
+  await dialog.getByTestId('landing-template-landing-order').locator('label').click()
+  await expect(dialog.getByRole('radio', { name: /Single product order page/ })).toBeChecked()
+  await expect(dialog.getByText('Product to sell')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Choose product' }).click()
+  await page.getByRole('option', { name: /Straw hat/ }).click()
+  await expect(dialog.getByLabel('Page name')).toHaveValue('Straw hat')
+  await expect(dialog.getByText('/p/straw-hat')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Create page' }).click()
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\/[0-9a-f-]+$/, { timeout: 30_000 })
+  expect(b.creates.at(-1)).toEqual({ kind: 'page', key: 'landing:straw-hat', title: 'Straw hat', from: 'template', template: 'landing-order', product_id: HAT })
+  await expect(canvas(page).getByTestId('canvas-empty')).toBeVisible({ timeout: 30_000 })
+
+  // The order form asks for its product first.
+  await page.getByTestId('add-order_form').click()
+  const setup = page.getByRole('dialog', { name: 'Add order form' })
+  await expect(setup.getByRole('button', { name: 'Insert' })).toBeDisabled()
+  await setup.getByRole('button', { name: 'Choose product' }).click()
+  await page.getByRole('option', { name: /Straw hat/ }).click()
+  await setup.getByRole('button', { name: 'Insert' }).click()
+  await expect(setup).toBeHidden()
+
+  const inspector = page.getByRole('complementary', { name: 'Inspector' })
+  await inspector.getByLabel('At most').fill('3')
+  await inspector.getByLabel('Button text').fill('Order with cash on delivery')
+  await inspector.getByRole('combobox', { name: 'E-mail' }).click()
+  await page.getByRole('option', { name: 'Don’t ask' }).click()
+  await expect
+    .poll(() => {
+      const saved = savedOf(b, 'order_form')?.props
+      return saved && { product_id: saved.product_id, quantity: saved.quantity, button_label: saved.button_label, fields: saved.fields, payment: saved.payment }
+    }, { timeout: 6000 })
+    .toEqual({ product_id: HAT, quantity: { default: 1, max: 3 }, button_label: 'Order with cash on delivery', fields: { email: 'hidden', note: 'optional' }, payment: 'cod_only' })
+})

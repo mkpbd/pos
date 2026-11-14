@@ -44,6 +44,32 @@ class EloquentShippingRates implements ShippingRates
         return null;
     }
 
+    public function districtMethods(): array
+    {
+        $locale = $this->locale->current();
+        $zones = ShippingZone::query()
+            ->where('is_active', true)
+            ->with(['methods' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('name')])
+            ->orderBy('sort_order')->orderBy('name')->orderBy('id')
+            ->get();
+        $methods = [];
+        $byZone = [];
+        foreach ($zones as $zone) {
+            foreach ($zone->methods as $method) {
+                $methods[] = self::option($method, $locale);
+                $byZone[$zone->id][] = $method->id;
+            }
+        }
+        $districts = [];
+        if ($byZone !== []) {
+            foreach (ShippingZoneDistrict::query()->whereIn('zone_id', array_keys($byZone))->orderBy('district_id')->get(['zone_id', 'district_id']) as $row) {
+                $districts[(string) $row->district_id] = $byZone[$row->zone_id];
+            }
+        }
+
+        return ['methods' => $methods, 'districts' => $districts];
+    }
+
     public function zoneOverview(): array
     {
         $locale = $this->locale->current();

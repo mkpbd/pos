@@ -28,6 +28,7 @@ import { B4Form, type B4FormProps } from './b4-forms'
 import { B6Form } from './b6-forms'
 import { B8aForm } from './b8a-forms'
 import { B8bForm } from './b8b-forms'
+import { P2aForm } from './order-form'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
 import { PopupSettingsPanel } from './popup-settings'
@@ -36,7 +37,7 @@ import { ElementSetupHost } from './setup-dialog'
 import { StyleTab } from './style-tab'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
-import { B4_TYPES, B6_TYPES, B8A_TYPES, B8B_TYPES, validateNode } from './validate'
+import { B4_TYPES, B6_TYPES, B8A_TYPES, B8B_TYPES, P2A_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
 
 const ICONS: Record<string, typeof HeadingIcon> = {
@@ -81,6 +82,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   if (B6_TYPES.has(node.type)) return <B6Form key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
   if (B8A_TYPES.has(node.type)) return <B8aForm key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
   if (B8B_TYPES.has(node.type)) return <B8bForm key={node.id} node={node as Element} {...common} context={b4.context} />
+  if (P2A_TYPES.has(node.type)) return <P2aForm key={node.id} node={node as Element} {...common} context={b4.context} />
   switch (node.type) {
     case 'section':
       return (

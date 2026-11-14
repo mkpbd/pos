@@ -1298,6 +1298,68 @@
         "popup"
       ],
       "requires": []
+    },
+    {
+      "id": "landing-order",
+      "scope": "page",
+      "preset": null,
+      "category": "landing",
+      "name": "Single product order page",
+      "description": "A product hero, benefits, how to use, reviews of the product, questions and answers and an order form with cash on delivery.",
+      "thumbnail": "/builder-templates/landing-order.png",
+      "allowed_in": [
+        "page"
+      ],
+      "requires": [
+        "product",
+        "products"
+      ]
+    },
+    {
+      "id": "landing-eid-sale",
+      "scope": "page",
+      "preset": null,
+      "category": "landing",
+      "name": "Eid / sale campaign",
+      "description": "A sale headline, an offer countdown, the running coupon, the product, more offers and an order form.",
+      "thumbnail": "/builder-templates/landing-eid-sale.png",
+      "allowed_in": [
+        "page"
+      ],
+      "requires": [
+        "product",
+        "products",
+        "promotions"
+      ]
+    },
+    {
+      "id": "landing-new-arrival",
+      "scope": "page",
+      "preset": null,
+      "category": "landing",
+      "name": "New arrival launch",
+      "description": "A launch headline, the new product, a photo gallery, what is new and an order form.",
+      "thumbnail": "/builder-templates/landing-new-arrival.png",
+      "allowed_in": [
+        "page"
+      ],
+      "requires": [
+        "product",
+        "products"
+      ]
+    },
+    {
+      "id": "landing-lead",
+      "scope": "page",
+      "preset": null,
+      "category": "landing",
+      "name": "Lead / contact campaign",
+      "description": "An offer headline, its benefits and a short call-me-back form (name, phone, district).",
+      "thumbnail": "/builder-templates/landing-lead.png",
+      "allowed_in": [
+        "page"
+      ],
+      "requires": []
     }
   ]
 }

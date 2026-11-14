@@ -9,6 +9,7 @@ import type {
   FaqListData,
   FlashSaleBarData,
   MenuData,
+  OrderFormData,
   ProductSpotlightData,
   PromoCardData,
   ReviewWallData,
@@ -88,4 +89,13 @@ export function isStoreHoursData(data: BuilderData): data is StoreHoursData {
 export function isChartStoreData(data: BuilderData): data is ChartStoreData {
   const d = data as Record<string, unknown>
   return isObject(data) && !('type' in data) && Array.isArray(d.labels) && Array.isArray(d.series)
+}
+
+/* P2a */
+
+/** An order form's data: a product with its variants (the rest is read defensively). */
+export function isOrderFormData(data: BuilderData): data is OrderFormData {
+  if (!isObject(data) || 'type' in data) return false
+  const product = (data as Record<string, unknown>).product
+  return isObject(product) && typeof product.id === 'string' && typeof product.name === 'string' && Array.isArray(product.variants) && Array.isArray(product.options)
 }

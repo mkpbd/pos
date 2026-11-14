@@ -154,7 +154,7 @@ class ResolveBuilderElements
         foreach ($b4 as $id => $element) {
             // B6: a spotlight on a product that is not listed online at all has nothing to show
             // (a listed but unpublished one resolves with `state: unavailable`).
-            if (in_array($element['type'], ['promo_card', 'product_spotlight'], true) && ! isset($data[$id])) {
+            if (in_array($element['type'], ['promo_card', 'product_spotlight', 'order_form'], true) && ! isset($data[$id])) {
                 $errors[$id] = [[
                     'path' => 'props.product_id',
                     'message' => 'This product is not on sale in the online store (not listed, unpublished or out of its schedule).',

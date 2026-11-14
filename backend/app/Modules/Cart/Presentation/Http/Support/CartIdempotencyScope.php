@@ -26,4 +26,15 @@ final class CartIdempotencyScope implements ShopperIdempotencyScope
 
         return $token === null ? null : 'cart:'.CartOwner::hashToken($token);
     }
+
+    public function resolveVisitor(Request $request): ?string
+    {
+        $account = Auth::guard('customer')->user();
+        if ($account instanceof CustomerAccount) {
+            return 'customer:'.$account->id;
+        }
+        $id = $request->hasSession() ? $request->session()->getId() : null;
+
+        return is_string($id) && $id !== '' ? 'session:'.hash('sha256', $id) : null;
+    }
 }

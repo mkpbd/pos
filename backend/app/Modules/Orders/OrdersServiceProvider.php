@@ -5,6 +5,7 @@ namespace App\Modules\Orders;
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
 use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
+use App\Modules\Marketing\Application\Contracts\AttributedOrders;
 use App\Modules\Orders\Application\Contracts\OrderBaskets;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Contracts\PurchaseVerifier;
@@ -15,6 +16,7 @@ use App\Modules\Orders\Application\Events\OrderReturnRequested;
 use App\Modules\Orders\Application\Events\OrderReturnUpdated;
 use App\Modules\Orders\Application\Services\NoOrderLineReviews;
 use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
+use App\Modules\Orders\Infrastructure\EloquentAttributedOrders;
 use App\Modules\Orders\Infrastructure\EloquentCustomerWebOrders;
 use App\Modules\Orders\Infrastructure\EloquentOrderBaskets;
 use App\Modules\Orders\Infrastructure\EloquentPurchaseVerifier;
@@ -52,6 +54,8 @@ class OrdersServiceProvider extends ModuleServiceProvider
         $this->app->bindIf(OrderLineReviews::class, NoOrderLineReviews::class);
         // P1b: web orders as baskets for "frequently bought together" (OnlineCatalog).
         $this->app->bind(OrderBaskets::class, EloquentOrderBaskets::class);
+        // P2a: web orders by campaign attribution (declared by Marketing).
+        $this->app->bind(AttributedOrders::class, EloquentAttributedOrders::class);
     }
 
     public function boot(): void

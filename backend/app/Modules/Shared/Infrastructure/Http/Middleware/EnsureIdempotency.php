@@ -22,7 +22,9 @@ use Throwable;
  *
  * Keys are scoped (ADR-014): staff routes use `user:{id}`; storefront routes
  * (`idempotent:shopper`) use `customer:{account id}` or, for guests, `cart:{cart token hash}`
- * — a guest without a cart gets CART_EMPTY (there is nothing to check out).
+ * — a guest without a cart gets CART_EMPTY (there is nothing to check out). P2a:
+ * `idempotent:visitor` (landing page order forms, no cart) uses `customer:{account id}` or
+ * `session:{session id hash}`.
  */
 class EnsureIdempotency
 {
@@ -43,6 +45,12 @@ class EnsureIdempotency
             $scope = app()->bound(ShopperIdempotencyScope::class) ? app(ShopperIdempotencyScope::class)->resolve($request) : null;
             if ($scope === null) {
                 return ApiResponse::error('CART_EMPTY', 'Your cart is empty.', 422);
+            }
+        } elseif ($mode === 'visitor') {
+            // P2a: checkouts without a cart (landing page order forms) — the customer or the session.
+            $scope = app()->bound(ShopperIdempotencyScope::class) ? app(ShopperIdempotencyScope::class)->resolveVisitor($request) : null;
+            if ($scope === null) {
+                return ApiResponse::error('SESSION_REQUIRED', 'Please reload the page and try again.', 419);
             }
         } else {
             $userId = (string) $request->user()?->getAuthIdentifier();

@@ -686,3 +686,124 @@ test('P1b: Classic Shop product page — delivery note, buy now, quick-buy bar, 
   await expect(page.getByText('Oxford Button-down Shirt').first()).toBeVisible()
   await adminContext.close()
 })
+
+test('P2a: a Facebook short link opens the order page; the shopper orders with COD without a cart; the order counts for the campaign', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+
+  // The short link adds the campaign tags and lands on the order page.
+  await page.goto(`${base}/go/fb-order`)
+  await expect(page).toHaveURL(/\/p\/order-now\?.*utm_source=facebook.*sl=fb-order|\/p\/order-now\?.*sl=fb-order.*utm_source=facebook/)
+  const form = page.getByTestId('order-form').first()
+  await expect(form).toBeVisible({ timeout: 30_000 })
+
+  // One-page COD order: details, address, delivery; the live total; confirm.
+  await form.getByLabel('Your name').fill('Rahim Uddin')
+  await form.getByLabel('Mobile number').fill('01711000444')
+  await form.getByLabel('Division').selectOption({ label: 'Dhaka (ঢাকা)' })
+  await form.getByLabel('District').selectOption({ label: 'Dhaka (ঢাকা)' })
+  await form.getByLabel('Full address').fill('House 5, Road 2, Mirpur')
+  // The delivery choice appears once a district is chosen.
+  const shipping = page.getByTestId('order-form-shipping').first().getByRole('radio')
+  await shipping.check()
+  await expect(shipping).toBeChecked()
+  await expect(page.getByTestId('order-form-summary').first()).toContainText(/\d/, { timeout: 30_000 })
+  await page.getByTestId('order-form-submit').first().click()
+  await expect(page.getByTestId('order-form-thanks').first()).toBeVisible({ timeout: 30_000 })
+  const number = (await page.getByTestId('order-form-number').first().innerText()).match(/WEB-\d+/)?.[0]
+  expect(number).toBeTruthy()
+
+  // The shopper's cart was never used.
+  const cart = await page.evaluate(async () => (await (await fetch('/api/v1/store/cart', { headers: { Accept: 'application/json' }, credentials: 'include' })).json()) as { data: { lines?: unknown[]; items?: unknown[] } | null })
+  expect((cart.data?.lines ?? cart.data?.items ?? []).length).toBe(0)
+
+  // Staff: the order is a landing-page order of the Facebook campaign, and the campaign stats count it.
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@greenbasket.test')
+  const api = async (url: string) => admin.evaluate(async (u) => (await (await fetch(u, { headers: { Accept: 'application/json' }, credentials: 'include' })).json()) as { data: any }, url)
+  const orders = await api('/api/v1/web-orders?source=landing_page')
+  const row = orders.data.find((o: { number: string }) => o.number === number)
+  expect(row).toBeTruthy()
+  expect(row.campaign?.name).toBe('Facebook order page')
+  const stats = await api('/api/v1/marketing/stats')
+  const fb = stats.data.by_campaign.find((c: { campaign: { name: string } | null }) => c.campaign?.name === 'Facebook order page')
+  expect(fb.orders).toBeGreaterThanOrEqual(4)
+  await admin.goto(`${base}/admin/marketing/campaigns`)
+  await expect(admin.getByText('Facebook order page').first()).toBeVisible()
+  await adminContext.close()
+})
+
+test('P2b: Little Sprouts posts to Facebook and Instagram in practice mode, serves a product feed, and shoppers can share or order on WhatsApp', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('kids.shop.localhost')
+  const adminContext = await browser.newContext()
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@littlesprouts.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // The demo store is connected in practice mode (sandbox).
+  const accounts = await call('GET', '/api/v1/social/accounts')
+  expect(accounts.body.data).toMatchObject({ connected: true, sandbox: true })
+
+  // A post from a product with its photo, to Facebook and Instagram: published (practice) with a short link per network.
+  const products = await call('GET', `/api/v1/products?search=${encodeURIComponent('Floppy-ear Plush Bunny')}`)
+  const bunny = products.body.data.find((p: { name: string }) => p.name === 'Floppy-ear Plush Bunny')
+  const detail = await call('GET', `/api/v1/products/${bunny.id}`)
+  const imageId = detail.body.data.images[0].id
+  const post = await call('POST', '/api/v1/social/posts', { caption: 'Soft, safe and ready to cuddle 🐰 #littlesprouts', targets: ['facebook', 'instagram'], image_ids: [imageId], product_id: bunny.id })
+  expect(post.status).toBe(201)
+  const published = await call('POST', `/api/v1/social/posts/${post.body.data.id}/publish`)
+  expect(published.body.data.status).toBe('published')
+  for (const result of published.body.data.results) {
+    expect(result).toMatchObject({ status: 'published', sandbox: true })
+    expect(result.short_link.url).toContain('/go/')
+  }
+
+  // A post that the practice network rejects: failed, with a plain reason.
+  const bad = await call('POST', '/api/v1/social/posts', { caption: 'Practice failure #fail-test', targets: ['facebook'], image_ids: [imageId], product_id: bunny.id })
+  const failed = await call('POST', `/api/v1/social/posts/${bad.body.data.id}/publish`)
+  expect(failed.body.data.status).toBe('failed')
+  expect(failed.body.data.results[0].error.code).toBe('SANDBOX_FAILURE')
+
+  // The Meta product feed: real products with BDT prices; a new address retires the old one.
+  const feeds = await call('GET', '/api/v1/social/feeds')
+  let meta = feeds.body.data.find((f: { channel: string }) => f.channel === 'meta')
+  if (!meta.enabled) meta = (await call('PATCH', '/api/v1/social/feeds/meta', { enabled: true })).body.data
+  const feedPath = new URL(meta.xml_url).pathname
+  const feed = await admin.evaluate(async (path) => {
+    const res = await fetch(path)
+    return { status: res.status, text: await res.text() }
+  }, feedPath)
+  expect(feed.status).toBe(200)
+  expect(feed.text).toContain('<g:id>')
+  expect(feed.text).toContain(' BDT</g:price>')
+  const rotated = await call('POST', '/api/v1/social/feeds/meta/rotate')
+  expect(new URL(rotated.body.data.xml_url).pathname).not.toBe(feedPath)
+  expect(await admin.evaluate(async (path) => (await fetch(path, { cache: 'no-store' })).status, feedPath)).toBe(404)
+
+  // The admin page shows practice mode and the published post.
+  await admin.goto(`${base}/admin/marketing/social`)
+  await expect(admin.getByText(/Practice mode/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(admin.getByText('Soft, safe and ready to cuddle', { exact: false }).first()).toBeVisible()
+
+  // WhatsApp number on: the product page offers "Order on WhatsApp" with a wa.me link, and a share bar.
+  expect((await call('PATCH', '/api/v1/storefront/settings', { whatsapp_number: '01700000004', whatsapp_order_button: true, whatsapp_chat_button: true })).status).toBe(200)
+  await adminContext.close()
+  await page.goto(`${base}/product/plush-bunny`)
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  const order = page.getByRole('link', { name: /Order on WhatsApp/ })
+  await expect(order).toHaveAttribute('href', /^https:\/\/wa\.me\/8801700000004\?text=/)
+  await expect(page.getByRole('link', { name: /Share on Facebook/ }).first()).toHaveAttribute('href', /facebook\.com\/sharer/)
+})

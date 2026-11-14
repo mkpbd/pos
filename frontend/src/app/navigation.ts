@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -26,6 +26,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/web-returns', label: 'Web returns', icon: PackageXIcon, permission: 'web_orders.view' },
   { to: '/cod-remittances', label: 'COD remittances', icon: BanknoteIcon, permission: 'web_orders.remit' },
   { to: '/promotions', label: 'Promotions', icon: BadgePercentIcon, permission: 'promotions.view' },
+  // P2a campaigns / short links (marketing.view), P2b social posts / product feeds (social.view).
+  { to: '/marketing', label: 'Marketing', icon: MegaphoneIcon, permission: ['marketing.view', 'social.view'] },
   { to: '/reviews', label: 'Reviews', icon: StarIcon, permission: 'reviews.view' },
   { to: '/returns', label: 'Returns', icon: Undo2Icon, permission: 'returns.view' },
   { to: '/cash-registers', label: 'Cash registers', icon: WalletIcon, permission: ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage'] },

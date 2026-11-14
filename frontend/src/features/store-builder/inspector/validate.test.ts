@@ -23,11 +23,11 @@ describe('validateNode: builder elements', () => {
   it('accepts every registry default except the elements that need content first', () => {
     // B4: a video needs its link, a promoted product its product, a countdown its end, a discount its promotion, a menu its menu.
     // B6: images, logos, a map address, a category, a product and the shop-the-look photo.
-    // B8a: the before / after photos, the bundle's products and the photo grid's photos.
+    // B8a: the before / after photos, the bundle's products and the photo grid's photos. P2a: the order form's product.
     const needContent = [
       'hero_slider', 'banner_grid', 'rich_text', 'features_strip', 'testimonials', 'product_tabs', 'video', 'promo_card', 'countdown', 'discount', 'menu',
       'gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look',
-      'before_after', 'bundle', 'photo_grid',
+      'before_after', 'bundle', 'photo_grid', 'order_form',
     ]
     for (const meta of ELEMENT_REGISTRY) {
       const node = buildElement(meta.type, registry, new Set())!

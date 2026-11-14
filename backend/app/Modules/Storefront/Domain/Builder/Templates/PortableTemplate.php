@@ -46,6 +46,18 @@ final class PortableTemplate
     /** B6: product sources a shop-the-look hotspot's `product_ref` may name. */
     public const PRODUCT_SOURCES = ['featured', 'best_sellers', 'new_arrivals', 'on_sale'];
 
+    /**
+     * P2a: `landing` — the product a new campaign page is made for (chosen when it is created;
+     * else the store's first featured, best-selling or newest product).
+     */
+    public const LANDING_SOURCE = 'landing';
+
+    /**
+     * P2a: elements whose own `product_id` a template names with `props.product_ref: {source,
+     * index}` (any product source or `landing`); left out when the store has no such product.
+     */
+    public const PRODUCT_REF_ELEMENTS = ['order_form', 'product_spotlight', 'promo_card', 'review_wall'];
+
     /** B8b: promotion references of a discount element (`promotion_ref`). */
     public const PROMOTION_REFS = ['coupon'];
 
@@ -276,6 +288,16 @@ final class PortableTemplate
                 }
                 $props['items'] = $items;
             }
+            if (in_array($node['type'] ?? null, self::PRODUCT_REF_ELEMENTS, true) && array_key_exists('product_ref', $props)) {
+                // P2a: an order form, spotlight, promoted product or product review wall of a
+                // product named by source position (or the campaign page's product).
+                $productId = self::productRef($props['product_ref'], $resolver);
+                if ($productId === null) {
+                    return null;
+                }
+                unset($props['product_ref']);
+                $props['product_id'] = $productId;
+            }
             if (isset($node['props'])) {
                 $node['props'] = self::assetsToMedia($props, $resolver);
             }
@@ -313,7 +335,7 @@ final class PortableTemplate
      */
     private static function productRef(mixed $ref, TemplateReferenceResolver $resolver): ?string
     {
-        return is_array($ref) && in_array($ref['source'] ?? null, self::PRODUCT_SOURCES, true) && is_int($ref['index'] ?? null)
+        return is_array($ref) && in_array($ref['source'] ?? null, [...self::PRODUCT_SOURCES, self::LANDING_SOURCE], true) && is_int($ref['index'] ?? null)
             && $ref['index'] >= 0 && $ref['index'] < self::PRODUCT_REF_MAX
             ? $resolver->product($ref['source'], $ref['index'])
             : null;

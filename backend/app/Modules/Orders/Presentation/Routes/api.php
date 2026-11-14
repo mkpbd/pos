@@ -4,6 +4,7 @@ use App\Modules\Orders\Presentation\Http\Controllers\AccountOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\AccountReturnController;
 use App\Modules\Orders\Presentation\Http\Controllers\CodRemittanceController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutController;
+use App\Modules\Orders\Presentation\Http\Controllers\StoreDirectCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderReturnController;
@@ -14,6 +15,9 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'c
     Route::get('checkout/options', [StoreCheckoutController::class, 'options'])->name('store.checkout.options');
     Route::post('checkout/preview', [StoreCheckoutController::class, 'preview'])->middleware('throttle:checkout')->name('store.checkout.preview');
     Route::post('checkout', [StoreCheckoutController::class, 'place'])->middleware(['throttle:checkout', 'idempotent:shopper'])->name('store.checkout');
+    // P2a: a landing page's order form orders directly, without the cart.
+    Route::post('checkout/direct/preview', [StoreDirectCheckoutController::class, 'preview'])->middleware('throttle:checkout')->name('store.checkout.direct.preview');
+    Route::post('checkout/direct', [StoreDirectCheckoutController::class, 'place'])->middleware(['throttle:checkout', 'idempotent:visitor'])->name('store.checkout.direct');
     Route::get('orders/{number}', [StoreOrderController::class, 'show'])->where('number', '[A-Za-z0-9-]{1,40}')->name('store.orders.show');
 });
 

@@ -19,7 +19,9 @@ interface PromotionRedemptions
     /**
      * Appends one redemption per promotion used and counts the coupon's use.
      *
+     * P2a: `$email` is null for landing page orders placed without one.
+     *
      * @param  list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>  $redemptions
      */
-    public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, string $email, array $redemptions): void;
+    public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, ?string $email, array $redemptions): void;
 }

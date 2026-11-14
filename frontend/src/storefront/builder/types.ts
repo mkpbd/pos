@@ -4,7 +4,7 @@
  * BuilderDocumentSchema::normalize is the source of truth; ./validate.ts mirrors its value rules.
  */
 
-import type { CatalogImage, FaqGroup, MediaRef, ProductCard, ProductDetail, StoreSection, StorefrontMenu, ThemeColors } from '../types'
+import type { CatalogImage, FaqGroup, MediaRef, ProductCard, ProductDetail, ShippingMethod, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
 export type Device = 'desktop' | 'tablet' | 'mobile'
@@ -554,6 +554,38 @@ export type FormSubmitResponse = { message: string }
 
 export type B8bElement = FormElement
 
+/* ----------------------------------------------------------------------------------------------
+ * P2a: the one-product order form (`order_form`, group commerce; page, cms, zone). A cash-on-
+ * delivery order straight from a landing page: no cart step, POST /store/checkout/direct.
+ * -------------------------------------------------------------------------------------------- */
+
+export type OrderFormEmailField = 'hidden' | 'optional' | 'required'
+export type OrderFormNoteField = 'hidden' | 'optional'
+export type OrderFormPayment = 'cod_only' | 'store_methods'
+/** An optional add-on product the shopper can tick (`label` ✱ ≤ 120). */
+export type OrderFormUpsell = { product_id: string; label: string }
+export type OrderFormProps = {
+  /** The product sold (invalid until set up). */
+  product_id: string | null
+  /** ✱ ≤ 120 (empty = no heading). */
+  title: string
+  /** ✱ ≤ 400. */
+  text: string
+  /** Let the shopper choose the variant (else the default variant is ordered). */
+  show_variants: boolean
+  /** `default` 1–10, `max` 1–20, default ≤ max. */
+  quantity: { default: number; max: number }
+  fields: { email: OrderFormEmailField; note: OrderFormNoteField }
+  payment: OrderFormPayment
+  /** ✱ ≤ 60. */
+  button_label: string
+  /** ✱ ≤ 400. */
+  success_message: string
+  upsell: OrderFormUpsell | null
+  layout: 'stacked' | 'two_columns'
+}
+export type OrderFormElement = ElementOf<'order_form', OrderFormProps>
+
 export type Element =
   | HeadingElement
   | TextElement
@@ -567,6 +599,7 @@ export type Element =
   | B6Element
   | B8aElement
   | B8bElement
+  | OrderFormElement
 
 export type ElementType = Element['type']
 
@@ -750,7 +783,24 @@ export type StoreHoursData = { timezone: string; state?: ElementDataState }
 /** B8a store-source chart: what the server counted (one series; name translated "Products" / "Reviews"). */
 export type ChartStoreData = { labels: string[]; series: ChartSeries[]; state?: ElementDataState }
 
+/**
+ * P2a order form `data[id]`: the product (and add-on) as the product page gets them, the enabled
+ * payment methods (`cod_only` → cash on delivery only), whether guests may order and checkout is
+ * open, and delivery hints (methods; the methods per district id). The preview is authoritative.
+ */
+export type OrderFormData = {
+  product: ProductDetail
+  upsell: ProductDetail | null
+  payment_methods: { code: 'cod' | 'bank_transfer'; display_name: string }[]
+  cod_enabled: boolean
+  guest_checkout: boolean
+  checkout_available: boolean
+  shipping: { methods: ShippingMethod[]; districts: Record<string, string[]> | [] }
+  state?: ElementDataState
+}
+
 export type ElementData =
+  | OrderFormData
   | CountdownData
   | DiscountData
   | PromoCardData

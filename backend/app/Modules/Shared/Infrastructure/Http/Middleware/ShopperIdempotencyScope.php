@@ -12,4 +12,11 @@ use Illuminate\Http\Request;
 interface ShopperIdempotencyScope
 {
     public function resolve(Request $request): ?string;
+
+    /**
+     * P2a (`idempotent:visitor`, checkouts without a cart): `customer:{account id}` for a
+     * signed-in shopper, else `session:{sha256 of the storefront session id}`; null without a
+     * session.
+     */
+    public function resolveVisitor(Request $request): ?string;
 }

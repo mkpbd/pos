@@ -20,12 +20,27 @@ export type StorefrontSettings = {
   default_locale?: StoreLocale
   /** Amounts and numbers in Bengali digits (০১২…) when the store is in Bangla (default off; E12b). */
   bangla_digits?: boolean
+  /** P2b: share buttons on product, campaign and blog pages (default on). */
+  share_buttons?: boolean
+  /** P2b: the shop's WhatsApp number as digits for wa.me ("8801712345678"); null = none. */
+  whatsapp_number?: string | null
+  /** P2b: "Order on WhatsApp" next to Buy now (default on; works once a number is set). */
+  whatsapp_order_button?: boolean
+  /** P2b: floating WhatsApp chat button on every store page (default on; works once a number is set). */
+  whatsapp_chat_button?: boolean
   updated_at: string | null
 }
 
 export type StoreLocale = 'en' | 'bn'
 
-export type StorefrontDomain = { id: string; host: string; is_primary: boolean; created_at: string | null }
+export type StorefrontDomain = {
+  id: string
+  host: string
+  is_primary: boolean
+  /** P2a: the page this host's `/` shows (e.g. `/p/eid-sale`); null = the home page. */
+  entry_path?: string | null
+  created_at: string | null
+}
 
 export const THEME_COLORS = ['primary', 'primary_foreground', 'accent', 'accent_foreground', 'highlight', 'sale', 'heading', 'text', 'canvas', 'surface', 'border'] as const
 export type ThemeColor = (typeof THEME_COLORS)[number]
@@ -364,7 +379,25 @@ export function useSaveStorefrontSettingsMutation() {
 
   return useMutation({
     mutationFn: (
-      input: Partial<Pick<StorefrontSettings, 'is_enabled' | 'site_name' | 'meta_description' | 'fulfilment_store_id' | 'guest_checkout_enabled' | 'return_window_days' | 'allow_indexing' | 'bangla_enabled' | 'default_locale' | 'bangla_digits'>>,
+      input: Partial<
+        Pick<
+          StorefrontSettings,
+          | 'is_enabled'
+          | 'site_name'
+          | 'meta_description'
+          | 'fulfilment_store_id'
+          | 'guest_checkout_enabled'
+          | 'return_window_days'
+          | 'allow_indexing'
+          | 'bangla_enabled'
+          | 'default_locale'
+          | 'bangla_digits'
+          | 'share_buttons'
+          | 'whatsapp_number'
+          | 'whatsapp_order_button'
+          | 'whatsapp_chat_button'
+        >
+      >,
     ) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),
@@ -392,6 +425,16 @@ export function useMakeDomainPrimaryMutation() {
 
   return useMutation({
     mutationFn: (id: string) => api.patch<StorefrontDomain>(`/storefront/domains/${id}`, { is_primary: true }).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.domains }),
+  })
+}
+
+/** P2a: which page a domain opens on (`null` = the home page). */
+export function useSetDomainEntryPathMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, entryPath }: { id: string; entryPath: string | null }) => api.patch<StorefrontDomain>(`/storefront/domains/${id}`, { entry_path: entryPath }).then((r) => r.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: storefrontKeys.domains }),
   })
 }

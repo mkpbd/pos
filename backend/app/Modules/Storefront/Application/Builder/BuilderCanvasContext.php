@@ -34,7 +34,8 @@ class BuilderCanvasContext
         $bootstrap = $this->locale->using($lang, fn () => $this->bootstrap->buildWithTheme($theme));
 
         return [
-            'bootstrap' => $bootstrap + ['preview' => ! $this->config->settings()->is_enabled],
+            // P2a: the canvas shows pages directly, so no domain entry page.
+            'bootstrap' => $bootstrap + ['preview' => ! $this->config->settings()->is_enabled, 'entry_path' => null],
             'theme_source' => 'draft',
             'store_url' => $this->config->primaryUrl(),
             'locales' => $bootstrap['store']['locales'],

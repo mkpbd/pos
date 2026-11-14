@@ -6,6 +6,7 @@ use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Orders\Application\Actions\CancelOrder;
 use App\Modules\Orders\Application\Actions\OrderWorkflow;
 use App\Modules\Orders\Application\Actions\ProcessOrdersInBulk;
+use App\Modules\Orders\Application\Contracts\OrderCampaigns;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -43,7 +44,10 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 class WebOrderController
 {
-    public function __construct(private readonly OrderPresenter $presenter) {}
+    public function __construct(
+        private readonly OrderPresenter $presenter,
+        private readonly OrderCampaigns $campaigns,
+    ) {}
 
     /**
      * Web orders (the orders board)
@@ -55,7 +59,8 @@ class WebOrderController
      * unpaid: the courier owes the money); `search` matches number, contact name, phone and
      * e-mail. Newest first, 25 per page. Rows: `{id, number, placed_at, status, status_label,
      * payment_status, payment_method, contact_name, contact_phone, total, currency,
-     * item_count, district, courier_name, tracking_number, shipment_status, delivered_at}`.
+     * item_count, district, courier_name, tracking_number, shipment_status, delivered_at,
+     * source, campaign: {id, name}|null}` (P2a: filter `source` storefront | landing_page).
      * `meta.status_counts`: `{all, <every status>: n, cod_unremitted}` for the current
      * filters except `status` (and except `cod_unremitted` for its own count).
      */
@@ -73,6 +78,8 @@ class WebOrderController
             'date_from' => ['sometimes', 'date_format:Y-m-d'],
             'date_to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+            // P2a: cart checkout or a landing page's order form.
+            'source' => ['sometimes', Rule::in(Order::SOURCES)],
         ]);
         $timezone = $organizations->summary($tenant->requireOrganization())['timezone'] ?? config('app.timezone');
         $day = fn (string $date) => Carbon::parse($date, $timezone)->startOfDay()->setTimezone(config('app.timezone'));
@@ -86,6 +93,7 @@ class WebOrderController
         $filtered = fn (bool $withCodUnremitted) => Order::query()
             ->when($request->query('payment_status'), fn (Builder $q, string $v) => $q->where('payment_status', $v))
             ->when($request->query('payment_method'), fn (Builder $q, string $v) => $q->where('payment_method', $v))
+            ->when($request->query('source'), fn (Builder $q, string $v) => $q->where('source', $v))
             ->when($request->query('courier_id'), fn (Builder $q, string $v) => $q->whereHas('shipment', fn (Builder $s) => $s->where('courier_id', $v)))
             ->when($request->query('district_id'), fn (Builder $q, $v) => $q->whereHas('shippingAddress', fn (Builder $a) => $a->where('district_id', (int) $v)))
             ->when($withCodUnremitted && $request->boolean('cod_unremitted'), $codUnremitted)
@@ -115,10 +123,12 @@ class WebOrderController
             )));
         }
         $page = $query->paginate(ListQuery::perPage($request));
+        // P2a: each row's campaign, resolved once for the page.
+        $campaigns = $this->campaigns->campaignsFor(collect($page->items())->mapWithKeys(fn (Order $o) => [$o->id => $o->attribution])->all());
 
         return ApiResponse::paginated(
             $page,
-            fn (Order $o) => new JsonResource(OrderPresenter::row($o, Decimal::round((string) ($o->getAttribute('lines_sum_quantity') ?? '0'), 3))),
+            fn (Order $o) => new JsonResource(OrderPresenter::row($o, Decimal::round((string) ($o->getAttribute('lines_sum_quantity') ?? '0'), 3)) + ['campaign' => $campaigns[$o->id] ?? null]),
             ['status_counts' => $statusCounts],
         );
     }
