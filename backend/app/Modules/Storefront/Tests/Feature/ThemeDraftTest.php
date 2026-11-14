@@ -117,6 +117,8 @@ class ThemeDraftTest extends TestCase
             ->assertJsonPath('data.settings.typography', [
                 'heading_font' => 'jost', 'body_font' => 'poppins', 'body_size' => 17, 'heading_scale' => 1.333,
                 'line_height' => 1.6, 'heading_weight' => 800, 'mobile_scale' => 0.9, 'letter_spacing' => 0.01,
+                // B10: Bangla fonts automatic, Bangla spacing at its defaults.
+                'bangla_heading_font' => null, 'bangla_body_font' => null, 'bangla_line_height' => 1.7, 'bangla_scale' => 1,
             ])
             ->assertJsonPath('data.settings.palette', [['name' => 'Brand teal', 'hex' => '#0f766e'], ['name' => 'Glass', 'hex' => '#ffffff80']])
             ->json('data.settings');

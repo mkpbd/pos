@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { BootstrapContext, storefrontKeys } from '../../api'
@@ -6,6 +7,8 @@ import { NoticeProvider } from '../../components/notice-provider'
 import { useDictionary } from '../../i18n/dictionaries'
 import { buildLocaleValue, LocaleContext } from '../../i18n/locale'
 import { parseLocale, setLocaleRuntime, type Locale } from '../../i18n/runtime'
+import { useThemeFonts } from '../../font-loader'
+import type { FontSource } from '../../fonts'
 import { formatPrice } from '../../money'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../../theme'
 import type { StorefrontBootstrap, StorefrontTheme } from '../../types'
@@ -29,7 +32,9 @@ import {
   type Rect,
 } from './protocol'
 import { sanitizeHtml } from './sanitize'
+import { FormatBar } from './format-bar'
 import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
+import { isEditUi, useCanvasEditing } from './use-canvas-editing'
 
 /*
  * The store builder canvas (B2), inside the editor's iframe at /admin/builder-canvas. It draws the
@@ -61,9 +66,12 @@ function cleanSections(sections: RenderPageSection[]): RenderPageSection[] {
 const safeIds = (ids: readonly (string | null | undefined)[]) => ids.filter((id): id is string => typeof id === 'string' && NODE_ID.test(id))
 
 /** Outlines for the selection, hover and nodes with problems; ids are checked against the id pattern before they reach a selector. */
-function outlineCss(frame: RenderFrame | null): string {
+function outlineCss(frame: RenderFrame | null, dropTarget: string | null = null): string {
   if (!frame) return ''
   const rules: string[] = []
+  // B10: the image or background a dragged picture would replace.
+  const [drop] = safeIds([dropTarget])
+  if (drop) rules.push(`[data-b="${drop}"]{outline:3px dashed #16a34a !important;outline-offset:-3px}`)
   const [selection] = safeIds([frame.selection])
   const [hover] = safeIds([frame.hover])
   for (const id of safeIds(frame.errors ?? [])) rules.push(`[data-b="${id}"]{outline:2px solid #dc2626 !important;outline-offset:-2px}`)
@@ -81,6 +89,8 @@ html{scroll-behavior:auto}
 .b-page [data-b-global]::before{content:"Global section";position:absolute;top:6px;right:6px;z-index:40;max-width:60%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border-radius:4px;background:#4c1d95;color:#fff;font:600 11px/1.4 system-ui,sans-serif;padding:2px 8px;pointer-events:none}
 .b-page [data-b-global][data-b-global-title]::before{content:"Global section · " attr(data-b-global-title)}
 .b-page [data-b-global]{box-shadow:inset 0 0 0 1px #8b5cf6}
+[data-b-editing]{outline:2px solid #7c3aed !important;outline-offset:3px;cursor:text !important;-webkit-user-select:text;user-select:text;min-width:1ch}
+[data-b-editing] *{cursor:text !important}
 `
 
 const PRODUCT_TYPES = new Set(['product_grid', 'product_carousel', 'product_tabs', 'hot_deals', 'category_strip', 'brand_strip', 'blog_posts'])
@@ -414,6 +424,9 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const [init, setInit] = useState<InitFrame | null>(null)
   const [frame, setFrame] = useState<RenderFrame | null>(null)
   const [themeDraft, setThemeDraft] = useState<CanvasThemeSettings | null>(null)
+  // B10: the store's uploaded fonts the Site styles draft may name; the language the editor edits in.
+  const [themeFonts, setThemeFonts] = useState<FontSource[] | undefined>(undefined)
+  const [localeOverride, setLocaleOverride] = useState<Locale | null>(null)
   const pendingRects = useRef(false)
   const sectionsRef = useRef<readonly unknown[]>([])
   const queryClient = useQueryClient()
@@ -438,21 +451,51 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     })
   }, [post])
 
+  const initial = init?.bootstrap ?? null
+  // The theme draft (Site styles) over the bootstrap theme: everything that reads the theme sees it.
+  const bootstrap = useMemo(
+    () => (initial && (themeDraft || themeFonts) ? { ...initial, theme: mergeThemeSettings(initial.theme, themeDraft ?? {}, themeFonts) } : initial),
+    [initial, themeDraft, themeFonts],
+  )
+  const locale: Locale = localeOverride ?? parseLocale(init?.locale) ?? 'en'
+
+  const sections = useMemo(() => (frame ? cleanSections(frame.sections) : []), [frame])
+  const livePage = useMemo<BuilderPage | null>(
+    () =>
+      frame
+        ? // B9: unavailable global references ride along in `sections` (BuilderPage types them as sections).
+          { document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' }, sections: sections as RenderSection[], media: frame.media ?? {}, data: frame.data ?? {} }
+        : null,
+    [frame, sections],
+  )
+  // B10: texts edited in place, the format bar's links, pictures dropped from the desktop.
+  const editor = useCanvasEditing({ post, sections, page: livePage, locale, selection: frame?.selection ?? null })
+  const editorRef = useRef(editor)
+  useLayoutEffect(() => {
+    editorRef.current = editor
+  })
+  // While a text is edited the page stays as it was drawn (the outlines still follow the editor).
+  const page = editor.frozenPage ?? livePage
+
   // Messages from the editor.
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const message = readParentMessage(event, origin, parent)
       if (!message) return
+      const editing = editorRef.current
       if (message.type === 'init') {
         // Anything that reads the bootstrap from the cache finds the editor's copy.
         queryClient.setQueryData(storefrontKeys.bootstrapFor(null), message.bootstrap)
         const requested = parseLocale(message.locale)
         if (requested) queryClient.setQueryData(storefrontKeys.bootstrapFor(requested), message.bootstrap)
         setInit(message)
-      }
-      else if (message.type === 'render') setFrame(message)
-      else if (message.type === 'theme') setThemeDraft(message.settings)
-      else if (message.type === 'scroll-to') {
+      } else if (message.type === 'render') {
+        // B10: a committed text hands its element back to React just before the new value is drawn.
+        if (!editing.beforeRender(() => setFrame(message))) setFrame(message)
+      } else if (message.type === 'theme') {
+        setThemeDraft(message.settings)
+        if (Array.isArray(message.fonts)) setThemeFonts(message.fonts)
+      } else if (message.type === 'scroll-to') {
         if (!NODE_ID.test(message.id)) return
         const el = document.querySelector(`[data-b="${message.id}"]`)
         if (!el) return
@@ -464,6 +507,19 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         const el = document.querySelector<HTMLElement>(`[data-b="${message.id}"]`)
         // B9: the node's whole motion (entrance, staggered children, loop) as the last frame describes it.
         if (el) playMotion(el, motionTargets(sectionsRef.current).find((target) => target.id === message.id))
+      } else if (message.type === 'edit-text') {
+        if (typeof message.id === 'string' && NODE_ID.test(message.id)) editing.startEdit(message.id, typeof message.field === 'string' ? message.field : undefined)
+      } else if (message.type === 'end-text-edit') editing.finish(message.commit === true ? 'commit' : 'cancel')
+      else if (message.type === 'text-edit-link-result') editing.answerLink(typeof message.url === 'string' ? message.url : null)
+      else if (message.type === 'set-locale') {
+        const next = parseLocale(message.locale)
+        if (!next) return
+        editing.finish('cancel')
+        setInit((current) => {
+          if (current) queryClient.setQueryData(storefrontKeys.bootstrapFor(next), current.bootstrap)
+          return current
+        })
+        setLocaleOverride(next)
       }
     }
     window.addEventListener('message', onMessage)
@@ -472,18 +528,26 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   }, [origin, parent, post, queryClient])
 
   // Display only: pointer input selects, links and forms do nothing, editor shortcuts go to the editor.
+  // B10: except inside the text being edited and its format bar.
   useEffect(() => {
     let hovered: string | null = null
     // B9: anything inside a global section selects the reference (its nodes are edited in the global itself).
     const idAt = (target: EventTarget | null) =>
       target instanceof Element ? ((target.closest<HTMLElement>('[data-b-global]') ?? target.closest<HTMLElement>('[data-b]'))?.dataset.b ?? null) : null
     const swallow = (event: Event) => {
+      if (isEditUi(event.target)) return
       event.preventDefault()
       event.stopPropagation()
     }
     const onClick = (event: MouseEvent) => {
+      if (isEditUi(event.target)) return
       swallow(event)
       if (event.type === 'click') post({ type: 'click', id: idAt(event.target) })
+    }
+    const onDoubleClick = (event: MouseEvent) => {
+      if (isEditUi(event.target)) return
+      swallow(event)
+      editorRef.current.onDoubleClick(event)
     }
     const onOver = (event: MouseEvent) => {
       const id = idAt(event.target)
@@ -497,6 +561,12 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       post({ type: 'hover', id: null })
     }
     const onKey = (event: KeyboardEvent) => {
+      // Keys typed into the text being edited stay there (Delete, Ctrl+Z …).
+      if (editorRef.current.isEditing()) return
+      if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        if (editorRef.current.onEnter()) event.preventDefault()
+        return
+      }
       if (!isEditorShortcut(event)) return
       event.preventDefault()
       post({ type: 'key', key: event.key, ctrl: event.ctrlKey, shift: event.shiftKey, meta: event.metaKey })
@@ -504,7 +574,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     const options = { capture: true }
     document.addEventListener('click', onClick, options)
     document.addEventListener('auxclick', onClick, options)
-    document.addEventListener('dblclick', swallow, options)
+    document.addEventListener('dblclick', onDoubleClick, options)
     document.addEventListener('pointerdown', swallow, options)
     document.addEventListener('mousedown', swallow, options)
     document.addEventListener('submit', swallow, options)
@@ -521,7 +591,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     return () => {
       document.removeEventListener('click', onClick, options)
       document.removeEventListener('auxclick', onClick, options)
-      document.removeEventListener('dblclick', swallow, options)
+      document.removeEventListener('dblclick', onDoubleClick, options)
       document.removeEventListener('pointerdown', swallow, options)
       document.removeEventListener('mousedown', swallow, options)
       document.removeEventListener('submit', swallow, options)
@@ -536,11 +606,9 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     }
   }, [post, reportRects])
 
-  const initial = init?.bootstrap ?? null
-  // The theme draft (Site styles) over the bootstrap theme: everything that reads the theme sees it.
-  const bootstrap = useMemo(() => (initial && themeDraft ? { ...initial, theme: mergeThemeSettings(initial.theme, themeDraft) } : initial), [initial, themeDraft])
-  const locale: Locale = parseLocale(init?.locale) ?? 'en'
   useThemeEffects(bootstrap)
+  // B10: only the fonts the (draft) theme uses.
+  useThemeFonts(bootstrap?.theme ?? null, locale)
   useLayoutEffect(() => {
     document.documentElement.lang = locale
     setLocaleRuntime({ lang: locale, banglaDigits: locale === 'bn' && bootstrap?.store.bangla_digits === true })
@@ -565,18 +633,9 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     [loaded, bootstrap],
   )
 
-  const sections = useMemo(() => (frame ? cleanSections(frame.sections) : []), [frame])
   useLayoutEffect(() => {
     sectionsRef.current = sections
   }, [sections])
-  const page = useMemo<BuilderPage | null>(
-    () =>
-      frame
-        ? // B9: unavailable global references ride along in `sections` (BuilderPage types them as sections).
-          { document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' }, sections: sections as RenderSection[], media: frame.media ?? {}, data: frame.data ?? {} }
-        : null,
-    [frame, sections],
-  )
   const pending = useMemo(() => new Set(frame?.pending ?? []), [frame])
   const surroundings: CanvasSurroundings = frame?.surroundings && CANVAS_SURROUNDINGS.includes(frame.surroundings) ? frame.surroundings : 'page'
   // P1b: product page zones show the product they are previewed with, in the theme's product layout.
@@ -626,7 +685,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       <BootstrapContext value={bootstrap}>
         <NoticeProvider>
           <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
-          <style data-testid="canvas-outlines">{outlineCss(frame)}</style>
+          <style data-testid="canvas-outlines">{outlineCss(frame, editor.dropTarget)}</style>
           <main id="main" className="min-h-screen" data-surroundings={surroundings}>
             {surroundings === 'header' && frame?.device === 'mobile' && (
               <p role="note" data-testid="canvas-compact-note" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
@@ -653,6 +712,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
             )}
             {samples.after}
           </main>
+          {editor.editing?.kind === 'html' &&
+            createPortal(<FormatBar target={editor.editing.element} onCommand={editor.format} onLink={editor.requestLink} />, document.body)}
         </NoticeProvider>
       </BootstrapContext>
     </LocaleContext>

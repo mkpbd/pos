@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
+import { BANGLA_FONTS, BODY_FONT_KEYS, HEADING_FONT_KEYS } from '@/storefront/fonts'
+import type { BanglaRoleFont, BanglaTypography, BodyFont, CustomFontKey, HeadingFont, ThemeFonts } from '@/storefront/types'
 
 export type StorefrontSettings = {
   is_enabled: boolean
@@ -58,8 +60,13 @@ export type PaletteEntry = { name: string; hex: string }
 /** B3 type scale (storefront/type-scale.ts has the defaults and limits). */
 export type ThemeTypeScale = { body_size: number; heading_scale: number; line_height: number; heading_weight: number; mobile_scale: number; letter_spacing: number }
 
-export const HEADING_FONTS = ['baloo', 'poppins', 'playfair', 'jost', 'system'] as const
-export const BODY_FONTS = ['poppins', 'jost', 'system'] as const
+/** B10: the built-in fonts (storefront/fonts.ts is the catalogue); uploaded fonts are `custom:<uuid>` on top. */
+export const HEADING_FONTS = HEADING_FONT_KEYS
+export const BODY_FONTS = BODY_FONT_KEYS
+export { BANGLA_FONTS }
+export type { BanglaRoleFont, BodyFont, CustomFontKey, HeadingFont, ThemeFonts }
+/** B10 theme typography: fonts (built-in or `custom:<uuid>`), Bangla fonts (null = default) and Bangla spacing. */
+export type ThemeTypography = { heading_font: HeadingFont; body_font: BodyFont } & Partial<ThemeTypeScale> & BanglaTypography
 export const BUTTON_STYLES = ['pill', 'rounded', 'square'] as const
 
 /* Theme presets and layout variants (T1); the first value of each list is today's look. */
@@ -85,7 +92,7 @@ export type ThemeDocument = {
   /** The B3 roles are absent in documents from before B3 (= null). */
   colors: Record<ThemeColor, string> & Partial<Record<ThemeRoleColor, string | null>>
   /** The type scale keys are absent in documents from before B3 (= the defaults). */
-  typography: { heading_font: (typeof HEADING_FONTS)[number]; body_font: (typeof BODY_FONTS)[number] } & Partial<ThemeTypeScale>
+  typography: ThemeTypography
   /** Absent before B3 (= none). */
   palette?: PaletteEntry[]
   shape: { button_style: (typeof BUTTON_STYLES)[number]; card_radius: number }
@@ -139,6 +146,8 @@ export type ThemeDraft = {
   /** Only returned to holders of storefront.custom_css. */
   custom_css: string | null
   has_custom_css: boolean
+  /** B10: the fonts in effect for the draft (Bangla fonts resolved) and the uploaded fonts it uses. */
+  fonts?: ThemeFonts | null
 }
 
 /** A published theme version (GET /storefront/theme/versions). */
@@ -359,6 +368,7 @@ export const storefrontKeys = {
   themePresets: ['storefront', 'theme', 'presets'] as const,
   themeDraft: ['storefront', 'theme', 'draft'] as const,
   themeVersions: ['storefront', 'theme', 'versions'] as const,
+  fonts: ['storefront', 'fonts'] as const,
   menus: ['storefront', 'menus'] as const,
   menu: (id: string) => ['storefront', 'menus', id] as const,
   linkTargets: ['storefront', 'link-targets'] as const,
@@ -716,5 +726,78 @@ export function useReorderSectionsMutation() {
   return useMutation({
     mutationFn: (ids: string[]) => api.put<HomepageSection[]>('/storefront/homepage-sections/order', { ids }).then((r) => r.data),
     onSuccess: (sections) => queryClient.setQueryData(storefrontKeys.sections, sections),
+  })
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B10: uploaded fonts (GET/POST /storefront/fonts, DELETE /storefront/fonts/{id})
+ * -------------------------------------------------------------------------------------------- */
+
+/** Where an uploaded font is used: the live theme and / or the theme draft. */
+export type FontUsage = 'live_theme' | 'theme_draft'
+/** The typography roles that name it. */
+export type FontRole = 'heading' | 'body' | 'bangla_heading' | 'bangla_body'
+
+/** An uploaded woff2 font of the store. */
+export type StoreFont = {
+  id: string
+  /** `custom:<uuid>`: what the theme typography names it by. */
+  key: CustomFontKey
+  name: string
+  /** The CSS family it is declared under. */
+  family: string
+  url: string
+  format: 'woff2'
+  weight_min: number
+  weight_max: number
+  /** Bytes. */
+  size: number
+  used_by: FontUsage[]
+  roles: FontRole[]
+  created_at: string | null
+}
+
+export type StoreFontList = { fonts: StoreFont[]; limit: number; max_bytes: number }
+
+/** Upload limits (the server's): woff2 only, 500 KB, four per store, names up to 60 characters. */
+export const FONT_LIMITS = { files: 4, maxBytes: 512_000, nameMax: 60 } as const
+
+export function useStoreFonts(enabled = true) {
+  return useQuery({
+    queryKey: storefrontKeys.fonts,
+    queryFn: ({ signal }) => api.get<StoreFontList>('/storefront/fonts', { signal }).then((r) => r.data),
+    enabled,
+  })
+}
+
+/** After an upload or delete: the font list and the theme draft (its `fonts`) are stale. */
+function useFontsChanged() {
+  const queryClient = useQueryClient()
+  return () =>
+    Promise.all([queryClient.invalidateQueries({ queryKey: storefrontKeys.fonts }), queryClient.invalidateQueries({ queryKey: storefrontKeys.themeDraft })])
+}
+
+export type FontUploadInput = { file: File; name: string; weight_min?: number; weight_max?: number }
+
+export function useUploadFontMutation() {
+  const changed = useFontsChanged()
+  return useMutation({
+    mutationFn: ({ file, name, weight_min, weight_max }: FontUploadInput) => {
+      const body = new FormData()
+      body.append('file', file)
+      body.append('name', name)
+      if (weight_min !== undefined) body.append('weight_min', String(weight_min))
+      if (weight_max !== undefined) body.append('weight_max', String(weight_max))
+      return api.post<StoreFont>('/storefront/fonts', body).then((r) => r.data)
+    },
+    onSuccess: () => changed(),
+  })
+}
+
+export function useDeleteFontMutation() {
+  const changed = useFontsChanged()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/storefront/fonts/${encodeURIComponent(id)}`),
+    onSuccess: () => changed(),
   })
 }

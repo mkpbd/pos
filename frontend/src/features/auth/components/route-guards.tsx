@@ -34,7 +34,9 @@ export function RequireAuth() {
 
   // Hold rendering until the branch sent in X-Branch-Id is one the server will accept.
   if (isPending || (data && !branchIsValid)) return <FullScreenLoader />
-  if (error) {
+  // Only when there is no session at all: a failed background refetch (slow or overloaded server) keeps
+  // the last good session, so open forms are not unmounted and the user's typing is not lost.
+  if (error && !data) {
     return (
       <div className="mx-auto max-w-md p-6 pt-24">
         <ErrorState title="Could not load your session" error={error} onRetry={() => refetch()} />

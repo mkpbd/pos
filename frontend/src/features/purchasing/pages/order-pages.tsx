@@ -423,7 +423,8 @@ export function PurchaseOrderPage() {
 
   if (!orderId) return <OrderForm key="new" />
   if (isPending) return <LoadingState rows={6} label="Loading order" />
-  if (error) return <ErrorState error={error} onRetry={() => refetch()} />
+  // Only without data: a failed background refetch keeps the open form (and what was typed).
+  if (!data) return <ErrorState error={error} onRetry={() => refetch()} />
 
   return data.status === 'draft' && can('purchases.manage') ? <OrderForm key={data.id} order={data} /> : <OrderView order={data} />
 }

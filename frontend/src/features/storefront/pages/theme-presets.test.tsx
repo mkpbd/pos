@@ -77,7 +77,7 @@ describe('theme presets', () => {
     expect(screen.getByTestId('theme-status')).toHaveTextContent('Draft — not live yet')
     expect(screen.getByRole('combobox', { name: 'Header' })).toHaveTextContent('Centered brand, search icon')
     expect(screen.getByRole('combobox', { name: 'Footer' })).toHaveTextContent('Brand & product showcase')
-    expect(screen.getByText('Playfair Display (serif, elegant)', { selector: '[data-slot="select-value"] *' })).toBeInTheDocument()
+    expect(screen.getByText('Playfair Display', { selector: '[data-slot="select-value"]' })).toBeInTheDocument()
     expect(within(screen.getByTestId('preset-handmade')).getByText('Current')).toBeInTheDocument()
   })
 

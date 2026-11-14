@@ -5,6 +5,7 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Builder\BuilderCanvasContext;
+use App\Modules\Storefront\Application\Builder\BuilderPageCheck;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
 use App\Modules\Storefront\Application\Builder\EditBuilderBanner;
@@ -147,6 +148,25 @@ class BuilderDocumentController
         );
 
         return ApiResponse::success(BuilderPresenter::document($saved->load('publishedVersion')));
+    }
+
+    /**
+     * Check the page
+     *
+     * B10: what only the server can check before publishing. `{content?}`: unsaved content
+     * (normalized like a draft save; malformed is 422 DOCUMENT_INVALID), omitted = the saved
+     * draft. Nothing is saved. Returns `{issues: [{code, severity: error|warning|tip, node_id|null,
+     * message, details: {path, field, ids?, url?, target?, states?, global_id?, title?}}], counts:
+     * {error, warning, tip}, checked_at}` — gone records (the save check's codes),
+     * GLOBAL_UNPUBLISHED, ORDER_FORM_PRODUCT_NOT_ON_SALE, LINK_BROKEN (errors); PRODUCT_NOT_LIVE,
+     * CATEGORY_HIDDEN, BRAND_HIDDEN, BANNER_NOT_LIVE, MENU_INACTIVE, LINK_UNKNOWN (warnings);
+     * FORM_NO_RECIPIENT (tip). Errors don't block publishing.
+     */
+    public function check(Request $request, BuilderDocument $document, BuilderPageCheck $check): JsonResponse
+    {
+        $content = $request->validate(['content' => ['sometimes', 'array']])['content'] ?? null;
+
+        return ApiResponse::success($check->check($document, $content));
     }
 
     /**

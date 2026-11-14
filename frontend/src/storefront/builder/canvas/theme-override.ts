@@ -1,4 +1,5 @@
-import type { StorefrontTheme } from '../../types'
+import { customFonts, effectiveBanglaFonts, toCustomFonts, type FontSource } from '../../fonts'
+import type { StorefrontTheme, ThemeFontKey } from '../../types'
 
 /*
  * The draft theme on the builder canvas (B3): the editor sends the theme draft's settings with a
@@ -27,9 +28,33 @@ function primitives(value: unknown): Record<string, unknown> {
   return Object.fromEntries(Object.entries(value).filter(([key, v]) => /^[a-z_]{1,40}$/.test(key) && (plain(v) || v === null)))
 }
 
-/** The bootstrap theme with the draft settings laid over it (unknown or invalid values ignored). */
-export function mergeThemeSettings(theme: StorefrontTheme, settings: unknown): StorefrontTheme {
-  if (!isObject(settings)) return theme
+/**
+ * B10: the theme's `fonts` for its (draft) typography: the fonts in effect and the uploaded fonts
+ * they use, found in the bootstrap's list and the editor's (`fonts` of the theme message).
+ */
+export function resolveThemeFonts(theme: StorefrontTheme, extra: readonly FontSource[] = []): StorefrontTheme {
+  const custom = toCustomFonts([...customFonts(theme), ...extra])
+  const { typography } = theme
+  const bangla = effectiveBanglaFonts(typography, custom)
+  const roles = new Set<unknown>([typography.heading_font, typography.body_font, bangla.body, bangla.heading])
+  return {
+    ...theme,
+    fonts: {
+      heading: typography.heading_font,
+      body: typography.body_font,
+      bangla_heading: bangla.heading as ThemeFontKey,
+      bangla_body: bangla.body as ThemeFontKey,
+      custom: custom.filter((font) => roles.has(font.id)),
+    },
+  }
+}
+
+/**
+ * The bootstrap theme with the draft settings laid over it (unknown or invalid values ignored).
+ * B10: `fonts` = the store's uploaded fonts the draft may name (the theme message's list).
+ */
+export function mergeThemeSettings(theme: StorefrontTheme, settings: unknown, fonts?: readonly FontSource[]): StorefrontTheme {
+  if (!isObject(settings)) return fonts?.length ? resolveThemeFonts(theme, fonts) : theme
   const colors: Record<string, string | null> = { ...(theme.colors as unknown as Record<string, string | null>) }
   if (isObject(settings.colors)) {
     for (const [key, value] of Object.entries(settings.colors)) {
@@ -39,7 +64,7 @@ export function mergeThemeSettings(theme: StorefrontTheme, settings: unknown): S
       else if (value === null && OPTIONAL_ROLES.has(key)) colors[key] = null
     }
   }
-  return {
+  const merged: StorefrontTheme = {
     ...theme,
     colors: colors as unknown as StorefrontTheme['colors'],
     typography: { ...theme.typography, ...primitives(settings.typography) } as StorefrontTheme['typography'],
@@ -47,4 +72,5 @@ export function mergeThemeSettings(theme: StorefrontTheme, settings: unknown): S
     layout: { ...theme.layout, ...primitives(settings.layout) } as StorefrontTheme['layout'],
     ...(typeof settings.preset === 'string' && /^[a-z_-]{1,32}$/.test(settings.preset) ? { preset: settings.preset as StorefrontTheme['preset'] } : {}),
   }
+  return resolveThemeFonts(merged, fonts)
 }

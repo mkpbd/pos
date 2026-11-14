@@ -56,7 +56,7 @@ function seoErrors(problems: readonly Problem[]): Partial<Record<keyof SeoForm, 
   return out
 }
 
-function SeoTextField({ label, value, max, kind, placeholder, onChange, error, lang, hint }: {
+function SeoTextField({ label, value, max, kind, placeholder, onChange, error, lang, hint, checkField }: {
   label: string
   value: string
   max: number
@@ -66,6 +66,8 @@ function SeoTextField({ label, value, max, kind, placeholder, onChange, error, l
   error?: string
   lang?: string
   hint?: string
+  /** B10: the page check's key for this field (`seo.title`), so "Fix it" can focus it. */
+  checkField?: string
 }) {
   const id = useId()
   const advice = lengthHint(value.length, kind)
@@ -78,6 +80,7 @@ function SeoTextField({ label, value, max, kind, placeholder, onChange, error, l
     placeholder,
     'aria-invalid': error ? true : undefined,
     'aria-describedby': `${id}-help`,
+    'data-check-field': checkField,
     onChange: (e: { target: { value: string } }) => onChange(e.target.value),
   } as const
   return (
@@ -186,6 +189,7 @@ export function SeoPanel({ content, document, bangla, problems = [], onCommand }
         kind="title"
         placeholder={document.title}
         hint="Empty: the page title is used."
+        checkField="seo.title"
         error={errors.title}
         onChange={(title) => set({ title }, 'title')}
       />
@@ -195,6 +199,7 @@ export function SeoPanel({ content, document, bangla, problems = [], onCommand }
         max={SEO_DESCRIPTION_MAX}
         kind="description"
         placeholder="e.g. Fresh handmade sweets delivered across Dhaka. Order before 4 pm for same-day delivery."
+        checkField="seo.description"
         error={errors.description}
         onChange={(description) => set({ description }, 'description')}
       />

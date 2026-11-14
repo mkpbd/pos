@@ -57,8 +57,51 @@ export type TypeScaleSettings = {
   letter_spacing?: number
 }
 
-export type HeadingFont = 'baloo' | 'poppins' | 'playfair' | 'jost' | 'system'
-export type BodyFont = 'poppins' | 'jost' | 'system'
+/** B10: fonts with Bengali glyphs (each also draws Latin, or falls back to the Latin font of its stack). */
+export type BanglaFontKey = 'hind-siliguri' | 'noto-sans-bengali' | 'anek-bangla' | 'tiro-bangla' | 'baloo-da-2'
+/** B10: an uploaded font (`custom:<uuid>`, see ThemeFonts.custom). */
+export type CustomFontKey = `custom:${string}`
+export type HeadingFont = 'baloo' | 'poppins' | 'playfair' | 'jost' | 'system' | BanglaFontKey | CustomFontKey
+export type BodyFont = 'poppins' | 'jost' | 'system' | BanglaFontKey | CustomFontKey
+/** B10: a font for Bangla text (`typography.bangla_*_font`); null = the default (the main font when it is a Bangla font, else Hind Siliguri / Baloo Da 2). */
+export type BanglaRoleFont = BanglaFontKey | CustomFontKey
+/** B10: any font a theme can name. */
+export type ThemeFontKey = HeadingFont | BodyFont
+
+/** B10: an uploaded woff2 font as the theme payload exposes it (`theme.fonts.custom`). */
+export type CustomFont = {
+  /** `custom:<uuid>` — the key the typography names it by. */
+  id: CustomFontKey
+  name: string
+  /** The CSS family the storefront declares it under (`sf-custom-…`). */
+  family: string
+  /** The woff2 file (served with a long cache). */
+  url: string
+  format?: 'woff2'
+  weight_min: number
+  weight_max: number
+}
+
+/**
+ * B10 theme payload `fonts` (bootstrap, draft preview, canvas bootstrap): the fonts in effect —
+ * `bangla_*` are never null (the chosen Bangla font, else the main font when it is a Bangla font,
+ * else baloo-da-2 / hind-siliguri) — and the uploaded fonts those four roles use.
+ */
+export type ThemeFonts = {
+  heading: ThemeFontKey
+  body: ThemeFontKey
+  bangla_heading: ThemeFontKey
+  bangla_body: ThemeFontKey
+  custom: CustomFont[]
+}
+
+/** B10 typography keys: Bangla fonts (null = default), line height 1.4–2.0 (default 1.7), size scale 0.9–1.2 (default 1). */
+export type BanglaTypography = {
+  bangla_heading_font?: BanglaRoleFont | null
+  bangla_body_font?: BanglaRoleFont | null
+  bangla_line_height?: number
+  bangla_scale?: number
+}
 export type ButtonStyle = 'pill' | 'rounded' | 'square'
 
 /* Theme presets and layout variants (T1, STOREFRONT_THEMES_PLAN §3.1): presentation only. */
@@ -104,7 +147,9 @@ export type ProductLayout = {
 
 export type StorefrontTheme = {
   colors: ThemeColors
-  typography: { heading_font: HeadingFont; body_font: BodyFont } & TypeScaleSettings
+  typography: { heading_font: HeadingFont; body_font: BodyFont } & TypeScaleSettings & BanglaTypography
+  /** B10: the fonts in effect and their uploaded fonts (absent before B10 = today's fonts). */
+  fonts?: ThemeFonts | null
   shape: { button_style: ButtonStyle; card_radius: number }
   layout: { container_width: number; sticky_header: boolean; listing_columns?: ListingColumns; product?: Partial<ProductLayout> | null } & Partial<LayoutVariants>
   /** The preset the theme was last set from (absent before T1 = `default`). */

@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from 'react'
+import { useContext, useId, type ReactNode } from 'react'
+import { QueryClientContext } from '@tanstack/react-query'
 import { CheckIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,10 +9,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ColorControl, ControlLabel, Swatch } from '@/features/store-builder/controls'
 import {
-  BODY_FONTS,
   BUTTON_STYLES,
-  HEADING_FONTS,
   MAX_PALETTE_COLORS,
+  useStoreFonts,
   type PaletteEntry,
   type ThemeColor,
   type ThemeRoleColor,
@@ -21,8 +21,12 @@ import {
 import { contrastRatio, meetsAA } from '@/features/storefront/contrast'
 import { colorValues, COLOR_LABELS, contrastPairs, effectiveColor, PALETTE_NAME_MAX, typographyValues, type ThemeFormValues } from '@/features/storefront/theme-form'
 import { cn } from '@/lib/utils'
+import { fontStack } from '@/storefront/fonts'
 import { TYPE_DEFAULTS, TYPE_LIMITS, typeSamples } from '@/storefront/type-scale'
-import { applyPalette, BUTTON_LABELS, BUTTON_RADII, FONT_FAMILIES, FONT_LABELS, HEADING_WEIGHTS, paletteMatches, PREDEFINED_PALETTES, withColor } from './theme-options'
+import { CustomFonts } from './custom-fonts'
+import { RangeField } from './range-field'
+import { TypographyFields } from './typography-fields'
+import { applyPalette, BUTTON_LABELS, BUTTON_RADII, HEADING_WEIGHTS, paletteMatches, PREDEFINED_PALETTES, withColor } from './theme-options'
 
 type Colors = ThemeFormValues['colors']
 type Role = ThemeColor | ThemeRoleColor
@@ -169,11 +173,8 @@ export function GlobalStylesPanel({ settings, onChange, disabled = false, errors
         <PaletteEditor palette={palette} onChange={setPalette} disabled={disabled} suggestion={colors.primary} errors={errors} />
       </Group>
 
-      <Group variant={variant} title="Fonts">
-        <div className="grid gap-4 @lg:grid-cols-2">
-          <FontSelect label="Heading font" value={typography.heading_font} options={HEADING_FONTS} disabled={disabled} onChange={(heading_font) => setTypography({ heading_font: heading_font as ThemeFormValues['typography']['heading_font'] })} error={errors['typography.heading_font']} />
-          <FontSelect label="Body font" value={typography.body_font} options={BODY_FONTS} disabled={disabled} onChange={(body_font) => setTypography({ body_font: body_font as ThemeFormValues['typography']['body_font'] })} error={errors['typography.body_font']} />
-        </div>
+      <Group variant={variant} title="Fonts" description="Pick fonts for headings and text; the samples show English and Bangla. Bangla text can have its own fonts and spacing.">
+        <FontsSection typography={typography} onChange={setTypography} disabled={disabled} errors={errors} />
       </Group>
 
       <Group
@@ -339,61 +340,27 @@ function PaletteEditor({ palette, onChange, disabled, suggestion, errors }: { pa
   )
 }
 
-function FontSelect({ label, value, options, onChange, disabled, error }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void; disabled: boolean; error?: string }) {
-  const id = useId()
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger id={id} className="w-full" aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((f) => (
-            <SelectItem key={f} value={f}>
-              <span style={{ fontFamily: FONT_FAMILIES[f] }}>{FONT_LABELS[f]}</span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </div>
-  )
+export { RangeField }
+
+type FontsProps = { typography: Typography; onChange: (next: Partial<Typography>) => void; disabled: boolean; errors: Record<string, string | undefined> }
+
+/**
+ * B10: the font pickers, plus the store's uploaded fonts where the API is at hand (the panel is
+ * also drawn on its own, e.g. in tests, without a query client: then only the built-in fonts).
+ */
+function FontsSection(props: FontsProps) {
+  const client = useContext(QueryClientContext)
+  return client ? <ConnectedFonts {...props} /> : <TypographyFields {...props} typography={props.typography} custom={[]} />
 }
 
-/** A labelled slider with its value; native range input, so keyboard and screen readers work. */
-export function RangeField({ label, tooltip, value, min, max, step, format, onChange, disabled, error, hint }: {
-  label: string
-  tooltip?: string
-  value: number
-  min: number
-  max: number
-  step: number
-  format: (value: number) => string
-  onChange: (value: number) => void
-  disabled?: boolean
-  error?: string
-  hint?: string
-}) {
-  const id = useId()
+function ConnectedFonts(props: FontsProps) {
+  const fonts = useStoreFonts()
+  const custom = fonts.data?.fonts ?? []
   return (
-    <div className="flex flex-col gap-1.5">
-      <ControlLabel label={label} htmlFor={id} tooltip={tooltip} status={<span className="text-sm text-muted-foreground tabular-nums">{format(value)}</span>} />
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        aria-valuetext={format(value)}
-        aria-invalid={error ? true : undefined}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-primary disabled:opacity-50"
-      />
-      {error ? <p className="text-sm text-destructive">{error}</p> : hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
+    <>
+      <TypographyFields {...props} custom={custom} />
+      <CustomFonts data={fonts.data} loading={fonts.isPending} disabled={props.disabled} />
+    </>
   )
 }
 
@@ -441,8 +408,8 @@ function TypeScaleControls({ typography, onChange, disabled, errors }: { typogra
 function TypePreview({ typography, colors, fonts, buttonStyle }: { typography: Typography; colors: Record<Role, string>; fonts: Pick<Typography, 'heading_font' | 'body_font'>; buttonStyle: string }) {
   const samples = typeSamples(typography)
   const shift = typography.heading_weight - 700
-  const headingFont = FONT_FAMILIES[fonts.heading_font]
-  const bodyFont = FONT_FAMILIES[fonts.body_font]
+  const headingFont = fontStack(fonts.heading_font)
+  const bodyFont = fontStack(fonts.body_font)
   const spacing = typography.letter_spacing === 0 ? undefined : `${typography.letter_spacing}em`
   const [title, heading] = samples
 

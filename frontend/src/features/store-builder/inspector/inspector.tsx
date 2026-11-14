@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowUpLeftIcon,
   CircleAlertIcon,
@@ -24,6 +24,7 @@ import { elementMeta, isWrappedSectionType } from '@/storefront/builder/registry
 import type { ButtonElement, DividerElement, Element, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, TextElement, WrappedElement } from '@/storefront/builder/types'
 import { elementContext, kindInfo } from '../document-kind'
 import { AdvancedTab } from './advanced-tab'
+import { focusFieldSoon } from './check-focus'
 import { AiWriterBar } from './ai-writer'
 import { B4Form, type B4FormProps } from './b4-forms'
 import { B6Form } from './b6-forms'
@@ -224,12 +225,31 @@ function registryIcons(registry: InspectorProps['registry']): readonly string[] 
   return Array.isArray(icons) && icons.every((name) => typeof name === 'string') ? (icons as string[]) : undefined
 }
 
-function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false }: InspectorProps) {
+function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false, focus }: InspectorProps) {
   const [tab, setTab] = useState<Tab>('content')
+  const panel = useRef<HTMLElement | null>(null)
+  const nodeId = node?.id ?? null
+
+  // B10: page check "Fix it": the tab (switched while rendering, once per request), then the field once it has rendered.
+  const focusToken = focus?.token ?? null
+  const focusNode = focus?.nodeId ?? null
+  const focusTarget = focus?.field ?? null
+  const [seenToken, setSeenToken] = useState<number | null>(null)
+  if (focusToken !== null && focusToken !== seenToken && focusNode === nodeId) {
+    setSeenToken(focusToken)
+    if (nodeId && focus) setTab(focus.tab)
+  }
+  const handled = useRef<number | null>(null)
+  useEffect(() => {
+    if (focusToken === null || handled.current === focusToken || focusNode !== nodeId) return
+    return focusFieldSoon(() => panel.current, focusTarget, () => {
+      handled.current = focusToken
+    })
+  }, [focusToken, focusNode, focusTarget, nodeId])
 
   if (!node) {
     return (
-      <aside aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
+      <aside ref={panel} aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
         {document.kind === 'popup' ? (
           <PopupSettingsPanel settings={readPopupSettings(content.popup)} document={document} problems={serverProblems} bangla={locales.includes('bn')} onCommand={onCommand} />
         ) : (
@@ -254,7 +274,7 @@ function InspectorPanel({ content, node, document, registry, locales, errors: se
   const otherProblems = serverProblems.filter((p) => !isInlineProblem(node, p, bangla))
 
   return (
-    <aside aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
+    <aside ref={panel} aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <NodeIcon type={node.type} />
         <h2 className="min-w-0 flex-1 truncate text-base font-semibold">{label}</h2>

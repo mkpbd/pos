@@ -94,7 +94,7 @@ describe('online store admin', () => {
         ...theme.settings,
         // Buttons followed the primary colour before B3: they still do; links keep the secondary colour.
         colors: { ...theme.settings.colors, primary: '#a35a00', button: '#a35a00', button_foreground: '#3b2500', button_hover: null, link: '#6f55c2' },
-        typography: { ...theme.settings.typography, body_size: 16, heading_scale: 1.25, line_height: 1.5, heading_weight: 700, mobile_scale: 1, letter_spacing: 0 },
+        typography: { ...theme.settings.typography, body_size: 16, heading_scale: 1.25, line_height: 1.5, heading_weight: 700, mobile_scale: 1, letter_spacing: 0, bangla_heading_font: null, bangla_body_font: null, bangla_line_height: 1.7, bangla_scale: 1 },
         palette: [],
         footer: { ...theme.settings.footer, copyright: '© Berry Kids' },
       },

@@ -21,6 +21,50 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B10 — Store builder: edit on the page, page check before publish, fonts & Bangla typography
+
+#### Added
+- **Edit on the page:** double-click a text (or Enter / *Edit text* in the mini toolbar) and type straight on the canvas. Headings, text, buttons, list items, icon boxes, pricing features… — the editable fields come from the registry's translatable fields. Rich text gets a small format bar (bold, italic, link via a checked URL prompt, bulleted / numbered list, clear formatting), sanitized to the server's allowed tags. Esc cancels; Tab, click outside or leaving the canvas keeps the change; each edit is one undo step. Plain text over its limit is cut with a note; a value the document rules refuse is not applied (plain message). Text inside a global section points to the global.
+- **Edit in: English | বাংলা** in the toolbar (stores with Bangla): the canvas switches language and fonts; Bangla edits go to `translations.bn`.
+- **Drop a picture** from the computer onto an image or a section / row / column background: checked (JPEG, PNG, WebP, GIF ≤ 5 MB), uploaded to the media library with a progress bar on the node, set for the current device; double-click a picture or *Replace picture* opens the media chooser.
+- **Spacing handles:** grips on the top and bottom edge of the selected section, inner row or column change its padding (Alt: margin) for the current device, snapping to 4 px with a live value badge; arrow keys move 4 px; one undo step per drag.
+- **Quick bar:** text alignment and text colour (theme colours, store palette or any colour) for text elements, written to the current device.
+- **Check page:** toolbar button with a count badge (red with errors) and a panel grouped into errors, warnings and tips, each with *Fix it* (selects the item and focuses the field, applies a fix such as a readable theme colour, or opens Site styles). Client checks run live: missing or empty link, button without text, picture without description, heading order, contrast below WCAG AA where the page sets colours, hidden on every device, empty section / heading / text, phone text under 14 px, oversized pictures, missing SEO title / description. Server check `POST /storefront/builder/documents/{id}/check` (saved draft or unsaved content; nothing saved): links to pages, products, categories, brands, landing pages and blog posts that are gone or not live, deleted / hidden / inactive records, unpublished or missing global sections, order forms whose product is off sale, forms nobody receives.
+- **Publish dialog** runs the check on what is about to go live and shows *N errors, M warnings* with the first errors; publishing is never blocked (*Publish anyway*); a failed server check says so with a retry.
+- **Bangla typography:** heading and body fonts gain Hind Siliguri, Noto Sans Bengali, Anek Bangla, Tiro Bangla and Baloo Da 2 (`@fontsource` 5.3.0); separate Bangla heading / body fonts (`typography.bangla_heading_font` / `bangla_body_font`, *Automatic* = today's look), Bangla line spacing (1.4–2.0, default 1.7) and size (0.9–1.2). Font pickers show an English and a Bangla sample.
+- **Your own fonts:** upload up to 4 WOFF2 fonts per store (≤ 500 KB, name, weight range; file checked by its WOFF2 header, duplicates refused) and use them for any font role; delete is refused while the live theme or the draft uses the font (409 `FONT_IN_USE`). `GET/POST /storefront/fonts`, `DELETE /storefront/fonts/{id}`; new table `storefront_fonts`; audited.
+
+#### Changed
+- **Fonts load on demand:** the storefront downloads only the fonts its theme uses (each font is its own CSS chunk; the body font is preloaded; uploaded fonts get `@font-face` with `font-display: swap`). The admin Theme page and builder load font samples only when shown.
+- Theme payloads (`bootstrap.theme.fonts`, theme draft responses) list the effective fonts and the uploaded fonts in use.
+
+#### Fixed
+- Page builder: a click on the canvas blurred the canvas itself, which would have cancelled in-place editing on a double-click.
+
+#### Tests
+- Backend 1169 (PostgreSQL: 1168 pass, 1 opt-in skip; new `StoreBuilderB10Test`, `ThemeFontsTest`); Pint clean.
+- vitest 1982 (new: canvas in-place editing, fonts, inline edit, media upload, spacing drag, editor B10, page check, inspector focus, typography); mocked Playwright 315 pass / 171 skipped (new `storefront-builder-b10.spec.ts`, `store-builder-b10.spec.ts`, B10 cases in `store-builder.spec.ts`).
+- Full-stack (PostgreSQL, desktop): `integration.spec.ts` + `demo-stores.spec.ts` 42 — new **B10**: a broken product link found by the server check (and not in unsaved content that fixes it), a heading typed on the canvas, *Publish anyway* past the check, a real WOFF2 upload (a non-font refused), Bangla fonts published, `FONT_IN_USE`, shoppers get the store's font face and download no unused font; builder acceptance 5.
+- Note: under heavy load `storefront-landing.test.tsx` (COD order form) can time out in the full vitest run and `storefront-builder.spec.ts` "mobile 375" once measured a gap during a font swap; both pass alone and on rerun.
+
+#### Upgrade
+- `php artisan migrate` (adds `storefront_fonts`). Existing themes need no change — the new keys read with their defaults and the look is unchanged.
+- Uploaded fonts live on the media disk at `fonts/<org>/<id>.woff2`. On a local disk let the web server send long-cache headers for `/storage/fonts/*`; on a CDN / bucket allow CORS for fonts (cross-origin `@font-face` needs it).
+
+### Phase 9 — Polish and hardening (part 1)
+
+#### Fixed
+- **Lost form input under load:** a failed background refresh of the signed-in session (slow or overloaded server) replaced the whole app with "Could not load your session", unmounting open forms — the "new product form lost typed values" report. The session guard now keeps the last good session and shows the error only when there is no session at all; the product, purchase order and goods receipt editors likewise keep their form when a refresh fails. Regression test proves the old behaviour failed.
+- **Phone layout:** tables inside a scroll box (e.g. the product's online listing variants) no longer widen admin pages on phones — the scroll box is now the positioning container of their screen-reader-only labels (one global rule for every admin table).
+- **Storefront:** on phones the share row keeps the floating WhatsApp button's corner free, so no share button hides under it.
+- **Page builder:** the selected item's mini toolbar uses its real width (it no longer runs off the canvas) and, for a section at the very top of the page, goes below it or into its top-right corner instead of over its first heading.
+
+#### Security
+- `npm audit`: 3 high and 6 total advisories → **0 in production dependencies**. `shadcn` updated to 4.23.0 (provenance-signed, released 19 days earlier; transitive versions resolved with `--before` to avoid releases under two weeks old) and moved to devDependencies — it is a build-time tool whose CSS is bundled, none of its JavaScript ships. Remaining dev-only advisories (deepmerge, minimatch via ts-morph in the shadcn CLI) have no fix within its dependency ranges and never reach the browser.
+
+#### Tests
+- vitest 1891; mocked Playwright 302 (all); full-stack builder acceptance 5. Note: two countdown tests in `storefront-promotions.test.tsx` can time out when the machine is heavily loaded; they pass on their own and in a normal full run.
+
 ### B9 — Store builder: global sections, AI writer, copy & paste, page SEO, more animation
 
 #### Added

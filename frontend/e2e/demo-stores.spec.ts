@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { expect as baseExpect, test, type Page } from '@playwright/test'
 
 // Full-stack against `php artisan serve` (one request at a time): storefront pages need a few seconds after admin changes.
@@ -893,5 +895,141 @@ test('B9: a global section shows on a campaign page and updates everywhere when 
   expect((await call('POST', `/api/v1/storefront/builder/documents/${aboutDoc.id}/publish`, { note: 'B9 SEO' })).status).toBe(200)
   const aboutHtml = await shell('/pages/about-us')
   expect(aboutHtml).toContain('<title>About Green Basket — our farms</title>')
+  await adminContext.close()
+})
+
+test('B10: Mati & Co. edits a heading on the page, publishes past the page check, and gives the store Bangla and its own fonts', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('handmade.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@mati.test')
+  const token = async () => decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+  const call = async (method: string, url: string, body?: unknown) =>
+    admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token: await token() },
+    )
+  type Node = { id: string; type?: string; props?: Record<string, unknown>; columns?: { elements: Node[] }[] }
+  const headingColumn = (node: Node): { elements: Node[] } | null => {
+    for (const column of node.columns ?? []) {
+      if (column.elements.some((e) => e.type === 'heading')) return column
+      for (const element of column.elements) {
+        const inner = headingColumn(element)
+        if (inner) return inner
+      }
+    }
+    return null
+  }
+
+  // A campaign page with a heading and a button whose link leads to a product that doesn't exist.
+  const made = await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })
+  const section = made.body.data.nodes[0] as Node
+  const column = headingColumn(section)!
+  const heading = column.elements.find((e) => e.type === 'heading')!
+  heading.props!.text = 'Handmade with care'
+  column.elements.push({ ...heading, id: 'e_b10_button', type: 'button', props: { label: 'See the candle', link: { url: '/product/no-such-candle' }, variant: 'primary', size: 'md', full_width: false } } as Node)
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b10-check', title: 'B10 check', from: 'blank' })
+  if (doc.status === 409) {
+    // A rerun on the same database: reuse the page.
+    const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === 'landing:b10-check')
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const docId = doc.body.data.id as string
+  const content = { schema_version: 1, seo: { title: 'Mati & Co. — handmade', description: 'Candles and pottery made by hand.', image: null, noindex: false, translations: {} }, sections: [section] }
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content })).status).toBe(200)
+
+  // The server check finds the broken link in the saved draft, and not in unsaved content that fixes it.
+  const checked = await call('POST', `/api/v1/storefront/builder/documents/${docId}/check`, {})
+  expect(checked.status).toBe(200)
+  const broken = checked.body.data.issues.find((i: { code: string }) => i.code === 'LINK_BROKEN')
+  expect(broken).toMatchObject({ severity: 'error', node_id: 'e_b10_button', details: { target: 'product' } })
+  const fixed = structuredClone(content)
+  headingColumn(fixed.sections[0])!.elements.find((e) => e.id === 'e_b10_button')!.props!.link = { url: '/shop' }
+  const rechecked = await call('POST', `/api/v1/storefront/builder/documents/${docId}/check`, { content: fixed })
+  expect(rechecked.status).toBe(200)
+  expect(rechecked.body.data.issues.some((i: { code: string }) => i.code === 'LINK_BROKEN')).toBe(false)
+
+  // In the builder: type the new heading straight on the page.
+  await admin.goto(`${base}/admin/storefront/builder/${docId}`)
+  const frame = admin.frameLocator('[data-testid="builder-canvas"]')
+  const canvasHeading = frame.getByRole('heading', { name: 'Handmade with care' })
+  await expect(canvasHeading).toBeVisible({ timeout: 60_000 })
+  const box = (await canvasHeading.boundingBox())!
+  await canvasHeading.click({ position: { x: Math.max(1, box.width - 6), y: Math.max(1, box.height - 4) } })
+  await admin.getByTestId('mini-toolbar').getByRole('button', { name: 'Edit text on the page (Enter)' }).click()
+  // Type only once the canvas has made the heading editable.
+  await expect(frame.locator('[contenteditable="true"], [contenteditable="plaintext-only"]').first()).toBeVisible()
+  await admin.keyboard.press('Control+A')
+  await admin.keyboard.type('Made by hand in Dhaka')
+  await admin.keyboard.press('Tab')
+  await expect(frame.getByRole('heading', { name: 'Made by hand in Dhaka' })).toBeVisible()
+  await expect(admin.getByLabel('Heading text', { exact: true })).toHaveValue('Made by hand in Dhaka')
+  await expect(admin.getByTestId('save-status')).toContainText('Saved', { timeout: 30_000 })
+
+  // The page check lists the broken link; publishing shows it and still lets the owner go ahead.
+  await admin.getByRole('button', { name: /Check page/ }).click()
+  await expect(admin.getByTestId('check-panel').getByTestId('check-issue-LINK_BROKEN')).toBeVisible({ timeout: 30_000 })
+  await admin.getByRole('button', { name: 'Publish', exact: true }).click()
+  const publish = admin.getByRole('dialog', { name: 'Publish this page?' })
+  await expect(publish.getByTestId('publish-check')).toContainText(/1 error/, { timeout: 30_000 })
+  await publish.getByRole('button', { name: 'Publish anyway' }).click()
+  await expect(admin.getByText(/^Published — version \d+ is live\.$/)).toBeVisible({ timeout: 30_000 })
+  await page.goto(`${base}/p/b10-check`)
+  await expect(page.getByRole('heading', { name: 'Made by hand in Dhaka' })).toBeVisible({ timeout: 30_000 })
+
+  // The store's own font: a real WOFF2 upload (a rerun finds the same file already there).
+  const woff2 = readFileSync(fileURLToPath(new URL('../node_modules/@fontsource/tiro-bangla/files/tiro-bangla-bengali-400-normal.woff2', import.meta.url))).toString('base64')
+  const postFont = async (data: string, name: string) =>
+    admin.evaluate(
+      async ({ data, name, token }) => {
+        const form = new FormData()
+        form.append('file', new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], { type: 'font/woff2' }), `${name}.woff2`)
+        form.append('name', name)
+        form.append('weight_min', '400')
+        const res = await fetch('/api/v1/storefront/fonts', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-XSRF-TOKEN': token }, body: form })
+        return { status: res.status, body: (await res.json()) as { data?: { id: string }; error?: { code: string; details?: { font_id?: string } } } }
+      },
+      { data, name, token: await token() },
+    )
+  const upload = await postFont(woff2, 'Mati Script')
+  let fontId = upload.body.data?.id
+  if (!fontId) {
+    expect(upload.status).toBe(422)
+    fontId = upload.body.error?.details?.font_id ?? (await call('GET', '/api/v1/storefront/fonts')).body.data.fonts.find((f: { name: string }) => f.name === 'Mati Script').id
+  }
+  // A file that isn't a font is refused.
+  const fake = await postFont(Buffer.from('not a font at all').toString('base64'), 'Fake font')
+  expect(fake.status).toBe(422)
+
+  // Bangla typography in the theme draft, then published: Anek Bangla headings, the store's font for Bangla text.
+  const draft = await call('GET', '/api/v1/storefront/theme/draft')
+  const settings = draft.body.data.settings
+  settings.typography = { ...settings.typography, bangla_heading_font: 'anek-bangla', bangla_body_font: `custom:${fontId}`, bangla_line_height: 1.8 }
+  const saved = await call('PUT', '/api/v1/storefront/theme/draft', { revision: draft.body.data.draft_revision, settings })
+  expect(saved.status).toBe(200)
+  expect(saved.body.data.fonts).toMatchObject({ bangla_heading: 'anek-bangla', bangla_body: `custom:${fontId}` })
+  expect((await call('POST', '/api/v1/storefront/theme/publish', { note: 'B10 fonts' })).status).toBe(200)
+
+  // A font the theme uses can't be deleted.
+  const refused = await call('DELETE', `/api/v1/storefront/fonts/${fontId}`)
+  expect(refused.status).toBe(409)
+  expect(refused.body.error.code).toBe('FONT_IN_USE')
+
+  // Shoppers get the store's font face, and no font the theme doesn't use is downloaded.
+  const fontRequests: string[] = []
+  page.on('request', (r) => {
+    // Real font downloads only (in development Vite also serves `?import&url` modules that just hold a file's address).
+    if (r.resourceType() === 'font') fontRequests.push(r.url())
+  })
+  await page.goto(`${base}/p/b10-check`)
+  await expect(page.getByRole('heading', { name: 'Made by hand in Dhaka' })).toBeVisible({ timeout: 30_000 })
+  // (A string: the e2e TypeScript project has no DOM types.)
+  await expect.poll(() => page.evaluate(`[...document.fonts].some((f) => f.family.replace(/"/g, '').startsWith('sf-custom-'))`)).toBe(true)
+  expect(fontRequests.filter((u) => /noto-sans-bengali|tiro-bangla/.test(u))).toEqual([])
   await adminContext.close()
 })

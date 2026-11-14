@@ -61,6 +61,36 @@ class BuilderReferences
      */
     public function check(array $document, ?string $context = null): void
     {
+        ['uses' => $uses, 'globals' => $globals] = $this->collect($document);
+
+        $errors = $this->globalErrors($globals, $context);
+        foreach ($uses as $code => $list) {
+            $all = array_values(array_unique(array_merge(...array_column($list, 'ids'))));
+            $found = $this->existing($code, $all);
+            foreach ($list as $entry) {
+                $missing = array_values(array_diff($entry['ids'], $found));
+                if ($missing !== []) {
+                    $baseCode = explode(':', $code)[0];
+                    $errors[] = ['path' => $entry['path'], 'node_id' => $entry['node_id'], 'message' => self::MESSAGES[$baseCode], 'code' => $baseCode, 'ids' => $missing];
+                }
+            }
+        }
+
+        if ($errors !== []) {
+            throw new InvalidBuilderDocument($errors, 'The page refers to records that do not exist.');
+        }
+    }
+
+    /**
+     * B10: every reference of the document — `uses` keyed by check code (`BANNER_NOT_FOUND:<placement>`
+     * for banners) with the path, node id and ids, and the global section references — for the
+     * save check and the page check (BuilderPageCheck).
+     *
+     * @param  array<string, mixed>  $document  normalized
+     * @return array{uses: array<string, list<array{path: string, node_id: ?string, ids: list<string>}>>, globals: list<array{path: string, node_id: string, ref: string}>}
+     */
+    public function collect(array $document): array
+    {
         /** @var array<string, list<array{path: string, node_id: ?string, ids: list<string>}>> $uses code => uses */
         $uses = [];
         $use = function (string $code, string $path, ?string $nodeId, array $ids) use (&$uses) {
@@ -142,22 +172,15 @@ class BuilderReferences
             }
         });
 
-        $errors = $this->globalErrors($globals, $context);
-        foreach ($uses as $code => $list) {
-            $all = array_values(array_unique(array_merge(...array_column($list, 'ids'))));
-            $found = $this->existing($code, $all);
-            foreach ($list as $entry) {
-                $missing = array_values(array_diff($entry['ids'], $found));
-                if ($missing !== []) {
-                    $baseCode = explode(':', $code)[0];
-                    $errors[] = ['path' => $entry['path'], 'node_id' => $entry['node_id'], 'message' => self::MESSAGES[$baseCode], 'code' => $baseCode, 'ids' => $missing];
-                }
-            }
-        }
+        return ['uses' => $uses, 'globals' => $globals];
+    }
 
-        if ($errors !== []) {
-            throw new InvalidBuilderDocument($errors, 'The page refers to records that do not exist.');
-        }
+    /**
+     * B10: the plain message of a reference check code.
+     */
+    public static function message(string $code): string
+    {
+        return self::MESSAGES[$code];
     }
 
     /**
@@ -168,7 +191,7 @@ class BuilderReferences
      * @param  list<array{path: string, node_id: string, ref: string}>  $globals
      * @return list<array<string, mixed>>
      */
-    private function globalErrors(array $globals, ?string $context): array
+    public function globalErrors(array $globals, ?string $context): array
     {
         if ($globals === []) {
             return [];
@@ -204,10 +227,12 @@ class BuilderReferences
     }
 
     /**
+     * The ids of `$ids` that exist for a reference check code (B10: public for the page check).
+     *
      * @param  list<string>  $ids
      * @return list<string>
      */
-    private function existing(string $code, array $ids): array
+    public function existing(string $code, array $ids): array
     {
         [$code, $placement] = array_pad(explode(':', $code, 2), 2, null);
 

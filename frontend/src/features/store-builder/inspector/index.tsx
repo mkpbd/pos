@@ -16,6 +16,7 @@ export type {
   InspectorChangeOptions,
   InspectorCommand,
   InspectorDocument,
+  InspectorFocus,
   InspectorProps,
   Problem,
 } from './types'

@@ -305,7 +305,8 @@ export function ProductEditorPage() {
 
   if (!productId) return <ProductForm key="new" />
   if (isPending) return <LoadingState rows={8} label="Loading product" />
-  if (error) return <ErrorState error={error} onRetry={() => refetch()} />
+  // Only without data: a failed background refetch keeps the open form (and what was typed).
+  if (!data) return <ErrorState error={error} onRetry={() => refetch()} />
 
   // Remount per product so the form's defaults always belong to the product shown.
   return (

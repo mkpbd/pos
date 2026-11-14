@@ -11,9 +11,35 @@ namespace App\Modules\Storefront\Domain;
  */
 final class ThemeSchema
 {
-    public const HEADING_FONTS = ['baloo', 'poppins', 'playfair', 'jost', 'system'];
+    /**
+     * B10: fonts with Bangla glyphs (each also covers Latin or falls back to the Latin font for it).
+     * They can be heading, body and Bangla fonts.
+     */
+    public const BANGLA_FONTS = ['hind-siliguri', 'noto-sans-bengali', 'anek-bangla', 'tiro-bangla', 'baloo-da-2'];
 
-    public const BODY_FONTS = ['poppins', 'jost', 'system'];
+    public const HEADING_FONTS = ['baloo', 'poppins', 'playfair', 'jost', 'system', ...self::BANGLA_FONTS];
+
+    public const BODY_FONTS = ['poppins', 'jost', 'system', ...self::BANGLA_FONTS];
+
+    /**
+     * B10: an organization's uploaded font (`custom:<lower-case uuid>`), usable in every font role.
+     */
+    public const CUSTOM_FONT_PATTERN = '/^custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
+
+    public const CUSTOM_FONT_PREFIX = 'custom:';
+
+    /**
+     * B10: the font roles of `typography` (role => key); the Bangla roles are null = automatic.
+     */
+    public const FONT_ROLES = [
+        'heading' => 'heading_font',
+        'body' => 'body_font',
+        'bangla_heading' => 'bangla_heading_font',
+        'bangla_body' => 'bangla_body_font',
+    ];
+
+    /** B10: today's Bangla fonts — what Bangla text uses when the main font has no Bangla glyphs. */
+    public const BANGLA_FALLBACKS = ['heading' => 'baloo-da-2', 'body' => 'hind-siliguri'];
 
     public const BUTTON_STYLES = ['pill', 'rounded', 'square'];
 
@@ -103,6 +129,9 @@ final class ThemeSchema
         'heading_weight' => [400, 900],
         'mobile_scale' => [0.8, 1.0],
         'letter_spacing' => [-0.02, 0.1],
+        // B10: Bangla text needs more room — its own line height and a size factor.
+        'bangla_line_height' => [1.4, 2.0],
+        'bangla_scale' => [0.9, 1.2],
     ];
 
     /** The integer type scale keys (the others are decimals). */
@@ -156,6 +185,11 @@ final class ThemeSchema
                 // Whole numbers are stored as integers (JSON has one number type).
                 'mobile_scale' => 1,
                 'letter_spacing' => 0,
+                // B10: fonts for Bangla text (null = automatic, see fonts()) and Bangla spacing.
+                'bangla_heading_font' => null,
+                'bangla_body_font' => null,
+                'bangla_line_height' => 1.7,
+                'bangla_scale' => 1,
             ],
             // B3: the store's saved colours [{name, hex}] (content: presets keep it).
             'palette' => [],
@@ -220,6 +254,16 @@ final class ThemeSchema
                     $number = round((float) $value, in_array($key, self::INTEGER_TYPE_KEYS, true) ? 0 : 3);
                     // One form per value whatever the storage (json_encode writes 1.0 as 1): whole numbers are ints.
                     $result['typography'][$key] = floor($number) === $number ? (int) $number : $number;
+                }
+            }
+        }
+
+        // B10: custom font ids in one form (`custom:<lower-case uuid>`).
+        if (is_array($result['typography'])) {
+            foreach (self::FONT_ROLES as $key) {
+                $value = $result['typography'][$key] ?? null;
+                if (is_string($value) && str_starts_with(strtolower($value), self::CUSTOM_FONT_PREFIX)) {
+                    $result['typography'][$key] = strtolower($value);
                 }
             }
         }
@@ -290,6 +334,89 @@ final class ThemeSchema
             $settings['favicon_media_id'],
             ...$settings['footer']['payment_logo_media_ids'],
         ], 'is_string')));
+    }
+
+    /**
+     * B10: the ids (uuids) of the custom fonts the theme uses, in role order, without repeats.
+     *
+     * @param  array<string, mixed>  $settings  normalized
+     * @return list<string>
+     */
+    public static function customFontIds(array $settings): array
+    {
+        $ids = [];
+        foreach (self::FONT_ROLES as $key) {
+            $value = $settings['typography'][$key] ?? null;
+            if (is_string($value) && preg_match(self::CUSTOM_FONT_PATTERN, $value) === 1) {
+                $ids[] = substr($value, strlen(self::CUSTOM_FONT_PREFIX));
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * B10: the roles (heading, body, bangla_heading, bangla_body) in which the theme uses a custom font.
+     *
+     * @param  array<string, mixed>  $settings  normalized
+     * @return list<string>
+     */
+    public static function customFontRoles(array $settings, string $fontId): array
+    {
+        $roles = [];
+        foreach (self::FONT_ROLES as $role => $key) {
+            if (($settings['typography'][$key] ?? null) === self::CUSTOM_FONT_PREFIX.strtolower($fontId)) {
+                $roles[] = $role;
+            }
+        }
+
+        return $roles;
+    }
+
+    /**
+     * B10: the font of each role as the storefront applies it. Heading and body are the chosen
+     * fonts. A Bangla role is its chosen font; when automatic (null), the main font of the role if
+     * it has Bangla glyphs, else today's Bangla font (Baloo Da 2 for headings, Hind Siliguri for text).
+     *
+     * @param  array<string, mixed>  $settings  normalized
+     * @return array{heading: string, body: string, bangla_heading: string, bangla_body: string}
+     */
+    public static function fonts(array $settings): array
+    {
+        $typography = $settings['typography'];
+        $fonts = ['heading' => (string) $typography['heading_font'], 'body' => (string) $typography['body_font']];
+        foreach (['heading', 'body'] as $role) {
+            $chosen = $typography[self::FONT_ROLES['bangla_'.$role]] ?? null;
+            $fonts['bangla_'.$role] = match (true) {
+                is_string($chosen) => $chosen,
+                in_array($fonts[$role], self::BANGLA_FONTS, true) => $fonts[$role],
+                default => self::BANGLA_FALLBACKS[$role],
+            };
+        }
+
+        return $fonts;
+    }
+
+    /**
+     * B10: the theme with every custom font that is not in `$existing` (uuids) put back to its
+     * role's default (restoring a version whose font was deleted since).
+     *
+     * @param  array<string, mixed>  $settings  normalized
+     * @param  list<string>  $existing
+     * @return array<string, mixed>
+     */
+    public static function withoutMissingFonts(array $settings, array $existing): array
+    {
+        $defaults = self::defaults()['typography'];
+        foreach (self::FONT_ROLES as $key) {
+            $value = $settings['typography'][$key] ?? null;
+            if (is_string($value) && str_starts_with($value, self::CUSTOM_FONT_PREFIX)
+                && ! in_array(substr($value, strlen(self::CUSTOM_FONT_PREFIX)), $existing, true)) {
+                $settings['typography'][$key] = $defaults[$key];
+            }
+        }
+
+        return $settings;
     }
 
     /**

@@ -16,6 +16,7 @@ import {
   Undo2Icon,
   UndoDotIcon,
   CheckIcon,
+  ListChecksIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -26,6 +27,7 @@ import type { Device } from '@/storefront/builder/types'
 import { problemCount } from './autosave'
 import { DEVICE_WIDTHS } from './canvas-config'
 import { IS_MAC, useRelativeTime } from './format'
+import { EDIT_LOCALES } from './inline-edit'
 import { isDirty, useEditor, type SaveState } from './store'
 
 const DEVICES: { device: Device; label: string; icon: typeof MonitorIcon }[] = [
@@ -151,9 +153,41 @@ type ToolbarProps = {
   onDiscard: () => void
   onHistory: () => void
   onShowProblem: () => void
+  /** B10: the store edits Bangla too: offer "Edit in: English | বাংলা". */
+  bangla?: boolean
+  /** B10: the page check's errors and warnings (the badge); absent = no Check page button. */
+  check?: { errors: number; warnings: number; open: boolean; onToggle: () => void }
 }
 
-export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem }: ToolbarProps) {
+/** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
+function LocaleToggle() {
+  const locale = useEditor((s) => s.editLocale)
+  const setLocale = useEditor((s) => s.setEditLocale)
+  return (
+    <div role="group" aria-label="Edit in" className="flex items-center gap-1 rounded-md border p-0.5" data-testid="edit-locale">
+      <span className="hidden px-1.5 text-xs text-muted-foreground xl:inline" aria-hidden>
+        Edit in
+      </span>
+      {EDIT_LOCALES.map(({ value, label, lang }) => (
+        <Button
+          key={value}
+          type="button"
+          size="sm"
+          variant={locale === value ? 'secondary' : 'ghost'}
+          className="h-7 px-2"
+          lang={lang}
+          aria-pressed={locale === value}
+          title={value === 'bn' ? 'Show and edit the Bangla texts on the page (empty ones show English)' : 'Show and edit the English texts on the page'}
+          onClick={() => setLocale(value)}
+        >
+          {label}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -187,6 +221,8 @@ export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard,
         ))}
       </div>
 
+      {bangla && <LocaleToggle />}
+
       <div className="flex items-center gap-1">
         <Hint label={`Undo (${MOD}+Z)`}>
           <Button type="button" variant="ghost" size="icon" aria-label="Undo" disabled={!canUndo} onClick={undo}>
@@ -202,6 +238,24 @@ export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard,
 
       <SaveStatus onShowProblem={onShowProblem} />
 
+      {check && (
+        <Hint label="Look for missing picture descriptions, hard-to-read text, broken links and more">
+          <Button type="button" variant={check.open ? 'secondary' : 'outline'} aria-pressed={check.open} onClick={check.onToggle} data-testid="check-page-button">
+            <ListChecksIcon /> Check page
+            {check.errors + check.warnings > 0 && (
+              <span
+                data-testid="check-badge"
+                className={cn('ml-0.5 rounded-full px-1.5 text-xs font-semibold tabular-nums', check.errors > 0 ? 'bg-destructive text-white' : 'bg-amber-500 text-amber-950')}
+              >
+                <span aria-hidden>{check.errors + check.warnings}</span>
+                <span className="sr-only">
+                  {[check.errors > 0 && `${check.errors} ${check.errors === 1 ? 'error' : 'errors'}`, check.warnings > 0 && `${check.warnings} ${check.warnings === 1 ? 'warning' : 'warnings'}`].filter(Boolean).join(', ')}
+                </span>
+              </span>
+            )}
+          </Button>
+        </Hint>
+      )}
       <Hint label={document.preview_url ? (isPopup ? 'See this popup on your store at once, whatever its trigger (new tab)' : 'See your draft on the store (new tab)') : 'Preview needs a store address — add a domain under Settings & domains'}>
         {/* A span keeps the tooltip working on the disabled button. */}
         <span tabIndex={document.preview_url ? undefined : 0}>

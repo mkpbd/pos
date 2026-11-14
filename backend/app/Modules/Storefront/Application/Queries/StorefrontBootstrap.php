@@ -26,6 +26,8 @@ use Carbon\CarbonImmutable;
  * `["en","bn"]`), `store.default_locale`, `store.bangla_digits` and the resolved `locale`.
  * Cached per language. B1: `builder.home` — a published store builder home page exists.
  * B4: `builder.header`, `builder.footer` and `builder.zones` (render payloads or null).
+ * B10: `theme.fonts` — `{heading, body, bangla_heading, bangla_body, custom: [{id, name, family,
+ * url, format, weight_min, weight_max}]}` (CustomFonts::themeFonts).
  */
 class StorefrontBootstrap
 {
@@ -39,6 +41,7 @@ class StorefrontBootstrap
         private readonly LocaleContext $locale,
         private readonly BuilderPages $builder,
         private readonly MenuTrees $menuTrees,
+        private readonly CustomFonts $fonts,
     ) {}
 
     /**
@@ -124,6 +127,8 @@ class StorefrontBootstrap
                 'preset' => $t['preset'],
                 'colors' => $t['colors'],
                 'typography' => $t['typography'],
+                // B10: the font of each role (Bangla roles effective) and the custom fonts to load.
+                'fonts' => $this->fonts->themeFonts($t),
                 'shape' => $t['shape'],
                 'layout' => $t['layout'],
                 'logo' => $ref($t['logo_media_id']),

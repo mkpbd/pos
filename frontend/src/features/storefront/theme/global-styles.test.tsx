@@ -135,7 +135,7 @@ describe('GlobalStylesPanel', () => {
     expect(last(onChange).typography.heading_weight).toBe(900)
 
     await user.click(screen.getByRole('button', { name: /Reset sizes/ }))
-    expect(last(onChange).typography).toEqual({ heading_font: 'baloo', body_font: 'poppins', body_size: 16, heading_scale: 1.25, line_height: 1.5, heading_weight: 700, mobile_scale: 1, letter_spacing: 0 })
+    expect(last(onChange).typography).toEqual({ heading_font: 'baloo', body_font: 'poppins', body_size: 16, heading_scale: 1.25, line_height: 1.5, heading_weight: 700, mobile_scale: 1, letter_spacing: 0, bangla_heading_font: null, bangla_body_font: null, bangla_line_height: 1.7, bangla_scale: 1 })
   })
 
   it('sets fonts, button shape and card radius', async () => {
@@ -144,7 +144,7 @@ describe('GlobalStylesPanel', () => {
     render(<Harness onChange={onChange} />)
 
     await user.click(screen.getByRole('combobox', { name: 'Heading font' }))
-    await user.click(await screen.findByRole('option', { name: 'Playfair Display (serif, elegant)' }))
+    await user.click(await screen.findByRole('option', { name: /^Playfair Display/ }))
     expect(last(onChange).typography.heading_font).toBe('playfair')
     await user.click(screen.getByRole('radio', { name: 'Square' }))
     expect(last(onChange).shape).toEqual({ button_style: 'square', card_radius: 12 })

@@ -1767,3 +1767,152 @@ test('B9: makes a section global from the Layers menu; the page keeps a referenc
   // The canvas still shows the section, now drawn from the global.
   await expect(canvas(page).getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
 })
+
+/* ---------------------------------------------------------------------------------------------
+ * B10: editing on the page, spacing handles, the quick bar, picture drop, Check page
+ * ------------------------------------------------------------------------------------------- */
+
+function findIn(sections: AnyNode[], id: string): AnyNode | undefined {
+  for (const node of sections) {
+    if (node.id === id) return node
+    for (const column of node.columns ?? []) {
+      if ((column as unknown as AnyNode).id === id) return column as unknown as AnyNode
+      const inner = findIn(column.elements, id)
+      if (inner) return inner
+    }
+  }
+  return undefined
+}
+
+type Styled = { style?: { base?: { spacing?: { padding?: { bottom?: string } }; typography?: { align?: string } } } }
+
+test('B10: edits a heading in place on the canvas — one undo step, the autosave carries it', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  const frame = canvas(page)
+  await frame.getByRole('heading', { name: 'Made fresh every morning' }).dblclick()
+  await expect(frame.locator('[contenteditable="true"], [contenteditable="plaintext-only"]').first()).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.type('Baked at dawn')
+  await page.keyboard.press('Enter')
+  await expect(frame.getByRole('heading', { name: 'Baked at dawn' })).toBeVisible()
+  await expect
+    .poll(() => (findIn(b.puts.at(-1)?.content.sections ?? [], 'e_heading')?.props as { text?: string } | undefined)?.text, { timeout: 6000 })
+    .toBe('Baked at dawn')
+
+  // One undo step brings the old text back.
+  await toolbar(page).getByRole('button', { name: 'Undo' }).click()
+  await expect(frame.getByRole('heading', { name: 'Made fresh every morning' })).toBeVisible()
+  await expect(toolbar(page).getByRole('button', { name: 'Undo' })).toBeDisabled()
+
+  // The mini toolbar's Edit text: the canvas gets the focus, so typing goes straight into the heading.
+  await page.getByTestId('mini-toolbar').getByRole('button', { name: 'Edit text on the page (Enter)' }).click()
+  await expect(frame.locator('[contenteditable="true"], [contenteditable="plaintext-only"]').first()).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.type('Fresh every day')
+  await page.keyboard.press('Enter')
+  await expect(frame.getByRole('heading', { name: 'Fresh every day' })).toBeVisible()
+})
+
+test('B10: drags a section’s bottom spacing handle (snaps to 4 px, one undo step) and centres a heading from the quick bar', async ({ page }) => {
+  // Tall enough that the features section's bottom edge is on screen.
+  await page.setViewportSize({ width: 1600, height: 1400 })
+  const b = await mockBackend(page, { exists: true })
+  await openEditor(page, b)
+  await canvas(page).locator('[data-b="s_features"]').click({ position: { x: 4, y: 4 } })
+
+  const grip = page.getByTestId('spacing-handle-bottom')
+  await expect(grip).toBeVisible()
+  await expect(grip).toHaveAttribute('aria-valuenow', '48')
+  const box = (await grip.boundingBox())!
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 12, { steps: 3 })
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + 24, { steps: 3 })
+  await expect(page.getByTestId('spacing-badge')).toContainText(/Padding bottom · \d+ px/)
+  await page.mouse.up()
+
+  const bottom = () => (findIn(b.puts.at(-1)?.content.sections ?? [], 's_features') as Styled | undefined)?.style?.base?.spacing?.padding?.bottom
+  await expect.poll(bottom, { timeout: 6000 }).toMatch(/^\d+px$/)
+  const px = Number(bottom()!.replace('px', ''))
+  expect(px).toBeGreaterThan(48)
+  expect(px % 4).toBe(0)
+  await expect(grip).toHaveAttribute('aria-valuenow', String(px))
+  await toolbar(page).getByRole('button', { name: 'Undo' }).click()
+  await expect(grip).toHaveAttribute('aria-valuenow', '48')
+  await expect(toolbar(page).getByRole('button', { name: 'Undo' })).toBeDisabled()
+
+  // Quick bar: centre the heading on desktop.
+  await canvas(page).getByRole('heading', { name: 'Made fresh every morning' }).click()
+  await page.getByTestId('mini-toolbar').getByRole('button', { name: 'Align centre (desktop)' }).click()
+  await expect(canvas(page).locator('[data-b="e_heading"]')).toHaveCSS('text-align', 'center')
+  await expect
+    .poll(() => (findIn(b.puts.at(-1)?.content.sections ?? [], 'e_heading') as Styled | undefined)?.style?.base?.typography?.align, { timeout: 6000 })
+    .toBe('center')
+})
+
+test('B10: a picture dropped on an image uploads to the media library with progress and replaces it', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  const uploads: string[] = []
+  await page.route('**/api/v1/media', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    uploads.push(route.request().headers()['content-type'] ?? '')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return route.fulfill({ status: 201, json: envelope({ id: 'media-new', url: '/favicon.svg', srcset: '/favicon.svg 1600w', width: 800, height: 600, alt: null, original_name: 'farm.png', mime_type: 'image/png', size: 2000, created_at: null }) })
+  })
+  await openEditor(page, b)
+  const target = canvas(page).locator('[data-b="e_image"]')
+  await expect(target).toBeVisible()
+  // A file dragged from the desktop onto the picture.
+  const inner = page.frames().find((f) => f.url().includes('builder-canvas'))!
+  await inner.evaluate(`(() => {
+    const element = document.querySelector('[data-b="e_image"] img') ?? document.querySelector('[data-b="e_image"]')
+    const data = new DataTransfer()
+    data.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'farm.png', { type: 'image/png' }))
+    const init = { bubbles: true, cancelable: true, dataTransfer: data }
+    element.dispatchEvent(new DragEvent('dragenter', init))
+    element.dispatchEvent(new DragEvent('dragover', init))
+    element.dispatchEvent(new DragEvent('drop', init))
+  })()`)
+  await expect(page.getByRole('progressbar', { name: 'Uploading farm.png' })).toBeVisible()
+  await expect(page.getByText(/“farm.png” is in your media library and on the page/)).toBeVisible()
+  expect(uploads[0]).toContain('multipart/form-data')
+  await expect
+    .poll(() => (findIn(b.puts.at(-1)?.content.sections ?? [], 'e_image')?.props as { media_id?: string } | undefined)?.media_id, { timeout: 6000 })
+    .toBe('media-new')
+})
+
+test('B10: Check page lists issues with Fix it; the publish dialog shows the summary and still publishes', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  const b = await mockBackend(page, { exists: true })
+  const checks: unknown[] = []
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/check`, (route) => {
+    checks.push(route.request().postDataJSON())
+    return route.fulfill({
+      json: envelope({
+        issues: [{ code: 'link_missing_page', severity: 'error', node_id: 'e_button', message: 'The button links to a page that doesn’t exist.', details: { field: 'props.link.url' } }],
+        counts: { error: 1, warning: 0, tip: 0 },
+        checked_at: '2026-11-14T10:00:00Z',
+      }),
+    })
+  })
+  await openEditor(page, b)
+  await toolbar(page).getByRole('button', { name: /Check page/ }).click()
+  const panel = page.getByTestId('check-panel')
+  await expect(panel.getByText('The button links to a page that doesn’t exist.')).toBeVisible()
+  expect((checks[0] as { content?: { sections: unknown[] } }).content?.sections.length).toBe(sample.sections.length)
+  await expect(toolbar(page).getByTestId('check-badge')).toBeVisible()
+  await panel.getByRole('button', { name: /^Fix it: The button links/ }).click()
+  await expect(page.getByTestId('inspector-panel')).toContainText(/Button/)
+  await panel.getByRole('button', { name: 'Close the page check' }).click()
+
+  await toolbar(page).getByRole('button', { name: 'Publish' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Publish this page?' })
+  await expect(dialog.getByTestId('publish-check')).toContainText(/Page check: 1 error/)
+  await dialog.getByRole('button', { name: 'Publish anyway' }).click()
+  await expect(dialog).toBeHidden()
+  expect(b.publishes).toHaveLength(1)
+})

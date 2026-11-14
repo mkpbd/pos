@@ -82,6 +82,13 @@ export type InspectorDocument = {
   storeUrl?: string | null
 }
 
+/**
+ * B10: a page check "Fix it" asks the inspector to show a field: the node is already selected
+ * (`nodeId`; null = the page settings), the tab switches and the field gets focus. A new `token`
+ * repeats the request.
+ */
+export type InspectorFocus = { nodeId: string | null; tab: 'content' | 'style' | 'advanced'; field: string | null; token: number }
+
 export type InspectorProps = {
   /** The whole draft. */
   content: BuilderContent
@@ -102,4 +109,6 @@ export type InspectorProps = {
   theme?: { colors?: Record<string, string>; palette?: readonly { name: string; hex: string }[] }
   /** B4: the user may add or change custom HTML (`storefront.custom_html`); default false (read only). */
   canCustomHtml?: boolean
+  /** B10: show and focus a field (page check "Fix it"). */
+  focus?: InspectorFocus | null
 }

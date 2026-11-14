@@ -1,26 +1,18 @@
 import type { ThemeColor, ThemeRoleColor } from '@/features/storefront/api'
 import { effectiveColor, type ThemeFormValues } from '@/features/storefront/theme-form'
+import { FONT_INFO, type BuiltInFontKey } from '@/storefront/fonts'
+import { FONT_HINTS } from './typography-model'
 
 type Colors = ThemeFormValues['colors']
 type Role = ThemeColor | ThemeRoleColor
 
-/** Font names as the owner reads them. */
-export const FONT_LABELS: Record<string, string> = {
-  baloo: 'Baloo (rounded, playful)',
-  poppins: 'Poppins (geometric)',
-  playfair: 'Playfair Display (serif, elegant)',
-  jost: 'Jost (clean, modern)',
-  system: 'System font',
-}
+/** Font names as the owner reads them (B10: from the storefront's font catalogue, Bangla fonts included). */
+export const FONT_LABELS: Record<string, string> = Object.fromEntries(
+  (Object.keys(FONT_INFO) as BuiltInFontKey[]).map((key) => [key, key === 'system' ? FONT_INFO[key].label : `${FONT_INFO[key].label} (${FONT_HINTS[key]})`]),
+)
 
-/** The typefaces as the storefront stacks them (storefront/theme.ts), for the previews. */
-export const FONT_FAMILIES: Record<string, string> = {
-  baloo: "'Baloo 2 Variable', 'Poppins', system-ui, sans-serif",
-  poppins: "'Poppins', system-ui, sans-serif",
-  playfair: "'Playfair Display Variable', Georgia, serif",
-  jost: "'Jost Variable', system-ui, sans-serif",
-  system: 'system-ui, sans-serif',
-}
+/** The typefaces as the storefront stacks them (storefront/fonts.ts), for the previews. */
+export const FONT_FAMILIES: Record<string, string> = Object.fromEntries((Object.keys(FONT_INFO) as BuiltInFontKey[]).map((key) => [key, FONT_INFO[key].stack]))
 
 export const BUTTON_LABELS: Record<string, string> = { pill: 'Pill', rounded: 'Rounded', square: 'Square' }
 

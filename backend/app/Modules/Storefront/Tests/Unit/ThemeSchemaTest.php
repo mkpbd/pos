@@ -41,6 +41,11 @@ class ThemeSchemaTest extends TestCase
             'heading_weight' => 700,
             'mobile_scale' => 1,
             'letter_spacing' => 0,
+            // B10.
+            'bangla_heading_font' => null,
+            'bangla_body_font' => null,
+            'bangla_line_height' => 1.7,
+            'bangla_scale' => 1,
         ], $defaults['typography']);
         $this->assertSame([], $defaults['palette']);
         $this->assertSame($defaults, ThemeSchema::normalize([]));
@@ -84,7 +89,7 @@ class ThemeSchemaTest extends TestCase
             'palette' => [['name' => ' Brand ', 'hex' => '#ABCDEF', 'extra' => true], 'junk', ['name' => 'No hex'], ['name' => 'Glass', 'hex' => '#FFFFFF80']],
         ]);
 
-        $this->assertSame([17, 1.2, 1.6, 800, 1, 0], array_values(array_slice($normalized['typography'], 2)));
+        $this->assertSame([17, 1.2, 1.6, 800, 1, 0], array_values(array_slice($normalized['typography'], 2, 6)));
         $this->assertSame([['name' => 'Brand', 'hex' => '#abcdef'], ['name' => 'Glass', 'hex' => '#ffffff80']], $normalized['palette']);
         $this->assertSame([], ThemeSchema::normalize(['palette' => 'none'])['palette']);
     }

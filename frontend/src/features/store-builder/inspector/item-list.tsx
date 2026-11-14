@@ -92,7 +92,7 @@ export function ItemList<T extends ItemWithId>(props: ItemListProps<T>) {
   const listError = errors[errorPrefix]
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2" data-testid={`item-list-${errorPrefix}`}>
+    <section aria-labelledby={headingId} className="flex flex-col gap-2" data-testid={`item-list-${errorPrefix}`} data-item-list={errorPrefix}>
       <div className="flex items-center gap-2">
         <h3 id={headingId} className="flex-1 text-sm font-medium">{label}</h3>
         <span className="text-xs text-muted-foreground tabular-nums">{items.length} of {max}</span>
@@ -163,6 +163,7 @@ function SortableItem({ id, index, count, noun, title, lead, open, hasError, can
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn('rounded-md border bg-background', isDragging && 'relative z-10 shadow-md', hasError && 'border-destructive/60')}
       data-testid="item-card"
+      data-item-id={id}
     >
       <div className="flex items-center gap-1 p-1">
         <button

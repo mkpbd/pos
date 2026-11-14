@@ -167,6 +167,13 @@
   body {
     @apply bg-canvas text-foreground;
     }
+  /*
+   * A table's scroll box is the containing block of its absolutely positioned bits (screen-reader-only
+   * labels, badges): otherwise they are placed against the page and widen it on phones.
+   */
+  :where(.overflow-x-auto, .overflow-auto):has(> table) {
+    position: relative;
+    }
   h1, h2, h3, h4, h5, h6 {
     @apply text-heading;
     }

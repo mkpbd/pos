@@ -10,6 +10,7 @@ import { PopupHost } from '../builder/popups/popup-host'
 import { CampaignTracker } from '../landing/campaign-tracker'
 import { PopupBanner } from '../popup/popup-banner'
 import { WhatsAppChatButton } from '../social/whatsapp'
+import { useThemeFonts } from '../font-loader'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
 import { PreviewRibbon } from './announcement-bar'
@@ -30,7 +31,7 @@ export function StorefrontLayout() {
     return (
       <LocaleContext value={locale}>
         <BootstrapContext value={query.data}>
-          <ThemeEffects bootstrap={query.data} />
+          <ThemeEffects bootstrap={query.data} locale={locale.locale} />
           <CampaignTracker />
           <NoticeProvider>
             <CartDrawerProvider>
@@ -82,8 +83,10 @@ function StoreFrame({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
  * too), the tab title and favicon (Laravel writes them in production; Vite does not), and
  * the store's custom CSS — always as text content of a <style>, never as HTML.
  */
-function ThemeEffects({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
+function ThemeEffects({ bootstrap, locale }: { bootstrap: StorefrontBootstrap; locale: string }) {
   const { theme, store } = bootstrap
+  // B10: only the fonts the theme uses (and its uploaded fonts' @font-face rules).
+  useThemeFonts(theme, locale)
 
   useLayoutEffect(() => applyCssVars(document.documentElement, themeToCssVars(theme)), [theme])
   useLayoutEffect(() => applyDataAttributes(document.documentElement, themeDataAttributes(theme)), [theme])

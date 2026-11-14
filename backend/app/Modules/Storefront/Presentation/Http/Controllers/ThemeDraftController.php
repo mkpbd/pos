@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
+use App\Modules\Storefront\Application\Queries\CustomFonts;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveThemeDraftRequest;
 use App\Modules\Storefront\Presentation\Http\Support\BuilderPresenter;
@@ -21,6 +22,7 @@ class ThemeDraftController
     public function __construct(
         private readonly ManageThemeDraft $theme,
         private readonly StorefrontConfig $config,
+        private readonly CustomFonts $fonts,
     ) {}
 
     /**
@@ -30,7 +32,8 @@ class ThemeDraftController
      * {version_id, number, published_at}|null, preview_url, custom_css, has_custom_css}`.
      * Before the first draft the draft is the live theme at revision 0. Custom CSS is not
      * drafted (`PUT /storefront/theme/custom-css` stays immediate); `custom_css` is only
-     * returned to holders of `storefront.custom_css`.
+     * returned to holders of `storefront.custom_css`. B10: `fonts` — the draft's fonts as the
+     * storefront loads them (`{heading, body, bangla_heading, bangla_body, custom: [...]}`).
      */
     public function show(Request $request): JsonResponse
     {
@@ -117,11 +120,14 @@ class ThemeDraftController
 
     private function payload(Request $request): JsonResponse
     {
+        $state = $this->theme->state();
+
         return ApiResponse::success(StorefrontPresenter::themeDraft(
-            $this->theme->state(),
+            $state,
             $this->config->theme(),
             $request->user()->can('storefront.custom_css'),
             $this->config->primaryUrl(),
+            $this->fonts->themeFonts($state['settings']),
         ))->header('Cache-Control', 'no-store, private');
     }
 }

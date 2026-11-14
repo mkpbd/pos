@@ -58,6 +58,8 @@ export type EditorState = {
   selection: string | null
   hover: string | null
   device: Device
+  /** B10: the language texts are edited in on the canvas ("Edit in: English | বাংলা"). */
+  editLocale: 'en' | 'bn'
   history: { past: Snapshot[]; future: Snapshot[] }
   saveState: SaveState
   /** Server problems per node id (`''` = the page). */
@@ -82,6 +84,7 @@ export type EditorActions = {
   select: (id: string | null) => void
   setHover: (id: string | null) => void
   setDevice: (device: Device) => void
+  setEditLocale: (locale: 'en' | 'bn') => void
   undo: () => void
   redo: () => void
   /** Replaces everything with a document from the server (open, discard, restore, "load their version"): history is cleared. */
@@ -126,6 +129,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
     selection: null,
     hover: null,
     device: 'desktop',
+    editLocale: 'en',
     history: { past: [], future: [] },
     saveState: { status: 'saved', savedAt: detail.draft_updated_at ? Date.parse(detail.draft_updated_at) : null },
     errors: {},
@@ -160,6 +164,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       if (get().hover !== id) set({ hover: id })
     },
     setDevice: (device) => set({ device }),
+    setEditLocale: (editLocale) => set({ editLocale }),
 
     undo: () => {
       const state = get()

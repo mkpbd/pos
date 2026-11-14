@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useBlocker, useNavigate } from 'react-router'
 import {
   closestCenter,
@@ -23,6 +23,8 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useCurrentUserQuery } from '@/features/auth/api'
+import { MediaPicker } from '@/features/media/components/media-picker'
+import { useStoreFonts } from '@/features/storefront/api'
 import { useCan } from '@/features/auth/use-auth'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
@@ -46,7 +48,14 @@ import {
   type VersionSummary,
 } from './api'
 import { Autosave, problemCount, problemsByNode } from './autosave'
-import { CanvasFrame, type CanvasHandle } from './canvas-frame'
+import { CanvasFrame, type CanvasEditMessage, type CanvasHandle, type NodeUpload, type SpacingTarget } from './canvas-frame'
+import { CheckPanel } from './check-panel'
+import { usePageCheck } from './use-page-check'
+import { applyTextEdit, firstInlineField } from './inline-edit'
+import { dropTargetOf, pictureFileProblem, setNodePicture, uploadErrorMessage, uploadPicture } from './media-upload'
+import type { PageCheckIssue, PageCheckTab } from './page-check'
+import { applyPageCheckFix } from './page-check-fix'
+import { hasSpacingHandles, setSpacing, spacingAt } from './spacing-drag'
 import type { ResizePhase, ResizeRow } from './column-handles'
 import { resetColumnWidth, resizeColumns, setColumnWidth } from './column-resize'
 import { EditorUiContext, nodeLabel, nodeName, useCommands, useEditorUi, type EditorUi } from './commands'
@@ -55,11 +64,11 @@ import { globalKeys, useGlobalEntries, useGlobalsQuery } from './global-api'
 import { DetachConfirm, MakeGlobalDialog } from './global-dialogs'
 import { GlobalDocBar, GlobalDocPanel, GlobalRefPanel, GlobalSectionsPanel } from './global-panel'
 import { expandGlobals, globalContextFor, globalRefOf, referencedGlobals } from './global-sections'
-import { ConflictDialog, LeaveDialog, PublishDialog, VersionHistoryDialog } from './dialogs'
+import { ConflictDialog, LeaveDialog, LinkPrompt, PublishDialog, VersionHistoryDialog } from './dialogs'
 import { elementContext, isProductZone, kindInfo, parseZoneKey } from './document-kind'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector, withSeo } from './inspector'
-import { BREAKPOINT, widthAt } from './inspector/style-model'
+import { BREAKPOINT, DEVICE_LABEL, widthAt } from './inspector/style-model'
 import { flattenLayers } from './layers'
 import { LayersPanel, type LayerIndicator } from './layers-panel'
 import { MiniToolbar } from './mini-toolbar'
@@ -82,10 +91,15 @@ import { readPopupSettings } from './popup-model'
  * autosave with its conflict dialog; the unsaved-change guard.
  */
 
-/** The canvas language: base texts are the source language; Bangla is edited as a translation. */
+/** The canvas language by default: base texts are the source language; Bangla is a translation (B10: "Edit in"). */
 export const EDITOR_LOCALE = 'en'
 
 const AUTOSCROLL_EDGE = 48
+
+/** Calls the canvas handle when it is mounted. */
+function onCanvas(canvas: RefObject<CanvasHandle | null>, run: (handle: CanvasHandle) => void) {
+  if (canvas.current) run(canvas.current)
+}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -270,7 +284,11 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const saveStatus = useEditor((s) => s.saveState.status)
   const select = useEditor((s) => s.select)
   const setHover = useEditor((s) => s.setHover)
+  const editLocale = useEditor((s) => s.editLocale)
   const { canvas, globals, single = false } = useEditorUi()
+  const bangla = canvasContext.locales.includes('bn')
+  // B10: Bangla on the canvas only while the store has it.
+  const canvasLocale = bangla ? editLocale : EDITOR_LOCALE
   // B4: what this document is (page, header, footer, zone) and which elements it may hold.
   const info = useMemo(() => kindInfo(documentInfo), [documentInfo])
   const context = elementContext(documentInfo)
@@ -337,14 +355,14 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   /* ---------------------------------------------------------------- canvas data ------------ */
   // B9: each global section reference is drawn as its global's draft (see global-sections.ts).
   const expanded = useMemo(() => expandGlobals(content, globals ?? new Map(), context), [content, globals, context])
-  const preview = usePreviewData(expanded.content, { locale: EDITOR_LOCALE, localMedia, enabled: true })
+  const preview = usePreviewData(expanded.content, { locale: canvasLocale, localMedia, enabled: true })
   // Scheduled nodes change state with time: the clock the canvas tree is computed with ticks each minute.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000)
     return () => clearInterval(timer)
   }, [])
-  const sections = useMemo<RenderSection[]>(() => toRenderTree(expanded.content, { locale: EDITOR_LOCALE, now, reveal: selection }), [expanded, selection, now])
+  const sections = useMemo<RenderSection[]>(() => toRenderTree(expanded.content, { locale: canvasLocale, now, reveal: selection }), [expanded, selection, now, canvasLocale])
   // The inspector looks things up in the drawn document; nodes it can't show (unavailable globals) are left out.
   const inspectorContent = useMemo(
     () => (expanded.content === content ? content : { ...expanded.content, sections: expanded.content.sections.filter((s) => Array.isArray(s.columns)) }),
@@ -354,6 +372,201 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const ownerOf = useCallback((id: string | null) => (id ? (expanded.owners.get(id) ?? id) : null), [expanded])
   const errorIds = useMemo(() => [...Object.keys(errors), ...Object.keys(preview.errors)].filter((id) => id !== ''), [errors, preview.errors])
   const selectedInfo = findNode(content, selection)
+
+  /* ---------------------------------------------------------------- B10 edit on the page -- */
+  const [uploads, setUploads] = useState<Record<string, NodeUpload>>({})
+  const [replaceId, setReplaceId] = useState<string | null>(null)
+  const [linkRequest, setLinkRequest] = useState<{ url: string | null } | null>(null)
+  const fontsQuery = useStoreFonts()
+  const fonts = fontsQuery.data?.fonts
+
+  /** A node of a drawn global section is edited in the global's own document. */
+  const insideGlobal = useCallback((id: string) => ownerOf(id) !== id, [ownerOf])
+  const GLOBAL_NOTE = 'This is part of a global section. Open the global section to change it — every page that uses it changes too.'
+
+  const applyPicture = useCallback(
+    (id: string, mediaId: string, media?: { url: string; srcset: string; width: number; height: number; alt: string | null }) => {
+      const state = store.getState()
+      const bp = BREAKPOINT[state.device]
+      return state.apply((c) => setNodePicture(c, id, mediaId, bp), { select: id, ...(media ? { media: { [mediaId]: media } } : {}) })
+    },
+    [store],
+  )
+
+  const dropPicture = useCallback(
+    async (id: string, file: File) => {
+      if (insideGlobal(id)) return void toast.info(GLOBAL_NOTE)
+      const problem = pictureFileProblem(file)
+      if (problem) return void toast.error(problem)
+      if (!dropTargetOf(findNode(store.getState().content, id)?.node, BREAKPOINT[store.getState().device])) {
+        return void toast.error('Drop the picture on a picture, or on a section that has a background picture.')
+      }
+      setUploads((u) => ({ ...u, [id]: { progress: null, name: file.name } }))
+      try {
+        const item = await uploadPicture(file, { onProgress: (progress) => setUploads((u) => (u[id] ? { ...u, [id]: { ...u[id]!, progress } } : u)) })
+        if (applyPicture(id, item.id, item)) toast.success(`“${file.name}” is in your media library and on the page. Undo puts the old picture back.`)
+      } catch (error) {
+        toast.error(uploadErrorMessage(error, file.name))
+      } finally {
+        setUploads((u) => {
+          const next = { ...u }
+          delete next[id]
+          return next
+        })
+      }
+    },
+    [applyPicture, insideGlobal, store],
+  )
+
+  const onCanvasEdit = useCallback(
+    (message: CanvasEditMessage) => {
+      const state = store.getState()
+      switch (message.type) {
+        case 'text-edit-start':
+          if (insideGlobal(message.id)) {
+            onCanvas(canvas, (c) => c.endTextEdit(false))
+            return void toast.info(GLOBAL_NOTE)
+          }
+          if (state.selection !== message.id) state.select(message.id)
+          return
+        case 'text-edit-commit': {
+          // A refused or unchanged commit still gets a render, so the canvas shows the text as it is at once.
+          const redraw = () => onCanvas(canvas, (c) => c.rerender())
+          if (insideGlobal(message.id)) {
+            redraw()
+            return void toast.info(GLOBAL_NOTE)
+          }
+          const result = applyTextEdit(state.content, message, { context, bangla })
+          if (!result.ok) {
+            redraw()
+            return void toast.error(result.message)
+          }
+          if (!result.changed || !state.apply(() => result.content, { select: message.id })) redraw()
+          if (result.note) toast.info(result.note)
+          return
+        }
+        case 'text-edit-cancel':
+          return
+        case 'text-edit-link':
+          setLinkRequest({ url: message.url })
+          return
+        case 'image-drop':
+          return void dropPicture(message.id, message.file)
+        case 'image-replace':
+          if (insideGlobal(message.id)) return void toast.info(GLOBAL_NOTE)
+          if (state.selection !== message.id) state.select(message.id)
+          setReplaceId(message.id)
+          return
+      }
+    },
+    [store, insideGlobal, canvas, context, bangla, dropPicture, setLinkRequest, setReplaceId],
+  )
+
+  // An edit in progress ends when another node is chosen (committed), on a device switch (committed) or an undo / redo (cancelled).
+  useEffect(() => {
+    onCanvas(canvas, (c) => {
+      const editing = c.editing()
+      if (editing && editing !== selection) c.endTextEdit(true)
+    })
+  }, [selection, canvas])
+  useEffect(() => {
+    onCanvas(canvas, (c) => c.endTextEdit(true))
+  }, [device, canvas])
+  useEffect(
+    () =>
+      store.subscribe((state, previous) => {
+        if (state.history.future.length !== previous.history.future.length && state.history.future.length > 0 && state.content !== previous.content && state.lastEdit === null) {
+          onCanvas(canvas, (c) => c.endTextEdit(false))
+        }
+      }),
+    [store, canvas],
+  )
+
+  /** Starts editing the selected element's text on the canvas (Enter, the mini toolbar). */
+  const editText = useCallback(
+    (id: string) => {
+      if (insideGlobal(id)) return void toast.info(GLOBAL_NOTE)
+      const field = firstInlineField(store.getState().content, id)
+      if (field === null) return
+      onCanvas(canvas, (c) => c.editText(id))
+    },
+    [store, canvas, insideGlobal],
+  )
+
+  /* ---------------------------------------------------------------- B10 spacing handles ---- */
+  const spacingSession = useRef<string | null>(null)
+  const onSpacing = useCallback<SpacingTarget['onChange']>(
+    (box, side, px, phase) => {
+      const state = store.getState()
+      const id = state.selection
+      if (!id) return
+      spacingSession.current ??= `spacing:${id}:${box}:${side}:${Date.now()}`
+      state.apply((c) => setSpacing(c, id, BREAKPOINT[state.device], box, side, px), { coalesceKey: spacingSession.current, coalesceWindow: Number.POSITIVE_INFINITY })
+      if (phase === 'end') spacingSession.current = null
+    },
+    [store],
+  )
+  const spacing = useMemo<SpacingTarget | null>(() => {
+    const info = findNode(content, selection)
+    if (!info || globalRefOf(info.node) || !hasSpacingHandles(info.node)) return null
+    const style = (info.node as { style?: Parameters<typeof spacingAt>[0] }).style
+    const at = (box: 'padding' | 'margin', side: 'top' | 'bottom') => spacingAt(style, breakpoint, box, side)
+    return {
+      nodeId: info.node.id,
+      label: nodeLabel(info.node, registry).toLowerCase(),
+      deviceLabel: DEVICE_LABEL[device].toLowerCase(),
+      values: { padding: { top: at('padding', 'top'), bottom: at('padding', 'bottom') }, margin: { top: at('margin', 'top'), bottom: at('margin', 'bottom') } },
+      onChange: onSpacing,
+    }
+  }, [content, selection, breakpoint, device, registry, onSpacing])
+
+  /* ---------------------------------------------------------------- B10 page check --------- */
+  const [checkOpen, setCheckOpen] = useState(false)
+  const checkTheme = useMemo(
+    () => ({ colors: inspectorTheme.colors, container_width: (themeSettings?.layout as { container_width?: number } | undefined)?.container_width ?? canvasContext.bootstrap.theme.layout?.container_width }),
+    [inspectorTheme.colors, themeSettings, canvasContext.bootstrap.theme.layout],
+  )
+  const check = usePageCheck({ content: expanded.content, draft: content, documentId: documentInfo.id, document: { kind: documentInfo.kind, key: documentInfo.key }, theme: checkTheme, media: preview.media })
+  const runServerCheck = check.runServer
+  const [focus, setFocus] = useState<{ nodeId: string | null; tab: PageCheckTab; field: string | null; token: number } | null>(null)
+  const openCheck = useCallback(() => {
+    setCheckOpen(true)
+    void runServerCheck(store.getState().content)
+  }, [runServerCheck, store, setCheckOpen])
+  const showIssue = useCallback(
+    (issue: PageCheckIssue) => {
+      const id = issue.node_id ? ownerOf(issue.node_id) : null
+      const state = store.getState()
+      state.select(id && findNode(state.content, id) ? id : null)
+      if (id) commands.reveal(id)
+    },
+    [ownerOf, store, commands],
+  )
+  const runFix = useCallback(
+    (issue: PageCheckIssue) => {
+      const fix = issue.fix
+      if (!fix) return
+      const state = store.getState()
+      if (fix.kind === 'site-styles') return setStylesOpen(true)
+      if (fix.kind === 'apply') {
+        if (insideGlobal(fix.node_id)) return void toast.info(GLOBAL_NOTE)
+        if (state.apply((c) => applyPageCheckFix(c, fix), { select: fix.node_id })) {
+          commands.reveal(fix.node_id)
+          toast.success('Fixed. Undo puts it back.')
+        }
+        return
+      }
+      const owner = fix.node_id ? ownerOf(fix.node_id) : null
+      if (fix.node_id && owner !== fix.node_id) {
+        state.select(owner)
+        return void toast.info(GLOBAL_NOTE)
+      }
+      state.select(owner)
+      if (owner) commands.reveal(owner)
+      setFocus((f) => ({ nodeId: owner, tab: fix.tab, field: fix.field, token: (f?.token ?? 0) + 1 }))
+    },
+    [store, commands, ownerOf, insideGlobal],
+  )
 
   /* ---------------------------------------------------------------- shortcuts -------------- */
   const handleKey = useCallback(
@@ -389,6 +602,12 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
         if (info && info.kind !== 'column') commands.requestDelete(state.selection)
         return true
       }
+      // B10: Enter edits the selected element's text on the canvas.
+      if (k === 'enter' && state.selection && !key.shift) {
+        if (firstInlineField(state.content, state.selection) === null) return false
+        editText(state.selection)
+        return true
+      }
       if (k === 'escape') {
         const info = findNode(state.content, state.selection)
         state.select(info?.parentId ?? null)
@@ -406,7 +625,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       }
       return false
     },
-    [commands, store],
+    [commands, store, editText],
   )
 
   useEffect(() => {
@@ -418,6 +637,8 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       // Arrows move focus inside menus, tabs and the layers tree; only plain page focus moves the selection.
       if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && target && target !== document.body && !target.closest('[data-canvas-keys]')) return
       if ((event.key === 'Delete' || event.key === 'Backspace' || event.key === 'Escape') && target?.closest('[role="tree"]')) return
+      // Enter on a button, link or tree row is theirs; on the page it edits the selected text.
+      if (event.key === 'Enter' && target && target !== document.body && (target.closest('button, a, [role="tree"], [role="slider"], [role="separator"]') || !target.closest('[data-canvas-keys]'))) return
       if (handleKey({ key: event.key, ctrl: event.ctrlKey, shift: event.shiftKey, meta: event.metaKey })) event.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
@@ -718,14 +939,30 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
           onPublish={() => {
             setPublishError(null)
             setPublishOpen(true)
+            // B10: the server checks the content about to be published (errors never block it).
+            void runServerCheck(store.getState().content)
           }}
           onDiscard={() => setDiscardOpen(true)}
           onHistory={() => setHistoryOpen(true)}
           onShowProblem={showProblem}
+          bangla={bangla}
+          check={{ errors: check.counts.errors, warnings: check.counts.warnings, open: checkOpen, onToggle: () => (checkOpen ? setCheckOpen(false) : openCheck()) }}
         />
         <div className="flex min-h-0 flex-1">
           <nav aria-label="Add elements, page layers and templates" className="flex w-72 shrink-0 flex-col border-r bg-background">
-            <Tabs value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
+            {checkOpen && (
+              <CheckPanel
+                check={check}
+                labelOf={(id) => {
+                  const info = findNode(expanded.content, id)
+                  return info ? nodeName(info.node, registry, globals) : null
+                }}
+                onShow={showIssue}
+                onFix={runFix}
+                onClose={() => setCheckOpen(false)}
+              />
+            )}
+            <Tabs hidden={checkOpen} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
               <TabsList className={cn('m-2 grid w-auto', showGlobalTab && showTemplatesTab ? 'grid-cols-4' : showGlobalTab || showTemplatesTab ? 'grid-cols-3' : 'grid-cols-2')}>
                 <TabsTrigger value="add">Add</TabsTrigger>
                 <TabsTrigger value="layers">Layers</TabsTrigger>
@@ -775,7 +1012,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
               product={canvasProduct}
               emptyText={info.empty}
               bootstrap={canvasContext.bootstrap}
-              locale={EDITOR_LOCALE}
+              locale={canvasLocale}
               sections={sections}
               data={preview.data}
               media={preview.media}
@@ -789,12 +1026,16 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
               onSelect={(id) => select(ownerOf(id))}
               onHover={(id) => setHover(ownerOf(id))}
               onKey={handleKey}
-              toolbar={() => <MiniToolbar />}
+              toolbar={() => <MiniToolbar theme={inspectorTheme} onEditText={editText} onReplacePicture={setReplaceId} />}
               hoverLabel={labelOf}
               handleRef={canvas}
               theme={themeSettings as CanvasThemeSettings | null}
               resizeRow={resizeRow}
               onResize={onResize}
+              fonts={fonts}
+              onEdit={onCanvasEdit}
+              spacing={spacing}
+              uploads={uploads}
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
@@ -813,6 +1054,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
                 device={device}
                 theme={inspectorTheme}
                 canCustomHtml={canCustomHtml}
+                focus={focus}
                 onCommand={(command) => {
                   const state = store.getState()
                   switch (command.type) {
@@ -872,7 +1114,38 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       </DragOverlay>
 
       <SiteStylesDrawer open={stylesOpen} onOpenChange={setStylesOpen} styles={siteStyles} canPublish={canPublish} />
-      <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} pending={publishPending} error={publishError} onPublish={(note) => void publish(note)} popup={isPopup} usedOn={documentInfo.kind === 'global' ? (documentInfo.usage?.usage_count ?? 0) : null} />
+      <PublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        pending={publishPending}
+        error={publishError}
+        onPublish={(note) => void publish(note)}
+        popup={isPopup}
+        usedOn={documentInfo.kind === 'global' ? (documentInfo.usage?.usage_count ?? 0) : null}
+        check={check}
+        onShowCheck={() => {
+          setPublishOpen(false)
+          setCheckOpen(true)
+        }}
+      />
+      <LinkPrompt
+        request={linkRequest}
+        onAnswer={(url) => {
+          setLinkRequest(null)
+          onCanvas(canvas, (c) => c.linkResult(url))
+        }}
+      />
+      <MediaPicker
+        open={replaceId !== null}
+        onOpenChange={(open) => !open && setReplaceId(null)}
+        title={findNode(content, replaceId)?.node.type === 'image' ? 'Replace picture' : 'Replace background picture'}
+        selected={[]}
+        onConfirm={(ids) => {
+          const id = replaceId
+          setReplaceId(null)
+          if (id && ids[0] && applyPicture(id, ids[0])) toast.success('Picture replaced. Undo puts the old one back.')
+        }}
+      />
       <ConflictDialog open={saveStatus === 'conflict'} pending={conflictPending} onChoose={chooseConflict} />
       <VersionHistoryDialog
         documentId={documentInfo.id}

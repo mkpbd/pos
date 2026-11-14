@@ -7,6 +7,7 @@ import { PageLoadingView } from '../components/state-views'
 import { LocaleContext, useLocale } from '../i18n/locale'
 import { rich } from '../i18n/rich'
 import { isMessageKey } from '../i18n/translate'
+import { loadFont } from '../font-loader'
 import { headingFontStack } from '../theme'
 import { isGalleryDisabled, useDemoStoresQuery, type DemoStore } from './api'
 import { useStandaloneLocale } from './demo-locale'
@@ -37,6 +38,13 @@ function DemoGallery() {
   useEffect(() => {
     document.title = title
   }, [title])
+
+  // B10: outside the store layout no theme loads fonts: the default theme's (storefront.css defaults).
+  useEffect(() => {
+    for (const font of ['poppins', 'baloo']) void loadFont(font)
+    void loadFont('hind-siliguri', false)
+    void loadFont('baloo-da-2', false)
+  }, [])
 
   useEffect(() => {
     const robots = document.createElement('meta')
@@ -151,6 +159,10 @@ function DemoCard({ demo }: { demo: DemoStore }) {
     { key: 'canvas', value: canvas, label: t('demos.color.canvas', { value: canvas ?? '' }) },
   ].filter((swatch) => swatch.value !== null)
   const categories = (demo.category_names ?? []).slice(0, 6)
+  // B10: fonts load on demand; the card's heading font is loaded for it.
+  useEffect(() => {
+    void loadFont(demo.heading_font)
+  }, [demo.heading_font])
 
   return (
     <article

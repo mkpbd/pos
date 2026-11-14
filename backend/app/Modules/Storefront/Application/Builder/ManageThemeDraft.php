@@ -6,6 +6,7 @@ use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Actions\SaveTheme;
+use App\Modules\Storefront\Application\Queries\CustomFonts;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Domain\ThemeSchema;
@@ -38,6 +39,7 @@ class ManageThemeDraft
         private readonly StorefrontConfig $config,
         private readonly SaveTheme $save,
         private readonly AuditTrail $audit,
+        private readonly CustomFonts $fonts,
     ) {}
 
     /**
@@ -180,7 +182,10 @@ class ManageThemeDraft
         return DB::transaction(function () use ($versionId) {
             $document = $this->document();
             $version = BuilderVersion::query()->where('document_id', $document->id)->whereKey($versionId)->firstOrFail();
-            $document = $this->writeDraft($document, $this->save->prepare($version->content));
+            // B10: a custom font deleted since goes back to its role's default.
+            $content = ThemeSchema::normalize($version->content);
+            $content = ThemeSchema::withoutMissingFonts($content, $this->fonts->existing(ThemeSchema::customFontIds($content)));
+            $document = $this->writeDraft($document, $this->save->prepare($content));
             $this->audit->record('storefront.theme_restored', $document, [], ['version_id' => $version->id, 'number' => $version->number]);
 
             return $document;

@@ -3,9 +3,14 @@ import { envelope, readCanvasMessage, type CanvasMessage, type CanvasProduct, ty
 import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderSection } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
+import type { FontSource } from '@/storefront/fonts'
+import { cn } from '@/lib/utils'
 import { CANVAS_URL, DEVICE_WIDTHS } from './canvas-config'
 import { ColumnHandles, type ResizePhase, type ResizeRow } from './column-handles'
+import { toolbarPosition } from './toolbar-position'
 import type { DropIndicator } from './drop-targets'
+import { SpacingHandles, type SpacingPhase, type SpacingValues } from './spacing-handles'
+import type { SpacingBox, SpacingSide } from './spacing-drag'
 
 /*
  * The canvas iframe (/admin/builder-canvas) at the device width, scaled to fit, with the editor's
@@ -23,7 +28,34 @@ export type CanvasHandle = {
   toCanvasPoint: (clientX: number, clientY: number) => { x: number; y: number } | null
   rects: () => Record<string, Rect>
   viewport: () => { w: number; h: number }
+  /** B10: starts editing a text in place (no field: the node's first shown field). */
+  editText: (id: string, field?: string) => void
+  /** B10: finishes the edit in progress (selection change, undo, device switch): commit or cancel. */
+  endTextEdit: (commit: boolean) => void
+  /** B10: the answer to the format bar's Link button (a URL, '' = remove the link, null = cancelled). */
+  linkResult: (url: string | null) => void
+  /** B10: the node whose text is being edited on the canvas (null: none). */
+  editing: () => string | null
+  /** B10: sends the render again although nothing changed (after a refused text edit the canvas shows the old text). */
+  rerender: () => void
 }
+
+/** B10: canvas messages of editing on the page (text edits, dropped pictures, "Replace picture"). */
+export type CanvasEditMessage = Extract<CanvasMessage, { type: 'text-edit-start' | 'text-edit-commit' | 'text-edit-cancel' | 'text-edit-link' | 'image-drop' | 'image-replace' }>
+
+const EDIT_TYPES: ReadonlySet<string> = new Set(['text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
+
+/** B10: the selected section / inner row / column's spacing handles (values in px at this device; null = can't be dragged). */
+export type SpacingTarget = {
+  nodeId: string
+  label: string
+  deviceLabel: string
+  values: SpacingValues
+  onChange: (box: SpacingBox, side: SpacingSide, px: number, phase: SpacingPhase) => void
+}
+
+/** B10: an upload running for a node (0–1; null while the size isn't known yet). */
+export type NodeUpload = { progress: number | null; name: string }
 
 export type CanvasFrameProps = {
   bootstrap: StorefrontBootstrap
@@ -58,25 +90,50 @@ export type CanvasFrameProps = {
   popup?: PopupSettings
   /** P1b: a product page zone's preview product (its photo, name and price fill the sample around the zone). */
   product?: CanvasProduct | null
+  /** B10: the store's uploaded fonts (sent with the theme; absent = the bootstrap's fonts). */
+  fonts?: FontSource[]
+  /** B10: text edits, dropped pictures and "Replace picture" from the canvas. */
+  onEdit?: (message: CanvasEditMessage) => void
+  /** B10: spacing handles on the selection (null: none). */
+  spacing?: SpacingTarget | null
+  /** B10: uploads per node id, drawn as progress over the node. */
+  uploads?: Record<string, NodeUpload>
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
   const [ready, setReady] = useState(0)
+  // B10: a render the canvas waits for although nothing changed (a refused text edit shows the old text at once).
+  const [renderTick, setRenderTick] = useState(0)
+  // B10: a file dragged in from the desktop: the overlay lets every pointer through to the canvas.
+  const [fileDrag, setFileDrag] = useState(false)
   const [rects, setRects] = useState<Record<string, Rect>>({})
   const rectsRef = useRef<Record<string, Rect>>({})
   const viewportRef = useRef({ w: DEVICE_WIDTHS.desktop, h: 0 })
-  const callbacks = useRef({ onSelect, onHover, onKey })
+  const callbacks = useRef({ onSelect, onHover, onKey, onEdit })
   useLayoutEffect(() => {
-    callbacks.current = { onSelect, onHover, onKey }
+    callbacks.current = { onSelect, onHover, onKey, onEdit }
   })
+  // B10: the node whose text is being edited in the canvas (its toolbar and handles step aside).
+  const [editing, setEditing] = useState<string | null>(null)
+  const editingRef = useRef<string | null>(null)
 
   const width = DEVICE_WIDTHS[device]
   const scale = area.w > 0 ? Math.min(1, (area.w - 32) / width) : 1
   const frameHeight = scale > 0 ? Math.max(200, area.h / scale) : area.h
+  // The mini toolbar's real width (it grows with its buttons), for keeping it inside the canvas.
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarWidth, setToolbarWidth] = useState(280)
+  useLayoutEffect(() => {
+    const el = toolbarRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setToolbarWidth(Math.ceil(el.offsetWidth) || 280))
+    observer.observe(el)
+    return () => observer.disconnect()
+  })
 
   useLayoutEffect(() => {
     const el = areaRef.current
@@ -97,8 +154,20 @@ export function CanvasFrame(props: CanvasFrameProps) {
     const onMessage = (event: MessageEvent) => {
       const message: CanvasMessage | null = readCanvasMessage(event, window.location.origin, frameRef.current?.contentWindow ?? null)
       if (!message) return
+      if (EDIT_TYPES.has(message.type)) {
+        const edit = message as CanvasEditMessage
+        if (edit.type === 'image-drop') setFileDrag(false)
+        if (edit.type === 'text-edit-start') editingRef.current = edit.id
+        else if (edit.type === 'text-edit-commit' || edit.type === 'text-edit-cancel') editingRef.current = null
+        setEditing(editingRef.current)
+        callbacks.current.onEdit?.(edit)
+        return
+      }
       switch (message.type) {
         case 'ready':
+          // A new canvas page has no edit going on.
+          editingRef.current = null
+          setEditing(null)
           setReady((n) => n + 1)
           break
         case 'rects':
@@ -108,7 +177,9 @@ export function CanvasFrame(props: CanvasFrameProps) {
           break
         case 'click':
           // A click on the page takes focus off any field, so Delete and the arrows act on the selection.
-          if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur()
+          // B10: not the canvas itself — that would end a text edit the canvas has just started (the
+          // double-click's second click arrives after the edit took focus).
+          if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body && document.activeElement !== frameRef.current) document.activeElement.blur()
           callbacks.current.onSelect(message.id)
           break
         case 'hover':
@@ -123,13 +194,24 @@ export function CanvasFrame(props: CanvasFrameProps) {
     return () => window.removeEventListener('message', onMessage)
   }, [])
 
+  // B10: a language change is `set-locale`; init carries the language the canvas starts in.
+  const localeRef = useRef(locale)
+  const sentLocale = useRef<string | null>(null)
   useEffect(() => {
-    if (ready > 0) send({ type: 'init', bootstrap, locale })
-  }, [ready, bootstrap, locale, send])
+    if (ready === 0) return
+    send({ type: 'init', bootstrap, locale: localeRef.current })
+    sentLocale.current = localeRef.current
+  }, [ready, bootstrap, send])
+  useEffect(() => {
+    localeRef.current = locale
+    if (ready === 0 || sentLocale.current === locale) return
+    send({ type: 'set-locale', locale })
+    sentLocale.current = locale
+  }, [ready, locale, send])
 
   useEffect(() => {
-    if (ready > 0 && theme) send({ type: 'theme', settings: theme })
-  }, [ready, theme, send])
+    if (ready > 0 && theme) send(fonts ? { type: 'theme', settings: theme, fonts } : { type: 'theme', settings: theme })
+  }, [ready, theme, fonts, send])
 
   useEffect(() => {
     if (ready > 0) {
@@ -140,7 +222,34 @@ export function CanvasFrame(props: CanvasFrameProps) {
         ...(product ? { product } : {}),
       })
     }
-  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, product, send])
+  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, product, send, renderTick])
+
+  useEffect(() => {
+    const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const over = (event: DragEvent) => {
+      if (!hasFiles(event)) return
+      setFileDrag(true)
+      // dragover repeats while the file is over this window; when it stops (dropped in the canvas, left), the overlay comes back.
+      clearTimeout(timer)
+      timer = setTimeout(() => setFileDrag(false), 1500)
+    }
+    const end = () => {
+      clearTimeout(timer)
+      setFileDrag(false)
+    }
+    window.addEventListener('dragenter', over)
+    window.addEventListener('dragover', over)
+    window.addEventListener('drop', end)
+    window.addEventListener('dragend', end)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('dragenter', over)
+      window.removeEventListener('dragover', over)
+      window.removeEventListener('drop', end)
+      window.removeEventListener('dragend', end)
+    }
+  }, [])
 
   useImperativeHandle(
     handleRef,
@@ -157,6 +266,18 @@ export function CanvasFrame(props: CanvasFrameProps) {
       },
       rects: () => rectsRef.current,
       viewport: () => viewportRef.current,
+      editText: (id, field) => {
+        // Typing goes into the canvas: it gets the focus before it starts the edit.
+        frameRef.current?.focus()
+        frameRef.current?.contentWindow?.focus()
+        send(field ? { type: 'edit-text', id, field } : { type: 'edit-text', id })
+      },
+      rerender: () => setRenderTick((n) => n + 1),
+      endTextEdit: (commit) => {
+        if (editingRef.current !== null) send({ type: 'end-text-edit', commit })
+      },
+      linkResult: (url) => send({ type: 'text-edit-link-result', url }),
+      editing: () => editingRef.current,
     }),
     [scale, send],
   )
@@ -164,6 +285,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
   const scaled = (r: Rect) => ({ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: r.h * scale })
   const selected = selection ? rects[selection] : undefined
   const hovered = hover && hover !== selection ? rects[hover] : undefined
+  const editingNow = editing !== null
+  const spacingRect = spacing ? rects[spacing.nodeId] : undefined
 
   return (
     <div ref={areaRef} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/60" data-testid="canvas-area" data-device={device}>
@@ -177,8 +300,9 @@ export function CanvasFrame(props: CanvasFrameProps) {
           style={{ width, height: frameHeight, transform: `scale(${scale})`, transformOrigin: '0 0' }}
         />
         <div
-          className={dragging ? 'absolute inset-0 z-10 cursor-grabbing' : 'pointer-events-none absolute inset-0 z-10 overflow-hidden'}
+          className={dragging ? 'absolute inset-0 z-10 cursor-grabbing' : cn('pointer-events-none absolute inset-0 z-10 overflow-hidden', fileDrag && '[&_*]:pointer-events-none!')}
           data-testid="canvas-overlay"
+          data-file-drag={fileDrag || undefined}
           aria-hidden={dragging ? true : undefined}
         >
           {!dragging && hovered && hover && hovered.h > 0 && (
@@ -186,12 +310,37 @@ export function CanvasFrame(props: CanvasFrameProps) {
               {hoverLabel(hover)}
             </span>
           )}
-          {!dragging && selected && selected.h > 0 && (
-            <div className="pointer-events-auto absolute" style={{ left: Math.max(0, Math.min(selected.x * scale, width * scale - 280)), top: selected.y * scale >= 36 ? selected.y * scale - 34 : Math.max(0, selected.y * scale + 2) }}>
+          {!dragging && !editingNow && selected && selected.h > 0 && (
+            <div ref={toolbarRef} className="pointer-events-auto absolute" style={toolbarPosition(selected, scale, { w: width * scale, h: frameHeight * scale }, toolbarWidth)}>
               {toolbar(selected)}
             </div>
           )}
-          {!dragging && resizeRow && onResize && <ColumnHandles row={resizeRow} rects={rects} scale={scale} onResize={onResize} />}
+          {!dragging && !editingNow && resizeRow && onResize && <ColumnHandles row={resizeRow} rects={rects} scale={scale} onResize={onResize} />}
+          {!dragging && !editingNow && spacing && spacingRect && (
+            <SpacingHandles nodeId={spacing.nodeId} nodeLabel={spacing.label} rect={spacingRect} scale={scale} values={spacing.values} deviceLabel={spacing.deviceLabel} onChange={spacing.onChange} />
+          )}
+          {Object.entries(uploads ?? {}).map(([id, upload]) => {
+            const r = rects[id]
+            if (!r || r.h <= 0) return null
+            const percent = upload.progress === null ? null : Math.round(upload.progress * 100)
+            return (
+              <div key={id} className="absolute z-20 flex items-center justify-center bg-black/40" style={scaled(r)} data-testid={`upload-${id}`}>
+                <div
+                  role="progressbar"
+                  aria-label={`Uploading ${upload.name}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={percent ?? undefined}
+                  className="flex w-48 max-w-[80%] flex-col gap-1 rounded-md bg-white px-3 py-2 text-xs text-neutral-900 shadow"
+                >
+                  <span className="truncate">Uploading {upload.name}…{percent !== null ? ` ${percent} %` : ''}</span>
+                  <span className="h-1.5 overflow-hidden rounded-full bg-neutral-200" aria-hidden>
+                    <span className="block h-full bg-blue-600 transition-[width] motion-reduce:transition-none" style={{ width: `${percent ?? 10}%` }} />
+                  </span>
+                </div>
+              </div>
+            )
+          })}
           {dragging && indicator && (
             <div
               data-testid="drop-indicator"

@@ -5,11 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckIcon, ExternalLinkIcon, HistoryIcon, Loader2Icon, UploadCloudIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
-// The storefront's font faces, so the preset previews and font choices show in their real typeface.
-import '@fontsource-variable/baloo-2'
-import '@fontsource-variable/jost'
-import '@fontsource-variable/playfair-display'
-import '@fontsource/poppins/600.css'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
@@ -23,6 +18,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
 import { useMediaLookup } from '@/features/media/api'
+import { loadFont } from '@/storefront/font-loader'
 import { MediaField, MediaPicker, MediaThumb } from '@/features/media/components/media-picker'
 import {
   fetchThemeDraft,
@@ -511,6 +507,11 @@ function PresetOption({ preset, checked, current, disabled, onSelect }: { preset
   const { colors, typography, shape } = preset.theme
   const descriptionId = `preset-${preset.key}-description`
   const buttonRadius = shape.button_style === 'pill' ? '9999px' : shape.button_style === 'rounded' ? '0.375rem' : '0'
+  // Only the fonts this card shows are downloaded (B10: no font is bundled with the admin up front).
+  useEffect(() => {
+    void loadFont(typography.heading_font)
+    void loadFont(typography.body_font)
+  }, [typography.heading_font, typography.body_font])
 
   return (
     <label

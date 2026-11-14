@@ -41,6 +41,11 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Store builder upgrade (B9):** `php artisan migrate` adds the nullable `builder_documents.context` (global sections). The AI writer uses the existing AI settings and budget (usage feature `builder_writer`); nothing else to configure.
 
+**Store builder upgrade (B10):** `php artisan migrate` adds `storefront_fonts` (stores' own fonts); existing themes need no change. Uploaded fonts are WOFF2 files on the media disk at `fonts/<org>/<id>.woff2` and never change once written:
+- Local `public` disk: have Nginx send a long cache for them, e.g. `location ^~ /storage/fonts/ { add_header Cache-Control "public, max-age=31536000, immutable"; types { font/woff2 woff2; } }`.
+- S3 / CDN bucket: the files are uploaded with `Cache-Control: public, max-age=31536000, immutable`; allow CORS `GET` from the store domains, because browsers load `@font-face` files across origins only with CORS.
+- Built-in fonts (including the five Bangla fonts) ship in the frontend build as separate files and load only when a theme uses them.
+
 The store builder's canvas (B2) is a third built page that the admin editor loads in an iframe from the same origin. Map it before the `/admin/` fallback:
 
 ```nginx

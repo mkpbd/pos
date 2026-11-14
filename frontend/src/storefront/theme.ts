@@ -1,33 +1,18 @@
 import { useStorefront } from './api'
 import { legibleOn } from './color'
 import { resolveTypeScale, typeScaleVars } from './type-scale'
-import type { BodyFont, ButtonStyle, HeadingCase, HeadingFont, LayoutVariants, StorefrontTheme, ThemeColors } from './types'
-
-const SYSTEM_STACK = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
-
-const SERIF_FALLBACK = "Georgia, 'Times New Roman', serif"
+import { banglaStacks, banglaTypography, customFonts, fontStack } from './fonts'
+import type { ButtonStyle, HeadingCase, LayoutVariants, StorefrontTheme, ThemeColors } from './types'
 
 /*
- * Bangla pages put Hind Siliguri / Baloo Da 2 in front of whichever stack is chosen
- * (storefront.css, `:lang(bn)`), so every stack renders Bengali text.
+ * B10: the font stacks live in ./fonts.ts (built-in Latin and Bangla fonts, uploaded fonts). Bangla
+ * content puts the theme's Bangla font (or today's Hind Siliguri / Baloo Da 2) in front of the
+ * chosen stack (storefront.css `:lang(bn)` reads --sf-font-bangla-*).
  */
-const HEADING_STACKS: Record<HeadingFont, string> = {
-  baloo: `'Baloo 2 Variable', 'Poppins', ${SYSTEM_STACK}`,
-  poppins: `'Poppins', ${SYSTEM_STACK}`,
-  playfair: `'Playfair Display Variable', ${SERIF_FALLBACK}`,
-  jost: `'Jost Variable', 'Poppins', ${SYSTEM_STACK}`,
-  system: SYSTEM_STACK,
-}
 
 /** The font stack for a theme's heading font; an unknown name gets the system stack. */
 export function headingFontStack(font: string): string {
-  return Object.hasOwn(HEADING_STACKS, font) ? HEADING_STACKS[font as HeadingFont] : SYSTEM_STACK
-}
-
-const BODY_STACKS: Record<BodyFont, string> = {
-  poppins: `'Poppins', ${SYSTEM_STACK}`,
-  jost: `'Jost Variable', 'Poppins', ${SYSTEM_STACK}`,
-  system: SYSTEM_STACK,
+  return fontStack(font)
 }
 
 /** Today's look: what a theme without the T1 layout keys (or with unknown values) gets. */
@@ -136,19 +121,30 @@ export function themeToCssVars(theme: StorefrontTheme): Record<string, string> {
   // Without a hover colour the button keeps its automatic hover; the variable then repeats the button colour.
   vars['--sf-button-hover'] = roles.button_hover ?? roles.button
   vars['--sf-link'] = roles.link
-  vars['--sf-font-heading'] = HEADING_STACKS[theme.typography.heading_font] ?? SYSTEM_STACK
-  vars['--sf-font-body'] = BODY_STACKS[theme.typography.body_font] ?? SYSTEM_STACK
+  const custom = customFonts(theme)
+  vars['--sf-font-heading'] = fontStack(theme.typography.heading_font, custom)
+  vars['--sf-font-body'] = fontStack(theme.typography.body_font, custom)
+  // B10: Bangla content's fonts and, when the theme sets them, its line height and size scale.
+  const bangla = banglaStacks(theme)
+  vars['--sf-font-bangla-body'] = bangla.body
+  vars['--sf-font-bangla-heading'] = bangla.heading
+  const spacing = banglaTypography(theme.typography)
+  if (spacing.lineHeight !== null) {
+    vars['--sf-bangla-line-height'] = String(spacing.lineHeight)
+    vars['--sf-bangla-leading-factor'] = String(Number((spacing.lineHeight / 1.5).toFixed(4)))
+  }
+  if (spacing.scale !== null) vars['--sf-bangla-scale'] = String(spacing.scale)
   vars['--sf-radius-button'] = BUTTON_RADII[theme.shape.button_style] ?? BUTTON_RADII.rounded
   vars['--sf-radius-card'] = `${theme.shape.card_radius}px`
   vars['--sf-container'] = `${theme.layout.container_width}px`
   const headingCase = resolveLayout(theme.layout).heading_case
   vars['--sf-heading-transform'] = HEADING_TRANSFORMS[headingCase]
   // Capitals read better slightly spaced; the theme's heading letter spacing (B3) adds to it.
-  const spacing = resolveTypeScale(theme.typography).letter_spacing
+  const tracking = resolveTypeScale(theme.typography).letter_spacing
   const em = (value: number) => `${Number(value.toFixed(3))}em`
-  vars['--sf-heading-tracking'] = headingCase === 'uppercase' ? em(0.04 + spacing) : spacing === 0 ? 'normal' : em(spacing)
+  vars['--sf-heading-tracking'] = headingCase === 'uppercase' ? em(0.04 + tracking) : tracking === 0 ? 'normal' : em(tracking)
   // Headings without a case class: only set when the theme asks for spacing, so they keep inheriting otherwise.
-  if (spacing !== 0) vars['--sf-heading-letter-spacing'] = em(spacing)
+  if (tracking !== 0) vars['--sf-heading-letter-spacing'] = em(tracking)
   Object.assign(vars, typeScaleVars(theme.typography))
   // Stars on a dark surface (`.sf-on-dark`, painted in the heading colour): the primary when it
   // stands out there, else the surface colour (classic's primary is as dark as its footer).

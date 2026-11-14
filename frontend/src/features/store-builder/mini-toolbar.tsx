@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, BookmarkPlusIcon, ClipboardCopyIcon, CopyIcon, EllipsisIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, PencilIcon, Trash2Icon } from 'lucide-react'
+import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, BookmarkPlusIcon, ClipboardCopyIcon, CopyIcon, EllipsisIcon, EyeIcon, EyeOffIcon, GripVerticalIcon, ImageUpIcon, PencilIcon, TypeIcon, Trash2Icon } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import type { Section } from '@/storefront/builder/types'
@@ -8,8 +8,13 @@ import { nodeLabel, nodeName, useCommands, useEditorUi } from './commands'
 import type { Dragged } from './drop-targets'
 import { globalRefOf } from './global-sections'
 import { NodeClipboardItems } from './clipboard-menu'
-import { useEditor } from './store'
+import { firstInlineField } from './inline-edit'
+import { QuickBar, type QuickTheme } from './quick-bar'
+import { QUICK_TEXT_TYPES, setNodeStyleValue } from './quick-style'
+import { BREAKPOINT } from './inspector/style-model'
+import { useEditor, useEditorStoreApi } from './store'
 import { findNode } from './tree'
+import { dropTargetOf } from './media-upload'
 
 function ToolButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
   return (
@@ -26,10 +31,12 @@ function ToolButton({ label, onClick, disabled, children }: { label: string; onC
   )
 }
 
-/** The floating toolbar of the selected node on the canvas. */
-export function MiniToolbar() {
+/** The floating toolbar of the selected node on the canvas. B10: Edit text, Replace picture and the text quick bar. */
+export function MiniToolbar({ theme, onEditText, onReplacePicture }: { theme?: QuickTheme; onEditText?: (id: string) => void; onReplacePicture?: (id: string) => void } = {}) {
+  const store = useEditorStoreApi()
   const selection = useEditor((s) => s.selection)
   const content = useEditor((s) => s.content)
+  const device = useEditor((s) => s.device)
   const { registry, globals } = useEditorUi()
   const commands = useCommands()
   const info = findNode(content, selection)
@@ -60,6 +67,16 @@ export function MiniToolbar() {
         </button>
       )}
       <span className="max-w-56 truncate px-1.5 text-xs font-medium whitespace-nowrap text-white" title={name}>{name}</span>
+      {onEditText && info.kind === 'element' && firstInlineField(content, id) !== null && (
+        <ToolButton label="Edit text on the page (Enter)" onClick={() => onEditText(id)}>
+          <TypeIcon aria-hidden />
+        </ToolButton>
+      )}
+      {onReplacePicture && dropTargetOf(info.node, BREAKPOINT[device]) && (
+        <ToolButton label={info.node.type === 'image' ? 'Replace picture' : 'Replace background picture'} onClick={() => onReplacePicture(id)}>
+          <ImageUpIcon aria-hidden />
+        </ToolButton>
+      )}
       {ref && commands.openGlobal && (
         <ToolButton label="Edit global section" onClick={() => commands.openGlobal?.(ref.ref)}>
           <PencilIcon aria-hidden />
@@ -107,6 +124,14 @@ export function MiniToolbar() {
           <NodeClipboardItems id={id} kind={info.kind} />
         </DropdownMenuContent>
       </DropdownMenu>
+      {QUICK_TEXT_TYPES.has(info.node.type) && (
+        <QuickBar
+          node={info.node}
+          device={device}
+          theme={theme}
+          onApply={(path, value) => store.getState().apply((c) => setNodeStyleValue(c, id, BREAKPOINT[device], path, value), { coalesceKey: `quick:${id}:${path.join('.')}` })}
+        />
+      )}
       {parentLabel && (
         <ToolButton label={`Select the ${parentLabel}`} onClick={() => commands.selectParent(id)}>
           <ArrowUpLeftIcon aria-hidden />

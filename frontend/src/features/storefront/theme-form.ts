@@ -18,6 +18,8 @@ import {
   type ThemeRoleColor,
   type ThemeTypeScale,
 } from '@/features/storefront/api'
+import { BANGLA_FONTS, BANGLA_TYPE_DEFAULTS, BANGLA_TYPE_LIMITS, isCustomFontKey } from '@/storefront/fonts'
+import type { BanglaRoleFont, BodyFont, HeadingFont } from '@/storefront/types'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { normalizeProductLayout, productLayoutSchema } from '@/features/storefront/theme/product-layout'
@@ -36,6 +38,9 @@ const ANNOUNCEMENT_TRANSLATION_NAMES = ANNOUNCEMENT_TRANSLATIONS.map((f) => f.na
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a hex colour such as #f59e0b.')
 const optional = (max: number) => z.string().trim().max(max)
 const socialLink = z.union([z.url({ protocol: /^https$/, error: 'Use an https:// link.' }), z.literal('')])
+/** B10: a built-in font of the list, or an uploaded one (`custom:<uuid>`). */
+const fontKey = <T extends string>(keys: readonly string[]) => z.custom<T>((v) => (typeof v === 'string' && keys.includes(v)) || isCustomFontKey(v), 'Choose a font from the list.')
+const banglaRanged = (key: keyof typeof BANGLA_TYPE_LIMITS) => z.number({ error: 'Enter a number.' }).min(BANGLA_TYPE_LIMITS[key].min).max(BANGLA_TYPE_LIMITS[key].max)
 const ranged = (key: keyof ThemeTypeScale) => z.number({ error: 'Enter a number.' }).min(TYPE_LIMITS[key].min).max(TYPE_LIMITS[key].max)
 
 export const PALETTE_NAME_MAX = 40
@@ -52,8 +57,13 @@ export const themeSchema = z
       .max(MAX_PALETTE_COLORS, `Up to ${MAX_PALETTE_COLORS} colours.`),
     preset: z.enum(THEME_PRESETS),
     typography: z.object({
-      heading_font: z.enum(HEADING_FONTS),
-      body_font: z.enum(BODY_FONTS),
+      heading_font: fontKey<HeadingFont>(HEADING_FONTS),
+      body_font: fontKey<BodyFont>(BODY_FONTS),
+      // B10: fonts for Bangla text (null = the default) and Bangla spacing.
+      bangla_heading_font: fontKey<BanglaRoleFont>(BANGLA_FONTS).nullable(),
+      bangla_body_font: fontKey<BanglaRoleFont>(BANGLA_FONTS).nullable(),
+      bangla_line_height: banglaRanged('bangla_line_height'),
+      bangla_scale: banglaRanged('bangla_scale'),
       body_size: ranged('body_size').int(),
       heading_scale: ranged('heading_scale'),
       line_height: ranged('line_height'),
@@ -143,9 +153,23 @@ export function colorValues(colors: ThemeDocument['colors']): ThemeFormValues['c
   return { ...base, ...roles }
 }
 
-/** Fonts plus every type scale key (themes from before B3 get the defaults, which look as before). */
+/** A stored spacing value inside its limits, else the default. */
+function banglaValue(value: unknown, key: keyof typeof BANGLA_TYPE_LIMITS): number {
+  const { min, max } = BANGLA_TYPE_LIMITS[key]
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : BANGLA_TYPE_DEFAULTS[key]
+}
+
+/** Fonts plus every type scale key (themes from before B3 get the defaults, which look as before; before B10 the Bangla defaults). */
 export function typographyValues(typography: ThemeDocument['typography']): ThemeFormValues['typography'] {
-  return { heading_font: typography.heading_font, body_font: typography.body_font, ...resolveTypeScale(typography) }
+  return {
+    heading_font: typography.heading_font,
+    body_font: typography.body_font,
+    ...resolveTypeScale(typography),
+    bangla_heading_font: typography.bangla_heading_font ?? null,
+    bangla_body_font: typography.bangla_body_font ?? null,
+    bangla_line_height: banglaValue(typography.bangla_line_height, 'bangla_line_height'),
+    bangla_scale: banglaValue(typography.bangla_scale, 'bangla_scale'),
+  }
 }
 
 export function toFormValues(doc: ThemeDocument): ThemeFormValues {

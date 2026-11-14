@@ -78,15 +78,18 @@ final class StorefrontPresenter
      * /storefront/theme` (not drafted: it stays immediate).
      *
      * @param  array{document: ?BuilderDocument, settings: array<string, mixed>, has_unpublished_changes: bool}  $state
+     * @param  array<string, mixed>|null  $fonts
      * @return array<string, mixed>
      */
-    public static function themeDraft(array $state, ThemeSettings $live, bool $withCss, ?string $storeUrl): array
+    public static function themeDraft(array $state, ThemeSettings $live, bool $withCss, ?string $storeUrl, ?array $fonts = null): array
     {
         $document = $state['document'];
         $published = $document?->publishedVersion;
 
         return [
             'settings' => $state['settings'],
+            // B10: the draft's fonts as the storefront loads them (CustomFonts::themeFonts).
+            'fonts' => $fonts,
             'draft_revision' => $document->draft_revision ?? 0,
             'has_unpublished_changes' => $state['has_unpublished_changes'],
             'draft_updated_at' => $document?->draft_updated_at?->toIso8601String(),

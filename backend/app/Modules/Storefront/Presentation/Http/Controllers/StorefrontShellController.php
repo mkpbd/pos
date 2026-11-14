@@ -349,6 +349,12 @@ class StorefrontShellController
         if ($data['theme']['favicon']) {
             $head[] = '<link rel="icon" href="'.$e($data['theme']['favicon']['url']).'">';
         }
+        // B10: a custom body font is preloaded (built-in fonts are preloaded by the storefront build).
+        foreach ($data['theme']['fonts']['custom'] ?? [] as $font) {
+            if (($font['id'] ?? null) === ($data['theme']['fonts']['body'] ?? null)) {
+                $head[] = '<link rel="preload" as="font" type="font/woff2" href="'.$e($font['url']).'" crossorigin>';
+            }
+        }
         if ($noindex) {
             $head[] = '<meta name="robots" content="'.self::ROBOTS_NOINDEX.'">';
         }

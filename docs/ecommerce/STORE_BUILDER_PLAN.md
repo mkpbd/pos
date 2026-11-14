@@ -422,3 +422,27 @@ Original questions:
   parent; loops pause on hover/focus and stop after three cycles; hover under `(hover:hover) and (pointer:fine)` and on focus-visible;
   parallax as an aria-hidden layer (≤20 % of the section height) on desktop pointers only; all under
   `prefers-reduced-motion: no-preference`.
+
+### As built — B10 edit on the page, page check, fonts & Bangla typography (2026-11-15)
+
+- **Edit on the page:** the canvas (`canvas/text-fields.ts`, `text-edit.ts`, `format-bar.tsx`, `use-canvas-editing.ts`) finds a
+  node's texts from the registry's translatable fields (translation-key names, e.g. `items.<id>.title`) and makes the drawn element
+  `contenteditable` in place; the original DOM is restored when the edit ends (React's nodes are never lost) and the typed text stays
+  until the editor's next render. Protocol v1 additions: editor → canvas `edit-text`, `set-locale`, `end-text-edit`,
+  `text-edit-link-result`, `theme.fonts`; canvas → editor `text-edit-start|commit|cancel`, `text-edit-link`, `image-drop` (the File),
+  `image-replace`. The editor (`inline-edit.ts`) re-sanitizes HTML (`sanitizeRichText`, the server's tags), applies limits and
+  `validateNode`, one undo step; refused commits trigger a re-render. Locale `en` writes props, others `translations[locale]`.
+- **Pictures, spacing, quick bar:** dropped files upload with XHR progress (`media-upload.ts`, the API client's XSRF and branch
+  headers) and set the image or the background at the current device; the overlay lets desktop file drags through. Spacing grips
+  (`spacing-handles.tsx`) write px padding (Alt: margin) to the current device, 4 px snap, 0–400; %, vh and vw values are left to the
+  Style tab. Quick bar: alignment + text colour for text elements (buttons excluded).
+- **Page check:** client engine `page-check.ts` (pure, over the expanded content + theme + media) and fixes `page-check-fix.ts`;
+  contrast only where the page sets colours (theme pairs are checked on the Theme page); issues inside a global point at its
+  reference. Server `BuilderPageCheck` reuses `BuilderReferences` (same "gone" codes as the save check) plus link, liveness, global,
+  order-form and form-recipient checks; `{content}` checks unsaved edits. Fix it = `focus` (inspector `focus` prop: tab, card, field;
+  null node = page SEO), `apply` (one undo step) or `site-styles`. Publishing is never blocked.
+- **Fonts:** catalogue `storefront/fonts.ts` (ids → families, stacks, Bangla flags), loader `font-loader.ts` (dynamic CSS import per
+  font, body font preloaded, uploaded fonts as `@font-face` with the server's opaque `sf-custom-…` family). Bangla keys live in
+  `typography`; the payload's `fonts` gives the effective Bangla fonts so old themes keep Hind Siliguri / Baloo Da 2 for Bangla
+  glyphs only. Custom fonts have their own table (`storefront_fonts`, not the image media library): WOFF2 header check, 4 per store,
+  500 KB, in-use = live theme or draft (409), restore falls back to defaults.

@@ -5,6 +5,7 @@ namespace App\Modules\Storefront\Presentation\Http\Requests;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Storefront\Domain\ThemeSchema;
 use App\Modules\Storefront\Presentation\Http\Rules\SafeLink;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,8 +38,13 @@ class SaveThemeRequest extends FormRequest
             "{$p}preset" => ['sometimes', Rule::in(ThemeSchema::PRESETS)],
             "{$p}colors" => ['sometimes', 'array'],
             "{$p}typography" => ['sometimes', 'array'],
-            "{$p}typography.heading_font" => ['sometimes', Rule::in(ThemeSchema::HEADING_FONTS)],
-            "{$p}typography.body_font" => ['sometimes', Rule::in(ThemeSchema::BODY_FONTS)],
+            // B10: a built-in font or one of the organization's custom fonts (`custom:<uuid>`; existence: SaveTheme).
+            "{$p}typography.heading_font" => ['sometimes', 'string', self::font(ThemeSchema::HEADING_FONTS)],
+            "{$p}typography.body_font" => ['sometimes', 'string', self::font(ThemeSchema::BODY_FONTS)],
+            "{$p}typography.bangla_heading_font" => ['sometimes', 'nullable', 'string', self::font(ThemeSchema::BANGLA_FONTS)],
+            "{$p}typography.bangla_body_font" => ['sometimes', 'nullable', 'string', self::font(ThemeSchema::BANGLA_FONTS)],
+            "{$p}typography.bangla_line_height" => $decimal('bangla_line_height'),
+            "{$p}typography.bangla_scale" => $decimal('bangla_scale'),
             // B3: the type scale (ThemeSchema::TYPE_SCALE).
             "{$p}typography.body_size" => ['sometimes', 'integer', "between:{$sizeMin},{$sizeMax}"],
             "{$p}typography.heading_scale" => $decimal('heading_scale'),
@@ -111,5 +117,19 @@ class SaveThemeRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * B10: one of the built-in fonts or `custom:<uuid>` (case-insensitive).
+     *
+     * @param  list<string>  $builtIn
+     */
+    private static function font(array $builtIn): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($builtIn) {
+            if (! is_string($value) || (! in_array($value, $builtIn, true) && preg_match(ThemeSchema::CUSTOM_FONT_PATTERN, strtolower($value)) !== 1)) {
+                $fail('Choose one of the fonts offered.');
+            }
+        };
     }
 }

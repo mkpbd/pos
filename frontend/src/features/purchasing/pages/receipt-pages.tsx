@@ -307,7 +307,8 @@ export function ReceiptPage() {
   const { data, error, isPending, refetch } = useReceiptQuery(receiptId)
 
   if (isPending) return <LoadingState rows={6} label="Loading receipt" />
-  if (error) return <ErrorState error={error} onRetry={() => refetch()} />
+  // Only without data: a failed background refetch keeps the open form (and what was typed).
+  if (!data) return <ErrorState error={error} onRetry={() => refetch()} />
   const landed = hasLandedCosts(data)
 
   return (

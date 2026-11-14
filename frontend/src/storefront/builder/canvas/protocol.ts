@@ -1,5 +1,6 @@
 import type { StorefrontBootstrap } from '../../types'
 import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderPageSection } from '../types'
+import type { FontSource } from '../../fonts'
 import type { CanvasThemeSettings } from './theme-override'
 
 /*
@@ -82,11 +83,34 @@ export type ParentMessage =
     }
   | { type: 'scroll-to'; id: string }
   /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */
-  | { type: 'theme'; settings: CanvasThemeSettings }
+  | {
+      type: 'theme'
+      settings: CanvasThemeSettings
+      /**
+       * B10 (additive): the store's uploaded fonts (GET /storefront/fonts records as they come, or
+       * theme payload `fonts.custom` entries), so a Site styles draft that picks one shows it. Absent =
+       * the bootstrap theme's `fonts.custom` only.
+       */
+      fonts?: FontSource[]
+    }
   /** Drag autoscroll near the canvas edges. */
   | { type: 'scroll-by'; dy: number }
   /** B6 (additive, v stays 1): replay a node's entrance animation once (the inspector's "Preview animation"). */
   | { type: 'play-motion'; id: string }
+  /**
+   * B10 (additive, v stays 1): start editing a text field in place (the inspector's "Edit on the
+   * page", Enter on the selected node). `field` absent = the node's first field shown on the canvas.
+   */
+  | { type: 'edit-text'; id: string; field?: string }
+  /** B10: finish the edit in progress (selection changed, undo, device switch …): commit or cancel it. */
+  | { type: 'end-text-edit'; commit: boolean }
+  /** B10: the language the canvas draws and edits in ("Edit in: English | বাংলা"); the next `render` carries that language's texts. */
+  | { type: 'set-locale'; locale: string }
+  /**
+   * B10: the editor's answer to `text-edit-link` (its URL prompt, validated): a URL = link the
+   * selected text, `''` = remove the link, null = the owner cancelled (nothing changes).
+   */
+  | { type: 'text-edit-link-result'; url: string | null }
 
 /** Canvas → parent. Rects are in the canvas viewport's CSS pixels. */
 export type CanvasMessage =
@@ -95,6 +119,45 @@ export type CanvasMessage =
   | { type: 'click'; id: string | null }
   | { type: 'hover'; id: string | null }
   | { type: 'key'; key: string; ctrl: boolean; shift: boolean; meta: boolean }
+  /**
+   * B10 (additive, v stays 1): a text field became editable on the canvas (double-click, Enter,
+   * `edit-text`). The editor keeps its shortcuts away while it lasts. `field` is a translation
+   * key (see TextFieldKey); `kind`: `html` (rich text with the format bar), `multiline` (Enter = new
+   * line) or `line` (Enter commits).
+   */
+  | { type: 'text-edit-start'; id: string; field: string; locale?: string; kind?: TextFieldKind }
+  /**
+   * B10: the edited value (one commit = one undo step). Plain fields: the text (line breaks only in
+   * multiline fields). HTML fields: sanitized to the server's tags (sanitizeRichText). The editor
+   * checks the limits and applies it to `props` (the store's default language) or
+   * `translations.<locale>.<field>`; the canvas shows it from the next `render`.
+   */
+  | { type: 'text-edit-commit'; id: string; field: string; value: string; locale: string; kind?: TextFieldKind }
+  /** B10: Esc (or an edit that changed nothing): the field shows its value again. */
+  | { type: 'text-edit-cancel'; id: string; field?: string }
+  /** B10: the format bar's Link button; `url` = the link at the selection (null = none). The editor prompts and answers `text-edit-link-result`. */
+  | { type: 'text-edit-link'; id: string; field: string; url: string | null }
+  /**
+   * B10: a file dropped on an image element (`target: 'image'`, sets `props.media_id`) or on a
+   * section / inner row / column with a background image (`'background'`, sets the current
+   * device's `background.image.media_id`). The File is structured-cloned; the editor checks the
+   * type and size, uploads (drawing the progress on the node in its overlay) and applies the media id.
+   */
+  | { type: 'image-drop'; id: string; target: ImageDropTarget; file: File }
+  /** B10: double-click on an image (or a background-image node): the editor opens the media chooser for it. */
+  | { type: 'image-replace'; id: string; target?: ImageDropTarget }
+
+/** B10: how a text field is edited in place. */
+export type TextFieldKind = 'line' | 'multiline' | 'html'
+
+/**
+ * B10: a text field of a node, named like its translation key: `text`, `primary.label`,
+ * `items.<item_id>.title`, `plans.<plan_id>.features.<feature_id>.text`, `labels.<index>` — the
+ * registry's translatable patterns (`items.*.title`) with the item ids filled in.
+ */
+export type TextFieldKey = string
+
+export type ImageDropTarget = 'image' | 'background'
 
 type Envelope = { source: typeof BUILDER_SOURCE; v: typeof PROTOCOL_VERSION }
 
@@ -102,8 +165,8 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion'])
-const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result'])
+const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {
   if (event.origin !== origin) return false

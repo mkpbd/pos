@@ -5,6 +5,7 @@ use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderAiController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
+use App\Modules\Storefront\Presentation\Http\Controllers\CustomFontController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
 use App\Modules\Storefront\Presentation\Http\Controllers\FormSubmissionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
@@ -47,6 +48,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         // B3: the theme draft (draft → publish like builder pages).
         Route::get('theme/draft', [ThemeDraftController::class, 'show']);
         Route::get('theme/versions', [ThemeDraftController::class, 'versions']);
+        // B10: the store's own fonts.
+        Route::get('fonts', [CustomFontController::class, 'index']);
         Route::get('menus', [MenuController::class, 'index']);
         Route::get('menus/{menu}', [MenuController::class, 'show'])->whereUuid('menu');
         Route::get('link-targets', LinkTargetController::class);
@@ -70,6 +73,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::post('theme/versions/{version}/restore', [ThemeDraftController::class, 'restore'])->whereUuid('version');
         // B3: applies to the draft.
         Route::post('theme/presets/{preset}/apply', [ThemeDraftController::class, 'applyPreset'])->whereIn('preset', ThemePresets::KEYS);
+        Route::post('fonts', [CustomFontController::class, 'store']);
+        Route::delete('fonts/{font}', [CustomFontController::class, 'destroy'])->whereUuid('font');
         Route::post('menus', [MenuController::class, 'store']);
         Route::patch('menus/{menu}', [MenuController::class, 'update'])->whereUuid('menu');
         Route::put('menus/{menu}/items', [MenuController::class, 'replaceItems'])->whereUuid('menu');
@@ -123,6 +128,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         // B2: canvas data for unsaved elements and media (validated per element).
         Route::post('resolve', [BuilderDocumentController::class, 'resolve']);
         Route::put('documents/{document}/draft', [BuilderDocumentController::class, 'saveDraft'])->whereUuid('document');
+        // B10: page check before publish (nothing is saved).
+        Route::post('documents/{document}/check', [BuilderDocumentController::class, 'check'])->whereUuid('document');
         Route::post('documents/{document}/publish', [BuilderDocumentController::class, 'publish'])->whereUuid('document')->middleware('can:storefront.publish');
         Route::post('documents/{document}/discard', [BuilderDocumentController::class, 'discard'])->whereUuid('document');
         Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
