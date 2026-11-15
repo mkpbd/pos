@@ -39,6 +39,7 @@ import { ElementSetupHost } from './setup-dialog'
 import { SeoPanel } from './seo-panel'
 import { hasSeo } from './seo-panel-model'
 import { StyleTab } from './style-tab'
+import { MultiInspector } from './common-style-form'
 import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
 import { B4_TYPES, B6_TYPES, B8A_TYPES, B8B_TYPES, P2A_TYPES, validateNode } from './validate'
@@ -225,7 +226,27 @@ function registryIcons(registry: InspectorProps['registry']): readonly string[] 
   return Array.isArray(icons) && icons.every((name) => typeof name === 'string') ? (icons as string[]) : undefined
 }
 
-function InspectorPanel({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false, focus }: InspectorProps) {
+function InspectorPanel(props: InspectorProps) {
+  const { nodes, onChangeMany, content, node, registry, device = 'desktop', theme, onCommand } = props
+  if (nodes && nodes.length > 1 && onChangeMany) {
+    return (
+      <MultiInspector
+        key={nodes.map((n) => n.id).join(',')}
+        content={content}
+        nodes={nodes}
+        primaryId={node?.id ?? null}
+        device={device}
+        theme={theme}
+        labelOf={(n) => nodeLabel(n, registry)}
+        onChangeMany={onChangeMany}
+        onCommand={onCommand}
+      />
+    )
+  }
+  return <SingleInspector {...props} />
+}
+
+function SingleInspector({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false, focus }: InspectorProps) {
   const [tab, setTab] = useState<Tab>('content')
   const panel = useRef<HTMLElement | null>(null)
   const nodeId = node?.id ?? null

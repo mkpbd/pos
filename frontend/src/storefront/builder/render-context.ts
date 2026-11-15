@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { MessageKey } from '../i18n/en'
-import type { BuilderData, BuilderPage, ElementDataState, NodeState, RenderElement } from './types'
+import type { BuilderData, BuilderPage, Device, DeviceOrder, ElementDataState, NodeState, RenderElement } from './types'
 
 /*
  * What every node of a builder page can read while it renders: the payload (data, media), whether
@@ -29,6 +29,15 @@ export function useOwnerDocumentId(): string | undefined {
   const { page } = usePage()
   return useContext(GlobalDocumentCtx) ?? page.document?.id
 }
+
+/**
+ * B12: the device a page is drawn for (the viewport's on the store, the editor's device on the
+ * canvas) and the document's per-device order. Containers draw their children through
+ * `orderedChildren` (./device-order.ts) with these.
+ */
+export type DeviceOrderContext = { device: Device; order: DeviceOrder | null }
+
+export const DeviceOrderCtx = createContext<DeviceOrderContext>({ device: 'desktop', order: null })
 
 /** The column an element sits in (image `sizes`). */
 export const ColumnWidthCtx = createContext<{ base: number; tablet?: number; mobile?: number }>({ base: 100 })

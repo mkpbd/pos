@@ -8,6 +8,7 @@ use App\Modules\Shared\Domain\Translations;
 use App\Modules\Storefront\Application\Queries\SectionContentResolver;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\BuilderJson;
+use App\Modules\Storefront\Domain\Builder\DeviceOrder;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\StyleSchema;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
@@ -43,6 +44,10 @@ use stdClass;
  *   grid images. Published bundles keep only the items of products on sale.
  * - B8b: published form elements have `notify_email: null` (staff addresses stay private);
  *   a popup's `popup` settings are not part of the payload (BuilderPopups adds them).
+ * - B12: `device_order` — `{tablet?: {<root|column id>: [child ids]}, mobile?: …}` or null: the
+ *   document's order on tablets and phones with the global sections' own orders merged in, the
+ *   lists cut to the children in the payload (DeviceOrder; mobile → tablet → base fallback is the
+ *   client's).
  */
 class BuilderPageRenderer
 {
@@ -140,6 +145,8 @@ class BuilderPageRenderer
                 'seo' => $this->seo($content['seo'] ?? null, $media),
             ],
             'sections' => BuilderJson::present(['sections' => $sections])['sections'],
+            // B12: the order on tablets and phones of what is shown (null: the base order everywhere).
+            'device_order' => DeviceOrder::canonical(DeviceOrder::lists($content['device_order'] ?? null), DeviceOrder::containers(['sections' => $sections])),
             'media' => $media === [] ? new stdClass : $media,
             'data' => $data === [] ? new stdClass : $data,
         ];

@@ -111,4 +111,11 @@ export type InspectorProps = {
   canCustomHtml?: boolean
   /** B10: show and focus a field (page check "Fix it"). */
   focus?: InspectorFocus | null
+  /**
+   * B12: every selected item (page order) when two or more are selected; `node` stays the item
+   * picked last. The panel then shows the Common style form and Line up.
+   */
+  nodes?: BuilderNode[]
+  /** B12: replace several nodes at once (same ids) — ONE undo step. */
+  onChangeMany?(next: BuilderNode[], opts?: InspectorChangeOptions): void
 }

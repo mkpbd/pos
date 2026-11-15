@@ -8,6 +8,7 @@ use App\Modules\Storefront\Application\Builder\BuilderCanvasContext;
 use App\Modules\Storefront\Application\Builder\BuilderPageCheck;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
+use App\Modules\Storefront\Application\Builder\CopyBuilderSection;
 use App\Modules\Storefront\Application\Builder\EditBuilderBanner;
 use App\Modules\Storefront\Application\Builder\ManageBuilderDocuments;
 use App\Modules\Storefront\Application\Builder\Publishing\BuilderPublishSchedules;
@@ -17,6 +18,7 @@ use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
 use App\Modules\Storefront\Presentation\Http\Requests\BannerRules;
+use App\Modules\Storefront\Presentation\Http\Requests\CopyBuilderSectionRequest;
 use App\Modules\Storefront\Presentation\Http\Requests\CreateBuilderDocumentRequest;
 use App\Modules\Storefront\Presentation\Http\Requests\ResolveBuilderElementsRequest;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveBuilderDraftRequest;
@@ -149,6 +151,32 @@ class BuilderDocumentController
         );
 
         return ApiResponse::success(BuilderPresenter::document($saved->load('publishedVersion')));
+    }
+
+    /**
+     * Copy a section to other pages
+     *
+     * B12: `{section: <section or global_section node>, document_ids: uuid[] (1–20, distinct),
+     * position: top|bottom}` — appended to the top or the bottom of each document's **draft**
+     * (never published), each in its own transaction: new ids for the section and everything in
+     * it, no anchor, validated like a draft save in that document's context (allowed elements,
+     * global sections that fit, limits, references). Custom HTML in the section needs
+     * storefront.custom_html (403 CUSTOM_HTML_FORBIDDEN, nothing copied). Returns `{results:
+     * [{document_id, title, status: copied|failed, section_id?, revision?, error?: {code, message,
+     * errors?}}]}` in the order of `document_ids`; failed codes: DOCUMENT_NOT_FOUND (also another
+     * organization's), TARGET_NOT_SUPPORTED (popups, global sections), DOCUMENT_INVALID. Each copy
+     * is audited.
+     */
+    public function copySection(CopyBuilderSectionRequest $request, CopyBuilderSection $copy): JsonResponse
+    {
+        $results = $copy(
+            $request->section(),
+            array_values((array) $request->validated('document_ids')),
+            (string) $request->validated('position'),
+            (bool) $request->user()?->can('storefront.custom_html'),
+        );
+
+        return ApiResponse::success(['results' => $results]);
     }
 
     /**

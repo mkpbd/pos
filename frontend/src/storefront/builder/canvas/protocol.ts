@@ -1,5 +1,5 @@
 import type { StorefrontBootstrap } from '../../types'
-import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderPageSection } from '../types'
+import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderPageSection } from '../types'
 import type { FontSource } from '../../fonts'
 import type { CanvasThemeSettings } from './theme-override'
 
@@ -80,6 +80,11 @@ export type ParentMessage =
       popup?: PopupSettings
       /** P1b (additive): with a product page zone, the product its sample shows (absent = grey blocks). */
       product?: CanvasProduct
+      /**
+       * B12 (additive): the draft's per-device order. The canvas draws sections and column
+       * elements in `device`'s order (mobile → tablet → base). Absent = base order.
+       */
+      device_order?: DeviceOrder | null
     }
   | { type: 'scroll-to'; id: string }
   /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */
@@ -116,7 +121,11 @@ export type ParentMessage =
 export type CanvasMessage =
   | { type: 'ready' }
   | { type: 'rects'; nodes: Record<string, Rect>; scrollY: number; height: number; viewport: { w: number; h: number } }
-  | { type: 'click'; id: string | null }
+  /**
+   * B12 (additive, v stays 1): the modifier keys held while clicking, for multi-select (Ctrl / Cmd
+   * toggles, Shift selects a range). Absent = not held.
+   */
+  | { type: 'click'; id: string | null; ctrl?: boolean; shift?: boolean; meta?: boolean }
   | { type: 'hover'; id: string | null }
   | { type: 'key'; key: string; ctrl: boolean; shift: boolean; meta: boolean }
   /**
@@ -217,7 +226,8 @@ export function readCanvasProduct(value: unknown): CanvasProduct | null {
 export function isEditorShortcut(event: { key: string; ctrlKey: boolean; metaKey: boolean; altKey?: boolean }): boolean {
   const mod = event.ctrlKey || event.metaKey
   const key = event.key.toLowerCase()
-  // B9: c / v (copy and paste nodes) too, so they work while focus is in the canvas.
-  if (mod && ['z', 'y', 'd', 'c', 'v'].includes(key)) return true
-  return !mod && ['delete', 'backspace', 'escape', 'arrowup', 'arrowdown'].includes(key)
+  // B9: c / v (copy and paste nodes) too, so they work while focus is in the canvas. B12: k (the command box).
+  if (mod && ['z', 'y', 'd', 'c', 'v', 'k'].includes(key)) return true
+  // B12: `?` opens the shortcut sheet (typed with Shift on most layouts, so Shift is not checked).
+  return !mod && ['delete', 'backspace', 'escape', 'arrowup', 'arrowdown', '?'].includes(key)
 }

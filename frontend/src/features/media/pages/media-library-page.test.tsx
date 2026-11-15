@@ -53,7 +53,7 @@ describe('media library', () => {
     await user.click(await screen.findByRole('button', { name: 'Edit picture hero.png' }))
     const dialog = await screen.findByRole('dialog')
     // Nothing changed yet: a plain, disabled Save.
-    expect(within(dialog).getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
 
     await user.click(within(dialog).getByRole('tab', { name: 'Turn and flip' }))
     await user.click(within(dialog).getByRole('button', { name: 'Turn right' }))

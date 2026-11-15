@@ -67,7 +67,8 @@ class BuilderDiffTest extends TestCase
         $doc = ['sections' => [self::section('s_a', [self::el('e_h', 'heading', ['text' => 'Same'])])]];
         $reordered = ['sections' => [['columns' => $doc['sections'][0]['columns'], 'props' => [], 'type' => 'section', 'id' => 's_a']]];
 
-        $this->assertSame(['added' => [], 'removed' => [], 'changed' => [], 'moved' => []], BuilderDiff::compare($doc, $reordered));
+        // B12: `device_moved` too.
+        $this->assertSame(['added' => [], 'removed' => [], 'changed' => [], 'moved' => [], 'device_moved' => []], BuilderDiff::compare($doc, $reordered));
         $this->assertSame(3, count(BuilderDiff::compare(['sections' => []], $doc)['added']));
     }
 

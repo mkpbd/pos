@@ -1,4 +1,4 @@
-import type { BuilderContent, Column, DocumentContext, DocumentSection, Element, GlobalContext, GlobalSectionNode, RenderGlobalInfo, Section } from '@/storefront/builder/types'
+import type { BuilderContent, Column, DocumentContext, DocumentSection, Element, GlobalContext, GlobalSectionNode, RenderGlobalInfo, Section, DeviceOrder } from '@/storefront/builder/types'
 import { cloneWithFreshIds, collectIds } from './tree'
 
 /*
@@ -28,6 +28,8 @@ export type GlobalEntry = {
   /** The draft's one section (null while loading or when it is gone). */
   section: Section | null
   state: 'loading' | 'ready' | 'missing'
+  /** B12: the global draft's own phone / tablet order (its columns; its `root` is ignored). */
+  device_order?: DeviceOrder | null
 }
 
 export function isGlobalRef(node: unknown): node is GlobalSectionRef {
@@ -183,6 +185,30 @@ export function expandGlobals(content: BuilderContent, globals: ReadonlyMap<stri
     return { ...section, global: marker }
   })
   return { content: { ...content, sections: sections as unknown as Section[] }, owners }
+}
+
+/**
+ * B12: the phone / tablet order the canvas draws with: the draft's own, plus each drawn global's
+ * column lists (a global's `root` is ignored, like the server does for render payloads).
+ */
+export function mergedDeviceOrder(content: BuilderContent, globals: ReadonlyMap<string, GlobalEntry>): DeviceOrder | null {
+  const own = content.device_order ?? null
+  const refs = sectionNodes(content).filter(isGlobalRef)
+  if (refs.length === 0) return own
+  const merged: DeviceOrder = { tablet: { ...(own?.tablet ?? {}) }, mobile: { ...(own?.mobile ?? {}) } }
+  for (const ref of refs) {
+    const order = globals.get(ref.ref)?.device_order
+    if (!order) continue
+    for (const device of ['tablet', 'mobile'] as const) {
+      for (const [container, ids] of Object.entries(order[device] ?? {})) {
+        if (container !== 'root' && !Object.hasOwn(merged[device]!, container)) merged[device]![container] = ids
+      }
+    }
+  }
+  const out: DeviceOrder = {}
+  if (Object.keys(merged.tablet!).length > 0) out.tablet = merged.tablet
+  if (Object.keys(merged.mobile!).length > 0) out.mobile = merged.mobile
+  return out.tablet || out.mobile ? out : null
 }
 
 /** Why a reference can't be drawn, in plain words (null: it can). */

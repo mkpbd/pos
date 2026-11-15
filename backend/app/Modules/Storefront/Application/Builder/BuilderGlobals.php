@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Application\Builder;
 
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
+use App\Modules\Storefront\Domain\Builder\DeviceOrder;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\DB;
  *   `global: {id, title, section_id, version}`; the reference's own hidden / schedule are kept in
  *   `global_ref` for the renderer. A missing global, one that was never published (published
  *   render) or one made for another context stays a `global_section` node with `unavailable`.
+ *   B12: the global's own `device_order` lists of its columns join the content's `device_order`.
  * - usage(): the documents whose draft or live version refers to a global (organization-scoped).
  */
 class BuilderGlobals
@@ -63,6 +65,14 @@ class BuilderGlobals
             $section['id'] = $node['id'];
             $section['global_ref'] = ['hidden' => $node['hidden'] ?? false, 'schedule' => $node['schedule'] ?? null];
             $content['sections'][$i] = $section;
+            // B12: the global's own order on tablets and phones (its columns; its root is one section).
+            foreach (DeviceOrder::lists($body['device_order'] ?? null) as $device => $lists) {
+                foreach ($lists as $container => $ids) {
+                    if ($container !== DeviceOrder::ROOT) {
+                        $content['device_order'][$device][$container] = $ids;
+                    }
+                }
+            }
         }
 
         return $content;

@@ -119,6 +119,8 @@ class BuilderPopups
             'settings' => array_diff_key($settings, array_flip(self::ADMIN_ONLY)),
             'payload' => [
                 'sections' => $rendered['sections'],
+                // B12.
+                'device_order' => $rendered['device_order'],
                 'media' => $rendered['media'],
                 'data' => $rendered['data'],
             ],

@@ -19,10 +19,12 @@ import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
 import { BackgroundVideoLayer, ParallaxLayer, ShapeDivider } from './section-layers'
 import { isWrappedSectionType, NODE_ID } from './registry'
-import { ColumnWidthCtx, GlobalDocumentCtx, PageCtx, usePage } from './render-context'
+import { ColumnWidthCtx, DeviceOrderCtx, GlobalDocumentCtx, PageCtx, usePage } from './render-context'
+import { DEVICE_ORDER_ROOT, orderedChildren } from './device-order'
+import { useViewportDevice } from './use-viewport-device'
 import { PreviewMark } from './preview-mark'
 import { useLocale } from '../i18n/locale'
-import type { BuilderPage, NodeState, RenderColumn, RenderElement, RenderPageSection, RenderSection } from './types'
+import type { BuilderPage, Device, DeviceOrder, NodeState, RenderColumn, RenderElement, RenderPageSection, RenderSection } from './types'
 import { buttonAction, ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
 import { globalInfo, isUnavailableGlobalSection } from './global-sections'
 
@@ -126,13 +128,15 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
 }
 
 function Columns({ columns, rowId, nested }: { columns: RenderColumn[]; rowId: string; nested: boolean }) {
+  const { device, order } = useContext(DeviceOrderCtx)
   const list = Array.isArray(columns) ? columns.filter((column) => typeof column?.id === 'string' && NODE_ID.test(column.id)) : []
   return (
     <div className="b-row" data-b-row={rowId}>
       {list.map((column) => (
         <ColumnWidthCtx.Provider key={column.id} value={normalizeWidth(column.width)}>
           <div className="b-col" data-b={column.id}>
-            {(Array.isArray(column.elements) ? column.elements : []).map((element) => (
+            {/* B12: the device's own element order (DOM order = visual order). */}
+            {orderedChildren(column.id, Array.isArray(column.elements) ? column.elements : [], order, device).map((element) => (
               <ElementNode key={element.id} element={element} nested={nested} />
             ))}
           </div>
@@ -364,6 +368,7 @@ export function PageRenderer({
   className,
   scope,
   motion,
+  device: forcedDevice,
 }: {
   page: BuilderPage
   placeholder?: (element: RenderElement) => ReactNode
@@ -381,6 +386,12 @@ export function PageRenderer({
    * `canvas`), which replays one on request through `playMotion` (./motion.ts).
    */
   motion?: boolean
+  /**
+   * B12: the device whose section / element order is drawn. The editor canvas passes the editor's
+   * device; elsewhere it follows the viewport (tablet / mobile breakpoints; desktop = base order
+   * until matchMedia answers).
+   */
+  device?: Device
 }) {
   const draft = page.document?.source === 'draft'
   const rootRef = useRef<HTMLDivElement>(null)
@@ -389,6 +400,12 @@ export function PageRenderer({
   const validScope = scopePrefix(scope) ? scope : undefined
   const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope }), [sections, page.media, validScope])
   const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
+  // B12: phone / tablet order — sections here, elements in Columns.
+  const viewportDevice = useViewportDevice()
+  const device = forcedDevice ?? viewportDevice
+  const order: DeviceOrder | null = typeof page.device_order === 'object' && page.device_order !== null ? page.device_order : null
+  const orderContext = useMemo(() => ({ device, order }), [device, order])
+  const drawnSections = useMemo(() => orderedChildren(DEVICE_ORDER_ROOT, sections, order, device), [sections, order, device])
   const targets = useMemo(() => motionTargets(sections), [sections])
   useMotionRuntime(rootRef, targets, motion ?? page.document?.key !== 'canvas')
   // B6: at most one sticky section, and only in page-like documents (never the header or footer).
@@ -400,12 +417,14 @@ export function PageRenderer({
 
   return (
     <PageCtx.Provider value={context}>
-      <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
-        <style data-testid="builder-styles">{css}</style>
-        {sections.map((section) => (
-          <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
-        ))}
-      </div>
+      <DeviceOrderCtx value={orderContext}>
+        <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
+          <style data-testid="builder-styles">{css}</style>
+          {drawnSections.map((section) => (
+            <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
+          ))}
+        </div>
+      </DeviceOrderCtx>
     </PageCtx.Provider>
   )
 }

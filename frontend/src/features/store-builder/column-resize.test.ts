@@ -60,7 +60,8 @@ describe('column resize maths', () => {
 
   it('drags a divider at one breakpoint only', () => {
     const content = cloneSample()
-    const next = resizeColumns(content, 's_story', 0, 62, 'base')
+    expect(rowWidths(columnsOf(resizeColumns(content, 's_story', 0, 62, 'base'), 's_story'), 'base')).toEqual([62, 38])
+    const next = resizeColumns(content, 's_story', 0, 62, 'base', 5)
     expect(rowWidths(columnsOf(next, 's_story'), 'base')).toEqual([60, 40])
     // Tablet and mobile kept their own widths.
     expect(columnsOf(next, 's_story').map((c) => c.width)).toEqual([

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useBlocker, useNavigate } from 'react-router'
 import {
   closestCenter,
@@ -69,7 +69,7 @@ import { ElementIcon } from './element-icon'
 import { globalKeys, useGlobalEntries, useGlobalsQuery } from './global-api'
 import { DetachConfirm, MakeGlobalDialog } from './global-dialogs'
 import { GlobalDocBar, GlobalDocPanel, GlobalRefPanel, GlobalSectionsPanel } from './global-panel'
-import { expandGlobals, globalContextFor, globalRefOf, referencedGlobals } from './global-sections'
+import { expandGlobals, globalContextFor, globalRefOf, isGlobalRef, mergedDeviceOrder, referencedGlobals } from './global-sections'
 import { ConflictDialog, LeaveDialog, LinkPrompt, PublishDialog } from './dialogs'
 import { elementContext, isProductZone, kindInfo } from './document-kind'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
@@ -79,7 +79,16 @@ import { flattenLayers } from './layers'
 import { LayersPanel, type LayerIndicator } from './layers-panel'
 import { MiniToolbar } from './mini-toolbar'
 import { toRenderTree } from './render-tree'
-import { useEditor, useEditorStoreApi } from './store'
+import { useEditor, useEditorStoreApi, useSelectedIds } from './store'
+import { selectedNodes } from './selection'
+import { CommandBox } from './command-box'
+import { useCommandItems, type CommandActions } from './use-command-items'
+import { ShortcutSheet } from './shortcut-sheet'
+import { CopyToPagesDialog } from './copy-to-pages'
+import { canCopySectionsFrom } from './copy-to-pages-api'
+import { useUndoMemory } from './undo-memory'
+import { deviceView, resolveDeviceDrop } from './device-drop'
+import { spacingGuides } from './snapping'
 import { SiteStylesDrawer } from './site-styles'
 import { useSiteStyles } from './use-site-styles'
 import { Toolbar } from './toolbar'
@@ -87,7 +96,7 @@ import { findNode, setColumnPreset, setNode, type DropTarget } from './tree'
 import { SaveTemplateDialog } from './templates/save-template-dialog'
 import { TemplatesPanel } from './templates/templates-panel'
 import { useTemplateInserter } from './templates/use-insert-template'
-import type { Column, InnerRowElement, Section } from '@/storefront/builder/types'
+import type { BuilderNode, Column, DocumentSection, InnerRowElement, Section } from '@/storefront/builder/types'
 import { usePreviewData } from './use-preview-data'
 import { readPopupSettings } from './popup-model'
 
@@ -105,6 +114,15 @@ const AUTOSCROLL_EDGE = 48
 /** Calls the canvas handle when it is mounted. */
 function onCanvas(canvas: RefObject<CanvasHandle | null>, run: (handle: CanvasHandle) => void) {
   if (canvas.current) run(canvas.current)
+}
+
+/** B12: a dialog opened from a key pressed in the canvas gets the focus (the canvas iframe keeps it otherwise). */
+function takeFocusFromCanvas() {
+  const active = document.activeElement
+  if (active instanceof HTMLIFrameElement) {
+    window.focus()
+    active.blur()
+  }
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -140,7 +158,8 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   const canCustomHtml = can('storefront.custom_html')
   const queryClient = useQueryClient()
   const canvas = useRef<CanvasHandle | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteIds, setDeleteIds] = useState<string[]>([])
+  const [copySectionId, setCopySectionId] = useState<string | null>(null)
   const [saveTemplateId, setSaveTemplateId] = useState<string | null>(null)
 
   const autosave = useMemo(
@@ -164,6 +183,8 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   const globalContext = useEditor((s) => s.document.context)
   // B9: the store (clipboard), the globals this draft shows (drawn from their drafts) and the global dialogs.
   const org = useCurrentUserQuery().data?.organization?.id ?? ''
+  // B12: the undo history survives a reload (per store, document and draft revision).
+  useUndoMemory(store, org)
   const refKey = useEditor((s) => referencedGlobals(s.content).join(','))
   const refIds = useMemo(() => (refKey ? refKey.split(',') : []), [refKey])
   const globals = useGlobalEntries(refIds)
@@ -188,7 +209,9 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
     return {
       registry,
       canvas,
-      requestDelete: setDeleteId,
+      requestDelete: (id: string) => setDeleteIds([id]),
+      requestDeleteMany: setDeleteIds,
+      requestCopyToPages: single || !canCopySectionsFrom(documentKind) ? undefined : setCopySectionId,
       canCustomHtml,
       context,
       requestSaveTemplate: setSaveTemplateId,
@@ -207,7 +230,8 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
       {/* Its own provider: the editor renders outside the admin shell. */}
       <TooltipProvider delayDuration={300}>
         <EditorLayout autosave={autosave} canPublish={canPublish} canSubmit={canSubmit} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
-        <DeleteConfirm id={deleteId} onClose={() => setDeleteId(null)} />
+        <DeleteConfirm ids={deleteIds} onClose={() => setDeleteIds([])} />
+        <CopyToPages id={copySectionId} onClose={() => setCopySectionId(null)} />
         <SaveTemplate id={saveTemplateId} onClose={() => setSaveTemplateId(null)} />
         <MakeGlobalDialog sectionId={makeGlobalId} onClose={() => setMakeGlobalId(null)} />
         <DetachConfirm refId={detachId} onClose={() => setDetachId(null)} />
@@ -216,12 +240,31 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   )
 }
 
-function DeleteConfirm({ id, onClose }: { id: string | null; onClose: () => void }) {
+function DeleteConfirm({ ids, onClose }: { ids: string[]; onClose: () => void }) {
   const content = useEditor((s) => s.content)
   const commands = useCommands()
   const { registry } = useEditorUi()
+  const id = ids.length === 1 ? ids[0]! : null
   const info = findNode(content, id)
   const label = info ? nodeLabel(info.node, registry) : ''
+  // B12: several items, one confirmation, one undo step.
+  const many = ids.length > 1 ? selectedNodes(content, ids).filter((n) => n.kind !== 'column') : []
+  if (ids.length > 1) {
+    const sections = many.filter((n) => n.kind === 'section').length
+    return (
+      <ConfirmDialog
+        open={many.length > 0}
+        onOpenChange={(open) => !open && onClose()}
+        title={`Delete these ${many.length} items?`}
+        description={`${sections > 0 ? `${sections === 1 ? 'A section is' : `${sections} sections are`} removed with everything in ${sections === 1 ? 'it' : 'them'}. ` : ''}You can undo this in one step.`}
+        confirmLabel={`Delete ${many.length} items`}
+        onConfirm={() => {
+          commands.removeMany(ids)
+          onClose()
+        }}
+      />
+    )
+  }
   return (
     <ConfirmDialog
       open={id !== null && info !== null}
@@ -241,6 +284,15 @@ function DeleteConfirm({ id, onClose }: { id: string | null; onClose: () => void
       }}
     />
   )
+}
+
+/** B12: "Copy to other pages…" for the section `id` of the draft as it is now. */
+function CopyToPages({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const content = useEditor((s) => s.content)
+  const documentId = useEditor((s) => s.document.id)
+  const info = findNode(content, id)
+  const section = info?.kind === 'section' ? (info.node as DocumentSection) : null
+  return <CopyToPagesDialog section={section} openId={documentId} onClose={onClose} />
 }
 
 /** Save as template (B5) for the section `id` of the draft as it is now. */
@@ -277,6 +329,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const commands = useCommands()
   const content = useEditor((s) => s.content)
   const selection = useEditor((s) => s.selection)
+  const selectedIds = useSelectedIds()
+  const several = selectedIds.length > 1
   const hover = useEditor((s) => s.hover)
   const device = useEditor((s) => s.device)
   const errors = useEditor((s) => s.errors)
@@ -319,6 +373,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [conflictPending, setConflictPending] = useState(false)
   const [stylesOpen, setStylesOpen] = useState(false)
+  // B12: the command box (Ctrl/Cmd+K) and the keyboard shortcut sheet (?).
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   // B11: approval and the store's timezone (planned publishes are chosen in it).
   const timeZone = useCurrentUserQuery().data?.organization?.timezone
   const [submitOpen, setSubmitOpen] = useState(false)
@@ -340,6 +397,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   /* ---------------------------------------------------------------- column widths (B3) ----- */
   const breakpoint = BREAKPOINT[device]
   const resizeRow = useMemo<ResizeRow | null>(() => {
+    if (several) return null
     const info = findNode(content, selection)
     if (!info) return null
     const row = info.kind === 'column' ? findNode(content, info.parentId)?.node : info.node
@@ -347,7 +405,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     const columns = (row as Section | InnerRowElement).columns as Column[]
     if (columns.length < 2) return null
     return { rowId: row.id, columns: columns.map((column) => ({ id: column.id, width: widthAt(column.width, breakpoint).value ?? 100 })) }
-  }, [content, selection, breakpoint])
+  }, [content, selection, breakpoint, several])
   // One drag = one undo step, however long it takes.
   const resizeSession = useRef<string | null>(null)
   const onResize = useCallback(
@@ -369,7 +427,13 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     const timer = setInterval(() => setNow(Date.now()), 60_000)
     return () => clearInterval(timer)
   }, [])
-  const sections = useMemo<RenderSection[]>(() => toRenderTree(expanded.content, { locale: canvasLocale, now, reveal: selection }), [expanded, selection, now, canvasLocale])
+  const revealKey = selectedIds.join(',')
+  const sections = useMemo<RenderSection[]>(
+    () => toRenderTree(expanded.content, { locale: canvasLocale, now, reveal: revealKey ? revealKey.split(',') : null }),
+    [expanded, revealKey, now, canvasLocale],
+  )
+  // B12: the phone / tablet order the canvas draws with (globals' column orders merged in).
+  const canvasDeviceOrder = useMemo(() => mergedDeviceOrder(content, globals ?? new Map()), [content, globals])
   // The inspector looks things up in the drawn document; nodes it can't show (unavailable globals) are left out.
   const inspectorContent = useMemo(
     () => (expanded.content === content ? content : { ...expanded.content, sections: expanded.content.sections.filter((s) => Array.isArray(s.columns)) }),
@@ -514,6 +578,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     [store],
   )
   const spacing = useMemo<SpacingTarget | null>(() => {
+    if (several) return null
     const info = findNode(content, selection)
     if (!info || globalRefOf(info.node) || !hasSpacingHandles(info.node)) return null
     const style = (info.node as { style?: Parameters<typeof spacingAt>[0] }).style
@@ -524,8 +589,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       deviceLabel: DEVICE_LABEL[device].toLowerCase(),
       values: { padding: { top: at('padding', 'top'), bottom: at('padding', 'bottom') }, margin: { top: at('margin', 'top'), bottom: at('margin', 'bottom') } },
       onChange: onSpacing,
+      guides: spacingGuides(content, info.node.id, breakpoint),
     }
-  }, [content, selection, breakpoint, device, registry, onSpacing])
+  }, [content, selection, breakpoint, device, registry, onSpacing, several])
 
   /* ---------------------------------------------------------------- B10 page check --------- */
   const [checkOpen, setCheckOpen] = useState(false)
@@ -590,13 +656,27 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         state.redo()
         return true
       }
+      // B12: the command box and the shortcut sheet.
+      if (mod && k === 'k') {
+        takeFocusFromCanvas()
+        setCommandOpen(true)
+        return true
+      }
+      if (!mod && key.key === '?') {
+        takeFocusFromCanvas()
+        setShortcutsOpen(true)
+        return true
+      }
+      const several = state.selectedIds.length > 1
       if (mod && k === 'd' && state.selection) {
-        commands.duplicate(state.selection)
+        if (several) commands.duplicateMany(state.selectedIds)
+        else commands.duplicate(state.selection)
         return true
       }
       // B9: from the canvas (the editor's own copy / paste events handle the rest of the window).
       if (mod && k === 'c') {
-        if (state.selection) commands.copy(state.selection)
+        if (several) commands.copyMany(state.selectedIds)
+        else if (state.selection) commands.copy(state.selection)
         return true
       }
       if (mod && k === 'v') {
@@ -604,24 +684,34 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         return true
       }
       if (mod) return false
+      if ((k === 'delete' || k === 'backspace') && several) {
+        commands.requestDeleteMany(state.selectedIds)
+        return true
+      }
       if ((k === 'delete' || k === 'backspace') && state.selection) {
         const info = findNode(state.content, state.selection)
         if (info && info.kind !== 'column') commands.requestDelete(state.selection)
         return true
       }
       // B10: Enter edits the selected element's text on the canvas.
-      if (k === 'enter' && state.selection && !key.shift) {
+      if (k === 'enter' && state.selection && !key.shift && !several) {
         if (firstInlineField(state.content, state.selection) === null) return false
         editText(state.selection)
         return true
       }
       if (k === 'escape') {
+        // B12: Esc clears a selection of several items.
+        if (several) {
+          state.clearSelection()
+          return true
+        }
         const info = findNode(state.content, state.selection)
         state.select(info?.parentId ?? null)
         return true
       }
       if (k === 'arrowup' || k === 'arrowdown') {
-        const rows = flattenLayers(state.content)
+        // B12: on a tablet or phone the canvas shows things in that device's order.
+        const rows = flattenLayers(state.content, state.device)
         const index = rows.findIndex((row) => row.node.id === state.selection)
         const next = rows[index < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, index + (k === 'arrowdown' ? 1 : -1)))]
         if (next) {
@@ -657,9 +747,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     const busy = (event: ClipboardEvent) => isTypingTarget(event.target) || (window.getSelection()?.toString() ?? '') !== ''
     const onCopy = (event: ClipboardEvent) => {
       if (busy(event)) return
-      const selected = store.getState().selection
+      const { selection: selected, selectedIds: ids } = store.getState()
       if (!selected) return
-      const text = commands.copy(selected, { system: false })
+      const text = ids.length > 1 ? commands.copyMany(ids, { system: false }) : commands.copy(selected, { system: false })
       if (!text) return
       event.clipboardData?.setData('text/plain', text)
       event.preventDefault()
@@ -743,6 +833,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     if (first) commands.reveal(first)
   }
 
+  const openPreviewRef = useRef<() => Promise<void>>(async () => undefined)
   const openPreview = async () => {
     const url = store.getState().document.preview_url
     if (!url) return
@@ -757,6 +848,10 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       window.open(url, '_blank', 'noopener')
     }
   }
+
+  useLayoutEffect(() => {
+    openPreviewRef.current = openPreview
+  })
 
   /** Saves the latest changes first; null when saved, else why not (for the dialog). */
   const saveFirst = async (verb: string): Promise<string | null> => {
@@ -996,7 +1091,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       if (point && canvas.current) {
         const viewport = canvas.current.viewport()
         edge.current = point.y < AUTOSCROLL_EDGE ? -1 : viewport.h > 0 && point.y > viewport.h - AUTOSCROLL_EDGE ? 1 : 0
-        setCanvasDrop(computeDropTarget(state.content, canvas.current.rects(), point, item, viewport.w))
+        // B12: on a tablet or phone the canvas draws the device's order; positions are worked out on it.
+        setCanvasDrop(computeDropTarget(deviceView(state.content, state.device), canvas.current.rects(), point, item, viewport.w))
         setLayerDrop(null)
         return
       }
@@ -1012,15 +1108,24 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     const active = event.active.rect.current.translated
     const middle = active ? active.top + active.height / 2 : 0
     const half = middle < over.rect.top + over.rect.height / 2 ? 'top' : 'bottom'
-    const result = layerDropTarget(state.content, overData.nodeId, half, item)
+    const result = layerDropTarget(deviceView(state.content, state.device), overData.nodeId, half, item)
     setLayerDrop(result ? { target: result.target, indicator: { rowId: result.rowId, position: result.position } } : null)
   }
 
   const onDragEnd = (event: DragEndEvent) => {
     const item = (event.active.data.current as { dragged?: Dragged } | undefined)?.dragged
-    const target = canvasDrop?.target ?? layerDrop?.target ?? null
+    const dropped = canvasDrop?.target ?? layerDrop?.target ?? null
     resetDrag()
-    if (!item || !target) return
+    if (!item || !dropped) return
+    // B12: in Tablet / Mobile view a move within its own place changes only that device's order.
+    const state = store.getState()
+    const resolved = resolveDeviceDrop(state.content, state.device, item, dropped)
+    if (resolved.kind === 'device') {
+      if (item.kind === 'node' && state.apply(resolved.edit, { select: item.id })) commands.reveal(item.id)
+      return
+    }
+    const target = resolved.target
+    if (resolved.movesEverywhere && item.kind === 'node') toast.info(`Moved on all devices (computer, tablet and phone). To change only the ${DEVICE_LABEL[state.device].toLowerCase()} order, move it within its own column or among the sections.`)
     if (item.kind === 'template') {
       if (single) return
       // Templates are whole sections: they only go between sections.
@@ -1038,6 +1143,11 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   })()) : ''
 
   const selectedNode = selectedInfo?.node ?? null
+  // B12: several selected — the inspector shows the Common style form for them (global section references left out).
+  const inspectorNodes = useMemo<BuilderNode[] | undefined>(
+    () => (several ? selectedNodes(content, selectedIds).map((n) => n.node).filter((node) => !isGlobalRef(node)) : undefined),
+    [several, content, selectedIds],
+  )
   const selectedRef = globalRefOf(selectedNode)
   const globalSettings = single && selectedNode === null
   const inspectorDocument = {
@@ -1054,6 +1164,34 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     activePending,
     storeUrl: canvasContext.store_url,
   }
+  /* ---------------------------------------------------------------- B12 command box --------- */
+  const commandActions = useMemo<CommandActions>(
+    () => ({
+      publish: canPublish
+        ? () => {
+            setPublishError(null)
+            setPublishOpen(true)
+            void runServerCheck(store.getState().content)
+          }
+        : null,
+      submit:
+        !canPublish && canSubmit
+          ? () => {
+              setSubmitError(null)
+              setSubmitOpen(true)
+              void runServerCheck(store.getState().content)
+            }
+          : null,
+      preview: documentInfo.preview_url ? () => void openPreviewRef.current() : null,
+      check: openCheck,
+      history: () => setHistoryOpen(true),
+      styles: () => setStylesOpen(true),
+      shortcuts: () => setShortcutsOpen(true),
+    }),
+    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck],
+  )
+  const commandItems = useCommandItems(commandOpen, commandActions, single ? null : templates)
+
   const labelOf = useCallback((id: string) => {
     const info = findNode(store.getState().content, ownerOf(id))
     return info ? nodeName(info.node, registry, globals) : ''
@@ -1107,6 +1245,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           onShowProblem={showProblem}
           bangla={bangla}
           check={{ errors: check.counts.errors, warnings: check.counts.warnings, open: checkOpen, onToggle: () => (checkOpen ? setCheckOpen(false) : openCheck()) }}
+          onCommandBox={() => setCommandOpen(true)}
+          onShortcuts={() => setShortcutsOpen(true)}
         />
         <div className="flex min-h-0 flex-1">
           <nav aria-label="Add elements, page layers and templates" className="flex w-72 shrink-0 flex-col border-r bg-background">
@@ -1178,12 +1318,21 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               media={preview.media}
               pending={preview.pending}
               selection={selection}
+              selectedIds={selectedIds}
+              deviceOrder={canvasDeviceOrder}
               hover={hover}
               errorIds={errorIds}
               device={device}
               dragging={dragged !== null && pointerDrag}
               indicator={canvasDrop?.indicator ?? null}
-              onSelect={(id) => select(ownerOf(id))}
+              onSelect={(id, gesture) => {
+                const owner = ownerOf(id)
+                const state = store.getState()
+                // B12: Ctrl/Cmd+click adds or takes out, Shift+click adds the items between.
+                if (owner && gesture?.toggle) state.toggleSelect(owner)
+                else if (owner && gesture?.range) state.selectRange(owner)
+                else if (owner || !(gesture?.toggle || gesture?.range)) select(owner)
+              }}
               onHover={(id) => setHover(ownerOf(id))}
               onKey={handleKey}
               toolbar={() => <MiniToolbar theme={inspectorTheme} onEditText={editText} onReplacePicture={setReplaceId} />}
@@ -1211,6 +1360,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 locales={canvasContext.locales}
                 errors={errors[selection ?? ''] ?? []}
                 onChange={(next, options) => store.getState().apply((c) => setNode(c, next), { coalesceKey: options?.coalesceKey, media: options?.media })}
+                nodes={inspectorNodes && inspectorNodes.length > 1 ? inspectorNodes : undefined}
+                onChangeMany={(next, options) => store.getState().apply((c) => next.reduce((acc, node) => setNode(acc, node), c), { coalesceKey: options?.coalesceKey, media: options?.media })}
                 device={device}
                 theme={inspectorTheme}
                 canCustomHtml={canCustomHtml}
@@ -1274,6 +1425,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       </DragOverlay>
 
       <SiteStylesDrawer open={stylesOpen} onOpenChange={setStylesOpen} styles={siteStyles} canPublish={canPublish} />
+      <CommandBox open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} />
+      <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}

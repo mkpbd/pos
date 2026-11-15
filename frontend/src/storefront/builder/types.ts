@@ -761,7 +761,19 @@ export type PageSeo = {
  * GlobalSectionNode entries (see DocumentSection) — typed `Section[]` for older code, check with
  * `isGlobalSectionNode`.
  */
-export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo }
+export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo; device_order?: DeviceOrder }
+
+/**
+ * B12: per-device order of a container's children, by container id → the children's ids in the
+ * order that device shows them. Containers: `root` (DEVICE_ORDER_ROOT, the document's sections) and
+ * columns (their elements, inner row columns included). Absent device / container = inherited:
+ * mobile falls back to tablet, tablet to the base (desktop) order. The server keeps every list
+ * exactly the container's current children; readers still treat lists as hints (./device-order.ts).
+ */
+export type DeviceOrderMap = Record<string, string[]>
+export type DeviceOrder = { tablet?: DeviceOrderMap; mobile?: DeviceOrderMap }
+/** The devices that can have their own order (desktop is the base order of the document). */
+export type OrderDevice = keyof DeviceOrder
 
 /** The editor's names (B2): the whole draft, and any node of it (section, column or element). */
 export type BuilderContent = BuilderDocument
@@ -954,6 +966,8 @@ export type BuilderPage = {
    * element id). B4: for countdown, discount, promo_card, menu and faq_list elements, their data.
    */
   data: Record<string, BuilderData>
+  /** B12: the document's per-device order (published with the version; drafts: the draft's). Absent / null = base order everywhere. */
+  device_order?: DeviceOrder | null
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -996,7 +1010,7 @@ export type StorePopupEntry = {
   /** The published version number; null in a draft preview. Frequency records are kept per popup id, across versions. */
   version: number | null
   settings: StorePopupSettings
-  payload: Pick<BuilderPage, 'sections' | 'media' | 'data'>
+  payload: Pick<BuilderPage, 'sections' | 'media' | 'data' | 'device_order'>
 }
 /** Already ordered (priority desc, then oldest). `never_on`: path prefixes no popup covers. */
 export type StorePopupsResponse = { popups: StorePopupEntry[]; never_on: string[] }

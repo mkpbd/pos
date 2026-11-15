@@ -26,6 +26,15 @@ final class BuilderJson
         if (is_array($document['seo'] ?? null)) {
             $document['seo'] = self::seo($document['seo']);
         }
+        // B12: the order on tablets and phones, containers in document order again.
+        if (array_key_exists('device_order', $document)) {
+            $order = DeviceOrder::canonical(DeviceOrder::lists($document['device_order']), DeviceOrder::containers($document));
+            if ($order === null) {
+                unset($document['device_order']);
+            } else {
+                $document['device_order'] = $order;
+            }
+        }
 
         return $document;
     }

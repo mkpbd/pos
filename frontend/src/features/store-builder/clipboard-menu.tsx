@@ -1,6 +1,6 @@
-import { ClipboardCopyIcon, ClipboardPasteIcon, GlobeIcon, PaintbrushIcon, PaintBucketIcon, PencilIcon, UnlinkIcon } from 'lucide-react'
+import { ClipboardCopyIcon, ClipboardPasteIcon, CopyPlusIcon, GlobeIcon, PaintbrushIcon, PaintBucketIcon, PencilIcon, UnlinkIcon } from 'lucide-react'
 import { DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut } from '@/components/ui/dropdown-menu'
-import { useCommands } from './commands'
+import { useCommands, useEditorUi } from './commands'
 import { globalRefOf } from './global-sections'
 import { useEditorStoreApi } from './store'
 import type { NodeKind } from './tree'
@@ -20,6 +20,7 @@ export function NodeClipboardItems({ id, kind }: { id: string; kind: NodeKind })
   const node = findNode(store.getState().content, id)?.node
   const ref = globalRefOf(node)
   const canPasteStyle = commands.canPasteStyle(id)
+  const { requestCopyToPages } = useEditorUi()
 
   return (
     <>
@@ -46,6 +47,14 @@ export function NodeClipboardItems({ id, kind }: { id: string; kind: NodeKind })
           </DropdownMenuItem>
           <DropdownMenuItem disabled={!canPasteStyle} onSelect={() => commands.pasteStyleTo(id)}>
             <PaintBucketIcon /> Paste style
+          </DropdownMenuItem>
+        </>
+      )}
+      {kind === 'section' && requestCopyToPages && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => requestCopyToPages(id)}>
+            <CopyPlusIcon /> Copy to other pages…
           </DropdownMenuItem>
         </>
       )}

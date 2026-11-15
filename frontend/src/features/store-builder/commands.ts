@@ -4,7 +4,10 @@ import { elementMeta } from '@/storefront/builder/registry'
 import type { BuilderContent, BuilderNode, Column, DocumentContext, Element, InnerRowElement, Section } from '@/storefront/builder/types'
 import type { ElementsMetadata } from './api'
 import type { CanvasHandle } from './canvas-frame'
-import { copyNode, copyStyle, parseClip, pasteClip, pasteStyle, readNodesClip, readStyleClip, rememberClip, stylesCompatible, writeSystemClipboard, type NodesClip } from './clipboard'
+import { clipSize, copyNode, copyNodes, copyStyle, parseClip, pasteClip, pasteStyle, readNodesClip, readStyleClip, rememberClip, stylesCompatible, writeSystemClipboard, type NodesClip } from './clipboard'
+import { isOrderDevice, moveInDeviceOrder, orderContainerOf } from './device-order-edit'
+import { canWrapInInnerRow, canWrapInSection, deleteGroup, duplicateGroup, deletableNodes, groupHides, moveGroup, setHiddenGroup, wrapInInnerRow as wrapInRow, wrapInSection as wrapInOwnSection } from './group-ops'
+import { editEach, selectedNodes, siblingGroup } from './selection'
 import { globalRefOf, isGlobalRef, type GlobalEntry } from './global-sections'
 import { createElement } from './inspector'
 import { useEditorStoreApi } from './store'
@@ -19,6 +22,8 @@ export type EditorUi = {
   registry: ElementsMetadata
   canvas: RefObject<CanvasHandle | null>
   requestDelete: (id: string) => void
+  /** B12: one confirmation for deleting several items. */
+  requestDeleteMany?: (ids: string[]) => void
   /** B4: the user may add or change custom HTML (`storefront.custom_html`); default true. */
   canCustomHtml?: boolean
   /** B4: the open document's element context (new elements' setup and defaults). */
@@ -33,6 +38,8 @@ export type EditorUi = {
   noun?: string
   /** B9: the globals this document refers to (names, contexts, drafts). */
   globals?: ReadonlyMap<string, GlobalEntry>
+  /** B12: opens "Copy to other pages…" for a section (absent: not offered here). */
+  requestCopyToPages?: (sectionId: string) => void
   /** B9: opens "Make global" for a section (absent: not offered here). */
   requestMakeGlobal?: (sectionId: string) => void
   /** B9: asks before detaching a global section reference. */
@@ -195,9 +202,14 @@ export function useCommands() {
     [store, single],
   )
 
+  /** One place up or down; B12: in tablet / phone view sections and elements move in that device's order only. */
   const step = useCallback(
     (id: string, direction: -1 | 1) => {
-      const ok = store.getState().apply((content) => moveBy(content, id, direction), { select: id })
+      const state = store.getState()
+      const ok =
+        isOrderDevice(state.device) && orderContainerOf(state.content, id)
+          ? state.apply((content) => moveInDeviceOrder(content, state.device, id, direction), { select: id })
+          : state.apply((content) => moveBy(content, id, direction), { select: id })
       if (ok) reveal(id)
       return ok
     },
@@ -301,7 +313,7 @@ export function useCommands() {
         toast.error(result.message)
         return false
       }
-      const ok = state.apply(() => result.content, { select: result.id })
+      const ok = state.apply(() => result.content, result.ids.length > 1 ? { selectMany: result.ids } : { select: result.id })
       if (ok) reveal(result.id)
       return ok
     },
@@ -351,12 +363,177 @@ export function useCommands() {
     [store, org, registry],
   )
 
+  /* ---------------------------------------------------------------- B12 several selected --- */
+
+  /** Moves several siblings one place as a block (tablet / phone view: in that device's order). One undo step. */
+  const stepMany = useCallback(
+    (ids: string[], direction: -1 | 1): boolean => {
+      const state = store.getState()
+      const primary = state.selection ?? ids[ids.length - 1] ?? null
+      const deviceOnly = isOrderDevice(state.device) && ids.length > 0 && orderContainerOf(state.content, ids[0]!) !== null
+      if (deviceOnly && !siblingGroup(state.content, ids)) return false
+      const ok = deviceOnly ? state.apply((c) => moveInDeviceOrder(c, state.device, ids, direction)) : state.apply((c) => moveGroup(c, ids, direction))
+      if (ok && primary) reveal(primary)
+      return ok
+    },
+    [store, reveal],
+  )
+
+  const duplicateMany = useCallback(
+    (ids: string[]): boolean => {
+      const state = store.getState()
+      const nodes = selectedNodes(state.content, ids)
+      if (!canCustomHtml && nodes.some((n) => containsCustomHtml(n.node))) {
+        toast.error(CUSTOM_HTML_DENIED)
+        return false
+      }
+      if (single && nodes.some((n) => n.kind === 'section')) {
+        toast.info(SINGLE_SECTION_NOTE)
+        return false
+      }
+      const result = duplicateGroup(state.content, ids)
+      if (result.ids.length === 0) {
+        toast.error('There’s no room for that many copies there.')
+        return false
+      }
+      const ok = state.apply(() => result.content, { selectMany: result.ids })
+      if (ok) reveal(result.ids[0]!)
+      return ok
+    },
+    [store, canCustomHtml, single, reveal],
+  )
+
+  /** Asks once before deleting several items (columns are left out: they go with the column layout). */
+  const requestDeleteMany = useCallback(
+    (ids: string[]) => {
+      const nodes = deletableNodes(store.getState().content, ids)
+      if (nodes.length === 0) return
+      if (single && nodes.some((n) => n.kind === 'section')) {
+        toast.info(SINGLE_SECTION_NOTE)
+        return
+      }
+      if (nodes.length === 1 || !ui.requestDeleteMany) return requestDelete(nodes[0]!.node.id)
+      ui.requestDeleteMany(nodes.map((n) => n.node.id))
+    },
+    [store, single, requestDelete, ui],
+  )
+
+  /** Deletes several items without asking (after the confirmation); one undo step. */
+  const removeMany = useCallback(
+    (ids: string[]): boolean => {
+      const state = store.getState()
+      const result = deleteGroup(state.content, ids)
+      return state.apply(() => result.content, { select: result.next })
+    },
+    [store],
+  )
+
+  /** Hides all (when any is shown) or shows all; one undo step. */
+  const toggleHiddenMany = useCallback(
+    (ids: string[]): boolean => {
+      const state = store.getState()
+      const hide = groupHides(state.content, ids)
+      return state.apply((c) => setHiddenGroup(c, ids, hide))
+    },
+    [store],
+  )
+
+  const copyMany = useCallback(
+    (ids: string[], options: { system?: boolean; quiet?: boolean } = {}): string | null => {
+      const state = store.getState()
+      const nodes = selectedNodes(state.content, ids)
+      if (!canCustomHtml && nodes.some((n) => containsCustomHtml(n.node))) {
+        toast.error(CUSTOM_HTML_DENIED)
+        return null
+      }
+      const clip = copyNodes(state.content, ids, org, (ref) => globals?.get(ref)?.context ?? null)
+      if (!clip) return null
+      const text = rememberClip(clip)
+      if (options.system !== false) writeSystemClipboard(text)
+      const count = clipSize(clip)
+      if (!options.quiet) toast.success(count === 1 ? 'Copied. Paste it on any page with Ctrl+V.' : `${count} items copied. Paste them on any page with Ctrl+V.`)
+      return text
+    },
+    [store, org, globals, canCustomHtml],
+  )
+
+  /** Pastes the copied style on every selected item it fits; one undo step. */
+  const pasteStyleToMany = useCallback(
+    (ids: string[]): boolean => {
+      const clip = readStyleClip(org)
+      if (!clip) {
+        toast.info('Copy the style of something first.')
+        return false
+      }
+      const state = store.getState()
+      const fits = selectedNodes(state.content, ids).filter((n) => !isGlobalRef(n.node) && stylesCompatible(clip.node_type, n.node.type))
+      if (fits.length === 0) {
+        toast.error(`The copied style is from a ${typeLabel(clip.node_type, registry).toLowerCase()}, so it doesn’t fit any of the selected items.`)
+        return false
+      }
+      const ok = state.apply((c) => editEach(c, fits.map((n) => n.node.id), (acc, id) => pasteStyle(acc, id, clip)))
+      const skipped = ids.length - fits.length
+      if (ok) toast.success(`Style pasted on ${fits.length} ${fits.length === 1 ? 'item' : 'items'}${skipped > 0 ? ` (${skipped} didn’t fit)` : ''}. Undo puts the old style back.`)
+      return ok
+    },
+    [store, org, registry],
+  )
+
+  /** Whether the copied style fits any of the items. */
+  const canPasteStyleToMany = useCallback(
+    (ids: string[]): boolean => {
+      const clip = readStyleClip(org)
+      if (!clip) return false
+      return selectedNodes(store.getState().content, ids).some((n) => !isGlobalRef(n.node) && stylesCompatible(clip.node_type, n.node.type))
+    },
+    [store, org],
+  )
+
+  const wrapInInnerRow = useCallback(
+    (ids: string[]): boolean => {
+      const state = store.getState()
+      const reason = canWrapInInnerRow(state.content, ids)
+      if (reason) {
+        toast.info(reason)
+        return false
+      }
+      const result = wrapInRow(state.content, ids)
+      if (!result.id) return false
+      const ok = state.apply(() => result.content, { select: result.id })
+      if (ok) reveal(result.id)
+      return ok
+    },
+    [store, reveal],
+  )
+
+  const wrapInSection = useCallback(
+    (ids: string[]): boolean => {
+      const state = store.getState()
+      const reason = canWrapInSection(state.content, ids, single)
+      if (reason) {
+        toast.info(reason)
+        return false
+      }
+      const result = wrapInOwnSection(state.content, ids, single)
+      if (!result.id) return false
+      const ok = state.apply(() => result.content, { select: result.id })
+      if (ok) reveal(result.id)
+      return ok
+    },
+    [store, reveal, single],
+  )
+
   return useMemo(
     () => ({
       insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal, requestSaveTemplate,
       copy, paste, copyStyleOf, canPasteStyle, pasteStyleTo, requestMakeGlobal, requestDetach, openGlobal,
+      stepMany, duplicateMany, requestDeleteMany, removeMany, toggleHiddenMany, copyMany, pasteStyleToMany, canPasteStyleToMany, wrapInInnerRow, wrapInSection,
     }),
-    [insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal, requestSaveTemplate, copy, paste, copyStyleOf, canPasteStyle, pasteStyleTo, requestMakeGlobal, requestDetach, openGlobal],
+    [
+      insert, move, step, duplicate, toggleHidden, remove, requestDelete, selectParent, reveal, requestSaveTemplate,
+      copy, paste, copyStyleOf, canPasteStyle, pasteStyleTo, requestMakeGlobal, requestDetach, openGlobal,
+      stepMany, duplicateMany, requestDeleteMany, removeMany, toggleHiddenMany, copyMany, pasteStyleToMany, canPasteStyleToMany, wrapInInnerRow, wrapInSection,
+    ],
   )
 }
 

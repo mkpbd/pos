@@ -21,6 +21,27 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B12 — Store builder: faster building
+
+#### Added
+- **Select several items:** Ctrl/Cmd+click toggles, Shift+click adds the siblings in between (canvas and Layers; in the order shown, also on tablet/phone). A blue "N selected" bar offers Move up/down as a block, Duplicate all, Copy all, Hide/Show all, Delete all (one confirmation), copy/paste style, wrap in an inner row or a new section. Each group action is one undo step; actions that need items side by side explain why they are unavailable.
+- **Common style:** with several selected, the inspector shows only the style parts they all support, "Mixed" where they differ, and changes all of them for the current device. **Line up:** align text, place blocks left/centre/right, equal spacing (value), same width (columns share the row equally).
+- **Ctrl+K command box** (also from the canvas): add an element or template, go to anything on the page, open another page, or run an action — English and Bangla words, recent first, keyboard only if you like.
+- **Snapping:** spacing grips snap to the section above/below and common sizes with a dashed guide and a badge; column handles snap to halves, thirds, quarters and the other columns. Alt drags freely.
+- **Order on phones and tablets:** sections and the items inside a column can have their own order per device (`device_order`). In Tablet/Mobile view Move up/down, drag in the Layers panel and the canvas change only that device ("Same as computer" resets); shoppers' pages are rendered in that order, so reading and Tab order match what they see. Compare lists "Moved on phones/tablets".
+- **Copy to other pages:** a section's ⋯ menu copies it to the top or bottom of up to 20 pages' drafts at once (`POST /storefront/builder/sections/copy`), with a result per page; nothing is published.
+- **Keyboard shortcuts sheet** (`?`) and an **undo history that survives a reload** (per page; reset with a note if the page was changed elsewhere).
+
+#### Fixed
+- A typecheck error in a media test shipped with B11 (`getByRole` has no `exact` option).
+
+#### Tests
+- Backend 1260 (PostgreSQL: 1259 pass, 1 opt-in skip; new `BuilderB12DeviceOrderTest`, `StoreBuilderB12Test`); Pint clean; vitest 2103; mocked Playwright 347 + the B12 command-box test (passes 12/12 alone; it timed out once while three test runs shared the machine); new `store-builder-b12a/b12b`, `storefront-builder-b12` specs.
+- Full-stack (PostgreSQL, desktop) 45 + builder acceptance 5 — new **B12** test: a published page shows its sections in a different order on a 375 px phone than on a computer, a malformed order is refused, one section is copied to two pages (an unknown page fails on its own), Ctrl+K adds a heading and Ctrl+click selects two headings.
+
+#### Notes
+- No migration and no new dependency. The builder's code chunk is now 565 kB (it grows with the editor; lazy-loading the command box and dialogs is a candidate for later).
+
 ### B11 — Store builder: publish later, versions & approval; picture tools; five new demo looks
 
 #### Added

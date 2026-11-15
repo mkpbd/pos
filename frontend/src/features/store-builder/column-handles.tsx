@@ -1,19 +1,22 @@
 import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { Rect } from '@/storefront/builder/canvas/protocol'
-import { MIN_WIDTH, resizePair, SNAP, sideBySide } from './column-resize'
+import { MIN_WIDTH, resizePair, sideBySide } from './column-resize'
+import { keyboardColumnLeft, snapColumnLeft, type SnapGuide } from './snapping'
 
 /*
  * Drag handles between the columns of the selected row on the canvas (B3), for the device being
- * edited: drag to move width from one column to its neighbour (snaps to 5 %, the % shows while
- * dragging), or focus a handle and use ← / → (5 % per press). Handles appear only between
- * columns that sit side by side on this device.
+ * edited: drag to move width from one column to its neighbour (the % shows while dragging), or
+ * focus a handle and use ← / → (to the next 5 % mark). Handles appear only between columns that
+ * sit side by side on this device. B12: the width snaps to shares of the row (1/2, 1/3, 2/3, 1/4 …)
+ * and to the other columns' widths, with a dashed guide and its name, else to 5 %; Alt while
+ * dragging = free (1 %).
  */
 
 export type ResizeRow = { rowId: string; columns: { id: string; width: number }[] }
 
 export type ResizePhase = 'move' | 'end'
 
-type Active = { index: number; startX: number; startLeft: number; pxPerPercent: number; widths: number[]; left: number }
+type Active = { index: number; startX: number; startLeft: number; pxPerPercent: number; widths: number[]; left: number; guide: SnapGuide | null }
 
 export function ColumnHandles({ row, rects, scale, onResize }: {
   row: ResizeRow
@@ -27,14 +30,14 @@ export function ColumnHandles({ row, rects, scale, onResize }: {
   // While dragging, the pointer is followed on the window (a cover keeps it off the iframe).
   useEffect(() => {
     if (!active) return
-    const leftAt = (clientX: number) => active.startLeft + (clientX - active.startX) / active.pxPerPercent
+    const leftAt = (event: globalThis.PointerEvent) => snapColumnLeft(active.widths, active.index, active.startLeft + (event.clientX - active.startX) / active.pxPerPercent, event.altKey)
     const onMove = (event: globalThis.PointerEvent) => {
-      const left = leftAt(event.clientX)
-      setActive((a) => (a ? { ...a, left } : a))
+      const { value: left, guide } = leftAt(event)
+      setActive((a) => (a ? { ...a, left, guide } : a))
       onResize(row.rowId, active.index, left, 'move')
     }
     const onUp = (event: globalThis.PointerEvent) => {
-      onResize(row.rowId, active.index, leftAt(event.clientX), 'end')
+      onResize(row.rowId, active.index, leftAt(event).value, 'end')
       setActive(null)
     }
     window.addEventListener('pointermove', onMove)
@@ -60,7 +63,8 @@ export function ColumnHandles({ row, rects, scale, onResize }: {
     const top = Math.min(a.y, b.y) * scale
     const height = Math.max(24, (Math.max(a.y + a.h, b.y + b.h) - Math.min(a.y, b.y)) * scale)
     const dragging = active?.index === index
-    const pair = dragging ? resizePair(active.widths, index, active.left) : null
+    const pair = dragging ? resizePair(active.widths, index, active.left, 0) : null
+    const guide = dragging ? active.guide : null
     const total = widths[index]! + widths[index + 1]!
 
     const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -75,13 +79,13 @@ export function ColumnHandles({ row, rects, scale, onResize }: {
       } catch {
         // Not supported (tests): the window listeners still follow the pointer over the cover.
       }
-      setActive({ index, startX: event.clientX, startLeft: widths[index]!, pxPerPercent, widths, left: widths[index]! })
+      setActive({ index, startX: event.clientX, startLeft: widths[index]!, pxPerPercent, widths, left: widths[index]!, guide: null })
     }
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
       event.preventDefault()
       event.stopPropagation()
-      onResize(row.rowId, index, widths[index]! + (event.key === 'ArrowRight' ? SNAP : -SNAP), 'end')
+      onResize(row.rowId, index, keyboardColumnLeft(widths, index, event.key === 'ArrowRight' ? 1 : -1), 'end')
     }
 
     return (
@@ -102,11 +106,13 @@ export function ColumnHandles({ row, rects, scale, onResize }: {
         className="group pointer-events-auto absolute z-20 flex w-3 -translate-x-1/2 cursor-col-resize touch-none items-center justify-center outline-none"
         style={{ left: x, top, height }}
       >
+        {guide && <span data-testid="column-guide" className="absolute -inset-y-4 left-1/2 -translate-x-1/2 border-l border-dashed border-blue-600" aria-hidden />}
         <span className={`h-full w-1 rounded-full ${dragging ? 'bg-blue-600' : 'bg-blue-600/60 group-hover:bg-blue-600 group-focus-visible:bg-blue-600'}`} aria-hidden />
         <span className="absolute top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-white bg-blue-600 shadow" aria-hidden />
         {(dragging || pair) && (
           <span data-testid="column-resize-label" className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-3 rounded bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-white shadow">
             {pair ? `${pair[0]} % | ${pair[1]} %` : `${widths[index]} % | ${widths[index + 1]} %`}
+            {guide ? ` · ${guide.label}` : ''}
           </span>
         )}
       </div>

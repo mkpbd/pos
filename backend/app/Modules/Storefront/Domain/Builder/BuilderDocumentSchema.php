@@ -37,6 +37,9 @@ use Illuminate\Support\Facades\Validator;
  * section's own content (`$global`) is exactly one section, without references, `seo` or
  * `sticky`. Pages and content pages may carry `seo` (search & sharing, see seo()), kept only
  * when set so older documents normalize unchanged.
+ *
+ * B12: any document may carry `device_order` (the order of sections and of a column's elements
+ * on tablets and phones, DeviceOrder) — canonical, kept only when set.
  */
 final class BuilderDocumentSchema
 {
@@ -281,17 +284,28 @@ final class BuilderDocumentSchema
         $popup = $this->context === 'popup'
             ? PopupSettings::normalize($document['popup'] ?? null, fn (string $path, string $message, ?string $code = null) => $this->error($path === '' ? 'popup' : "popup.{$path}", null, $message, $code))
             : null;
+        // B12: the order on tablets and phones (kept only when set).
+        $deviceOrder = DeviceOrder::normalize(
+            $document['device_order'] ?? null,
+            ['sections' => $sections],
+            fn (string $path, ?string $nodeId, string $message, string $code) => $this->error($path, $nodeId, $message, $code),
+        );
         if ($this->errors !== []) {
             throw new InvalidBuilderDocument($this->errors);
         }
 
+        $result = ['schema_version' => self::SCHEMA_VERSION];
         if ($popup !== null) {
-            return ['schema_version' => self::SCHEMA_VERSION, 'popup' => $popup, 'sections' => $sections];
+            $result['popup'] = $popup;
+        } elseif ($seo !== null) {
+            $result['seo'] = $seo;
+        }
+        $result['sections'] = $sections;
+        if ($deviceOrder !== null) {
+            $result['device_order'] = $deviceOrder;
         }
 
-        return $seo === null
-            ? ['schema_version' => self::SCHEMA_VERSION, 'sections' => $sections]
-            : ['schema_version' => self::SCHEMA_VERSION, 'seo' => $seo, 'sections' => $sections];
+        return $result;
     }
 
     /**

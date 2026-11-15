@@ -137,6 +137,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         // B2: canvas data for unsaved elements and media (validated per element).
         Route::post('resolve', [BuilderDocumentController::class, 'resolve']);
         Route::put('documents/{document}/draft', [BuilderDocumentController::class, 'saveDraft'])->whereUuid('document');
+        // B12: one section into the drafts of several documents (never published).
+        Route::post('sections/copy', [BuilderDocumentController::class, 'copySection']);
         // B10: page check before publish (nothing is saved).
         Route::post('documents/{document}/check', [BuilderDocumentController::class, 'check'])->whereUuid('document');
         Route::post('documents/{document}/publish', [BuilderDocumentController::class, 'publish'])->whereUuid('document')->middleware('can:storefront.publish');

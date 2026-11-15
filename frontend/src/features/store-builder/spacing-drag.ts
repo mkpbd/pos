@@ -5,7 +5,8 @@ import { findNode, setNode } from './tree'
 /*
  * B10 spacing handles (contract §1): on the selected section, inner row or column, the handles on
  * its top and bottom edges change its padding (margin with Alt) for the device being edited — the
- * value goes into that device's breakpoint only (sparse per-device styles), in px, snapped to 4 px.
+ * value goes into that device's breakpoint only (sparse per-device styles), in px. B12: the handles
+ * snap the value (guides, 4 px grid; Alt = free, see snapping.ts); `setSpacing` only bounds it.
  */
 
 export type SpacingBox = 'padding' | 'margin'
@@ -39,12 +40,17 @@ export function snapSpacing(px: number): number {
   return Math.max(0, Math.min(SPACING_MAX, Math.round(px / SPACING_SNAP) * SPACING_SNAP))
 }
 
-/** The content with the node's spacing side set (px) on the breakpoint. */
+/** Bounded to 0 – 400 whole px (B12: the handles snap; see snapping.ts). */
+export function clampSpacing(px: number): number {
+  return Math.max(0, Math.min(SPACING_MAX, Math.round(px)))
+}
+
+/** The content with the node's spacing side set (px, whole and bounded; the caller snaps) on the breakpoint. */
 export function setSpacing(content: BuilderContent, id: string, breakpoint: Breakpoint, box: SpacingBox, side: SpacingSide, px: number): BuilderContent {
   const info = findNode(content, id)
   if (!info) return content
   const node = info.node as BuilderNode & { style?: ResponsiveStyle }
-  const value = `${snapSpacing(px)}px`
+  const value = `${clampSpacing(px)}px`
   const style = node.style ?? {}
   if (resolveStyleValue(style, breakpoint, ['spacing', box, side]).origin.kind === 'here' && style[breakpoint]?.spacing?.[box]?.[side] === value) return content
   return setNode(content, { ...node, style: writeStyleValue(style, breakpoint, ['spacing', box, side], value) } as BuilderNode)

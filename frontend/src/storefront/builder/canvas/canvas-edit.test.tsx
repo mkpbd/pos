@@ -148,6 +148,9 @@ describe('B10 editing on the canvas', () => {
 
     // Keys typed into the text never reach the editor as shortcuts.
     fireEvent.keyDown(heading, { key: 'Delete' })
+    // B12: nor do the command box and shortcut sheet keys (a `?` is typed, Ctrl+K stays with the text).
+    fireEvent.keyDown(heading, { key: 'k', ctrlKey: true })
+    fireEvent.keyDown(heading, { key: '?', shiftKey: true })
     expect(sent('key')).toEqual([])
 
     heading.textContent = 'Warm bread'

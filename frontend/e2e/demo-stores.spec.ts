@@ -1035,6 +1035,112 @@ test('B10: Mati & Co. edits a heading on the page, publishes past the page check
   await adminContext.close()
 })
 
+test('B12: Little Sprouts — phones see their own section order; a section is copied to two pages at once; Ctrl+K adds an element and two items are selected together', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('kids.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@littlesprouts.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { id: string; type?: string; props?: Record<string, unknown>; translations?: Record<string, unknown>; columns?: { elements: Node[] }[] }
+  const firstHeading = (node: Node): Node | null => {
+    for (const column of node.columns ?? []) for (const element of column.elements) {
+      if (element.type === 'heading') return element
+      const inner = firstHeading(element)
+      if (inner) return inner
+    }
+    return null
+  }
+  const section = async (heading: string) => {
+    const made = await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })
+    const node = made.body.data.nodes[0] as Node
+    const h = firstHeading(node)!
+    h.props = { ...h.props, text: heading }
+    h.translations = {}
+    return node
+  }
+  const ensurePage = async (key: string, title: string) => {
+    let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key, title, from: 'blank' })
+    if (doc.status === 409) {
+      // A rerun on the same database: reuse the page.
+      const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === key)
+      doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+    }
+    return doc.body.data as { id: string; draft_revision: number }
+  }
+
+  // Computers: "First for computers" above "First on phones"; phones: the other way round.
+  const desktopFirst = await section('First for computers')
+  const phoneFirst = await section('First on phones')
+  const orderDoc = await ensurePage('landing:b12-order', 'B12 order')
+  const content = { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections: [desktopFirst, phoneFirst], device_order: { mobile: { root: [phoneFirst.id, desktopFirst.id] } } }
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${orderDoc.id}/draft`, { revision: orderDoc.draft_revision, content })
+  expect(saved.status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${orderDoc.id}/publish`, { note: 'B12 order' })).status).toBe(200)
+  // A malformed order is refused.
+  const bad = await call('PUT', `/api/v1/storefront/builder/documents/${orderDoc.id}/draft`, { revision: saved.body.data.draft_revision, content: { ...content, device_order: { watch: { root: [] } } } })
+  expect(bad.status).toBe(422)
+
+  const topOf = async (tab: Page, name: string) => (await tab.getByRole('heading', { name }).boundingBox())!.y
+  await page.setViewportSize({ width: 1366, height: 900 })
+  await page.goto(`${base}/p/b12-order`)
+  await expect(page.getByRole('heading', { name: 'First on phones' })).toBeVisible({ timeout: 30_000 })
+  expect(await topOf(page, 'First for computers')).toBeLessThan(await topOf(page, 'First on phones'))
+  const phone = await browser.newContext({ viewport: { width: 375, height: 800 }, isMobile: true, hasTouch: true })
+  const phonePage = await phone.newPage()
+  await phonePage.goto(`${base}/p/b12-order`)
+  await expect(phonePage.getByRole('heading', { name: 'First on phones' })).toBeVisible({ timeout: 30_000 })
+  expect(await topOf(phonePage, 'First on phones')).toBeLessThan(await topOf(phonePage, 'First for computers'))
+  await phone.close()
+
+  // Copy one section into two pages' drafts at once; an unknown page fails on its own.
+  const a = await ensurePage('landing:b12-copy-a', 'B12 copy A')
+  const b = await ensurePage('landing:b12-copy-b', 'B12 copy B')
+  const promo = await section('Copied to many pages')
+  const copied = await call('POST', '/api/v1/storefront/builder/sections/copy', { section: promo, document_ids: [a.id, b.id, '00000000-0000-4000-8000-000000000000'], position: 'top' })
+  expect(copied.status).toBe(200)
+  expect(copied.body.data.results.map((r: { status: string }) => r.status)).toEqual(['copied', 'copied', 'failed'])
+  expect(copied.body.data.results[2].error.code).toBe('DOCUMENT_NOT_FOUND')
+  for (const id of [a.id, b.id]) {
+    const draft = await call('GET', `/api/v1/storefront/builder/documents/${id}`)
+    const top = draft.body.data.content.sections[0] as Node
+    expect(firstHeading(top)!.props!.text).toBe('Copied to many pages')
+    expect(top.id).not.toBe(promo.id)
+  }
+
+  // The builder: Ctrl+K adds a heading; Ctrl+click selects two headings and the group toolbar counts them.
+  await admin.goto(`${base}/admin/storefront/builder/${orderDoc.id}`)
+  const frame = admin.frameLocator('[data-testid="builder-canvas"]')
+  const computersHeading = frame.getByRole('heading', { name: 'First for computers' })
+  await expect(computersHeading).toBeVisible({ timeout: 60_000 })
+  const headings = frame.getByRole('heading')
+  const before = await headings.count()
+  await admin.keyboard.press('Control+k')
+  const box = admin.getByRole('combobox', { name: 'Find an element, a page or an action' })
+  await box.fill('Heading')
+  await expect(admin.getByRole('listbox', { name: 'Results' }).getByRole('option').first()).toBeVisible()
+  await box.press('Enter')
+  await expect(headings).toHaveCount(before + 1)
+  const clickCorner = async (locator: typeof computersHeading, modifiers?: ('Control' | 'Shift')[]) => {
+    const r = (await locator.boundingBox())!
+    await locator.click({ position: { x: Math.max(1, r.width - 6), y: Math.max(1, r.height - 4) }, modifiers })
+  }
+  await clickCorner(computersHeading)
+  await clickCorner(frame.getByRole('heading', { name: 'First on phones' }), ['Control'])
+  await expect(admin.getByTestId('selected-count')).toContainText('2')
+  await adminContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

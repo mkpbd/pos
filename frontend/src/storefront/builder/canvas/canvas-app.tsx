@@ -17,7 +17,7 @@ import { PopupFrame } from '../popups/popup-frame'
 import { motionTargets } from '../compile-styles'
 import { playMotion } from '../motion'
 import { NODE_ID } from '../registry'
-import type { BuilderPage, RenderColumn, RenderElement, RenderPageSection, RenderSection } from '../types'
+import type { BuilderPage, Device, RenderColumn, RenderElement, RenderPageSection, RenderSection } from '../types'
 import { normalizeStorePopupSettings } from '../validate'
 import {
   CANVAS_SURROUNDINGS,
@@ -464,7 +464,14 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     () =>
       frame
         ? // B9: unavailable global references ride along in `sections` (BuilderPage types them as sections).
-          { document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' }, sections: sections as RenderSection[], media: frame.media ?? {}, data: frame.data ?? {} }
+          {
+            document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' },
+            sections: sections as RenderSection[],
+            media: frame.media ?? {},
+            data: frame.data ?? {},
+            // B12: drawn in the editor's device order (PageRenderer `device`).
+            device_order: frame.device_order ?? null,
+          }
         : null,
     [frame, sections],
   )
@@ -542,7 +549,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     const onClick = (event: MouseEvent) => {
       if (isEditUi(event.target)) return
       swallow(event)
-      if (event.type === 'click') post({ type: 'click', id: idAt(event.target) })
+      // B12: the modifiers select several nodes (the swallowed mousedown keeps Shift from selecting text).
+      if (event.type === 'click') post({ type: 'click', id: idAt(event.target), ctrl: event.ctrlKey, shift: event.shiftKey, meta: event.metaKey })
     }
     const onDoubleClick = (event: MouseEvent) => {
       if (isEditUi(event.target)) return
@@ -661,6 +669,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     )
   }
 
+  // B12: the editor's device picks the section / element order (the canvas iframe's width may lag a device switch).
+  const device: Device = frame?.device === 'tablet' || frame?.device === 'mobile' ? frame.device : 'desktop'
   const emptyText = typeof frame?.emptyText === 'string' && frame.emptyText ? frame.emptyText : EMPTY_TEXT
   // The document being edited (not named `document`: the effects above use the global one).
   const drawn =
@@ -670,14 +680,14 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       </div>
     ) : surroundings === 'header' ? (
       <header data-canvas-part="header">
-        <PageRenderer page={page} placeholder={placeholder} />
+        <PageRenderer page={page} placeholder={placeholder} device={device} />
       </header>
     ) : surroundings === 'footer' ? (
       <footer data-canvas-part="footer">
-        <PageRenderer page={page} placeholder={placeholder} />
+        <PageRenderer page={page} placeholder={placeholder} device={device} />
       </footer>
     ) : (
-      <PageRenderer page={page} placeholder={placeholder} />
+      <PageRenderer page={page} placeholder={placeholder} device={device} />
     )
 
   return (
@@ -697,7 +707,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
               // B8b: the popup in its layout over a faded store page; nothing runs (no trigger, close or submit).
               <div className="relative min-h-screen" data-canvas-part="popup">
                 <PopupPageSample />
-                <PopupFrame id="canvas" settings={popupSettings} page={page} mode="canvas" />
+                <PopupFrame id="canvas" settings={popupSettings} page={page} mode="canvas" device={device} />
                 {page.sections.length === 0 && (
                   <p data-testid="canvas-empty" className="absolute inset-x-0 top-4 z-[70] mx-auto max-w-sm rounded bg-white/90 p-3 text-center text-sm text-neutral-600 shadow">
                     {emptyText}

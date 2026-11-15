@@ -3,7 +3,8 @@ import type { BuilderContent, BuilderNode, Column, DocumentContext, DocumentSect
 import type { ElementsMetadata } from './api'
 import { allowedIn } from './document-kind'
 import { globalFits, isGlobalRef, sectionNodes } from './global-sections'
-import { cloneWithFreshIds, collectIds, findNode, insertElement, insertSection, setNode, type DropTarget } from './tree'
+import { selectedNodes } from './selection'
+import { cloneWithFreshIds, collectIds, findNode, insertElement, insertSection, newSectionFor, setNode, type DropTarget } from './tree'
 
 /*
  * B9 copy & paste of sections, inner rows and elements across documents, and copy / paste style.
@@ -30,6 +31,13 @@ export type NodesClip = {
   node: DocumentSection | Element
   /** For a copied global section reference: the global's context (null: unknown). */
   global_context?: GlobalContext | null
+  /**
+   * B12: more copied nodes of the same kind, pasted after `node` in this order (a copy of several
+   * selected items). Older editors ignore it and paste `node` only.
+   */
+  more?: (DocumentSection | Element)[]
+  /** B12: the global contexts of copied global section references, by their ref. */
+  global_contexts?: Record<string, GlobalContext | null>
 }
 
 export type StyleClip = {
@@ -73,11 +81,20 @@ export function parseClip(text: string | null | undefined): Clip | null {
     const value = JSON.parse(text) as Partial<Clip>
     if (value?.marker !== CLIPBOARD_MARKER || value.v !== VERSION || typeof value.org !== 'string') return null
     if (value.kind === 'style') return typeof value.node_type === 'string' && value.style && typeof value.style === 'object' ? (value as StyleClip) : null
-    if ((value.kind === 'section' || value.kind === 'element') && value.node && typeof value.node === 'object' && typeof (value.node as { id?: unknown }).id === 'string') return value as NodesClip
+    if ((value.kind === 'section' || value.kind === 'element') && isNodeLike(value.node)) {
+      const clip = value as NodesClip
+      // A malformed list of more nodes is dropped (the first node still pastes).
+      if (clip.more !== undefined && !(Array.isArray(clip.more) && clip.more.every(isNodeLike))) return { ...clip, more: undefined }
+      return clip
+    }
     return null
   } catch {
     return null
   }
+}
+
+function isNodeLike(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string'
 }
 
 export function serializeClip(clip: Clip): string {
@@ -147,7 +164,8 @@ export type PasteTarget = {
   noun: string
 }
 
-export type PasteResult = { ok: true; content: BuilderContent; id: string } | { ok: false; message: string }
+/** `id`: the last pasted node; `ids` (B12): every pasted node, in order. */
+export type PasteResult = { ok: true; content: BuilderContent; id: string; ids: string[] } | { ok: false; message: string }
 
 export const CUSTOM_HTML_PASTE_DENIED = 'The copy holds custom HTML, and only people allowed to use custom HTML can add it.'
 
@@ -211,12 +229,13 @@ function elementTarget(content: BuilderContent, selection: string | null, type: 
   return last ? { kind: 'column', columnId: last.id, index: last.elements.length } : null
 }
 
-/** Pastes a clip into the open document (see the file comment). */
+/** Pastes a clip into the open document (see the file comment); B12: several nodes go in one after the other. */
 export function pasteClip(clip: NodesClip, target: PasteTarget): PasteResult {
   const { content, selection, context, registry, canCustomHtml, single, noun } = target
   if (clip.org !== target.org) return { ok: false, message: 'This was copied from another store. Copy it again from this store, then paste.' }
+  const nodes = [clip.node, ...(clip.more ?? [])]
 
-  const types = elementTypes(clip.node)
+  const types = nodes.flatMap(elementTypes)
   const refused = [...new Set(types.filter((type) => !allowedIn(registry?.types.find((t) => t.type === type) ?? { type }, context)))]
   if (refused.length > 0) return { ok: false, message: `This ${noun} can’t hold ${list(refused.map((type) => labelOf(type, registry)))}, so it wasn’t pasted.` }
   if (!canCustomHtml && types.includes('custom_html')) return { ok: false, message: CUSTOM_HTML_PASTE_DENIED }
@@ -224,22 +243,72 @@ export function pasteClip(clip: NodesClip, target: PasteTarget): PasteResult {
   const existing = collectIds(content)
   if (clip.kind === 'section') {
     if (single) return { ok: false, message: 'A global section holds just one section. Copy the elements you want and paste them here instead.' }
-    if (isGlobalRef(clip.node)) {
+    for (const node of nodes) {
+      if (!isGlobalRef(node)) continue
       if (context === 'popup') return { ok: false, message: 'Global sections can’t go in a popup.' }
-      if (clip.global_context && !globalFits(clip.global_context, context)) return { ok: false, message: `This global section is made for ${clip.global_context === 'page' ? 'pages' : `the ${clip.global_context}`}, so it can’t go in this ${noun}.` }
+      const global = clip.global_contexts?.[node.ref] ?? (node === clip.node ? clip.global_context : null)
+      if (global && !globalFits(global, context)) return { ok: false, message: `This global section is made for ${global === 'page' ? 'pages' : `the ${global}`}, so it can’t go in this ${noun}.` }
     }
-    const copy = cloneWithFreshIds(forContext(clip.node as Section, context), existing)
-    const next = insertSection(content, copy, sectionIndexAfter(content, selection))
-    if (next === content) return { ok: false, message: `There’s no room for another section on this ${noun}.` }
-    return { ok: true, content: next, id: copy.id }
+    const copies = nodes.map((node) => cloneWithFreshIds(forContext(node as Section, context), existing))
+    const at = sectionIndexAfter(content, selection)
+    let next = content
+    for (const [i, copy] of copies.entries()) {
+      const inserted = insertSection(next, copy, at + i)
+      if (inserted === next) return { ok: false, message: `There’s no room for ${copies.length === 1 ? 'another section' : `${copies.length} more sections`} on this ${noun}.` }
+      next = inserted
+    }
+    return { ok: true, content: next, id: copies[copies.length - 1]!.id, ids: copies.map((c) => c.id) }
   }
 
-  const element = cloneWithFreshIds(forContext(clip.node as Element, context), existing)
-  const where = elementTarget(content, selection, element.type, single)
+  const elements = nodes.map((node) => cloneWithFreshIds(forContext(node as Element, context), existing))
+  const where = elementTarget(content, selection, elements[0]!.type, single)
   if (!where) return { ok: false, message: 'Select where it should go first.' }
-  const next = insertElement(content, element, where, existing)
-  if (next === content) return { ok: false, message: 'There’s no room for it there. Select another column or section and paste again.' }
-  return { ok: true, content: next, id: element.id }
+  const noRoom: PasteResult = { ok: false, message: 'There’s no room for it there. Select another column or section and paste again.' }
+  let next = content
+  if (where.kind === 'new-section' && elements.length > 1) {
+    const section = newSectionFor(elements[0]!, existing)
+    section.columns = [{ ...section.columns[0]!, elements }]
+    next = insertSection(content, section, where.index)
+    if (next === content) return noRoom
+  } else {
+    for (const [i, element] of elements.entries()) {
+      const inserted = insertElement(next, element, where.kind === 'column' ? { ...where, index: where.index + i } : where, existing)
+      if (inserted === next) return noRoom
+      next = inserted
+    }
+  }
+  return { ok: true, content: next, id: elements[elements.length - 1]!.id, ids: elements.map((e) => e.id) }
+}
+
+/**
+ * B12: the clip of several selected items (document order; nested ones go with their parent;
+ * columns are skipped). Elements copied together with sections become sections of their own, so
+ * everything pastes as sections. Null when nothing can be copied.
+ */
+export function copyNodes(content: BuilderContent, ids: readonly string[], org: string, globalContext?: (ref: string) => GlobalContext | null): NodesClip | null {
+  const nodes = selectedNodes(content, ids).filter((n) => n.kind !== 'column')
+  if (nodes.length === 0) return null
+  if (nodes.length === 1) return copyNode(content, nodes[0]!.node.id, org, globalContext)
+  const mixed = nodes.some((n) => n.kind === 'section') && nodes.some((n) => n.kind === 'element')
+  const scratch = collectIds(content)
+  const copied = nodes.map((n) => {
+    const node = structuredClone(n.node) as DocumentSection | Element
+    return mixed && n.kind === 'element' ? newSectionFor(node as Element, scratch) : node
+  })
+  const kind = mixed || nodes[0]!.kind === 'section' ? 'section' : 'element'
+  const clip: NodesClip = { marker: CLIPBOARD_MARKER, v: VERSION, org, kind, node: copied[0]!, more: copied.slice(1) }
+  const refs = copied.filter(isGlobalRef)
+  if (refs.length > 0) {
+    const first = copied[0]
+    if (isGlobalRef(first)) clip.global_context = globalContext?.(first.ref) ?? null
+    clip.global_contexts = Object.fromEntries(refs.map((ref) => [ref.ref, globalContext?.(ref.ref) ?? null]))
+  }
+  return clip
+}
+
+/** How many nodes a clip holds. */
+export function clipSize(clip: NodesClip): number {
+  return 1 + (clip.more?.length ?? 0)
 }
 
 /* ----------------------------------------------------------------------------------------------

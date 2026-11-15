@@ -65,7 +65,7 @@ describe('canvas frame (editor side)', () => {
     expect(handle.current!.rects()).toEqual({ e_heading: { x: 10, y: 50, w: 300, h: 40 } })
 
     fromCanvas({ type: 'click', id: 'e_heading' })
-    expect(onSelect).toHaveBeenCalledWith('e_heading')
+    expect(onSelect).toHaveBeenCalledWith('e_heading', { toggle: false, range: false })
     fromCanvas({ type: 'hover', id: 'e_text' })
     expect(onHover).toHaveBeenCalledWith('e_text')
     fromCanvas({ type: 'key', key: 'z', ctrl: true, shift: false, meta: false })
@@ -74,6 +74,13 @@ describe('canvas frame (editor side)', () => {
     fromCanvas({ type: 'click', id: 'e_text' }, { origin: 'https://evil.test' })
     fromCanvas({ type: 'click', id: 'e_text' }, { source: window })
     expect(onSelect).toHaveBeenCalledTimes(1)
+
+    // B12: Ctrl/Cmd+click adds or takes out, Shift+click adds a range.
+    fromCanvas({ type: 'click', id: 'e_text', meta: true })
+    expect(onSelect).toHaveBeenLastCalledWith('e_text', { toggle: true, range: false })
+    fromCanvas({ type: 'click', id: 'e_text', shift: true, ctrl: false })
+    expect(onSelect).toHaveBeenLastCalledWith('e_text', { toggle: false, range: true })
+    onSelect.mockClear()
 
     // With the rects known, the selected node gets its toolbar.
     view.rerender(<CanvasFrame {...props} selection="e_heading" />)

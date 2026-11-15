@@ -54,7 +54,7 @@ const BANNER: Record<Device, string> = {
   mobile: 'Changes apply to phones only. Desktop and tablet values show through until you change them.',
 }
 
-function DeviceBanner({ device, onDevice }: { device: Device; onDevice?: (device: Device) => void }) {
+export function DeviceBanner({ device, onDevice }: { device: Device; onDevice?: (device: Device) => void }) {
   const Icon = DEVICES.find((d) => d.device === device)!.Icon
   return (
     <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 p-3" data-testid="style-device-banner">
@@ -84,7 +84,7 @@ function DeviceBanner({ device, onDevice }: { device: Device; onDevice?: (device
   )
 }
 
-function StyleGroup({ id, title, open, setHere, children }: { id: GroupId; title: string; open: boolean; setHere: boolean; children: ReactNode }) {
+export function StyleGroup({ id, title, open, setHere, children }: { id: GroupId; title: string; open: boolean; setHere: boolean; children: ReactNode }) {
   const [expanded, setExpanded] = useState(open)
   const tip = GROUP_TIPS[id]
   return (
@@ -421,7 +421,7 @@ const TYPOGRAPHY_LABELS: Record<TypographyKey, string> = {
 
 const BORDER_LABELS: Record<BorderKey, string> = { width: 'Line width', style: 'Line', color: 'Line colour', radius: 'Rounded corners' }
 
-function OpacityControl({ value, onChange, status }: { value: number | undefined; onChange: (v: number) => void; status: ReactNode }) {
+export function OpacityControl({ value, onChange, status }: { value: number | undefined; onChange: (v: number) => void; status: ReactNode }) {
   return (
     <SliderControl
       label="Opacity"

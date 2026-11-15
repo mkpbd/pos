@@ -469,3 +469,21 @@ Original questions:
 - **Five new looks:** presets fashion, electronics, grocery (Bangla fonts), beauty, furniture — existing T1 layout options only;
   demo stores with 12 products and exactly 10 photos each (reused for banners, tiles, blog covers; ≈ 4.4 MB total); site templates
   with Bangla; 40 section templates without thumbnails (the template browser draws a sketch with name and category).
+
+### As built — B12 faster building (2026-11-15)
+
+- **Selection:** `selection` stays the primary item; `selectedIds` holds the group (pick order). Ctrl/Cmd toggles, Shift selects
+  siblings in the displayed (device) order; group actions (move as a block, duplicate, delete, hide, copy/paste style, wrap) are each
+  one undo step and need siblings where it matters (else disabled with the reason). The inspector's **Common style** shows only
+  the style parts every selected item supports, "Mixed" values, and writes to all for the current device; **Line up** (align text,
+  place blocks via auto margins, equal spacing, same width) lives there too.
+- **Command box (Ctrl/Cmd+K)**, shortcut sheet (`?`), undo history persisted per document and draft revision (reset with a note when
+  the page changed elsewhere). The canvas forwards modifier clicks and the two shortcuts (not during a text edit).
+- **Snapping:** spacing grips snap to neighbours' values and common steps (dashed guide + badge), column handles to row shares and
+  other columns; Alt turns it off. `setSpacing` / `resizeColumns` only clamp — the handles snap.
+- **Device order:** `device_order` per device for the page root and columns (not columns themselves), normalized on the server
+  (`DeviceOrder`), rendered as real DOM order (`orderedChildren`, `useViewportDevice`; canvas by its device prop). Editor:
+  `device-order-edit.ts` mirrors the server rules; Layers, arrow keys and Move up/down follow the device order in tablet/phone view;
+  drag within a container there changes only that device; "Same as computer" (or "Same as tablet" for phones) deletes the entry.
+- **Copy to other pages:** `CopyBuilderSection` copies into each target draft in its own transaction (new ids, context
+  validation, never publishes); the open document is left out of the picker (its revision would change under the editor).

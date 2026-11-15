@@ -4,7 +4,7 @@ import { XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLocale } from '../../i18n/locale'
 import { PageRenderer } from '../page-renderer'
-import type { BuilderPage, StorePopupSettings } from '../types'
+import type { BuilderPage, Device, StorePopupSettings } from '../types'
 import { PopupActionsCtx, type PopupActions } from './popup-context'
 import { isModalLayout, popupScope } from './rules'
 
@@ -101,9 +101,11 @@ type Props = {
   /** Live only. */
   onClose?: (reason: PopupCloseReason) => void
   onActed?: () => void
+  /** B12: the device whose order is drawn (the canvas: the editor's device; live: the viewport's). */
+  device?: Device
 }
 
-export function PopupFrame({ id, settings, page, mode = 'live', onClose, onActed }: Props) {
+export function PopupFrame({ id, settings, page, mode = 'live', onClose, onActed, device }: Props) {
   const { t } = useLocale()
   const live = mode === 'live'
   const layout = settings.layout
@@ -213,7 +215,7 @@ export function PopupFrame({ id, settings, page, mode = 'live', onClose, onActed
   const content = (
     <div ref={contentRef} className="min-w-0 flex-1">
       <PopupActionsCtx.Provider value={actions}>
-        <PageRenderer page={page} scope={popupScope(id)} testId="builder-popup-content" className="b-popup-content" />
+        <PageRenderer page={page} scope={popupScope(id)} testId="builder-popup-content" className="b-popup-content" device={device} />
       </PopupActionsCtx.Provider>
     </div>
   )

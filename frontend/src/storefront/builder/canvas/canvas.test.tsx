@@ -51,6 +51,12 @@ describe('builder canvas protocol', () => {
     expect(isEditorShortcut({ key: 'V', ctrlKey: false, metaKey: true })).toBe(true)
     expect(isEditorShortcut({ key: 'a', ctrlKey: true, metaKey: false })).toBe(false)
     expect(isEditorShortcut({ key: 'c', ctrlKey: false, metaKey: false })).toBe(false)
+    // B12: Ctrl/Cmd+K opens the command box, `?` the shortcut sheet; a plain k stays in the canvas.
+    expect(isEditorShortcut({ key: 'k', ctrlKey: true, metaKey: false })).toBe(true)
+    expect(isEditorShortcut({ key: 'K', ctrlKey: false, metaKey: true })).toBe(true)
+    expect(isEditorShortcut({ key: 'k', ctrlKey: false, metaKey: false })).toBe(false)
+    expect(isEditorShortcut({ key: '?', ctrlKey: false, metaKey: false })).toBe(true)
+    expect(isEditorShortcut({ key: '?', ctrlKey: true, metaKey: false })).toBe(false)
   })
 
   it('cleans unsaved rich text before drawing it', () => {
@@ -116,6 +122,48 @@ describe('builder canvas app', () => {
     // Editor shortcuts typed inside the canvas go to the editor.
     fireEvent.keyDown(document.body, { key: 'z', ctrlKey: true })
     expect(posted.at(-1)).toMatchObject({ type: 'key', key: 'z', ctrl: true })
+  })
+
+  it('B12: clicks carry the modifier keys for multi-select; Shift never starts a text selection; Ctrl+K and ? reach the editor', async () => {
+    const { posted, send } = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    send(frame())
+    const heading = await screen.findByRole('heading', { name: 'Made fresh every morning' })
+
+    heading.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(posted.at(-1)).toEqual(expect.objectContaining({ type: 'click', id: 'e_heading', ctrl: false, shift: false, meta: false }))
+    heading.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))
+    expect(posted.at(-1)).toMatchObject({ type: 'click', id: 'e_heading', ctrl: true, shift: false })
+    heading.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, metaKey: true }))
+    expect(posted.at(-1)).toMatchObject({ type: 'click', id: 'e_heading', meta: true })
+
+    // Shift+click: the mouse down is swallowed (no text selection), the click selects a range.
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true, shiftKey: true })
+    heading.dispatchEvent(down)
+    expect(down.defaultPrevented).toBe(true)
+    heading.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }))
+    expect(posted.at(-1)).toMatchObject({ type: 'click', id: 'e_heading', shift: true })
+
+    const ctrlK = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })
+    document.body.dispatchEvent(ctrlK)
+    expect(ctrlK.defaultPrevented).toBe(true)
+    expect(posted.at(-1)).toMatchObject({ type: 'key', key: 'k', ctrl: true })
+    fireEvent.keyDown(document.body, { key: '?', shiftKey: true })
+    expect(posted.at(-1)).toMatchObject({ type: 'key', key: '?', shift: true })
+  })
+
+  it('B12: draws the sections in the editor device’s order (DOM order), base order on desktop', async () => {
+    const { send } = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    const ids = page.sections.map((section) => section.id)
+    expect(ids.length).toBeGreaterThan(1)
+    const reversed = [...ids].reverse()
+    const drawn = () => Array.from(document.querySelectorAll<HTMLElement>('.b-page section.b-section')).map((el) => el.dataset.b)
+    send(frame({ device: 'mobile', device_order: { tablet: { root: reversed } } }))
+    await screen.findByRole('heading', { name: 'Made fresh every morning' })
+    expect(drawn()).toEqual(reversed)
+    send(frame({ device: 'desktop', device_order: { tablet: { root: reversed } } }))
+    expect(drawn()).toEqual(ids)
   })
 
   it('B6: replays a node’s entrance animation when the editor asks (valid ids only)', async () => {

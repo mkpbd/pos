@@ -17,6 +17,8 @@ namespace App\Modules\Storefront\Domain\Builder;
  *   `popup` settings) are one entry with `node_id` null and `type` `document`.
  * - `moved`: ids of nodes on both sides whose parent changed or whose order among the siblings
  *   both sides share changed (the fewest such nodes).
+ * - B12 `device_moved`: `[{id, device: tablet|mobile}]` — nodes out of order on that device
+ *   (deviceMoved()); `device_order` is not a page-level change.
  */
 final class BuilderDiff
 {
@@ -36,7 +38,7 @@ final class BuilderDiff
     /**
      * @param  array<string, mixed>  $from
      * @param  array<string, mixed>  $to
-     * @return array{added: list<array<string, mixed>>, removed: list<array<string, mixed>>, changed: list<array<string, mixed>>, moved: list<string>}
+     * @return array{added: list<array<string, mixed>>, removed: list<array<string, mixed>>, changed: list<array<string, mixed>>, moved: list<string>, device_moved: list<array{id: string, device: string}>}
      */
     public static function compare(array $from, array $to): array
     {
@@ -71,7 +73,68 @@ final class BuilderDiff
             }
         }
 
-        return ['added' => $added, 'removed' => $removed, 'changed' => $changed, 'moved' => self::moved($before, $after)];
+        return [
+            'added' => $added,
+            'removed' => $removed,
+            'changed' => $changed,
+            'moved' => self::moved($before, $after),
+            'device_moved' => self::deviceMoved($from, $to, $after),
+        ];
+    }
+
+    /**
+     * B12: nodes out of order on a tablet or phone — in a container both sides have, among the
+     * children both sides share, by the effective order on that device; only where the device has
+     * an order of its own on either side (a phone that follows the tablet is not listed again).
+     *
+     * @param  array<string, mixed>  $from
+     * @param  array<string, mixed>  $to
+     * @param  array<string, mixed>  $after  the "after" index (document order)
+     * @return list<array{id: string, device: string}>
+     */
+    private static function deviceMoved(array $from, array $to, array $after): array
+    {
+        $listsBefore = DeviceOrder::lists($from['device_order'] ?? null);
+        $listsAfter = DeviceOrder::lists($to['device_order'] ?? null);
+        if ($listsBefore === [] && $listsAfter === []) {
+            return [];
+        }
+        $containersBefore = DeviceOrder::containers($from);
+        $containersAfter = DeviceOrder::containers($to);
+
+        $moved = [];
+        foreach (DeviceOrder::DEVICES as $device) {
+            foreach ($containersAfter as $container => $children) {
+                if (! isset($containersBefore[$container]) || (! isset($listsBefore[$device][$container]) && ! isset($listsAfter[$device][$container]))) {
+                    continue;
+                }
+                $old = DeviceOrder::fit(DeviceOrder::own($listsBefore, $device, $container) ?? [], $containersBefore[$container]);
+                $new = DeviceOrder::fit(DeviceOrder::own($listsAfter, $device, $container) ?? [], $children);
+                $shared = array_flip(array_intersect($old, $new));
+                $old = array_values(array_filter($old, fn (string $id) => isset($shared[$id])));
+                $new = array_values(array_filter($new, fn (string $id) => isset($shared[$id])));
+                if ($old === $new) {
+                    continue;
+                }
+                $kept = array_flip(self::lcs($old, $new));
+                foreach ($new as $id) {
+                    if (! isset($kept[$id])) {
+                        $moved[$id][$device] = true;
+                    }
+                }
+            }
+        }
+
+        $result = [];
+        foreach (array_map('strval', array_keys($after)) as $id) {
+            foreach (DeviceOrder::DEVICES as $device) {
+                if (isset($moved[$id][$device])) {
+                    $result[] = ['id' => $id, 'device' => $device];
+                }
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -165,7 +228,8 @@ final class BuilderDiff
      */
     private static function documentValues(array $document): array
     {
-        return array_diff_key($document, array_flip(['sections', 'schema_version']));
+        // B12: the order on tablets and phones is reported as `device_moved`.
+        return array_diff_key($document, array_flip(['sections', 'schema_version', 'device_order']));
     }
 
     /**

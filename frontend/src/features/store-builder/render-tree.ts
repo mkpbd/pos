@@ -69,13 +69,18 @@ export function scheduleState(schedule: Schedule, now: number): NodeState | null
 export type RenderTreeOptions = {
   locale: string
   now: number
-  /** A hidden node drawn anyway (the selection). */
-  reveal?: string | null
+  /** Hidden nodes drawn anyway (the selection; B12: every selected node). */
+  reveal?: string | readonly string[] | null
+}
+
+function revealed(id: string, reveal: RenderTreeOptions['reveal']): boolean {
+  if (!reveal) return false
+  return typeof reveal === 'string' ? reveal === id : reveal.includes(id)
 }
 
 function renderNode(node: AnyNode, options: RenderTreeOptions): Record<string, unknown> | null {
   const state: NodeState | null = node.hidden ? 'hidden' : scheduleState(node.schedule, options.now)
-  if (state === 'hidden' && node.id !== options.reveal) return null
+  if (state === 'hidden' && !revealed(node.id, options.reveal)) return null
   const { translations: _translations, ...rest } = node
   const out: Record<string, unknown> = { ...rest, props: translated(node, options.locale) }
   if (state) out.state = state

@@ -16,6 +16,8 @@ export type ChangeItem = {
   title: string
   /** One line per changed field. */
   details: string[]
+  /** B12: the badge text when it isn't the kind's own ("Moved on phones"). */
+  badge?: string
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -113,6 +115,19 @@ export function changeItems(result: CompareResult, typeLabel: (type: string) => 
     const id = typeof node === 'string' ? node : node.node_id
     const known = typeof node === 'string' ? lookup(node) : node
     items.push({ key: `m:${id}`, kind: 'moved', nodeId: id, title: known ? nodeTitle(known, typeLabel) : 'A part of the page', details: [] })
+  }
+  // B12: the order on phones or tablets changed.
+  for (const entry of result.device_moved ?? []) {
+    const root = entry.id === 'root'
+    const known = root ? null : lookup(entry.id)
+    items.push({
+      key: `d:${entry.device}:${entry.id}`,
+      kind: 'moved',
+      badge: entry.device === 'mobile' ? 'Moved on phones' : 'Moved on tablets',
+      nodeId: root ? null : entry.id,
+      title: root ? 'The order of the sections' : `The order inside ${known ? nodeTitle(known, typeLabel).toLowerCase() : 'a column'}`,
+      details: [],
+    })
   }
   return items
 }

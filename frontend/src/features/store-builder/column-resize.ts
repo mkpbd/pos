@@ -57,8 +57,12 @@ function rowOfColumn(content: BuilderContent, columnId: string): { row: Row; ind
   return { row: row as Row, index: info.index }
 }
 
-/** Moves the divider after column `index` of row `rowId` at a breakpoint (see resizePair). */
-export function resizeColumns(content: BuilderContent, rowId: string, index: number, left: number, breakpoint: Breakpoint, step = SNAP): BuilderContent {
+/**
+ * Moves the divider after column `index` of row `rowId` at a breakpoint (see resizePair). B12: the
+ * canvas handles snap `left` themselves (guides, 5 % steps, Alt = free; see snapping.ts), so by
+ * default the value is only bounded and rounded (`step` 0).
+ */
+export function resizeColumns(content: BuilderContent, rowId: string, index: number, left: number, breakpoint: Breakpoint, step = 0): BuilderContent {
   const row = findNode(content, rowId)?.node
   if (!row || (row.type !== 'section' && row.type !== 'inner_row')) return content
   const columns = (row as Row).columns as Column[]

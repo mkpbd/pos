@@ -75,7 +75,7 @@ export function globalSection(detail: Pick<DocumentDetail, 'content'>): Section 
 
 export function entryFromDetail(detail: DocumentDetail): GlobalEntry {
   const section = globalSection(detail)
-  return { id: detail.id, title: detail.title, context: (detail.context ?? 'page') as GlobalContext, section, state: section ? 'ready' : 'missing' }
+  return { id: detail.id, title: detail.title, context: (detail.context ?? 'page') as GlobalContext, section, state: section ? 'ready' : 'missing', device_order: detail.content.device_order ?? null }
 }
 
 /**

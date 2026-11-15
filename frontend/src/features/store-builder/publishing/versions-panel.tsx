@@ -427,7 +427,7 @@ function CompareDialog({ documentId, entries, liveVersionId, initial, support, c
   })
   const changesState: ChangesState =
     left === right
-      ? { status: 'ready', result: { added: [], removed: [], changed: [], moved: [] } }
+      ? { status: 'ready', result: { added: [], removed: [], changed: [], moved: [], device_moved: [] } }
       : changes.isPending
         ? { status: 'loading' }
         : changes.error

@@ -2,7 +2,7 @@ import { ELEMENT_REGISTRY } from '@/storefront/builder/registry'
 import { cloneSample } from '@/storefront/builder/test-payload'
 import type { BuilderContent, Element, Section } from '@/storefront/builder/types'
 import { checkDocument } from './check'
-import { clearClipboardMemory, CLIPBOARD_MARKER, copyNode, copyStyle, parseClip, pasteClip, pasteStyle, readNodesClip, readStyleClip, rememberClip, serializeClip, stylesCompatible, type PasteTarget } from './clipboard'
+import { clearClipboardMemory, clipSize, CLIPBOARD_MARKER, copyNode, copyNodes, copyStyle, parseClip, pasteClip, pasteStyle, readNodesClip, readStyleClip, rememberClip, serializeClip, stylesCompatible, type PasteTarget } from './clipboard'
 import { makeGlobal } from './global-sections'
 import { createEditorStore } from './store'
 import { detail } from './test-helpers'
@@ -156,5 +156,44 @@ describe('copy style / paste style', () => {
     expect(text.props).toEqual((findNode(content, 'e_text')!.node as Element).props)
     store.getState().undo()
     expect((findNode(store.getState().content, 'e_text')!.node as Element).style).toEqual((findNode(content, 'e_text')!.node as Element).style)
+  })
+})
+
+describe('B12 copy & paste of several items', () => {
+  it('copies several elements and pastes them in order after the selection (one edit)', () => {
+    const source = cloneSample()
+    const clip = copyNodes(source, ['e_button', 'e_heading'], ORG)!
+    expect(clip.kind).toBe('element')
+    expect(clipSize(clip)).toBe(2)
+    expect(clip.node.id).toBe('e_heading')
+    // Through the clipboard text and back.
+    const parsed = parseClip(serializeClip(clip)) as typeof clip
+    const result = pasteClip(parsed, target(source, { selection: 'e_image' }))
+    if (!result.ok) throw new Error(result.message)
+    expect(result.ids).toHaveLength(2)
+    const column = findNode(result.content, 'c_story_media')!.node as { elements: { id: string; type: string }[] }
+    expect(column.elements.map((e) => e.type)).toEqual(['image', 'heading', 'button'])
+    expect(checkDocument(result.content)).toEqual([])
+  })
+
+  it('elements copied with sections become sections of their own; nested ones go with their parent', () => {
+    const source = cloneSample()
+    const clip = copyNodes(source, ['s_hero', 'e_image', 's_story', 'e_heading'], ORG)!
+    expect(clip.kind).toBe('section')
+    // s_hero, s_story (with e_heading inside) — e_image is inside s_story too.
+    expect(clipSize(clip)).toBe(2)
+    const mixed = copyNodes(source, ['s_hero', 'e_feat_a'], ORG)!
+    expect(clipSize(mixed)).toBe(2)
+    expect(mixed.more![0]!.type).toBe('section')
+    const result = pasteClip(mixed, target(empty()))
+    if (!result.ok) throw new Error(result.message)
+    expect(result.content.sections).toHaveLength(2)
+    expect(checkDocument(result.content)).toEqual([])
+  })
+
+  it('a malformed list of more nodes is ignored (the first node still pastes)', () => {
+    const clip = copyNode(cloneSample(), 'e_heading', ORG)!
+    const parsed = parseClip(JSON.stringify({ ...clip, more: ['nope'] }))
+    expect(parsed && parsed.kind !== 'style' ? parsed.more : 'x').toBeUndefined()
   })
 })

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { envelope, readCanvasMessage, type CanvasMessage, type CanvasProduct, type CanvasSurroundings, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
-import type { BuilderData, BuilderMedia, Device, PopupSettings, RenderSection } from '@/storefront/builder/types'
+import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderSection } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { FontSource } from '@/storefront/fonts'
@@ -10,6 +10,7 @@ import { ColumnHandles, type ResizePhase, type ResizeRow } from './column-handle
 import { toolbarPosition } from './toolbar-position'
 import type { DropIndicator } from './drop-targets'
 import { SpacingHandles, type SpacingPhase, type SpacingValues } from './spacing-handles'
+import type { SpacingGuide } from './snapping'
 import type { SpacingBox, SpacingSide } from './spacing-drag'
 
 /*
@@ -52,7 +53,12 @@ export type SpacingTarget = {
   deviceLabel: string
   values: SpacingValues
   onChange: (box: SpacingBox, side: SpacingSide, px: number, phase: SpacingPhase) => void
+  /** B12: neighbours' values the handles snap to. */
+  guides?: SpacingGuide[]
 }
+
+/** B12: how a canvas click picks: Ctrl/Cmd adds or removes the item, Shift adds a range. */
+export type SelectGesture = { toggle: boolean; range: boolean }
 
 /** B10: an upload running for a node (0–1; null while the size isn't known yet). */
 export type NodeUpload = { progress: number | null; name: string }
@@ -65,12 +71,14 @@ export type CanvasFrameProps = {
   media: Record<string, BuilderMedia>
   pending: string[]
   selection: string | null
+  /** B12: every selected id (several: each gets an outline, the toolbar spans them all). */
+  selectedIds?: string[]
   hover: string | null
   errorIds: string[]
   device: Device
   dragging: boolean
   indicator: DropIndicator | null
-  onSelect: (id: string | null) => void
+  onSelect: (id: string | null, gesture?: SelectGesture) => void
   onHover: (id: string | null) => void
   onKey: (key: { key: string; ctrl: boolean; shift: boolean; meta: boolean }) => void
   /** The selected node's floating toolbar, placed above its rect. */
@@ -98,10 +106,12 @@ export type CanvasFrameProps = {
   spacing?: SpacingTarget | null
   /** B10: uploads per node id, drawn as progress over the node. */
   uploads?: Record<string, NodeUpload>
+  /** B12: the draft's phone / tablet order (globals merged), drawn in Tablet and Mobile view. */
+  deviceOrder?: DeviceOrder | null
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -180,7 +190,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
           // B10: not the canvas itself — that would end a text edit the canvas has just started (the
           // double-click's second click arrives after the edit took focus).
           if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body && document.activeElement !== frameRef.current) document.activeElement.blur()
-          callbacks.current.onSelect(message.id)
+          callbacks.current.onSelect(message.id, { toggle: message.ctrl === true || message.meta === true, range: message.shift === true })
           break
         case 'hover':
           callbacks.current.onHover(message.id)
@@ -220,9 +230,10 @@ export function CanvasFrame(props: CanvasFrameProps) {
         ...(emptyText ? { emptyText } : {}),
         ...(popup ? { popup } : {}),
         ...(product ? { product } : {}),
+        ...(deviceOrder ? { device_order: deviceOrder } : {}),
       })
     }
-  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, product, send, renderTick])
+  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, product, deviceOrder, send, renderTick])
 
   useEffect(() => {
     const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
@@ -283,8 +294,11 @@ export function CanvasFrame(props: CanvasFrameProps) {
   )
 
   const scaled = (r: Rect) => ({ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: r.h * scale })
-  const selected = selection ? rects[selection] : undefined
-  const hovered = hover && hover !== selection ? rects[hover] : undefined
+  // B12: several selected — the others get outlines here (the canvas outlines the primary) and the toolbar spans them all.
+  const others = (selectedIds ?? []).filter((id) => id !== selection)
+  const group = others.length > 0 ? unionRect([selection, ...others].map((id) => (id ? rects[id] : undefined))) : undefined
+  const selected = group ?? (selection ? rects[selection] : undefined)
+  const hovered = hover && hover !== selection && !others.includes(hover) ? rects[hover] : undefined
   const editingNow = editing !== null
   const spacingRect = spacing ? rects[spacing.nodeId] : undefined
 
@@ -310,6 +324,11 @@ export function CanvasFrame(props: CanvasFrameProps) {
               {hoverLabel(hover)}
             </span>
           )}
+          {!dragging &&
+            others.map((id) => {
+              const r = rects[id]
+              return r && r.h > 0 ? <div key={id} data-testid="multi-outline" className="absolute rounded-[2px] outline-2 -outline-offset-2 outline-blue-600" style={scaled(r)} /> : null
+            })}
           {!dragging && !editingNow && selected && selected.h > 0 && (
             <div ref={toolbarRef} className="pointer-events-auto absolute" style={toolbarPosition(selected, scale, { w: width * scale, h: frameHeight * scale }, toolbarWidth)}>
               {toolbar(selected)}
@@ -317,7 +336,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
           )}
           {!dragging && !editingNow && resizeRow && onResize && <ColumnHandles row={resizeRow} rects={rects} scale={scale} onResize={onResize} />}
           {!dragging && !editingNow && spacing && spacingRect && (
-            <SpacingHandles nodeId={spacing.nodeId} nodeLabel={spacing.label} rect={spacingRect} scale={scale} values={spacing.values} deviceLabel={spacing.deviceLabel} onChange={spacing.onChange} />
+            <SpacingHandles nodeId={spacing.nodeId} nodeLabel={spacing.label} rect={spacingRect} scale={scale} values={spacing.values} deviceLabel={spacing.deviceLabel} onChange={spacing.onChange} guides={spacing.guides} />
           )}
           {Object.entries(uploads ?? {}).map(([id, upload]) => {
             const r = rects[id]
@@ -352,4 +371,15 @@ export function CanvasFrame(props: CanvasFrameProps) {
       </div>
     </div>
   )
+}
+
+/** The box around several rects (the ones drawn); undefined when none is. */
+function unionRect(list: (Rect | undefined)[]): Rect | undefined {
+  const drawn = list.filter((r): r is Rect => r !== undefined && r.h > 0)
+  if (drawn.length === 0) return undefined
+  const x = Math.min(...drawn.map((r) => r.x))
+  const y = Math.min(...drawn.map((r) => r.y))
+  const right = Math.max(...drawn.map((r) => r.x + r.w))
+  const bottom = Math.max(...drawn.map((r) => r.y + r.h))
+  return { x, y, w: right - x, h: bottom - y }
 }

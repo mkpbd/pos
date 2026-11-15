@@ -129,7 +129,9 @@ class StoreBuilderPopupsTest extends TestCase
         $this->assertSame(1, $popup['version']);
         $this->assertSame(['layout', 'position', 'width', 'overlay', 'close_on_overlay', 'label', 'trigger', 'frequency', 'stop_after_action', 'pages', 'devices', 'audience', 'priority'], array_keys($popup['settings']));
         $this->assertSame(['slide_in', 'Weekend', ['kind' => 'on_scroll', 'delay_seconds' => 5, 'scroll_percent' => 40]], [$popup['settings']['layout'], $popup['settings']['label'], $popup['settings']['trigger']]);
-        $this->assertSame(['sections', 'media', 'data'], array_keys($popup['payload']));
+        // B12: `device_order` (null: the base order on every device).
+        $this->assertSame(['sections', 'device_order', 'media', 'data'], array_keys($popup['payload']));
+        $this->assertNull($popup['payload']['device_order']);
         $this->assertSame('Hello', $popup['payload']['sections'][0]['columns'][0]['elements'][0]['props']['text']);
         $this->assertSame('dismiss', $popup['payload']['sections'][0]['columns'][0]['elements'][1]['props']['action']);
         $this->assertStringNotContainsString('"translations"', (string) $response->getContent());

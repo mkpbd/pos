@@ -116,11 +116,11 @@ export function ChangeList({ changes, typeLabel, lookup, shown, onShow }: { chan
               <li key={item.key} className={cn('flex flex-col gap-1 px-3 py-2', active && 'bg-primary/8')} data-testid={`change-${item.kind}`}>
                 <div className="flex items-start gap-2">
                   <Badge variant={KIND_BADGE[item.kind]} className="mt-0.5">
-                    <Icon aria-hidden /> {CHANGE_KIND_LABEL[item.kind]}
+                    <Icon aria-hidden /> {item.badge ?? CHANGE_KIND_LABEL[item.kind]}
                   </Badge>
                   <span className="min-w-0 flex-1 text-sm font-medium break-words">{item.title}</span>
                   {onShow && item.nodeId && (
-                    <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 px-2" aria-pressed={active} aria-label={`Show ${CHANGE_KIND_LABEL[item.kind].toLowerCase()}: ${item.title}`} onClick={() => onShow(item)}>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 px-2" aria-pressed={active} aria-label={`Show ${(item.badge ?? CHANGE_KIND_LABEL[item.kind]).toLowerCase()}: ${item.title}`} onClick={() => onShow(item)}>
                       <EyeIcon aria-hidden /> Show
                     </Button>
                   )}

@@ -111,8 +111,10 @@ class BuilderPublishingController
      * `from`, `to`: `draft`, `live` or a version / checkpoint id of the document (default `live`
      * → `draft`). → `{from: {kind, id, number, name}, to: {…}, added: [{id, type, kind, parent_id,
      * label}], removed: […], changed: [{node_id, type, fields: [{field, before, after}]}], moved:
-     * [node id]}` — a changed style is the field `style` with null values; page settings changes
-     * have `node_id` null and `type` `document`. 404 VERSION_NOT_FOUND.
+     * [node id], device_moved: [{id, device: tablet|mobile}]}` — a changed style is the field
+     * `style` with null values; page settings changes have `node_id` null and `type` `document`;
+     * B12: `device_moved` lists nodes moved in a tablet / phone order of their own. 404
+     * VERSION_NOT_FOUND.
      */
     public function compare(Request $request, BuilderDocument $document, BuilderSnapshots $snapshots): JsonResponse
     {

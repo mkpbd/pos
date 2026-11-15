@@ -18,9 +18,11 @@ import {
   CheckIcon,
   ListChecksIcon,
   SendIcon,
+  KeyboardIcon,
+  SearchIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -163,6 +165,10 @@ type ToolbarProps = {
   bangla?: boolean
   /** B10: the page check's errors and warnings (the badge); absent = no Check page button. */
   check?: { errors: number; warnings: number; open: boolean; onToggle: () => void }
+  /** B12: opens the command box (Ctrl/Cmd+K). */
+  onCommandBox?: () => void
+  /** B12: opens the keyboard shortcut sheet (?). */
+  onShortcuts?: () => void
 }
 
 /** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
@@ -193,7 +199,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -228,6 +234,14 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       </div>
 
       {bangla && <LocaleToggle />}
+
+      {onCommandBox && (
+        <Hint label={`Find an element, a page or an action (${MOD}+K)`}>
+          <Button type="button" variant="ghost" size="icon" aria-label="Find or do anything" aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'} onClick={onCommandBox} data-testid="command-box-button">
+            <SearchIcon />
+          </Button>
+        </Hint>
+      )}
 
       <div className="flex items-center gap-1">
         <Hint label={`Undo (${MOD}+Z)`}>
@@ -299,6 +313,15 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
           <DropdownMenuItem disabled={!document.published} onSelect={onDiscard} className={cn(!document.published && 'opacity-50')}>
             <UndoDotIcon /> Discard changes
           </DropdownMenuItem>
+          {onShortcuts && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onShortcuts}>
+                <KeyboardIcon /> Keyboard shortcuts
+                <DropdownMenuShortcut>?</DropdownMenuShortcut>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

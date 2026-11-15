@@ -34,8 +34,9 @@ describe('spacing handles (B10)', () => {
     expect(hasSpacingHandles(findNode(content, 'e_heading')!.node)).toBe(false)
 
     expect(spacingAt(style(content, 's_features'), 'mobile', 'padding', 'top')).toBe(48)
-    const phone = setSpacing(content, 's_features', 'mobile', 'padding', 'top', 18)
+    const phone = setSpacing(content, 's_features', 'mobile', 'padding', 'top', 20.4)
     expect(style(phone, 's_features').mobile?.spacing?.padding?.top).toBe('20px')
+    expect(style(setSpacing(content, 's_features', 'mobile', 'padding', 'top', 999), 's_features').mobile?.spacing?.padding?.top).toBe('400px')
     expect(style(phone, 's_features').base?.spacing?.padding?.top).toBe('48px')
     expect(spacingAt(style(phone, 's_features'), 'mobile', 'padding', 'top')).toBe(20)
     expect(spacingAt(style(phone, 's_features'), 'base', 'padding', 'top')).toBe(48)

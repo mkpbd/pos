@@ -11,6 +11,7 @@ import { PublishDialog } from '../dialogs'
 import { detail } from '../test-helpers'
 import type { DocumentSchedule, ReviewSummary } from '../publishing-api'
 import { changeItems, fieldLabel, valueText } from './changes'
+import { readCompare } from '../publishing-api'
 import { checkScheduleInput, defaultScheduleInput, formatStoreTime } from './schedule-time'
 
 /* B11: publish later, versions & named copies, compare, approval — editor and pages list. */
@@ -51,6 +52,7 @@ describe('change list in plain words', () => {
         removed: [{ node_id: 'e_old', type: 'image' }],
         changed: [{ node_id: 'e_btn', type: 'button', fields: [{ field: 'props.label', before: 'Shop now', after: 'Buy now' }, { field: 'style', before: null, after: null }] }],
         moved: ['s_1'],
+        device_moved: [],
       },
       (type) => ({ heading: 'Heading', image: 'Image', button: 'Button', section: 'Section' })[type] ?? type,
       (id) => (id === 's_1' ? { node_id: 's_1', type: 'section' } : null),
@@ -62,6 +64,16 @@ describe('change list in plain words', () => {
       ['moved', 'Section'],
     ])
     expect(items[2]!.details).toEqual(['Button text: “Shop now” → “Buy now”', 'Design (colours, sizes, spacing) changed'])
+  })
+
+  it('B12: lists phone and tablet order changes', () => {
+    const result = readCompare({ added: [], removed: [], changed: [], moved: [], device_moved: [{ id: 'root', device: 'mobile' }, { id: 'c_1', device: 'tablet' }, { id: 5, device: 'x' }] })
+    expect(result.device_moved).toHaveLength(2)
+    const items = changeItems(result, (type) => (type === 'column' ? 'Column' : type), (id) => (id === 'c_1' ? { node_id: 'c_1', type: 'column' } : null))
+    expect(items.map((i) => [i.badge, i.title, i.nodeId])).toEqual([
+      ['Moved on phones', 'The order of the sections', null],
+      ['Moved on tablets', 'The order inside column', 'c_1'],
+    ])
   })
 })
 

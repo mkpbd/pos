@@ -217,19 +217,25 @@ export type CompareResult = {
   removed: CompareNode[]
   changed: (Omit<CompareNode, 'node_id'> & { node_id: string | null; fields: FieldChange[] })[]
   moved: (string | CompareNode)[]
+  /** B12: containers (`root` = the sections, else a column id) whose phone / tablet order differs. */
+  device_moved: { id: string; device: 'tablet' | 'mobile' }[]
 }
 
 type RawNode = { id?: string; node_id?: string | null; type?: string; label?: string | null }
 
 /** The server's `{id, type, kind, parent_id, label}` (added / removed) and `{node_id, …}` (changed) as CompareNode. */
 export function readCompare(body: unknown): CompareResult {
-  const value = (body ?? {}) as { added?: RawNode[]; removed?: RawNode[]; changed?: (RawNode & { fields?: FieldChange[] })[]; moved?: (string | RawNode)[] }
+  const value = (body ?? {}) as { added?: RawNode[]; removed?: RawNode[]; changed?: (RawNode & { fields?: FieldChange[] })[]; moved?: (string | RawNode)[]; device_moved?: unknown }
   const node = (n: RawNode): CompareNode => ({ node_id: String(n.node_id ?? n.id ?? ''), type: n.type ?? 'element', label: n.label ?? null })
   return {
     added: (value.added ?? []).map(node),
     removed: (value.removed ?? []).map(node),
     changed: (value.changed ?? []).map((n) => ({ node_id: n.node_id ?? n.id ?? null, type: n.type ?? 'element', label: n.label ?? null, fields: n.fields ?? [] })),
     moved: (value.moved ?? []).map((n) => (typeof n === 'string' ? n : node(n))),
+    device_moved: (Array.isArray(value.device_moved) ? value.device_moved : []).flatMap((entry: unknown) => {
+      const { id, device } = (entry ?? {}) as { id?: unknown; device?: unknown }
+      return typeof id === 'string' && (device === 'tablet' || device === 'mobile') ? [{ id, device }] : []
+    }),
   }
 }
 
