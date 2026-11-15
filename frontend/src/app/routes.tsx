@@ -85,6 +85,8 @@ const pages = {
   mediaLibrary: page(() => import('@/features/media/pages/media-library-page'), 'MediaLibraryPage'),
   storefrontHomepage: page(() => import('@/features/storefront/pages/homepage-page'), 'HomepagePage'),
   storefrontBanners: page(() => import('@/features/storefront/pages/banners-page'), 'BannersPage'),
+  // B17: festival calendar and one-click setup.
+  storefrontFestivals: page(() => import('@/features/storefront/pages/festivals-page'), 'FestivalsPage'),
   storeBuilderPages: page(() => import('@/features/store-builder/pages/pages-page'), 'StoreBuilderPagesPage'),
   storeBuilderEditor: page(() => import('@/features/store-builder/pages/editor-page'), 'StoreBuilderEditorPage'),
   webCategories: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebCategoriesPage'),
@@ -270,6 +272,7 @@ export const routes: RouteObject[] = [
               guarded('storefront.view', 'storefront/homepage', pages.storefrontHomepage),
               guarded('storefront.view', 'storefront/banners', pages.storefrontBanners),
               guarded('storefront.view', 'storefront/pages', pages.storeBuilderPages),
+              guarded('storefront.view', 'storefront/festivals', pages.storefrontFestivals),
               guarded('shipping.manage', 'storefront/shipping', pages.storefrontShipping),
               guarded('shipping.manage', 'storefront/shipping/couriers', pages.storefrontCouriers),
               guarded('payment_gateways.manage', 'storefront/payments', pages.storefrontPayments),

@@ -1,15 +1,18 @@
 import type {
+  BanglaDateData,
   BuilderData,
   BundleData,
   CategoryCardData,
   ChartStoreData,
   ComparisonTableData,
   CountdownData,
+  DeliveryPromiseData,
   DiscountData,
   FaqListData,
   FlashSaleBarData,
   MenuData,
   OrderFormData,
+  PaymentBadgesData,
   ProductSpotlightData,
   PromoCardData,
   ReviewWallData,
@@ -98,4 +101,20 @@ export function isOrderFormData(data: BuilderData): data is OrderFormData {
   if (!isObject(data) || 'type' in data) return false
   const product = (data as Record<string, unknown>).product
   return isObject(product) && typeof product.id === 'string' && typeof product.name === 'string' && Array.isArray(product.variants) && Array.isArray(product.options)
+}
+
+/* B17 */
+
+export function isPaymentBadgesData(data: BuilderData): data is PaymentBadgesData {
+  const d = data as Record<string, unknown>
+  return isObject(data) && !('type' in data) && Array.isArray(d.methods) && Array.isArray(d.wallets)
+}
+
+export function isDeliveryPromiseData(data: BuilderData): data is DeliveryPromiseData {
+  const d = data as Record<string, unknown>
+  return isObject(data) && !('type' in data) && Array.isArray(d.zones) && typeof d.cod_everywhere === 'boolean'
+}
+
+export function isBanglaDateData(data: BuilderData): data is BanglaDateData {
+  return isStoreHoursData(data)
 }

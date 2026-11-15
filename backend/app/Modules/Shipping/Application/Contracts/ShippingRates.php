@@ -44,4 +44,13 @@ interface ShippingRates
      * @return list<array{zone: string, method: ?string, min_days: int, max_days: int, fee: ?string, free_over: ?string, cod_allowed: bool}>
      */
     public function zoneOverview(): array;
+
+    /**
+     * B17: the active delivery zones in zone order (the store builder's delivery promise):
+     * id, name, whether the zone covers at least one district, and its active methods in
+     * display order (names in the request's language). [] when shipping is not set up.
+     *
+     * @return list<array{id: string, name: string, covers_districts: bool, methods: list<ShippingOption>}>
+     */
+    public function activeZones(): array;
 }

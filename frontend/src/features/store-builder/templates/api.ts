@@ -112,7 +112,8 @@ export function usePopupTemplatesQuery(enabled = true) {
  * arrival, lead form), applied as a new `landing:<slug>` page.
  */
 export function isLandingTemplate(template: Pick<BuilderTemplate, 'id' | 'scope' | 'category'>): boolean {
-  return template.scope === 'page' && (template.category === 'landing' || template.id.startsWith('landing-'))
+  // B17: festival landing pages (`festival-<key>-landing`, category `festival`) are campaign pages too.
+  return template.scope === 'page' && (template.category === 'landing' || template.id.startsWith('landing-') || template.category === 'festival' || template.id.startsWith('festival-'))
 }
 
 /** P2a: an order template sells one product, chosen when the page is made. */

@@ -1,0 +1,240 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_8",
+                            "type": "inner_row",
+                            "props": {},
+                            "columns": [
+                                {
+                                    "id": "c_1",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 60,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_1",
+                                            "type": "ornament",
+                                            "props": {
+                                                "name": "lantern",
+                                                "color": "#f2c14e",
+                                                "secondary_color": "#fff3c4",
+                                                "size": 96,
+                                                "align": "left",
+                                                "flip": "none",
+                                                "opacity": 100,
+                                                "repeat": false
+                                            }
+                                        },
+                                        {
+                                            "id": "e_2",
+                                            "type": "bangla_date",
+                                            "props": {
+                                                "prefix": "Today is",
+                                                "show_gregorian": true,
+                                                "show_hijri": true,
+                                                "style": "plain",
+                                                "align": "left"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "prefix": "আজ"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_3",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Ramadan offers",
+                                                "level": 1,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "রমজানের অফার"
+                                                }
+                                            },
+                                            "style": {
+                                                "base": {
+                                                    "typography": {
+                                                        "align": "left"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_4",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>Everyday needs and Eid preparations at fair prices, delivered to your door all through the holy month.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>পবিত্র এই মাসজুড়ে প্রতিদিনের প্রয়োজন আর ঈদের প্রস্তুতি, ন্যায্য দামে, পৌঁছে যাবে আপনার দরজায়।</p>"
+                                                }
+                                            },
+                                            "style": {
+                                                "base": {
+                                                    "typography": {
+                                                        "align": "left"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_5",
+                                            "type": "button",
+                                            "props": {
+                                                "label": "See Ramadan offers",
+                                                "link": {
+                                                    "url": "/shop"
+                                                },
+                                                "variant": "primary",
+                                                "size": "lg",
+                                                "full_width": false
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "label": "রমজানের অফার দেখুন"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_2",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 40,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_6",
+                                            "type": "ornament",
+                                            "props": {
+                                                "name": "crescent_star",
+                                                "color": "#1b2a4a",
+                                                "secondary_color": "#f2c14e",
+                                                "size": 72,
+                                                "align": "center",
+                                                "flip": "none",
+                                                "opacity": 100,
+                                                "repeat": false
+                                            }
+                                        },
+                                        {
+                                            "id": "e_7",
+                                            "type": "countdown",
+                                            "props": {
+                                                "source": "date",
+                                                "ends_at": "2027-03-09T23:59:00+06:00",
+                                                "promotion_id": null,
+                                                "title": "Offer ends in",
+                                                "expired_text": "This offer has ended. Thank you for shopping with us.",
+                                                "style": "boxes"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "title": "অফার শেষ হতে বাকি",
+                                                    "expired_text": "অফারটি শেষ হয়েছে। আমাদের সঙ্গে কেনাকাটার জন্য ধন্যবাদ।"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "style": {
+                                        "base": {
+                                            "background": {
+                                                "type": "color",
+                                                "color": "theme:surface"
+                                            },
+                                            "color": "theme:text",
+                                            "spacing": {
+                                                "padding": {
+                                                    "top": "24px",
+                                                    "bottom": "24px",
+                                                    "left": "20px",
+                                                    "right": "20px"
+                                                }
+                                            },
+                                            "border": {
+                                                "radius": {
+                                                    "tl": "16px",
+                                                    "tr": "16px",
+                                                    "br": "16px",
+                                                    "bl": "16px"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "gap": "32px",
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "#1b2a4a",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "#111c33",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

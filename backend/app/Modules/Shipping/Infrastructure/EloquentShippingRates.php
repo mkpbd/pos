@@ -98,6 +98,26 @@ class EloquentShippingRates implements ShippingRates
         return $result;
     }
 
+    public function activeZones(): array
+    {
+        $locale = $this->locale->current();
+
+        return ShippingZone::query()
+            ->where('is_active', true)
+            ->withExists('districts')
+            ->with(['methods' => fn ($q) => $q->where('is_active', true)])
+            ->orderBy('sort_order')->orderBy('name')->orderBy('id')
+            ->get()
+            ->map(fn (ShippingZone $zone) => [
+                'id' => $zone->id,
+                'name' => $zone->name,
+                'covers_districts' => (bool) $zone->districts_exists,
+                'methods' => $zone->methods->map(fn (ShippingMethod $m) => self::option($m, $locale))->values()->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     /**
      * @return array{id: string, name: string, description: ?string, fee: string, free_over: ?string, cod_allowed: bool, cod_fee: string, eta_min_days: int, eta_max_days: int}
      */

@@ -368,7 +368,8 @@ export type ProductSpotlightElement = ElementOf<'product_spotlight', { product_i
 export type Hotspot = { id: string; x: number; y: number; product_id: string }
 export type ShopTheLookElement = ElementOf<'shop_the_look', { media_id: string | null; alt: string; title: string; hotspots: Hotspot[] }>
 
-export type TrustBadgeItem = { id: string; icon: string; title: string; text: string }
+/** B17: an optional `link` (the key is absent when unset); 1–8 items. */
+export type TrustBadgeItem = { id: string; icon: string; title: string; text: string; link?: Link }
 export type TrustBadgesElement = ElementOf<'trust_badges', { items: TrustBadgeItem[]; style: 'row' | 'grid' }>
 
 /** Client-side only: this browser's recently viewed products (hidden when there are none). `limit` 4–12. */
@@ -627,6 +628,69 @@ export type OrderFormProps = {
 }
 export type OrderFormElement = ElementOf<'order_form', OrderFormProps>
 
+/* ----------------------------------------------------------------------------------------------
+ * B17: festival decoration and Bangladesh trust blocks. ✱ text is translatable: payment_badges
+ * `title` ≤ 80 / `note` ≤ 200, delivery_promise `title` ≤ 80, bangla_date `prefix` ≤ 60. The
+ * lists of allowed values are B17_ENUMS (./validate.ts) and ORNAMENT_NAMES (./elements/ornaments).
+ * -------------------------------------------------------------------------------------------- */
+
+export type OrnamentFlip = 'none' | 'horizontal' | 'vertical' | 'both'
+export type OrnamentProps = {
+  /** One of ORNAMENT_NAMES (`crescent_star`, `alpona_border`, …). */
+  name: string
+  /** `#rrggbb`, `#rrggbbaa` or `theme:<role>`. */
+  color: Color
+  /** Same, or null = the drawing's own tone. The flag ribbon always uses the national flag colours. */
+  secondary_color: Color | null
+  /** 16–480 px: the drawing's height (a repeated border's height). */
+  size: number
+  align: 'left' | 'center' | 'right'
+  flip: OrnamentFlip
+  /** 10–100 %. */
+  opacity: number
+  /** Repeat across the width (alpona_border and flag_ribbon only). */
+  repeat: boolean
+}
+export type OrnamentElement = ElementOf<'ornament', OrnamentProps>
+
+export type PaymentWallet = 'bkash' | 'nagad' | 'rocket' | 'upay'
+export type PaymentBadgesProps = {
+  title: string
+  show_store_methods: boolean
+  /** Unique, in the owner's order. Shown as plain text badges (never brand logos). */
+  wallets: PaymentWallet[]
+  note: string
+  style: 'chips' | 'list'
+  align: 'left' | 'center' | 'right'
+}
+export type PaymentBadgesElement = ElementOf<'payment_badges', PaymentBadgesProps>
+
+export type DeliveryPromiseLayout = 'cards' | 'list' | 'bar'
+export type DeliveryPromiseProps = {
+  title: string
+  /** 'all' or 1–12 shipping zone ids. */
+  zones: 'all' | string[]
+  show_price: boolean
+  show_cod: boolean
+  show_free_over: boolean
+  layout: DeliveryPromiseLayout
+}
+export type DeliveryPromiseElement = ElementOf<'delivery_promise', DeliveryPromiseProps>
+
+export type BanglaDateStyle = 'plain' | 'badge' | 'card'
+export type BanglaDateProps = {
+  /** e.g. "আজ" (empty = none). */
+  prefix: string
+  show_gregorian: boolean
+  /** Tabular Hijri, marked "expected". */
+  show_hijri: boolean
+  style: BanglaDateStyle
+  align: 'left' | 'center' | 'right'
+}
+export type BanglaDateElement = ElementOf<'bangla_date', BanglaDateProps>
+
+export type B17Element = OrnamentElement | PaymentBadgesElement | DeliveryPromiseElement | BanglaDateElement
+
 export type Element =
   | HeadingElement
   | TextElement
@@ -641,6 +705,7 @@ export type Element =
   | B8aElement
   | B8bElement
   | OrderFormElement
+  | B17Element
 
 export type ElementType = Element['type']
 
@@ -936,6 +1001,37 @@ export type OrderFormData = {
   state?: ElementDataState
 }
 
+/** B17 payment badges: the store's checkout methods and the chosen wallets, names already in the request language. */
+export type PaymentBadgesData = { methods: { code: string; name: string }[]; wallets: { code: string; name: string }[]; state?: ElementDataState }
+
+/**
+ * B17 delivery promise: one entry per shipping zone (its cheapest / quickest method). Money as
+ * NUMERIC strings; `fee` null = the zone's methods differ (show "from `fee_from`"). Drafts add
+ * `all_zones` and `missing` (chosen zones that no longer exist) for the editor.
+ */
+export type DeliveryPromiseZone = {
+  id: string
+  name: string
+  method: string | null
+  min_days: number
+  max_days: number
+  fee: string | null
+  fee_from: string
+  free_over: string | null
+  cod_allowed: boolean
+}
+export type DeliveryPromiseData = {
+  zones: DeliveryPromiseZone[]
+  cod_everywhere: boolean
+  free_over: string | null
+  all_zones?: { id: string; name: string }[]
+  missing?: string[]
+  state?: ElementDataState
+}
+
+/** B17 Bangla date: the store's IANA time zone (today is computed in the browser). */
+export type BanglaDateData = { timezone: string; state?: ElementDataState }
+
 export type ElementData =
   | OrderFormData
   | CountdownData
@@ -952,6 +1048,9 @@ export type ElementData =
   | ReviewWallData
   | StoreHoursData
   | ChartStoreData
+  | PaymentBadgesData
+  | DeliveryPromiseData
+  | BanglaDateData
 
 /** One entry of a payload's `data` map. */
 export type BuilderData = StoreSection | ElementData

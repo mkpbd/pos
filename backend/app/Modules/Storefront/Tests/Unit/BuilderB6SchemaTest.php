@@ -150,7 +150,9 @@ class BuilderB6SchemaTest extends TestCase
         foreach (ElementRegistry::B6 as $type) {
             $expected = match ($type) {
                 'icon_list', 'marquee' => [...$all, 'popup'],
-                'accordion', 'icon_box', 'logo_carousel', 'map', 'trust_badges' => $withFooter,
+                'accordion', 'icon_box', 'logo_carousel', 'map' => $withFooter,
+                // B17: trust badges go in bars too.
+                'trust_badges' => [...$withFooter, 'popup'],
                 // B8b: notices go in popups too.
                 'notice' => ['page', 'cms', 'zone', 'popup'],
                 default => ['page', 'cms', 'zone'],
@@ -232,7 +234,8 @@ class BuilderB6SchemaTest extends TestCase
             ]], ['media_id', 'alt', 'title', 'hotspots.0.x', 'hotspots.0.y', 'hotspots.1.x', 'hotspots.1.y', 'hotspots.1.product_id', 'hotspots.2.product_id']],
             'shop the look 9 spots' => ['shop_the_look', ['media_id' => self::MEDIA, 'hotspots' => $items(9, fn ($i) => ['id' => "h{$i}", 'x' => $i, 'y' => $i, 'product_id' => sprintf('0199a5c1-0000-7000-8000-%012d', $i)])], ['hotspots']],
             'shop the look no spots' => ['shop_the_look', ['media_id' => self::MEDIA, 'hotspots' => []], ['hotspots']],
-            'trust badges' => ['trust_badges', ['items' => $items(7, fn ($i) => ['id' => "b{$i}", 'icon' => 'truck', 'title' => 'T', 'text' => '']), 'style' => 'column'], ['items', 'style']],
+            // B17: up to 8 badges.
+            'trust badges' => ['trust_badges', ['items' => $items(9, fn ($i) => ['id' => "b{$i}", 'icon' => 'truck', 'title' => 'T', 'text' => '']), 'style' => 'column'], ['items', 'style']],
             'trust badge fields' => ['trust_badges', ['items' => [['id' => 'b1', 'icon' => 'rocket', 'title' => $text(61), 'text' => $text(121)]]], ['items.0.icon', 'items.0.title', 'items.0.text']],
             'recently viewed' => ['recently_viewed', ['title' => $text(121), 'limit' => 3], ['title', 'limit']],
             'recently viewed max' => ['recently_viewed', ['limit' => 13], ['limit']],

@@ -570,7 +570,8 @@ export const B6_LIMITS = {
   mapHeight: { min: 200, max: 600 },
   mapZoom: { min: 3, max: 20 },
   hotspots: { min: 1, max: 8 },
-  trustBadges: { min: 1, max: 6 },
+  /** B17: up to 8 (was 6). */
+  trustBadges: { min: 1, max: 8 },
   recentlyViewed: { min: 4, max: 12 },
   marqueeItems: { min: 1, max: 10 },
   chartLabels: { min: 1, max: 24 },
@@ -925,6 +926,8 @@ export function b6PropProblems(type: string, props: unknown): PropProblem[] {
         icon(problems, `${at}.icon`, item.icon)
         text(problems, `${at}.title`, item.title, T.trust_badges['items.*.title'], true)
         text(problems, `${at}.text`, item.text, T.trust_badges['items.*.text'])
+        // B17: optional; the key is absent when unset.
+        if ('link' in item) link(problems, `${at}.link`, item.link)
       })
       enumOf(problems, 'style', p.style, B6_ENUMS.trustBadgesStyle)
       break
@@ -1277,7 +1280,7 @@ export function b8aPropProblems(type: string, props: unknown): PropProblem[] {
 
 /** Every problem with an element's props, B6, B8a and B8b rules (empty = valid; unknown types []). */
 export function elementPropProblems(type: string, props: unknown): PropProblem[] {
-  return [...b6PropProblems(type, props), ...b8bPropProblems(type, props), ...(type === 'order_form' ? orderFormPropProblems(props) : [])]
+  return [...b6PropProblems(type, props), ...b8bPropProblems(type, props), ...(type === 'order_form' ? orderFormPropProblems(props) : []), ...b17PropProblems(type, props)]
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -1755,4 +1758,122 @@ export const GLOBAL_CONTEXT_USES: Record<GlobalContext, readonly DocumentContext
 export function globalFitsContext(global: unknown, context: DocumentContext): boolean {
   const kind = oneOf(global, B9_ENUMS.globalContext)
   return kind ? GLOBAL_CONTEXT_USES[kind].includes(context) : false
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B17: ornament, payment badges, delivery promise, Bangla date (contract §1)
+ * -------------------------------------------------------------------------------------------- */
+
+export const B17_ENUMS = {
+  ornamentName: [
+    'crescent_star',
+    'lantern',
+    'mosque_dome',
+    'alpona_border',
+    'alpona_round',
+    'kash_flower',
+    'dhak',
+    'diya',
+    'shapla',
+    'flag_ribbon',
+    'shaheed_minar',
+    'snowflake',
+    'gift_box',
+    'confetti',
+    'sparkle',
+    'sale_tag',
+  ],
+  /** Only border drawings repeat across the width. */
+  ornamentRepeatable: ['alpona_border', 'flag_ribbon'],
+  ornamentFlip: ['none', 'horizontal', 'vertical', 'both'],
+  align: ['left', 'center', 'right'],
+  paymentWallet: ['bkash', 'nagad', 'rocket', 'upay'],
+  paymentStyle: ['chips', 'list'],
+  deliveryLayout: ['cards', 'list', 'bar'],
+  banglaDateStyle: ['plain', 'badge', 'card'],
+} as const
+
+export const B17_LIMITS = {
+  ornamentSize: { min: 16, max: 480 },
+  ornamentOpacity: { min: 10, max: 100 },
+  deliveryZones: { min: 1, max: 12 },
+} as const
+
+/** Maximum length of each B17 text prop (✱ translatable). */
+export const B17_TEXT_LIMITS = {
+  payment_badges: { title: 80, note: 200 },
+  delivery_promise: { title: 80 },
+  bangla_date: { prefix: 60 },
+} as const
+
+function color(problems: Problems, path: string, value: unknown, nullable = false) {
+  if (nullable && value === null) return
+  if (!normalizeColor(value)) problems.push({ path, code: value === null || value === undefined ? 'required' : 'invalid' })
+}
+
+/** The client mirror of the server's B17 prop rules (empty = valid; other types []). */
+export function b17PropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const E = B17_ENUMS
+  switch (type) {
+    case 'ornament':
+      enumOf(problems, 'name', p.name, E.ornamentName)
+      color(problems, 'color', p.color)
+      color(problems, 'secondary_color', p.secondary_color, true)
+      int(problems, 'size', p.size, B17_LIMITS.ornamentSize)
+      enumOf(problems, 'align', p.align, E.align)
+      enumOf(problems, 'flip', p.flip, E.ornamentFlip)
+      int(problems, 'opacity', p.opacity, B17_LIMITS.ornamentOpacity)
+      flag(problems, 'repeat', p.repeat)
+      if (p.repeat === true && oneOf(p.name, E.ornamentName) && !oneOf(p.name, E.ornamentRepeatable)) problems.push({ path: 'repeat', code: 'invalid' })
+      break
+    case 'payment_badges': {
+      text(problems, 'title', p.title, B17_TEXT_LIMITS.payment_badges.title)
+      flag(problems, 'show_store_methods', p.show_store_methods)
+      if (!Array.isArray(p.wallets)) problems.push({ path: 'wallets', code: 'invalid' })
+      else {
+        const seen = new Set<unknown>()
+        p.wallets.forEach((wallet, i) => {
+          if (!oneOf(wallet, E.paymentWallet)) problems.push({ path: `wallets.${i}`, code: 'invalid' })
+          else if (seen.has(wallet)) problems.push({ path: `wallets.${i}`, code: 'duplicate' })
+          seen.add(wallet)
+        })
+      }
+      text(problems, 'note', p.note, B17_TEXT_LIMITS.payment_badges.note)
+      enumOf(problems, 'style', p.style, E.paymentStyle)
+      enumOf(problems, 'align', p.align, E.align)
+      break
+    }
+    case 'delivery_promise':
+      text(problems, 'title', p.title, B17_TEXT_LIMITS.delivery_promise.title)
+      if (p.zones !== 'all') {
+        if (!Array.isArray(p.zones)) problems.push({ path: 'zones', code: 'invalid' })
+        else {
+          if (p.zones.length < B17_LIMITS.deliveryZones.min) problems.push({ path: 'zones', code: 'too_few' })
+          if (p.zones.length > B17_LIMITS.deliveryZones.max) problems.push({ path: 'zones', code: 'too_many' })
+          const seen = new Set<unknown>()
+          p.zones.forEach((zone, i) => {
+            if (!isUuid(zone)) problems.push({ path: `zones.${i}`, code: 'invalid' })
+            else if (seen.has(zone)) problems.push({ path: `zones.${i}`, code: 'duplicate' })
+            seen.add(zone)
+          })
+        }
+      }
+      flag(problems, 'show_price', p.show_price)
+      flag(problems, 'show_cod', p.show_cod)
+      flag(problems, 'show_free_over', p.show_free_over)
+      enumOf(problems, 'layout', p.layout, E.deliveryLayout)
+      break
+    case 'bangla_date':
+      text(problems, 'prefix', p.prefix, B17_TEXT_LIMITS.bangla_date.prefix)
+      flag(problems, 'show_gregorian', p.show_gregorian)
+      flag(problems, 'show_hijri', p.show_hijri)
+      enumOf(problems, 'style', p.style, E.banglaDateStyle)
+      enumOf(problems, 'align', p.align, E.align)
+      break
+    default:
+      return []
+  }
+  return problems
 }

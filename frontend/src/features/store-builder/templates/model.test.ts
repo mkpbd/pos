@@ -4,7 +4,7 @@ import type { BuilderContent, Section } from '@/storefront/builder/types'
 import { checkDocument } from '../check'
 import { collectIds } from '../tree'
 import { isTemplatePreset, type BuilderTemplate } from './api'
-import { PRESET_LABELS, categoryLabel, filterTemplates, insertionIndex, insertSections, prepareSections, templateCategories, usableIn } from './model'
+import { PRESET_LABELS, categoryLabel, isFestivalTemplate, filterTemplates, insertionIndex, insertSections, prepareSections, templateCategories, usableIn } from './model'
 import { insertedMessage } from './use-insert-template'
 
 const template = (over: Partial<BuilderTemplate>): BuilderTemplate => ({
@@ -48,6 +48,13 @@ describe('templates model', () => {
     expect(templateCategories(usableIn(LIBRARY, 'page'))).toEqual(['cta', 'hero', 'products', 'promo', 'pages'])
     expect(categoryLabel('feature-strip')).toBe('Feature strip')
     expect(categoryLabel('cta')).toBe('Call to action')
+  })
+
+  it('B17: festival packs are their own category, listed first', () => {
+    expect(categoryLabel('festival')).toBe('Festivals')
+    expect(templateCategories([...usableIn(LIBRARY, 'page'), { ...LIBRARY[0]!, id: 'festival-eid-ul-fitr-hero', category: 'festival' }])[0]).toBe('festival')
+    expect(isFestivalTemplate({ id: 'festival-ekushey-bar', category: null })).toBe(true)
+    expect(isFestivalTemplate({ id: 'vegan-hero', category: 'hero' })).toBe(false)
   })
 
   it('inserts after the selection’s section, else at the end', () => {

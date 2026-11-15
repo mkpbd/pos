@@ -13,6 +13,8 @@ import { ICON_NAMES } from '@/storefront/builder/icons'
 import { B8A_TYPES as B8A_TYPE_LIST } from '@/storefront/builder/elements/b8a-types'
 import {
   B4_ENUMS,
+  B17_TEXT_LIMITS,
+  b17PropProblems,
   B6_LIMITS,
   B6_TEXT_LIMITS,
   B8A_LIMITS,
@@ -35,6 +37,7 @@ import {
   type PropProblem,
 } from '@/storefront/builder/validate'
 import type { BuilderNode, Problem } from './types'
+import { B17_TYPES, b17Message } from './b17-model'
 
 /** Text limits of the basic elements (backend ElementRegistry::TEXT_LIMITS). */
 export const TEXT_LIMITS = { heading: 200, text: 20000, buttonLabel: 60, alt: 200 } as const
@@ -96,7 +99,7 @@ export const P2A_TYPES: ReadonlySet<string> = new Set(['order_form'])
 /** B6 / B8a props that are not translated although they have a text limit (a person's name isn't). */
 const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'], team: ['members.*.name'] }
 
-const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form, order_form: ORDER_FORM_TEXT_LIMITS } as Record<string, Record<string, number>>
+const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form, order_form: ORDER_FORM_TEXT_LIMITS, ...B17_TEXT_LIMITS } as Record<string, Record<string, number>>
 
 /**
  * Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable).
@@ -547,6 +550,11 @@ function validateElement(node: Element, add: (path: string, message: string) => 
     return
   }
   if (B8B_TYPES.has(node.type)) return validateB8b(node, add, context)
+  if (B17_TYPES.has(node.type)) {
+    // B17: ornament, payment badges, delivery promise, Bangla date.
+    for (const problem of b17PropProblems(node.type, node.props)) add(`props.${problem.path}`, b17Message(node.type, problem))
+    return
+  }
   if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)
   if (B6_TYPES.has(node.type)) return validateB6(node, add)
   if (B8A_TYPES.has(node.type)) return validateB8a(node, add)

@@ -21,6 +21,23 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B17 — Store builder: festival packs & Bangladesh trust blocks
+
+#### Added
+- **Festival packs:** 10 occasions — Eid-ul-Fitr, Eid-ul-Adha, Ramadan, Durga Puja, Pohela Boishakh, 21 February (Ekushey), Independence Day, Victory Day, winter sale, 11.11 — each with a campaign page, a home banner and a top bar (30 built-in templates, category *Festivals*). No photos: drawn ornaments, festival colours, countdowns and the store's own products; every text in Bangla; every colour pair passes WCAG AA under all looks. Ekushey is a tribute (no sale wording or elements); Independence and Victory Day are dignified with a modest offer.
+- **Online store → Festivals:** the next 12 months' occasions with their dates (Eid / Ramadan / Puja from a sourced 2026–2028 table, marked *expected*), a setup dialog (dates, what to create, a discount) and *Review & publish*. Setup (`POST /storefront/festivals/{key}/setup`) writes drafts only: the campaign page, hero sections on top of the home page that show only between the dates, and a top bar with the same dates; countdowns end with the campaign; a repeat setup rewrites the same drafts. After *Publish all* everything appears and disappears by itself.
+- **New elements:** *Ornament* (16 original drawings — crescent & star, lantern, alpona, kash flower, dhak, diya, shapla, flag ribbon, Shaheed Minar …), *Payment badges* (the store's checkout methods plus bKash / Nagad / Rocket / Upay as text badges — never brand logos), *Delivery promise* (zones, days, fee, free-delivery threshold and cash on delivery from the shipping settings), *Bangla date* (today in the Bangladesh revised Bengali calendar, optional Gregorian and Hijri). *Trust badges* take up to 8 items with links and work in popups.
+
+#### Fixed
+- A new trust badge started with an invalid icon ("Choose an icon" on every new badge).
+
+#### Tests
+- Backend 1394 (PostgreSQL: 1393 pass, 1 opt-in skip): new `BuilderB17SchemaTest`, `StoreBuilderB17Test`, `BuilderFestivalTemplatesTest` (all 30 templates validated, contrast, Bangla, respectful wording, setup with every pack); Pint clean. vitest 2148; mocked Playwright 353 + 3 that timed out under the full run's load and pass on rerun (storefront-social share, forms bell, storefront-builder "mobile 375" — still load-sensitive). Builder acceptance 5.
+- Full-stack (PostgreSQL, desktop) 46: new **B17** test — the calendar lists Victory Day and marks Ekushey without sale wording; the Festivals page shows it; setup makes three drafts that stay hidden until *Publish all*; then the campaign page, the scheduled home banner and the top bar show; a second setup reuses the same drafts.
+
+#### Upgrade
+- `php artisan migrate` (`storefront_festival_setups`).
+
 ### B12 — Store builder: faster building
 
 #### Added

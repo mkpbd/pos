@@ -15,6 +15,7 @@ import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { cn } from '@/lib/utils'
 import { useCreateDocumentMutation } from '../api'
 import { templateNeedsProduct, useLandingTemplatesQuery, type BuilderTemplate } from '../templates/api'
+import { isFestivalTemplate } from '../templates/model'
 import { TemplateThumbnail } from '../templates/template-thumbnail'
 import type { MessageKey } from './messages'
 import { slugify, slugProblemKey } from './page-helpers'
@@ -156,6 +157,9 @@ export function NewLandingDialog({ open, onOpenChange }: { open: boolean; onOpen
   const productHelpId = useId()
 
   const list = templates.data ?? []
+  // B17: festival pages under their own heading, after the campaign pages and the empty page.
+  const festivals = list.filter(isFestivalTemplate)
+  const campaigns = list.filter((tpl) => !isFestivalTemplate(tpl))
   const template = list.find((tpl) => tpl.id === choice) ?? null
   const needsProduct = template !== null && templateNeedsProduct(template)
   const effectiveSlug = slugTouched ? slug : slugify(title)
@@ -217,6 +221,17 @@ export function NewLandingDialog({ open, onOpenChange }: { open: boolean; onOpen
     </div>
   )
 
+  const templateOption = (tpl: BuilderTemplate) => {
+    const w = words(tpl)
+    const requires = tpl.requires ?? []
+    const badges = [templateNeedsProduct(tpl) ? t('landing.needsProduct') : null, requires.includes('promotions') ? t('landing.needsPromotion') : null].filter((b): b is string => b !== null)
+    const hasPicture = !!(tpl.preview_url ?? tpl.thumbnail_url)
+    return option(tpl.id, w.name, w.text, <TemplateThumbnail template={{ ...tpl, name: w.name }} />, {
+      badges,
+      preview: hasPicture ? () => setPreviewing(tpl) : undefined,
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent lang={lang} className="max-h-[92svh] overflow-y-auto sm:max-w-3xl">
@@ -250,17 +265,16 @@ export function NewLandingDialog({ open, onOpenChange }: { open: boolean; onOpen
           <fieldset className="flex min-w-0 flex-col gap-2">
             <legend className="mb-2 text-sm font-medium">{t('landing.startLegend')}</legend>
             <div role="radiogroup" aria-label={t('landing.startLegend')} className="grid grid-cols-1 gap-3 p-0.5 min-[480px]:grid-cols-2 md:grid-cols-3">
-              {list.map((tpl) => {
-                const w = words(tpl)
-                const requires = tpl.requires ?? []
-                const badges = [templateNeedsProduct(tpl) ? t('landing.needsProduct') : null, requires.includes('promotions') ? t('landing.needsPromotion') : null].filter((b): b is string => b !== null)
-                const hasPicture = !!(tpl.preview_url ?? tpl.thumbnail_url)
-                return option(tpl.id, w.name, w.text, <TemplateThumbnail template={{ ...tpl, name: w.name }} />, {
-                  badges,
-                  preview: hasPicture ? () => setPreviewing(tpl) : undefined,
-                })
-              })}
+              {festivals.length > 0 && <p className="col-span-full text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t('landing.campaigns')}</p>}
+              {campaigns.map(templateOption)}
               {option(BLANK, t('landing.blank'), t('landing.blankDetail'), <TemplateThumbnail template={{ id: BLANK, scope: 'page', category: null, name: t('landing.blank'), thumbnail_url: null }} className="opacity-60" />)}
+              {festivals.length > 0 && (
+                <div className="col-span-full mt-2 flex flex-col gap-0.5" data-testid="landing-festivals">
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t('landing.festivals')}</p>
+                  <p className="text-xs text-muted-foreground">{t('landing.festivalsHelp')}</p>
+                </div>
+              )}
+              {festivals.map(templateOption)}
             </div>
             {templates.isPending && (
               <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">

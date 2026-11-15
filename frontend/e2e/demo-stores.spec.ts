@@ -1141,6 +1141,72 @@ test('B12: Little Sprouts — phones see their own section order; a section is c
   await adminContext.close()
 })
 
+test('B17: Bazar Fresh sets up Victory Day in one go; the home banner, campaign page and top bar show on the dates; a second setup reuses the drafts', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // The calendar lists the occasions of the next 12 months; 21 February is a tribute without sale wording.
+  const calendar = await call('GET', '/api/v1/storefront/festivals')
+  expect(calendar.status).toBe(200)
+  const festivals = calendar.body.data as { key: string; sale_wording: boolean; next: { year: number } }[]
+  const victory = festivals.find((f) => f.key === 'victory-day')!
+  expect(victory).toBeTruthy()
+  expect(festivals.find((f) => f.key === 'ekushey')?.sale_wording).toBe(false)
+
+  // The Festivals page shows it.
+  await admin.goto(`${base}/admin/storefront/festivals`)
+  await expect(admin.getByText('Victory Day').first()).toBeVisible({ timeout: 30_000 })
+
+  // Set up now → 2 days from now (so it shows during the test), then publish what it made.
+  const startsAt = new Date(Date.now() - 60 * 60_000).toISOString()
+  const endsAt = new Date(Date.now() + 2 * 24 * 60 * 60_000).toISOString()
+  const body = { year: victory.next.year, starts_at: startsAt, ends_at: endsAt, include: { landing: true, home_hero: true, bar: true }, discount_id: null, landing_slug: 'victory-day-e2e' }
+  const setup = await call('POST', '/api/v1/storefront/festivals/victory-day/setup', body)
+  expect(setup.status).toBe(200)
+  const docs = setup.body.data.documents as { id: string; role: string; key: string }[]
+  expect(docs.map((d) => d.role).sort()).toEqual(['bar', 'home', 'landing'])
+  // Nothing is live until published.
+  await page.goto(`${base}/p/victory-day-e2e`)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(0, { timeout: 15_000 })
+  const published = await call('POST', '/api/v1/storefront/builder/publish-all', { documents: setup.body.data.publish_ids, theme: false, note: 'Victory Day' })
+  expect(published.status).toBe(200)
+
+  // Shoppers: the campaign page, the home banner (first section of the home page) and the top bar.
+  const home = docs.find((d) => d.role === 'home')!
+  const homeDraft = await call('GET', `/api/v1/storefront/builder/documents/${home.id}`)
+  const heroId = homeDraft.body.data.content.sections[0].id as string
+  expect(homeDraft.body.data.content.sections[0].schedule).toMatchObject({ starts_at: expect.any(String), ends_at: expect.any(String) })
+  await page.goto(`${base}/p/victory-day-e2e`)
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 30_000 })
+  await page.goto(`${base}/`)
+  await expect(page.locator(`[data-b="${heroId}"]`)).toBeVisible({ timeout: 30_000 })
+  const bar = docs.find((d) => d.role === 'bar')!
+  await expect(page.locator(`[data-testid="builder-popup"][data-popup-id="${bar.id}"][data-layout="bar_top"]`)).toBeVisible({ timeout: 30_000 })
+
+  // Setting it up again for the same year rewrites the same drafts, without duplicates.
+  const again = await call('POST', '/api/v1/storefront/festivals/victory-day/setup', body)
+  expect(again.status).toBe(200)
+  expect((again.body.data.documents as { id: string }[]).map((d) => d.id).sort()).toEqual(docs.map((d) => d.id).sort())
+  const homeAgain = await call('GET', `/api/v1/storefront/builder/documents/${home.id}`)
+  const festivalSections = (homeAgain.body.data.content.sections as { schedule: unknown }[]).filter((s) => s.schedule)
+  expect(festivalSections.length).toBe((homeDraft.body.data.content.sections as { schedule: unknown }[]).filter((s) => s.schedule).length)
+  await adminContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

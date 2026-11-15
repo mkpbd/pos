@@ -560,6 +560,46 @@ const P2A: BaseMeta[] = [
   },
 ]
 
+/**
+ * B17 (contract §1): festival decoration and Bangladesh trust blocks. Payment badges and the
+ * delivery promise read the store's checkout methods / shipping zones (`data[id]`); the Bangla
+ * date reads the store time zone and computes today in the browser.
+ */
+const B17: BaseMeta[] = [
+  {
+    type: 'ornament',
+    group: 'media',
+    label: 'Ornament',
+    translatable: [],
+    props: { name: 'sparkle', color: 'theme:primary', secondary_color: null, size: 96, align: 'center', flip: 'none', opacity: 100, repeat: false },
+    children: null,
+  },
+  {
+    type: 'payment_badges',
+    group: 'commerce',
+    label: 'Payment badges',
+    translatable: ['title', 'note'],
+    props: { title: 'How you can pay', show_store_methods: true, wallets: [], note: '', style: 'chips', align: 'left' },
+    children: null,
+  },
+  {
+    type: 'delivery_promise',
+    group: 'commerce',
+    label: 'Delivery promise',
+    translatable: ['title'],
+    props: { title: 'Delivery', zones: 'all', show_price: true, show_cod: true, show_free_over: true, layout: 'cards' },
+    children: null,
+  },
+  {
+    type: 'bangla_date',
+    group: 'content',
+    label: 'Bangla date',
+    translatable: ['prefix'],
+    props: { prefix: '', show_gregorian: false, show_hijri: false, style: 'plain', align: 'left' },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] =['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 /** B8b: what may sit in a popup (contract §1): simple content, offers and forms; never shop grids, sliders, charts, maps or site parts. */
@@ -613,7 +653,8 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   category_card: PAGES,
   product_spotlight: PAGES,
   shop_the_look: PAGES,
-  trust_badges: ['page', 'cms', 'zone', 'footer'],
+  // B17: also in popups.
+  trust_badges: ['page', 'cms', 'zone', 'footer', 'popup'],
   recently_viewed: PAGES,
   marquee: IN_POPUP(ALL),
   pricing_table: PAGES,
@@ -628,6 +669,10 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   progress_bars: PAGES,
   form: IN_POPUP(PAGES),
   order_form: PAGES,
+  ornament: IN_POPUP(ALL),
+  payment_badges: ['page', 'cms', 'zone', 'footer'],
+  delivery_promise: ['page', 'cms', 'zone', 'footer'],
+  bangla_date: IN_POPUP(ALL),
 }
 
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
@@ -646,6 +691,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...B8A,
   ...B8B,
   ...P2A,
+  ...B17,
 ].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */

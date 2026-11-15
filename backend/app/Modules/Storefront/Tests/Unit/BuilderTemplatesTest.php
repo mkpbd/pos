@@ -169,7 +169,8 @@ class BuilderTemplatesTest extends TestCase
         foreach (['hero', 'promo', 'products', 'countdown', 'newsletter', 'categories', 'testimonials', 'features'] as $category) {
             $this->assertContains($category, $kids, "kids {$category}");
         }
-        $pages = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'page'));
+        // B17: the festival packs' landing pages are checked in BuilderFestivalTemplatesTest.
+        $pages = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'page' && $t['category'] !== 'festival'));
         // P2a: four campaign page templates (category `landing`).
         $this->assertEqualsCanonicalizing(['about', 'contact', 'faq', 'sale', 'collection', 'landing', 'landing', 'landing', 'landing'], array_column($pages, 'category'));
         $sites = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'site'));

@@ -147,6 +147,8 @@ final class B6ElementProps extends ElementProps
                     'icon' => $this->icon($item['icon'] ?? null, "{$path}.icon", false),
                     'title' => $this->text($item['title'] ?? null, "{$path}.title", 1, $max('items.title')),
                     'text' => $this->text($item['text'] ?? null, "{$path}.text", 0, $max('items.text')),
+                    // B17: an optional link, stored only when set (older documents normalize unchanged).
+                    ...(($link = $this->link($item['link'] ?? null, "{$path}.link")) === null ? [] : ['link' => $link]),
                 ]),
                 'style' => $this->enum('style', ElementRegistry::TRUST_BADGE_STYLES),
             ],

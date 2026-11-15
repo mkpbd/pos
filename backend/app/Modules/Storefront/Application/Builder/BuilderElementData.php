@@ -60,6 +60,16 @@ use Carbon\CarbonImmutable;
  * - B8a chart with a store `data_source`: `{labels, series: [{id, name, values}]}` — products
  *   per top-level category or approved reviews per star rating; nothing to show → no data.
  *
+ * - B17 payment_badges: `{methods: [{code, name}], wallets: [{code, name}]}` — the enabled
+ *   checkout methods (display names in the request's language; [] unless `show_store_methods`)
+ *   and the chosen wallets as text names; both empty is `state: empty` (left out publicly).
+ * - B17 delivery_promise: `{zones: [{id, name, method, min_days, max_days, fee, fee_from,
+ *   free_over, cod_allowed}], cod_everywhere, free_over}` of the active zones that deliver
+ *   somewhere (all, or the chosen ones in their order); money as NUMERIC strings. None is
+ *   `state: empty`. Drafts also get `all_zones: [{id, name}]` (the inspector's picker) and
+ *   `missing: [id]` (chosen zones that are gone, switched off or without methods).
+ * - B17 bangla_date: `{timezone}` of the organization (the storefront computes the date).
+ *
  * In a draft (preview) an element that would be left out publicly keeps its data with
  * `state: expired | inactive | unavailable`; an element whose record is gone has no data.
  */
@@ -72,6 +82,12 @@ class BuilderElementData
     private array $ratingCounts = [];
 
     private ?string $timezone = null;
+
+    /** @var list<array{code: string, name: string}>|null B17: the enabled checkout methods, once per render */
+    private ?array $paymentMethods = null;
+
+    /** @var list<array<string, mixed>>|null B17: the active delivery zones, once per render */
+    private ?array $zones = null;
 
     public function __construct(
         private readonly PromotionShowcase $promotions,
@@ -99,6 +115,8 @@ class BuilderElementData
         $this->live = null;
         $this->ratingCounts = [];
         $this->timezone = null;
+        $this->paymentMethods = null;
+        $this->zones = null;
 
         $ids = fn (string $type, string $prop, ?callable $when = null) => array_values(array_unique(array_filter(array_map(
             fn (array $e) => $e['type'] === $type && ($when === null || $when($e)) ? ($e['props'][$prop] ?? null) : null,
@@ -241,6 +259,15 @@ class BuilderElementData
                     break;
                 case 'order_form':
                     [$data, $state] = $this->orderForm($props, $orderDetails, $orderPreview, $checkout ?? $this->checkoutOptions());
+                    break;
+                case 'payment_badges':
+                    [$data, $state] = $this->paymentBadges($props);
+                    break;
+                case 'delivery_promise':
+                    [$data, $state] = $this->deliveryPromise($props, $preview);
+                    break;
+                case 'bangla_date':
+                    $data = ['timezone' => $this->timezone()];
                     break;
             }
 
@@ -644,6 +671,95 @@ class BuilderElementData
             'checkout_available' => $store !== null && $store['is_active'] && $store['branch_is_active'],
             'shipping' => ['methods' => $shipping['methods'], 'districts' => $shipping['districts'] === [] ? new \stdClass : $shipping['districts']],
         ];
+    }
+
+    /**
+     * B17: how the store takes payment — its enabled checkout methods (when shown) and the
+     * chosen mobile wallets as text names in the request's language.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array{0: array<string, mixed>, 1: ?string}
+     */
+    private function paymentBadges(array $props): array
+    {
+        $methods = [];
+        if ($props['show_store_methods']) {
+            $this->paymentMethods ??= array_map(fn (array $m) => ['code' => $m['code'], 'name' => $m['display_name']], $this->payments->enabled());
+            $methods = $this->paymentMethods;
+        }
+        $bangla = $this->locale->current() === LocaleContext::BN;
+        $wallets = array_map(fn (string $code) => [
+            'code' => $code,
+            'name' => ElementRegistry::PAYMENT_WALLET_NAMES[$code][$bangla ? 'bn' : 'en'],
+        ], $props['wallets']);
+
+        return [['methods' => $methods, 'wallets' => $wallets], $methods === [] && $wallets === [] ? 'empty' : null];
+    }
+
+    /**
+     * B17: the delivery promise — one line per active zone that delivers somewhere (covers a
+     * district and has an active method): the method's name when it is the only one, the
+     * fastest / slowest days, the fee when every method agrees and the lowest fee, the
+     * free-delivery threshold when every method agrees, and whether cash on delivery is
+     * possible. Exact decimals throughout.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array{0: array<string, mixed>, 1: ?string}
+     */
+    private function deliveryPromise(array $props, bool $preview): array
+    {
+        $this->zones ??= $this->shipping->activeZones();
+        $delivers = fn (array $zone) => $zone['covers_districts'] && $zone['methods'] !== [];
+        $chosen = [];
+        $missing = [];
+        if ($props['zones'] === 'all') {
+            $chosen = array_values(array_filter($this->zones, $delivers));
+        } else {
+            $byId = array_column($this->zones, null, 'id');
+            foreach ($props['zones'] as $id) {
+                $zone = $byId[$id] ?? null;
+                if ($zone !== null && $delivers($zone)) {
+                    $chosen[] = $zone;
+                } else {
+                    $missing[] = $id;
+                }
+            }
+        }
+
+        $lines = array_map(function (array $zone) {
+            $methods = $zone['methods'];
+            $fees = array_values(array_unique(array_map(fn (array $m) => Decimal::round((string) $m['fee'], 2), $methods)));
+            $lowest = $fees[0];
+            foreach ($fees as $fee) {
+                $lowest = Decimal::min($lowest, $fee);
+            }
+            $thresholds = array_values(array_unique(array_map(fn (array $m) => $m['free_over'] === null ? '' : Decimal::round((string) $m['free_over'], 2), $methods)));
+
+            return [
+                'id' => $zone['id'],
+                'name' => $zone['name'],
+                'method' => count($methods) === 1 ? (string) $methods[0]['name'] : null,
+                'min_days' => (int) min(array_column($methods, 'eta_min_days')),
+                'max_days' => (int) max(array_column($methods, 'eta_max_days')),
+                'fee' => count($fees) === 1 ? $fees[0] : null,
+                'fee_from' => Decimal::round($lowest, 2),
+                'free_over' => count($thresholds) === 1 && $thresholds[0] !== '' ? $thresholds[0] : null,
+                'cod_allowed' => in_array(true, array_column($methods, 'cod_allowed'), true),
+            ];
+        }, $chosen);
+
+        $thresholds = array_values(array_unique(array_map(fn (array $line) => $line['free_over'] ?? '', $lines)));
+        $data = [
+            'zones' => $lines,
+            'cod_everywhere' => $lines !== [] && ! in_array(false, array_column($lines, 'cod_allowed'), true),
+            'free_over' => count($thresholds) === 1 && $thresholds[0] !== '' ? $thresholds[0] : null,
+        ];
+        if ($preview) {
+            $data['all_zones'] = array_map(fn (array $zone) => ['id' => $zone['id'], 'name' => $zone['name']], $this->zones);
+            $data['missing'] = $missing;
+        }
+
+        return [$data, $lines === [] ? 'empty' : null];
     }
 
     /**

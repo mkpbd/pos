@@ -1,0 +1,139 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "bar_top",
+        "position": "bottom_right",
+        "width": "md",
+        "overlay": false,
+        "close_on_overlay": false,
+        "label": "Pohela Boishakh announcement bar",
+        "trigger": {
+            "kind": "on_load",
+            "delay_seconds": 0,
+            "scroll_percent": 50
+        },
+        "frequency": {
+            "kind": "every_page_view",
+            "days": 7
+        },
+        "stop_after_action": false,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "all",
+        "priority": 45,
+        "starts_at": "2027-04-07T00:00:00+06:00",
+        "ends_at": "2027-04-14T23:59:00+06:00",
+        "translations": {
+            "bn": {
+                "label": "পহেলা বৈশাখ: ঘোষণা বার"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 10,
+                        "mobile": 15
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "ornament",
+                            "props": {
+                                "name": "shapla",
+                                "color": "#ffffff",
+                                "secondary_color": "#f9d56e",
+                                "size": 28,
+                                "align": "right",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": false
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 65,
+                        "mobile": 85
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p><strong>Shubho Noboborsho!</strong> Boishakh offers are on.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p><strong>শুভ নববর্ষ!</strong> বৈশাখী অফার চলছে।</p>"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 25,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_3",
+                            "type": "button",
+                            "props": {
+                                "label": "Shop now",
+                                "link": {
+                                    "url": "/shop"
+                                },
+                                "variant": "primary",
+                                "size": "sm",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "এখনই কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "8px",
+                            "bottom": "8px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#8e1515"
+                    },
+                    "color": "#ffffff",
+                    "layout": {
+                        "align": "center",
+                        "gap": "12px"
+                    }
+                }
+            }
+        }
+    ]
+}

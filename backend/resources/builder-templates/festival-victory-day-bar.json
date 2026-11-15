@@ -1,0 +1,111 @@
+{
+    "schema_version": 1,
+    "popup": {
+        "layout": "bar_top",
+        "position": "bottom_right",
+        "width": "md",
+        "overlay": false,
+        "close_on_overlay": false,
+        "label": "Victory Day announcement bar",
+        "trigger": {
+            "kind": "on_load",
+            "delay_seconds": 0,
+            "scroll_percent": 50
+        },
+        "frequency": {
+            "kind": "every_page_view",
+            "days": 7
+        },
+        "stop_after_action": false,
+        "pages": {
+            "kind": "all",
+            "paths": []
+        },
+        "devices": "all",
+        "audience": "all",
+        "priority": 45,
+        "starts_at": "2026-12-14T00:00:00+06:00",
+        "ends_at": "2026-12-16T23:59:00+06:00",
+        "translations": {
+            "bn": {
+                "label": "বিজয় দিবস: ঘোষণা বার"
+            }
+        }
+    },
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 10,
+                        "mobile": 15
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "ornament",
+                            "props": {
+                                "name": "shapla",
+                                "color": "#ffffff",
+                                "secondary_color": "#c8e6c9",
+                                "size": 24,
+                                "align": "right",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": false
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 90,
+                        "mobile": 85
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p><strong>Great Victory Day.</strong> Respect to the martyrs of 1971.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p><strong>মহান বিজয় দিবস।</strong> একাত্তরের শহীদদের প্রতি শ্রদ্ধা।</p>"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "8px",
+                            "bottom": "8px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#00563f"
+                    },
+                    "color": "#ffffff",
+                    "layout": {
+                        "align": "center",
+                        "gap": "12px"
+                    }
+                }
+            }
+        }
+    ]
+}

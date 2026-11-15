@@ -1,0 +1,934 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_8",
+                            "type": "inner_row",
+                            "props": {},
+                            "columns": [
+                                {
+                                    "id": "c_1",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 60,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_1",
+                                            "type": "ornament",
+                                            "props": {
+                                                "name": "dhak",
+                                                "color": "#f6d36b",
+                                                "secondary_color": "#ffffff",
+                                                "size": 96,
+                                                "align": "left",
+                                                "flip": "none",
+                                                "opacity": 100,
+                                                "repeat": false
+                                            }
+                                        },
+                                        {
+                                            "id": "e_2",
+                                            "type": "bangla_date",
+                                            "props": {
+                                                "prefix": "Today is",
+                                                "show_gregorian": true,
+                                                "show_hijri": false,
+                                                "style": "plain",
+                                                "align": "left"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "prefix": "আজ"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_3",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Puja shopping is here",
+                                                "level": 1,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "পূজার কেনাকাটা শুরু"
+                                                }
+                                            },
+                                            "style": {
+                                                "base": {
+                                                    "typography": {
+                                                        "align": "left"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_4",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>New clothes from Shashthi to Dashami and gifts for your loved ones, at festive prices for the Puja days.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>ষষ্ঠী থেকে দশমী, নতুন পোশাক আর প্রিয়জনের উপহার, পূজার দিনগুলোর জন্য উৎসবের দামে।</p>"
+                                                }
+                                            },
+                                            "style": {
+                                                "base": {
+                                                    "typography": {
+                                                        "align": "left"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_5",
+                                            "type": "button",
+                                            "props": {
+                                                "label": "Shop for Puja",
+                                                "link": {
+                                                    "url": "/shop"
+                                                },
+                                                "variant": "primary",
+                                                "size": "lg",
+                                                "full_width": false
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "label": "পূজার কেনাকাটা করুন"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_2",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 40,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_6",
+                                            "type": "ornament",
+                                            "props": {
+                                                "name": "kash_flower",
+                                                "color": "#a3201b",
+                                                "secondary_color": "#f6d36b",
+                                                "size": 96,
+                                                "align": "center",
+                                                "flip": "none",
+                                                "opacity": 100,
+                                                "repeat": false
+                                            }
+                                        },
+                                        {
+                                            "id": "e_7",
+                                            "type": "countdown",
+                                            "props": {
+                                                "source": "date",
+                                                "ends_at": "2027-10-10T23:59:00+06:00",
+                                                "promotion_id": null,
+                                                "title": "Offer ends in",
+                                                "expired_text": "This offer has ended. Thank you for shopping with us.",
+                                                "style": "boxes"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "title": "অফার শেষ হতে বাকি",
+                                                    "expired_text": "অফারটি শেষ হয়েছে। আমাদের সঙ্গে কেনাকাটার জন্য ধন্যবাদ।"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "style": {
+                                        "base": {
+                                            "background": {
+                                                "type": "color",
+                                                "color": "theme:surface"
+                                            },
+                                            "color": "theme:text",
+                                            "spacing": {
+                                                "padding": {
+                                                    "top": "24px",
+                                                    "bottom": "24px",
+                                                    "left": "20px",
+                                                    "right": "20px"
+                                                }
+                                            },
+                                            "border": {
+                                                "radius": {
+                                                    "tl": "16px",
+                                                    "tr": "16px",
+                                                    "br": "16px",
+                                                    "bl": "16px"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "gap": "32px",
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_9",
+                            "type": "spacer",
+                            "props": {},
+                            "style": {
+                                "base": {
+                                    "size": {
+                                        "height": "16px"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_10",
+                            "type": "ornament",
+                            "props": {
+                                "name": "alpona_border",
+                                "color": "#ffffff",
+                                "secondary_color": "#f6d36b",
+                                "size": 32,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "#a3201b",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "#7f1414",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_11",
+                            "type": "heading",
+                            "props": {
+                                "text": "Your Puja discount",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আপনার পূজার ছাড়"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_12",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>A little extra off for the festive days.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>উৎসবের দিনগুলোতে আরও একটু বাড়তি ছাড়।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_13",
+                            "type": "discount",
+                            "props": {
+                                "promotion_ref": "coupon",
+                                "title": "Extra Puja discount",
+                                "text": "Use this code at checkout.",
+                                "show_code": true,
+                                "button_label": "Shop now",
+                                "link": {
+                                    "url": "/shop"
+                                }
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "পূজার বাড়তি ছাড়",
+                                    "text": "চেকআউটে এই কোডটি ব্যবহার করুন।",
+                                    "button_label": "কেনাকাটা করুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#fff4e0"
+                    },
+                    "color": "#5c1010"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_5",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_14",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "Puja offers",
+                                "subtitle": "Festive prices while stocks last",
+                                "config": {
+                                    "source": "on_sale",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "columns": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "পূজার অফার",
+                                    "subtitle": "স্টক থাকা পর্যন্ত উৎসবের দাম"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_4",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_6",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_15",
+                            "type": "product_carousel",
+                            "props": {
+                                "title": "New for the Puja",
+                                "subtitle": "Fresh picks for the five days",
+                                "config": {
+                                    "source": "new_arrivals",
+                                    "category_id": null,
+                                    "limit": 10,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "পূজার নতুন সংগ্রহ",
+                                    "subtitle": "পাঁচ দিনের জন্য নতুন বাছাই"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "24px",
+                            "bottom": "48px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "16px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_5",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_7",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_16",
+                            "type": "heading",
+                            "props": {
+                                "text": "Shop for Puja with peace of mind",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "নিশ্চিন্তে পূজার কেনাকাটা"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_17",
+                            "type": "trust_badges",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "b1",
+                                        "icon": "star",
+                                        "title": "100% original products",
+                                        "text": "Checked before it ships"
+                                    },
+                                    {
+                                        "id": "b2",
+                                        "icon": "rotate-ccw",
+                                        "title": "7-day easy return",
+                                        "text": "If something is wrong, we make it right"
+                                    },
+                                    {
+                                        "id": "b3",
+                                        "icon": "truck",
+                                        "title": "Cash on delivery",
+                                        "text": "Pay when your order arrives"
+                                    },
+                                    {
+                                        "id": "b4",
+                                        "icon": "shield-check",
+                                        "title": "Secure checkout",
+                                        "text": "Your details stay private"
+                                    },
+                                    {
+                                        "id": "b5",
+                                        "icon": "phone",
+                                        "title": "Hotline",
+                                        "text": "Call us, we are happy to help"
+                                    }
+                                ],
+                                "style": "row"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.b1.title": "১০০% আসল পণ্য",
+                                    "items.b1.text": "পাঠানোর আগে যাচাই করা",
+                                    "items.b2.title": "৭ দিনে সহজ ফেরত",
+                                    "items.b2.text": "কোনো সমস্যা হলে আমরা ঠিক করে দেব",
+                                    "items.b3.title": "ক্যাশ অন ডেলিভারি",
+                                    "items.b3.text": "পণ্য হাতে পেয়ে টাকা দিন",
+                                    "items.b4.title": "নিরাপদ চেকআউট",
+                                    "items.b4.text": "আপনার তথ্য সুরক্ষিত থাকে",
+                                    "items.b5.title": "হটলাইন",
+                                    "items.b5.text": "ফোন করুন, সাহায্য করতে আমরা প্রস্তুত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_6",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_8",
+                    "type": "column",
+                    "width": {
+                        "base": 60,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_18",
+                            "type": "delivery_promise",
+                            "props": {
+                                "title": "Delivery before the Puja",
+                                "zones": "all",
+                                "show_price": true,
+                                "show_cod": true,
+                                "show_free_over": true,
+                                "layout": "cards"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "পূজার আগেই ডেলিভারি"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_9",
+                    "type": "column",
+                    "width": {
+                        "base": 40,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_19",
+                            "type": "payment_badges",
+                            "props": {
+                                "title": "How you can pay",
+                                "show_store_methods": true,
+                                "wallets": [],
+                                "note": "",
+                                "style": "chips",
+                                "align": "left"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "যেভাবে টাকা দিতে পারেন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "24px",
+                            "bottom": "48px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "16px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_7",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_10",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_20",
+                            "type": "ornament",
+                            "props": {
+                                "name": "alpona_round",
+                                "color": "#a3201b",
+                                "secondary_color": "#d99a1e",
+                                "size": 88,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": false
+                            }
+                        },
+                        {
+                            "id": "e_21",
+                            "type": "heading",
+                            "props": {
+                                "text": "Shubho Sharodiya",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "শুভ শারদীয়া"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_22",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Warm wishes for Durga Puja from all of us. May the festive days bring joy to your home.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>আমাদের সবার পক্ষ থেকে শারদীয় দুর্গোৎসবের আন্তরিক শুভেচ্ছা। উৎসবের দিনগুলো আনন্দে ভরে উঠুক আপনার ঘর।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#fff4e0"
+                    },
+                    "color": "#7f1414"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_8",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_11",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_23",
+                            "type": "heading",
+                            "props": {
+                                "text": "How to order",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "কীভাবে অর্ডার করবেন"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_24",
+                            "type": "steps",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "i1",
+                                        "title": "Choose",
+                                        "text": "Pick your favourites from the shop.",
+                                        "icon": null
+                                    },
+                                    {
+                                        "id": "i2",
+                                        "title": "Order",
+                                        "text": "Add them to the cart and check out, online or with cash on delivery.",
+                                        "icon": null
+                                    },
+                                    {
+                                        "id": "i3",
+                                        "title": "Receive",
+                                        "text": "We bring your order to your door.",
+                                        "icon": null
+                                    }
+                                ],
+                                "layout": "horizontal",
+                                "numbered": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.i1.title": "পছন্দ করুন",
+                                    "items.i1.text": "দোকান থেকে পছন্দের পণ্য বেছে নিন।",
+                                    "items.i2.title": "অর্ডার করুন",
+                                    "items.i2.text": "কার্টে যোগ করে অর্ডার দিন, অনলাইনে বা ক্যাশ অন ডেলিভারিতে।",
+                                    "items.i3.title": "হাতে পান",
+                                    "items.i3.text": "আমরা অর্ডারটি পৌঁছে দেব আপনার দরজায়।"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_25",
+                            "type": "heading",
+                            "props": {
+                                "text": "Questions and answers",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "প্রশ্ন ও উত্তর"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_26",
+                            "type": "accordion",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "q1",
+                                        "title": "When will my order arrive?",
+                                        "html": "<p>Delivery times for each area are shown above. Festival days are busy, so please order a few days early.</p>"
+                                    },
+                                    {
+                                        "id": "q2",
+                                        "title": "Can I pay cash on delivery?",
+                                        "html": "<p>Where cash on delivery is available, you will see it at checkout.</p>"
+                                    },
+                                    {
+                                        "id": "q3",
+                                        "title": "How do I use the discount code?",
+                                        "html": "<p>Copy the code above and enter it at checkout before you place your order.</p>"
+                                    },
+                                    {
+                                        "id": "q4",
+                                        "title": "Can I exchange a gift?",
+                                        "html": "<p>Yes. Please keep the product unused with its tag and contact us within 7 days of delivery.</p>"
+                                    }
+                                ],
+                                "open_first": true,
+                                "allow_multiple": false,
+                                "style": "boxed"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.q1.title": "অর্ডার কবে হাতে পাব?",
+                                    "items.q1.html": "<p>প্রতিটি এলাকার ডেলিভারির সময় ওপরে দেওয়া আছে। উৎসবের সময় চাপ বেশি থাকে, তাই কয়েক দিন আগে অর্ডার করুন।</p>",
+                                    "items.q2.title": "ক্যাশ অন ডেলিভারিতে টাকা দেওয়া যাবে?",
+                                    "items.q2.html": "<p>যেখানে ক্যাশ অন ডেলিভারি আছে, চেকআউটে তা দেখতে পাবেন।</p>",
+                                    "items.q3.title": "ডিসকাউন্ট কোড কীভাবে ব্যবহার করব?",
+                                    "items.q3.html": "<p>ওপরের কোডটি কপি করে অর্ডার দেওয়ার আগে চেকআউটে লিখুন।</p>",
+                                    "items.q4.title": "উপহার বদলানো যাবে?",
+                                    "items.q4.html": "<p>হ্যাঁ। পণ্যটি ট্যাগসহ অব্যবহৃত রাখুন এবং ডেলিভারির ৭ দিনের মধ্যে আমাদের সাথে যোগাযোগ করুন।</p>"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "64px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

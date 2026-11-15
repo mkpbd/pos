@@ -1,0 +1,156 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "ornament",
+                            "props": {
+                                "name": "shapla",
+                                "color": "#ffffff",
+                                "secondary_color": "#c8e6c9",
+                                "size": 72,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": false
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "bangla_date",
+                            "props": {
+                                "prefix": "Today is",
+                                "show_gregorian": true,
+                                "show_hijri": false,
+                                "style": "plain",
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "prefix": "আজ"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "heading",
+                            "props": {
+                                "text": "Great Independence Day",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "মহান স্বাধীনতা দিবস"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>On 26 March we remember with gratitude the freedom fighters and everyone who gave their lives for an independent Bangladesh.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>২৬ মার্চ আমরা কৃতজ্ঞতার সঙ্গে স্মরণ করি মুক্তিযোদ্ধাদের এবং স্বাধীন বাংলাদেশের জন্য জীবন দেওয়া সবাইকে।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "spacer",
+                            "props": {},
+                            "style": {
+                                "base": {
+                                    "size": {
+                                        "height": "16px"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_6",
+                            "type": "ornament",
+                            "props": {
+                                "name": "flag_ribbon",
+                                "color": "#006a4e",
+                                "secondary_color": "#f42a41",
+                                "size": 24,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "#006a4e",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "#00563f",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

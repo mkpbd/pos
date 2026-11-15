@@ -1,5 +1,9 @@
 import {
   BadgePercentIcon,
+  CalendarDaysIcon,
+  FlowerIcon,
+  TruckIcon,
+  WalletIcon,
   CircleHelpIcon,
   CodeIcon,
   CopyrightIcon,
@@ -160,6 +164,11 @@ export const ELEMENT_ICONS: Record<string, LucideIcon> = {
   form: ClipboardListIcon,
   // P2a
   order_form: ShoppingBagIcon,
+  // B17
+  ornament: FlowerIcon,
+  payment_badges: WalletIcon,
+  delivery_promise: TruckIcon,
+  bangla_date: CalendarDaysIcon,
 }
 
 export function elementIcon(type: string): LucideIcon {
@@ -240,6 +249,10 @@ export const ELEMENT_HINTS: Record<string, string> = {
   progress_bars: 'Bars or rings that show percentages.',
   form: 'Your own form with the questions you choose. Answers arrive under Content → Form submissions.',
   order_form: 'One product ordered right on the page: name, phone and address, cash on delivery — no cart.',
+  ornament: 'A festive drawing: crescent, lantern, alpona, kash flower and more.',
+  payment_badges: 'How shoppers can pay: cash on delivery, bKash, Nagad and more.',
+  delivery_promise: 'Delivery times and charges from your shipping settings.',
+  bangla_date: 'Today’s date in the Bangla calendar, e.g. ১ বৈশাখ ১৪৩৩.',
 }
 
 /** B4: the server may group the header / footer parts as `site`. */

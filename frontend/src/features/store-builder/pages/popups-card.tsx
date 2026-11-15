@@ -15,6 +15,7 @@ import { useCreateDocumentMutation, useSetPopupActiveMutation, type DocumentSumm
 import { POPUP_LAYOUT_ICONS, POPUP_TEMPLATE_LAYOUTS, popupStatus } from '../popup-model'
 import { PopupSketch } from '../popup-visuals'
 import { usePopupTemplatesQuery, type BuilderTemplate } from '../templates/api'
+import { isFestivalTemplate } from '../templates/model'
 import type { RemoveRequest } from './builder-parts'
 import type { MessageKey } from './messages'
 import { lastEdited } from './page-helpers'
@@ -189,6 +190,18 @@ function NewPopupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
     </label>
   )
 
+  const templateOption = (template: BuilderTemplate) => {
+    const w = words(template)
+    // B17: festival bars (`festival-<key>-bar`) sit at the top edge.
+    const layout = POPUP_TEMPLATE_LAYOUTS[template.id] ?? (isFestivalTemplate(template) ? 'bar_top' : 'modal')
+    return option(
+      template.id,
+      w.name,
+      w.text,
+      template.thumbnail_url ? <img src={template.thumbnail_url} alt="" className="aspect-[4/3] w-full rounded-md border object-cover" /> : <PopupSketch layout={layout} />,
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent lang={lang} className="sm:max-w-3xl">
@@ -219,17 +232,14 @@ function NewPopupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 text-sm font-medium">{t('popups.startLegend')}</legend>
             <div role="radiogroup" aria-label={t('popups.startLegend')} className="grid max-h-[50vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3 lg:grid-cols-4">
-              {list.map((template) => {
-                const w = words(template)
-                const layout = POPUP_TEMPLATE_LAYOUTS[template.id] ?? 'modal'
-                return option(
-                  template.id,
-                  w.name,
-                  w.text,
-                  template.thumbnail_url ? <img src={template.thumbnail_url} alt="" className="aspect-[4/3] w-full rounded-md border object-cover" /> : <PopupSketch layout={layout} />,
-                )
-              })}
+              {list.filter((template) => !isFestivalTemplate(template)).map(templateOption)}
               {option(BLANK, t('popups.blank'), t('popups.blankDetail'), <PopupSketch layout="modal" className="opacity-60" />)}
+              {list.some(isFestivalTemplate) && (
+                <p className="col-span-full mt-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase" data-testid="popup-festivals">
+                  {t('popups.festivals')}
+                </p>
+              )}
+              {list.filter(isFestivalTemplate).map(templateOption)}
             </div>
             {templates.isPending && (
               <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">

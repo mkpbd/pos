@@ -77,6 +77,10 @@ export const ELEMENT_WORDS: Record<string, string> = {
   progress_bars: 'অগ্রগতি শতাংশ progress percent',
   form: 'ফর্ম প্রশ্ন form survey',
   order_form: 'অর্ডার ফর্ম ক্যাশ অন ডেলিভারি order cod',
+  ornament: 'নকশা সাজ আলপনা চাঁদ ফানুস ornament decoration festival eid puja',
+  payment_badges: 'পেমেন্ট বিকাশ নগদ রকেট উপায় ক্যাশ অন ডেলিভারি payment bkash nagad cod',
+  delivery_promise: 'ডেলিভারি শিপিং সময় চার্জ delivery shipping',
+  bangla_date: 'বাংলা তারিখ বঙ্গাব্দ ক্যালেন্ডার bangla date calendar',
 }
 
 /** Words of the editor's actions (Bangla and English). */

@@ -58,6 +58,7 @@ import { Bangla, ImageListBangla, ImageListField, ItemBangla, Note, NumberField,
 import { itemErrors, limitIn, patch, setList, type ElementFormProps } from './form-model'
 import { HotspotEditor } from './hotspot-editor'
 import { ItemList } from './item-list'
+import { withBadgeLink } from './b17-model'
 import { ChoiceField, IconPicker, PixelField, SingleProductPicker, TextField, ToggleField } from './pickers'
 
 export type B6FormProps<N> = ElementFormProps<N>
@@ -727,19 +728,21 @@ export function ShopTheLookForm(props: B6FormProps<ShopTheLookElement>) {
 export function TrustBadgesForm(props: B6FormProps<TrustBadgesElement>) {
   const { node, onChange, errors, icons = ICON_NAMES } = props
   const p = node.props
+  // B17: up to 8 badges, each may link to a page (e.g. the returns policy).
+  const items = p.items
   return (
     <div className="flex flex-col gap-4">
       <ItemList<TrustBadgeItem>
         label="Badges"
         noun="badge"
-        items={p.items}
+        items={items}
         min={B6_LIMITS.trustBadges.min}
         max={B6_LIMITS.trustBadges.max}
         errors={errors}
-        create={(id) => ({ id, icon: 'badge-check', title: 'New badge', text: '' })}
+        create={(id) => ({ id, icon: 'shield-check', title: 'New badge', text: '' })}
         summary={(item) => item.title}
         lead={(item) => <IconLead name={item.icon} />}
-        onChange={(items, change) => setList(node, onChange, 'items', items, change)}
+        onChange={(next, change) => setList(node, onChange, 'items', next, change)}
       >
         {(item, i, update) => {
           const e = itemErrors(errors, 'items', i)
@@ -748,6 +751,13 @@ export function TrustBadgesForm(props: B6FormProps<TrustBadgesElement>) {
               <TextField label="Title" value={item.title} max={limit('trust_badges', 'items.*.title')} error={e.title} onChange={(title) => update({ title }, 'title')} />
               <TextField label="Text" hint="Optional." value={item.text} max={limit('trust_badges', 'items.*.text')} error={e.text} onChange={(text) => update({ text }, 'text')} />
               <IconPicker value={item.icon} icons={icons} error={e.icon} onChange={(icon) => update({ icon })} />
+              <LinkField
+                label="Link"
+                value={item.link?.url ?? null}
+                error={e.link ?? e['link.url']}
+                hint="Optional: e.g. your returns policy page. Shoppers can open it from the badge."
+                onChange={(url) => setList(node, onChange, 'items', items.map((x) => (x.id === item.id ? withBadgeLink(x, url) : x)), { typing: `${item.id}.link` })}
+              />
               <ItemBangla {...props} list="items" itemId={item.id} fields={[{ name: 'title', label: 'Title', base: item.title }, { name: 'text', label: 'Text', base: item.text }]} />
             </>
           )

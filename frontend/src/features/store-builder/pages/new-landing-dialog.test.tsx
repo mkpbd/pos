@@ -59,6 +59,26 @@ describe('new campaign page from a template', () => {
     expect(TEMPLATES.filter(templateNeedsProduct).map((t) => t.id)).toEqual(['landing-order', 'landing-eid-sale', 'landing-new-arrival'])
   })
 
+  it('B17: festival landing pages sit under their own heading after the campaign pages', async () => {
+    const user = userEvent.setup()
+    const festival = template('festival-eid-ul-fitr-landing', 'Eid-ul-Fitr page', ['products'], { category: 'festival' })
+    expect(isLandingTemplate(festival)).toBe(true)
+    mockApi({
+      'GET /auth/me': ok(manager()),
+      'GET /storefront/builder/documents': ok([]),
+      'GET /storefront/builder/templates': ok([...TEMPLATES, festival]),
+    })
+    renderRoutes(routes, '/storefront/pages')
+    await user.click(await screen.findByRole('button', { name: 'New campaign page' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New campaign page' })
+    const group = within(dialog).getByRole('radiogroup', { name: 'Start from' })
+    await waitFor(() => expect(within(group).getAllByRole('radio')).toHaveLength(6))
+    expect(within(group).getByText('Campaign pages')).toBeInTheDocument()
+    expect(within(group).getByTestId('landing-festivals')).toHaveTextContent(/Online store → Festivals/)
+    const radios = within(group).getAllByRole('radio')
+    expect(radios.at(-1)).toHaveAccessibleName(/Eid-ul-Fitr page/)
+  })
+
   it('creates an order page for a product: named after it, at /p/<its name>, then opens the editor', async () => {
     const user = userEvent.setup()
     const { bodies, fetchMock } = mockScreen(() => ({ status: 201, ...ok({ ...created, content: { schema_version: 1, sections: [] } }) }))

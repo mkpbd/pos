@@ -2094,6 +2094,444 @@
         "page"
       ],
       "requires": []
+    },
+    {
+      "id": "festival-eid-ul-fitr-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Eid-ul-Fitr landing page",
+      "description": "A Eid-ul-Fitr page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-eid-ul-fitr-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Eid-ul-Fitr hero",
+      "description": "A festive Eid-ul-Fitr hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-eid-ul-fitr-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Eid-ul-Fitr announcement bar",
+      "description": "A coloured bar at the top of every page announcing your Eid-ul-Fitr offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-eid-ul-adha-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Eid-ul-Adha landing page",
+      "description": "A Eid-ul-Adha page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-eid-ul-adha-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Eid-ul-Adha hero",
+      "description": "A festive Eid-ul-Adha hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-eid-ul-adha-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Eid-ul-Adha announcement bar",
+      "description": "A coloured bar at the top of every page announcing your Eid-ul-Adha offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-ramadan-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Ramadan landing page",
+      "description": "A Ramadan page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-ramadan-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Ramadan hero",
+      "description": "A festive Ramadan hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-ramadan-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Ramadan announcement bar",
+      "description": "A coloured bar at the top of every page announcing your Ramadan offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-durga-puja-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Durga Puja landing page",
+      "description": "A Durga Puja page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-durga-puja-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Durga Puja hero",
+      "description": "A festive Durga Puja hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-durga-puja-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Durga Puja announcement bar",
+      "description": "A coloured bar at the top of every page announcing your Durga Puja offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-pohela-boishakh-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Pohela Boishakh landing page",
+      "description": "A Pohela Boishakh page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-pohela-boishakh-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Pohela Boishakh hero",
+      "description": "A festive Pohela Boishakh hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-pohela-boishakh-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Pohela Boishakh announcement bar",
+      "description": "A coloured bar at the top of every page announcing your Pohela Boishakh offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-ekushey-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Ekushey February landing page",
+      "description": "A respectful tribute page for International Mother Language Day: the Shaheed Minar, the Bangla date, the song of Ekushey, your shop, trust, delivery and payment blocks. No sale wording.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-ekushey-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Ekushey February hero",
+      "description": "A respectful Ekushey hero for the home page: the Shaheed Minar drawing, the Bangla date and a tribute. No sale wording.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-ekushey-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Ekushey February announcement bar",
+      "description": "A quiet black bar at the top of every page paying tribute to the language martyrs, shown only on the dates you choose.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-independence-day-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Independence Day landing page",
+      "description": "A dignified Independence Day page in the national colours: a tribute headline, a modest thank-you offer with a countdown, your products, trust, delivery and payment blocks, a greeting and opening-day questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-independence-day-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Independence Day hero",
+      "description": "A dignified Independence Day hero for the home page in the national colours, with the Bangla date and a flag ribbon.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-independence-day-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Independence Day announcement bar",
+      "description": "A quiet bar at the top of every page marking Independence Day, shown only on the dates you choose.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-victory-day-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Victory Day landing page",
+      "description": "A dignified Victory Day page in the national colours: a tribute headline, a modest thank-you offer with a countdown, your products, trust, delivery and payment blocks, a greeting and opening-day questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-victory-day-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Victory Day hero",
+      "description": "A dignified Victory Day hero for the home page in the national colours, with the Bangla date and a flag ribbon.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-victory-day-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Victory Day announcement bar",
+      "description": "A quiet bar at the top of every page marking Victory Day, shown only on the dates you choose.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-winter-sale-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "Winter sale landing page",
+      "description": "A Winter sale page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-winter-sale-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "Winter sale hero",
+      "description": "A festive Winter sale hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-winter-sale-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "Winter sale announcement bar",
+      "description": "A coloured bar at the top of every page announcing your Winter sale offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-eleven-eleven-landing",
+      "scope": "page",
+      "preset": null,
+      "category": "festival",
+      "name": "11.11 sale landing page",
+      "description": "A 11.11 sale page: a festive headline with drawn ornaments, the Bangla date and a countdown, your running coupon, products on offer, trust, delivery and payment blocks, a greeting and questions.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "festival-eleven-eleven-hero",
+      "scope": "section",
+      "preset": null,
+      "category": "festival",
+      "name": "11.11 sale hero",
+      "description": "A festive 11.11 sale hero for the home page: drawn ornaments, the Bangla date, a headline, a button and a countdown.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "festival-eleven-eleven-bar",
+      "scope": "popup",
+      "preset": null,
+      "category": "festival",
+      "name": "11.11 sale announcement bar",
+      "description": "A coloured bar at the top of every page announcing your 11.11 sale offers, shown only on the festival dates.",
+      "thumbnail": null,
+      "allowed_in": [
+        "popup"
+      ],
+      "requires": []
     }
   ]
 }

@@ -1,0 +1,143 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "ornament",
+                            "props": {
+                                "name": "shaheed_minar",
+                                "color": "#ffffff",
+                                "secondary_color": "#c62828",
+                                "size": 160,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": false
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "bangla_date",
+                            "props": {
+                                "prefix": "Today is",
+                                "show_gregorian": true,
+                                "show_hijri": false,
+                                "style": "plain",
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "prefix": "আজ"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "heading",
+                            "props": {
+                                "text": "Amar Ekushey",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "অমর একুশে"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>International Mother Language Day. With deep respect we remember the language martyrs of 1952, who gave their lives for our mother tongue, Bangla.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>আন্তর্জাতিক মাতৃভাষা দিবস। মাতৃভাষা বাংলার জন্য জীবন দেওয়া ১৯৫২ সালের ভাষা শহীদদের আমরা গভীর শ্রদ্ধায় স্মরণ করি।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "spacer",
+                            "props": {},
+                            "style": {
+                                "base": {
+                                    "size": {
+                                        "height": "16px"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_6",
+                            "type": "ornament",
+                            "props": {
+                                "name": "alpona_border",
+                                "color": "#ffffff",
+                                "secondary_color": "#c62828",
+                                "size": 28,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#1d1d1f"
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

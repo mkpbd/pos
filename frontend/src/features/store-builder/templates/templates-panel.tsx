@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { useDraggable } from '@dnd-kit/core'
 import { Loader2Icon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -184,6 +185,15 @@ export function TemplatesPanel({ context, currentPreset, inserter, enabled = tru
         )}
       </div>
       <p className="px-3 pb-2 text-xs text-muted-foreground">Insert adds a template after the selected section. You can also drag its picture onto the page.</p>
+      {effectiveCategory === 'festival' && (
+        <p className="px-3 pb-2 text-xs text-muted-foreground" data-testid="festival-templates-hint">
+          Festival sections show all year until you give them dates (Advanced → Show from / Show until).{' '}
+          <Link to="/storefront/festivals" className="underline underline-offset-2">
+            Online store → Festivals
+          </Link>{' '}
+          sets up a festival page, a home banner and a bar for the dates in one go.
+        </p>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">{body}</div>
       <ConfirmDialog
         open={deleting !== null}

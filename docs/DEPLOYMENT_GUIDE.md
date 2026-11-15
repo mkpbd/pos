@@ -41,6 +41,8 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Store builder upgrade (B9):** `php artisan migrate` adds the nullable `builder_documents.context` (global sections). The AI writer uses the existing AI settings and budget (usage feature `builder_writer`); nothing else to configure.
 
+**Store builder upgrade (B17):** `php artisan migrate` (`storefront_festival_setups`). Festival pages, banners and bars show and hide by their dates through node schedules and popup dates — no extra job. The bundled Eid / Ramadan / Puja dates cover 2026–2028 (expected; the owner can change them per setup); extend `FestivalCalendar` for later years.
+
 **Store builder upgrade (B11):** `php artisan migrate` (builder schedules, reviews, saved copies; media focal point and edit source). **The scheduler must run** (`* * * * * php artisan schedule:run`): `storefront:publish-scheduled` publishes pages and themes set to *Publish later* every minute — without it scheduled pages never go live. Picture edits run in the request (GD, up to 6000 × 6000 px; PHP `memory_limit` ≥ 512M recommended); uploads over 2560 px are scaled down on upload. Optional once: `php artisan media:optimize --dry-run`, then without `--dry-run`, to shrink older oversized pictures. Demo databases: `php artisan db:seed --class=DemoThemesSeeder` adds the five new demo stores (existing ones are skipped); for local hosts add `fashion|electronics|grocery|beauty|furniture.shop.localhost`.
 
 **Store builder upgrade (B10):** `php artisan migrate` adds `storefront_fonts` (stores' own fonts); existing themes need no change. Uploaded fonts are WOFF2 files on the media disk at `fonts/<org>/<id>.woff2` and never change once written:

@@ -1,0 +1,777 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "ornament",
+                            "props": {
+                                "name": "shapla",
+                                "color": "#ffffff",
+                                "secondary_color": "#c8e6c9",
+                                "size": 72,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": false
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "bangla_date",
+                            "props": {
+                                "prefix": "Today is",
+                                "show_gregorian": true,
+                                "show_hijri": false,
+                                "style": "plain",
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "prefix": "আজ"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "heading",
+                            "props": {
+                                "text": "Great Independence Day",
+                                "level": 1,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "মহান স্বাধীনতা দিবস"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>On 26 March we remember with gratitude the freedom fighters and everyone who gave their lives for an independent Bangladesh.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>২৬ মার্চ আমরা কৃতজ্ঞতার সঙ্গে স্মরণ করি মুক্তিযোদ্ধাদের এবং স্বাধীন বাংলাদেশের জন্য জীবন দেওয়া সবাইকে।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_5",
+                            "type": "spacer",
+                            "props": {},
+                            "style": {
+                                "base": {
+                                    "size": {
+                                        "height": "16px"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_6",
+                            "type": "ornament",
+                            "props": {
+                                "name": "flag_ribbon",
+                                "color": "#006a4e",
+                                "secondary_color": "#f42a41",
+                                "size": 24,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": true
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "#006a4e",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "#00563f",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_2",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_4",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_7",
+                            "type": "heading",
+                            "props": {
+                                "text": "A small thank-you",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ছোট্ট একটি কৃতজ্ঞতা"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_8",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>To mark the day, a modest offer for our customers.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>দিনটি স্মরণে আমাদের ক্রেতাদের জন্য ছোট্ট একটি অফার।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_11",
+                            "type": "inner_row",
+                            "props": {},
+                            "columns": [
+                                {
+                                    "id": "c_2",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 50,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_9",
+                                            "type": "countdown",
+                                            "props": {
+                                                "source": "date",
+                                                "ends_at": "2027-03-26T23:59:00+06:00",
+                                                "promotion_id": null,
+                                                "title": "Offer ends in",
+                                                "expired_text": "This offer has ended. Thank you for shopping with us.",
+                                                "style": "boxes"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "title": "অফার শেষ হতে বাকি",
+                                                    "expired_text": "অফারটি শেষ হয়েছে। আমাদের সঙ্গে কেনাকাটার জন্য ধন্যবাদ।"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "style": {
+                                        "base": {
+                                            "background": {
+                                                "type": "color",
+                                                "color": "theme:surface"
+                                            },
+                                            "color": "theme:text",
+                                            "spacing": {
+                                                "padding": {
+                                                    "top": "24px",
+                                                    "bottom": "24px",
+                                                    "left": "20px",
+                                                    "right": "20px"
+                                                }
+                                            },
+                                            "border": {
+                                                "radius": {
+                                                    "tl": "16px",
+                                                    "tr": "16px",
+                                                    "br": "16px",
+                                                    "bl": "16px"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "c_3",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 50,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_10",
+                                            "type": "discount",
+                                            "props": {
+                                                "promotion_ref": "coupon",
+                                                "title": "Independence Day offer",
+                                                "text": "Use this code at checkout.",
+                                                "show_code": true,
+                                                "button_label": "Shop now",
+                                                "link": {
+                                                    "url": "/shop"
+                                                }
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "title": "স্বাধীনতা দিবসের অফার",
+                                                    "text": "চেকআউটে এই কোডটি ব্যবহার করুন।",
+                                                    "button_label": "কেনাকাটা করুন"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "gap": "24px",
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#f1f7f4"
+                    },
+                    "color": "#0d3b2e"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_3",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_5",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_12",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "Picks from our shop",
+                                "subtitle": null,
+                                "config": {
+                                    "source": "featured",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "columns": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "আমাদের দোকানের বাছাই"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_4",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_6",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_13",
+                            "type": "heading",
+                            "props": {
+                                "text": "Shopping with us",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আমাদের সাথে কেনাকাটা"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_14",
+                            "type": "trust_badges",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "b1",
+                                        "icon": "star",
+                                        "title": "100% original products",
+                                        "text": "Checked before it ships"
+                                    },
+                                    {
+                                        "id": "b2",
+                                        "icon": "rotate-ccw",
+                                        "title": "7-day easy return",
+                                        "text": "If something is wrong, we make it right"
+                                    },
+                                    {
+                                        "id": "b3",
+                                        "icon": "truck",
+                                        "title": "Cash on delivery",
+                                        "text": "Pay when your order arrives"
+                                    },
+                                    {
+                                        "id": "b4",
+                                        "icon": "shield-check",
+                                        "title": "Secure checkout",
+                                        "text": "Your details stay private"
+                                    },
+                                    {
+                                        "id": "b5",
+                                        "icon": "phone",
+                                        "title": "Hotline",
+                                        "text": "Call us, we are happy to help"
+                                    }
+                                ],
+                                "style": "row"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.b1.title": "১০০% আসল পণ্য",
+                                    "items.b1.text": "পাঠানোর আগে যাচাই করা",
+                                    "items.b2.title": "৭ দিনে সহজ ফেরত",
+                                    "items.b2.text": "কোনো সমস্যা হলে আমরা ঠিক করে দেব",
+                                    "items.b3.title": "ক্যাশ অন ডেলিভারি",
+                                    "items.b3.text": "পণ্য হাতে পেয়ে টাকা দিন",
+                                    "items.b4.title": "নিরাপদ চেকআউট",
+                                    "items.b4.text": "আপনার তথ্য সুরক্ষিত থাকে",
+                                    "items.b5.title": "হটলাইন",
+                                    "items.b5.text": "ফোন করুন, সাহায্য করতে আমরা প্রস্তুত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "24px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "16px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_5",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_7",
+                    "type": "column",
+                    "width": {
+                        "base": 60,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_15",
+                            "type": "delivery_promise",
+                            "props": {
+                                "title": "Delivery across Bangladesh",
+                                "zones": "all",
+                                "show_price": true,
+                                "show_cod": true,
+                                "show_free_over": true,
+                                "layout": "cards"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সারা বাংলাদেশে ডেলিভারি"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_8",
+                    "type": "column",
+                    "width": {
+                        "base": 40,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_16",
+                            "type": "payment_badges",
+                            "props": {
+                                "title": "How you can pay",
+                                "show_store_methods": true,
+                                "wallets": [],
+                                "note": "",
+                                "style": "chips",
+                                "align": "left"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "যেভাবে টাকা দিতে পারেন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "24px",
+                            "bottom": "48px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "16px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_6",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_9",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_17",
+                            "type": "ornament",
+                            "props": {
+                                "name": "flag_ribbon",
+                                "color": "#006a4e",
+                                "secondary_color": "#f42a41",
+                                "size": 20,
+                                "align": "center",
+                                "flip": "none",
+                                "opacity": 100,
+                                "repeat": true
+                            }
+                        },
+                        {
+                            "id": "e_18",
+                            "type": "heading",
+                            "props": {
+                                "text": "Respect to the martyrs, gratitude to the freedom fighters",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "শহীদদের প্রতি শ্রদ্ধা, মুক্তিযোদ্ধাদের প্রতি কৃতজ্ঞতা"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_19",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Greetings to everyone on Independence Day. Let us build our country together.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>সবাইকে মহান স্বাধীনতা দিবসের শুভেচ্ছা। আসুন, সবাই মিলে দেশ গড়ি।</p>"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "56px",
+                            "bottom": "56px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#ffffff"
+                    },
+                    "color": "#006a4e"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "id": "s_7",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "columns": [
+                {
+                    "id": "c_10",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_20",
+                            "type": "heading",
+                            "props": {
+                                "text": "Questions and answers",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "প্রশ্ন ও উত্তর"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_21",
+                            "type": "accordion",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "q1",
+                                        "title": "Are you open on 26 March?",
+                                        "html": "<p>Our online shop stays open. 26 March is a public holiday, so deliveries may start again on the next working day.</p>"
+                                    },
+                                    {
+                                        "id": "q2",
+                                        "title": "When will my order arrive?",
+                                        "html": "<p>Delivery times for each area are shown above.</p>"
+                                    },
+                                    {
+                                        "id": "q3",
+                                        "title": "Can I pay cash on delivery?",
+                                        "html": "<p>Where cash on delivery is available, you will see it at checkout.</p>"
+                                    }
+                                ],
+                                "open_first": true,
+                                "allow_multiple": false,
+                                "style": "boxed"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.q1.title": "২৬ মার্চ কি দোকান খোলা থাকবে?",
+                                    "items.q1.html": "<p>আমাদের অনলাইন দোকান খোলা থাকবে। ২৬ মার্চ সরকারি ছুটির দিন, তাই ডেলিভারি পরের কর্মদিবসে শুরু হতে পারে।</p>",
+                                    "items.q2.title": "অর্ডার কবে হাতে পাব?",
+                                    "items.q2.html": "<p>প্রতিটি এলাকার ডেলিভারির সময় ওপরে দেওয়া আছে।</p>",
+                                    "items.q3.title": "ক্যাশ অন ডেলিভারিতে টাকা দেওয়া যাবে?",
+                                    "items.q3.html": "<p>যেখানে ক্যাশ অন ডেলিভারি আছে, চেকআউটে তা দেখতে পাবেন।</p>"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "64px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "32px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

@@ -50,6 +50,49 @@ final class ElementRegistry
     /** P2a: the one-product order form of landing pages (pages, content pages and shop areas). */
     public const P2A = ['order_form'];
 
+    /**
+     * B17: festival decoration and Bangladesh trust blocks — a drawn ornament, how the store
+     * takes payment, its delivery promise (both from the real checkout / shipping setup) and
+     * today's date in the Bangla calendar. (`trust_badges`, B6, gained links and two more items.)
+     */
+    public const B17 = ['ornament', 'payment_badges', 'delivery_promise', 'bangla_date'];
+
+    /** B17: the built-in ornament drawings (original simple SVGs in the storefront). */
+    public const ORNAMENT_NAMES = [
+        'crescent_star', 'lantern', 'mosque_dome', 'alpona_border', 'alpona_round', 'kash_flower', 'dhak', 'diya',
+        'shapla', 'flag_ribbon', 'shaheed_minar', 'snowflake', 'gift_box', 'confetti', 'sparkle', 'sale_tag',
+    ];
+
+    /** B17: border drawings that may repeat across the width. */
+    public const ORNAMENT_REPEATABLE = ['alpona_border', 'flag_ribbon'];
+
+    public const ORNAMENT_FLIPS = ['none', 'horizontal', 'vertical', 'both'];
+
+    /** B17: an ornament's size (px; the height of border drawings) and opacity (percent). */
+    public const ORNAMENT_SIZE = [16, 480];
+
+    public const ORNAMENT_OPACITY = [10, 100];
+
+    /** B17: mobile wallets a payment badges block may name (text badges, never brand artwork). */
+    public const PAYMENT_WALLETS = ['bkash', 'nagad', 'rocket', 'upay'];
+
+    /** B17: wallet names by language (`en` is also the fallback). */
+    public const PAYMENT_WALLET_NAMES = [
+        'bkash' => ['en' => 'bKash', 'bn' => 'বিকাশ'],
+        'nagad' => ['en' => 'Nagad', 'bn' => 'নগদ'],
+        'rocket' => ['en' => 'Rocket', 'bn' => 'রকেট'],
+        'upay' => ['en' => 'Upay', 'bn' => 'উপায়'],
+    ];
+
+    public const PAYMENT_BADGE_STYLES = ['chips', 'list'];
+
+    public const DELIVERY_LAYOUTS = ['cards', 'list', 'bar'];
+
+    /** B17: a delivery promise lists `all` zones or 1–12 chosen ones. */
+    public const DELIVERY_ZONES = [1, 12];
+
+    public const BANGLA_DATE_STYLES = ['plain', 'badge', 'card'];
+
     /** P2a: whether the order form asks for an e-mail address / a note. */
     public const ORDER_FORM_EMAIL = ['hidden', 'optional', 'required'];
 
@@ -78,6 +121,8 @@ final class ElementRegistry
         'heading', 'text', 'image', 'button', 'icon', 'divider', 'spacer', 'inner_row',
         'cta', 'discount', 'countdown', 'newsletter_form', 'notice', 'icon_list', 'marquee',
         'video', 'social_icons', 'payment_icons', 'custom_html', 'form',
+        // B17: festival bars.
+        'ornament', 'trust_badges', 'bangla_date',
     ];
 
     /** B8b: a button's optional action (`link` is the default and is not stored). */
@@ -115,6 +160,8 @@ final class ElementRegistry
         'comparison_table', 'flash_sale_bar', 'bundle', 'review_wall', 'store_hours',
         // P2a.
         'order_form',
+        // B17.
+        'payment_badges', 'delivery_promise', 'bangla_date',
     ];
 
     /**
@@ -185,7 +232,8 @@ final class ElementRegistry
         'image_carousel.images' => [1, 20],
         'logo_carousel.logos' => [2, 24],
         'shop_the_look.hotspots' => [1, 8],
-        'trust_badges.items' => [1, 6],
+        // B17: up to 8 (was 6).
+        'trust_badges.items' => [1, 8],
         'marquee.items' => [1, 10],
         // B8a (nested lists: `<element>.<list>.<nested list>`).
         'pricing_table.plans' => [1, 4],
@@ -448,6 +496,10 @@ final class ElementRegistry
         'form' => ['title' => 120, 'text' => 400, 'submit_label' => 30, 'success_message' => 300, 'consent.text' => 300],
         // P2a (`upsell.label` is a nested prop, see TRANSLATION_PATHS).
         'order_form' => ['title' => 120, 'text' => 400, 'button_label' => 60, 'success_message' => 400, 'upsell.label' => 120],
+        // B17.
+        'payment_badges' => ['title' => 80, 'note' => 200],
+        'delivery_promise' => ['title' => 80],
+        'bangla_date' => ['prefix' => 60],
     ];
 
     /** Translatable fields stored in a nested prop (dot keys in `translations`): field => [prop, key]. */
@@ -492,7 +544,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17];
     }
 
     public static function exists(mixed $type): bool
@@ -506,7 +558,7 @@ final class ElementRegistry
     public static function sectionType(string $type): ?SectionType
     {
         return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true) || in_array($type, self::B8B, true)
-            || in_array($type, self::P2A, true)
+            || in_array($type, self::P2A, true) || in_array($type, self::B17, true)
             ? null
             : SectionType::tryFrom($type);
     }
@@ -541,7 +593,10 @@ final class ElementRegistry
     {
         $contexts = match ($type) {
             'inner_row', 'heading', 'text', 'button', 'icon', 'image', 'divider', 'spacer',
-            'social_icons', 'contact_block', 'custom_html', 'icon_list', 'marquee' => ['page', 'cms', 'header', 'footer', 'zone'],
+            'social_icons', 'contact_block', 'custom_html', 'icon_list', 'marquee',
+            // B17 (both also in popups).
+            'ornament', 'bangla_date' => ['page', 'cms', 'header', 'footer', 'zone'],
+            'payment_badges', 'delivery_promise' => ['page', 'cms', 'zone', 'footer'],
             'search_box' => ['page', 'cms', 'zone', 'header'],
             'payment_icons', 'newsletter_form',
             'accordion', 'icon_box', 'logo_carousel', 'map', 'trust_badges', 'store_hours' => ['page', 'cms', 'zone', 'footer'],
@@ -564,11 +619,11 @@ final class ElementRegistry
             'heading', 'text', 'image', 'button', 'rich_text', 'blog_posts',
             'video', 'icon', 'cta', 'custom_html', 'faq_list', 'contact_form',
             'accordion', 'tabs', 'icon_box', 'icon_list', 'quote', 'notice', 'counter', 'steps', 'chart',
-            'team', 'store_hours', 'progress_bars', 'form' => 'content',
-            'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid' => 'media',
+            'team', 'store_hours', 'progress_bars', 'form', 'bangla_date' => 'content',
+            'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid', 'ornament' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
             'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
-            'pricing_table', 'comparison_table', 'bundle', 'order_form' => 'commerce',
+            'pricing_table', 'comparison_table', 'bundle', 'order_form', 'payment_badges', 'delivery_promise' => 'commerce',
             'logo', 'menu', 'account_link', 'wishlist_link', 'cart_icon', 'language_switch', 'announcement',
             'social_icons', 'payment_icons', 'contact_block', 'copyright' => 'site',
             default => 'marketing',
@@ -638,6 +693,10 @@ final class ElementRegistry
             'progress_bars' => 'Progress bars',
             'form' => 'Form',
             'order_form' => 'Order form',
+            'ornament' => 'Ornament',
+            'payment_badges' => 'How you can pay',
+            'delivery_promise' => 'Delivery promise',
+            'bangla_date' => 'Bangla date',
             default => SectionType::from($type)->label(),
         };
     }
@@ -1127,6 +1186,14 @@ final class ElementRegistry
                 'upsell' => null,
                 'layout' => 'stacked',
             ],
+            // B17.
+            'ornament' => [
+                'name' => 'sparkle', 'color' => 'theme:primary', 'secondary_color' => null, 'size' => 96,
+                'align' => 'center', 'flip' => 'none', 'opacity' => 100, 'repeat' => false,
+            ],
+            'payment_badges' => ['title' => 'How you can pay', 'show_store_methods' => true, 'wallets' => [], 'note' => '', 'style' => 'chips', 'align' => 'left'],
+            'delivery_promise' => ['title' => 'Delivery', 'zones' => 'all', 'show_price' => true, 'show_cod' => true, 'show_free_over' => true, 'layout' => 'cards'],
+            'bangla_date' => ['prefix' => '', 'show_gregorian' => false, 'show_hijri' => false, 'style' => 'plain', 'align' => 'left'],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
     }
@@ -1232,6 +1299,10 @@ final class ElementRegistry
                     'default' => ['min' => self::ORDER_FORM_QUANTITY_DEFAULT[0], 'max' => self::ORDER_FORM_QUANTITY_DEFAULT[1]],
                     'max' => ['min' => self::ORDER_FORM_QUANTITY_MAX[0], 'max' => self::ORDER_FORM_QUANTITY_MAX[1]],
                 ],
+                // B17.
+                'ornament_size' => ['min' => self::ORNAMENT_SIZE[0], 'max' => self::ORNAMENT_SIZE[1]],
+                'ornament_opacity' => ['min' => self::ORNAMENT_OPACITY[0], 'max' => self::ORNAMENT_OPACITY[1]],
+                'delivery_zones' => ['min' => self::DELIVERY_ZONES[0], 'max' => self::DELIVERY_ZONES[1]],
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
             'data_when' => ['chart' => 'data_source!=manual'],
@@ -1337,6 +1408,14 @@ final class ElementRegistry
                 'order_form_email' => self::ORDER_FORM_EMAIL,
                 'order_form_note' => self::ORDER_FORM_NOTE,
                 'order_form_payment' => self::ORDER_FORM_PAYMENT,
+                // B17.
+                'ornament_names' => self::ORNAMENT_NAMES,
+                'ornament_repeatable' => self::ORNAMENT_REPEATABLE,
+                'ornament_flips' => self::ORNAMENT_FLIPS,
+                'payment_wallets' => self::PAYMENT_WALLETS,
+                'payment_badge_styles' => self::PAYMENT_BADGE_STYLES,
+                'delivery_layouts' => self::DELIVERY_LAYOUTS,
+                'bangla_date_styles' => self::BANGLA_DATE_STYLES,
             ],
             // B8b: the settings a new popup starts with.
             'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),

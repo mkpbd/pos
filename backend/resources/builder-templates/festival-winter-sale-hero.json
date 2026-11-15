@@ -1,0 +1,240 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "columns": [
+                {
+                    "id": "c_3",
+                    "type": "column",
+                    "width": {
+                        "base": 100,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_8",
+                            "type": "inner_row",
+                            "props": {},
+                            "columns": [
+                                {
+                                    "id": "c_1",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 60,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_1",
+                                            "type": "ornament",
+                                            "props": {
+                                                "name": "snowflake",
+                                                "color": "#dbeafe",
+                                                "secondary_color": null,
+                                                "size": 72,
+                                                "align": "left",
+                                                "flip": "none",
+                                                "opacity": 100,
+                                                "repeat": false
+                                            }
+                                        },
+                                        {
+                                            "id": "e_2",
+                                            "type": "bangla_date",
+                                            "props": {
+                                                "prefix": "Today is",
+                                                "show_gregorian": true,
+                                                "show_hijri": false,
+                                                "style": "plain",
+                                                "align": "left"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "prefix": "আজ"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_3",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Winter sale",
+                                                "level": 1,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "শীতের সেল"
+                                                }
+                                            },
+                                            "style": {
+                                                "base": {
+                                                    "typography": {
+                                                        "align": "left"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_4",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>Cosy picks for the chilly days, at winter prices while stocks last.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>শীতের দিনের আরামদায়ক বাছাই, শীতের বিশেষ দামে, স্টক থাকা পর্যন্ত।</p>"
+                                                }
+                                            },
+                                            "style": {
+                                                "base": {
+                                                    "typography": {
+                                                        "align": "left"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_5",
+                                            "type": "button",
+                                            "props": {
+                                                "label": "Shop the sale",
+                                                "link": {
+                                                    "url": "/shop"
+                                                },
+                                                "variant": "primary",
+                                                "size": "lg",
+                                                "full_width": false
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "label": "সেলের পণ্য দেখুন"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_2",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 40,
+                                        "mobile": 100
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_6",
+                                            "type": "ornament",
+                                            "props": {
+                                                "name": "snowflake",
+                                                "color": "#0d3b66",
+                                                "secondary_color": "#dbeafe",
+                                                "size": 40,
+                                                "align": "center",
+                                                "flip": "none",
+                                                "opacity": 100,
+                                                "repeat": false
+                                            }
+                                        },
+                                        {
+                                            "id": "e_7",
+                                            "type": "countdown",
+                                            "props": {
+                                                "source": "date",
+                                                "ends_at": "2027-01-31T23:59:00+06:00",
+                                                "promotion_id": null,
+                                                "title": "Offer ends in",
+                                                "expired_text": "This offer has ended. Thank you for shopping with us.",
+                                                "style": "boxes"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "title": "অফার শেষ হতে বাকি",
+                                                    "expired_text": "অফারটি শেষ হয়েছে। আমাদের সঙ্গে কেনাকাটার জন্য ধন্যবাদ।"
+                                                }
+                                            }
+                                        }
+                                    ],
+                                    "style": {
+                                        "base": {
+                                            "background": {
+                                                "type": "color",
+                                                "color": "theme:surface"
+                                            },
+                                            "color": "theme:text",
+                                            "spacing": {
+                                                "padding": {
+                                                    "top": "24px",
+                                                    "bottom": "24px",
+                                                    "left": "20px",
+                                                    "right": "20px"
+                                                }
+                                            },
+                                            "border": {
+                                                "radius": {
+                                                    "tl": "16px",
+                                                    "tr": "16px",
+                                                    "br": "16px",
+                                                    "bl": "16px"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "gap": "32px",
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "48px"
+                        }
+                    },
+                    "background": {
+                        "type": "gradient",
+                        "gradient": {
+                            "type": "linear",
+                            "angle": 135,
+                            "stops": [
+                                {
+                                    "color": "#0d3b66",
+                                    "position": 0
+                                },
+                                {
+                                    "color": "#14507f",
+                                    "position": 100
+                                }
+                            ]
+                        }
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "32px"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

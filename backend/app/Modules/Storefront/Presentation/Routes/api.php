@@ -9,6 +9,7 @@ use App\Modules\Storefront\Presentation\Http\Controllers\BuilderReviewController
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
 use App\Modules\Storefront\Presentation\Http\Controllers\CustomFontController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
+use App\Modules\Storefront\Presentation\Http\Controllers\FestivalController;
 use App\Modules\Storefront\Presentation\Http\Controllers\FormSubmissionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
@@ -60,6 +61,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::get('homepage-sections', [HomepageSectionController::class, 'index']);
         Route::get('homepage-sections/types', [HomepageSectionController::class, 'types']);
         Route::get('homepage-sections/{section}', [HomepageSectionController::class, 'show'])->whereUuid('section');
+        // B17: the festival calendar.
+        Route::get('festivals', [FestivalController::class, 'index']);
     });
 
     Route::middleware('can:storefront.manage')->group(function () {
@@ -93,6 +96,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::patch('homepage-sections/{section}', [HomepageSectionController::class, 'update'])->whereUuid('section');
         Route::post('homepage-sections/{section}/duplicate', [HomepageSectionController::class, 'duplicate'])->whereUuid('section');
         Route::delete('homepage-sections/{section}', [HomepageSectionController::class, 'destroy'])->whereUuid('section');
+        // B17: one-click festival setup (drafts only).
+        Route::post('festivals/{key}/setup', [FestivalController::class, 'setup'])->where('key', '[a-z0-9-]{2,40}');
     });
 
     Route::put('theme/custom-css', [StorefrontAdminController::class, 'updateCustomCss'])->middleware('can:storefront.custom_css');

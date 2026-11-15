@@ -429,7 +429,14 @@ export function TrustBadgesElement({ element }: { element: El<'trust_badges'> })
   const L = B6_TEXT_LIMITS.trust_badges
   const grid = oneOf(p.style, B6_ENUMS.trustBadgesStyle) === 'grid'
   const items = listItems(p.items, B6_LIMITS.trustBadges.max)
-    .map((item) => ({ id: item.id as string, icon: item.icon, title: str(item.title).slice(0, L['items.*.title']).trim(), text: str(item.text).slice(0, L['items.*.text']).trim() }))
+    .map((item) => ({
+      id: item.id as string,
+      icon: item.icon,
+      title: str(item.title).slice(0, L['items.*.title']).trim(),
+      text: str(item.text).slice(0, L['items.*.text']).trim(),
+      // B17: an optional link (e.g. "7-day easy return" → the returns policy page).
+      url: safeLink(item.link),
+    }))
     .filter((item) => item.title !== '')
   if (items.length === 0) return <DraftPlaceholder element={element} />
 
@@ -441,10 +448,16 @@ export function TrustBadgesElement({ element }: { element: El<'trust_badges'> })
       data-testid="builder-trust-badges"
     >
       {items.map((item) => (
-        <li key={item.id} className={cn('flex items-center gap-3', grid && 'rounded-sf-card border bg-sf-surface p-4')}>
+        <li key={item.id} className={cn('flex items-center gap-3', grid && 'rounded-sf-card border bg-sf-surface p-4 text-sf-text')}>
           {isIconName(item.icon) && <BuilderIcon name={item.icon} size={28} className="shrink-0 text-sf-accent" />}
           <div className="flex flex-col">
-            <span className="font-bold text-sf-heading">{item.title}</span>
+            {item.url ? (
+              <MenuLink url={item.url} className="font-bold text-sf-heading underline-offset-4 hover:underline">
+                {item.title}
+              </MenuLink>
+            ) : (
+              <span className="font-bold text-sf-heading">{item.title}</span>
+            )}
             {item.text && <span className="text-sm">{item.text}</span>}
           </div>
         </li>

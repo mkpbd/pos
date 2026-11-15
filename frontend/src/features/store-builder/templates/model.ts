@@ -26,6 +26,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   promotions: 'Promotions',
   pages: 'Whole pages',
   page: 'Whole pages',
+  // B17: festival packs (landing page, home hero, announcement bar per occasion).
+  festival: 'Festivals',
 }
 
 export function categoryLabel(category: string): string {
@@ -53,10 +55,13 @@ export function filterTemplates(templates: readonly BuilderTemplate[], query: Te
   })
 }
 
-/** The categories present, in label order. */
+/** B17: a built-in festival pack template (`festival-<key>-landing|hero|bar`, category `festival`). */
+export const isFestivalTemplate = (template: Pick<BuilderTemplate, 'id' | 'category'>) => template.category === 'festival' || template.id.startsWith('festival-')
+
+/** The categories present, in label order (B17: Festivals first while it is there). */
 export function templateCategories(templates: readonly BuilderTemplate[]): string[] {
   const categories = new Set(templates.map((t) => t.category).filter((c): c is string => typeof c === 'string' && c !== ''))
-  return [...categories].sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b)))
+  return [...categories].sort((a, b) => (a === 'festival' ? -1 : b === 'festival' ? 1 : categoryLabel(a).localeCompare(categoryLabel(b))))
 }
 
 /** A clicked template goes after the section of the selection, else at the end of the page. */

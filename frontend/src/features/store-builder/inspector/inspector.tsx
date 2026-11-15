@@ -30,6 +30,8 @@ import { B4Form, type B4FormProps } from './b4-forms'
 import { B6Form } from './b6-forms'
 import { B8aForm } from './b8a-forms'
 import { B8bForm } from './b8b-forms'
+import { B17Form } from './b17-forms'
+import { B17_TYPES } from './b17-model'
 import { P2aForm } from './order-form'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
@@ -80,7 +82,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   errors: Record<string, string>
   bangla: boolean
   content: InspectorProps['content']
-  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'>
+  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'> & { enums?: Record<string, unknown> }
 }) {
   const common = { onChange, errors, bangla } as const
   if (B4_TYPES.has(node.type)) return <B4Form key={node.id} node={node as Element} {...common} {...b4} />
@@ -88,6 +90,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   if (B8A_TYPES.has(node.type)) return <B8aForm key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
   if (B8B_TYPES.has(node.type)) return <B8bForm key={node.id} node={node as Element} {...common} context={b4.context} />
   if (P2A_TYPES.has(node.type)) return <P2aForm key={node.id} node={node as Element} {...common} context={b4.context} />
+  if (B17_TYPES.has(node.type)) return <B17Form key={node.id} node={node as Element} {...common} context={b4.context} enums={b4.enums} />
   switch (node.type) {
     case 'section':
       return (
@@ -352,7 +355,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
             bangla={bangla}
             content={content}
             documentId={document.id}
-            b4={{ context, theme, icons, canCustomHtml }}
+            b4={{ context, theme, icons, canCustomHtml, enums: registry.enums }}
           />
         </TabsContent>
         <TabsContent value="style" className="pt-4">

@@ -487,3 +487,19 @@ Original questions:
   drag within a container there changes only that device; "Same as computer" (or "Same as tablet" for phones) deletes the entry.
 - **Copy to other pages:** `CopyBuilderSection` copies into each target draft in its own transaction (new ids, context
   validation, never publishes); the open document is left out of the picker (its revision would change under the editor).
+
+### As built — B17 festival packs & Bangladesh trust blocks (2026-11-15)
+
+- **Elements:** `ornament` (16 original SVG drawings, decorative/aria-hidden, theme or hex colours, borders repeat), `payment_badges`
+  (the store's checkout methods via `CheckoutPaymentMethods` + owner-picked wallets as text, never logos), `delivery_promise`
+  (`ShippingRates::activeZones()`; fee / free-over / COD worked out with Decimal), `bangla_date` (client-side Bangladesh revised
+  calendar — 2019 revision, Falgun 29/30 — and tabular Hijri marked expected; data is only the store timezone so the published cache
+  never goes stale at midnight); `trust_badges` extended (≤ 8, item links, popups).
+- **Festival packs:** 30 templates (10 occasions × landing / hero / bar), no photos, every text in Bangla, every text/background pair
+  WCAG AA under all 10 presets (tests). Ekushey is a tribute (no sale elements or wording); Independence and Victory Day are dignified
+  with a modest offer. Wallets start empty so a page never claims a wallet the shop doesn't take.
+- **Calendar & setup:** `FestivalCalendar` (fixed dates computed; lunar/tithi from a sourced 2026–2028 table); `SetupFestival` writes
+  drafts only — landing page, hero sections on top of the home draft with the window as node schedule (replaced on a repeat setup),
+  a bar popup with the dates switched on (visible once published) — and overwrites countdown ends and discounts; `publish_ids` feed
+  the existing publish-all. One `storefront_festival_setups` row per store, occasion and year. Admin: Online store → Festivals
+  (calendar, setup dialog, review & publish); templates browser "Festivals" category.

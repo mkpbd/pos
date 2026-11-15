@@ -216,12 +216,15 @@ class StoreBuilderPopupsTest extends TestCase
 
     public function test_popups_start_from_templates(): void
     {
-        $templates = $this->getJson('/api/v1/storefront/builder/templates?scope=popup')->assertOk()->json('data');
+        $all = $this->getJson('/api/v1/storefront/builder/templates?scope=popup')->assertOk()->json('data');
+        // B17: the festival packs' top bars (no thumbnail) are checked in BuilderFestivalTemplatesTest.
+        $templates = array_values(array_filter($all, fn (array $t) => $t['category'] !== 'festival'));
+        $this->assertCount(10, array_filter($all, fn (array $t) => $t['category'] === 'festival'));
         $this->assertSame(['popup-newsletter', 'popup-exit-offer', 'popup-free-delivery-bar', 'popup-eid-sale', 'popup-cookie-notice', 'popup-contact-form'], array_column($templates, 'id'));
         foreach ($templates as $template) {
             $this->assertSame([['popup'], "/builder-templates/{$template['id']}.png", 'popup'], [$template['allowed_in'], $template['thumbnail_url'], $template['scope']]);
         }
-        $this->assertSame(array_column($templates, 'id'), array_column($this->getJson('/api/v1/storefront/builder/templates?context=popup&source=builtin')->json('data'), 'id'));
+        $this->assertSame(array_column($all, 'id'), array_column($this->getJson('/api/v1/storefront/builder/templates?context=popup&source=builtin')->json('data'), 'id'));
 
         $cookie = $this->popup('Cookies', 'popup-cookie-notice')->assertCreated()->json('data');
         $this->assertSame(['bar_bottom', 'once_forever', true], [$cookie['content']['popup']['layout'], $cookie['content']['popup']['frequency']['kind'], $cookie['content']['popup']['stop_after_action']]);
