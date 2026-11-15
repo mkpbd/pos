@@ -1,0 +1,60 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "testimonials",
+                            "props": {
+                                "title": "Real reviews",
+                                "subtitle": null,
+                                "config": {
+                                    "items": [
+                                        {
+                                            "quote": "The vitamin C serum really brightened my skin in a month. Packed beautifully too.",
+                                            "name": "Raisa M.",
+                                            "role": "Dhanmondi",
+                                            "rating": 5
+                                        },
+                                        {
+                                            "quote": "They helped me choose a lipstick shade over chat and it was perfect.",
+                                            "name": "Anika T.",
+                                            "role": "Uttara",
+                                            "rating": 5
+                                        },
+                                        {
+                                            "quote": "Original products and quick delivery to Khulna. The brush set is soft and good value.",
+                                            "name": "Mehjabin S.",
+                                            "role": "Khulna",
+                                            "rating": 4
+                                        }
+                                    ],
+                                    "background": null
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সত্যিকারের মতামত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

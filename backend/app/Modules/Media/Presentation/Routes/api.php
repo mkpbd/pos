@@ -8,4 +8,7 @@ Route::middleware(['auth:sanctum', 'tenant', 'can:media.manage'])->group(functio
     Route::post('media', [MediaController::class, 'store']);
     Route::patch('media/{media}', [MediaController::class, 'update'])->whereUuid('media');
     Route::delete('media/{media}', [MediaController::class, 'destroy'])->whereUuid('media');
+    Route::get('media/{media}/usage', [MediaController::class, 'usage'])->whereUuid('media');
+    // GD work on pictures up to 6000 × 6000 px: limited per user.
+    Route::post('media/{media}/edit', [MediaController::class, 'edit'])->whereUuid('media')->middleware('throttle:30,1');
 });

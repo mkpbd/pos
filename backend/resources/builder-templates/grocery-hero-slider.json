@@ -1,0 +1,90 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Mango season",
+                                            "kicker": "In season",
+                                            "title": "Mango season is here",
+                                            "subtitle": "Himsagar from Rajshahi orchards, at your door the same day.",
+                                            "button_label": "Shop fruit",
+                                            "link_url": "/category/fruits-vegetables",
+                                            "secondary_button_label": "All deals",
+                                            "secondary_link_url": "/shop",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "grocery/mangoes.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "মৌসুমি",
+                                                    "title": "আমের মৌসুম চলে এসেছে",
+                                                    "subtitle": "রাজশাহীর বাগানের হিমসাগর, একই দিনে আপনার দরজায়।",
+                                                    "button_label": "ফল কিনুন",
+                                                    "secondary_button_label": "সব অফার"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Pantry",
+                                            "kicker": "Kitchen basics",
+                                            "title": "Fill the pantry for less",
+                                            "subtitle": "Rice, dal, oil and spices at fair prices, delivered in two hours.",
+                                            "button_label": "Shop pantry",
+                                            "link_url": "/category/rice-dal-oil",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "grocery/whole-spices.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "রান্নাঘরের দরকারি",
+                                                    "title": "কম খরচে ভাঁড়ার ভরুন",
+                                                    "subtitle": "চাল, ডাল, তেল আর মসলা ন্যায্য দামে, দুই ঘণ্টায় ডেলিভারি।",
+                                                    "button_label": "কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

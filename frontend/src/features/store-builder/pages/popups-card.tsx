@@ -18,7 +18,7 @@ import { usePopupTemplatesQuery, type BuilderTemplate } from '../templates/api'
 import type { RemoveRequest } from './builder-parts'
 import type { MessageKey } from './messages'
 import { lastEdited } from './page-helpers'
-import { EditLink, ListRow } from './page-rows'
+import { EditLink, ListRow, PublishingBadges } from './page-rows'
 import { useScreenText } from './screen-language'
 
 /*
@@ -93,6 +93,7 @@ function PopupRow({ summary, canManage, canPublish, onDelete }: { summary: Docum
         <span className="flex flex-wrap items-center gap-1.5">
           <Badge variant={STATUS_VARIANT[status]} data-testid="popup-status">{t(`popups.status.${status}` as MessageKey)}</Badge>
           {summary.published && summary.has_unpublished_changes && <Badge variant="warning">{t('row.unpublished')}</Badge>}
+          <PublishingBadges summary={summary} />
         </span>
       }
     >

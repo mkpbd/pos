@@ -1,0 +1,112 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Glow routine",
+                                            "kicker": "Skincare",
+                                            "title": "Your glow routine",
+                                            "subtitle": "Serums and moisturisers made for humid days.",
+                                            "button_label": "Shop skincare",
+                                            "link_url": "/category/skincare",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "beauty/vitamin-c-serum.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "ত্বকের যত্ন",
+                                                    "title": "আপনার উজ্জ্বল ত্বকের রুটিন",
+                                                    "subtitle": "আর্দ্র দিনের জন্য সিরাম আর ময়েশ্চারাইজার।",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Lip colour",
+                                            "kicker": "New shades",
+                                            "title": "Velvet lips, all day",
+                                            "subtitle": "Matte shades that suit warm skin tones.",
+                                            "button_label": "Shop makeup",
+                                            "link_url": "/category/makeup",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "beauty/matte-lipstick.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "নতুন রং",
+                                                    "title": "সারা দিন ভেলভেট ঠোঁট",
+                                                    "subtitle": "উষ্ণ ত্বকের রঙে মানানো ম্যাট শেড।",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Fragrance",
+                                            "kicker": "Fragrance",
+                                            "title": "A scent for every day",
+                                            "subtitle": "Rose, jasmine and a touch of sandalwood.",
+                                            "button_label": "Shop fragrance",
+                                            "link_url": "/category/fragrance",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "beauty/eau-de-parfum.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "সুগন্ধি",
+                                                    "title": "প্রতিদিনের সুবাস",
+                                                    "subtitle": "গোলাপ, বেলি আর এক ফোঁটা চন্দন।",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

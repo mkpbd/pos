@@ -32,6 +32,9 @@ function styles(over: Partial<SiteStyles> = {}): SiteStyles {
     flush: vi.fn(async () => true),
     publish: vi.fn(async () => true),
     publishing: false,
+    schedule: null,
+    scheduleLater: vi.fn(async () => true),
+    cancelSchedule: vi.fn(async () => true),
     ...over,
   }
 }
@@ -68,5 +71,22 @@ describe('Site styles drawer: product page layout (P1b)', () => {
   it('shows the server’s message on the product layout field it belongs to', () => {
     const drawer = open(styles({ errors: { 'layout.product.details': 'Choose tabs, fold-out sections or one after another.' }, status: 'error', message: 'Some values aren’t allowed; fix the marked fields.' }))
     expect(within(within(drawer).getByTestId('site-styles-product-layout')).getByText('Choose tabs, fold-out sections or one after another.')).toBeInTheDocument()
+  })
+
+  it('B11: Publish site styles asks now or later; later sends the store-time instant', async () => {
+    const user = userEvent.setup()
+    const value = styles({ draft: { settings, draft_revision: 2, has_unpublished_changes: true, published: { number: 3, published_at: null } } as unknown as SiteStyles['draft'] })
+    const drawer = open(value)
+    await user.click(within(drawer).getByRole('button', { name: 'Publish site styles' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Publish the site styles?' })
+    await user.click(within(dialog).getByRole('radio', { name: /Publish later/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Schedule' }))
+    expect(value.scheduleLater).toHaveBeenCalledWith(expect.stringMatching(/T09:00:00[+-]\d\d:\d\d$/), null)
+    expect(value.publish).not.toHaveBeenCalled()
+  })
+
+  it('B11: a planned publish shows as a chip with its time', () => {
+    const drawer = open(styles({ schedule: { id: 's-1', status: 'pending', publish_at: '2026-12-01T03:00:00Z', note: null, created_by: null } }))
+    expect(within(drawer).getByTestId('schedule-chip')).toHaveTextContent('Goes live')
   })
 })

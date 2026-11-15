@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { REDUCED_MOTION_QUERY, TABLET_UP_QUERY, useMediaQuery } from '../components/use-media-query'
+import { withFocal } from '../focal'
 import { colorCss, PARALLAX_FACTORS } from './compile-styles'
 import { usePage } from './render-context'
 import { parallaxOffset, SHAPE_PATHS } from './section-layer-utils'
@@ -53,7 +54,7 @@ export function BackgroundVideoLayer({ video }: { video: { video: BackgroundVide
 
   return (
     <div className="b-bg-video" aria-hidden inert data-testid="builder-bg-video" data-playing={play || undefined}>
-      {poster && <img src={poster.url} srcSet={poster.srcset || undefined} sizes="100vw" alt="" loading="lazy" decoding="async" className="b-bg-poster" />}
+      {poster && <img src={poster.url} srcSet={poster.srcset || undefined} sizes="100vw" alt="" loading="lazy" decoding="async" className="b-bg-poster" style={withFocal(poster)} />}
       {play && src && (
         <iframe
           src={src}

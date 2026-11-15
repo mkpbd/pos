@@ -614,6 +614,630 @@
       "requires": []
     },
     {
+      "id": "fashion-hero-editorial",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "hero",
+      "name": "Editorial hero slider",
+      "description": "Two full-width slides with a headline and buttons, on photos of a summer dress and a handloom saree.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "fashion-categories",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "categories",
+      "name": "Shop by category tiles",
+      "description": "Your top-level categories as photo tiles: women, men, ethnic wear, shoes, bags and accessories.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "fashion-new-in-tabs",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "products",
+      "name": "New in tabs",
+      "description": "Tabs for new arrivals, featured pieces and best sellers in one product row.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "fashion-lookbook-trio",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "promo",
+      "name": "Lookbook trio",
+      "description": "Three photo tiles side by side for women, men and bags, each with a short line and a button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "fashion-flash-sale",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "countdown",
+      "name": "Weekend edit countdown",
+      "description": "A countdown with the products of your running flash sale. Hidden while no flash sale is running.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "fashion-style-story",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "story",
+      "name": "Studio story with photo",
+      "description": "A photo of a block-print kurti beside a short story about your studio and weavers, with a link to the about page.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "fashion-best-sellers",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "products",
+      "name": "Best sellers carousel",
+      "description": "A sliding row of the pieces your customers buy most.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "fashion-newsletter",
+      "scope": "section",
+      "preset": "fashion",
+      "category": "newsletter",
+      "name": "Dark newsletter band",
+      "description": "A near-black sign-up band with a kurti photo for new collections and members-only offers.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "electronics-sale-hero",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "hero",
+      "name": "Gadget sale hero",
+      "description": "Two big slides with a sale headline and buttons, on photos of a laptop and headphones.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "electronics-service-strip",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "features",
+      "name": "Warranty and service strip",
+      "description": "Four icons with short promises: official warranty, free delivery, cash on delivery and expert help.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "electronics-categories",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "categories",
+      "name": "Gadget categories",
+      "description": "Your top-level categories as photo tiles: phones, laptops, audio, watches, accessories and smart home.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "electronics-flash-deals",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "countdown",
+      "name": "Flash deals countdown",
+      "description": "A countdown with the products of your running flash sale. Hidden while no flash sale is running.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "electronics-deal-tiles",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "promo",
+      "name": "Three deal tiles",
+      "description": "Three photo tiles for phones, earbuds and gaming, each with a short offer and a button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "electronics-top-picks",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "products",
+      "name": "Top picks tabs",
+      "description": "Tabs for featured gadgets, new arrivals and best sellers in one product row.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "electronics-upgrade-cta",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "cta",
+      "name": "Upgrade call to action",
+      "description": "A deep navy band inviting shoppers to upgrade, with buttons to the shop and to the laptops.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "electronics-reviews",
+      "scope": "section",
+      "preset": "electronics",
+      "category": "testimonials",
+      "name": "Customer reviews",
+      "description": "Three short customer reviews with star ratings.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "grocery-hero-slider",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "hero",
+      "name": "Fresh produce hero",
+      "description": "Two full-width slides with a headline and buttons, on photos of mangoes and whole spices.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "grocery-delivery-promise",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "features",
+      "name": "Delivery promises",
+      "description": "Four icons with short promises: same-day delivery, freshness, cash on delivery and phone orders.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "grocery-aisles",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "categories",
+      "name": "Shop by aisle",
+      "description": "Your top-level categories as photo tiles, like the aisles of a supermarket.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "grocery-daily-deals",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "countdown",
+      "name": "Today's deals countdown",
+      "description": "A countdown with the products of your running flash sale. Hidden while no flash sale is running.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "promotions"
+      ]
+    },
+    {
+      "id": "grocery-fresh-picks",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "products",
+      "name": "Fresh picks grid",
+      "description": "A four-column grid of the newest products in the shop with a link to see all.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "grocery-offer-tiles",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "promo",
+      "name": "Three offer tiles",
+      "description": "Three photo tiles for vegetables, fish and rice, each with a short line and a button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "grocery-how-it-works",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "steps",
+      "name": "How ordering works",
+      "description": "Three numbered steps from choosing groceries to same-day delivery at the door.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "grocery-newsletter",
+      "scope": "section",
+      "preset": "grocery",
+      "category": "newsletter",
+      "name": "Weekly offers sign-up",
+      "description": "A deep green sign-up band for one e-mail a week with the best prices.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-hero-tiles",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "hero",
+      "name": "Three hero tiles",
+      "description": "Three photo tiles for skincare, lip colour and fragrance, each with a headline and a button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "beauty-promises",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "features",
+      "name": "Beauty promises",
+      "description": "Four icons with short promises: original products, free delivery, cash on delivery and shade help.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-shop-by-concern",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "categories",
+      "name": "Shop by category",
+      "description": "Your top-level categories as photo tiles: skincare, makeup, hair, fragrance, bath and tools.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-bestsellers",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "products",
+      "name": "Bestsellers carousel",
+      "description": "A sliding row of the products your customers love most.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-ritual-story",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "story",
+      "name": "Ritual story with photo",
+      "description": "A photo of handmade soaps beside a short note about choosing products for humid weather.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-new-launches",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "products",
+      "name": "New launches grid",
+      "description": "A four-column grid of the newest products on your shelf.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-testimonials",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "testimonials",
+      "name": "Real reviews",
+      "description": "Three short customer reviews with star ratings.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "beauty-glow-club",
+      "scope": "section",
+      "preset": "beauty",
+      "category": "newsletter",
+      "name": "Glow club sign-up",
+      "description": "A plum sign-up band with a clay mask photo for routines, new shades and members-only offers.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "furniture-hero",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "hero",
+      "name": "Room hero slider",
+      "description": "Two full-width slides with a headline and buttons, on photos of a linen sofa and a dining table.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "furniture-categories",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "categories",
+      "name": "Shop by room",
+      "description": "Your top-level categories as photo tiles: living room, bedroom, dining, home office, lighting and decor.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "furniture-new-arrivals",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "products",
+      "name": "New from the workshop",
+      "description": "A four-column grid of your newest pieces with a link to the shop.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "furniture-rooms",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "promo",
+      "name": "Three room tiles",
+      "description": "Three photo tiles for the bedroom, home office and lighting, each with a short line and a button.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": [
+        "banners"
+      ]
+    },
+    {
+      "id": "furniture-craft-story",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "story",
+      "name": "Workshop story with photo",
+      "description": "A photo of a solid wood desk beside a short story about your workshop, with a link to the about page.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "furniture-sale-cta",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "cta",
+      "name": "Home week call to action",
+      "description": "A forest green band announcing your sale with buttons to the shop and the living room.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "furniture-services",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "features",
+      "name": "Delivery and warranty strip",
+      "description": "Four icons with short promises: delivery and assembly, warranty, cash on delivery and workshop visits.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "furniture-testimonials",
+      "scope": "section",
+      "preset": "furniture",
+      "category": "testimonials",
+      "name": "Reviews from customers' homes",
+      "description": "Three short customer reviews with star ratings.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "neutral-cta-band",
       "scope": "section",
       "preset": null,
@@ -1206,6 +1830,116 @@
       "description": "Classic Shop's look: black and blue on white with uppercase headings, a season-sale slider, department tiles, product tabs and a flash sale.",
       "thumbnail": "/builder-templates/site-classic.png",
       "preview": "/builder-templates/site-classic-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-fashion",
+      "scope": "site",
+      "preset": "fashion",
+      "category": "site",
+      "name": "Fashion Boutique",
+      "description": "An editorial fashion boutique: a photo hero, category tiles, new-in tabs, a lookbook trio, weekend deals, the studio story, best sellers, reviews, journal and newsletter.",
+      "thumbnail": "/builder-templates/site-fashion.png",
+      "preview": "/builder-templates/site-fashion-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-electronics",
+      "scope": "site",
+      "preset": "electronics",
+      "category": "site",
+      "name": "Electronics Store",
+      "description": "A gadget shop: a sale hero, a service strip, category tiles, flash deals, three promo tiles, top-pick tabs, price drops, reviews, guides and newsletter.",
+      "thumbnail": "/builder-templates/site-electronics.png",
+      "preview": "/builder-templates/site-electronics-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-grocery",
+      "scope": "site",
+      "preset": "grocery",
+      "category": "site",
+      "name": "Supermarket",
+      "description": "A neighbourhood supermarket: a produce hero, delivery promises, aisles, today's deals, fresh picks, offer tiles, everyday essentials, reviews, recipes and newsletter.",
+      "thumbnail": "/builder-templates/site-grocery.png",
+      "preview": "/builder-templates/site-grocery-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-beauty",
+      "scope": "site",
+      "preset": "beauty",
+      "category": "site",
+      "name": "Beauty & Cosmetics",
+      "description": "A beauty and skincare shop: three hero tiles, promises, categories, bestsellers, a short brand note, new launches, two promo tiles, glow-week deals, reviews, notes and newsletter.",
+      "thumbnail": "/builder-templates/site-beauty.png",
+      "preview": "/builder-templates/site-beauty-full.jpg",
+      "allowed_in": [
+        "page",
+        "header",
+        "footer",
+        "zone"
+      ],
+      "requires": [
+        "banners",
+        "menus",
+        "promotions",
+        "blog"
+      ]
+    },
+    {
+      "id": "site-furniture",
+      "scope": "site",
+      "preset": "furniture",
+      "category": "site",
+      "name": "Furniture & Home",
+      "description": "A furniture and home shop: a room hero, shop by room, new arrivals, three room tiles, the workshop note, home-week deals, most loved, services, reviews, notes and newsletter.",
+      "thumbnail": "/builder-templates/site-furniture.png",
+      "preview": "/builder-templates/site-furniture-full.jpg",
       "allowed_in": [
         "page",
         "header",

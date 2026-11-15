@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { ExternalLinkIcon, PencilIcon } from 'lucide-react'
+import { CalendarClockIcon, CalendarX2Icon, ClockIcon, ExternalLinkIcon, MessageSquareWarningIcon, PencilIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useCurrentUserQuery } from '@/features/auth/api'
 import type { DocumentSummary } from '../api'
+import { failureText } from '../publishing-api'
+import { formatStoreDateTime } from './messages'
 import { liveUrl } from './page-helpers'
 import { useScreenText } from './screen-language'
 
@@ -14,15 +17,54 @@ import { useScreenText } from './screen-language'
 
 export function StatusBadges({ summary }: { summary: DocumentSummary }) {
   const { t, date } = useScreenText()
-  if (!summary.published) return <Badge variant="soft">{t('row.notPublished')}</Badge>
-  return (
-    <span className="flex flex-wrap items-center gap-1.5">
+  const live = !summary.published ? (
+    <Badge variant="soft">{t('row.notPublished')}</Badge>
+  ) : (
+    <>
       <Badge variant="success">
         {t('row.published', { n: summary.published.number })}
         {summary.published.published_at && ` · ${date(summary.published.published_at)}`}
       </Badge>
       {summary.has_unpublished_changes && <Badge variant="warning">{t('row.unpublished')}</Badge>}
+    </>
+  )
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {live}
+      <PublishingBadges summary={summary} />
     </span>
+  )
+}
+
+/** B11: a planned publish (or one that failed) and the approval state. */
+export function PublishingBadges({ summary }: { summary: Pick<DocumentSummary, 'schedule' | 'review'> }) {
+  const { t, lang } = useScreenText()
+  const timeZone = useCurrentUserQuery().data?.organization?.timezone
+  const schedule = summary.schedule
+  const review = summary.review
+  return (
+    <>
+      {schedule?.status === 'pending' && (
+        <Badge variant="info" data-testid="row-scheduled" title={t('row.scheduledHint', { date: formatStoreDateTime(lang, schedule.publish_at, timeZone) })}>
+          <CalendarClockIcon aria-hidden /> {t('row.scheduled', { date: formatStoreDateTime(lang, schedule.publish_at, timeZone) })}
+        </Badge>
+      )}
+      {schedule?.status === 'failed' && (
+        <Badge variant="destructive" data-testid="row-schedule-failed" title={failureText(schedule) ?? undefined}>
+          <CalendarX2Icon aria-hidden /> {t('row.scheduleFailed')}
+        </Badge>
+      )}
+      {review?.status === 'pending' && (
+        <Badge variant="warning" data-testid="row-review-pending">
+          <ClockIcon aria-hidden /> {t('row.reviewPending')}
+        </Badge>
+      )}
+      {review?.status === 'sent_back' && (
+        <Badge variant="destructive" data-testid="row-review-sent-back" title={review.comment ?? undefined}>
+          <MessageSquareWarningIcon aria-hidden /> {t('row.reviewSentBack')}
+        </Badge>
+      )}
+    </>
   )
 }
 

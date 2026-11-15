@@ -4,14 +4,14 @@ import { routes } from '@/app/routes'
 import { makeCurrentUser } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 import type { DocumentSummary } from '../api'
-import type { BuilderTemplate } from '../templates/api'
+import type { BuilderTemplate, TemplatePreset } from '../templates/api'
 
 /* The shop looks on the pages list (B5, B7): order and featured look, preview, live demo, drafts and use & publish now. */
 
 const MANAGE = ['storefront.view', 'storefront.manage']
 const PUBLISH = [...MANAGE, 'storefront.publish']
 
-type Preset = 'vegan' | 'handmade' | 'classic' | 'kids' | 'default'
+type Preset = TemplatePreset | 'default'
 const site = (preset: Preset, name: string, over: Partial<BuilderTemplate> = {}): BuilderTemplate => ({
   id: `site-${preset}`, scope: 'site', preset, category: null, name, description: `${name} demo store look.`, thumbnail_url: null, preview_url: null, allowed_in: ['page'], source: 'builtin', ...over,
 })
@@ -51,7 +51,7 @@ const themeDraft = (changes: boolean) => ({
 
 type Calls = { order: string[]; starts: { preset: string; body: unknown }[]; publishes: unknown[] }
 
-function mock(permissions: string[], options: { publishFails?: boolean; themeChanges?: boolean; demos?: unknown[] | 'off' } = {}) {
+function mock(permissions: string[], options: { publishFails?: boolean; themeChanges?: boolean; demos?: unknown[] | 'off'; sites?: BuilderTemplate[] } = {}) {
   const calls: Calls = { order: [], starts: [], publishes: [] }
   const start = (preset: string) => (init: RequestInit) => {
     calls.order.push(`start:${preset}`)
@@ -61,7 +61,7 @@ function mock(permissions: string[], options: { publishFails?: boolean; themeCha
   mockApi({
     'GET /auth/me': ok(makeCurrentUser({ permissions })),
     'GET /storefront/builder/documents': ok([existingHome]),
-    'GET /storefront/builder/templates': (_init, url) => ok(url.searchParams.get('scope') === 'site' ? SITES : []),
+    'GET /storefront/builder/templates': (_init, url) => ok(url.searchParams.get('scope') === 'site' ? (options.sites ?? SITES) : []),
     'GET /storefront/theme/presets': ok(presets),
     'GET /storefront/theme/draft': ok(themeDraft(options.themeChanges ?? true)),
     'GET /storefront/link-targets': ok({ pages: [], categories: [], brands: [], blog_categories: [], blog_posts: [] }),
@@ -69,6 +69,8 @@ function mock(permissions: string[], options: { publishFails?: boolean; themeCha
     'POST /storefront/builder/start-from-demo/vegan': start('vegan'),
     'POST /storefront/builder/start-from-demo/kids': start('kids'),
     'POST /storefront/builder/start-from-demo/default': start('default'),
+    'POST /storefront/builder/start-from-demo/fashion': start('fashion'),
+    'POST /storefront/builder/start-from-demo/furniture': start('furniture'),
     'POST /storefront/builder/publish-all': (init) => {
       calls.order.push('publish-all')
       calls.publishes.push(JSON.parse(String(init.body)))
@@ -308,5 +310,50 @@ describe('page builder: shop looks (B5, B7)', () => {
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Publish all' }))
     expect(await within(review).findByRole('alert')).toHaveTextContent('The footer is empty.')
     expect(within(review).getByRole('heading', { name: 'Your new look: Vegan Market' })).toBeInTheDocument()
+  })
+})
+
+describe('page builder: the five new looks (B11)', () => {
+  const B11_SITES = [
+    ...SITES,
+    site('fashion', 'Fashion Boutique', { thumbnail_url: '/builder-templates/site-fashion.png', preview_url: '/builder-templates/site-fashion-full.jpg' }),
+    site('electronics', 'Electronics Store'),
+    site('grocery', 'Supermarket'),
+    site('beauty', 'Beauty & Cosmetics'),
+    site('furniture', 'Furniture & Home'),
+  ]
+
+  it('lists ten looks: the featured one, then nine as 3 × 3 (never a lone card)', async () => {
+    mock(MANAGE, { sites: B11_SITES, demos: [demoStore('fashion', 'fashion.shop.localhost'), demoStore('grocery', 'grocery.shop.localhost')] })
+    renderRoutes(routes, '/storefront/pages')
+    const card = await screen.findByTestId('demo-looks')
+    await waitFor(() => expect(within(card).getAllByRole('button', { name: /^Use (?!and)/ })).toHaveLength(10))
+    const list = within(card).getByRole('list', { name: 'Demo looks' })
+    expect(list).toHaveClass('md:grid-cols-3')
+    expect(list).not.toHaveClass('xl:grid-cols-4')
+    for (const preset of ['fashion', 'electronics', 'grocery', 'beauty', 'furniture']) expect(within(card).getByTestId(`demo-look-${preset}`)).toBeInTheDocument()
+    expect(within(card).getByTestId('demo-look-fashion').querySelector('img')).toHaveAttribute('src', '/builder-templates/site-fashion.png')
+    // Live demo links for the new stores the server lists, none for the others.
+    const port = window.location.port ? `:${window.location.port}` : ''
+    expect(await within(card).findByRole('link', { name: /live demo of Fashion Boutique/ })).toHaveAttribute('href', `${window.location.protocol}//fashion.shop.localhost${port}/`)
+    expect(within(card).getByRole('link', { name: /live demo of Supermarket/ })).toBeInTheDocument()
+    expect(within(card).queryByRole('link', { name: /live demo of Electronics Store/ })).toBeNull()
+  })
+
+  it('a new look starts from its demo like the others', async () => {
+    const user = userEvent.setup()
+    const calls = mock(PUBLISH, { sites: B11_SITES })
+    renderRoutes(routes, '/storefront/pages')
+    await user.click(await screen.findByRole('button', { name: 'Preview Fashion Boutique' }))
+    const preview = await screen.findByRole('dialog', { name: 'Fashion Boutique' })
+    expect(within(preview).getByRole('img', { name: 'The whole home page of Fashion Boutique' })).toHaveAttribute('src', '/builder-templates/site-fashion-full.jpg')
+    await user.click(within(preview).getByRole('button', { name: 'Use this look' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Use Fashion Boutique?' })).getByRole('button', { name: 'Save as draft' }))
+    expect(await screen.findByRole('heading', { name: 'Your new look: Fashion Boutique' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Done for now' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Use Furniture & Home' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Use Furniture & Home?' })).getByRole('button', { name: 'Save as draft' }))
+    await waitFor(() => expect(calls.starts.map((s) => s.preset)).toEqual(['fashion', 'furniture']))
   })
 })

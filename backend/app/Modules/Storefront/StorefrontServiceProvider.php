@@ -25,6 +25,7 @@ use App\Modules\Storefront\Infrastructure\BuilderBlogReferences;
 use App\Modules\Storefront\Infrastructure\BuilderMediaReferences;
 use App\Modules\Storefront\Infrastructure\BuilderPageDesigns;
 use App\Modules\Storefront\Infrastructure\Caching\CacheStorefrontContentVersion;
+use App\Modules\Storefront\Infrastructure\Console\PublishScheduledBuilderCommand;
 use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
 use App\Modules\Storefront\Infrastructure\Notifications\SendFormSubmissionNotifications;
@@ -89,6 +90,11 @@ class StorefrontServiceProvider extends ModuleServiceProvider
 
         // B8b: staff hear about form submissions (queued, after commit).
         Event::listen(FormSubmitted::class, SendFormSubmissionNotifications::class);
+
+        // B11: "publish later" for builder pages and the theme (scheduled every minute in routes/console.php).
+        if ($this->app->runningInConsole()) {
+            $this->commands([PublishScheduledBuilderCommand::class]);
+        }
     }
 
     protected function permissions(): array

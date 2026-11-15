@@ -78,7 +78,8 @@ class DemoThemesSeederTest extends TestCase
         // P1a: photos per colour and size guides on Classic Shop and Little Sprouts.
         $this->seed(DemoVariantsSeeder::class);
         $this->assertSame($totals, $this->totals(), 'DemoVariantsSeeder skips stores that already have them.');
-        $this->assertSame(4, DB::table('size_guides')->count());
+        // Classic Shop, Little Sprouts and (B11) Loom & Lane have two each.
+        $this->assertSame(6, DB::table('size_guides')->count());
         $tote = $this->getJson('http://classic.shop.localhost/api/v1/store/products/leather-tote')->assertOk()->json('data');
         $this->assertSame(['Colour', 'image'], [$tote['photo_option'], $tote['options'][0]['display']]);
         $this->assertSame([1, 1], array_map(fn (array $v) => count($v['image_ids']), $tote['options'][0]['values']));
@@ -90,10 +91,10 @@ class DemoThemesSeederTest extends TestCase
         $this->assertSame('শিশুদের পোশাকের মাপের গাইড', $guide['title']);
         $this->assertSame('৬–১২ মাস', $guide['rows'][2]['cells']['age']);
 
-        // P1b: answered questions on two products per store, and "frequently bought together" from the demo orders and counter sale.
-        $this->assertSame(12, DB::table('product_questions')->where('status', 'published')->whereNotNull('answer')->count());
+        // P1b: answered questions on two products per store (three on the first four), and "frequently bought together" from the demo orders and counter sale.
+        $this->assertSame(22, DB::table('product_questions')->where('status', 'published')->whereNotNull('answer')->count());
         $this->seed(DemoProductPageSeeder::class);
-        $this->assertSame(12, DB::table('product_questions')->count(), 'DemoProductPageSeeder adds questions only to stores without any.');
+        $this->assertSame(22, DB::table('product_questions')->count(), 'DemoProductPageSeeder adds questions only to stores without any.');
         $avocado = $this->getJson('http://vegan.shop.localhost/api/v1/store/products/avocado')->assertOk()->json('data');
         $this->assertSame(2, $avocado['questions_count']);
         $this->assertSame('রাশেদ ক.', collect($this->getJson('http://vegan.shop.localhost/api/v1/store/products/avocado/questions')->assertOk()->json('data'))->firstWhere('question', 'ঢাকার বাইরে কি অ্যাভোকাডো পাঠান?')['name']);
@@ -103,16 +104,17 @@ class DemoThemesSeederTest extends TestCase
         $this->assertSame('automatic', $this->getJson('http://kids.shop.localhost/api/v1/store/products/cotton-bodysuit/related')->json('data.frequently_bought_source'));
 
         // P2a: a Facebook campaign per store — the order page, its short link, visits and three attributed orders.
-        $this->assertSame(4, DB::table('campaigns')->count());
-        $this->assertSame(12, DB::table('orders')->where('source', 'landing_page')->count());
-        $this->assertSame([12, 12, 12, 12], DB::table('short_links')->where('code', DemoLandingSeeder::CODE)->pluck('clicks')->map(fn ($c) => (int) $c)->all());
-        $this->assertSame(48, (int) DB::table('campaign_daily_stats')->sum('visits'));
+        $stores = count(DemoThemesSeeder::STORES);
+        $this->assertSame($stores, DB::table('campaigns')->count());
+        $this->assertSame(3 * $stores, DB::table('orders')->where('source', 'landing_page')->count());
+        $this->assertSame(array_fill(0, $stores, 12), DB::table('short_links')->where('code', DemoLandingSeeder::CODE)->pluck('clicks')->map(fn ($c) => (int) $c)->all());
+        $this->assertSame(12 * $stores, (int) DB::table('campaign_daily_stats')->sum('visits'));
         $page = $this->getJson('http://kids.shop.localhost/api/v1/store/builder/pages/'.DemoLandingSeeder::SLUG)->assertOk()->json('data');
         $this->assertNotEmpty(array_filter($page['data'], fn ($d) => isset($d['product'], $d['payment_methods'])), 'The order page shows its order form.');
         $this->get('http://kids.shop.localhost/go/'.DemoLandingSeeder::CODE, ['User-Agent' => 'Mozilla/5.0 Chrome/131'])->assertRedirect();
         $this->seed(DemoLandingSeeder::class);
-        $this->assertSame(4, DB::table('campaigns')->count(), 'DemoLandingSeeder skips stores that already have a campaign.');
-        $this->assertSame(12, DB::table('orders')->where('source', 'landing_page')->count());
+        $this->assertSame($stores, DB::table('campaigns')->count(), 'DemoLandingSeeder skips stores that already have a campaign.');
+        $this->assertSame(3 * $stores, DB::table('orders')->where('source', 'landing_page')->count());
 
         // P2b: Little Sprouts in social sandbox mode — Demo Page connected, three feeds on, two posts out and one scheduled.
         $sprouts = DB::table('storefront_domains')->where('host', 'kids.shop.localhost')->value('organization_id');
@@ -125,12 +127,12 @@ class DemoThemesSeederTest extends TestCase
         $this->seed(DemoSocialSeeder::class);
         $this->assertSame(3, DB::table('social_posts')->count(), 'DemoSocialSeeder skips a store that already has social settings.');
 
-        // The gallery lists the four stores in configured order.
+        // The gallery lists the nine stores in configured order.
         config(['storefront.demo_gallery' => true]);
         $demos = $this->getJson('http://platform.test/api/v1/demo-stores')->assertOk()->json('data');
-        $this->assertSame(['vegan.shop.localhost', 'handmade.shop.localhost', 'classic.shop.localhost', 'kids.shop.localhost'], array_column($demos, 'host'));
-        $this->assertSame(['Green Basket', 'Mati & Co.', 'Classic Shop', 'Little Sprouts'], array_column($demos, 'name'));
-        $this->assertSame(['vegan', 'handmade', 'classic', 'kids'], array_column($demos, 'preset'));
+        $this->assertSame(array_map(fn (string $key) => "{$key}.shop.localhost", DemoThemesSeeder::STORES), array_column($demos, 'host'));
+        $this->assertSame(['Green Basket', 'Mati & Co.', 'Classic Shop', 'Little Sprouts', 'Loom & Lane', 'Circuit Bazar', 'Bazar Fresh', 'Blush & Bloom', 'Kath & Home'], array_column($demos, 'name'));
+        $this->assertSame(DemoThemesSeeder::STORES, array_column($demos, 'preset'));
         $this->assertSame(['primary' => '#ffb020', 'accent' => '#7a5cc8', 'canvas' => '#f3f7fa'], $demos[3]['colors']);
         $this->assertSame(20, $demos[3]['product_count']);
         $this->assertSame(['Baby girls', 'Baby boys', 'Toys', 'Nursery', 'Feeding & bath', 'Shoes'], $demos[3]['category_names']);
@@ -148,6 +150,69 @@ class DemoThemesSeederTest extends TestCase
 
         $this->checkoutOnTheVeganStore();
         $this->littleSprouts();
+        $this->b11Stores($demos);
+    }
+
+    /**
+     * B11: the five new demo looks — ten photos each (≤ 200 KB, credited, reused by banners,
+     * category tiles and blog covers), Bangla names, menus, banners and section titles, a size
+     * guide on the fashion store and the coupon at its threshold.
+     *
+     * @param  list<array<string, mixed>>  $demos  the gallery
+     */
+    private function b11Stores(array $demos): void
+    {
+        $manifest = json_decode((string) file_get_contents(DemoThemesSeeder::path('images/manifest.json')), true);
+        foreach (['fashion', 'electronics', 'grocery', 'beauty', 'furniture'] as $key) {
+            $data = require DemoThemesSeeder::path("{$key}.php");
+            $host = $data['host'];
+            $this->assertSame("owner@{$key}.test", $data['owner']['email']);
+
+            // Ten photos, each credited and small; every one is used, banners only reuse them.
+            $files = array_map(fn (string $f) => basename($f, '.jpg'), glob(DemoThemesSeeder::path("images/{$key}/*.jpg")));
+            $this->assertCount(10, $files, $key);
+            foreach ($files as $file) {
+                $this->assertLessThanOrEqual(200 * 1024, filesize(DemoThemesSeeder::path("images/{$key}/{$file}.jpg")), "{$key}/{$file}");
+                $this->assertSame('Unsplash License', $manifest["{$key}/{$file}.jpg"]['licence'] ?? null, "{$key}/{$file} is credited");
+                $this->assertArrayHasKey($file, $data['products'], "{$key}/{$file} is a product photo");
+            }
+            foreach ($data['banners'] as $banner) {
+                $this->assertContains($banner['image'], $files, $key);
+            }
+            foreach ($data['categories'] as [, $image]) {
+                $this->assertContains($image, $files, $key);
+            }
+            $this->assertGreaterThanOrEqual(12, count($data['products']), $key);
+            $this->assertSame(10, DB::table('product_images')->where('organization_id', $this->organizationId($host))->count(), "{$key}: one photo per pictured product");
+
+            // Bangla: on in the store, product and category names, menu labels, banners and sections.
+            $bootstrap = $this->getJson("http://{$host}/api/v1/store/bootstrap?lang=bn")->assertOk()->json('data');
+            $this->assertSame($key, $bootstrap['theme']['preset']);
+            $slug = array_key_last($data['products']);
+            $this->assertSame($data['products'][$slug]['bn'][0], $this->getJson("http://{$host}/api/v1/store/products/{$slug}?lang=bn")->assertOk()->json('data.name'), $key);
+            $sections = $this->getJson("http://{$host}/api/v1/store/homepage?lang=bn")->assertOk()->json('data.sections');
+            $this->assertSame(array_column($data['sections'], 'type'), array_column($sections, 'type'), $key);
+            $strip = collect($sections)->firstWhere('type', 'category_strip');
+            $this->assertSame($data['sections'][array_search('category_strip', array_column($data['sections'], 'type'), true)]['bn']['title'], $strip['title'], $key);
+            $hero = collect($sections)->firstWhere('type', 'hero_slider');
+            $this->assertSame($data['banners']['banner-hero-1']['bn']['title'], $hero['banners'][0]['title'], $key);
+            $labels = DB::table('menu_items')->where('organization_id', $this->organizationId($host))->whereNotNull('translations')->count();
+            $this->assertSame(count($data['categories']) + 2 + 5, $labels, "{$key}: every menu label has Bangla");
+
+            $demo = collect($demos)->firstWhere('host', $host);
+            $this->assertSame($data['name'], $demo['name']);
+            $this->assertSame(count($data['products']), $demo['product_count']);
+            $this->assertSame(array_column($data['categories'], 0), $demo['category_names']);
+            $this->assertStringContainsString('/storage/media/', (string) $demo['image_url']);
+        }
+
+        // Loom & Lane: the clothing size guide in Bangla.
+        $this->assertSame('পোশাকের মাপের গাইড', $this->getJson('http://fashion.shop.localhost/api/v1/store/products/linen-shirt?lang=bn')->json('data.size_guide.title'));
+    }
+
+    private function organizationId(string $host): string
+    {
+        return (string) DB::table('storefront_domains')->where('host', $host)->value('organization_id');
     }
 
     /**

@@ -131,7 +131,16 @@ class BuilderTemplatesApiTest extends TestCase
         }
         // B7: the demo looks in the order they are shown — the kids look first, then the original look.
         $sites = $this->getJson(self::API.'/templates?scope=site')->assertOk()->json('data');
-        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($sites, 'id'));
+        $siteIds = ['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic', 'site-fashion', 'site-electronics', 'site-grocery', 'site-beauty', 'site-furniture'];
+        $this->assertSame($siteIds, array_column($sites, 'id'));
+        // B11: the new looks' section templates have no thumbnail (null), their site templates do.
+        $fashion = $this->getJson(self::API.'/templates?preset=fashion')->assertOk()->json('data');
+        foreach ($fashion as $template) {
+            $template['scope'] === 'site'
+                ? $this->assertSame(['/builder-templates/site-fashion.png', '/builder-templates/site-fashion-full.jpg'], [$template['thumbnail_url'], $template['preview_url']])
+                : $this->assertNull($template['thumbnail_url'], $template['id']);
+        }
+        $this->assertGreaterThanOrEqual(7, count($fashion));
         $this->assertSame(['BerryKid Kids Store', 'Original look'], [$sites[0]['name'], $sites[1]['name']]);
         $this->assertSame(['site-default'], array_column($this->getJson(self::API.'/templates?preset=default')->assertOk()->json('data'), 'id'));
 
@@ -153,7 +162,7 @@ class BuilderTemplatesApiTest extends TestCase
         $this->assertNotContains('page-contact', $landing);
         $this->assertContains('page-sale-landing', $landing);
         $header = $this->getJson(self::API.'/templates?context=header')->assertOk()->json('data');
-        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($header, 'id'));
+        $this->assertSame($siteIds, array_column($header, 'id'));
         // K1: the kids look's templates.
         $kids = $this->getJson(self::API.'/templates?preset=kids')->assertOk()->json('data');
         $this->assertSame(['kids'], array_values(array_unique(array_column($kids, 'preset'))));
@@ -376,7 +385,9 @@ class BuilderTemplatesApiTest extends TestCase
      */
     public static function presets(): array
     {
-        return ['vegan' => ['vegan'], 'handmade' => ['handmade'], 'classic' => ['classic'], 'kids' => ['kids']];
+        return ['vegan' => ['vegan'], 'handmade' => ['handmade'], 'classic' => ['classic'], 'kids' => ['kids'],
+            // B11.
+            'fashion' => ['fashion'], 'electronics' => ['electronics'], 'grocery' => ['grocery'], 'beauty' => ['beauty'], 'furniture' => ['furniture']];
     }
 
     #[DataProvider('presets')]

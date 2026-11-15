@@ -23,8 +23,11 @@ use Illuminate\Support\Facades\Storage;
  * @property ?string $alt
  * @property array<string, string> $renditions
  * @property string $checksum
+ * @property ?int $focal_x
+ * @property ?int $focal_y
+ * @property ?string $edited_from_id
  */
-#[Fillable(['organization_id', 'disk', 'path', 'original_name', 'mime_type', 'size', 'width', 'height', 'alt', 'renditions', 'checksum'])]
+#[Fillable(['organization_id', 'disk', 'path', 'original_name', 'mime_type', 'size', 'width', 'height', 'alt', 'renditions', 'checksum', 'focal_x', 'focal_y', 'edited_from_id'])]
 class Media extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -42,7 +45,19 @@ class Media extends Model
             'width' => 'integer',
             'height' => 'integer',
             'renditions' => 'array',
+            'focal_x' => 'integer',
+            'focal_y' => 'integer',
         ];
+    }
+
+    /**
+     * B11: the focal point in percent (`object-position: x% y%`), or null for the centre.
+     *
+     * @return array{x: int, y: int}|null
+     */
+    public function focal(): ?array
+    {
+        return $this->focal_x === null || $this->focal_y === null ? null : ['x' => $this->focal_x, 'y' => $this->focal_y];
     }
 
     public function url(): string
@@ -51,7 +66,9 @@ class Media extends Model
     }
 
     /**
-     * `srcset` of the original plus its generated renditions (narrowest first).
+     * `srcset` of the original plus its generated renditions (narrowest first). B11: a WebP
+     * rendition at the original's own width (made for large JPEG/PNG files) stands in for the
+     * original there; `url()` stays the original, the fallback for `src`.
      */
     public function srcset(): string
     {
@@ -59,7 +76,7 @@ class Media extends Model
         foreach ($this->renditions as $width => $path) {
             $candidates[(int) $width] = self::urlFor($this->disk, $path);
         }
-        $candidates[$this->width] = $this->url();
+        $candidates[$this->width] ??= $this->url();
         ksort($candidates);
 
         return implode(', ', array_map(fn (int $w, string $url) => "{$url} {$w}w", array_keys($candidates), $candidates));

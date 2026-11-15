@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "items": [
+                                        {
+                                            "icon": "shield-check",
+                                            "title": "Official warranty",
+                                            "text": "On every product"
+                                        },
+                                        {
+                                            "icon": "truck",
+                                            "title": "Free delivery",
+                                            "text": "Inside Dhaka over ৳5,000"
+                                        },
+                                        {
+                                            "icon": "credit-card",
+                                            "title": "Cash on delivery",
+                                            "text": "Check before you pay"
+                                        },
+                                        {
+                                            "icon": "headset",
+                                            "title": "Expert help",
+                                            "text": "01700-000006, 10 am to 8 pm"
+                                        }
+                                    ],
+                                    "background": null
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

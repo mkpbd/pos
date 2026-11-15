@@ -17,10 +17,11 @@ interface MediaLibrary
     public function existing(array $ids): array;
 
     /**
-     * Public representation keyed by id; unknown ids are absent.
+     * Public representation keyed by id; unknown ids are absent. B11: `focal` is the focal point
+     * in percent (`object-position: x% y%` wherever CSS crops the picture), or null for the centre.
      *
      * @param  list<string>  $ids
-     * @return array<string, array{id: string, url: string, srcset: string, width: int, height: int, alt: ?string}>
+     * @return array<string, array{id: string, url: string, srcset: string, width: int, height: int, alt: ?string, focal: array{x: int, y: int}|null}>
      */
     public function refs(array $ids): array;
 

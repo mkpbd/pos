@@ -1,0 +1,1086 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "fashion"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "autoplay_seconds": 6,
+                                            "height": "large"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "New season",
+                                                    "kicker": "NEW SEASON",
+                                                    "title": "Light layers for long days",
+                                                    "subtitle": "Breezy dresses, linen shirts and easy skirts, made for Dhaka summers.",
+                                                    "button_label": "Shop women",
+                                                    "link_url": "/category/women",
+                                                    "secondary_button_label": "Shop men",
+                                                    "secondary_link_url": "/category/men",
+                                                    "text_color": "#1c1917",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "fashion/wrap-midi-dress.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "নতুন মৌসুম",
+                                                            "title": "লম্বা দিনের হালকা পোশাক",
+                                                            "subtitle": "ঢাকার গরমের জন্য হালকা ড্রেস, লিনেন শার্ট আর আরামের স্কার্ট।",
+                                                            "button_label": "নারীদের",
+                                                            "secondary_button_label": "পুরুষদের"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Handloom",
+                                                    "kicker": "WOVEN IN BANGLADESH",
+                                                    "title": "Handloom, made for celebrations",
+                                                    "subtitle": "Cotton sarees and block-print kurtis from small weaving studios.",
+                                                    "button_label": "Shop ethnic wear",
+                                                    "link_url": "/category/ethnic",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "center",
+                                                    "image": {
+                                                        "asset": "fashion/handloom-saree.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "বাংলাদেশে বোনা",
+                                                            "title": "উৎসবের জন্য তাঁতের পোশাক",
+                                                            "subtitle": "ছোট তাঁতঘর থেকে সুতির শাড়ি আর ব্লক প্রিন্ট কুর্তি।",
+                                                            "button_label": "দেশি পোশাক দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Shop by category",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 6
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ক্যাটাগরি অনুযায়ী কিনুন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "product_tabs",
+                                    "props": {
+                                        "title": "New in",
+                                        "subtitle": "Fresh from the studio",
+                                        "config": {
+                                            "limit": 8,
+                                            "tabs": [
+                                                {
+                                                    "label": "New arrivals",
+                                                    "source": "new_arrivals"
+                                                },
+                                                {
+                                                    "label": "Featured",
+                                                    "source": "featured"
+                                                },
+                                                {
+                                                    "label": "Best sellers",
+                                                    "source": "best_sellers"
+                                                }
+                                            ]
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "নতুন এসেছে",
+                                            "subtitle": "স্টুডিও থেকে সদ্য"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "3-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Women",
+                                                    "kicker": "WOMEN",
+                                                    "title": "Skirts that move",
+                                                    "button_label": "Shop women",
+                                                    "link_url": "/category/women",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "fashion/pleated-skirt.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "নারী",
+                                                            "title": "দোলানো স্কার্ট",
+                                                            "button_label": "দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Men",
+                                                    "kicker": "MEN",
+                                                    "title": "Jackets for cool evenings",
+                                                    "button_label": "Shop men",
+                                                    "link_url": "/category/men",
+                                                    "text_color": "#1c1917",
+                                                    "image": {
+                                                        "asset": "fashion/bomber-jacket.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "পুরুষ",
+                                                            "title": "ঠান্ডা সন্ধ্যার জ্যাকেট",
+                                                            "button_label": "দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Bags",
+                                                    "kicker": "BAGS",
+                                                    "title": "Small bags, big days",
+                                                    "button_label": "Shop bags",
+                                                    "link_url": "/category/bags",
+                                                    "text_color": "#1c1917",
+                                                    "image": {
+                                                        "asset": "fashion/leather-satchel.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "ব্যাগ",
+                                                            "title": "ছোট ব্যাগ, বড় দিন",
+                                                            "button_label": "দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "hot_deals",
+                                    "props": {
+                                        "title": "The weekend edit",
+                                        "subtitle": "20 % off four favourites",
+                                        "config": {
+                                            "limit": 4,
+                                            "view_all_url": "/shop",
+                                            "promotion_id": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সপ্তাহান্তের বাছাই",
+                                            "subtitle": "চারটি প্রিয় পণ্যে ২০ % ছাড়"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "rich_text",
+                                    "props": {
+                                        "title": "Woven here, worn everywhere",
+                                        "subtitle": null,
+                                        "config": {
+                                            "alignment": "center",
+                                            "body_html": "<p>We cut our clothes in small batches in Dhaka and buy our handloom straight from weaving families. Read <a href=\"/pages/about-us\">our story</a> or see the <a href=\"/pages/faq\">FAQ</a>.</p>"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "এখানে বোনা, সবখানে পরা",
+                                            "body_html": "<p>আমরা ঢাকায় অল্প অল্প করে পোশাক কাটি আর তাঁতিদের কাছ থেকে সরাসরি তাঁতের কাপড় কিনি। পড়ুন <a href=\"/pages/about-us\">আমাদের গল্প</a> অথবা দেখুন <a href=\"/pages/faq\">প্রশ্নোত্তর</a>।</p>"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "product_carousel",
+                                    "props": {
+                                        "title": "Best sellers",
+                                        "subtitle": "What Dhaka is wearing",
+                                        "config": {
+                                            "source": "best_sellers",
+                                            "limit": 8,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সবচেয়ে বেশি বিক্রি",
+                                            "subtitle": "ঢাকা এখন যা পরছে"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "testimonials",
+                                    "props": {
+                                        "title": "Worn and loved",
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "quote": "The wrap dress fits beautifully and the fabric stays cool all day. Already ordered a second one.",
+                                                    "name": "Nadia R.",
+                                                    "role": "Banani",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "My handloom saree is even nicer in person. Packed with care and delivered in two days.",
+                                                    "name": "Sharmin A.",
+                                                    "role": "Chattogram",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Good linen shirts at a fair price. The exchange for a bigger size was easy.",
+                                                    "name": "Imtiaz H.",
+                                                    "role": "Mohammadpur",
+                                                    "rating": 4
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ক্রেতারা যা বলছেন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "blog_posts",
+                                    "props": {
+                                        "title": "Style notes",
+                                        "subtitle": null,
+                                        "config": {
+                                            "limit": 3,
+                                            "view_all_url": "/blog"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "স্টাইল নোট"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "newsletter",
+                                    "props": {
+                                        "title": "Join the Loom & Lane list",
+                                        "subtitle": null,
+                                        "config": {
+                                            "text": "New collections and members-only offers, twice a month. Unsubscribe any time.",
+                                            "button_label": "Subscribe",
+                                            "background": "#1c1917",
+                                            "foreground": "#ffffff",
+                                            "image_media_id": {
+                                                "asset": "fashion/block-print-kurti.jpg"
+                                            }
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "লুম অ্যান্ড লেনের তালিকায় যোগ দিন",
+                                            "text": "নতুন কালেকশন আর সদস্যদের অফার, মাসে দুবার। যেকোনো সময় বন্ধ করা যায়।",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Free delivery",
+                                                    "text": "Inside Dhaka over ৳3,000"
+                                                },
+                                                {
+                                                    "icon": "rotate-ccw",
+                                                    "title": "7-day exchange",
+                                                    "text": "Unworn, with tags"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Cash on delivery",
+                                                    "text": "Or bank transfer"
+                                                },
+                                                {
+                                                    "icon": "store",
+                                                    "title": "Visit the studio",
+                                                    "text": "Gulshan 2, 10 am to 9 pm"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "14px",
+                                    "bottom": "14px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 48,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 44
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search dresses, shirts, sarees…",
+                                        "button_label": ""
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "ড্রেস, শার্ট, শাড়ি খুঁজুন…"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "links"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_17",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": false
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "4px",
+                                    "bottom": "8px"
+                                }
+                            }
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_18",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "56px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "32px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "40px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 28,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_19",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 40,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_20",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>A Dhaka boutique for everyday clothes, handloom from Bangladeshi weavers, shoes and bags.</p>"
+                                    }
+                                },
+                                {
+                                    "id": "e_21",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 20,
+                                        "style": "square",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 22,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_22",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Information",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "তথ্য"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_23",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 22,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_24",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Customer care",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "গ্রাহক সেবা"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_25",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p><a href=\"/pages/faq\">Help and FAQ</a><br><a href=\"/account/orders\">Track your order</a><br><a href=\"/pages/contact\">Contact us</a></p>"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 28,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_26",
+                                    "type": "newsletter_form",
+                                    "props": {
+                                        "title": "New in, first",
+                                        "text": "New collections, twice a month.",
+                                        "button_label": "Subscribe",
+                                        "layout": "stacked"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সবার আগে নতুন কালেকশন",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_27",
+                                    "type": "divider",
+                                    "props": {
+                                        "line": "solid",
+                                        "thickness": 1,
+                                        "width": 100,
+                                        "color": "theme:border",
+                                        "align": "center"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_16",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "24px"
+                                }
+                            },
+                            "layout": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_24",
+                            "type": "column",
+                            "width": {
+                                "base": 60,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_28",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_25",
+                            "type": "column",
+                            "width": {
+                                "base": 40,
+                                "mobile": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                },
+                                "mobile": {
+                                    "layout": {
+                                        "justify": "start"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_29",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 22
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_17",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "28px",
+                                    "bottom": "28px"
+                                },
+                                "margin": {
+                                    "bottom": "24px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "#f3ece3"
+                            },
+                            "border": {
+                                "radius": {
+                                    "tl": "0px",
+                                    "tr": "0px",
+                                    "br": "0px",
+                                    "bl": "0px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_26",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_30",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Made to be worn",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "পরার জন্যই তৈরি"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_31",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Every size has a guide on the product page. Between two sizes? Choose the larger one.</p>"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

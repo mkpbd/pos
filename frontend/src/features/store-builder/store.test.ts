@@ -89,6 +89,6 @@ describe('editor store history', () => {
   it('media from the inspector are kept for the canvas', () => {
     const store = createEditorStore(detail())
     store.getState().apply((c) => setProps(c, 'e_image', { media_id: 'm-2' }), { media: { 'm-2': { id: 'm-2', url: '/a.jpg', srcset: '/a.jpg 1w', width: 1, height: 1, alt: null } } })
-    expect(store.getState().localMedia['m-2']).toEqual({ url: '/a.jpg', srcset: '/a.jpg 1w', width: 1, height: 1, alt: null })
+    expect(store.getState().localMedia['m-2']).toEqual({ url: '/a.jpg', srcset: '/a.jpg 1w', width: 1, height: 1, alt: null, focal: null })
   })
 })

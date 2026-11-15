@@ -1,0 +1,90 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "New season",
+                                            "kicker": "NEW SEASON",
+                                            "title": "Light layers for long days",
+                                            "subtitle": "Breezy dresses, linen shirts and easy skirts, made for Dhaka summers.",
+                                            "button_label": "Shop women",
+                                            "link_url": "/category/women",
+                                            "secondary_button_label": "Shop men",
+                                            "secondary_link_url": "/category/men",
+                                            "text_color": "#1c1917",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "fashion/wrap-midi-dress.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "নতুন মৌসুম",
+                                                    "title": "লম্বা দিনের হালকা পোশাক",
+                                                    "subtitle": "ঢাকার গরমের জন্য হালকা ড্রেস, লিনেন শার্ট আর আরামের স্কার্ট।",
+                                                    "button_label": "নারীদের",
+                                                    "secondary_button_label": "পুরুষদের"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Handloom",
+                                            "kicker": "WOVEN IN BANGLADESH",
+                                            "title": "Handloom, made for celebrations",
+                                            "subtitle": "Cotton sarees and block-print kurtis from small weaving studios.",
+                                            "button_label": "Shop ethnic wear",
+                                            "link_url": "/category/ethnic",
+                                            "text_color": "#ffffff",
+                                            "text_position": "center",
+                                            "image": {
+                                                "asset": "fashion/handloom-saree.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "বাংলাদেশে বোনা",
+                                                    "title": "উৎসবের জন্য তাঁতের পোশাক",
+                                                    "subtitle": "ছোট তাঁতঘর থেকে সুতির শাড়ি আর ব্লক প্রিন্ট কুর্তি।",
+                                                    "button_label": "দেশি পোশাক দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

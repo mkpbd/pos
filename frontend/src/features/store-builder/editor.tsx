@@ -28,7 +28,7 @@ import { useStoreFonts } from '@/features/storefront/api'
 import { useCan } from '@/features/auth/use-auth'
 import { ApiError } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import type { CanvasProduct, CanvasSurroundings } from '@/storefront/builder/canvas/protocol'
+import type { CanvasProduct } from '@/storefront/builder/canvas/protocol'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { RenderSection } from '@/storefront/builder/types'
 import { AddPanel } from './add-panel'
@@ -45,8 +45,14 @@ import {
   type CanvasContext,
   type DocumentDetail,
   type ElementsMetadata,
-  type VersionSummary,
 } from './api'
+import { cancelSchedule, schedulePublish, submitForReview, withdrawReview, type VersionEntry } from './publishing-api'
+import { formatStoreTime } from './publishing/schedule-time'
+import { ReviewChip, ScheduleChip } from './publishing/status-chips'
+import { ReviewScreen, SubmitReviewDialog } from './publishing/review-dialogs'
+import { canvasSurroundings } from './publishing/surroundings'
+import { entryTitle } from './publishing/version-names'
+import { VersionHistoryDialog, type CompareSupport } from './publishing/versions-panel'
 import { Autosave, problemCount, problemsByNode } from './autosave'
 import { CanvasFrame, type CanvasEditMessage, type CanvasHandle, type NodeUpload, type SpacingTarget } from './canvas-frame'
 import { CheckPanel } from './check-panel'
@@ -64,8 +70,8 @@ import { globalKeys, useGlobalEntries, useGlobalsQuery } from './global-api'
 import { DetachConfirm, MakeGlobalDialog } from './global-dialogs'
 import { GlobalDocBar, GlobalDocPanel, GlobalRefPanel, GlobalSectionsPanel } from './global-panel'
 import { expandGlobals, globalContextFor, globalRefOf, referencedGlobals } from './global-sections'
-import { ConflictDialog, LeaveDialog, LinkPrompt, PublishDialog, VersionHistoryDialog } from './dialogs'
-import { elementContext, isProductZone, kindInfo, parseZoneKey } from './document-kind'
+import { ConflictDialog, LeaveDialog, LinkPrompt, PublishDialog } from './dialogs'
+import { elementContext, isProductZone, kindInfo } from './document-kind'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector, withSeo } from './inspector'
 import { BREAKPOINT, DEVICE_LABEL, widthAt } from './inspector/style-model'
@@ -129,6 +135,8 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
   const store = useEditorStoreApi()
   const can = useCan()
   const canPublish = can('storefront.publish')
+  // B11: people who may edit but not publish send the draft for approval.
+  const canSubmit = can('storefront.manage') && !canPublish
   const canCustomHtml = can('storefront.custom_html')
   const queryClient = useQueryClient()
   const canvas = useRef<CanvasHandle | null>(null)
@@ -198,7 +206,7 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
     <EditorUiContext value={ui}>
       {/* Its own provider: the editor renders outside the admin shell. */}
       <TooltipProvider delayDuration={300}>
-        <EditorLayout autosave={autosave} canPublish={canPublish} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
+        <EditorLayout autosave={autosave} canPublish={canPublish} canSubmit={canSubmit} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
         <DeleteConfirm id={deleteId} onClose={() => setDeleteId(null)} />
         <SaveTemplate id={saveTemplateId} onClose={() => setSaveTemplateId(null)} />
         <MakeGlobalDialog sectionId={makeGlobalId} onClose={() => setMakeGlobalId(null)} />
@@ -247,6 +255,7 @@ function SaveTemplate({ id, onClose }: { id: string | null; onClose: () => void 
 type LayoutProps = {
   autosave: Autosave
   canPublish: boolean
+  canSubmit: boolean
   canCustomHtml: boolean
   canvasContext: CanvasContext
   registry: ElementsMetadata
@@ -263,15 +272,7 @@ function livePath(doc: { kind: string; key: string; path: string | null; preview
   return null
 }
 
-/** The canvas kind of a document; a product zone's version is drawn as its zone (P1b). */
-function canvasSurroundings(doc: { kind: string; key: string; context?: string | null }): CanvasSurroundings {
-  // B9: a header or footer global is drawn where the header or footer sits.
-  if (doc.kind === 'global') return doc.context === 'header' || doc.context === 'footer' ? doc.context : 'page'
-  if (doc.kind === 'zone') return parseZoneKey(doc.key)?.zone ?? 'page'
-  return doc.kind === 'header' || doc.kind === 'footer' || doc.kind === 'popup' ? doc.kind : 'page'
-}
-
-function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, registry, queryClient }: LayoutProps) {
+function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasContext, registry, queryClient }: LayoutProps) {
   const store = useEditorStoreApi()
   const commands = useCommands()
   const content = useEditor((s) => s.content)
@@ -318,6 +319,12 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [conflictPending, setConflictPending] = useState(false)
   const [stylesOpen, setStylesOpen] = useState(false)
+  // B11: approval and the store's timezone (planned publishes are chosen in it).
+  const timeZone = useCurrentUserQuery().data?.organization?.timezone
+  const [submitOpen, setSubmitOpen] = useState(false)
+  const [submitPending, setSubmitPending] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [reviewId, setReviewId] = useState<string | null>(null)
 
   /* ---------------------------------------------------------------- site styles (B3) ------- */
   const siteStyles = useSiteStyles()
@@ -385,7 +392,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
   const GLOBAL_NOTE = 'This is part of a global section. Open the global section to change it — every page that uses it changes too.'
 
   const applyPicture = useCallback(
-    (id: string, mediaId: string, media?: { url: string; srcset: string; width: number; height: number; alt: string | null }) => {
+    (id: string, mediaId: string, media?: { url: string; srcset: string; width: number; height: number; alt: string | null; focal?: { x: number; y: number } | null }) => {
       const state = store.getState()
       const bp = BREAKPOINT[state.device]
       return state.apply((c) => setNodePicture(c, id, mediaId, bp), { select: id, ...(media ? { media: { [mediaId]: media } } : {}) })
@@ -751,21 +758,41 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     }
   }
 
-  const publish = async (note: string | null) => {
+  /** Saves the latest changes first; null when saved, else why not (for the dialog). */
+  const saveFirst = async (verb: string): Promise<string | null> => {
+    if (await autosave.flush()) return null
+    const state = store.getState()
+    const count = problemCount(state.errors)
+    if (state.saveState.status === 'invalid') return `Fix the ${count} ${count === 1 ? 'problem' : 'problems'} on this page first (marked in red), then ${verb}.`
+    if (state.saveState.status === 'conflict') return 'This page changed somewhere else. Choose which version to keep first.'
+    return 'Your latest changes could not be saved. Check your connection and try again.'
+  }
+
+  /** A 422 from publish, schedule or submit: problems go on the page, the message in the dialog. */
+  const refusal = (error: unknown, fallback: string): string => {
+    if (error instanceof ApiError && error.status === 422) {
+      if (error.code === 'DOCUMENT_INVALID') store.getState().setErrors(problemsByNode(error))
+      return error.code === 'DOCUMENT_EMPTY' ? `Add something to the ${info.noun} first.` : error.message
+    }
+    return error instanceof Error ? error.message : fallback
+  }
+
+  const publish = async (note: string | null, options: { cancelSchedule?: boolean } = {}) => {
     setPublishPending(true)
     setPublishError(null)
     try {
-      const saved = await autosave.flush()
-      if (!saved) {
-        const state = store.getState()
-        const count = problemCount(state.errors)
-        if (state.saveState.status === 'invalid') setPublishError(`Fix the ${count} ${count === 1 ? 'problem' : 'problems'} on this page first (marked in red), then publish.`)
-        else if (state.saveState.status === 'conflict') setPublishError('This page changed somewhere else. Choose which version to keep first.')
-        else setPublishError('Your latest changes could not be saved. Check your connection and try again.')
+      const unsaved = await saveFirst('publish')
+      if (unsaved) {
+        setPublishError(unsaved)
         return
       }
-      const detail = await publishDocument(documentInfo.id, note)
-      store.getState().setDocument({ published: detail.published, preview_url: detail.preview_url ?? store.getState().document.preview_url })
+      const detail = await publishDocument(documentInfo.id, note, options)
+      store.getState().setDocument({
+        published: detail.published,
+        preview_url: detail.preview_url ?? store.getState().document.preview_url,
+        ...('schedule' in detail ? { schedule: detail.schedule ?? null } : {}),
+        ...('review' in detail ? { review: detail.review ?? null } : {}),
+      })
       setPublishOpen(false)
       const state = store.getState()
       const version = detail.published ? ` — version ${detail.published.number}` : ''
@@ -780,13 +807,103 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       if (unpublished.length > 0) toast.warning(`${unpublished.map((g) => `“${g.title}”`).join(', ')} ${unpublished.length === 1 ? 'isn’t' : 'aren’t'} published yet, so shoppers don’t see ${unpublished.length === 1 ? 'it' : 'them'} on this page.`)
       refreshList()
     } catch (error) {
-      if (error instanceof ApiError && error.status === 422) {
-        if (error.code === 'DOCUMENT_INVALID') store.getState().setErrors(problemsByNode(error))
-        setPublishError(error.code === 'DOCUMENT_EMPTY' ? `Add something to the ${info.noun} before publishing it.` : error.message)
-      } else setPublishError(error instanceof Error ? error.message : 'Could not publish.')
+      setPublishError(error instanceof ApiError && error.status === 422 && error.code === 'DOCUMENT_EMPTY' ? `Add something to the ${info.noun} before publishing it.` : refusal(error, 'Could not publish.'))
     } finally {
       setPublishPending(false)
     }
+  }
+
+  /** B11 "Publish later": the saved draft goes live at `publishAt` (it replaces a pending plan). */
+  const scheduleLater = async (publishAt: string, note: string | null) => {
+    setPublishPending(true)
+    setPublishError(null)
+    try {
+      const unsaved = await saveFirst('schedule it')
+      if (unsaved) {
+        setPublishError(unsaved)
+        return
+      }
+      const detail = await schedulePublish(documentInfo.id, { publish_at: publishAt, note })
+      const schedule = detail?.schedule ?? null
+      store.getState().setDocument({ schedule, ...('review' in (detail ?? {}) ? { review: detail.review ?? null } : {}) })
+      setPublishOpen(false)
+      toast.success(`Scheduled. The ${info.noun} goes live on ${formatStoreTime(schedule?.publish_at ?? publishAt, timeZone)}, as it is now.`)
+      refreshList()
+    } catch (error) {
+      setPublishError(refusal(error, 'Could not schedule it.'))
+    } finally {
+      setPublishPending(false)
+    }
+  }
+
+  const cancelPlanned = async () => {
+    const planned = store.getState().document.schedule
+    try {
+      const detail = await cancelSchedule(documentInfo.id)
+      store.getState().setDocument({ schedule: detail?.schedule ?? null })
+      toast.success(`Cancelled. The ${info.noun} won’t go live on ${formatStoreTime(planned?.publish_at, timeZone)}.`)
+      refreshList()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'NOTHING_SCHEDULED') {
+        store.getState().setDocument({ schedule: null })
+        toast.info('Nothing is planned any more — it may have gone live or been cancelled already.')
+        refreshList()
+        return
+      }
+      toast.error(error instanceof Error ? error.message : 'It couldn’t be cancelled. Try again.')
+    }
+  }
+
+  /** B11: the saved draft is sent for approval. */
+  const submitReview = async (note: string | null) => {
+    setSubmitPending(true)
+    setSubmitError(null)
+    try {
+      const unsaved = await saveFirst('submit it')
+      if (unsaved) {
+        setSubmitError(unsaved)
+        return
+      }
+      const review = await submitForReview(documentInfo.id, note)
+      store.getState().setDocument({ review })
+      setSubmitOpen(false)
+      toast.success('Submitted for review. You’ll get a notification when it is approved or sent back.')
+      refreshList()
+    } catch (error) {
+      setSubmitError(refusal(error, 'Could not submit it.'))
+    } finally {
+      setSubmitPending(false)
+    }
+  }
+
+  /** B11: the submitter takes a pending request back (the draft stays). */
+  const withdraw = async () => {
+    const review = store.getState().document.review
+    if (!review) return
+    try {
+      await withdrawReview(review.id)
+      store.getState().setDocument({ review: null })
+      toast.success('Request withdrawn. Your draft stays as it is.')
+      refreshList()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'REVIEW_NOT_PENDING') {
+        toast.info('Someone already decided on this request.')
+        void reviewDecided()
+        return
+      }
+      toast.error(error instanceof Error ? error.message : 'It couldn’t be withdrawn. Try again.')
+    }
+  }
+
+  /** After a decision on this document's review: where it stands now (the draft stays as it is). */
+  const reviewDecided = async () => {
+    try {
+      const detail = await fetchDocument(documentInfo.id)
+      store.getState().setDocument({ published: detail.published, schedule: detail.schedule ?? null, review: detail.review ?? null })
+    } catch {
+      // The chips catch up on the next open.
+    }
+    refreshList()
   }
 
   const replaceDraft = async (load: () => Promise<DocumentDetail>, message: string) => {
@@ -816,8 +933,21 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
     }
   }
 
-  const restore = (version: VersionSummary) =>
-    replaceDraft(() => restoreVersion(documentInfo.id, version.id), `Version ${version.number} is now your draft. Publish to make it live.`).then(() => setHistoryOpen(false))
+  const restore = (entry: VersionEntry) =>
+    replaceDraft(
+      () => restoreVersion(documentInfo.id, entry.id),
+      `${entry.kind === 'version' && entry.number !== null && !entry.name ? `Version ${entry.number}` : `“${entryTitle(entry)}”`} is now your draft. Publish to make it live.`,
+    ).then(() => setHistoryOpen(false))
+
+  /** B11: what compare needs (the draft as drawn now, the theme, element names). */
+  const compareSupport: CompareSupport = {
+    bootstrap: canvasContext.bootstrap,
+    surroundings,
+    emptyText: `Nothing on this ${info.noun} yet.`,
+    theme: themeSettings as CanvasThemeSettings | null,
+    draft: () => ({ sections: toRenderTree(expanded.content, { locale: EDITOR_LOCALE, now: Date.now() }), data: preview.data, media: preview.media, popup: popupSettings ?? null }),
+    typeLabel: (type) => registry.types.find((t) => (t.type as string) === type)?.label ?? (type === 'section' ? 'Section' : type === 'column' ? 'Column' : type),
+  }
 
   /* ---------------------------------------------------------------- drag & drop ------------ */
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: layerKeyboardCoordinates }))
@@ -934,6 +1064,36 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
       <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground" data-testid="store-builder-editor">
         <Toolbar
           canPublish={canPublish}
+          canSubmit={canSubmit}
+          onSubmitReview={() => {
+            setSubmitError(null)
+            setSubmitOpen(true)
+            void runServerCheck(store.getState().content)
+          }}
+          status={
+            <>
+              <ScheduleChip
+                schedule={documentInfo.schedule}
+                timeZone={timeZone}
+                canChange={canPublish}
+                onCancel={cancelPlanned}
+                onReschedule={() => {
+                  setPublishError(null)
+                  setPublishOpen(true)
+                }}
+              />
+              <ReviewChip
+                review={documentInfo.review}
+                canPublish={canPublish}
+                onOpenReview={() => setReviewId(documentInfo.review?.id ?? null)}
+                onResubmit={() => {
+                  setSubmitError(null)
+                  setSubmitOpen(true)
+                }}
+                onWithdraw={withdraw}
+              />
+            </>
+          }
           onRename={rename}
           onPreview={() => void openPreview()}
           onPublish={() => {
@@ -1119,7 +1279,7 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
         onOpenChange={setPublishOpen}
         pending={publishPending}
         error={publishError}
-        onPublish={(note) => void publish(note)}
+        onPublish={(note, options) => void publish(note, options)}
         popup={isPopup}
         usedOn={documentInfo.kind === 'global' ? (documentInfo.usage?.usage_count ?? 0) : null}
         check={check}
@@ -1127,7 +1287,19 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
           setPublishOpen(false)
           setCheckOpen(true)
         }}
+        later={canPublish ? { timeZone, current: documentInfo.schedule, onSchedule: (at, note) => void scheduleLater(at, note) } : undefined}
       />
+      <SubmitReviewDialog
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        pending={submitPending}
+        error={submitError}
+        onSubmit={(note) => void submitReview(note)}
+        noun={info.noun}
+        current={documentInfo.review}
+        check={check}
+      />
+      <ReviewScreen reviewId={reviewId} onClose={() => setReviewId(null)} onDecided={() => void reviewDecided()} />
       <LinkPrompt
         request={linkRequest}
         onAnswer={(url) => {
@@ -1154,7 +1326,10 @@ function EditorLayout({ autosave, canPublish, canCustomHtml, canvasContext, regi
         liveVersionId={documentInfo.published?.version_id ?? null}
         liveUrl={canvasContext.store_url && livePath(documentInfo) ? `${canvasContext.store_url}${livePath(documentInfo)}` : null}
         canRestore
+        canManage
         onRestore={restore}
+        flush={() => autosave.flush()}
+        compare={compareSupport}
       />
       <ConfirmDialog
         open={discardOpen}

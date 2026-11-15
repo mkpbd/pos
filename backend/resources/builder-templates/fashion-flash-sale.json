@@ -1,0 +1,43 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hot_deals",
+                            "props": {
+                                "title": "The weekend edit",
+                                "subtitle": "20 % off four favourites",
+                                "config": {
+                                    "limit": 4,
+                                    "view_all_url": "/shop",
+                                    "promotion_id": null
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সপ্তাহান্তের বাছাই",
+                                    "subtitle": "চারটি প্রিয় পণ্যে ২০ % ছাড়"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

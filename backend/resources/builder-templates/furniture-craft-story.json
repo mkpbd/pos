@@ -1,0 +1,114 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "72px",
+                            "bottom": "72px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "48px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 55,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "furniture/work-desk.jpg"
+                                },
+                                "alt": "Wooden writing desk with a lamp and swivel chair by a window with blinds",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 45,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Made by hand in our workshop",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "আমাদের কারখানায় হাতে তৈরি"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Every table, bed and desk is made by our carpenters from seasoned wood, oiled by hand and checked joint by joint.</p><p>We deliver and assemble it at your home.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "Meet the makers",
+                                "link": {
+                                    "url": "/pages/about-us"
+                                },
+                                "variant": "outline",
+                                "size": "md",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "কারিগরদের সাথে পরিচিত হোন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

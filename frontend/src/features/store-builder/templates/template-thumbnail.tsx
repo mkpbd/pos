@@ -17,11 +17,13 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BuilderTemplate } from './api'
+import { categoryLabel } from './model'
 
 /*
  * A template's picture: its screenshot when there is one (and it loads), else a generated
  * wireframe of the kind of section (hero, product row, text, band, whole page) with an icon and
- * the template's name — neutral colours, so it reads as a sketch, not as a broken image.
+ * the template's name (and, for a section, its category) — neutral colours, so it reads as a
+ * sketch, not as a broken image.
  */
 
 type Shape = 'hero' | 'grid' | 'text' | 'media' | 'band' | 'page'
@@ -29,16 +31,17 @@ type Shape = 'hero' | 'grid' | 'text' | 'media' | 'band' | 'page'
 const KINDS: { match: RegExp; icon: LucideIcon; shape: Shape }[] = [
   { match: /hero|slider|banner/, icon: GalleryHorizontalIcon, shape: 'hero' },
   { match: /countdown|flash|deal|sale/, icon: TimerIcon, shape: 'band' },
-  { match: /newsletter|subscribe/, icon: MailPlusIcon, shape: 'band' },
+  { match: /newsletter|subscribe|club/, icon: MailPlusIcon, shape: 'band' },
   { match: /cta|call/, icon: MousePointerClickIcon, shape: 'band' },
   { match: /testimonial|review|quote/, icon: MessageSquareQuoteIcon, shape: 'text' },
   { match: /faq|question/, icon: CircleHelpIcon, shape: 'text' },
   { match: /video/, icon: PlayCircleIcon, shape: 'media' },
   { match: /about|story/, icon: FileTextIcon, shape: 'media' },
   { match: /brand/, icon: BadgeIcon, shape: 'grid' },
-  { match: /categor/, icon: LayoutListIcon, shape: 'grid' },
-  { match: /product|grid|carousel|tab|collection/, icon: LayoutGridIcon, shape: 'grid' },
-  { match: /feature|benefit|usp/, icon: SparklesIcon, shape: 'grid' },
+  { match: /categor|aisle|room|concern/, icon: LayoutListIcon, shape: 'grid' },
+  { match: /product|grid|carousel|tab|collection|lookbook|seller|arrival|launch|pick/, icon: LayoutGridIcon, shape: 'grid' },
+  // B11: service and promise strips read as a row of features.
+  { match: /feature|benefit|usp|service|promise|trust|how-it-works/, icon: SparklesIcon, shape: 'grid' },
 ]
 
 function kindOf(template: Pick<BuilderTemplate, 'scope' | 'category' | 'name'>): { icon: LucideIcon; shape: Shape } {
@@ -146,6 +149,12 @@ export function TemplateThumbnail({ template, className }: { template: Pick<Buil
       <div className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 border-t bg-background/85 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
         <Icon className="size-3.5 shrink-0" />
         <span className="truncate">{template.name}</span>
+        {/* B11: section templates without a screenshot also say what kind of section they are. */}
+        {template.scope === 'section' && template.category && (
+          <span className="ml-auto shrink-0 rounded-sm bg-muted px-1 text-[10px] font-normal" data-testid="template-placeholder-category">
+            {categoryLabel(template.category)}
+          </span>
+        )}
       </div>
     </div>
   )

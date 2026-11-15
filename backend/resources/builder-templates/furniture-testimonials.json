@@ -1,0 +1,60 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "testimonials",
+                            "props": {
+                                "title": "In our customers' homes",
+                                "subtitle": null,
+                                "config": {
+                                    "items": [
+                                        {
+                                            "quote": "The dining table is beautiful and solid. The team assembled it in twenty minutes and cleaned up after.",
+                                            "name": "Shamima K.",
+                                            "role": "Bashundhara",
+                                            "rating": 5
+                                        },
+                                        {
+                                            "quote": "Our sofa is deep and comfortable, and the linen cover washes well.",
+                                            "name": "Faisal R.",
+                                            "role": "Gulshan",
+                                            "rating": 5
+                                        },
+                                        {
+                                            "quote": "Lovely jute rug. Delivery took a little longer than promised, but it was worth the wait.",
+                                            "name": "Nusrat J.",
+                                            "role": "Chattogram",
+                                            "rating": 4
+                                        }
+                                    ],
+                                    "background": null
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ক্রেতাদের ঘরে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

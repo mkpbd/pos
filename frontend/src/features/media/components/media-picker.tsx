@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { CheckIcon, ImageIcon, SearchIcon, XIcon } from 'lucide-react'
+import { CheckIcon, CropIcon, ImageIcon, SearchIcon, XIcon } from 'lucide-react'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useMediaLookup, useMediaQuery, type MediaItem } from '@/features/media/api'
+import { isEditable, useMediaLookup, useMediaQuery, type MediaItem } from '@/features/media/api'
+import { ImageEditorDialog } from '@/features/media/components/image-editor-dialog'
 import { UploadZone } from '@/features/media/components/upload-zone'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { cn } from '@/lib/utils'
@@ -43,6 +44,15 @@ export function MediaPicker({ open, onOpenChange, title, multiple = false, selec
       return
     }
     setChosen((current) => (current.includes(id) ? current.filter((x) => x !== id) : max && current.length >= max ? current : [...current, id]))
+  }
+
+  // B11: "Edit picture" for the one chosen image; a saved copy takes its place in the selection.
+  const [editing, setEditing] = useState<MediaItem | null>(null)
+  const lookup = useMediaLookup(open && chosen.length === 1 ? chosen : [])
+  const chosenId = chosen.length === 1 ? chosen[0] : undefined
+  const chosenItem = chosenId ? (media.data?.items.find((m) => m.id === chosenId) ?? lookup.byId.get(chosenId)) : undefined
+  const onEdited = (saved: MediaItem, mode: 'copy' | 'replace' | 'focal') => {
+    if (mode === 'copy' && editing) setChosen((current) => current.map((id) => (id === editing.id ? saved.id : id)))
   }
 
   const onUploaded = (items: MediaItem[]) => {
@@ -110,6 +120,11 @@ export function MediaPicker({ open, onOpenChange, title, multiple = false, selec
         )}
 
         <DialogFooter>
+          {chosenItem && isEditable(chosenItem) && (
+            <Button type="button" variant="ghost" className="sm:mr-auto" onClick={() => setEditing(chosenItem)}>
+              <CropIcon data-icon="inline-start" /> Edit picture
+            </Button>
+          )}
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             type="button"
@@ -122,6 +137,7 @@ export function MediaPicker({ open, onOpenChange, title, multiple = false, selec
             {multiple ? `Use ${chosen.length} image${chosen.length === 1 ? '' : 's'}` : 'Use image'}
           </Button>
         </DialogFooter>
+        <ImageEditorDialog item={editing} onClose={() => setEditing(null)} onSaved={onEdited} />
       </DialogContent>
     </Dialog>
   )

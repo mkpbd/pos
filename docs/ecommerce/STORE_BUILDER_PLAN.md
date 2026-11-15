@@ -446,3 +446,26 @@ Original questions:
   `typography`; the payload's `fonts` gives the effective Bangla fonts so old themes keep Hind Siliguri / Baloo Da 2 for Bangla
   glyphs only. Custom fonts have their own table (`storefront_fonts`, not the image media library): WOFF2 header check, 4 per store,
   500 KB, in-use = live theme or draft (409), restore falls back to defaults.
+
+### As built — B11 publish later, versions & approval, picture tools, five new looks (2026-11-15)
+
+- **Publish later:** `builder_schedules` hold a snapshot (content + draft revision) — one pending per document (partial unique
+  index); `storefront:publish-scheduled` claims due rows with `SKIP LOCKED` and publishes in a savepoint through the same
+  `publishSnapshot` path as a manual publish (`via: scheduled`, audited as the scheduler). Gone references → `failed` with the
+  validator's errors and a bell notification; unexpected errors leave it pending. `cancel_schedule` on publish-now avoids an older
+  snapshot replacing a newer fix. Theme drafts schedule the same way (no theme checkpoints/reviews).
+- **Versions:** `builder_versions` gain `kind` (version | checkpoint), `name`, `via`; checkpoints are unnumbered draft snapshots
+  (20 per document). `BuilderDiff` compares two contents node by node (added / removed / moved / changed fields, plain text ≤300,
+  style changes flagged only). The editor's compare screen draws two read-only canvases (the existing canvas page, `inert` iframe
+  with an overlay that scrolls by message) plus the change list as the accessible view.
+- **Approval:** `builder_reviews` snapshot the draft; anyone with `storefront.manage` may submit, publishers approve (now or as a
+  schedule), send back (comment required) or the submitter withdraws; `draft_changed` compares content values. No org setting:
+  the permission split decides. Pages list: "Waiting for approval" tab; the bell link `/storefront/pages?review=<id>` opens it.
+- **Picture tools:** `GdImageProcessor` (crop → rotate → flip → brightness → contrast → saturation, matching the CSS preview;
+  per-pixel for transparency); copies link `edited_from_id`; replace checks `MediaReferences` + every FK to `media` (read from the
+  PostgreSQL catalog). Focal point on media flows through `MediaLibrary::refs()` to every storefront picture that is cropped by CSS
+  (`storefront/focal.ts`); product photos (catalog images) and CSS background images are unaffected. Uploads are capped at
+  2560 px with EXIF orientation applied; full-width WebP rendition for big JPEG/PNG.
+- **Five new looks:** presets fashion, electronics, grocery (Bangla fonts), beauty, furniture — existing T1 layout options only;
+  demo stores with 12 products and exactly 10 photos each (reused for banners, tiles, blog covers; ≈ 4.4 MB total); site templates
+  with Bangla; 40 section templates without thumbnails (the template browser draws a sketch with name and category).

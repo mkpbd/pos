@@ -1,0 +1,90 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Laptop week",
+                                            "kicker": "LAPTOP WEEK",
+                                            "title": "Thin laptops from ৳89,990",
+                                            "subtitle": "Light enough to carry all day. Official warranty and free delivery.",
+                                            "button_label": "Shop laptops",
+                                            "link_url": "/category/laptops",
+                                            "secondary_button_label": "All deals",
+                                            "secondary_link_url": "/shop",
+                                            "text_color": "#0f172a",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "electronics/ultrabook-14.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "ল্যাপটপ সপ্তাহ",
+                                                    "title": "৳৮৯,৯৯০ থেকে পাতলা ল্যাপটপ",
+                                                    "subtitle": "সারা দিন বহন করার মতো হালকা। অফিশিয়াল ওয়ারেন্টি আর ফ্রি ডেলিভারি।",
+                                                    "button_label": "ল্যাপটপ দেখুন",
+                                                    "secondary_button_label": "সব অফার"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Sound sale",
+                                            "kicker": "UP TO 20 % OFF",
+                                            "title": "Hear more, pay less",
+                                            "subtitle": "Headphones, earbuds and speakers at flash-deal prices.",
+                                            "button_label": "Shop audio",
+                                            "link_url": "/category/audio",
+                                            "text_color": "#0f172a",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "electronics/over-ear-headphones.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "২০ % পর্যন্ত ছাড়",
+                                                    "title": "বেশি শুনুন, কম দিন",
+                                                    "subtitle": "হেডফোন, ইয়ারবাড আর স্পিকার ফ্ল্যাশ ডিলের দামে।",
+                                                    "button_label": "অডিও দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

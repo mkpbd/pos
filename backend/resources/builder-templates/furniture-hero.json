@@ -1,0 +1,90 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "hero_slider",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "autoplay_seconds": 6,
+                                    "height": "large"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Living room",
+                                            "kicker": "Made in Bangladesh",
+                                            "title": "Furniture for slow evenings",
+                                            "subtitle": "Solid wood and natural fabrics, delivered and assembled at home.",
+                                            "button_label": "Shop living room",
+                                            "link_url": "/category/living-room",
+                                            "secondary_button_label": "Our workshop",
+                                            "secondary_link_url": "/pages/about-us",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "furniture/three-seater-sofa.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "বাংলাদেশে তৈরি",
+                                                    "title": "ধীর সন্ধ্যার আসবাব",
+                                                    "subtitle": "খাঁটি কাঠ আর প্রাকৃতিক কাপড়, বাড়িতে পৌঁছে জোড়া লাগিয়ে দেওয়া হয়।",
+                                                    "button_label": "বসার ঘর",
+                                                    "secondary_button_label": "আমাদের কারখানা"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "hero_slider",
+                                            "name": "Dining",
+                                            "kicker": "Up to 10 % off",
+                                            "title": "Gather round the table",
+                                            "subtitle": "Dining tables and chairs for long family meals.",
+                                            "button_label": "Shop dining",
+                                            "link_url": "/category/dining",
+                                            "text_color": "#ffffff",
+                                            "text_position": "left",
+                                            "image": {
+                                                "asset": "furniture/dining-table.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "১০ % পর্যন্ত ছাড়",
+                                                    "title": "টেবিল ঘিরে সবাই",
+                                                    "subtitle": "পরিবারের দীর্ঘ খাবারের জন্য ডাইনিং টেবিল আর চেয়ার।",
+                                                    "button_label": "ডাইনিং দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

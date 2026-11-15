@@ -1,0 +1,102 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "3-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Phones",
+                                            "kicker": "PHONES",
+                                            "title": "New phones, two-year warranty",
+                                            "button_label": "Shop phones",
+                                            "link_url": "/category/phones",
+                                            "text_color": "#0f172a",
+                                            "image": {
+                                                "asset": "electronics/smartphone-pro.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "ফোন",
+                                                    "title": "নতুন ফোন, দুই বছরের ওয়ারেন্টি",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Earbuds",
+                                            "kicker": "AUDIO",
+                                            "title": "Earbuds from ৳3,990",
+                                            "button_label": "Shop audio",
+                                            "link_url": "/category/audio",
+                                            "text_color": "#0f172a",
+                                            "image": {
+                                                "asset": "electronics/wireless-earbuds.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "অডিও",
+                                                    "title": "৳৩,৯৯০ থেকে ইয়ারবাড",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Gaming",
+                                            "kicker": "GAMING",
+                                            "title": "Level up your setup",
+                                            "button_label": "Shop gaming",
+                                            "link_url": "/category/laptops",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "electronics/gaming-laptop.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "গেমিং",
+                                                    "title": "আপনার সেটআপ আরও শক্তিশালী করুন",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

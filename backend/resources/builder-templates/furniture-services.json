@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "items": [
+                                        {
+                                            "icon": "truck",
+                                            "title": "Delivery and assembly",
+                                            "text": "Free in Dhaka over ৳20,000"
+                                        },
+                                        {
+                                            "icon": "shield-check",
+                                            "title": "1-year warranty",
+                                            "text": "On frames and joints"
+                                        },
+                                        {
+                                            "icon": "credit-card",
+                                            "title": "Cash on delivery",
+                                            "text": "Or bank transfer"
+                                        },
+                                        {
+                                            "icon": "store",
+                                            "title": "Visit the workshop",
+                                            "text": "Tejgaon, 10 am to 7 pm"
+                                        }
+                                    ],
+                                    "background": null
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

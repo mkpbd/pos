@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEve
 import { ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, MapPinIcon, PauseIcon, PlayIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MenuLink } from '../../components/menu-link'
+import { withFocal } from '../../focal'
 import { useLocale } from '../../i18n/locale'
 import { useReducedMotion } from '../motion'
 import { DraftPlaceholder } from '../preview-mark'
@@ -52,6 +53,7 @@ function Img({ image, alt, aspect, sizes, className, eager = false }: { image: B
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"
       className={cn('block w-full', aspect ? 'h-full object-cover' : 'h-auto', className)}
+      style={aspect ? withFocal(image) : undefined}
     />
   )
 }

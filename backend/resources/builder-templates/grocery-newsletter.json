@@ -1,0 +1,45 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "newsletter",
+                            "props": {
+                                "title": "Weekly offers in your inbox",
+                                "subtitle": null,
+                                "config": {
+                                    "text": "One e-mail a week with the best prices. Unsubscribe any time.",
+                                    "button_label": "Subscribe",
+                                    "background": "#14532d",
+                                    "foreground": "#ffffff"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সাপ্তাহিক অফার আপনার ইনবক্সে",
+                                    "text": "সপ্তাহে একটি ই-মেইল, সেরা দামের খবর। যেকোনো সময় বন্ধ করা যায়।",
+                                    "button_label": "সাবস্ক্রাইব"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

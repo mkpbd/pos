@@ -8,11 +8,37 @@ export type MediaItem = {
   width: number
   height: number
   alt: string | null
+  /** B11: focal point in percent (`object-position`); null = centre. Optional for older fixtures. */
+  focal?: MediaFocal | null
+  /** B11: the picture an edited copy was made from. */
+  edited_from_id?: string | null
   original_name: string
   mime_type: string
   size: number
   created_at: string | null
 }
+
+export type MediaFocal = { x: number; y: number }
+
+/** B11: `POST /media/{id}/edit` — see features/media/editor/geometry.ts for how the editor builds it. */
+export type MediaEditInput = {
+  crop?: { x: number; y: number; w: number; h: number }
+  rotate: 0 | 90 | 180 | 270
+  flip_h: boolean
+  flip_v: boolean
+  brightness: number
+  contrast: number
+  saturation: number
+  focal_x?: number
+  focal_y?: number
+  mode: 'copy' | 'replace'
+  confirm_replace?: boolean
+}
+
+export type MediaUsage = { in_use: boolean; places: string[] }
+
+/** GIFs may be animated and are not edited. */
+export const isEditable = (item: Pick<MediaItem, 'mime_type'>) => ['image/jpeg', 'image/png', 'image/webp'].includes(item.mime_type)
 
 /** Accepted by the API: JPEG, PNG, WebP, GIF up to 5 MB. */
 export const MEDIA_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
@@ -65,6 +91,36 @@ export function useUpdateMediaAltMutation() {
 
   return useMutation({
     mutationFn: ({ id, alt }: { id: string; alt: string | null }) => api.patch<MediaItem>(`/media/${id}`, { alt }).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: mediaKeys.all }),
+  })
+}
+
+/** B11: focal point only (no new file); `null` resets it to the centre. */
+export function useUpdateMediaFocalMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, focal }: { id: string; focal: MediaFocal | null }) =>
+      api.patch<MediaItem>(`/media/${id}`, { focal_x: focal?.x ?? null, focal_y: focal?.y ?? null }).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: mediaKeys.all }),
+  })
+}
+
+/** B11: where a picture is used (asked before "Replace the original"). */
+export function useMediaUsageQuery(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...mediaKeys.all, 'usage', id] as const,
+    queryFn: ({ signal }) => api.get<MediaUsage>(`/media/${id}/usage`, { signal }).then((r) => r.data),
+    enabled,
+  })
+}
+
+/** B11: saves an edit as a new copy (201) or over the original (200). */
+export function useEditMediaMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: MediaEditInput }) => api.post<MediaItem>(`/media/${id}/edit`, input).then((r) => r.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: mediaKeys.all }),
   })
 }

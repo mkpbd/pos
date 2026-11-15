@@ -1,0 +1,60 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "testimonials",
+                            "props": {
+                                "title": "Customer reviews",
+                                "subtitle": null,
+                                "config": {
+                                    "items": [
+                                        {
+                                            "quote": "Got my laptop the next day with the warranty card and invoice. They even helped me set it up on the phone.",
+                                            "name": "Rakib H.",
+                                            "role": "Mirpur",
+                                            "rating": 5
+                                        },
+                                        {
+                                            "quote": "Honest advice: they told me the cheaper earbuds were enough for me. I will buy here again.",
+                                            "name": "Mitu S.",
+                                            "role": "Uttara",
+                                            "rating": 5
+                                        },
+                                        {
+                                            "quote": "Good prices on flash deals. Delivery to Sylhet took three days.",
+                                            "name": "Arif K.",
+                                            "role": "Sylhet",
+                                            "rating": 4
+                                        }
+                                    ],
+                                    "background": null
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ক্রেতাদের মতামত"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

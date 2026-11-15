@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { storefrontKeys, usePublishThemeMutation, useSaveThemeDraftMutation, useThemeDraftQuery, type ThemeDraft, type ThemeSettings } from '@/features/storefront/api'
+import { storefrontKeys, useSaveThemeDraftMutation, useThemeDraftQuery, type ThemeDraft, type ThemeSettings } from '@/features/storefront/api'
+import { themeScheduleOf, useThemePublishing, type DocumentSchedule } from './publishing-api'
 import { ApiError } from '@/lib/api/client'
 
 /*
@@ -26,8 +27,14 @@ export type SiteStyles = {
   errors: Record<string, string>
   change: (next: ThemeSettings) => void
   flush: () => Promise<boolean>
-  publish: () => Promise<boolean>
+  /** B11: `cancelSchedule` also cancels a pending planned publish. */
+  publish: (note?: string | null, options?: { cancelSchedule?: boolean }) => Promise<boolean>
   publishing: boolean
+  /** B11: the theme's planned publish (null: none). */
+  schedule: DocumentSchedule | null
+  /** B11: the saved draft goes live at `publishAt`. */
+  scheduleLater: (publishAt: string, note: string | null) => Promise<boolean>
+  cancelSchedule: () => Promise<boolean>
 }
 
 /** Validation errors `settings.colors.primary` → `colors.primary` (the panel's paths), first message each. */
@@ -39,7 +46,7 @@ export function useSiteStyles(delay = SITE_STYLES_SAVE_DELAY): SiteStyles {
   const queryClient = useQueryClient()
   const query = useThemeDraftQuery()
   const save = useSaveThemeDraftMutation()
-  const publishMutation = usePublishThemeMutation()
+  const { publish: publishMutation, schedule: scheduleMutation, cancel: cancelMutation } = useThemePublishing()
   const [local, setLocal] = useState<ThemeSettings | null>(null)
   const [status, setStatus] = useState<SiteStylesStatus>('idle')
   const [message, setMessage] = useState<string | null>(null)
@@ -119,11 +126,11 @@ export function useSiteStyles(delay = SITE_STYLES_SAVE_DELAY): SiteStyles {
   )
 
   const publishAsync = publishMutation.mutateAsync
-  const publish = useCallback(async () => {
+  const publish = useCallback(async (note: string | null = null, options: { cancelSchedule?: boolean } = {}) => {
     const saved = await flush()
     if (!saved) return false
     try {
-      const result = await publishAsync(null)
+      const result = await publishAsync({ note, ...options })
       toast.success(result?.published ? `Site styles published — version ${result.published.number} is live.` : 'Site styles published.')
       return true
     } catch (error) {
@@ -131,6 +138,32 @@ export function useSiteStyles(delay = SITE_STYLES_SAVE_DELAY): SiteStyles {
       return false
     }
   }, [flush, publishAsync])
+
+  const scheduleAsync = scheduleMutation.mutateAsync
+  const scheduleLater = useCallback(
+    async (publishAt: string, note: string | null) => {
+      if (!(await flush())) return false
+      try {
+        await scheduleAsync({ publish_at: publishAt, note })
+        return true
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not schedule the site styles.')
+        return false
+      }
+    },
+    [flush, scheduleAsync],
+  )
+  const cancelAsync = cancelMutation.mutateAsync
+  const cancelSchedule = useCallback(async () => {
+    try {
+      await cancelAsync()
+      return true
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'NOTHING_SCHEDULED') toast.info('Nothing is planned any more — it may have gone live or been cancelled already.')
+      else toast.error(error instanceof Error ? error.message : 'It couldn’t be cancelled. Try again.')
+      return false
+    }
+  }, [cancelAsync])
 
   return {
     settings: local ?? query.data?.settings ?? null,
@@ -143,6 +176,9 @@ export function useSiteStyles(delay = SITE_STYLES_SAVE_DELAY): SiteStyles {
     change,
     flush,
     publish,
-    publishing: publishMutation.isPending,
+    publishing: publishMutation.isPending || scheduleMutation.isPending,
+    schedule: themeScheduleOf(query.data),
+    scheduleLater,
+    cancelSchedule,
   }
 }

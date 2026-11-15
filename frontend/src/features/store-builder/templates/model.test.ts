@@ -98,4 +98,9 @@ describe('template presets (K1)', () => {
     for (const other of ['default', 'toys', '', null, undefined]) expect(isTemplatePreset(other)).toBe(false)
     expect(PRESET_LABELS.kids).toBe('Kids')
   })
+
+  it('B11: knows the five new looks with their names', () => {
+    for (const preset of ['fashion', 'electronics', 'grocery', 'beauty', 'furniture']) expect(isTemplatePreset(preset)).toBe(true)
+    expect([PRESET_LABELS.fashion, PRESET_LABELS.electronics, PRESET_LABELS.grocery, PRESET_LABELS.beauty, PRESET_LABELS.furniture]).toEqual(['Fashion', 'Electronics', 'Grocery', 'Beauty', 'Furniture'])
+  })
 })

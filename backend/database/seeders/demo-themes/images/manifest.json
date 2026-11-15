@@ -778,5 +778,305 @@
         "photographer": "Steve O'Reilly",
         "licence": "Unsplash License",
         "alt": "Pair of red canvas baby sneakers with white laces"
+    },
+    "fashion/wrap-midi-dress.jpg": {
+        "source": "https://unsplash.com/photos/woman-in-white-ink-blot-dress-5HGxv4nigtQ",
+        "photographer": "engin akyurt",
+        "licence": "Unsplash License",
+        "alt": "White wrap midi dress with a black ink-blot print and tie waist, worn by a model"
+    },
+    "fashion/pleated-skirt.jpg": {
+        "source": "https://unsplash.com/photos/woman-in-black-long-sleeve-shirt-and-teal-skirt-walking-on-dirt-road-during-daytime-E5AkWg5mBik",
+        "photographer": "Nina Mercado",
+        "licence": "Unsplash License",
+        "alt": "Mint pleated midi skirt swirling as a woman walks along a path"
+    },
+    "fashion/linen-shirt.jpg": {
+        "source": "https://unsplash.com/photos/a-white-shirt-hanging-on-a-clothes-line-S4f4apZd-hA",
+        "photographer": "tian dayong",
+        "licence": "Unsplash License",
+        "alt": "White short-sleeve linen shirt on a wooden hanger"
+    },
+    "fashion/bomber-jacket.jpg": {
+        "source": "https://unsplash.com/photos/brown-bomber-jacket-on-hanger-Fg15LdqpWrs",
+        "photographer": "Tobias Tullius",
+        "licence": "Unsplash License",
+        "alt": "Rust-brown lightweight bomber jacket held up on a hanger"
+    },
+    "fashion/block-print-kurti.jpg": {
+        "source": "https://unsplash.com/photos/dark-blue-dress-with-paisley-pattern-on-display-dYMt4ug7Vxs",
+        "photographer": "Zayed Ahmed Zadu",
+        "licence": "Unsplash License",
+        "alt": "Navy printed cotton kurti with paisley motifs on a mannequin"
+    },
+    "fashion/handloom-saree.jpg": {
+        "source": "https://unsplash.com/photos/red-green-and-white-textile-eLOLLINm5ZA",
+        "photographer": "soumya parthasarathy",
+        "licence": "Unsplash License",
+        "alt": "Handloom saree in red and green with a woven white border"
+    },
+    "fashion/leather-loafers.jpg": {
+        "source": "https://unsplash.com/photos/a-pair-of-brown-leather-loafers-on-a-stool-xPpfEQe0ZiY",
+        "photographer": "Husien Bisky",
+        "licence": "Unsplash License",
+        "alt": "Pair of brown leather penny loafers on a black stool"
+    },
+    "fashion/block-heel-sandals.jpg": {
+        "source": "https://unsplash.com/photos/pair-of-silver-open-toe-ankle-strap-heeled-sandals-on-ground-38RAOXlDT7o",
+        "photographer": "Amy Humphries",
+        "licence": "Unsplash License",
+        "alt": "Pair of silver ankle-strap block-heel sandals on a rock"
+    },
+    "fashion/leather-satchel.jpg": {
+        "source": "https://unsplash.com/photos/grey-leather-satchel-with-gold-buckles-J4DnKxz_3sA",
+        "photographer": "mostafa mahmoudi",
+        "licence": "Unsplash License",
+        "alt": "Grey leather satchel with gold buckles and a top handle"
+    },
+    "fashion/silk-scarf.jpg": {
+        "source": "https://unsplash.com/photos/black-sunglasses-on-yellow-and-white-textile-z5UuOcQjXCY",
+        "photographer": "Sama Hosseini",
+        "licence": "Unsplash License",
+        "alt": "Printed scarf with a yellow tropical leaf pattern beside sunglasses and a palm frond"
+    },
+    "electronics/smartphone-pro.jpg": {
+        "source": "https://unsplash.com/photos/smartphone-with-blank-screen-on-wood-J82GxqnwKSs",
+        "photographer": "Vojtech Bruzek",
+        "licence": "Unsplash License",
+        "alt": "Black smartphone with a blank screen lying on a light wooden surface"
+    },
+    "electronics/tablet-11.jpg": {
+        "source": "https://unsplash.com/photos/a-tablet-computer-sitting-on-top-of-a-table-p1B6G7acvZ8",
+        "photographer": "David Švihovec",
+        "licence": "Unsplash License",
+        "alt": "Tablet with a colourful home screen standing on a white desk"
+    },
+    "electronics/ultrabook-14.jpg": {
+        "source": "https://unsplash.com/photos/macbook-pro-on-top-of-brown-table-1SAnrIxw5OY",
+        "photographer": "Kari Shea",
+        "licence": "Unsplash License",
+        "alt": "Thin silver laptop open on a wooden desk"
+    },
+    "electronics/gaming-laptop.jpg": {
+        "source": "https://unsplash.com/photos/a-close-up-of-a-keyboard-in-the-dark-SuJc0LDT0_A",
+        "photographer": "Dharm Chauhan",
+        "licence": "Unsplash License",
+        "alt": "Gaming laptop keyboard glowing with rainbow RGB backlight in the dark"
+    },
+    "electronics/wireless-earbuds.jpg": {
+        "source": "https://unsplash.com/photos/white-wireless-earbuds-with-charging-case-on-gray-background-clrTR7gDRho",
+        "photographer": "Andrey Matveev",
+        "licence": "Unsplash License",
+        "alt": "White wireless earbuds with an open charging case on a grey surface"
+    },
+    "electronics/over-ear-headphones.jpg": {
+        "source": "https://unsplash.com/photos/black-wireless-headphones-on-white-desk-P7KF3cTRKcE",
+        "photographer": "Sam Grozyan",
+        "licence": "Unsplash License",
+        "alt": "Black over-ear headphones lying on a white desk"
+    },
+    "electronics/bluetooth-speaker.jpg": {
+        "source": "https://unsplash.com/photos/oval-grey-portable-speaker-on-white-surface--WB52caEpmI",
+        "photographer": "Lynda Sanchez",
+        "licence": "Unsplash License",
+        "alt": "Oval grey portable speaker with a carry strap on a white surface"
+    },
+    "electronics/smart-watch.jpg": {
+        "source": "https://unsplash.com/photos/black-smart-watch-with-white-background-O43D6CYzxqM",
+        "photographer": "Auguras Pipiras",
+        "licence": "Unsplash License",
+        "alt": "Black smart watch with a dark band showing app icons"
+    },
+    "electronics/mechanical-keyboard.jpg": {
+        "source": "https://unsplash.com/photos/a-mechanical-keyboard-with-white-teal-and-coral-keycaps-2BmIqyTdW-I",
+        "photographer": "Bruce",
+        "licence": "Unsplash License",
+        "alt": "Mechanical keyboard with white, teal and coral keycaps"
+    },
+    "electronics/security-camera.jpg": {
+        "source": "https://unsplash.com/photos/white-surveillance-camera-hanging-on-wall-KNt4zd8HPb0",
+        "photographer": "Alan J. Hendry",
+        "licence": "Unsplash License",
+        "alt": "White wireless security camera with two antennas mounted on a wall"
+    },
+    "grocery/mangoes.jpg": {
+        "source": "https://unsplash.com/photos/a-basket-of-yellow-and-green-fruit-lkflaFuiXII",
+        "photographer": "fatemeh zakeri",
+        "licence": "Unsplash License",
+        "alt": "Ripe yellow mangoes in a woven basket, one cut into cubes"
+    },
+    "grocery/potatoes.jpg": {
+        "source": "https://unsplash.com/photos/brown-potato-lot-B0s3Xndk6tw",
+        "photographer": "Lars Blankers",
+        "licence": "Unsplash License",
+        "alt": "A pile of fresh potatoes"
+    },
+    "grocery/red-onions.jpg": {
+        "source": "https://unsplash.com/photos/a-pile-of-red-onions-sitting-on-top-of-a-table-PNZIcBkVxHY",
+        "photographer": "Oriol Portell",
+        "licence": "Unsplash License",
+        "alt": "Red onions and loose papery skins on a dark red surface"
+    },
+    "grocery/river-fish.jpg": {
+        "source": "https://unsplash.com/photos/silver-and-red-fish-on-ice-gFrrHuHMpTw",
+        "photographer": "Tapan Kumar Choudhury",
+        "licence": "Unsplash License",
+        "alt": "Whole fresh fish laid out on crushed ice"
+    },
+    "grocery/farm-eggs.jpg": {
+        "source": "https://unsplash.com/photos/brown-chicken-eggs-in-carton-leOh1CzRZVQ",
+        "photographer": "Erol Ahmed",
+        "licence": "Unsplash License",
+        "alt": "Brown eggs in a cardboard egg tray"
+    },
+    "grocery/basmati-rice.jpg": {
+        "source": "https://unsplash.com/photos/a-spoon-filled-with-rice-on-top-of-a-table-q5oFM2GYbWM",
+        "photographer": "Rens D",
+        "licence": "Unsplash License",
+        "alt": "Uncooked long-grain white rice in a metal scoop"
+    },
+    "grocery/red-lentils.jpg": {
+        "source": "https://unsplash.com/photos/a-spoon-full-of-red-lentils-in-a-blue-bowl-maQN9R9-fIk",
+        "photographer": "Amna Shoukat",
+        "licence": "Unsplash License",
+        "alt": "Red lentils heaped in a spoon on a bed of lentils"
+    },
+    "grocery/mustard-oil.jpg": {
+        "source": "https://unsplash.com/photos/a-group-of-bottles-filled-with-yellow-liquid-BScSk37FviU",
+        "photographer": "Stephanie Sarlos",
+        "licence": "Unsplash License",
+        "alt": "Glass bottles of golden cooking oil on a kitchen counter"
+    },
+    "grocery/whole-spices.jpg": {
+        "source": "https://unsplash.com/photos/cinnamon-sticks-and-assorted-culinary-spices-uaHShoIDGeo",
+        "photographer": "Marion Botella",
+        "licence": "Unsplash License",
+        "alt": "Cinnamon sticks, star anise, peppercorns and ground spices seen from above"
+    },
+    "grocery/black-tea.jpg": {
+        "source": "https://unsplash.com/photos/person-pouring-tea-into-small-clay-cups-gXYwwTQ_tZw",
+        "photographer": "AJOY DAS",
+        "licence": "Unsplash License",
+        "alt": "Milk tea being poured into small clay cups"
+    },
+    "beauty/vitamin-c-serum.jpg": {
+        "source": "https://unsplash.com/photos/a-bottle-of-liquid-with-a-dropper-on-a-yellow-background-GjJZ5HBl2qQ",
+        "photographer": "Point Normal",
+        "licence": "Unsplash License",
+        "alt": "Amber serum bottle with a dropper releasing a drop on an orange background"
+    },
+    "beauty/gel-moisturiser.jpg": {
+        "source": "https://unsplash.com/photos/a-small-jar-of-cream-with-pink-flowers-on-marble-k2JN5zC54zQ",
+        "photographer": "Keity",
+        "licence": "Unsplash License",
+        "alt": "Glass jar of face cream with a black lid beside pink carnations on marble"
+    },
+    "beauty/clay-mask.jpg": {
+        "source": "https://unsplash.com/photos/green-ceramic-round-bowl-on-white-table-0BEqLfQwVzM",
+        "photographer": "Towfiqu barbhuiya",
+        "licence": "Unsplash License",
+        "alt": "Small bowl of green clay face mask with an applicator on a pale blue surface"
+    },
+    "beauty/matte-lipstick.jpg": {
+        "source": "https://unsplash.com/photos/three-lipsticks-displayed-with-stones-on-pink-background--NLfVaPLwmQ",
+        "photographer": "Jen Vazquez",
+        "licence": "Unsplash License",
+        "alt": "Three rose and nude lipsticks in silver tubes with crystals on a pink background"
+    },
+    "beauty/eyeshadow-palette.jpg": {
+        "source": "https://unsplash.com/photos/white-and-brown-eyeshadow-palette-5Us84s7blq8",
+        "photographer": "marianela",
+        "licence": "Unsplash License",
+        "alt": "Open eyeshadow palette with warm coral and pink shades on pink fabric"
+    },
+    "beauty/nail-polish.jpg": {
+        "source": "https://unsplash.com/photos/a-group-of-five-different-colored-nail-polishes-sp6wzdYJ7QQ",
+        "photographer": "Maria Lupan",
+        "licence": "Unsplash License",
+        "alt": "Nail polish bottles in green, blue and purple shades on white"
+    },
+    "beauty/argan-hair-oil.jpg": {
+        "source": "https://unsplash.com/photos/a-group-of-bottles-next-to-a-plant-A1vTsRrV9oY",
+        "photographer": "Lora Seis",
+        "licence": "Unsplash License",
+        "alt": "Three amber dropper bottles of hair oil on a stone ledge beside palm leaves"
+    },
+    "beauty/eau-de-parfum.jpg": {
+        "source": "https://unsplash.com/photos/perfume-bottle-and-cosmetic-jars-nka_sIQpKEU",
+        "photographer": "Birgith Roosipuu",
+        "licence": "Unsplash License",
+        "alt": "Glass perfume bottle and two small jars casting shadows on a golden surface"
+    },
+    "beauty/handmade-soap.jpg": {
+        "source": "https://unsplash.com/photos/assortment-of-natural-handmade-soap-bars-in-various-colors-lcPRIn9Bq2Y",
+        "photographer": "Nigel Hoare",
+        "licence": "Unsplash License",
+        "alt": "Stacked handmade soap bars in green, cream and pink tones"
+    },
+    "beauty/makeup-brushes.jpg": {
+        "source": "https://unsplash.com/photos/black-and-brown-makeup-brush-set-PEttXYw9hi8",
+        "photographer": "Edz Norton",
+        "licence": "Unsplash License",
+        "alt": "Set of makeup brushes with black handles fanned out on white"
+    },
+    "furniture/three-seater-sofa.jpg": {
+        "source": "https://unsplash.com/photos/a-beige-sofa-with-decorative-pillows-and-a-side-table-pYqXT6hoRbQ",
+        "photographer": "Aleksandra Dementeva",
+        "licence": "Unsplash License",
+        "alt": "Light beige fabric sofa with textured and green cushions beside a wooden side table"
+    },
+    "furniture/accent-armchair.jpg": {
+        "source": "https://unsplash.com/photos/brown-wooden-framed-yellow-padded-chair-_HqHX3LBN18",
+        "photographer": "Kam Idris",
+        "licence": "Unsplash License",
+        "alt": "Mustard yellow accent armchair on a wooden floor in a bright room"
+    },
+    "furniture/coffee-table.jpg": {
+        "source": "https://unsplash.com/photos/brown-wooden-table-with-white-ceramic-vase-on-top-7rvkxLAraU8",
+        "photographer": "Lasse Jensen",
+        "licence": "Unsplash License",
+        "alt": "Round light oak coffee table with a ceramic table lamp on a textured rug"
+    },
+    "furniture/platform-bed.jpg": {
+        "source": "https://unsplash.com/photos/a-bed-sitting-in-a-bedroom-next-to-a-window-J60bPeDiR8A",
+        "photographer": "laura adai",
+        "licence": "Unsplash License",
+        "alt": "Low wooden platform bed with mauve bedding below a gallery wall"
+    },
+    "furniture/dining-table.jpg": {
+        "source": "https://unsplash.com/photos/a-dining-room-with-a-table-and-chairs-Uaf1g970Hrk",
+        "photographer": "Jonathan Borba",
+        "licence": "Unsplash License",
+        "alt": "Long wooden dining table with wooden armchairs under pendant lights"
+    },
+    "furniture/dining-chair.jpg": {
+        "source": "https://unsplash.com/photos/a-simple-wooden-chair-with-a-white-cushion-JSUUbTs_UZ0",
+        "photographer": "syahmi syahir",
+        "licence": "Unsplash License",
+        "alt": "Simple wooden dining chair with a light cushioned seat"
+    },
+    "furniture/work-desk.jpg": {
+        "source": "https://unsplash.com/photos/wooden-desk-with-model-ship-and-lamp-by-window-Rjp8UxEIJ38",
+        "photographer": "Annie Spratt",
+        "licence": "Unsplash License",
+        "alt": "Wooden writing desk with a lamp and swivel chair by a window with blinds"
+    },
+    "furniture/pendant-lamp.jpg": {
+        "source": "https://unsplash.com/photos/rattan-pendant-lamp-with-wall-shadow-NmHxbm3xcrI",
+        "photographer": "Pavel Karagodin",
+        "licence": "Unsplash License",
+        "alt": "Woven rattan pendant lamp casting a shadow on a wall"
+    },
+    "furniture/jute-rug.jpg": {
+        "source": "https://unsplash.com/photos/half-rolled-circular-rug-with-scalloped-edge-on-wooden-floor-uxHwYYWu5Sk",
+        "photographer": "MKMHomes Craft",
+        "licence": "Unsplash License",
+        "alt": "Half-rolled round jute rug with a scalloped cream border on a wooden floor"
+    },
+    "furniture/ceramic-vase.jpg": {
+        "source": "https://unsplash.com/photos/ceramic-vases-on-wooden-surface-R0qthXq3jec",
+        "photographer": "Chloe Bolton",
+        "licence": "Unsplash License",
+        "alt": "Set of ceramic vases in neutral tones on a wooden surface"
     }
 }

@@ -1,10 +1,16 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { Loader2Icon, RocketIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { GlobalStylesPanel } from '@/features/storefront/theme/global-styles'
 import { productLayoutOf, PRODUCT_LAYOUT_KEYS, withProductLayout, type ProductLayout } from '@/features/storefront/theme/product-layout'
 import { ProductLayoutFields } from '@/features/storefront/theme/product-layout-card'
+import { useCurrentUserQuery } from '@/features/auth/api'
+import { ThemePublishDialog } from '@/features/storefront/theme/theme-dialogs'
+import { formatStoreTime } from './publishing/schedule-time'
+import { ScheduleChip } from './publishing/status-chips'
 import type { SiteStyles, SiteStylesStatus } from './use-site-styles'
 
 /*
@@ -13,6 +19,8 @@ import type { SiteStyles, SiteStylesStatus } from './use-site-styles'
  * P1b: the product page layout (theme `layout.product`: photos side, small photos, buy box in
  * view, details style) below it — the same draft, autosaved and published with the rest; the
  * canvas's product page samples follow it at once.
+ * B11: "Publish site styles" opens the theme publish dialog (now or later, store time); a planned
+ * publish shows as a chip in the header (details, change the time, cancel).
  */
 
 const STATUS_TEXT: Record<SiteStylesStatus, string> = { idle: 'Changes show on the page at once.', saving: 'Saving…', saved: 'Saved to the draft.', error: '' }
@@ -26,6 +34,8 @@ function productLayoutErrors(errors: Record<string, string>): Partial<Record<key
 export function SiteStylesDrawer({ open, onOpenChange, styles, canPublish }: { open: boolean; onOpenChange: (open: boolean) => void; styles: SiteStyles; canPublish: boolean }) {
   const { settings, draft } = styles
   const unpublished = draft?.has_unpublished_changes === true || settings !== (draft?.settings ?? null)
+  const timeZone = useCurrentUserQuery().data?.organization?.timezone
+  const [publishOpen, setPublishOpen] = useState(false)
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
@@ -43,6 +53,18 @@ export function SiteStylesDrawer({ open, onOpenChange, styles, canPublish }: { o
             {styles.status === 'error' ? <span className="text-destructive">{styles.message}</span> : STATUS_TEXT[styles.status]}
             {draft?.published ? ` Live: version ${draft.published.number}.` : draft ? ' Not published yet.' : ''}
           </p>
+          <div className="mt-1 empty:hidden">
+            <ScheduleChip
+              schedule={styles.schedule}
+              timeZone={timeZone}
+              canChange={canPublish}
+              noun="site styles"
+              onCancel={async () => {
+                if (await styles.cancelSchedule()) toast.success(`Cancelled. The site styles won’t go live on ${formatStoreTime(styles.schedule?.publish_at, timeZone)}.`)
+              }}
+              onReschedule={() => setPublishOpen(true)}
+            />
+          </div>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {styles.loading ? (
@@ -65,7 +87,7 @@ export function SiteStylesDrawer({ open, onOpenChange, styles, canPublish }: { o
         </div>
         <div className="flex flex-col gap-2 border-t p-4">
           {canPublish ? (
-            <Button type="button" onClick={() => void styles.publish()} disabled={!settings || styles.publishing || !unpublished}>
+            <Button type="button" onClick={() => setPublishOpen(true)} disabled={!settings || styles.publishing || !unpublished}>
               {styles.publishing ? <Loader2Icon className="animate-spin" data-icon="inline-start" /> : <RocketIcon data-icon="inline-start" />}
               {unpublished ? 'Publish site styles' : 'Site styles are live'}
             </Button>
@@ -77,6 +99,32 @@ export function SiteStylesDrawer({ open, onOpenChange, styles, canPublish }: { o
           </p>
         </div>
       </SheetContent>
+      <ThemePublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        title="Publish the site styles?"
+        pending={styles.publishing}
+        unsaved={false}
+        onPublish={(note, options) =>
+          void styles.publish(note, options).then((done) => {
+            if (done) setPublishOpen(false)
+          })
+        }
+        later={
+          canPublish
+            ? {
+                timeZone,
+                current: styles.schedule,
+                onSchedule: (at, note) =>
+                  void styles.scheduleLater(at, note).then((done) => {
+                    if (!done) return
+                    setPublishOpen(false)
+                    toast.success(`Scheduled. The site styles go live on ${formatStoreTime(at, timeZone)}, as they are now.`)
+                  }),
+              }
+            : undefined
+        }
+      />
     </Sheet>
   )
 }

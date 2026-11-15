@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { storefrontKeys } from '@/features/storefront/api'
 import { api } from '@/lib/api/client'
 import type { DemoStore } from '@/storefront/demos/api'
+import { DEMO_PRESETS, type DemoPreset } from '@/storefront/demos/presets'
 import type { DocumentContext, Section } from '@/storefront/builder/types'
 import { builderAdminKeys, type DocumentSummary } from '../api'
 
@@ -15,8 +16,8 @@ import { builderAdminKeys, type DocumentSummary } from '../api'
 /** B8b: `popup` templates are applied as a new popup document (POST /documents `{kind: popup, template}`). */
 export type TemplateScope = 'section' | 'page' | 'site' | 'popup'
 /** The demo looks with built-in templates (site, page and section); `default` has none. */
-export const TEMPLATE_PRESETS = ['vegan', 'handmade', 'classic', 'kids'] as const
-export type TemplatePreset = (typeof TEMPLATE_PRESETS)[number]
+export const TEMPLATE_PRESETS = DEMO_PRESETS
+export type TemplatePreset = DemoPreset
 
 export function isTemplatePreset(value: string | null | undefined): value is TemplatePreset {
   return (TEMPLATE_PRESETS as readonly (string | null | undefined)[]).includes(value)

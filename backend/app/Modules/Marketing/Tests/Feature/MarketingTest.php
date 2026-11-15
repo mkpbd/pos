@@ -182,7 +182,9 @@ class MarketingTest extends TestCase
         }
         $this->artisan('marketing:prune-visitor-hashes')->assertSuccessful();
         $this->assertSame(3, DB::table('campaign_visitor_hashes')->count());
-        $this->travel(3)->days();
+        // The prune keeps two UTC days back; the hashes' day is the store's (Asia/Dhaka) date, which runs a day ahead of
+        // UTC late in the UTC evening — four days later they are gone at any time of day.
+        $this->travel(4)->days();
         $this->artisan('marketing:prune-visitor-hashes')->assertSuccessful();
         $this->assertSame(0, DB::table('campaign_visitor_hashes')->count());
     }

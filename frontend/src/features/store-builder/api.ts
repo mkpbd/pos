@@ -4,6 +4,7 @@ import { storefrontKeys, type Banner, type BannerInput, type LinkTargets } from 
 import type { BuilderContent, BuilderData, BuilderMedia } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { ElementsMetadata, Problem } from './inspector'
+import type { DocumentReview, DocumentSchedule } from './publishing-api'
 
 /*
  * Admin API of the visual store builder (B1 engine + B2 additions): documents, draft saves,
@@ -46,6 +47,10 @@ export type DocumentSummary = {
   target?: ZoneTarget | null
   /** B9 global sections: where the global may be used (`page`, `header` or `footer`); absent for other documents. */
   context?: 'page' | 'header' | 'footer' | null
+  /** B11: the planned publish (pending, or the last failed one); null / absent = none. */
+  schedule?: DocumentSchedule | null
+  /** B11: the latest approval request (pending or sent back); null / absent = none. */
+  review?: DocumentReview | null
 }
 
 /** P1b: the category or product a zone version is for; `name` is null when that record is gone. */
@@ -295,8 +300,11 @@ export function saveDraft(id: string, revision: number, content: BuilderContent,
   return api.put<DocumentDetail>(`${doc(id)}/draft`, { revision, content }, { signal }).then((r) => r.data)
 }
 
-export function publishDocument(id: string, note: string | null) {
-  return api.post<DocumentDetail>(`${doc(id)}/publish`, note ? { note } : {}).then((r) => r.data)
+/** B11: `cancelSchedule` (sent only when given) also cancels a pending planned publish; false keeps it. */
+export function publishDocument(id: string, note: string | null, options: { cancelSchedule?: boolean } = {}) {
+  const body: Record<string, unknown> = note ? { note } : {}
+  if (options.cancelSchedule !== undefined) body.cancel_schedule = options.cancelSchedule
+  return api.post<DocumentDetail>(`${doc(id)}/publish`, body).then((r) => r.data)
 }
 
 export function discardDraft(id: string) {

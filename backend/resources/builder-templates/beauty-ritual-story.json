@@ -1,0 +1,114 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "72px",
+                            "bottom": "72px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "theme:surface"
+                    },
+                    "layout": {
+                        "align": "center",
+                        "gap": "48px"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "48px",
+                            "bottom": "48px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 45,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Tested in Dhaka humidity",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "ঢাকার আর্দ্রতায় পরীক্ষিত"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Every product on our shelf is tried in real Dhaka weather first: light textures, gentle ingredients and shades that suit warm skin.</p>"
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "Our story",
+                                "link": {
+                                    "url": "/pages/about-us"
+                                },
+                                "variant": "outline",
+                                "size": "md",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "আমাদের গল্প"
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 55,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "image",
+                            "props": {
+                                "media_id": {
+                                    "asset": "beauty/handmade-soap.jpg"
+                                },
+                                "alt": "Stacked handmade soap bars in green, cream and pink tones",
+                                "link": null,
+                                "aspect": "4:3",
+                                "fit": "cover"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -10,6 +10,7 @@ use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
 use App\Modules\Storefront\Application\Builder\EditBuilderBanner;
 use App\Modules\Storefront\Application\Builder\ManageBuilderDocuments;
+use App\Modules\Storefront\Application\Builder\Publishing\BuilderPublishSchedules;
 use App\Modules\Storefront\Application\Builder\ResolveBuilderElements;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
@@ -172,13 +173,16 @@ class BuilderDocumentController
     /**
      * Publish the draft
      *
-     * A new version (number max+1) goes live; audited, the storefront cache is refreshed.
+     * A new version (number max+1) goes live; audited, the storefront cache is refreshed. B11:
+     * `cancel_schedule` (bool, default false) also cancels the pending "publish later" in the same
+     * transaction (audited, reason `published_now`).
      */
-    public function publish(Request $request, BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
+    public function publish(Request $request, BuilderDocument $document, BuilderPublishSchedules $schedules): JsonResponse
     {
-        $note = $request->validate(['note' => ['sometimes', 'nullable', 'string', 'max:160']])['note'] ?? null;
+        $data = $request->validate(['note' => ['sometimes', 'nullable', 'string', 'max:160'], 'cancel_schedule' => ['sometimes', 'boolean']]);
+        $published = $schedules->publishNow($document, $data['note'] ?? null, (bool) ($data['cancel_schedule'] ?? false));
 
-        return ApiResponse::success(BuilderPresenter::document($documents->publish($document, $note)->load('publishedVersion')));
+        return ApiResponse::success(BuilderPresenter::document($published->load('publishedVersion')));
     }
 
     /**
@@ -194,11 +198,18 @@ class BuilderDocumentController
     /**
      * Version history
      *
-     * Newest first.
+     * Newest first: `[{id, kind: version|checkpoint, number|null, name, note, via:
+     * manual|scheduled|review|null, published_at|null, created_by, created_at}]`. B11:
+     * `include=checkpoints` adds the draft checkpoints (published versions only by default).
      */
-    public function versions(BuilderDocument $document): JsonResponse
+    public function versions(Request $request, BuilderDocument $document): JsonResponse
     {
-        return ApiResponse::success(BuilderPresenter::versions($document->versions()->orderByDesc('number')->get()));
+        $include = $request->validate(['include' => ['sometimes', Rule::in(['checkpoints'])]])['include'] ?? null;
+        $versions = $document->versions()
+            ->when($include === null, fn ($q) => $q->where('kind', BuilderVersion::KIND_VERSION))
+            ->orderByDesc('created_at')->orderByRaw('number DESC NULLS LAST')->orderByDesc('id')->get();
+
+        return ApiResponse::success(BuilderPresenter::versions($versions));
     }
 
     /**

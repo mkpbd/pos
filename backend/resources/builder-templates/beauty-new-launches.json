@@ -1,0 +1,45 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "product_grid",
+                            "props": {
+                                "title": "New launches",
+                                "subtitle": "Just on the shelf",
+                                "config": {
+                                    "source": "new_arrivals",
+                                    "category_id": null,
+                                    "limit": 8,
+                                    "columns": 4,
+                                    "view_all_url": "/shop"
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "নতুন এসেছে",
+                                    "subtitle": "সদ্য তাকে উঠেছে"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

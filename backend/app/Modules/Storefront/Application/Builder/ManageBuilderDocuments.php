@@ -36,6 +36,7 @@ class ManageBuilderDocuments
         private readonly StorefrontCatalog $catalog,
         private readonly TenantContext $tenant,
         private readonly BuilderGlobals $globals,
+        private readonly BuilderReferences $references,
     ) {}
 
     /**
@@ -327,30 +328,62 @@ class ManageBuilderDocuments
     {
         return DB::transaction(function () use ($document, $note) {
             $locked = $this->lock($document);
-            if (($locked->draft['sections'] ?? []) === []) {
-                throw new BusinessRuleViolation('DOCUMENT_EMPTY', 'Add at least one section before publishing this page.');
-            }
 
-            $version = BuilderVersion::query()->create([
-                'document_id' => $locked->id,
-                'number' => (int) BuilderVersion::query()->where('document_id', $locked->id)->max('number') + 1,
-                'schema_version' => $locked->schema_version,
-                'content' => $locked->draft,
-                'note' => $note === null || trim($note) === '' ? null : trim($note),
-                'published_at' => CarbonImmutable::now(),
-                'created_by' => StaffActor::id(),
-            ]);
-            $before = $locked->published_version_id;
-            $locked->published_version_id = $version->id;
-            $locked->save();
-
-            $this->audit->record('storefront.builder_published', $locked, ['published_version_id' => $before], [
-                'published_version_id' => $version->id,
-                'number' => $version->number,
-            ], ['note' => $version->note]);
-
-            return $locked;
+            return $this->publishLocked($locked, $locked->draft, $note, BuilderVersion::VIA_MANUAL);
         });
+    }
+
+    /**
+     * B11: publishes a snapshot taken earlier (a schedule's or a review's) instead of the draft,
+     * which stays as it is. The snapshot's references are checked again first: records deleted
+     * since are 422 DOCUMENT_INVALID (`details.errors[]`) and nothing is published. `$context`
+     * goes into the audit (schedule / review id).
+     *
+     * @param  array<string, mixed>  $content
+     * @param  array<string, mixed>  $context
+     */
+    public function publishSnapshot(BuilderDocument $document, array $content, ?string $note, string $via, array $context = []): BuilderDocument
+    {
+        return DB::transaction(function () use ($document, $content, $note, $via, $context) {
+            $locked = $this->lock($document);
+            $this->references->check($content, $locked->contentContext());
+
+            return $this->publishLocked($locked, $content, $note, $via, $context);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $content
+     * @param  array<string, mixed>  $context
+     */
+    private function publishLocked(BuilderDocument $locked, array $content, ?string $note, string $via, array $context = []): BuilderDocument
+    {
+        if (($content['sections'] ?? []) === []) {
+            throw new BusinessRuleViolation('DOCUMENT_EMPTY', 'Add at least one section before publishing this page.');
+        }
+
+        $version = BuilderVersion::query()->create([
+            'document_id' => $locked->id,
+            'kind' => BuilderVersion::KIND_VERSION,
+            'number' => (int) BuilderVersion::query()->where('document_id', $locked->id)->max('number') + 1,
+            'via' => $via,
+            'schema_version' => $locked->schema_version,
+            'content' => $content,
+            'note' => $note === null || trim($note) === '' ? null : trim($note),
+            'published_at' => CarbonImmutable::now(),
+            'created_by' => StaffActor::id(),
+        ]);
+        $before = $locked->published_version_id;
+        $locked->published_version_id = $version->id;
+        $locked->save();
+        $locked->setRelation('publishedVersion', $version);
+
+        $this->audit->record('storefront.builder_published', $locked, ['published_version_id' => $before], [
+            'published_version_id' => $version->id,
+            'number' => $version->number,
+        ], ['note' => $version->note] + ($via === BuilderVersion::VIA_MANUAL ? [] : ['via' => $via]) + $context);
+
+        return $locked;
     }
 
     /**
@@ -379,7 +412,9 @@ class ManageBuilderDocuments
     {
         return DB::transaction(function () use ($document, $version) {
             $locked = $this->writeDraft($this->lock($document), $version->content);
-            $this->audit->record('storefront.builder_restored', $locked, [], ['version_id' => $version->id, 'number' => $version->number]);
+            // B11: a draft checkpoint restores the same way (kind checkpoint, no number).
+            $this->audit->record('storefront.builder_restored', $locked, [], ['version_id' => $version->id, 'number' => $version->number]
+                + ($version->isCheckpoint() ? ['kind' => BuilderVersion::KIND_CHECKPOINT, 'name' => $version->name] : []));
 
             return $locked;
         });

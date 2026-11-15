@@ -4,13 +4,11 @@ namespace App\Modules\Storefront\Presentation\Http\Support;
 
 use App\Modules\Cms\Application\Contracts\PageContent;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
-use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Application\Builder\BuilderGlobals;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\Builder\BuilderJson;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
-use App\Modules\Users\Application\Contracts\UserDirectory;
 
 /**
  * API shapes of store builder documents and versions (B1).
@@ -33,13 +31,17 @@ final class BuilderPresenter
      * all-products version, the product itself for a product version (when live), the product
      * changed last in the category or a subcategory for a category version (null when none).
      *
+     * B11: `schedule` and `review` (BuilderPublishingPresenter::states()).
+     *
      * @param  string|false|null  $storeUrl  the primary store URL when already known (false: look it up)
      * @param  array<string, array<string, mixed>>|null  $cmsPages  CMS page summaries by id when already known
      * @param  array{names: array<string, array<string, string>>, slugs: array<string, ?string>}|null  $zones  P1b: target names and matching product slugs when already known (zoneContext())
+     * @param  array<string, array{schedule: array<string, mixed>|null, review: array<string, mixed>|null}>|null  $publishing  B11: states by document id when already known
      * @return array<string, mixed>
      */
-    public static function summary(BuilderDocument $document, string|false|null $storeUrl = false, ?array $cmsPages = null, ?array $zones = null): array
+    public static function summary(BuilderDocument $document, string|false|null $storeUrl = false, ?array $cmsPages = null, ?array $zones = null, ?array $publishing = null): array
     {
+        $publishing ??= BuilderPublishingPresenter::states([$document]);
         $published = $document->publishedVersion;
         $storeUrl = $storeUrl === false ? self::storeUrl() : $storeUrl;
         $pageId = $document->cmsPageId();
@@ -101,6 +103,9 @@ final class BuilderPresenter
                 'number' => $published->number,
                 'published_at' => $published->published_at?->toIso8601String(),
             ],
+            // B11: the pending (or failed) "publish later" and the open (or sent back) review.
+            'schedule' => $publishing[$document->id]['schedule'] ?? null,
+            'review' => $publishing[$document->id]['review'] ?? null,
         ];
     }
 
@@ -116,8 +121,9 @@ final class BuilderPresenter
         $documents = collect($documents);
         $cmsPages = app(PageContent::class)->summaries($documents->map(fn (BuilderDocument $d) => $d->cmsPageId())->filter()->values()->all());
         $zones = self::zoneContext($documents->all(), $storeUrl !== null);
+        $publishing = BuilderPublishingPresenter::states($documents->all());
 
-        return $documents->map(fn (BuilderDocument $d) => self::summary($d, $storeUrl, $cmsPages, $zones))->values()->all();
+        return $documents->map(fn (BuilderDocument $d) => self::summary($d, $storeUrl, $cmsPages, $zones, $publishing))->values()->all();
     }
 
     /**
@@ -275,20 +281,8 @@ final class BuilderPresenter
      */
     public static function versions(iterable $versions): array
     {
-        $versions = collect($versions);
-        $names = app(UserDirectory::class)->names(
-            app(TenantContext::class)->requireOrganization(),
-            $versions->pluck('created_by')->filter()->unique()->values()->all(),
-        );
-
-        return $versions->map(fn (BuilderVersion $v) => [
-            'id' => $v->id,
-            'number' => $v->number,
-            'note' => $v->note,
-            'published_at' => $v->published_at?->toIso8601String(),
-            'created_by' => $v->created_by === null ? null : ['id' => $v->created_by, 'name' => $names[$v->created_by] ?? null],
-            'created_at' => $v->created_at?->toIso8601String(),
-        ])->values()->all();
+        // B11: also `kind` (version | checkpoint), `name` and `via`.
+        return BuilderPublishingPresenter::versions($versions);
     }
 
     /**

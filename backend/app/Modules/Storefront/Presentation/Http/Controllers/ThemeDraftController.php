@@ -4,11 +4,15 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
+use App\Modules\Storefront\Application\Builder\Publishing\BuilderPublishSchedules;
 use App\Modules\Storefront\Application\Queries\CustomFonts;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveThemeDraftRequest;
 use App\Modules\Storefront\Presentation\Http\Support\BuilderPresenter;
+use App\Modules\Storefront\Presentation\Http\Support\BuilderPublishingPresenter;
+use App\Modules\Storefront\Presentation\Http\Support\PublishAtRules;
 use App\Modules\Storefront\Presentation\Http\Support\StorefrontPresenter;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -59,12 +63,41 @@ class ThemeDraftController
      *
      * `{note?}` (≤ 160). The draft becomes the live theme (audited, storefront cache refreshed)
      * and a new version; the first publish first records the theme that was live before as
-     * version 1.
+     * version 1. B11: `cancel_schedule` (bool, default false) also cancels the pending "publish
+     * later" in the same transaction.
      */
-    public function publish(Request $request): JsonResponse
+    public function publish(Request $request, BuilderPublishSchedules $schedules): JsonResponse
     {
-        $note = $request->validate(['note' => ['sometimes', 'nullable', 'string', 'max:160']])['note'] ?? null;
-        $this->theme->publish($note);
+        $data = $request->validate(['note' => ['sometimes', 'nullable', 'string', 'max:160'], 'cancel_schedule' => ['sometimes', 'boolean']]);
+        $schedules->publishThemeNow($data['note'] ?? null, (bool) ($data['cancel_schedule'] ?? false));
+
+        return $this->payload($request);
+    }
+
+    /**
+     * Publish the theme draft later
+     *
+     * B11: `{publish_at, note?}` (future, at most a year ahead; note ≤ 160). Snapshots the current
+     * theme draft; that snapshot becomes the live theme at `publish_at` (images or fonts deleted
+     * since: the schedule fails with the reason, bell notification). Replaces the pending one.
+     * Returns the draft payload with `schedule`.
+     */
+    public function schedule(Request $request, BuilderPublishSchedules $schedules): JsonResponse
+    {
+        $data = $request->validate(PublishAtRules::rules(true), PublishAtRules::messages());
+        $schedules->scheduleTheme(CarbonImmutable::parse($data['publish_at']), $data['note'] ?? null);
+
+        return $this->payload($request);
+    }
+
+    /**
+     * Cancel publishing the theme later
+     *
+     * B11: 409 NOTHING_SCHEDULED when nothing is pending. Returns the draft payload.
+     */
+    public function cancelSchedule(Request $request, BuilderPublishSchedules $schedules): JsonResponse
+    {
+        $schedules->cancelTheme();
 
         return $this->payload($request);
     }
@@ -121,6 +154,7 @@ class ThemeDraftController
     private function payload(Request $request): JsonResponse
     {
         $state = $this->theme->state();
+        $document = $state['document'];
 
         return ApiResponse::success(StorefrontPresenter::themeDraft(
             $state,
@@ -128,6 +162,9 @@ class ThemeDraftController
             $request->user()->can('storefront.custom_css'),
             $this->config->primaryUrl(),
             $this->fonts->themeFonts($state['settings']),
-        ))->header('Cache-Control', 'no-store, private');
+        ) + [
+            // B11: the pending (or failed) "publish later" of the theme draft.
+            'schedule' => $document === null ? null : BuilderPublishingPresenter::states([$document])[$document->id]['schedule'],
+        ])->header('Cache-Control', 'no-store, private');
     }
 }

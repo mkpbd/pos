@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils'
+import { withFocal } from '../../focal'
 import type { BuilderMedia } from '../types'
 
-/** A library image with exactly this alt text (decorative when ""). */
+/** A library image with exactly this alt text (decorative when ""); B11: cropped around its focal point. */
 export function BuilderImg({
   media,
   alt,
@@ -27,6 +28,7 @@ export function BuilderImg({
       decoding="async"
       draggable={false}
       className={cn('block', className)}
+      style={withFocal(media)}
     />
   )
 }

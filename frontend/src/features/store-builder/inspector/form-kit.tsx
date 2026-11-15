@@ -99,7 +99,7 @@ export function NumberField({ label, value, min, max, step = 1, decimals = 2, on
   )
 }
 
-const toRef = (m: MediaItem): MediaRef => ({ id: m.id, url: m.url, srcset: m.srcset, width: m.width, height: m.height, alt: m.alt })
+const toRef = (m: MediaItem): MediaRef => ({ id: m.id, url: m.url, srcset: m.srcset, width: m.width, height: m.height, alt: m.alt, focal: m.focal ?? null })
 
 /** Looks up chosen media (the picker's cached pages first, then the API) so the canvas can draw them at once. */
 function useMediaRefs() {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2Icon, PencilIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { CropIcon, Loader2Icon, PencilIcon, SearchIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
@@ -9,7 +9,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { formatBytes, useDeleteMediaMutation, useMediaQuery, useUpdateMediaAltMutation, type MediaItem } from '@/features/media/api'
+import { formatBytes, isEditable, useDeleteMediaMutation, useMediaQuery, useUpdateMediaAltMutation, type MediaItem } from '@/features/media/api'
+import { ImageEditorDialog } from '@/features/media/components/image-editor-dialog'
 import { UploadZone } from '@/features/media/components/upload-zone'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -74,10 +75,11 @@ export function MediaLibraryPage() {
   const remove = useDeleteMediaMutation()
   const [editing, setEditing] = useState<MediaItem | null>(null)
   const [deleting, setDeleting] = useState<MediaItem | null>(null)
+  const [picture, setPicture] = useState<MediaItem | null>(null)
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Media library" description="Images for the online store: logos, banners, menu promotions. Large images get web-optimised copies automatically." />
+      <PageHeader title="Media library" description="Images for the online store: logos, banners, menu promotions. Pictures over 2560 px are made smaller on upload, and every image gets web-optimised copies automatically." />
 
       <UploadZone />
 
@@ -115,7 +117,13 @@ export function MediaLibraryPage() {
                     {m.width}×{m.height} · {formatBytes(m.size)}
                   </span>
                   <span className={m.alt ? 'truncate' : 'text-warning-soft-foreground'} title={m.alt ?? undefined}>{m.alt || 'No alt text'}</span>
+                  {(m.edited_from_id || m.focal) && (
+                    <span className="text-muted-foreground">{[m.edited_from_id && 'Edited copy', m.focal && 'Focal point set'].filter(Boolean).join(' · ')}</span>
+                  )}
                   <div className="flex justify-end">
+                    {isEditable(m) && (
+                      <Button variant="ghost" size="icon-sm" aria-label={`Edit picture ${m.original_name}`} onClick={() => setPicture(m)}><CropIcon /></Button>
+                    )}
                     <Button variant="ghost" size="icon-sm" aria-label={`Edit alt text of ${m.original_name}`} onClick={() => setEditing(m)}><PencilIcon /></Button>
                     <Button variant="ghost" size="icon-sm" aria-label={`Delete ${m.original_name}`} onClick={() => setDeleting(m)}><Trash2Icon /></Button>
                   </div>
@@ -128,6 +136,7 @@ export function MediaLibraryPage() {
       )}
 
       <AltTextDialog item={editing} onClose={() => setEditing(null)} />
+      <ImageEditorDialog item={picture} onClose={() => setPicture(null)} />
 
       <ConfirmDialog
         open={deleting !== null}

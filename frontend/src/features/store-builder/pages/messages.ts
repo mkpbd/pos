@@ -153,6 +153,28 @@ const en = {
   'row.lastEdited': 'Last edited {date}',
   'row.editAria': '{label} {name}',
   'row.viewAria': 'View {name} on your store (opens in a new tab)',
+  // B11: planned publishes and approval
+  'row.scheduled': 'Goes live {date}',
+  'row.scheduledHint': 'Planned to go live on {date} (store time)',
+  'row.scheduleFailed': 'Didn’t go live as planned',
+  'row.reviewPending': 'Waiting for approval',
+  'row.reviewSentBack': 'Sent back',
+  'tabs.label': 'Pages and approvals',
+  'tabs.all': 'All pages',
+  'tabs.reviews': 'Waiting for approval',
+  'reviews.title': 'Waiting for approval',
+  'reviews.text': 'Changes your team sent for approval. Open one to see it next to the live page, then approve and publish it, or send it back with a comment.',
+  'reviews.empty': 'Nothing is waiting for approval.',
+  'reviews.loading': 'Loading the requests',
+  'reviews.error': 'Could not load the requests',
+  'reviews.listLabel': 'Requests waiting for approval',
+  'reviews.sentBy': 'Sent by {name} · {date}',
+  'reviews.someone': 'a team member',
+  'reviews.changed': 'Edited since it was sent',
+  'reviews.open': 'Open review',
+  'reviews.openAria': 'Open the review of {name}',
+  'reviews.count.one': '{count} waiting',
+  'reviews.count.other': '{count} waiting',
 
   // Home page
   'home.title': 'Home page',
@@ -575,6 +597,28 @@ const bn: Record<MessageKey, string> = {
   'row.lastEdited': 'শেষ পরিবর্তন {date}',
   'row.editAria': '{name} {label}',
   'row.viewAria': '{name} আপনার দোকানে দেখুন (নতুন ট্যাবে খুলবে)',
+  // B11
+  'row.scheduled': 'লাইভ হবে {date}',
+  'row.scheduledHint': '{date} তারিখে লাইভ হওয়ার কথা (দোকানের সময়)',
+  'row.scheduleFailed': 'ঠিক সময়ে লাইভ হয়নি',
+  'row.reviewPending': 'অনুমোদনের অপেক্ষায়',
+  'row.reviewSentBack': 'ফেরত পাঠানো হয়েছে',
+  'tabs.label': 'পেজ ও অনুমোদন',
+  'tabs.all': 'সব পেজ',
+  'tabs.reviews': 'অনুমোদনের অপেক্ষায়',
+  'reviews.title': 'অনুমোদনের অপেক্ষায়',
+  'reviews.text': 'আপনার টিম যে পরিবর্তনগুলো অনুমোদনের জন্য পাঠিয়েছে। একটি খুলে লাইভ পেজের পাশে দেখুন, তারপর অনুমোদন দিয়ে পাবলিশ করুন, অথবা মন্তব্যসহ ফেরত পাঠান।',
+  'reviews.empty': 'অনুমোদনের অপেক্ষায় কিছু নেই।',
+  'reviews.loading': 'অনুরোধগুলো লোড হচ্ছে',
+  'reviews.error': 'অনুরোধগুলো লোড করা যায়নি',
+  'reviews.listLabel': 'অনুমোদনের অপেক্ষায় থাকা অনুরোধ',
+  'reviews.sentBy': 'পাঠিয়েছেন {name} · {date}',
+  'reviews.someone': 'টিমের একজন',
+  'reviews.changed': 'পাঠানোর পরে বদলানো হয়েছে',
+  'reviews.open': 'রিভিউ খুলুন',
+  'reviews.openAria': '{name} এর রিভিউ খুলুন',
+  'reviews.count.one': '{count}টি অপেক্ষায়',
+  'reviews.count.other': '{count}টি অপেক্ষায়',
 
   'home.title': 'হোম পেজ',
   'home.text': 'ক্রেতারা প্রথমে যে পেজটি দেখেন। এখানে একটি পাবলিশ না করা পর্যন্ত তাঁরা Homepage ট্যাবের সেকশনগুলো দেখবেন।',
@@ -879,6 +923,20 @@ export function translateCount(lang: ScreenLang, key: CountKey, count: number, v
 
 export function isScreenLang(value: unknown): value is ScreenLang {
   return value === 'en' || value === 'bn'
+}
+
+/** B11: a date and time in the store's timezone, in the language ("20 Nov, 09:00"). */
+export function formatStoreDateTime(lang: ScreenLang, iso: string | null | undefined, timeZone: string | undefined): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }
+  const locale = lang === 'bn' ? 'bn-BD' : 'en-GB'
+  try {
+    return date.toLocaleString(locale, { ...options, timeZone })
+  } catch {
+    return date.toLocaleString(locale, options)
+  }
 }
 
 /** The date (and time) in the language: Bangla digits and month names in Bangla. */

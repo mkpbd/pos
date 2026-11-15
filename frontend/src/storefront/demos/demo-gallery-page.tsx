@@ -2,6 +2,7 @@ import { useEffect, useId, type ReactNode } from 'react'
 import { LayoutDashboardIcon, StoreIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { LanguageSwitcher } from '../components/language-switcher'
 import { PageLoadingView } from '../components/state-views'
 import { LocaleContext, useLocale } from '../i18n/locale'
@@ -10,6 +11,7 @@ import { isMessageKey } from '../i18n/translate'
 import { loadFont } from '../font-loader'
 import { headingFontStack } from '../theme'
 import { isGalleryDisabled, useDemoStoresQuery, type DemoStore } from './api'
+import { galleryColumns } from './grid'
 import { useStandaloneLocale } from './demo-locale'
 import { demoAdminUrl, demoStoreUrl, safeColor } from './links'
 
@@ -101,7 +103,7 @@ function GalleryBody() {
   }
 
   return (
-    <ul aria-label={t('demos.list')} className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="demo-grid">
+    <ul aria-label={t('demos.list')} className={cn('grid grid-cols-1 gap-6', galleryColumns(query.data.length))} data-testid="demo-grid">
       {query.data.map((demo) => (
         <li key={demo.host} className="flex">
           <DemoCard demo={demo} />
@@ -124,7 +126,7 @@ function GallerySkeleton() {
   return (
     <div role="status" aria-live="polite" data-testid="demo-loading">
       <span className="sr-only">{t('demos.loading')}</span>
-      <div aria-hidden className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div aria-hidden className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {[0, 1, 2].map((index) => (
           <div key={index} className="overflow-hidden rounded-sf-card border bg-sf-surface">
             <Skeleton className="aspect-video rounded-none" />

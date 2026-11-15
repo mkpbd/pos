@@ -42,6 +42,7 @@ class EloquentMediaLibrary implements MediaLibrary
                 'width' => $m->width,
                 'height' => $m->height,
                 'alt' => $m->alt,
+                'focal' => $m->focal(),
             ]])
             ->all();
     }

@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useThemeVersionsQuery, type ThemeVersion } from '@/features/storefront/api'
+import { PublishWhenFields } from '@/features/store-builder/publishing/publish-when'
+import { usePublishWhen, type PublishLater } from '@/features/store-builder/publishing/use-publish-when'
 
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -25,9 +27,13 @@ function formatWhen(iso: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-/** Publish the theme draft with an optional note. */
-export function ThemePublishDialog({ open, onOpenChange, pending, unsaved, onPublish }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; unsaved: boolean; onPublish: (note: string | null) => void }) {
+/**
+ * Publish the theme draft with an optional note. B11: with `later` (people who may publish),
+ * "Publish now | Publish later" in the store's timezone, and "Cancel it" for a planned publish.
+ */
+export function ThemePublishDialog({ open, onOpenChange, pending, unsaved, onPublish, later, title = 'Publish the theme?' }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; unsaved: boolean; onPublish: (note: string | null, options?: { cancelSchedule?: boolean }) => void; later?: PublishLater; title?: string }) {
   const [note, setNote] = useState('')
+  const when = usePublishWhen(open, later)
   return (
     <Dialog
       open={open}
@@ -39,21 +45,30 @@ export function ThemePublishDialog({ open, onOpenChange, pending, unsaved, onPub
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Publish the theme?</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Shoppers see the new colours, fonts and layout right away. {unsaved && 'Your unsaved changes are saved first. '}The current look stays in the version history.
+            {when.scheduling
+              ? `The colours, fonts and layout go live at the time you choose, exactly as they are now. ${unsaved ? 'Your unsaved changes are saved first. ' : ''}Changes you make after this stay in your draft.`
+              : `Shoppers see the new colours, fonts and layout right away. ${unsaved ? 'Your unsaved changes are saved first. ' : ''}The current look stays in the version history.`}
           </DialogDescription>
         </DialogHeader>
         <form
           id="theme-publish-form"
           className="flex flex-col gap-2"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault()
             // Portalled, but React still bubbles the submit to the theme form around the dialog.
             e.stopPropagation()
-            onPublish(note.trim() || null)
+            if (later && when.scheduling) {
+              const iso = when.laterInstant()
+              if (iso) later.onSchedule(iso, note.trim() || null)
+              return
+            }
+            onPublish(note.trim() || null, when.nowOptions)
           }}
         >
+          <PublishWhenFields when={when} noun="theme" />
           <Label htmlFor="theme-publish-note">Note (optional)</Label>
           <Textarea id="theme-publish-note" value={note} maxLength={160} rows={2} placeholder="What changed? e.g. Eid colours" onChange={(e) => setNote(e.target.value)} />
         </form>
@@ -63,7 +78,7 @@ export function ThemePublishDialog({ open, onOpenChange, pending, unsaved, onPub
           </Button>
           <Button type="submit" form="theme-publish-form" disabled={pending}>
             {pending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
-            Publish
+            {when.scheduling ? 'Schedule' : 'Publish'}
           </Button>
         </DialogFooter>
       </DialogContent>

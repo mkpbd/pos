@@ -1,0 +1,75 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#2f4a3a"
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "44px",
+                            "bottom": "44px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "cta",
+                            "props": {
+                                "title": "Home week: up to 10 % off",
+                                "text": "Selected furniture and lighting, delivered and assembled for free on larger orders.",
+                                "primary": {
+                                    "label": "Shop the sale",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "secondary": {
+                                    "label": "Living room",
+                                    "link": {
+                                        "url": "/category/living-room"
+                                    }
+                                },
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "হোম সপ্তাহ: ১০ % পর্যন্ত ছাড়",
+                                    "text": "বাছাই করা আসবাব আর বাতি, বড় অর্ডারে বিনা খরচে ডেলিভারি ও জোড়া লাগানো।",
+                                    "primary.label": "সেলে কিনুন",
+                                    "secondary.label": "বসার ঘর"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

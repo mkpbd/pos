@@ -1,0 +1,1049 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "grocery"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "autoplay_seconds": 6,
+                                            "height": "large"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Mango season",
+                                                    "kicker": "In season",
+                                                    "title": "Mango season is here",
+                                                    "subtitle": "Himsagar from Rajshahi orchards, at your door the same day.",
+                                                    "button_label": "Shop fruit",
+                                                    "link_url": "/category/fruits-vegetables",
+                                                    "secondary_button_label": "All deals",
+                                                    "secondary_link_url": "/shop",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "grocery/mangoes.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "মৌসুমি",
+                                                            "title": "আমের মৌসুম চলে এসেছে",
+                                                            "subtitle": "রাজশাহীর বাগানের হিমসাগর, একই দিনে আপনার দরজায়।",
+                                                            "button_label": "ফল কিনুন",
+                                                            "secondary_button_label": "সব অফার"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Pantry",
+                                                    "kicker": "Kitchen basics",
+                                                    "title": "Fill the pantry for less",
+                                                    "subtitle": "Rice, dal, oil and spices at fair prices, delivered in two hours.",
+                                                    "button_label": "Shop pantry",
+                                                    "link_url": "/category/rice-dal-oil",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "grocery/whole-spices.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "রান্নাঘরের দরকারি",
+                                                            "title": "কম খরচে ভাঁড়ার ভরুন",
+                                                            "subtitle": "চাল, ডাল, তেল আর মসলা ন্যায্য দামে, দুই ঘণ্টায় ডেলিভারি।",
+                                                            "button_label": "কিনুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Same-day delivery",
+                                                    "text": "Order before 6 pm in Dhaka"
+                                                },
+                                                {
+                                                    "icon": "shield-check",
+                                                    "title": "Freshness promise",
+                                                    "text": "Not happy? We replace it"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Cash on delivery",
+                                                    "text": "Or bank transfer"
+                                                },
+                                                {
+                                                    "icon": "headset",
+                                                    "title": "Order by phone",
+                                                    "text": "01700-000007, 7 am to 10 pm"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Shop by aisle",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 6
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "তাক অনুযায়ী কিনুন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "hot_deals",
+                                    "props": {
+                                        "title": "Today's deals",
+                                        "subtitle": "Ends tomorrow night",
+                                        "config": {
+                                            "limit": 4,
+                                            "view_all_url": "/shop",
+                                            "promotion_id": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "আজকের অফার",
+                                            "subtitle": "কাল রাতে শেষ"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "product_grid",
+                                    "props": {
+                                        "title": "Fresh picks",
+                                        "subtitle": "Just arrived at the shop",
+                                        "config": {
+                                            "source": "new_arrivals",
+                                            "category_id": null,
+                                            "limit": 8,
+                                            "columns": 4,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "তাজা বাছাই",
+                                            "subtitle": "সদ্য দোকানে এসেছে"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "3-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Vegetables",
+                                                    "kicker": "Every morning",
+                                                    "title": "Fresh vegetables daily",
+                                                    "button_label": "Shop now",
+                                                    "link_url": "/category/fruits-vegetables",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "grocery/red-onions.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "প্রতিদিন সকালে",
+                                                            "title": "প্রতিদিন তাজা সবজি",
+                                                            "button_label": "কিনুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Fish",
+                                                    "kicker": "Cleaned and cut",
+                                                    "title": "River fish, ready to cook",
+                                                    "button_label": "Shop fish",
+                                                    "link_url": "/category/fish-meat",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "grocery/river-fish.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "কেটে পরিষ্কার",
+                                                            "title": "নদীর মাছ, রান্নার জন্য তৈরি",
+                                                            "button_label": "কিনুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Rice",
+                                                    "kicker": "Save on 5 kg",
+                                                    "title": "Rice for the whole month",
+                                                    "button_label": "Shop rice",
+                                                    "link_url": "/category/rice-dal-oil",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "grocery/basmati-rice.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "৫ কেজিতে সাশ্রয়",
+                                                            "title": "পুরো মাসের চাল",
+                                                            "button_label": "কিনুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "product_carousel",
+                                    "props": {
+                                        "title": "Everyday essentials",
+                                        "subtitle": "What the neighbourhood buys most",
+                                        "config": {
+                                            "source": "best_sellers",
+                                            "limit": 8,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "প্রতিদিনের দরকারি",
+                                            "subtitle": "পাড়ার সবাই যা বেশি কেনেন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "rich_text",
+                                    "props": {
+                                        "title": "Fresh from the bazar, at your door",
+                                        "subtitle": null,
+                                        "config": {
+                                            "alignment": "center",
+                                            "body_html": "<p>We buy produce at dawn, pack your order by hand and deliver it the same day. Read <a href=\"/pages/about-us\">our story</a> or see the <a href=\"/pages/faq\">FAQ</a>.</p>"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "বাজার থেকে তাজা, আপনার দরজায়",
+                                            "body_html": "<p>আমরা ভোরে বাজার করি, হাতে আপনার অর্ডার প্যাক করি আর একই দিনে পৌঁছে দিই। পড়ুন <a href=\"/pages/about-us\">আমাদের গল্প</a> অথবা দেখুন <a href=\"/pages/faq\">প্রশ্নোত্তর</a>।</p>"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "testimonials",
+                                    "props": {
+                                        "title": "What neighbours say",
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "quote": "The fish was cleaned exactly as I asked and arrived within two hours. Like having a bazar next door.",
+                                                    "name": "Shirin A.",
+                                                    "role": "Mohammadpur",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Honest weights and fair prices. The Himsagar mangoes were the sweetest this year.",
+                                                    "name": "Habib R.",
+                                                    "role": "Dhanmondi",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Good service. Once an egg was cracked and they replaced the tray the next day.",
+                                                    "name": "Lima K.",
+                                                    "role": "Shyamoli",
+                                                    "rating": 4
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "প্রতিবেশীরা যা বলেন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "blog_posts",
+                                    "props": {
+                                        "title": "Kitchen notes",
+                                        "subtitle": null,
+                                        "config": {
+                                            "limit": 3,
+                                            "view_all_url": "/blog"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "রান্নাঘরের কথা"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "newsletter",
+                                    "props": {
+                                        "title": "Weekly offers in your inbox",
+                                        "subtitle": null,
+                                        "config": {
+                                            "text": "One e-mail a week with the best prices. Unsubscribe any time.",
+                                            "button_label": "Subscribe",
+                                            "background": "#14532d",
+                                            "foreground": "#ffffff"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সাপ্তাহিক অফার আপনার ইনবক্সে",
+                                            "text": "সপ্তাহে একটি ই-মেইল, সেরা দামের খবর। যেকোনো সময় বন্ধ করা যায়।",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "14px",
+                                    "bottom": "14px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 18
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 44,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 50
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search rice, fish, vegetables…",
+                                        "button_label": "Search"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "চাল, মাছ, সবজি খুঁজুন…",
+                                            "button_label": "খুঁজুন"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": true
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 8
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 16
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": true
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "6px",
+                                    "bottom": "6px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:primary"
+                            },
+                            "color": "theme:primary_foreground"
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 85
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_17",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 15
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_18",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "select"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "56px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "32px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "40px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_19",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 40,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_20",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>The morning bazar at your door: fresh produce, fish and kitchen basics at fair prices.</p>"
+                                    }
+                                },
+                                {
+                                    "id": "e_21",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 24
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 20,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_22",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Information",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "তথ্য"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_23",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 25,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_24",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Contact us",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "যোগাযোগ"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_25",
+                                    "type": "contact_block",
+                                    "props": {
+                                        "show_phone": true,
+                                        "show_email": true,
+                                        "show_address": true,
+                                        "layout": "stacked"
+                                    }
+                                },
+                                {
+                                    "id": "e_26",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 22,
+                                        "style": "circle",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 25,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_27",
+                                    "type": "newsletter_form",
+                                    "props": {
+                                        "title": "Weekly offers",
+                                        "text": "The best prices, once a week.",
+                                        "button_label": "Subscribe",
+                                        "layout": "stacked"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সাপ্তাহিক অফার",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "14px",
+                                    "bottom": "14px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:primary"
+                            },
+                            "color": "theme:primary_foreground"
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_28",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_16",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "28px",
+                                    "bottom": "28px"
+                                },
+                                "margin": {
+                                    "bottom": "24px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "#e9f5e4"
+                            },
+                            "border": {
+                                "radius": {
+                                    "tl": "16px",
+                                    "tr": "16px",
+                                    "br": "16px",
+                                    "bl": "16px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_24",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_29",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Fresh every morning",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "প্রতিদিন সকালে তাজা"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_30",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Order before 6 pm for same-day delivery in Dhaka. Free over ৳1,000.</p>"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

@@ -18,6 +18,11 @@ export const demos = {
   'demos.preset.handmade': 'Handmade',
   'demos.preset.classic': 'Classic',
   'demos.preset.kids': 'Kids',
+  'demos.preset.fashion': 'Fashion',
+  'demos.preset.electronics': 'Electronics',
+  'demos.preset.grocery': 'Grocery',
+  'demos.preset.beauty': 'Beauty',
+  'demos.preset.furniture': 'Furniture',
 
   'demos.colors': 'Theme colours',
   'demos.color.primary': 'Primary {value}',

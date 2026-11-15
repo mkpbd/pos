@@ -18,6 +18,11 @@ export const demos: Translations<typeof en> = {
   'demos.preset.handmade': 'হ্যান্ডমেড',
   'demos.preset.classic': 'ক্লাসিক',
   'demos.preset.kids': 'কিডস',
+  'demos.preset.fashion': 'ফ্যাশন',
+  'demos.preset.electronics': 'ইলেকট্রনিক্স',
+  'demos.preset.grocery': 'গ্রোসারি',
+  'demos.preset.beauty': 'বিউটি',
+  'demos.preset.furniture': 'ফার্নিচার',
 
   'demos.colors': 'থিমের রং',
   'demos.color.primary': 'প্রধান রং {value}',

@@ -1,0 +1,75 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "background": {
+                        "type": "color",
+                        "color": "#0f172a"
+                    },
+                    "color": "#ffffff"
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "44px",
+                            "bottom": "44px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "cta",
+                            "props": {
+                                "title": "Time for an upgrade?",
+                                "text": "Trade-in advice, official warranty and free delivery on larger orders.",
+                                "primary": {
+                                    "label": "Shop all deals",
+                                    "link": {
+                                        "url": "/shop"
+                                    }
+                                },
+                                "secondary": {
+                                    "label": "See laptops",
+                                    "link": {
+                                        "url": "/category/laptops"
+                                    }
+                                },
+                                "align": "center"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "নতুন ডিভাইসের সময় হয়েছে?",
+                                    "text": "সঠিক পরামর্শ, অফিশিয়াল ওয়ারেন্টি আর বড় অর্ডারে ফ্রি ডেলিভারি।",
+                                    "primary.label": "সব অফার দেখুন",
+                                    "secondary.label": "ল্যাপটপ দেখুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

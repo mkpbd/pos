@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useState, type ReactNode } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { FilePlusIcon, HouseIcon, Loader2Icon, MegaphoneIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useCan } from '@/features/auth/use-auth'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { cn } from '@/lib/utils'
@@ -16,6 +17,9 @@ import { GlobalSectionsCard } from './global-sections-card'
 import { ListingColumnsCard } from './listing-columns-card'
 import { PopupsCard } from './popups-card'
 import { ProductZonesCard } from './product-zones-card'
+import { useReviewsQuery } from '../publishing-api'
+import { ReviewScreen } from '../publishing/review-dialogs'
+import { ReviewsCard } from './reviews-card'
 import type { ScreenLang } from './messages'
 import { NewLandingDialog } from './new-landing-dialog'
 import { lastEdited } from './page-helpers'
@@ -38,6 +42,9 @@ import { StartGuide } from './start-guide'
  * B8b: Popups & bars (list, on / off, new from a template, delete).
  * B9: Global sections (what each is for, where it is used, edit, delete when unused).
  * P2a: a new campaign page may start from a landing page template (new-landing-dialog.tsx).
+ * B11: rows show planned publishes and approval states; people who may publish get a
+ * "Waiting for approval" tab (with its count) and open a request in the review screen
+ * (`?review=<id>` opens one directly, e.g. from a notification; `?tab=reviews` the tab).
  */
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
@@ -113,6 +120,33 @@ function HomeCard({ home, canManage }: { home: DocumentSummary | undefined; canM
   )
 }
 
+/** B11: "All pages | Waiting for approval (n)" for people who may publish; the plain list for everyone else. */
+function PagesTabs({ canPublish, tab, onTab, count, reviews, children }: { canPublish: boolean; tab: 'all' | 'reviews'; onTab: (tab: 'all' | 'reviews') => void; count: number | null; reviews: ReactNode; children: ReactNode }) {
+  const { t, num } = useScreenText()
+  if (!canPublish) return children
+  return (
+    <Tabs value={tab} onValueChange={(value) => onTab(value as 'all' | 'reviews')} className="flex flex-col gap-6">
+      <TabsList aria-label={t('tabs.label')} className="w-fit">
+        <TabsTrigger value="all">{t('tabs.all')}</TabsTrigger>
+        <TabsTrigger value="reviews" data-testid="reviews-tab">
+          {t('tabs.reviews')}
+          {count !== null && count > 0 && (
+            <span data-testid="reviews-count" className="ml-1.5 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-amber-950 tabular-nums">
+              {num(count)}
+            </span>
+          )}
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="all" className="flex flex-col gap-6">
+        {children}
+      </TabsContent>
+      <TabsContent value="reviews" className="flex flex-col gap-6">
+        {reviews}
+      </TabsContent>
+    </Tabs>
+  )
+}
+
 function GroupHeading({ id, title, description }: { id: string; title: string; description: string }) {
   return (
     <div>
@@ -147,6 +181,22 @@ function PagesScreen() {
   const remove = useDeleteDocumentMutation()
   const [creating, setCreating] = useState(false)
   const [removing, setRemoving] = useState<RemoveRequest | null>(null)
+  // B11: approval requests (publishers only).
+  const reviews = useReviewsQuery('pending', canPublish)
+  const [params, setParams] = useSearchParams()
+  const openReview = canPublish ? params.get('review') : null
+  const [tab, setTab] = useState<'all' | 'reviews'>(() => (params.get('tab') === 'reviews' || params.get('review') ? 'reviews' : 'all'))
+  const reviewCount = reviews.data?.length ?? 0
+  const setReview = (id: string | null) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (id) next.set('review', id)
+        else next.delete('review')
+        return next
+      },
+      { replace: id === null },
+    )
 
   const all = documents.data ?? []
   const pages = all.filter((d) => d.kind === 'page')
@@ -188,7 +238,8 @@ function PagesScreen() {
         ) : documents.error ? (
           <ErrorState title={t('screen.error')} error={documents.error} onRetry={() => void documents.refetch()} />
         ) : (
-          <>
+          <PagesTabs canPublish={canPublish} tab={tab} onTab={setTab} count={reviews.data ? reviewCount : null} reviews={<ReviewsCard reviews={reviews} onOpen={(review) => setReview(review.id)} />}>
+            <>
             {canManage && <StartGuide documents={all} canPublish={canPublish} />}
             <DemoLooksCard documents={all} canManage={canManage} canPublish={canPublish} />
             <section aria-labelledby="group-pages" className="flex flex-col gap-4">
@@ -241,10 +292,12 @@ function PagesScreen() {
               <GroupHeading id="group-popups" title={t('group.popups.title')} description={t('group.popups.text')} />
               <PopupsCard documents={popups} canManage={canManage} canPublish={canPublish} onRemove={setRemoving} />
             </section>
-          </>
+            </>
+          </PagesTabs>
         )}
       </div>
       <NewLandingDialog open={creating} onOpenChange={setCreating} />
+      {canPublish && <ReviewScreen reviewId={openReview} onClose={() => setReview(null)} />}
       <ScreenConfirm
         open={removing !== null}
         onOpenChange={(open) => !open && setRemoving(null)}

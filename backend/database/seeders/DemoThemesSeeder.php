@@ -71,8 +71,9 @@ use Illuminate\Support\Facades\Event;
 use RuntimeException;
 
 /**
- * T2: four demo online stores (K1 added the fourth), each its own organization with its own host
- * and theme preset (development only; refuses in production). Run after `migrate:fresh --seed`:
+ * T2: nine demo online stores (K1 added the fourth, B11 the last five), each its own organization
+ * with its own host and theme preset (development only; refuses in production). Run after
+ * `migrate:fresh --seed`:
  *
  *   php artisan db:seed --class=DemoThemesSeeder
  *
@@ -80,6 +81,11 @@ use RuntimeException;
  *   Mati & Co.      handmade.shop.localhost  owner@mati.test           / password  coupon MATI15
  *   Classic Shop    classic.shop.localhost   owner@classicshop.test    / password  coupon CLASSIC20
  *   Little Sprouts  kids.shop.localhost      owner@littlesprouts.test  / password  coupon SPROUT10
+ *   Loom & Lane     fashion.shop.localhost      owner@fashion.test      / password  coupon STYLE15
+ *   Circuit Bazar   electronics.shop.localhost  owner@electronics.test  / password  coupon TECH10
+ *   Bazar Fresh     grocery.shop.localhost      owner@grocery.test      / password  coupon FRESH10
+ *   Blush & Bloom   beauty.shop.localhost       owner@beauty.test       / password  coupon GLOW15
+ *   Kath & Home     furniture.shop.localhost    owner@furniture.test    / password  coupon HOME10
  *
  * Store content lives in database/seeders/demo-themes/<store>.php, photos (with credits in
  * manifest.json) in demo-themes/images/<store>/. Everything is created through the same
@@ -92,6 +98,11 @@ use RuntimeException;
  * P2b: Little Sprouts in social sandbox mode — "Demo Page" connected, product feeds on, two
  * published posts and one scheduled (DemoSocialSeeder).
  *
+ * B11: the last five stores ship ten photos each — banners, category tiles and blog covers reuse
+ * the product photos (a banner names its photo with `image`), a few products have none — and
+ * Bangla (`bangla` on; `bn` texts on categories, products, banners, sections, pages, blog posts
+ * and the menu labels).
+ *
  * Sale prices: the variant's selling price is the catalog's sale price and its compare-at
  * price the regular one (struck through, "−N %", on-sale sources). The flash sale is an
  * automatic countdown promotion on other products, so sale prices stay exactly as listed.
@@ -101,7 +112,13 @@ use RuntimeException;
  */
 class DemoThemesSeeder extends Seeder
 {
-    public const STORES = ['vegan', 'handmade', 'classic', 'kids'];
+    public const STORES = ['vegan', 'handmade', 'classic', 'kids', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture'];
+
+    /** B11: Bangla labels of the fixed menu items (stores with Bangla on). */
+    private const MENU_BN = [
+        'Blog' => 'ব্লগ', 'About' => 'আমাদের কথা', 'About us' => 'আমাদের কথা', 'Contact' => 'যোগাযোগ', 'FAQ' => 'প্রশ্নোত্তর',
+        'Privacy policy' => 'গোপনীয়তা নীতি', 'Terms of service' => 'শর্তাবলি',
+    ];
 
     private const PASSWORD = 'password';
 
@@ -219,14 +236,16 @@ class DemoThemesSeeder extends Seeder
         }
         // Resolved after the categories exist: the listing action reads the category tree once.
         $saveListing = app(SaveCategoryListing::class);
-        foreach ($this->data['categories'] as $slug => [, $image, $description]) {
+        foreach ($this->data['categories'] as $slug => $category) {
+            [, $image, $description] = $category;
             $saveListing($this->categories[$slug], [
                 'is_visible' => true,
                 'slug' => $slug,
                 'image_media_id' => $image === null ? null : $this->image($image),
                 'description_html' => "<p>{$description}</p>",
                 'seo_description' => $description,
-            ]);
+                // B11: the Bangla name (fourth value).
+            ] + (isset($category[3]) ? ['translations' => ['bn' => ['name' => $category[3]]]] : []));
         }
 
         // Option names become filterable attributes (colours as swatches).
@@ -295,7 +314,8 @@ class DemoThemesSeeder extends Seeder
                     'variant_id' => $bySku[$v['sku']]->id,
                     'compare_at_price' => $v['sale'] === null ? null : $v['price'],
                 ], $variants),
-            ]);
+                // B11: Bangla name and short description.
+            ] + (isset($p['bn']) ? ['translations' => ['bn' => ['name' => $p['bn'][0], 'short_description' => $p['bn'][1]]]] : []));
         }
     }
 
@@ -361,7 +381,8 @@ class DemoThemesSeeder extends Seeder
             'meta_description' => $this->data['meta_description'],
             'fulfilment_store_id' => $this->mainStoreId(),
             'return_window_days' => 7,
-        ]);
+            // B11: Bangla on (English stays the default language, Latin digits).
+        ] + (($this->data['bangla'] ?? false) ? ['bangla_enabled' => true, 'default_locale' => 'en', 'bangla_digits' => false] : []));
     }
 
     /**
@@ -457,6 +478,7 @@ class DemoThemesSeeder extends Seeder
                 'template' => $template,
                 'status' => 'published',
                 'body_html' => $page['body'],
+                'translations' => isset($page['bn']) ? ['bn' => ['title' => $page['bn']]] : null,
             ], fn ($v) => $v !== null))->id;
         }
 
@@ -466,15 +488,19 @@ class DemoThemesSeeder extends Seeder
         }
 
         $banners = app(ManageBanners::class);
-        foreach ($this->data['banners'] as $image => $banner) {
-            $this->banners[$image] = $banners->save(new Banner, $banner + ['desktop_media_id' => $this->image($image)])->id;
+        // B11: a banner may name its photo (`image`, e.g. a product photo) instead of being keyed by it.
+        foreach ($this->data['banners'] as $key => $banner) {
+            $attributes = array_diff_key($banner, ['image' => true, 'bn' => true]) + ['desktop_media_id' => $this->image($banner['image'] ?? $key)];
+            $this->banners[$key] = $banners->save(new Banner, $attributes + (isset($banner['bn']) ? ['translations' => ['bn' => $banner['bn']]] : []))->id;
         }
 
         [$name, $slug, $description] = $this->data['blog']['category'];
         $category = app(ManageBlogCategories::class)->save(new BlogCategory, ['name' => $name, 'slug' => $slug, 'description' => $description]);
         $posts = app(SaveBlogPost::class);
-        foreach ($this->data['blog']['posts'] as [$postSlug, $title, $excerpt, $cover, $daysAgo, $body]) {
-            $posts->save(new BlogPost, [
+        foreach ($this->data['blog']['posts'] as $post) {
+            [$postSlug, $title, $excerpt, $cover, $daysAgo, $body] = $post;
+            // B11: an optional seventh value holds the Bangla title and excerpt.
+            $posts->save(new BlogPost, (isset($post[6]) ? ['translations' => ['bn' => $post[6]]] : []) + [
                 'category_id' => $category->id,
                 'slug' => $postSlug,
                 'title' => $title,
@@ -518,6 +544,11 @@ class DemoThemesSeeder extends Seeder
             if ($type === 'rich_text') {
                 $attributes['title'] = $this->data['rich_text']['title'];
             }
+            // B11: Bangla texts of the section (title, subtitle; the text block's and newsletter's texts).
+            $bn = $type === 'rich_text' ? ($this->data['rich_text']['bn'] ?? null) : ($section['bn'] ?? null);
+            if ($bn !== null) {
+                $attributes['translations'] = ['bn' => $bn];
+            }
 
             $sections->save(new HomepageSection, $attributes + ['config' => $config]);
         }
@@ -533,23 +564,27 @@ class DemoThemesSeeder extends Seeder
 
         $main = $saveMenu->save(new Menu, ['name' => 'Main navigation', 'location' => 'main']);
         $items = [];
-        foreach ($this->data['categories'] as $slug => [$name]) {
-            $items[] = ['type' => 'category', 'label' => $name, 'target_id' => $this->categories[$slug]];
+        $bangla = (bool) ($this->data['bangla'] ?? false);
+        foreach ($this->data['categories'] as $slug => $category) {
+            $items[] = ['type' => 'category', 'label' => $category[0], 'target_id' => $this->categories[$slug]]
+                + ($bangla && isset($category[3]) ? ['translations' => ['bn' => ['label' => $category[3]]]] : []);
         }
+        // B11: the fixed labels in Bangla too when the store has Bangla on.
+        $label = fn (array $item) => $item + ($bangla && isset(self::MENU_BN[$item['label']]) ? ['translations' => ['bn' => ['label' => self::MENU_BN[$item['label']]]]] : []);
         $replace($main, [
             ...$items,
-            ['type' => 'blog', 'label' => 'Blog'],
-            ['type' => 'page', 'label' => 'About', 'target_id' => $pages['about']],
+            $label(['type' => 'blog', 'label' => 'Blog']),
+            $label(['type' => 'page', 'label' => 'About', 'target_id' => $pages['about']]),
         ]);
 
         $footer = $saveMenu->save(new Menu, ['name' => 'Information', 'location' => 'footer_1']);
-        $replace($footer, [
+        $replace($footer, array_map($label, [
             ['type' => 'page', 'label' => 'About us', 'target_id' => $pages['about']],
             ['type' => 'page', 'label' => 'Contact', 'target_id' => $pages['contact']],
             ['type' => 'page', 'label' => 'FAQ', 'target_id' => $pages['faq']],
             ['type' => 'page', 'label' => 'Privacy policy', 'target_id' => $pages['privacy']],
             ['type' => 'page', 'label' => 'Terms of service', 'target_id' => $pages['terms']],
-        ]);
+        ]));
     }
 
     /**

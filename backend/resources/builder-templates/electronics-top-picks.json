@@ -1,0 +1,54 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "product_tabs",
+                            "props": {
+                                "title": "Top picks",
+                                "subtitle": null,
+                                "config": {
+                                    "limit": 8,
+                                    "tabs": [
+                                        {
+                                            "label": "Featured",
+                                            "source": "featured"
+                                        },
+                                        {
+                                            "label": "New arrivals",
+                                            "source": "new_arrivals"
+                                        },
+                                        {
+                                            "label": "Best sellers",
+                                            "source": "best_sellers"
+                                        }
+                                    ]
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "সেরা বাছাই"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

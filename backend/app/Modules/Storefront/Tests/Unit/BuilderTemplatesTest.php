@@ -131,7 +131,7 @@ class BuilderTemplatesTest extends TestCase
             } else {
                 $this->assertNotContains('popup', $t['allowed_in'], $t['id']);
             }
-            $this->assertContains($t['preset'], [null, 'default', 'vegan', 'handmade', 'classic', 'kids'], $t['id']);
+            $this->assertContains($t['preset'], [null, ...ThemePresets::KEYS], $t['id']);
             if ($t['preset'] === 'default') {
                 $this->assertSame('site', $t['scope'], "{$t['id']}: the original look has a site template only");
             }
@@ -160,7 +160,7 @@ class BuilderTemplatesTest extends TestCase
         // The library: ≥ 24 section templates, 6+ per preset and neutral ones; the five pages; one site per preset.
         $sections = array_filter($manifest, fn (array $t) => $t['scope'] === 'section');
         $this->assertGreaterThanOrEqual(24, count($sections));
-        foreach (['vegan', 'handmade', 'classic', 'kids', null] as $preset) {
+        foreach (['vegan', 'handmade', 'classic', 'kids', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture', null] as $preset) {
             $this->assertGreaterThanOrEqual(6, count(array_filter($sections, fn (array $t) => $t['preset'] === $preset)), (string) $preset);
         }
         // K1: the kids look's sections, one per block of its homepage.
@@ -174,8 +174,9 @@ class BuilderTemplatesTest extends TestCase
         $this->assertEqualsCanonicalizing(['about', 'contact', 'faq', 'sale', 'collection', 'landing', 'landing', 'landing', 'landing'], array_column($pages, 'category'));
         $sites = array_values(array_filter($manifest, fn (array $t) => $t['scope'] === 'site'));
         // B7: one site per preset, the original look included, in the order the demo looks are shown.
-        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic'], array_column($sites, 'id'));
-        $this->assertSame(['kids', 'default', 'vegan', 'handmade', 'classic'], array_column($sites, 'preset'));
+        // B11: the five new looks after them.
+        $this->assertSame(['site-kids', 'site-default', 'site-vegan', 'site-handmade', 'site-classic', 'site-fashion', 'site-electronics', 'site-grocery', 'site-beauty', 'site-furniture'], array_column($sites, 'id'));
+        $this->assertSame(['kids', 'default', 'vegan', 'handmade', 'classic', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture'], array_column($sites, 'preset'));
         $this->assertEqualsCanonicalizing(ThemePresets::KEYS, array_column($sites, 'preset'));
         foreach ($sites as $site) {
             $this->assertSame(['page', 'header', 'footer', 'zone'], $site['allowed_in']);
@@ -342,6 +343,55 @@ class BuilderTemplatesTest extends TestCase
         });
         foreach (['header', 'footer', 'zone'] as $context) {
             $this->assertStringContainsString('"bn"', (string) json_encode($library->sections('site-default', $context)), $context);
+        }
+    }
+
+    /**
+     * B11: the five new looks — a site template named after its preset whose home follows the demo
+     * store's homepage, with Bangla on every titled element and banner, photos of its own demo set
+     * only; 6–10 section templates each, without thumbnails (only the site templates have a
+     * thumbnail and a tall preview).
+     */
+    public function test_the_b11_looks(): void
+    {
+        $library = app(BuilderTemplateLibrary::class);
+        foreach (['fashion', 'electronics', 'grocery', 'beauty', 'furniture'] as $preset) {
+            $site = $library->site($preset);
+            $this->assertSame("site-{$preset}", $site['id']);
+            $this->assertSame(ThemePresets::name($preset), $site['name']);
+            $this->assertSame(["/builder-templates/site-{$preset}.png", "/builder-templates/site-{$preset}-full.jpg"], [$site['thumbnail'], $site['preview']]);
+
+            $data = require database_path("seeders/demo-themes/{$preset}.php");
+            $home = $library->sections("site-{$preset}", 'page');
+            $this->assertSame(array_column($data['sections'], 'type'), array_map(fn (array $s) => $s['columns'][0]['elements'][0]['type'], $home), $preset);
+            $this->assertGreaterThanOrEqual(8, count($home));
+            $this->assertLessThanOrEqual(12, count($home));
+            $sets = array_values(array_unique(array_map(fn (string $a) => explode('/', $a)[0], PortableTemplate::assets($library->content("site-{$preset}")['parts']['home']['sections']))));
+            $this->assertSame([$preset], $sets, "{$preset}: photos of its own demo set");
+            foreach (PortableTemplate::banners($home) as $banner) {
+                $this->assertNotEmpty($banner['translations']['bn']['title'] ?? null, $banner['name']);
+            }
+            BuilderDocumentSchema::walk(['sections' => $home], function (array $node, string $path, string $kind) use ($preset) {
+                if ($kind === 'element' && is_string($node['props']['title'] ?? null)) {
+                    $this->assertNotEmpty($node['translations']['bn']['title'] ?? null, "{$preset} {$node['type']}");
+                }
+            });
+            foreach (['header', 'footer', 'zone'] as $context) {
+                $this->assertStringContainsString('"bn"', (string) json_encode($library->sections("site-{$preset}", $context)), "{$preset} {$context}");
+            }
+
+            $sections = array_values(array_filter($library->all(), fn (array $t) => $t['scope'] === 'section' && $t['preset'] === $preset));
+            $this->assertGreaterThanOrEqual(6, count($sections), $preset);
+            $this->assertLessThanOrEqual(10, count($sections), $preset);
+            foreach ($sections as $t) {
+                $this->assertStringStartsWith("{$preset}-", $t['id']);
+                $this->assertNull($t['thumbnail'], "{$t['id']}: section templates of the new looks have no thumbnail");
+                $this->assertNull($t['preview'], $t['id']);
+            }
+            $categories = array_column($sections, 'category');
+            foreach (['hero', 'products', 'categories'] as $category) {
+                $this->assertContains($category, $categories, "{$preset} {$category}");
+            }
         }
     }
 

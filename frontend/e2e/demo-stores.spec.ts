@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect as baseExpect, test, type Page } from '@playwright/test'
@@ -1032,4 +1033,171 @@ test('B10: Mati & Co. edits a heading on the page, publishes past the page check
   await expect.poll(() => page.evaluate(`[...document.fonts].some((f) => f.family.replace(/"/g, '').startsWith('sf-custom-'))`)).toBe(true)
   expect(fontRequests.filter((u) => /noto-sans-bengali|tiro-bangla/.test(u))).toEqual([])
   await adminContext.close()
+})
+
+const B11_LOOKS = [
+  { preset: 'fashion', name: 'Loom & Lane' },
+  { preset: 'electronics', name: 'Circuit Bazar' },
+  { preset: 'grocery', name: 'Bazar Fresh' },
+  { preset: 'beauty', name: 'Blush & Bloom' },
+  { preset: 'furniture', name: 'Kath & Home' },
+]
+
+test('B11: the five new demo looks open on their own hosts with their own look', async ({ page }) => {
+  test.setTimeout(180_000)
+  await page.goto('/demos')
+  for (const look of B11_LOOKS) {
+    await expect(page.getByRole('link', { name: `Open store: ${look.name}` })).toHaveAttribute('href', `${origin(`${look.preset}.shop.localhost`)}/`)
+  }
+  for (const look of B11_LOOKS) {
+    await page.goto(`${origin(`${look.preset}.shop.localhost`)}/`)
+    await expect(page.locator('html')).toHaveAttribute('data-sf-preset', look.preset, { timeout: 30_000 })
+    await expect(page.locator('main img').first()).toBeVisible({ timeout: 30_000 })
+  }
+})
+
+test('B11: Loom & Lane — a staff editor sends a page for approval, the owner approves it; a scheduled page goes live on time; an edited picture keeps its focal point', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(360_000)
+  const base = origin('fashion.shop.localhost')
+  const ownerContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const owner = await ownerContext.newPage()
+  await signIn(owner, base, 'owner@fashion.test')
+  const callAs = (context: typeof ownerContext, tab: Page) => async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return tab.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const call = callAs(ownerContext, owner)
+  // A valid section from a built-in template: its first heading carries the page's text, plus an image when given.
+  type Node = { id: string; type?: string; props?: Record<string, unknown>; translations?: Record<string, unknown>; columns?: { elements: Node[] }[] }
+  const headingColumn = (node: Node): { elements: Node[] } | null => {
+    for (const column of node.columns ?? []) {
+      if (column.elements.some((e) => e.type === 'heading')) return column
+      for (const element of column.elements) {
+        const inner = headingColumn(element)
+        if (inner) return inner
+      }
+    }
+    return null
+  }
+  const pageContent = async (heading: string, image?: { media_id: string }) => {
+    const made = await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })
+    const section = made.body.data.nodes[0] as Node
+    const column = headingColumn(section)!
+    const first = column.elements.find((e) => e.type === 'heading')!
+    first.props = { ...first.props, text: heading, level: 1 }
+    first.translations = {}
+    if (image) column.elements.push({ ...first, id: 'e_b11_img', type: 'image', translations: {}, props: { media_id: image.media_id, alt: 'Edited photo', link: null, aspect: '1:1', fit: 'cover' } })
+    return { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections: [section] }
+  }
+  const ensurePage = async (key: string, title: string) => {
+    let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key, title, from: 'blank' })
+    if (doc.status === 409) {
+      // A rerun on the same database: reuse the page.
+      const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === key)
+      doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+    }
+    expect([200, 201]).toContain(doc.status)
+    return doc.body.data as { id: string; draft_revision: number }
+  }
+
+  // Picture tools: upload a photo, save a cropped and brighter copy, set its focal point.
+  const photo = readFileSync(fileURLToPath(new URL('../../backend/database/seeders/demo-themes/images/fashion/bomber-jacket.jpg', import.meta.url))).toString('base64')
+  const uploaded = await owner.evaluate(
+    async ({ data, token }) => {
+      const form = new FormData()
+      form.append('file', new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], { type: 'image/jpeg' }), 'jacket.jpg')
+      form.append('alt', 'Bomber jacket')
+      const res = await fetch('/api/v1/media', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-XSRF-TOKEN': token }, body: form })
+      return { status: res.status, body: (await res.json()) as { data: { id: string; width: number } } }
+    },
+    { data: photo, token: decodeURIComponent((await ownerContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '') },
+  )
+  expect([200, 201]).toContain(uploaded.status)
+  const edited = await call('POST', `/api/v1/media/${uploaded.body.data.id}/edit`, { crop: { x: 100, y: 100, w: 600, h: 600 }, rotate: 0, flip_h: false, flip_v: false, brightness: 12, contrast: 0, saturation: 0, mode: 'copy' })
+  expect([200, 201]).toContain(edited.status)
+  expect(edited.body.data).toMatchObject({ width: 600, height: 600 })
+  const copyId = edited.body.data.id as string
+  expect(copyId).not.toBe(uploaded.body.data.id)
+  expect((await call('PATCH', `/api/v1/media/${copyId}`, { focal_x: 30, focal_y: 70 })).body.data.focal).toEqual({ x: 30, y: 70 })
+
+  // A staff editor who may change pages but not publish them.
+  const roles = await call('GET', '/api/v1/roles')
+  let role = (roles.body.data as { id: string; name: string }[]).find((r) => r.name === 'B11 Page editor')
+  if (!role) role = (await call('POST', '/api/v1/roles', { name: 'B11 Page editor', description: null, permissions: ['storefront.view', 'storefront.manage', 'media.manage'] })).body.data
+  const branches = (await call('GET', '/api/v1/branches')).body.data as { id: string }[]
+  const editorEmail = 'pages@fashion.test'
+  const created = await call('POST', '/api/v1/users', { name: 'Rima Editor', email: editorEmail, phone: null, password: 'Pages-Edit-2026!', role_ids: [role!.id], branch_ids: [branches[0]!.id] })
+  expect([201, 422]).toContain(created.status) // 422 = a rerun: the editor exists already
+
+  const approvalDoc = await ensurePage('landing:b11-approval', 'B11 approval')
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${approvalDoc.id}/draft`, { revision: approvalDoc.draft_revision, content: await pageContent('Draft by the owner', { media_id: copyId }) })).status).toBe(200)
+
+  // The editor changes the heading and sends the page for approval from the builder.
+  const editorContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const editor = await editorContext.newPage()
+  await editor.goto(`${base}/admin/login`)
+  await editor.getByLabel('E-mail').fill(editorEmail)
+  await editor.getByLabel('Password').fill('Pages-Edit-2026!')
+  await editor.getByRole('button', { name: 'Sign in' }).click()
+  await expect(editor).not.toHaveURL(/\/admin\/login/, { timeout: 30_000 })
+  const editorCall = callAs(editorContext, editor)
+  const current = await editorCall('GET', `/api/v1/storefront/builder/documents/${approvalDoc.id}`)
+  expect((await editorCall('PUT', `/api/v1/storefront/builder/documents/${approvalDoc.id}/draft`, { revision: current.body.data.draft_revision, content: await pageContent('New season, new layers', { media_id: copyId }) })).status).toBe(200)
+  // Publishing is not theirs.
+  expect((await editorCall('POST', `/api/v1/storefront/builder/documents/${approvalDoc.id}/publish`, { note: 'try' })).status).toBe(403)
+  await editor.goto(`${base}/admin/storefront/builder/${approvalDoc.id}`)
+  await expect(editor.frameLocator('[data-testid="builder-canvas"]').getByRole('heading', { name: 'New season, new layers' })).toBeVisible({ timeout: 60_000 })
+  await editor.getByRole('button', { name: 'Submit for review' }).click()
+  const submit = editor.getByRole('dialog', { name: 'Submit this page for review?' })
+  await submit.getByLabel('Message for the person who approves (optional)').fill('Ready for the weekend')
+  await submit.getByRole('button', { name: 'Submit for review' }).click()
+  await expect(submit).toBeHidden({ timeout: 30_000 })
+
+  // The owner opens the review from its link (the bell's) and approves it; shoppers then see the page.
+  const reviews = await call('GET', '/api/v1/storefront/builder/reviews?status=pending')
+  const review = (reviews.body.data as { id: string; document: { id: string } }[]).find((r) => r.document.id === approvalDoc.id)!
+  expect(review).toBeTruthy()
+  await owner.goto(`${base}/admin/storefront/pages?review=${review.id}`)
+  await owner.getByRole('button', { name: 'Approve and publish now' }).click()
+  await expect.poll(async () => (await call('GET', `/api/v1/storefront/builder/reviews/${review.id}`)).body.data.review.status, { timeout: 30_000 }).toBe('approved')
+  await page.goto(`${base}/p/b11-approval`)
+  await expect(page.getByRole('heading', { name: 'New season, new layers' })).toBeVisible({ timeout: 30_000 })
+  // The edited copy is drawn with its focal point.
+  await expect(page.locator('main img[alt="Edited photo"]')).toHaveCSS('object-position', '30% 70%')
+  await editorContext.close()
+
+  // Publish later: the snapshot goes live once its time has come and the scheduler runs.
+  const laterDoc = await ensurePage('landing:b11-later', 'B11 later')
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${laterDoc.id}/draft`, { revision: laterDoc.draft_revision, content: await pageContent('Opening at noon') })).status).toBe(200)
+  const at = new Date(Date.now() + 65_000).toISOString()
+  const scheduled = await call('POST', `/api/v1/storefront/builder/documents/${laterDoc.id}/schedule`, { publish_at: at, note: 'B11 later' })
+  expect(scheduled.status).toBe(200)
+  expect(scheduled.body.data.schedule).toMatchObject({ status: 'pending' })
+  // Not live before its time.
+  await page.goto(`${base}/p/b11-later`)
+  await expect(page.getByRole('heading', { name: 'Opening at noon' })).toHaveCount(0)
+  const backend = fileURLToPath(new URL('../../backend/', import.meta.url))
+  const runScheduler = () =>
+    execFileSync(process.env.E2E_PHP ?? 'php', ['artisan', 'storefront:publish-scheduled'], {
+      cwd: backend,
+      env: { ...process.env, DB_CONNECTION: 'pgsql', DB_DATABASE: process.env.E2E_DB_DATABASE ?? 'pos_e2e', CACHE_STORE: 'database', QUEUE_CONNECTION: 'sync', MAIL_MAILER: 'log' },
+    })
+  await expect
+    .poll(async () => {
+      runScheduler()
+      return (await call('GET', `/api/v1/storefront/builder/documents/${laterDoc.id}`)).body.data.schedule?.status ?? 'done'
+    }, { timeout: 150_000, intervals: [10_000] })
+    .toBe('done')
+  await page.goto(`${base}/p/b11-later`)
+  await expect(page.getByRole('heading', { name: 'Opening at noon' })).toBeVisible({ timeout: 30_000 })
+  const versions = await call('GET', `/api/v1/storefront/builder/documents/${laterDoc.id}/versions`)
+  expect(versions.body.data[0]).toMatchObject({ kind: 'version', via: 'scheduled' })
+  await ownerContext.close()
 })

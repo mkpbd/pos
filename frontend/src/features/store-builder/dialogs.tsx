@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { CircleAlertIcon, CircleCheckIcon, ExternalLinkIcon, HistoryIcon, Loader2Icon, TriangleAlertIcon } from 'lucide-react'
+import { CircleAlertIcon, CircleCheckIcon, Loader2Icon, TriangleAlertIcon } from 'lucide-react'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
-import { ErrorState, LoadingState } from '@/components/common/state-views'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,14 +11,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useVersionsQuery, type VersionSummary } from './api'
-import { formatDateTime } from './format'
+import { PublishWhenFields } from './publishing/publish-when'
+import { usePublishWhen, type PublishLater } from './publishing/use-publish-when'
 import { ServerCheckNote } from './check-panel'
 import type { PageCheck } from './use-page-check'
 import { countsText } from './page-check'
@@ -131,9 +129,16 @@ function PublishCheck({ check, onShowAll }: { check: PageCheck; onShowAll?: () =
   )
 }
 
-/** Publish with an optional note; `error` explains why it cannot (problems, empty page). */
-export function PublishDialog({ open, onOpenChange, pending, error, onPublish, popup = false, usedOn = null, check, onShowCheck }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string | null; onPublish: (note: string | null) => void; popup?: boolean; /** B9: a global section — how many pages show it. */ usedOn?: number | null; /** B10: the page check (summary above the note). */ check?: PageCheck; /** B10: opens the Check page panel. */ onShowCheck?: () => void }) {
+/**
+ * Publish with an optional note; `error` explains why it cannot (problems, empty page). B11: with
+ * `later`, "Publish now | Publish later" — later takes a date and time in the store's timezone and
+ * puts the page live then, as it is now (./publishing/publish-when.tsx).
+ */
+export function PublishDialog({ open, onOpenChange, pending, error, onPublish, popup = false, usedOn = null, check, onShowCheck, later }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string | null; onPublish: (note: string | null, options?: { cancelSchedule?: boolean }) => void; popup?: boolean; /** B9: a global section — how many pages show it. */ usedOn?: number | null; /** B10: the page check (summary above the note). */ check?: PageCheck; /** B10: opens the Check page panel. */ onShowCheck?: () => void; /** B11: offer "Publish later". */ later?: PublishLater }) {
   const [note, setNote] = useState('')
+  const when = usePublishWhen(open, later)
+  const noun = usedOn !== null ? 'global section' : popup ? 'popup' : 'page'
+
   return (
     <Dialog
       open={open}
@@ -146,7 +151,9 @@ export function PublishDialog({ open, onOpenChange, pending, error, onPublish, p
         <DialogHeader>
           <DialogTitle>{usedOn !== null ? 'Publish this global section?' : popup ? 'Publish this popup?' : 'Publish this page?'}</DialogTitle>
           <DialogDescription>
-            {usedOn !== null
+            {when.scheduling
+              ? `The ${noun} goes live at the time you choose, exactly as it is now. Changes you make after this stay in your draft.`
+              : usedOn !== null
               ? `Every page that uses it${usedOn > 0 ? ` (${usedOn})` : ''} shows this version right away. Earlier versions stay in the version history.`
               : popup
               ? 'Shoppers see this version while the popup is switched on. Earlier versions stay in the version history.'
@@ -156,11 +163,18 @@ export function PublishDialog({ open, onOpenChange, pending, error, onPublish, p
         <form
           id="publish-form"
           className="flex flex-col gap-2"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault()
-            onPublish(note.trim() || null)
+            if (later && when.scheduling) {
+              const iso = when.laterInstant()
+              if (iso) later.onSchedule(iso, note.trim() || null)
+              return
+            }
+            onPublish(note.trim() || null, when.nowOptions)
           }}
         >
+          <PublishWhenFields when={when} noun={noun} />
           {check && <PublishCheck check={check} onShowAll={onShowCheck} />}
           <Label htmlFor="publish-note">Note (optional)</Label>
           <Textarea id="publish-note" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} placeholder="What changed? e.g. Eid sale banners" rows={2} />
@@ -176,7 +190,7 @@ export function PublishDialog({ open, onOpenChange, pending, error, onPublish, p
           </Button>
           <Button type="submit" form="publish-form" disabled={pending}>
             {pending && <Loader2Icon className="animate-spin" aria-hidden />}
-            {check && check.counts.errors > 0 ? 'Publish anyway' : 'Publish'}
+            {when.scheduling ? 'Schedule' : check && check.counts.errors > 0 ? 'Publish anyway' : 'Publish'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -219,93 +233,5 @@ export function LeaveDialog({ open, onStay, onLeave }: { open: boolean; onStay: 
       confirmLabel="Leave anyway"
       onConfirm={onLeave}
     />
-  )
-}
-
-type VersionHistoryProps = {
-  documentId: string
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  liveVersionId: string | null
-  /** The live page on the store, or null without a store address. */
-  liveUrl: string | null
-  canRestore: boolean
-  onRestore: (version: VersionSummary) => Promise<void>
-}
-
-export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersionId, liveUrl, canRestore, onRestore }: VersionHistoryProps) {
-  const versions = useVersionsQuery(documentId, open)
-  const [restoring, setRestoring] = useState<VersionSummary | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <HistoryIcon className="size-5" aria-hidden /> Version history
-            </DialogTitle>
-            <DialogDescription>Every publish is kept. Restoring copies a version into your draft; the store changes only when you publish.</DialogDescription>
-          </DialogHeader>
-          {versions.isPending ? (
-            <LoadingState rows={3} label="Loading versions" />
-          ) : versions.error ? (
-            <ErrorState title="Could not load the versions" error={versions.error} onRetry={() => void versions.refetch()} />
-          ) : versions.data.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">Nothing published yet. Your first publish appears here.</p>
-          ) : (
-            <ul className="max-h-[60vh] divide-y overflow-y-auto" aria-label="Published versions">
-              {versions.data.map((version) => {
-                const live = version.id === liveVersionId
-                return (
-                  <li key={version.id} className="flex flex-wrap items-center gap-3 py-3" data-testid={`version-${version.number}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-2 font-medium">
-                        Version {version.number}
-                        {live && <Badge variant="success">Live</Badge>}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDateTime(version.published_at ?? version.created_at)}
-                        {version.created_by?.name && ` · ${version.created_by.name}`}
-                      </p>
-                      {version.note && <p className="mt-0.5 text-sm">{version.note}</p>}
-                    </div>
-                    {live && liveUrl && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={liveUrl} target="_blank" rel="noopener noreferrer" aria-label={`View version ${version.number} on your store (opens in a new tab)`}>
-                          <ExternalLinkIcon aria-hidden /> View
-                        </a>
-                      </Button>
-                    )}
-                    {canRestore && (
-                      <Button variant="outline" size="sm" onClick={() => setRestoring(version)} aria-label={`Restore version ${version.number} to the draft`}>
-                        Restore to draft
-                      </Button>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </DialogContent>
-      </Dialog>
-      <ConfirmDialog
-        open={restoring !== null}
-        onOpenChange={(next) => !next && setRestoring(null)}
-        title={`Restore version ${restoring?.number ?? ''} to your draft?`}
-        description="Your current draft is replaced by this version (undo history is cleared). Nothing changes on the store until you publish."
-        confirmLabel="Restore"
-        pending={busy}
-        onConfirm={() => {
-          if (!restoring) return
-          setBusy(true)
-          void onRestore(restoring).finally(() => {
-            setBusy(false)
-            setRestoring(null)
-          })
-        }}
-      />
-    </>
   )
 }

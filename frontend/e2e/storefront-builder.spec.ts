@@ -136,10 +136,19 @@ test('mobile 375: columns stack, mobile type scale, full-width button, no spacer
   await expect(heading).toHaveCSS('font-size', '28px')
   await expect(heading).toHaveCSS('text-align', 'center')
 
+  // Stacked: the media column starts below the text column (16px mobile gap), same left edge and width. Both boxes are
+  // read in one go and re-read until steady: the theme's fonts load on demand (B10) and can reflow the text in between.
+  await expect
+    .poll(() =>
+      p.evaluate<number>(`(() => {
+        const t = document.querySelector('[data-b="c_story_text"]').getBoundingClientRect()
+        const m = document.querySelector('[data-b="c_story_media"]').getBoundingClientRect()
+        return Math.round(m.top - t.bottom)
+      })()`),
+    )
+    .toBe(16)
   const text = (await node(p, 'c_story_text').boundingBox())!
   const media = (await node(p, 'c_story_media').boundingBox())!
-  // Stacked: the media column starts below the text column (16px mobile gap), same left edge and width.
-  expect(Math.round(media.y - (text.y + text.height))).toBe(16)
   expect(Math.abs(media.x - text.x)).toBeLessThan(2)
   expect(Math.abs(media.width - text.width)).toBeLessThan(2)
 

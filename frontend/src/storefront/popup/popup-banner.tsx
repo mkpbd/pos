@@ -3,7 +3,9 @@ import { useLocation } from 'react-router'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { XIcon } from 'lucide-react'
 import { useStorefront } from '../api'
+import { cn } from '@/lib/utils'
 import { MenuLink } from '../components/menu-link'
+import { pictureFocal } from '../focal'
 import { useLocale } from '../i18n/locale'
 import type { StorePopup } from '../types'
 import { isPopupBlockedPath, isPopupDue, markPopupShown, popupDelayMs } from './frequency'
@@ -11,6 +13,8 @@ import { isPopupBlockedPath, isPopupDue, markPopupShown, popupDelayMs } from './
 function PopupPicture({ popup }: { popup: StorePopup }) {
   const { image, mobile_image: mobile } = popup
   if (!image) return null
+  // B11: each picture's own focal point.
+  const focal = pictureFocal(image, mobile)
 
   return (
     <picture>
@@ -23,7 +27,8 @@ function PopupPicture({ popup }: { popup: StorePopup }) {
         height={image.height}
         alt={image.alt ?? ''}
         decoding="async"
-        className="max-h-[50dvh] w-full object-cover"
+        className={cn('max-h-[50dvh] w-full object-cover', focal?.className)}
+        style={focal?.style}
       />
     </picture>
   )

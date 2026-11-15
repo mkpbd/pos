@@ -1,0 +1,102 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "3-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Bedroom",
+                                            "kicker": "Bedroom",
+                                            "title": "Calm nights start here",
+                                            "button_label": "Shop bedroom",
+                                            "link_url": "/category/bedroom",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "furniture/platform-bed.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "শোবার ঘর",
+                                                    "title": "শান্ত রাতের শুরু এখানে",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Home office",
+                                            "kicker": "Home office",
+                                            "title": "A desk you will love",
+                                            "button_label": "Shop desks",
+                                            "link_url": "/category/home-office",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "furniture/work-desk.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "হোম অফিস",
+                                                    "title": "পছন্দের একটি ডেস্ক",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Lighting",
+                                            "kicker": "Lighting",
+                                            "title": "Warm light, woven by hand",
+                                            "button_label": "Shop lighting",
+                                            "link_url": "/category/lighting",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "furniture/pendant-lamp.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "আলো",
+                                                    "title": "হাতে বোনা উষ্ণ আলো",
+                                                    "button_label": "দেখুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

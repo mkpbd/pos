@@ -4,6 +4,7 @@ namespace App\Modules\Media\Infrastructure\Jobs;
 
 use App\Modules\Media\Domain\RenditionPlan;
 use App\Modules\Media\Infrastructure\Models\Media;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use GdImage;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -14,6 +15,9 @@ use Illuminate\Support\Facades\Storage;
  * Writes WebP copies at the standard widths narrower than the original (GD; no image
  * package needed). GIFs are left alone so animations survive. A failure only means the
  * original is served without a srcset, so it is logged and not retried.
+ *
+ * B11: JPEG and PNG originals over RenditionPlan::FULL_SIZE_WEBP_MIN_BYTES also get a WebP
+ * copy at their own width, kept only when it is smaller than the original.
  */
 class GenerateMediaRenditions implements ShouldQueue
 {
@@ -32,7 +36,8 @@ class GenerateMediaRenditions implements ShouldQueue
         }
 
         $widths = RenditionPlan::widthsFor($media->width);
-        if ($widths === []) {
+        $fullSize = RenditionPlan::wantsFullSizeWebp($media->mime_type, $media->size);
+        if ($widths === [] && ! $fullSize) {
             return;
         }
 
@@ -42,6 +47,9 @@ class GenerateMediaRenditions implements ShouldQueue
             Log::warning('Media renditions skipped: unreadable image', ['media_id' => $media->id]);
 
             return;
+        }
+        if (! imageistruecolor($source)) {
+            imagepalettetotruecolor($source);
         }
 
         $renditions = [];
@@ -59,7 +67,23 @@ class GenerateMediaRenditions implements ShouldQueue
             $renditions[(string) $width] = $path;
         }
 
+        if ($fullSize) {
+            imagesavealpha($source, true);
+            ob_start();
+            imagewebp($source, null, 80);
+            $bytes = (string) ob_get_clean();
+            if ($bytes !== '' && strlen($bytes) < $media->size) {
+                $path = "{$base}-{$media->width}.webp";
+                $disk->put($path, $bytes);
+                $renditions[(string) $media->width] = $path;
+            }
+        }
+
         $media->renditions = $renditions;
         $media->saveQuietly();
+        // B11: an edited picture keeps its id; cached storefront pages pick up the new srcset.
+        if ($media->wasChanged('renditions')) {
+            app(StorefrontContentVersion::class)->bump($media->organization_id);
+        }
     }
 }

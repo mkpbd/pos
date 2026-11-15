@@ -1,0 +1,100 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "How it works",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "যেভাবে কাজ করে"
+                                }
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "steps",
+                            "props": {
+                                "items": [
+                                    {
+                                        "id": "st1",
+                                        "title": "Fill your basket",
+                                        "text": "Pick fresh produce and kitchen basics in a few taps.",
+                                        "icon": "store"
+                                    },
+                                    {
+                                        "id": "st2",
+                                        "title": "We pack and deliver",
+                                        "text": "We pack by hand and deliver the same day in Dhaka.",
+                                        "icon": "truck"
+                                    },
+                                    {
+                                        "id": "st3",
+                                        "title": "Pay at the door",
+                                        "text": "Check your groceries, then pay cash or by transfer.",
+                                        "icon": "credit-card"
+                                    }
+                                ],
+                                "layout": "horizontal",
+                                "numbered": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.st1.title": "ঝুড়ি ভরুন",
+                                    "items.st1.text": "কয়েক ট্যাপে তাজা সবজি আর দরকারি জিনিস বেছে নিন।",
+                                    "items.st2.title": "আমরা প্যাক করে পৌঁছে দিই",
+                                    "items.st2.text": "হাতে প্যাক করে ঢাকায় একই দিনে পৌঁছে দিই।",
+                                    "items.st3.title": "দরজায় পরিশোধ করুন",
+                                    "items.st3.text": "জিনিস দেখে নিয়ে নগদে বা ট্রান্সফারে পরিশোধ করুন।"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

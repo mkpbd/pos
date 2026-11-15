@@ -180,7 +180,7 @@ describe('Inspector: content forms', () => {
     await user.click(await within(dialog).findByRole('button', { name: 'Mangoes' }))
     await user.click(within(dialog).getByRole('button', { name: 'Use image' }))
     await waitFor(() => expect(last()).toMatchObject({ props: { media_id: UUID } }))
-    expect(lastOpts()).toEqual({ media: { [UUID]: { id: UUID, url: image.url, srcset: image.srcset, width: 800, height: 600, alt: 'Mangoes' } } })
+    expect(lastOpts()).toEqual({ media: { [UUID]: { id: UUID, url: image.url, srcset: image.srcset, width: 800, height: 600, alt: 'Mangoes', focal: null } } })
 
     await user.type(screen.getByLabelText('Description (alt text)'), 'Ripe')
     expect(last()).toMatchObject({ props: { alt: 'Ripe' } })

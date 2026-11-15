@@ -57,11 +57,12 @@ describe('store builder editor', () => {
     await waitFor(() => expect(dividers()).toBe(2))
   })
 
-  it('publish needs the publish permission; preview is offered with a store address', async () => {
+  it('publish needs the publish permission (B11: editors submit for review instead); preview is offered with a store address', async () => {
     mockEditor(['storefront.view', 'storefront.manage'])
     renderRoutes(routes, '/storefront/builder/doc-1')
     const toolbar = await screen.findByRole('banner', { name: 'Editor toolbar' })
-    expect(within(toolbar).getByRole('button', { name: 'Publish' })).toBeDisabled()
+    expect(within(toolbar).queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: 'Submit for review' })).toBeEnabled()
     expect(within(toolbar).getByRole('button', { name: 'Preview draft' })).toBeEnabled()
     expect(within(toolbar).getByRole('textbox', { name: 'Page title' })).toHaveValue('Home')
   })

@@ -135,7 +135,7 @@ export function LinkField({ label, value, onChange, required = false, error, hin
  * Media chooser
  * -------------------------------------------------------------------------------------------- */
 
-const toRef = (m: MediaItem): MediaRef => ({ id: m.id, url: m.url, srcset: m.srcset, width: m.width, height: m.height, alt: m.alt })
+const toRef = (m: MediaItem): MediaRef => ({ id: m.id, url: m.url, srcset: m.srcset, width: m.width, height: m.height, alt: m.alt, focal: m.focal ?? null })
 
 /** A single image from the media library with "Choose / Change / Remove"; reports the chosen image's ref. */
 export function ImageChooser({ value, onChange, title, error }: {

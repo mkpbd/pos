@@ -44,7 +44,7 @@ final class ThemeSchema
     public const BUTTON_STYLES = ['pill', 'rounded', 'square'];
 
     /** T1: the look the theme started from (ThemePresets); every value stays editable. */
-    public const PRESETS = ['default', 'vegan', 'handmade', 'classic', 'kids'];
+    public const PRESETS = ['default', 'vegan', 'handmade', 'classic', 'kids', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture'];
 
     // T1: layout variants. The first of each list is today's look (the default).
     public const HEADER_STYLES = ['standard', 'centered', 'commerce'];

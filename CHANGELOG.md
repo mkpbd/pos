@@ -21,6 +21,29 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B11 — Store builder: publish later, versions & approval; picture tools; five new demo looks
+
+#### Added
+- **Publish later:** the publish dialog offers *Publish now | Publish later* (date and time in store time); the snapshot taken then goes live on time through `storefront:publish-scheduled` (every minute, once only) as a normal version. A toolbar / Pages-list badge shows "Goes live …" with change-the-time and cancel; if records the page uses were deleted meanwhile nothing is published and the scheduler gets a bell notification with the reason. Publishing now while a publish is planned offers to cancel it (ticked) so an older snapshot can't replace a newer fix. The theme (Theme page and builder Site styles) can be scheduled too.
+- **Versions & saved copies:** versions can be named; *Save a named copy* keeps an unpublished snapshot of the draft (20 per page) that can be restored like a version. **Compare** shows two read-only previews side by side (desktop / tablet / phone, scrolling together) with a plain list of what was added, removed, moved or changed and *Show* to point at it.
+- **Approval:** staff who may edit but not publish see *Submit for review*; publishers get a bell notification and a *Waiting for approval* tab on the Pages list (the link opens the review). The review shows live and proposed side by side with the change list; *Approve and publish now* (or at a time) or *Send back…* with a required comment; the submitter is notified and can withdraw. The permission split decides who must ask.
+- **Picture tools** (media library and picker, *Edit picture*): crop (free, 1:1, 4:5, 16:9, 3:2), turn and mirror, brightness / contrast / colour strength, and a **focal point** that every storefront picture cropped by its frame keeps in view (banners, builder images, galleries, cards, popups). Saved as a new copy by default; replacing the original lists where it is used and needs confirmation. Uploads over 2560 px are scaled down, phone photos turned upright and metadata removed; big JPEG/PNG get a full-size WebP copy. `php artisan media:optimize` does the same for older pictures.
+- **Five new demo looks:** *Fashion Boutique* (Loom & Lane), *Electronics Store* (Circuit Bazar), *Supermarket* (Bazar Fresh, Bangla fonts), *Beauty & Cosmetics* (Blush & Bloom), *Furniture & Home* (Kath & Home) — theme presets (WCAG AA), site templates with Bangla and 8 section templates each, and demo stores (`<preset>.shop.localhost`, `owner@<preset>.test`) with 12 products, natural variants, coupon, reviews, blog and Bangla. Per the owner's request the demos stay light: exactly 10 Unsplash photos per store (≈ 4.4 MB in all, reused for banners and tiles), only a thumbnail and a tall preview per look, no section thumbnails (the template browser draws a sketch with name and category). The demo gallery shows 9 stores.
+
+#### Fixed
+- `MarketingTest` visitor-hash pruning failed late in the UTC evening (the hashes' day is the store's Dhaka date); the live prune was correct, the test now travels far enough.
+- `storefront-builder.spec.ts` "mobile 375" measured a gap while an on-demand font was swapping in; it now waits for a steady layout.
+- Picture editor: the disabled button read "Save focal point" before anything changed; it now reads "Save".
+- Media editing no longer changes PHP's time limit in console runs (it cut long test runs and workers at 120 s).
+
+#### Tests
+- Backend 1251 (PostgreSQL: 1250 pass, 1 opt-in skip; new `StoreBuilderB11PublishingTest`, `BuilderDiffTest`, `MediaEditorTest`, demo looks / preset / template / seeder checks); Pint clean.
+- vitest 2021; mocked Playwright 338 pass (new `store-builder-b11`, `media-editor`, `storefront-demos-b11`).
+- Full-stack (PostgreSQL, desktop) 44 — new **B11**: the five looks open on their own hosts; a staff editor without publish rights is refused publishing, submits from the builder, the owner approves from the review link and shoppers see it with the edited photo's focal point; a page set to publish later stays hidden and goes live when the scheduler runs (`via: scheduled`). Builder acceptance 5.
+
+#### Upgrade
+- `php artisan migrate` (builder schedules, reviews, saved copies; media focal point and edit source). **Run the scheduler** (`schedule:run` every minute) — scheduled pages go live only through it. Optional: `php artisan media:optimize --dry-run`, then without it. Demo databases: `php artisan db:seed --class=DemoThemesSeeder` adds the five new stores.
+
 ### B10 — Store builder: edit on the page, page check before publish, fonts & Bangla typography
 
 #### Added

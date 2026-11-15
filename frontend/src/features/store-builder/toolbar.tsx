@@ -17,6 +17,7 @@ import {
   UndoDotIcon,
   CheckIcon,
   ListChecksIcon,
+  SendIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -147,6 +148,11 @@ function TitleField({ title, canEdit, onRename }: { title: string; canEdit: bool
 
 type ToolbarProps = {
   canPublish: boolean
+  /** B11: may edit but not publish — "Submit for review" instead of Publish. */
+  canSubmit?: boolean
+  onSubmitReview?: () => void
+  /** B11: the planned publish and approval chips. */
+  status?: ReactNode
   onRename: (title: string) => Promise<void>
   onPreview: () => void
   onPublish: () => void
@@ -187,7 +193,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -237,6 +243,7 @@ export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard,
       </div>
 
       <SaveStatus onShowProblem={onShowProblem} />
+      {status}
 
       {check && (
         <Hint label="Look for missing picture descriptions, hard-to-read text, broken links and more">
@@ -264,13 +271,21 @@ export function Toolbar({ canPublish, onRename, onPreview, onPublish, onDiscard,
           </Button>
         </span>
       </Hint>
-      <Hint label={canPublish ? 'Make this draft live on your store' : 'You don’t have permission to publish'}>
-        <span tabIndex={canPublish ? undefined : 0}>
-          <Button type="button" disabled={!canPublish} onClick={onPublish}>
-            <RocketIcon /> Publish
+      {!canPublish && canSubmit ? (
+        <Hint label="Send this draft to someone who can publish it">
+          <Button type="button" onClick={onSubmitReview}>
+            <SendIcon /> Submit for review
           </Button>
-        </span>
-      </Hint>
+        </Hint>
+      ) : (
+        <Hint label={canPublish ? 'Make this draft live on your store, now or later' : 'You don’t have permission to publish'}>
+          <span tabIndex={canPublish ? undefined : 0}>
+            <Button type="button" disabled={!canPublish} onClick={onPublish}>
+              <RocketIcon /> Publish
+            </Button>
+          </span>
+        </Hint>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button type="button" variant="ghost" size="icon" aria-label="More page actions" title="More page actions">

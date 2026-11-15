@@ -142,7 +142,7 @@ async function mockBackend(page: Page, options: { exists?: boolean } = {}): Prom
     b.published = { version_id: 'v-2', number: 2, published_at: '2026-11-11T09:00:00+00:00' }
     return route.fulfill({ json: envelope({ ...summary(b), content: b.content }) })
   })
-  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/versions`, (route) =>
+  await page.route(`**/api/v1/storefront/builder/documents/${DOC_ID}/versions*`, (route) =>
     route.fulfill({
       json: envelope([
         { id: 'v-2', number: 2, note: 'Eid banners', published_at: '2026-11-11T09:00:00+00:00', created_by: { id: 'u-1', name: 'Nadia Store' }, created_at: '2026-11-11T09:00:00+00:00' },

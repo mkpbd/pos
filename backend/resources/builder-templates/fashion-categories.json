@@ -1,0 +1,41 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "category_strip",
+                            "props": {
+                                "title": "Shop by category",
+                                "subtitle": null,
+                                "config": {
+                                    "source": "top_level",
+                                    "limit": 6
+                                },
+                                "items": []
+                            },
+                            "translations": {
+                                "bn": {
+                                    "title": "ক্যাটাগরি অনুযায়ী কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

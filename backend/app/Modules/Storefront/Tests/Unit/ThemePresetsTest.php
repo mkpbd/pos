@@ -177,6 +177,42 @@ class ThemePresetsTest extends TestCase
         $this->assertSame('standard', ThemeSchema::defaults()['layout']['card_style']);
     }
 
+    /**
+     * B11: the five new looks — distinct names, existing layout options and fonts only (the B10
+     * Bangla fonts on grocery and beauty), and white text readable on their sale and highlight
+     * colours (ribbons and badges).
+     */
+    public function test_the_b11_presets(): void
+    {
+        $this->assertSame(['default', 'vegan', 'handmade', 'classic', 'kids', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture'], ThemePresets::KEYS);
+        $expected = [
+            'fashion' => ['Fashion Boutique', 'playfair', 'poppins', 'square', 0, [1320, 'standard', 'widgets', 'minimal', 'full', 'uppercase', 'ticker']],
+            'electronics' => ['Electronics Store', 'poppins', 'system', 'rounded', 8, [1280, 'commerce', 'columns', 'commerce', 'sale', 'normal', 'utility']],
+            'grocery' => ['Supermarket', 'anek-bangla', 'hind-siliguri', 'rounded', 10, [1280, 'commerce', 'columns', 'standard', 'full', 'normal', 'ticker']],
+            'beauty' => ['Beauty & Cosmetics', 'tiro-bangla', 'jost', 'pill', 20, [1200, 'standard', 'showcase', 'standard', 'tiles', 'normal', 'ticker']],
+            'furniture' => ['Furniture & Home', 'jost', 'poppins', 'square', 2, [1280, 'centered', 'showcase', 'minimal', 'full', 'normal', 'utility']],
+        ];
+        $names = array_map(fn (string $key) => ThemePresets::name($key), ThemePresets::KEYS);
+        $this->assertSame($names, array_values(array_unique($names)));
+        foreach ($expected as $key => [$name, $heading, $body, $button, $radius, $layout]) {
+            $theme = ThemePresets::theme($key);
+            $this->assertSame($name, ThemePresets::name($key));
+            $this->assertGreaterThan(40, mb_strlen(ThemePresets::description($key)));
+            $this->assertSame(['heading_font' => $heading, 'body_font' => $body] + ThemeSchema::defaults()['typography'], $theme['typography'], $key);
+            $this->assertSame([$button, $radius], [$theme['shape']['button_style'], $theme['shape']['card_radius']], $key);
+            $l = $theme['layout'];
+            $this->assertSame($layout, [$l['container_width'], $l['header_style'], $l['footer_style'], $l['card_style'], $l['hero_style'], $l['heading_case'], $l['top_bar']], $key);
+            $c = $theme['colors'];
+            foreach (['white on the sale ribbon' => ['#ffffff', $c['sale']], 'white on the highlight badge' => ['#ffffff', $c['highlight']]] as $label => [$fg, $bg]) {
+                $this->assertGreaterThanOrEqual(4.5, self::contrast($fg, $bg), "{$key}: {$label} ({$fg} on {$bg})");
+            }
+        }
+        $this->assertContains('anek-bangla', ThemeSchema::BANGLA_FONTS);
+        $this->assertContains('tiro-bangla', ThemeSchema::BANGLA_FONTS);
+        // Beauty's blush buttons carry dark plum text (white on blush fails AA).
+        $this->assertLessThan(4.5, self::contrast('#ffffff', ThemePresets::theme('beauty')['colors']['primary']));
+    }
+
     public function test_applying_keeps_the_content(): void
     {
         $current = ThemeSchema::normalize([

@@ -1,13 +1,13 @@
 # Demo image credits
 
-The photos in `backend/database/seeders/demo-themes/images/` exist only to dress the four **demo storefronts** (Green Basket, Mati & Co., Classic Shop and Little Sprouts). They are not product photos of anything we sell and must not be reused as real catalogue imagery.
+The photos in `backend/database/seeders/demo-themes/images/` exist only to dress the nine **demo storefronts** (Green Basket, Mati & Co., Classic Shop, Little Sprouts and, since B11, Loom & Lane, Circuit Bazar, Bazar Fresh, Blush & Bloom and Kath & Home). They are not product photos of anything we sell and must not be reused as real catalogue imagery.
 
 Every image comes from Unsplash or Pexels and is used under that site's licence, both of which allow free commercial use and modification without permission:
 
 - [Unsplash License](https://unsplash.com/license)
 - [Pexels License](https://www.pexels.com/license/)
 
-Attribution is not required by either licence, but we credit every photographer below. Files were cropped and resized (products and category tiles 900×900, banners 1600×700) and re-encoded as JPEG. The machine-readable list (source, photographer, licence, alt text) is `backend/database/seeders/demo-themes/images/manifest.json`.
+Attribution is not required by either licence, but we credit every photographer below. Files were cropped and resized (products and category tiles 900×900, banners 1600×700) and re-encoded as JPEG. The five B11 stores ship ten photos each (900×900, JPEG, at most 200 KB): their banners, category tiles, blog covers and the store builder's site and section templates reuse the product photos, and a few products have no photo. The machine-readable list (source, photographer, licence, alt text) is `backend/database/seeders/demo-themes/images/manifest.json`.
 
 ## Green Basket — vegan preset (`vegan/`)
 
@@ -160,3 +160,78 @@ Products and category tiles 900×900, the two hero banners 1600×700, promo tile
 | `shape-sorter.jpg` | Wooden shape sorter board with colourful blocks | Angie Dutton | Unsplash | [link](https://unsplash.com/photos/E1shiIGT8Oo) |
 | `strawberry-dress.jpg` | Strawberry print children's dress on a hanger | Adriana Chionetti | Unsplash | [link](https://unsplash.com/photos/3lFz3TD68QA) |
 | `walker-sneakers.jpg` | Pair of red canvas baby sneakers with white laces | Steve O'Reilly | Unsplash | [link](https://unsplash.com/photos/HwfuoxlAOls) |
+
+## Loom & Lane — fashion preset (`fashion/`, B11)
+
+| File | Alt text | Photographer | Licence | Source |
+|---|---|---|---|---|
+| `block-heel-sandals.jpg` | Pair of silver ankle-strap block-heel sandals on a rock | Amy Humphries | Unsplash | [link](https://unsplash.com/photos/pair-of-silver-open-toe-ankle-strap-heeled-sandals-on-ground-38RAOXlDT7o) |
+| `block-print-kurti.jpg` | Navy printed cotton kurti with paisley motifs on a mannequin | Zayed Ahmed Zadu | Unsplash | [link](https://unsplash.com/photos/dark-blue-dress-with-paisley-pattern-on-display-dYMt4ug7Vxs) |
+| `bomber-jacket.jpg` | Rust-brown lightweight bomber jacket held up on a hanger | Tobias Tullius | Unsplash | [link](https://unsplash.com/photos/brown-bomber-jacket-on-hanger-Fg15LdqpWrs) |
+| `handloom-saree.jpg` | Handloom saree in red and green with a woven white border | soumya parthasarathy | Unsplash | [link](https://unsplash.com/photos/red-green-and-white-textile-eLOLLINm5ZA) |
+| `leather-loafers.jpg` | Pair of brown leather penny loafers on a black stool | Husien Bisky | Unsplash | [link](https://unsplash.com/photos/a-pair-of-brown-leather-loafers-on-a-stool-xPpfEQe0ZiY) |
+| `leather-satchel.jpg` | Grey leather satchel with gold buckles and a top handle | mostafa mahmoudi | Unsplash | [link](https://unsplash.com/photos/grey-leather-satchel-with-gold-buckles-J4DnKxz_3sA) |
+| `linen-shirt.jpg` | White short-sleeve linen shirt on a wooden hanger | tian dayong | Unsplash | [link](https://unsplash.com/photos/a-white-shirt-hanging-on-a-clothes-line-S4f4apZd-hA) |
+| `pleated-skirt.jpg` | Mint pleated midi skirt swirling as a woman walks along a path | Nina Mercado | Unsplash | [link](https://unsplash.com/photos/woman-in-black-long-sleeve-shirt-and-teal-skirt-walking-on-dirt-road-during-daytime-E5AkWg5mBik) |
+| `silk-scarf.jpg` | Printed scarf with a yellow tropical leaf pattern beside sunglasses and a palm frond | Sama Hosseini | Unsplash | [link](https://unsplash.com/photos/black-sunglasses-on-yellow-and-white-textile-z5UuOcQjXCY) |
+| `wrap-midi-dress.jpg` | White wrap midi dress with a black ink-blot print and tie waist, worn by a model | engin akyurt | Unsplash | [link](https://unsplash.com/photos/woman-in-white-ink-blot-dress-5HGxv4nigtQ) |
+
+## Circuit Bazar — electronics preset (`electronics/`, B11)
+
+| File | Alt text | Photographer | Licence | Source |
+|---|---|---|---|---|
+| `bluetooth-speaker.jpg` | Oval grey portable speaker with a carry strap on a white surface | Lynda Sanchez | Unsplash | [link](https://unsplash.com/photos/oval-grey-portable-speaker-on-white-surface--WB52caEpmI) |
+| `gaming-laptop.jpg` | Gaming laptop keyboard glowing with rainbow RGB backlight in the dark | Dharm Chauhan | Unsplash | [link](https://unsplash.com/photos/a-close-up-of-a-keyboard-in-the-dark-SuJc0LDT0_A) |
+| `mechanical-keyboard.jpg` | Mechanical keyboard with white, teal and coral keycaps | Bruce | Unsplash | [link](https://unsplash.com/photos/a-mechanical-keyboard-with-white-teal-and-coral-keycaps-2BmIqyTdW-I) |
+| `over-ear-headphones.jpg` | Black over-ear headphones lying on a white desk | Sam Grozyan | Unsplash | [link](https://unsplash.com/photos/black-wireless-headphones-on-white-desk-P7KF3cTRKcE) |
+| `security-camera.jpg` | White wireless security camera with two antennas mounted on a wall | Alan J. Hendry | Unsplash | [link](https://unsplash.com/photos/white-surveillance-camera-hanging-on-wall-KNt4zd8HPb0) |
+| `smart-watch.jpg` | Black smart watch with a dark band showing app icons | Auguras Pipiras | Unsplash | [link](https://unsplash.com/photos/black-smart-watch-with-white-background-O43D6CYzxqM) |
+| `smartphone-pro.jpg` | Black smartphone with a blank screen lying on a light wooden surface | Vojtech Bruzek | Unsplash | [link](https://unsplash.com/photos/smartphone-with-blank-screen-on-wood-J82GxqnwKSs) |
+| `tablet-11.jpg` | Tablet with a colourful home screen standing on a white desk | David Švihovec | Unsplash | [link](https://unsplash.com/photos/a-tablet-computer-sitting-on-top-of-a-table-p1B6G7acvZ8) |
+| `ultrabook-14.jpg` | Thin silver laptop open on a wooden desk | Kari Shea | Unsplash | [link](https://unsplash.com/photos/macbook-pro-on-top-of-brown-table-1SAnrIxw5OY) |
+| `wireless-earbuds.jpg` | White wireless earbuds with an open charging case on a grey surface | Andrey Matveev | Unsplash | [link](https://unsplash.com/photos/white-wireless-earbuds-with-charging-case-on-gray-background-clrTR7gDRho) |
+
+## Bazar Fresh — grocery preset (`grocery/`, B11)
+
+| File | Alt text | Photographer | Licence | Source |
+|---|---|---|---|---|
+| `basmati-rice.jpg` | Uncooked long-grain white rice in a metal scoop | Rens D | Unsplash | [link](https://unsplash.com/photos/a-spoon-filled-with-rice-on-top-of-a-table-q5oFM2GYbWM) |
+| `black-tea.jpg` | Milk tea being poured into small clay cups | AJOY DAS | Unsplash | [link](https://unsplash.com/photos/person-pouring-tea-into-small-clay-cups-gXYwwTQ_tZw) |
+| `farm-eggs.jpg` | Brown eggs in a cardboard egg tray | Erol Ahmed | Unsplash | [link](https://unsplash.com/photos/brown-chicken-eggs-in-carton-leOh1CzRZVQ) |
+| `mangoes.jpg` | Ripe yellow mangoes in a woven basket, one cut into cubes | fatemeh zakeri | Unsplash | [link](https://unsplash.com/photos/a-basket-of-yellow-and-green-fruit-lkflaFuiXII) |
+| `mustard-oil.jpg` | Glass bottles of golden cooking oil on a kitchen counter | Stephanie Sarlos | Unsplash | [link](https://unsplash.com/photos/a-group-of-bottles-filled-with-yellow-liquid-BScSk37FviU) |
+| `potatoes.jpg` | A pile of fresh potatoes | Lars Blankers | Unsplash | [link](https://unsplash.com/photos/brown-potato-lot-B0s3Xndk6tw) |
+| `red-lentils.jpg` | Red lentils heaped in a spoon on a bed of lentils | Amna Shoukat | Unsplash | [link](https://unsplash.com/photos/a-spoon-full-of-red-lentils-in-a-blue-bowl-maQN9R9-fIk) |
+| `red-onions.jpg` | Red onions and loose papery skins on a dark red surface | Oriol Portell | Unsplash | [link](https://unsplash.com/photos/a-pile-of-red-onions-sitting-on-top-of-a-table-PNZIcBkVxHY) |
+| `river-fish.jpg` | Whole fresh fish laid out on crushed ice | Tapan Kumar Choudhury | Unsplash | [link](https://unsplash.com/photos/silver-and-red-fish-on-ice-gFrrHuHMpTw) |
+| `whole-spices.jpg` | Cinnamon sticks, star anise, peppercorns and ground spices seen from above | Marion Botella | Unsplash | [link](https://unsplash.com/photos/cinnamon-sticks-and-assorted-culinary-spices-uaHShoIDGeo) |
+
+## Blush & Bloom — beauty preset (`beauty/`, B11)
+
+| File | Alt text | Photographer | Licence | Source |
+|---|---|---|---|---|
+| `argan-hair-oil.jpg` | Three amber dropper bottles of hair oil on a stone ledge beside palm leaves | Lora Seis | Unsplash | [link](https://unsplash.com/photos/a-group-of-bottles-next-to-a-plant-A1vTsRrV9oY) |
+| `clay-mask.jpg` | Small bowl of green clay face mask with an applicator on a pale blue surface | Towfiqu barbhuiya | Unsplash | [link](https://unsplash.com/photos/green-ceramic-round-bowl-on-white-table-0BEqLfQwVzM) |
+| `eau-de-parfum.jpg` | Glass perfume bottle and two small jars casting shadows on a golden surface | Birgith Roosipuu | Unsplash | [link](https://unsplash.com/photos/perfume-bottle-and-cosmetic-jars-nka_sIQpKEU) |
+| `eyeshadow-palette.jpg` | Open eyeshadow palette with warm coral and pink shades on pink fabric | marianela | Unsplash | [link](https://unsplash.com/photos/white-and-brown-eyeshadow-palette-5Us84s7blq8) |
+| `gel-moisturiser.jpg` | Glass jar of face cream with a black lid beside pink carnations on marble | Keity | Unsplash | [link](https://unsplash.com/photos/a-small-jar-of-cream-with-pink-flowers-on-marble-k2JN5zC54zQ) |
+| `handmade-soap.jpg` | Stacked handmade soap bars in green, cream and pink tones | Nigel Hoare | Unsplash | [link](https://unsplash.com/photos/assortment-of-natural-handmade-soap-bars-in-various-colors-lcPRIn9Bq2Y) |
+| `makeup-brushes.jpg` | Set of makeup brushes with black handles fanned out on white | Edz Norton | Unsplash | [link](https://unsplash.com/photos/black-and-brown-makeup-brush-set-PEttXYw9hi8) |
+| `matte-lipstick.jpg` | Three rose and nude lipsticks in silver tubes with crystals on a pink background | Jen Vazquez | Unsplash | [link](https://unsplash.com/photos/three-lipsticks-displayed-with-stones-on-pink-background--NLfVaPLwmQ) |
+| `nail-polish.jpg` | Nail polish bottles in green, blue and purple shades on white | Maria Lupan | Unsplash | [link](https://unsplash.com/photos/a-group-of-five-different-colored-nail-polishes-sp6wzdYJ7QQ) |
+| `vitamin-c-serum.jpg` | Amber serum bottle with a dropper releasing a drop on an orange background | Point Normal | Unsplash | [link](https://unsplash.com/photos/a-bottle-of-liquid-with-a-dropper-on-a-yellow-background-GjJZ5HBl2qQ) |
+
+## Kath & Home — furniture preset (`furniture/`, B11)
+
+| File | Alt text | Photographer | Licence | Source |
+|---|---|---|---|---|
+| `accent-armchair.jpg` | Mustard yellow accent armchair on a wooden floor in a bright room | Kam Idris | Unsplash | [link](https://unsplash.com/photos/brown-wooden-framed-yellow-padded-chair-_HqHX3LBN18) |
+| `ceramic-vase.jpg` | Set of ceramic vases in neutral tones on a wooden surface | Chloe Bolton | Unsplash | [link](https://unsplash.com/photos/ceramic-vases-on-wooden-surface-R0qthXq3jec) |
+| `coffee-table.jpg` | Round light oak coffee table with a ceramic table lamp on a textured rug | Lasse Jensen | Unsplash | [link](https://unsplash.com/photos/brown-wooden-table-with-white-ceramic-vase-on-top-7rvkxLAraU8) |
+| `dining-chair.jpg` | Simple wooden dining chair with a light cushioned seat | syahmi syahir | Unsplash | [link](https://unsplash.com/photos/a-simple-wooden-chair-with-a-white-cushion-JSUUbTs_UZ0) |
+| `dining-table.jpg` | Long wooden dining table with wooden armchairs under pendant lights | Jonathan Borba | Unsplash | [link](https://unsplash.com/photos/a-dining-room-with-a-table-and-chairs-Uaf1g970Hrk) |
+| `jute-rug.jpg` | Half-rolled round jute rug with a scalloped cream border on a wooden floor | MKMHomes Craft | Unsplash | [link](https://unsplash.com/photos/half-rolled-circular-rug-with-scalloped-edge-on-wooden-floor-uxHwYYWu5Sk) |
+| `pendant-lamp.jpg` | Woven rattan pendant lamp casting a shadow on a wall | Pavel Karagodin | Unsplash | [link](https://unsplash.com/photos/rattan-pendant-lamp-with-wall-shadow-NmHxbm3xcrI) |
+| `platform-bed.jpg` | Low wooden platform bed with mauve bedding below a gallery wall | laura adai | Unsplash | [link](https://unsplash.com/photos/a-bed-sitting-in-a-bedroom-next-to-a-window-J60bPeDiR8A) |
+| `three-seater-sofa.jpg` | Light beige fabric sofa with textured and green cushions beside a wooden side table | Aleksandra Dementeva | Unsplash | [link](https://unsplash.com/photos/a-beige-sofa-with-decorative-pillows-and-a-side-table-pYqXT6hoRbQ) |
+| `work-desk.jpg` | Wooden writing desk with a lamp and swivel chair by a window with blinds | Annie Spratt | Unsplash | [link](https://unsplash.com/photos/wooden-desk-with-model-ship-and-lamp-by-window-Rjp8UxEIJ38) |

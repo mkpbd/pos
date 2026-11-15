@@ -16,8 +16,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { useCan } from '@/features/auth/use-auth'
+import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useMediaLookup } from '@/features/media/api'
+import { cn } from '@/lib/utils'
 import { loadFont } from '@/storefront/font-loader'
 import { MediaField, MediaPicker, MediaThumb } from '@/features/media/components/media-picker'
 import {
@@ -35,7 +36,6 @@ import {
   type ThemeVersion,
   useApplyThemePresetMutation,
   useDiscardThemeDraftMutation,
-  usePublishThemeMutation,
   useRestoreThemeVersionMutation,
   useSaveCustomCssMutation,
   useSaveThemeDraftMutation,
@@ -53,6 +53,9 @@ import { ANNOUNCEMENT_TEXT_MAX, THEME_FIELDS, themeSchema, toDocument, toFormVal
 import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
 import { rhfBnErrors, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
+import { themeScheduleOf, useThemePublishing } from '@/features/store-builder/publishing-api'
+import { formatStoreTime } from '@/features/store-builder/publishing/schedule-time'
+import { ScheduleChip } from '@/features/store-builder/publishing/status-chips'
 
 /** Without a store domain (no `preview_url`): the store's home page on this host, showing the saved draft theme to staff. */
 const DRAFT_PREVIEW_URL = '/?preview=draft'
@@ -134,7 +137,10 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
   const { control, register } = form
   const queryClient = useQueryClient()
   const save = useSaveThemeDraftMutation()
-  const publish = usePublishThemeMutation()
+  // B11: publish now or later; the planned publish shows in the status bar.
+  const { publish, schedule: scheduleMutation, cancel: cancelMutation } = useThemePublishing()
+  const timeZone = useAuth().organization?.timezone
+  const themeSchedule = themeScheduleOf(draft)
   const discard = useDiscardThemeDraftMutation()
   const restore = useRestoreThemeVersionMutation()
   const [conflict, setConflict] = useState<ThemeFormValues | null>(null)
@@ -228,14 +234,36 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
     else window.open(url, '_blank', 'noopener')
   }
 
-  const onPublish = async (note: string | null) => {
+  const onPublish = async (note: string | null, options: { cancelSchedule?: boolean } = {}) => {
     if (!(await saveIfDirty())) return
     try {
-      await publish.mutateAsync(note)
+      await publish.mutateAsync({ note, ...options })
       setPublishing(false)
       toast.success('Theme published. Your store shows it now.')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not publish the theme.')
+    }
+  }
+
+  /** B11 "Publish later": the saved draft goes live at `publishAt` (it replaces a pending plan). */
+  const onSchedule = async (publishAt: string, note: string | null) => {
+    if (!(await saveIfDirty())) return
+    try {
+      const result = await scheduleMutation.mutateAsync({ publish_at: publishAt, note })
+      setPublishing(false)
+      toast.success(`Scheduled. The theme goes live on ${formatStoreTime(themeScheduleOf(result)?.publish_at ?? publishAt, timeZone)}, as it is now.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not schedule the theme.')
+    }
+  }
+
+  const onCancelSchedule = async () => {
+    try {
+      await cancelMutation.mutateAsync()
+      toast.success(`Cancelled. The theme won’t go live on ${formatStoreTime(themeSchedule?.publish_at, timeZone)}.`)
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'NOTHING_SCHEDULED') toast.info('Nothing is planned any more — it may have gone live or been cancelled already.')
+      else toast.error(error instanceof Error ? error.message : 'It couldn’t be cancelled. Try again.')
     }
   }
 
@@ -289,7 +317,7 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
     }
   }
 
-  const busy = save.isPending || publish.isPending || discard.isPending || resolving
+  const busy = save.isPending || publish.isPending || scheduleMutation.isPending || cancelMutation.isPending || discard.isPending || resolving
   const status = isDirty ? 'unsaved' : draft.has_unpublished_changes ? 'draft' : 'live'
 
   return (
@@ -301,6 +329,9 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
             ? 'Your store shows this theme.'
             : 'You are editing a draft. Shoppers keep seeing the live theme until you publish.'}
           {draft.published && ` Live: version ${draft.published.number}.`}
+        </span>
+        <span className="ml-auto">
+          <ScheduleChip schedule={themeSchedule} timeZone={timeZone} canChange={canManage && canPublish} noun="theme" onCancel={onCancelSchedule} onReschedule={() => setPublishing(true)} />
         </span>
       </div>
 
@@ -476,7 +507,14 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
         )}
       </div>
 
-      <ThemePublishDialog open={publishing} onOpenChange={setPublishing} pending={busy} unsaved={isDirty} onPublish={(note) => void onPublish(note)} />
+      <ThemePublishDialog
+        open={publishing}
+        onOpenChange={setPublishing}
+        pending={busy}
+        unsaved={isDirty}
+        onPublish={(note, options) => void onPublish(note, options)}
+        later={canPublish ? { timeZone, current: themeSchedule, onSchedule: (at, note) => void onSchedule(at, note) } : undefined}
+      />
       <ThemeConflictDialog open={conflict !== null} pending={resolving} onChoose={(choice) => void onConflict(choice)} />
       <ThemeVersionsDialog open={history} onOpenChange={setHistory} liveNumber={draft.published?.number ?? null} canRestore={canManage} onRestore={onRestore} />
       <ConfirmDialog
@@ -501,6 +539,14 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
 }
 
 const PREVIEW_SWATCHES = ['primary', 'accent', 'highlight', 'sale', 'heading', 'canvas'] as const
+
+/** B11: ten presets (default + nine demo looks) as 2 × 5 on wide screens; never a row with one card. */
+function presetColumns(count: number): string {
+  if (count % 5 === 0) return 'sm:grid-cols-2 xl:grid-cols-5'
+  if (count % 4 === 0) return 'sm:grid-cols-2 xl:grid-cols-4'
+  if (count % 3 === 0) return 'sm:grid-cols-3'
+  return 'sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5'
+}
 
 /** A preset as a selectable card: a miniature of its colours, heading font and buttons. */
 function PresetOption({ preset, checked, current, disabled, onSelect }: { preset: ThemePreset; checked: boolean; current: boolean; disabled: boolean; onSelect: () => void }) {
@@ -597,7 +643,7 @@ function PresetCard({ draft, canManage }: { draft: ThemeDraft; canManage: boolea
         ) : presets.error ? (
           <ErrorState error={presets.error} onRetry={() => presets.refetch()} />
         ) : (
-          <div role="radiogroup" aria-label="Theme presets" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+          <div role="radiogroup" aria-label="Theme presets" className={cn('grid gap-4', presetColumns(presets.data.length))}>
             {presets.data.map((preset) => (
               <PresetOption key={preset.key} preset={preset} checked={selected === preset.key} current={current === preset.key} disabled={!canManage || apply.isPending} onSelect={() => setSelected(preset.key)} />
             ))}

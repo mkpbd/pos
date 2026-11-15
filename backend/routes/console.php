@@ -40,5 +40,8 @@ Schedule::command('ai:daily-insights')->everyThirtyMinutes()->withoutOverlapping
 // P2b: scheduled Facebook / Instagram posts go out when due (each target once); interrupted ones are recovered.
 Schedule::command('social:publish-due')->everyMinute()->withoutOverlapping();
 
+// B11: store builder pages and themes scheduled to "publish later" go live when due (each schedule once).
+Schedule::command('storefront:publish-scheduled')->everyMinute()->withoutOverlapping();
+
 // Unpaid bank-transfer web orders are cancelled (and restocked) when their payment hold runs out.
 Schedule::command('orders:expire-pending')->everyMinute()->withoutOverlapping();

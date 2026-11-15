@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { MenuLink } from '../components/menu-link'
 import { isLightColor } from '../color'
+import { pictureFocal } from '../focal'
 import type { StoreBanner } from '../types'
 import { useBannerButtonColors } from './banner-colors'
 
@@ -16,6 +17,8 @@ const POSITION = {
  */
 export function BannerPicture({ banner, sizes, priority = false, className }: { banner: StoreBanner; sizes: string; priority?: boolean; className?: string }) {
   const { image, mobile_image: mobile } = banner
+  // B11: each picture's own focal point; the mobile one applies where its <source> does.
+  const focal = pictureFocal(image, mobile)
 
   return (
     <picture>
@@ -30,7 +33,8 @@ export function BannerPicture({ banner, sizes, priority = false, className }: { 
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : undefined}
         decoding="async"
-        className={cn('size-full object-cover', className)}
+        className={cn('size-full object-cover', focal?.className, className)}
+        style={focal?.style}
       />
     </picture>
   )

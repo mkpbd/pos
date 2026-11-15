@@ -1,6 +1,7 @@
 /** GET /api/v1/store/bootstrap — see backend Storefront\Application\Queries\StorefrontBootstrap. */
 
 import type { BootstrapBuilder, BuilderPage, ProductZoneKey } from './builder/types'
+import type { ThemePresetKey } from './demos/presets'
 import type { Attribution } from './landing/attribution'
 
 /**
@@ -16,6 +17,8 @@ export type MediaRef = {
   width: number
   height: number
   alt: string | null
+  /** B11: focal point in percent for `object-position` (see ./focal.ts); null/absent = centre. */
+  focal?: { x: number; y: number } | null
 }
 
 export type ThemeColors = {
@@ -105,7 +108,8 @@ export type BanglaTypography = {
 export type ButtonStyle = 'pill' | 'rounded' | 'square'
 
 /* Theme presets and layout variants (T1, STOREFRONT_THEMES_PLAN §3.1): presentation only. */
-export type ThemePreset = 'default' | 'vegan' | 'handmade' | 'classic' | 'kids'
+/** The preset keys are listed once, in demos/presets.ts (B11: nine demo looks plus `default`). */
+export type ThemePreset = ThemePresetKey
 export type HeaderStyle = 'standard' | 'centered' | 'commerce'
 export type FooterStyle = 'columns' | 'showcase' | 'widgets'
 export type CardStyle = 'standard' | 'minimal' | 'commerce' | 'arched'

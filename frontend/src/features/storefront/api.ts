@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
+import { THEME_PRESET_KEYS, type ThemePresetKey } from '@/storefront/demos/presets'
 import { BANGLA_FONTS, BODY_FONT_KEYS, HEADING_FONT_KEYS } from '@/storefront/fonts'
 import type { BanglaRoleFont, BanglaTypography, BodyFont, CustomFontKey, HeadingFont, ThemeFonts } from '@/storefront/types'
 
@@ -70,8 +71,9 @@ export type ThemeTypography = { heading_font: HeadingFont; body_font: BodyFont }
 export const BUTTON_STYLES = ['pill', 'rounded', 'square'] as const
 
 /* Theme presets and layout variants (T1); the first value of each list is today's look. */
-export const THEME_PRESETS = ['default', 'vegan', 'handmade', 'classic', 'kids'] as const
-export type ThemePresetKey = (typeof THEME_PRESETS)[number]
+/** B11: listed once in storefront/demos/presets.ts (`default` + nine demo looks). */
+export const THEME_PRESETS = THEME_PRESET_KEYS
+export type { ThemePresetKey }
 export const LAYOUT_OPTIONS = {
   header_style: ['standard', 'centered', 'commerce'],
   footer_style: ['columns', 'showcase', 'widgets'],

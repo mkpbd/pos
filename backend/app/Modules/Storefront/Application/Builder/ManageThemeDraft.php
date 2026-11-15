@@ -120,28 +120,64 @@ class ManageThemeDraft
     {
         return DB::transaction(function () use ($note) {
             $document = $this->document();
-            $draft = $this->settings($document);
 
-            if (! BuilderVersion::query()->where('document_id', $document->id)->exists()) {
-                $live = $this->config->theme();
-                $this->version($document, $live->settings, self::FIRST_VERSION_NOTE, $live->updated_at ?? CarbonImmutable::now(), null);
-            }
-
-            $theme = $this->save->settings($draft);
-            $version = $this->version($document, $theme->settings, $note, CarbonImmutable::now(), StaffActor::id());
-
-            $before = $document->published_version_id;
-            $document->published_version_id = $version->id;
-            $document->draft = $theme->settings;
-            $document->save();
-
-            $this->audit->record('storefront.theme_published', $document, ['published_version_id' => $before], [
-                'published_version_id' => $version->id,
-                'number' => $version->number,
-            ], ['note' => $version->note]);
-
-            return $document->load('publishedVersion');
+            return $this->publishSettings($document, $this->settings($document), $note, BuilderVersion::VIA_MANUAL, [], true);
         });
+    }
+
+    /**
+     * B11: makes a theme snapshot taken earlier (a schedule's) the live theme; the draft stays as
+     * it is. Media or custom fonts deleted since are 422 MEDIA_NOT_FOUND / FONT_NOT_FOUND and
+     * nothing is published.
+     *
+     * @param  array<string, mixed>  $settings
+     * @param  array<string, mixed>  $context  for the audit
+     */
+    public function publishSnapshot(array $settings, ?string $note, string $via, array $context = []): BuilderDocument
+    {
+        return DB::transaction(fn () => $this->publishSettings($this->document(), $settings, $note, $via, $context, false));
+    }
+
+    /**
+     * B11: the theme document for a schedule (created from the live theme when missing), locked
+     * for the transaction, and the draft settings to snapshot.
+     *
+     * @return array{document: BuilderDocument, settings: array<string, mixed>}
+     */
+    public function lockedDraft(): array
+    {
+        $document = $this->document();
+
+        return ['document' => $document, 'settings' => $this->settings($document)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @param  array<string, mixed>  $context
+     */
+    private function publishSettings(BuilderDocument $document, array $settings, ?string $note, string $via, array $context, bool $syncDraft): BuilderDocument
+    {
+        if (! BuilderVersion::query()->where('document_id', $document->id)->exists()) {
+            $live = $this->config->theme();
+            $this->version($document, $live->settings, self::FIRST_VERSION_NOTE, $live->updated_at ?? CarbonImmutable::now(), null, null);
+        }
+
+        $theme = $this->save->settings($settings);
+        $version = $this->version($document, $theme->settings, $note, CarbonImmutable::now(), StaffActor::id(), $via);
+
+        $before = $document->published_version_id;
+        $document->published_version_id = $version->id;
+        if ($syncDraft) {
+            $document->draft = $theme->settings;
+        }
+        $document->save();
+
+        $this->audit->record('storefront.theme_published', $document, ['published_version_id' => $before], [
+            'published_version_id' => $version->id,
+            'number' => $version->number,
+        ], ['note' => $version->note] + ($via === BuilderVersion::VIA_MANUAL ? [] : ['via' => $via]) + $context);
+
+        return $document->load('publishedVersion');
     }
 
     /**
@@ -248,10 +284,12 @@ class ManageThemeDraft
     /**
      * @param  array<string, mixed>  $settings
      */
-    private function version(BuilderDocument $document, array $settings, ?string $note, DateTimeInterface $publishedAt, ?string $createdBy): BuilderVersion
+    private function version(BuilderDocument $document, array $settings, ?string $note, DateTimeInterface $publishedAt, ?string $createdBy, ?string $via): BuilderVersion
     {
         return BuilderVersion::query()->create([
             'document_id' => $document->id,
+            'kind' => BuilderVersion::KIND_VERSION,
+            'via' => $via,
             'number' => (int) BuilderVersion::query()->where('document_id', $document->id)->max('number') + 1,
             'schema_version' => 1,
             'content' => $settings,

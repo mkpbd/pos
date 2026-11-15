@@ -1,0 +1,1112 @@
+{
+    "schema_version": 1,
+    "theme": {
+        "preset": "furniture"
+    },
+    "parts": {
+        "home": {
+            "sections": [
+                {
+                    "id": "s_1",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_1",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_1",
+                                    "type": "hero_slider",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "autoplay_seconds": 6,
+                                            "height": "large"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Living room",
+                                                    "kicker": "Made in Bangladesh",
+                                                    "title": "Furniture for slow evenings",
+                                                    "subtitle": "Solid wood and natural fabrics, delivered and assembled at home.",
+                                                    "button_label": "Shop living room",
+                                                    "link_url": "/category/living-room",
+                                                    "secondary_button_label": "Our workshop",
+                                                    "secondary_link_url": "/pages/about-us",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "furniture/three-seater-sofa.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "বাংলাদেশে তৈরি",
+                                                            "title": "ধীর সন্ধ্যার আসবাব",
+                                                            "subtitle": "খাঁটি কাঠ আর প্রাকৃতিক কাপড়, বাড়িতে পৌঁছে জোড়া লাগিয়ে দেওয়া হয়।",
+                                                            "button_label": "বসার ঘর",
+                                                            "secondary_button_label": "আমাদের কারখানা"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "hero_slider",
+                                                    "name": "Dining",
+                                                    "kicker": "Up to 10 % off",
+                                                    "title": "Gather round the table",
+                                                    "subtitle": "Dining tables and chairs for long family meals.",
+                                                    "button_label": "Shop dining",
+                                                    "link_url": "/category/dining",
+                                                    "text_color": "#ffffff",
+                                                    "text_position": "left",
+                                                    "image": {
+                                                        "asset": "furniture/dining-table.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "১০ % পর্যন্ত ছাড়",
+                                                            "title": "টেবিল ঘিরে সবাই",
+                                                            "subtitle": "পরিবারের দীর্ঘ খাবারের জন্য ডাইনিং টেবিল আর চেয়ার।",
+                                                            "button_label": "ডাইনিং দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_2",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_2",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_2",
+                                    "type": "category_strip",
+                                    "props": {
+                                        "title": "Shop by room",
+                                        "subtitle": null,
+                                        "config": {
+                                            "source": "top_level",
+                                            "limit": 6
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ঘর অনুযায়ী কিনুন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_3",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_3",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_3",
+                                    "type": "product_grid",
+                                    "props": {
+                                        "title": "New arrivals",
+                                        "subtitle": "Fresh from the workshop",
+                                        "config": {
+                                            "source": "new_arrivals",
+                                            "category_id": null,
+                                            "limit": 8,
+                                            "columns": 4,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "নতুন এসেছে",
+                                            "subtitle": "কারখানা থেকে সদ্য"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_4",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_4",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_4",
+                                    "type": "banner_grid",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "layout": "3-col"
+                                        },
+                                        "items": [
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Bedroom",
+                                                    "kicker": "Bedroom",
+                                                    "title": "Calm nights start here",
+                                                    "button_label": "Shop bedroom",
+                                                    "link_url": "/category/bedroom",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "furniture/platform-bed.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "শোবার ঘর",
+                                                            "title": "শান্ত রাতের শুরু এখানে",
+                                                            "button_label": "দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Home office",
+                                                    "kicker": "Home office",
+                                                    "title": "A desk you will love",
+                                                    "button_label": "Shop desks",
+                                                    "link_url": "/category/home-office",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "furniture/work-desk.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "হোম অফিস",
+                                                            "title": "পছন্দের একটি ডেস্ক",
+                                                            "button_label": "দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "item_type": "banner",
+                                                "banner": {
+                                                    "placement": "home_promo",
+                                                    "name": "Lighting",
+                                                    "kicker": "Lighting",
+                                                    "title": "Warm light, woven by hand",
+                                                    "button_label": "Shop lighting",
+                                                    "link_url": "/category/lighting",
+                                                    "text_color": "#ffffff",
+                                                    "image": {
+                                                        "asset": "furniture/pendant-lamp.jpg"
+                                                    },
+                                                    "translations": {
+                                                        "bn": {
+                                                            "kicker": "আলো",
+                                                            "title": "হাতে বোনা উষ্ণ আলো",
+                                                            "button_label": "দেখুন"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_5",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_5",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_5",
+                                    "type": "rich_text",
+                                    "props": {
+                                        "title": "Made by hand in Tejgaon",
+                                        "subtitle": null,
+                                        "config": {
+                                            "alignment": "center",
+                                            "body_html": "<p>Every table, bed and desk is made by our carpenters from seasoned wood, then delivered and assembled at your home. Read <a href=\"/pages/about-us\">our story</a> or see the <a href=\"/pages/faq\">FAQ</a>.</p>"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "তেজগাঁওয়ে হাতে তৈরি",
+                                            "body_html": "<p>প্রতিটি টেবিল, খাট আর ডেস্ক আমাদের কাঠমিস্ত্রিরা শুকানো কাঠ দিয়ে তৈরি করেন, তারপর বাড়িতে পৌঁছে জোড়া লাগিয়ে দেন। পড়ুন <a href=\"/pages/about-us\">আমাদের গল্প</a> অথবা দেখুন <a href=\"/pages/faq\">প্রশ্নোত্তর</a>।</p>"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_6",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_6",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_6",
+                                    "type": "hot_deals",
+                                    "props": {
+                                        "title": "Home week",
+                                        "subtitle": "10 % off four pieces",
+                                        "config": {
+                                            "limit": 4,
+                                            "view_all_url": "/shop",
+                                            "promotion_id": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "হোম সপ্তাহ",
+                                            "subtitle": "চারটি পণ্যে ১০ % ছাড়"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_7",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_7",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_7",
+                                    "type": "product_carousel",
+                                    "props": {
+                                        "title": "Most loved",
+                                        "subtitle": "Pieces our customers come back for",
+                                        "config": {
+                                            "source": "best_sellers",
+                                            "limit": 8,
+                                            "view_all_url": "/shop"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "সবচেয়ে প্রিয়",
+                                            "subtitle": "ক্রেতারা বারবার যা কেনেন"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_8",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_8",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_8",
+                                    "type": "features_strip",
+                                    "props": {
+                                        "title": null,
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "icon": "truck",
+                                                    "title": "Delivery and assembly",
+                                                    "text": "Free in Dhaka over ৳20,000"
+                                                },
+                                                {
+                                                    "icon": "shield-check",
+                                                    "title": "1-year warranty",
+                                                    "text": "On frames and joints"
+                                                },
+                                                {
+                                                    "icon": "credit-card",
+                                                    "title": "Cash on delivery",
+                                                    "text": "Or bank transfer"
+                                                },
+                                                {
+                                                    "icon": "store",
+                                                    "title": "Visit the workshop",
+                                                    "text": "Tejgaon, 10 am to 7 pm"
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_9",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_9",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_9",
+                                    "type": "testimonials",
+                                    "props": {
+                                        "title": "In our customers' homes",
+                                        "subtitle": null,
+                                        "config": {
+                                            "items": [
+                                                {
+                                                    "quote": "The dining table is beautiful and solid. The team assembled it in twenty minutes and cleaned up after.",
+                                                    "name": "Shamima K.",
+                                                    "role": "Bashundhara",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Our sofa is deep and comfortable, and the linen cover washes well.",
+                                                    "name": "Faisal R.",
+                                                    "role": "Gulshan",
+                                                    "rating": 5
+                                                },
+                                                {
+                                                    "quote": "Lovely jute rug. Delivery took a little longer than promised, but it was worth the wait.",
+                                                    "name": "Nusrat J.",
+                                                    "role": "Chattogram",
+                                                    "rating": 4
+                                                }
+                                            ],
+                                            "background": null
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ক্রেতাদের ঘরে"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_10",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_10",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_10",
+                                    "type": "blog_posts",
+                                    "props": {
+                                        "title": "Home notes",
+                                        "subtitle": null,
+                                        "config": {
+                                            "limit": 3,
+                                            "view_all_url": "/blog"
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "ঘরের কথা"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_11",
+                    "type": "section",
+                    "props": {
+                        "layout": "full-bleed"
+                    },
+                    "columns": [
+                        {
+                            "id": "c_11",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_11",
+                                    "type": "newsletter",
+                                    "props": {
+                                        "title": "Letters from the workshop",
+                                        "subtitle": null,
+                                        "config": {
+                                            "text": "New pieces, care tips and workshop news, once a month. Unsubscribe any time.",
+                                            "button_label": "Subscribe",
+                                            "background": "#2f4a3a",
+                                            "foreground": "#ffffff",
+                                            "image_media_id": {
+                                                "asset": "furniture/ceramic-vase.jpg"
+                                            }
+                                        },
+                                        "items": []
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "কারখানা থেকে চিঠি",
+                                            "text": "নতুন পণ্য, যত্নের টিপস আর কারখানার খবর, মাসে একবার। যেকোনো সময় বন্ধ করা যায়।",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "header": {
+            "sections": [
+                {
+                    "id": "s_12",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "layout": {
+                                "align": "center"
+                            },
+                            "spacing": {
+                                "padding": {
+                                    "top": "20px",
+                                    "bottom": "12px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_12",
+                            "type": "column",
+                            "width": {
+                                "base": 30
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_12",
+                                    "type": "search_box",
+                                    "props": {
+                                        "placeholder": "Search sofas, tables, lamps…",
+                                        "button_label": ""
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "placeholder": "সোফা, টেবিল, বাতি খুঁজুন…"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_13",
+                            "type": "column",
+                            "width": {
+                                "base": 40
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_13",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 56,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_14",
+                            "type": "column",
+                            "width": {
+                                "base": 12
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_14",
+                                    "type": "language_switch",
+                                    "props": {
+                                        "style": "links"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_15",
+                            "type": "column",
+                            "width": {
+                                "base": 6
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_15",
+                                    "type": "account_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_16",
+                            "type": "column",
+                            "width": {
+                                "base": 6
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_16",
+                                    "type": "wishlist_link",
+                                    "props": {
+                                        "show_label": false
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_17",
+                            "type": "column",
+                            "width": {
+                                "base": 6
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_17",
+                                    "type": "cart_icon",
+                                    "props": {
+                                        "show_count": true,
+                                        "show_total": false
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_13",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "0px",
+                                    "bottom": "12px"
+                                }
+                            }
+                        }
+                    },
+                    "when_menu": "main",
+                    "columns": [
+                        {
+                            "id": "c_18",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_18",
+                                    "type": "divider",
+                                    "props": {
+                                        "line": "solid",
+                                        "thickness": 1,
+                                        "width": 100,
+                                        "color": "theme:border",
+                                        "align": "center"
+                                    }
+                                },
+                                {
+                                    "id": "e_19",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "main",
+                                        "layout": "horizontal",
+                                        "show_children": "dropdown"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "sections": [
+                {
+                    "id": "s_14",
+                    "type": "section",
+                    "props": {
+                        "layout": "full"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "48px",
+                                    "bottom": "48px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "theme:accent"
+                            },
+                            "color": "theme:accent_foreground"
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "32px",
+                                    "bottom": "32px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_19",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_20",
+                                    "type": "newsletter_form",
+                                    "props": {
+                                        "title": "Letters from the workshop",
+                                        "text": "New pieces and care tips, once a month.",
+                                        "button_label": "Subscribe",
+                                        "layout": "inline"
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "title": "কারখানা থেকে চিঠি",
+                                            "button_label": "সাবস্ক্রাইব"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_15",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "56px",
+                                    "bottom": "32px"
+                                }
+                            },
+                            "layout": {
+                                "gap": "32px"
+                            }
+                        },
+                        "mobile": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "40px",
+                                    "bottom": "24px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_20",
+                            "type": "column",
+                            "width": {
+                                "base": 40,
+                                "tablet": 100,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_21",
+                                    "type": "logo",
+                                    "props": {
+                                        "height": 48,
+                                        "link": {
+                                            "url": "/"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_22",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Solid wood furniture made in our Tejgaon workshop, delivered and assembled at your home.</p>"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_21",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_23",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Information",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "তথ্য"
+                                        }
+                                    },
+                                    "when_menu": "footer"
+                                },
+                                {
+                                    "id": "e_24",
+                                    "type": "menu",
+                                    "props": {
+                                        "menu_ref": "footer",
+                                        "layout": "vertical",
+                                        "show_children": "none"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_22",
+                            "type": "column",
+                            "width": {
+                                "base": 30,
+                                "tablet": 50,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_25",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Visit the workshop",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "কারখানায় আসুন"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_26",
+                                    "type": "contact_block",
+                                    "props": {
+                                        "show_phone": true,
+                                        "show_email": true,
+                                        "show_address": true,
+                                        "layout": "stacked"
+                                    }
+                                },
+                                {
+                                    "id": "e_27",
+                                    "type": "social_icons",
+                                    "props": {
+                                        "size": 22,
+                                        "style": "plain",
+                                        "color": null
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "s_16",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "16px",
+                                    "bottom": "24px"
+                                }
+                            },
+                            "layout": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_23",
+                            "type": "column",
+                            "width": {
+                                "base": 60,
+                                "mobile": 100
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_28",
+                                    "type": "copyright",
+                                    "props": {
+                                        "text": null
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "c_24",
+                            "type": "column",
+                            "width": {
+                                "base": 40,
+                                "mobile": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "justify": "end"
+                                    }
+                                },
+                                "mobile": {
+                                    "layout": {
+                                        "justify": "start"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_29",
+                                    "type": "payment_icons",
+                                    "props": {
+                                        "height": 22
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "listing_top": {
+            "sections": [
+                {
+                    "id": "s_17",
+                    "type": "section",
+                    "props": {
+                        "layout": "boxed"
+                    },
+                    "style": {
+                        "base": {
+                            "spacing": {
+                                "padding": {
+                                    "top": "28px",
+                                    "bottom": "28px"
+                                },
+                                "margin": {
+                                    "bottom": "24px"
+                                }
+                            },
+                            "background": {
+                                "type": "color",
+                                "color": "#ece5d8"
+                            },
+                            "border": {
+                                "radius": {
+                                    "tl": "2px",
+                                    "tr": "2px",
+                                    "br": "2px",
+                                    "bl": "2px"
+                                }
+                            }
+                        }
+                    },
+                    "columns": [
+                        {
+                            "id": "c_25",
+                            "type": "column",
+                            "width": {
+                                "base": 100
+                            },
+                            "style": {
+                                "base": {
+                                    "typography": {
+                                        "align": "center"
+                                    }
+                                }
+                            },
+                            "elements": [
+                                {
+                                    "id": "e_30",
+                                    "type": "heading",
+                                    "props": {
+                                        "text": "Made by hand, delivered and assembled",
+                                        "level": 2,
+                                        "link": null
+                                    },
+                                    "translations": {
+                                        "bn": {
+                                            "text": "হাতে তৈরি, বাড়িতে জোড়া লাগানো"
+                                        }
+                                    }
+                                },
+                                {
+                                    "id": "e_31",
+                                    "type": "text",
+                                    "props": {
+                                        "html": "<p>Free delivery and assembly in Dhaka over ৳20,000. One-year warranty on all furniture.</p>"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

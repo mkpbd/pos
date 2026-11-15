@@ -4,6 +4,8 @@ use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderAiController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderPublishingController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderReviewController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
 use App\Modules\Storefront\Presentation\Http\Controllers\CustomFontController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
@@ -69,6 +71,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::put('theme', [StorefrontAdminController::class, 'updateTheme'])->middleware('can:storefront.publish');
         Route::put('theme/draft', [ThemeDraftController::class, 'save']);
         Route::post('theme/publish', [ThemeDraftController::class, 'publish'])->middleware('can:storefront.publish');
+        // B11: publish the theme draft later.
+        Route::post('theme/schedule', [ThemeDraftController::class, 'schedule'])->middleware('can:storefront.publish');
+        Route::delete('theme/schedule', [ThemeDraftController::class, 'cancelSchedule'])->middleware('can:storefront.publish');
         Route::post('theme/discard', [ThemeDraftController::class, 'discard']);
         Route::post('theme/versions/{version}/restore', [ThemeDraftController::class, 'restore'])->whereUuid('version');
         // B3: applies to the draft.
@@ -116,6 +121,10 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::get('documents/{document}', [BuilderDocumentController::class, 'show'])->whereUuid('document');
         Route::get('documents/{document}/versions', [BuilderDocumentController::class, 'versions'])->whereUuid('document');
         Route::get('documents/{document}/render', [BuilderDocumentController::class, 'render'])->whereUuid('document');
+        // B11: a version's / checkpoint's render and the change list between two snapshots.
+        Route::get('documents/{document}/versions/{version}/render', [BuilderPublishingController::class, 'renderVersion'])
+            ->whereUuid(['document', 'version'])->scopeBindings();
+        Route::get('documents/{document}/compare', [BuilderPublishingController::class, 'compare'])->whereUuid('document');
         // B2: the editor canvas — the store bootstrap of the staff member's own organization.
         Route::get('canvas-context', [BuilderDocumentController::class, 'canvasContext']);
         // B5: built-in and own templates (no content).
@@ -135,6 +144,20 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
             ->whereUuid(['document', 'version'])->scopeBindings();
         Route::delete('documents/{document}', [BuilderDocumentController::class, 'destroy'])->whereUuid('document');
+        // B11: publish later (storefront.publish), draft checkpoints and version names, reviews.
+        Route::post('documents/{document}/schedule', [BuilderPublishingController::class, 'schedule'])->whereUuid('document')->middleware('can:storefront.publish');
+        Route::delete('documents/{document}/schedule', [BuilderPublishingController::class, 'cancelSchedule'])->whereUuid('document')->middleware('can:storefront.publish');
+        Route::post('documents/{document}/checkpoints', [BuilderPublishingController::class, 'checkpoint'])->whereUuid('document');
+        Route::patch('documents/{document}/versions/{version}', [BuilderPublishingController::class, 'renameVersion'])
+            ->whereUuid(['document', 'version'])->scopeBindings();
+        Route::delete('documents/{document}/versions/{version}', [BuilderPublishingController::class, 'deleteVersion'])
+            ->whereUuid(['document', 'version'])->scopeBindings();
+        Route::post('documents/{document}/reviews', [BuilderPublishingController::class, 'submitReview'])->whereUuid('document');
+        Route::get('reviews', [BuilderReviewController::class, 'index']);
+        Route::get('reviews/{review}', [BuilderReviewController::class, 'show'])->whereUuid('review');
+        Route::post('reviews/{review}/approve', [BuilderReviewController::class, 'approve'])->whereUuid('review')->middleware('can:storefront.publish');
+        Route::post('reviews/{review}/send-back', [BuilderReviewController::class, 'sendBack'])->whereUuid('review')->middleware('can:storefront.publish');
+        Route::post('reviews/{review}/withdraw', [BuilderReviewController::class, 'withdraw'])->whereUuid('review');
         // A banner of the page, edited in place or copied when anything else shows it (copy-on-write).
         Route::post('documents/{document}/banners/{banner}', [BuilderDocumentController::class, 'editBanner'])->whereUuid(['document', 'banner']);
         // B5: templates — apply (built-in id or own uuid), save a section, delete an own one.
@@ -144,7 +167,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::delete('templates/{template}', [BuilderTemplateController::class, 'destroy'])->whereUuid('template');
         // B5: a demo look into drafts only (no storefront.publish needed), then publish them together.
         Route::post('start-from-demo/{preset}', [BuilderTemplateController::class, 'startFromDemo'])
-            ->whereIn('preset', ['default', 'vegan', 'handmade', 'classic', 'kids'])->middleware('throttle:builder-templates');
+            ->whereIn('preset', ['default', 'vegan', 'handmade', 'classic', 'kids', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture'])->middleware('throttle:builder-templates');
         Route::post('publish-all', [BuilderTemplateController::class, 'publishAll'])->middleware('can:storefront.publish');
         // B9: the AI writer (through the AI module's gate and budget; nothing is saved).
         Route::post('ai/write', BuilderAiController::class)->middleware('throttle:builder-ai');

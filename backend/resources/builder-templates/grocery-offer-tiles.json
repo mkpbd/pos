@@ -1,0 +1,102 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "banner_grid",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "layout": "3-col"
+                                },
+                                "items": [
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Vegetables",
+                                            "kicker": "Every morning",
+                                            "title": "Fresh vegetables daily",
+                                            "button_label": "Shop now",
+                                            "link_url": "/category/fruits-vegetables",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "grocery/red-onions.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "প্রতিদিন সকালে",
+                                                    "title": "প্রতিদিন তাজা সবজি",
+                                                    "button_label": "কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Fish",
+                                            "kicker": "Cleaned and cut",
+                                            "title": "River fish, ready to cook",
+                                            "button_label": "Shop fish",
+                                            "link_url": "/category/fish-meat",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "grocery/river-fish.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "কেটে পরিষ্কার",
+                                                    "title": "নদীর মাছ, রান্নার জন্য তৈরি",
+                                                    "button_label": "কিনুন"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "item_type": "banner",
+                                        "banner": {
+                                            "placement": "home_promo",
+                                            "name": "Rice",
+                                            "kicker": "Save on 5 kg",
+                                            "title": "Rice for the whole month",
+                                            "button_label": "Shop rice",
+                                            "link_url": "/category/rice-dal-oil",
+                                            "text_color": "#ffffff",
+                                            "image": {
+                                                "asset": "grocery/basmati-rice.jpg"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "kicker": "৫ কেজিতে সাশ্রয়",
+                                                    "title": "পুরো মাসের চাল",
+                                                    "button_label": "কিনুন"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

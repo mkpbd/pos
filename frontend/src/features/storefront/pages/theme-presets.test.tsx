@@ -166,6 +166,59 @@ describe('theme presets', () => {
     expect(saved?.layout).toEqual({ ...kidsLook.layout, card_style: 'arched' })
   })
 
+  it('B11: ten presets in two rows of five; a new look keeps its preset key when the draft is saved', async () => {
+    const user = userEvent.setup()
+    let saved: ThemeDocument | undefined
+    let applied: string | null = null
+    const beautyLook: ThemePreset['theme'] = {
+      ...handmadeLook,
+      preset: 'beauty',
+      colors: { ...handmadeLook.colors, primary: '#f2c4c9', primary_foreground: '#4a1530', accent: '#8e3b5f', canvas: '#fdf6f4', sale: '#b4234a' },
+      typography: { heading_font: 'tiro-bangla', body_font: 'jost' },
+      shape: { button_style: 'pill', card_radius: 20 },
+    }
+    const beauty: ThemeDraft = { ...theme, settings: { ...settings, ...beautyLook, layout: beautyLook.layout } }
+    const NAMES = { fashion: 'Fashion Boutique', electronics: 'Electronics Store', grocery: 'Supermarket', beauty: 'Beauty & Cosmetics', furniture: 'Furniture & Home' } as const
+    const added = (['fashion', 'electronics', 'grocery', 'beauty', 'furniture'] as const).map((key) => ({
+      key, name: NAMES[key], description: `The ${key} demo look.`, theme: key === 'beauty' ? beautyLook : { ...handmadeLook, preset: key },
+    }))
+    mockApi({
+      'GET /auth/me': ok(manager()),
+      'GET /storefront/theme/draft': ok(beauty),
+      'GET /storefront/theme/presets': ok([...presets, { key: 'kids', name: 'Kids Store', description: 'Playful.', theme: { ...handmadeLook, preset: 'kids' } }, ...added]),
+      'GET /media': emptyMedia,
+      'PUT /storefront/theme/draft': (init) => {
+        saved = (JSON.parse(String(init.body)) as { settings: ThemeDocument }).settings
+        return ok({ ...beauty, settings: saved })
+      },
+      'POST /storefront/theme/presets/grocery/apply': () => {
+        applied = 'grocery'
+        return ok({ ...beauty, has_unpublished_changes: true, settings: { ...beauty.settings, preset: 'grocery' } })
+      },
+    })
+    renderRoutes(routes, '/storefront/theme')
+
+    const group = await screen.findByRole('radiogroup', { name: 'Theme presets' })
+    expect(within(group).getAllByRole('radio')).toHaveLength(10)
+    expect(group).toHaveClass('sm:grid-cols-2', 'xl:grid-cols-5')
+    expect(within(group).getByRole('radio', { name: 'Beauty & Cosmetics' })).toBeChecked()
+    expect(within(screen.getByTestId('preset-beauty')).getByText('Current')).toBeInTheDocument()
+    expect(within(group).getByRole('radio', { name: 'Furniture & Home' })).toHaveAccessibleDescription('The furniture demo look.')
+
+    // An edit after choosing the look keeps its key (an unknown key would fall back to `default`).
+    await user.click(screen.getByRole('combobox', { name: 'Product cards' }))
+    await user.click(await screen.findByRole('option', { name: 'Standard' }))
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    await waitFor(() => expect(saved).toBeDefined())
+    expect(saved?.preset).toBe('beauty')
+    expect(saved?.typography).toMatchObject({ heading_font: 'tiro-bangla', body_font: 'jost' })
+
+    await user.click(within(group).getByRole('radio', { name: 'Supermarket' }))
+    await user.click(screen.getByRole('button', { name: 'Apply preset' }))
+    await user.click(within(await screen.findByRole('alertdialog', { name: 'Apply the Supermarket preset?' })).getByRole('button', { name: 'Apply preset' }))
+    await waitFor(() => expect(applied).toBe('grocery'))
+  })
+
   it('shows the presets read-only without storefront.manage', async () => {
     mockApi({
       'GET /auth/me': ok(viewer()),

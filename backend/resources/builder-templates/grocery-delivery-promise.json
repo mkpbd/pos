@@ -1,0 +1,57 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "full-bleed"
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "features_strip",
+                            "props": {
+                                "title": null,
+                                "subtitle": null,
+                                "config": {
+                                    "items": [
+                                        {
+                                            "icon": "truck",
+                                            "title": "Same-day delivery",
+                                            "text": "Order before 6 pm in Dhaka"
+                                        },
+                                        {
+                                            "icon": "shield-check",
+                                            "title": "Freshness promise",
+                                            "text": "Not happy? We replace it"
+                                        },
+                                        {
+                                            "icon": "credit-card",
+                                            "title": "Cash on delivery",
+                                            "text": "Or bank transfer"
+                                        },
+                                        {
+                                            "icon": "headset",
+                                            "title": "Order by phone",
+                                            "text": "01700-000007, 7 am to 10 pm"
+                                        }
+                                    ],
+                                    "background": null
+                                },
+                                "items": []
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

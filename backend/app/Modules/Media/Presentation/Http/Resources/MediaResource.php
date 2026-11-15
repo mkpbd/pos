@@ -22,6 +22,8 @@ class MediaResource extends JsonResource
             'width' => $m->width,
             'height' => $m->height,
             'alt' => $m->alt,
+            'focal' => $m->focal(),
+            'edited_from_id' => $m->edited_from_id,
             'original_name' => $m->original_name,
             'mime_type' => $m->mime_type,
             'size' => $m->size,
