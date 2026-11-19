@@ -96,6 +96,8 @@ class CopyBuilderSection
             }
         }
         $copy = $this->withoutDismiss($copy);
+        // B13: the copy is no version of an A/B test (the test is the source page's).
+        unset($copy['experiment']);
 
         $sections = is_array($content['sections'] ?? null) ? array_values($content['sections']) : [];
         if ($position === 'top') {

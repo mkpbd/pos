@@ -1,3 +1,4 @@
+import type { ExperimentArms } from '../builder/audience/types'
 import type { Device } from '../builder/types'
 
 /*
@@ -39,10 +40,15 @@ export type InsightsBeacon = {
   events: InsightEvent[]
   scroll?: ScrollStep
   vitals?: WebVitals
+  /** B13: the running A/B tests' arms this visitor sees, on every batch (never with DNT / GPC — nothing is sent then). */
+  arms?: ExperimentArms
 }
 
-/** §2 `attribution.builder`: the builder page (and its section) the shopper last clicked toward a product, and the device. */
-export type BuilderAttribution = { document_id: string; node_id?: string; device?: Device }
+/**
+ * §2 `attribution.builder`: the builder page (and its section) the shopper last clicked toward a
+ * product, and the device. B13: `experiments` = the running A/B tests' arms seen on that page.
+ */
+export type BuilderAttribution = { document_id: string; node_id?: string; device?: Device; experiments?: ExperimentArms }
 
 /** The builder part of an order / cart request's `attribution`. */
 export type WithBuilderAttribution = { builder?: BuilderAttribution }

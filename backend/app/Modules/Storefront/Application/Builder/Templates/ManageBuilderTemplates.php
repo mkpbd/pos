@@ -191,7 +191,10 @@ class ManageBuilderTemplates
     public function save(array $attributes): BuilderTemplate
     {
         $context = $attributes['context'];
-        $document = ($this->prepare)(['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'sections' => [$attributes['section']]], $context);
+        // B13: a template is no version of an A/B test.
+        $section = $attributes['section'];
+        unset($section['experiment']);
+        $document = ($this->prepare)(['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'sections' => [$section]], $context);
         $allowed = array_values(array_filter(ElementRegistry::CONTEXTS, function (string $candidate) use ($document, $context) {
             if ($candidate === $context) {
                 return true;

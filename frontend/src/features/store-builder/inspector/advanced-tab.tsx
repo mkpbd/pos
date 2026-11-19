@@ -1,6 +1,7 @@
 /*
  * Advanced tab of a section or element: devices it shows on, hidden, schedule (edited in the
- * organization's timezone, stored as ISO 8601 with offset) and, for sections, the anchor.
+ * organization's timezone, stored as ISO 8601 with offset), B13 "Who sees this" (audience) and,
+ * for sections, the anchor.
  */
 
 import { MonitorIcon, SmartphoneIcon, TabletIcon } from 'lucide-react'
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils'
 import type { Device, Element, Schedule, Section } from '@/storefront/builder/types'
 import { FieldError, type Errors } from './fields'
 import type { InspectorChangeOptions } from './types'
+import { WhoSeesThis } from './who-sees-this'
 
 const DEVICES: { device: Device; label: string; Icon: typeof MonitorIcon }[] = [
   { device: 'desktop', label: 'Desktop', Icon: MonitorIcon },
@@ -97,6 +99,19 @@ export function AdvancedTab<N extends Section | Element>({ node, onChange, error
           <Input type="datetime-local" value={toZonedInput(schedule?.ends_at, timeZone)} onChange={(e) => setSchedule('ends_at', e.target.value)} />
         </FormField>
       </fieldset>
+
+      <WhoSeesThis
+        nodeId={node.id}
+        noun={noun}
+        audience={node.audience}
+        errors={errors}
+        onChange={(audience, opts) => {
+          const next = { ...node }
+          if (audience) next.audience = audience
+          else delete next.audience
+          onChange(next, opts)
+        }}
+      />
 
       {node.type === 'section' && (
         <FormField

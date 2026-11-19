@@ -13,6 +13,9 @@ import type { Dragged, LayerPosition } from './drop-targets'
 import { NodeClipboardItems } from './clipboard-menu'
 import { useEditor, useEditorStoreApi, useSelectedIds } from './store'
 import { ElementIcon } from './element-icon'
+import { ArmGroupHeader, ArmTag } from './experiments/layers-arms'
+import { LayerAudienceBadge } from './audience/audience-badge'
+import type { Audience } from '@/storefront/builder/audience/types'
 import { flattenLayers, layerDropSpot, layerRange, type LayerRow } from './layers'
 
 /*
@@ -93,6 +96,7 @@ function LayerItem({ row, selected, group, tabbable, hasErrors, indicator, order
       data-testid={`layer-${node.id}`}
       className="relative"
     >
+      {kind === 'section' && <ArmGroupHeader nodeId={node.id} />}
       {indicator === 'before' && <span className="absolute inset-x-1 top-0 h-0.5 rounded bg-blue-600" aria-hidden />}
       {indicator === 'after' && <span className="absolute inset-x-1 bottom-0 h-0.5 rounded bg-blue-600" aria-hidden />}
       <div
@@ -132,8 +136,10 @@ function LayerItem({ row, selected, group, tabbable, hasErrors, indicator, order
         >
           <ElementIcon type={node.type} className="size-3.5 shrink-0 text-muted-foreground" />
           <span className={cn('shrink-0', kind === 'section' && 'font-medium', hidden && 'line-through')}>{label}</span>
+          {kind !== 'column' && <LayerAudienceBadge node={node as { id: string; audience?: Audience | null }} />}
           {summary && <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span>}
           {kind === 'column' && <OrderBadge device={device} order={order} containerId={node.id} />}
+          {kind === 'section' && <ArmTag nodeId={node.id} />}
           {hasErrors && <CircleAlertIcon className="size-3.5 shrink-0 text-destructive" aria-label="Has problems" />}
         </button>
         {ownColumnOrder && (

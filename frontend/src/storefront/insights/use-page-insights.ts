@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import type { ExperimentArms } from '../builder/audience/types'
 import type { BuilderPage, Device } from '../builder/types'
 import { rememberBuilderClick } from './builder-attribution'
 import { createPageCollector } from './collector'
@@ -31,10 +32,13 @@ export function usePageInsights(
   device: Device,
   enabled: boolean,
   send: (beacon: InsightsBeacon) => void = sendBeaconPayload,
+  /** B13: the running A/B tests' arms this visitor sees (a new set starts a new page view). */
+  arms: ExperimentArms | null = null,
 ) {
   const target = enabled ? insightsTarget(page) : null
   const id = target?.id ?? null
   const version = target?.version ?? null
+  const armsKey = arms && Object.keys(arms).length > 0 ? JSON.stringify(arms) : null
   const deviceRef = useRef(device)
   const sendRef = useRef(send)
   // Kept current without starting a new page view (declared first: runs before the effect below).
@@ -48,6 +52,7 @@ export function usePageInsights(
     if (!root || id === null || version === null || isStaffView() || trackingRefused()) return
     const path = window.location.pathname.slice(0, 255)
     const startDevice = deviceRef.current
+    const pageArms: ExperimentArms | null = armsKey ? (JSON.parse(armsKey) as ExperimentArms) : null
     const collector = createPageCollector({
       root,
       documentId: id,
@@ -56,7 +61,8 @@ export function usePageInsights(
       device: startDevice,
       send: (beacon) => sendRef.current(beacon),
       vitals: vitalsFor(path),
-      onTowardProduct: (sectionId) => rememberBuilderClick(id, sectionId, startDevice),
+      onTowardProduct: (sectionId) => rememberBuilderClick(id, sectionId, startDevice, Date.now(), pageArms),
+      arms: pageArms,
     })
     // Sections drawn later (device order, language) are picked up.
     const mutations = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => collector.scan())
@@ -71,5 +77,5 @@ export function usePageInsights(
       window.removeEventListener('pagehide', onPageHide)
       collector.destroy()
     }
-  }, [rootRef, id, version])
+  }, [rootRef, id, version, armsKey])
 }

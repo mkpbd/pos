@@ -105,6 +105,8 @@ class StorefrontBootstrap
                 'name' => $settings->site_name,
                 'description' => $settings->meta_description,
                 'currency' => $organization['base_currency'] ?? null,
+                // B13: the store's IANA time zone (audience time rules).
+                'timezone' => (string) ($organization['timezone'] ?? config('app.timezone')),
                 // Exclusive tax mode: the storefront shows prices "excl. VAT"; tax is added at checkout.
                 'prices_include_tax' => ($organization['tax_mode'] ?? 'exclusive') === 'inclusive',
                 // E12: false (staging) = every page is noindex; the SPA keeps that on navigation.

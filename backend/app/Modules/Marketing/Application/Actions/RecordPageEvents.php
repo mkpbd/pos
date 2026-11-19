@@ -24,6 +24,11 @@ use Illuminate\Support\Facades\DB;
  * page view) counts the page view and the visitor; `scroll` counts each milestone above
  * `scroll_from` once. Counts are upserted with `INSERT … ON CONFLICT … DO UPDATE` (concurrent
  * beacons never lose an increment).
+ *
+ * B13: `arms: {<test id>: A|B}` — the A/B test versions the page view shows (sent with every
+ * beacon of it): for each test running in that version of the page, the page view, the unique
+ * visitor (the same daily hash, per version), the views and clicks of the version's sections and
+ * whether the beacon had a click on them go to builder_experiment_stats.
  */
 class RecordPageEvents
 {
@@ -32,6 +37,9 @@ class RecordPageEvents
     public const GRID = 20;
 
     public const SCROLL_MILESTONES = [25, 50, 75, 100];
+
+    /** B13: the A/B test versions a beacon may name. */
+    public const MAX_ARMS = 3;
 
     public function __construct(
         private readonly TenantContext $tenant,
@@ -103,8 +111,25 @@ class RecordPageEvents
         $day = CarbonImmutable::now($timezone)->toDateString();
         $device = $beacon['device'];
         $key = ['organization_id' => $organizationId, 'document_id' => $documentId, 'day' => $day, 'device' => $device];
+        // B13: the A/B test versions this page view shows.
+        $arms = $this->arms($beacon['arms'] ?? null, $documentId, (int) $beacon['version'], $pageView, $views, $clicks);
 
-        DB::transaction(function () use ($key, $pageView, $milestones, $views, $clicks, $cells, $vitals, $ip, $userAgent) {
+        DB::transaction(function () use ($key, $pageView, $milestones, $views, $clicks, $cells, $vitals, $ip, $userAgent, $arms) {
+            foreach ($arms as $row) {
+                $armKey = $key + ['experiment_id' => $row['experiment_id'], 'arm' => $row['arm']];
+                $unique = ! $pageView ? 0 : DB::table('builder_experiment_visitor_hashes')->insertOrIgnore($armKey + [
+                    'hash' => DailyVisitorHash::of($key['day'], $ip, $userAgent),
+                ]);
+                $this->increment('builder_experiment_stats', [$armKey + [
+                    'views' => $pageView ? 1 : 0,
+                    'visitors' => $unique > 0 ? 1 : 0,
+                    'section_views' => $row['section_views'],
+                    'clicks' => $row['clicks'],
+                    'clicked_views' => $row['clicks'] > 0 ? 1 : 0,
+                    'add_to_carts' => 0,
+                ]], array_keys($armKey), ['views', 'visitors', 'section_views', 'clicks', 'clicked_views']);
+            }
+
             if ($pageView || $milestones !== []) {
                 $unique = ! $pageView ? 0 : DB::table('builder_visitor_hashes')->insertOrIgnore($key + [
                     'hash' => DailyVisitorHash::of($key['day'], $ip, $userAgent),
@@ -137,6 +162,38 @@ class RecordPageEvents
         });
 
         return ['recorded' => true, 'accepted' => $accepted, 'ignored' => $ignored];
+    }
+
+    /**
+     * B13: per A/B test version the beacon names (`arms: {<test id>: A|B}`, at most 3) that runs
+     * in this version of the page, what to count: views and clicks of the version's sections
+     * (the page view and visitor go with `seq` 0). Tests that don't run there, bad arms and
+     * versions without anything to count are left out.
+     *
+     * @param  array<string, int>  $views  node => 1
+     * @param  array<string, int>  $clicks  node => clicks
+     * @return list<array{experiment_id: string, arm: string, section_views: int, clicks: int}>
+     */
+    private function arms(mixed $arms, string $documentId, int $version, bool $pageView, array $views, array $clicks): array
+    {
+        if (! is_array($arms) || $arms === []) {
+            return [];
+        }
+        $running = $this->documents->runningExperiments($documentId, $version);
+        $rows = [];
+        foreach (array_slice($arms, 0, self::MAX_ARMS, true) as $experiment => $arm) {
+            if (! is_string($experiment) || ! in_array($arm, ['A', 'B'], true) || ! isset($running[$experiment])) {
+                continue;
+            }
+            $sections = array_flip($running[$experiment][$arm]);
+            $sectionViews = count(array_intersect_key($views, $sections));
+            $sectionClicks = array_sum(array_intersect_key($clicks, $sections));
+            if ($pageView || $sectionViews > 0 || $sectionClicks > 0) {
+                $rows[] = ['experiment_id' => $experiment, 'arm' => $arm, 'section_views' => $sectionViews, 'clicks' => $sectionClicks];
+            }
+        }
+
+        return $rows;
     }
 
     /**

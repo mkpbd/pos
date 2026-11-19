@@ -12,6 +12,9 @@ namespace App\Modules\Shared\Domain;
  * B15: `builder` — the store builder page (and top-level section) the shopper last clicked
  * toward a product, `{document_id, node_id?, device?}` (format only here; whether the document
  * is the store's is checked when the order is placed).
+ *
+ * B13: `builder.experiments` — `{<A/B test id>: A|B}` (at most 3), the versions of that page's
+ * tests the shopper saw, so add-to-carts and orders count per version.
  */
 final class CampaignAttribution
 {
@@ -19,6 +22,9 @@ final class CampaignAttribution
 
     /** B15: a builder node id (BuilderDocumentSchema::ID_PATTERN). */
     public const NODE_PATTERN = '/^[a-z][a-z0-9_-]{1,31}$/';
+
+    /** B13: the A/B test versions an attribution may carry. */
+    public const MAX_EXPERIMENTS = 3;
 
     /** B15: the devices of page insights. */
     public const DEVICES = ['desktop', 'tablet', 'mobile'];
@@ -73,7 +79,7 @@ final class CampaignAttribution
      * B15: `{document_id (lower-case uuid), node_id?, device?}`, or null without a valid
      * document id (an invalid node id or device is dropped).
      *
-     * @return array{document_id: string, node_id?: string, device?: string}|null
+     * @return array{document_id: string, node_id?: string, device?: string, experiments?: array<string, string>}|null
      */
     public static function builder(mixed $value): ?array
     {
@@ -92,6 +98,34 @@ final class CampaignAttribution
         $device = $value['device'] ?? null;
         if (is_string($device) && in_array($device, self::DEVICES, true)) {
             $result['device'] = $device;
+        }
+        $experiments = self::experiments($value['experiments'] ?? null);
+        if ($experiments !== []) {
+            $result['experiments'] = $experiments;
+        }
+
+        return $result;
+    }
+
+    /**
+     * B13: the A/B test versions the shopper saw on the page, `{<test id>: A|B}` — at most 3,
+     * invalid entries dropped.
+     *
+     * @return array<string, string>
+     */
+    public static function experiments(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+        $result = [];
+        foreach ($value as $id => $arm) {
+            if (count($result) >= self::MAX_EXPERIMENTS) {
+                break;
+            }
+            if (is_string($id) && preg_match(self::NODE_PATTERN, $id) === 1 && in_array($arm, ['A', 'B'], true)) {
+                $result[$id] = $arm;
+            }
         }
 
         return $result;

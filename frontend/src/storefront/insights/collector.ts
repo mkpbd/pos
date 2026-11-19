@@ -1,5 +1,6 @@
 import { NODE_ID } from '../builder/registry'
 import type { Device } from '../builder/types'
+import type { ExperimentArms } from '../builder/audience/types'
 import { MAX_EVENTS_PER_BEACON, type InsightEvent, type InsightsBeacon, type ScrollStep } from './types'
 import type { VitalsMeter } from './vitals'
 
@@ -35,6 +36,8 @@ export type CollectorOptions = {
   vitals?: VitalsMeter | null
   onTowardProduct?: (sectionId: string) => void
   now?: () => number
+  /** B13: the running A/B tests' arms of this page view, sent with every batch (absent / empty = none). */
+  arms?: ExperimentArms | null
 }
 
 export type PageCollector = {
@@ -84,6 +87,7 @@ export function visibleEnough(entry: Pick<IntersectionObserverEntry, 'isIntersec
 }
 
 export function createPageCollector(options: CollectorOptions): PageCollector {
+  const arms = options.arms && Object.keys(options.arms).length > 0 ? options.arms : null
   const { root, send } = options
   const now = options.now ?? (() => Date.now())
   const view = typeof window === 'undefined' ? null : window
@@ -249,6 +253,7 @@ export function createPageCollector(options: CollectorOptions): PageCollector {
       const carry = withFinal && last
       if (events.length === 0 && !carry) break
       const beacon: InsightsBeacon = { document_id: options.documentId, version: options.version, path: options.path, device: options.device, seq, events }
+      if (arms) beacon.arms = { ...arms }
       if (carry) {
         finalSent = true
         beacon.scroll = deepest

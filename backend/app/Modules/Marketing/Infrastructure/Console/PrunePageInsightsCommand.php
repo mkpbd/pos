@@ -25,10 +25,12 @@ class PrunePageInsightsCommand extends Command
         $today = CarbonImmutable::now('UTC');
         $cutoff = $today->subDays(self::KEEP_DAYS)->toDateString();
         $deleted = 0;
-        foreach (['builder_page_stats', 'builder_section_stats', 'builder_click_cells', 'builder_vital_buckets'] as $table) {
+        // B13: A/B test counts too.
+        foreach (['builder_page_stats', 'builder_section_stats', 'builder_click_cells', 'builder_vital_buckets', 'builder_experiment_stats'] as $table) {
             $deleted += DB::table($table)->where('day', '<', $cutoff)->delete();
         }
-        $hashes = DB::table('builder_visitor_hashes')->where('day', '<', $today->subDays(2)->toDateString())->delete();
+        $hashes = DB::table('builder_visitor_hashes')->where('day', '<', $today->subDays(2)->toDateString())->delete()
+            + DB::table('builder_experiment_visitor_hashes')->where('day', '<', $today->subDays(2)->toDateString())->delete();
         $this->info("Deleted {$deleted} page insight rows and {$hashes} visitor hashes.");
 
         return self::SUCCESS;

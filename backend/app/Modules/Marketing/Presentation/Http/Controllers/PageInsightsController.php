@@ -2,6 +2,7 @@
 
 namespace App\Modules\Marketing\Presentation\Http\Controllers;
 
+use App\Modules\Marketing\Application\Queries\ExperimentResults;
 use App\Modules\Marketing\Application\Queries\PageInsights;
 use App\Modules\Shared\Domain\CampaignAttribution;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
@@ -35,6 +36,28 @@ class PageInsightsController
         return $result === null
             ? ApiResponse::error('NOT_FOUND', 'The requested resource was not found.', 404)
             : ApiResponse::success($result);
+    }
+
+    /**
+     * A/B test results
+     *
+     * B13: `?device=desktop|tablet|mobile` (default all) → `{experiment, document_id, from, to,
+     * device, timezone, currency, goal, arms: {A|B: {visitors, views, goal_count, rate, orders,
+     * revenue, add_to_carts, clicks, section_views}}, lift, probability_b_beats_a, confidence:
+     * low|medium|high, enough_data, recommendation: keep_a|keep_b|keep_running, daily: [{day, A:
+     * {visitors, goal_count}, B: …}]}` from the day the test started to the day it ended (else
+     * today). 404 NOT_FOUND (not a page of this store), 404 EXPERIMENT_NOT_FOUND.
+     */
+    public function experiment(Request $request, string $document, string $experiment, ExperimentResults $results): JsonResponse
+    {
+        $device = $request->validate(['device' => ['sometimes', 'nullable', 'string', Rule::in(CampaignAttribution::DEVICES)]])['device'] ?? null;
+        $result = $results->results($document, $experiment, $device);
+
+        return match ($result) {
+            'NOT_FOUND' => ApiResponse::error('NOT_FOUND', 'The requested resource was not found.', 404),
+            'EXPERIMENT_NOT_FOUND' => ApiResponse::error('EXPERIMENT_NOT_FOUND', 'This A/B test does not exist on this page.', 404),
+            default => ApiResponse::success($result),
+        };
     }
 
     /**

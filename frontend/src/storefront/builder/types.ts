@@ -4,10 +4,14 @@
  * BuilderDocumentSchema::normalize is the source of truth; ./validate.ts mirrors its value rules.
  */
 
+import type { Audience, AudienceCampaigns, Experiment, SectionExperiment } from './audience/types'
 import type { CatalogImage, FaqGroup, MediaRef, ProductCard, ProductDetail, ShippingMethod, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
 export type Device = 'desktop' | 'tablet' | 'mobile'
+
+/** B13: audiences and A/B tests (shapes in ./audience/types.ts). */
+export type * from './audience/types'
 
 /* ----------------------------------------------------------------------------------------------
  * Style values (sparse overrides; normalize drops unknown/invalid keys and never fills defaults)
@@ -149,6 +153,8 @@ type NodeCommon = {
   hidden: boolean
   schedule: Schedule
   translations: Record<string, Record<string, string>>
+  /** B13: who sees this node (null / absent = everyone). Presentation, not security. */
+  audience?: Audience | null
 }
 
 export type Column<E = Element> = {
@@ -727,6 +733,8 @@ export type Section = NodeCommon & {
   type: 'section'
   props: SectionProps
   columns: Column[]
+  /** B13: the A/B test arm this section belongs to (null / absent = in every version). */
+  experiment?: SectionExperiment | null
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -801,7 +809,7 @@ export type GlobalContext = 'page' | 'header' | 'footer'
  * B9: a reference to a global section, placed in a document's `sections[]` (page, cms, zone, header,
  * footer; never in a global or a popup). `ref` = the global document's uuid.
  */
-export type GlobalSectionNode = { id: string; type: 'global_section'; ref: string; hidden: boolean; schedule: Schedule }
+export type GlobalSectionNode = { id: string; type: 'global_section'; ref: string; hidden: boolean; schedule: Schedule; audience?: Audience | null; experiment?: SectionExperiment | null }
 
 /** What a document's `sections[]` may hold (B9): sections and global section references. */
 export type DocumentSection = Section | GlobalSectionNode
@@ -826,7 +834,7 @@ export type PageSeo = {
  * GlobalSectionNode entries (see DocumentSection) — typed `Section[]` for older code, check with
  * `isGlobalSectionNode`.
  */
-export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo; device_order?: DeviceOrder }
+export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo; device_order?: DeviceOrder; experiments?: Experiment[] }
 
 /**
  * B12: per-device order of a container's children, by container id → the children's ids in the
@@ -888,6 +896,8 @@ export type RenderUnavailableGlobal = {
   schedule?: Schedule
   state: 'unavailable'
   global: RenderGlobalInfo
+  audience?: Audience | null
+  experiment?: SectionExperiment | null
 }
 
 /**
@@ -1067,6 +1077,12 @@ export type BuilderPage = {
   data: Record<string, BuilderData>
   /** B12: the document's per-device order (published with the version; drafts: the draft's). Absent / null = base order everywhere. */
   device_order?: DeviceOrder | null
+  /** B13: the document's A/B tests (absent = none). Every arm's sections are in `sections`; the browser picks one. */
+  experiments?: Experiment[] | null
+  /** B13: the campaigns audience rules name → their utm_campaign and short links (absent = none). */
+  audience_campaigns?: AudienceCampaigns | null
+  /** B13: the store's IANA timezone for time rules (absent = bootstrap `store.timezone`, else Asia/Dhaka). */
+  timezone?: string | null
 }
 
 /* ----------------------------------------------------------------------------------------------

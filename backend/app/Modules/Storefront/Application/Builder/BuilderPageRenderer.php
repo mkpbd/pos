@@ -2,14 +2,19 @@
 
 namespace App\Modules\Storefront\Application\Builder;
 
+use App\Modules\Marketing\Application\Contracts\MarketingLinks;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
+use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Translations;
 use App\Modules\Storefront\Application\Queries\SectionContentResolver;
+use App\Modules\Storefront\Domain\Builder\AudienceRules;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\BuilderJson;
 use App\Modules\Storefront\Domain\Builder\DeviceOrder;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
+use App\Modules\Storefront\Domain\Builder\Experiments;
 use App\Modules\Storefront\Domain\Builder\StyleSchema;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use Carbon\CarbonImmutable;
@@ -48,6 +53,10 @@ use stdClass;
  *   document's order on tablets and phones with the global sections' own orders merged in, the
  *   lists cut to the children in the payload (DeviceOrder; mobile → tablet → base fallback is the
  *   client's).
+ * - B13: nodes keep `audience` and sections `experiment` as stored (the browser evaluates them;
+ *   every version is in the payload); `experiments` (published: `{id, status, split, winner}`,
+ *   draft: the full tests), `audience_campaigns` `{<campaign id>: {utm_campaign, short_links}}`
+ *   for the campaigns the rules name, and the store's `timezone`.
  */
 class BuilderPageRenderer
 {
@@ -57,6 +66,9 @@ class BuilderPageRenderer
         private readonly LocaleContext $locale,
         private readonly BuilderElementData $elementData,
         private readonly BuilderGlobals $globals,
+        private readonly MarketingLinks $marketing,
+        private readonly OrganizationDirectory $organizations,
+        private readonly TenantContext $tenant,
     ) {}
 
     /**
@@ -149,7 +161,41 @@ class BuilderPageRenderer
             'device_order' => DeviceOrder::canonical(DeviceOrder::lists($content['device_order'] ?? null), DeviceOrder::containers(['sections' => $sections])),
             'media' => $media === [] ? new stdClass : $media,
             'data' => $data === [] ? new stdClass : $data,
+            // B13: the A/B tests (published: what the browser needs to pick a version), how the
+            // campaigns of audience rules match a session, and the store's time zone (time rules).
+            'experiments' => $preview ? array_values($content['experiments'] ?? []) : Experiments::public($content['experiments'] ?? []),
+            'audience_campaigns' => $this->audienceCampaigns($sections),
+            'timezone' => $this->timezone(),
         ];
+    }
+
+    /**
+     * B13: `{<campaign id>: {utm_campaign, short_links}}` for the campaigns of the audience rules
+     * of the rendered nodes.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     */
+    private function audienceCampaigns(array $sections): object|array
+    {
+        $ids = [];
+        BuilderDocumentSchema::walk(['sections' => $sections], function (array $node) use (&$ids) {
+            foreach (AudienceRules::references(is_array($node['audience'] ?? null) ? $node['audience'] : null)['campaigns'] as $rule) {
+                array_push($ids, ...$rule['ids']);
+            }
+        });
+        $matches = $ids === [] ? [] : $this->marketing->audienceMatches(array_values(array_unique($ids)));
+
+        return $matches === [] ? new stdClass : $matches;
+    }
+
+    /**
+     * B13: the organization's IANA time zone.
+     */
+    private function timezone(): string
+    {
+        $organizationId = $this->tenant->organizationId();
+
+        return (string) (($organizationId === null ? null : $this->organizations->summary($organizationId)['timezone'] ?? null) ?? config('app.timezone'));
     }
 
     /**

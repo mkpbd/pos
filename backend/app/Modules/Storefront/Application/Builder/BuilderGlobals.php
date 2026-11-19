@@ -64,6 +64,10 @@ class BuilderGlobals
             ];
             $section['id'] = $node['id'];
             $section['global_ref'] = ['hidden' => $node['hidden'] ?? false, 'schedule' => $node['schedule'] ?? null];
+            // B13: the reference's own audience comes first (else the global's own).
+            if (is_array($node['audience'] ?? null)) {
+                $section['audience'] = $node['audience'];
+            }
             $content['sections'][$i] = $section;
             // B12: the global's own order on tablets and phones (its columns; its root is one section).
             foreach (DeviceOrder::lists($body['device_order'] ?? null) as $device => $lists) {

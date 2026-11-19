@@ -181,6 +181,9 @@ export function expandGlobals(content: BuilderContent, globals: ReadonlyMap<stri
       entry?.state === 'ready' && entry.section
         ? { ...entry.section, id: node.id, hidden: node.hidden === true || entry.section.hidden === true, schedule: node.schedule ?? entry.section.schedule ?? null }
         : placeholder(node, 'Loading the global section…')
+    // B13: who sees it is the reference's (this page's) choice.
+    if (node.audience) section.audience = node.audience
+    else delete section.audience
     for (const id of innerIds(section)) if (!owners.has(id)) owners.set(id, node.id)
     return { ...section, global: marker }
   })

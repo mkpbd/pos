@@ -62,6 +62,8 @@ const GROUP_ICONS: Record<string, typeof HeadingIcon> = { commerce: ShoppingBagI
 
 /** Advanced tab error keys; everything else belongs to the Content tab. */
 const ADVANCED_KEYS = new Set(['starts_at', 'ends_at', 'anchor', 'visibility', 'hidden'])
+/** B13: the audience's problems (`audience.rules.1.in`) belong to the Advanced tab too. */
+const isAdvancedKey = (key: string) => ADVANCED_KEYS.has(key) || key === 'audience' || key.startsWith('audience.')
 
 function nodeLabel(node: BuilderNode, registry: InspectorProps['registry']): string {
   if (node.type === 'section') return 'Section'
@@ -290,8 +292,8 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
   const errors = errorMap(node, problems, serverProblems)
   const hasAdvanced = node.type !== 'column'
   const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
-  const advancedErrors = Object.keys(errors).some((k) => ADVANCED_KEYS.has(k))
-  const contentErrors = Object.keys(errors).some((k) => !ADVANCED_KEYS.has(k))
+  const advancedErrors = Object.keys(errors).some(isAdvancedKey)
+  const contentErrors = Object.keys(errors).some((k) => !isAdvancedKey(k))
   const label = nodeLabel(node, registry)
   // Columns show their own "Select the section" button in the Content tab.
   const parent = node.type === 'section' || node.type === 'column' ? null : findParent(content, node.id)

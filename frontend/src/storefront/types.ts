@@ -210,6 +210,8 @@ export type StorefrontBootstrap = {
     whatsapp_order_button?: boolean
     /** P2b: the floating WhatsApp chat button on every store page. Effective: false without a number; absent = off. */
     whatsapp_chat_button?: boolean
+    /** B13: the store's IANA timezone (audience time rules; builder payloads carry their own `timezone` too). */
+    timezone?: string | null
   }
   /** E12b: the language this payload was resolved in (`?lang=`, else the store default). */
   locale?: string

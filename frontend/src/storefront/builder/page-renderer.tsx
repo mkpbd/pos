@@ -1,4 +1,4 @@
-import { useContext, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { MediaImage } from '../components/media-image'
 import { MenuLink } from '../components/menu-link'
@@ -31,6 +31,11 @@ import { buttonAction, ENUMS, normalizeWidth, oneOf, safeLink } from './validate
 import { globalInfo, isUnavailableGlobalSection } from './global-sections'
 import { ImagePriorityCtx, priorityImageElement, useImagePriority } from './image-priority'
 import { usePageInsights } from '../insights/use-page-insights'
+import { trackingRefused } from '../insights/privacy'
+import { useAudienceShows } from './audience/audience-ctx'
+import { LiveAudienceProvider } from './audience/audience-runtime'
+import { audienceKinds } from './audience/nodes'
+import { planArms, readExperiments, rememberReportedArms, sectionInArm } from './audience/experiments'
 
 /*
  * Draws a builder render payload: sections → columns (flex rows that wrap) → elements, styled by
@@ -50,6 +55,7 @@ function sectionState(value: unknown): SectionPreviewState | undefined {
 }
 
 const ANCHOR = /^[a-z0-9][a-z0-9-]{0,59}$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type Visible = { show: false } | { show: true; state: NodeState | null }
 
@@ -90,9 +96,11 @@ function PageSection({ section, sticky }: { section: RenderPageSection; sticky: 
 
 function SectionNode({ section, sticky }: { section: RenderSection; sticky: boolean }) {
   const { draft } = usePage()
+  // B13: a section with audience rules waits for the visitor's context, then shows only to its audience.
+  const audienceShows = useAudienceShows(section)
   const visible = visibility(section, draft)
-  const stickyTop = useStickyTop(sticky && visible.show)
-  if (!visible.show) return null
+  const stickyTop = useStickyTop(sticky && visible.show && audienceShows)
+  if (!visible.show || !audienceShows) return null
   const layout = oneOf(section.props?.layout, ENUMS.layout) ?? 'boxed'
   const anchor = typeof section.props?.anchor === 'string' && ANCHOR.test(section.props.anchor) ? section.props.anchor : undefined
   // B6 layers: shape dividers and a background video (absent on pre-B6 sections: unchanged markup).
@@ -152,8 +160,9 @@ function Columns({ columns, rowId, nested }: { columns: RenderColumn[]; rowId: s
 
 function ElementNode({ element, nested }: { element: RenderElement; nested: boolean }) {
   const { draft } = usePage()
+  const audienceShows = useAudienceShows(element)
   const visible = visibility(element, draft)
-  if (!visible.show) return null
+  if (!visible.show || !audienceShows) return null
 
   if (isWrappedSectionType(element.type)) return <WrappedSection element={element} state={visible.state} />
   // Inner rows nest one level only.
@@ -409,8 +418,22 @@ export function PageRenderer({
 }) {
   const draft = page.document?.source === 'draft'
   const rootRef = useRef<HTMLDivElement>(null)
+  // B13: the editor canvas draws every section it is sent (the editor picks the A/B arm, "Preview as" only fades).
+  const canvas = page.document?.key === 'canvas'
+  const experiments = useMemo(() => (canvas ? [] : readExperiments(page.experiments)), [canvas, page.experiments])
+  // B13: one arm per A/B test — the visitor's sticky arm of a running test on a published page; drafts and staff previews the default arm.
+  const publishedId = !draft && typeof page.document?.id === 'string' && UUID.test(page.document.id) ? page.document.id : null
+  const arms = useMemo(() => planArms(publishedId, experiments, { refused: trackingRefused() }), [publishedId, experiments])
   // B9: draft payloads may hold unavailable global section references besides sections.
-  const sections = useMemo<RenderPageSection[]>(() => (Array.isArray(page.sections) ? page.sections : []), [page.sections])
+  const sections = useMemo<RenderPageSection[]>(
+    () => (Array.isArray(page.sections) ? (experiments.length > 0 ? page.sections.filter((section) => sectionInArm(section, arms.shown)) : page.sections) : []),
+    [page.sections, experiments, arms],
+  )
+  const reportedKey = JSON.stringify(arms.reported)
+  useEffect(() => {
+    if (publishedId) rememberReportedArms(publishedId, JSON.parse(reportedKey))
+  }, [publishedId, reportedKey])
+  const kinds = useMemo(() => (canvas ? new Set<never>() : audienceKinds(sections)), [canvas, sections])
   const validScope = scopePrefix(scope) ? scope : undefined
   const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope }), [sections, page.media, validScope])
   const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
@@ -422,7 +445,7 @@ export function PageRenderer({
   const drawnSections = useMemo(() => orderedChildren(DEVICE_ORDER_ROOT, sections, order, device), [sections, order, device])
   const targets = useMemo(() => motionTargets(sections), [sections])
   useMotionRuntime(rootRef, targets, motion ?? page.document?.key !== 'canvas')
-  usePageInsights(rootRef, page, device, insights && !draft)
+  usePageInsights(rootRef, page, device, insights && !draft, undefined, arms.reported)
   // B15: the store page's first above-the-fold picture loads first; the header, footer, zones, popups and canvas have none.
   const priorityImage = useMemo(() => (validScope === 'page' ? priorityImageElement(drawnSections, page.media ?? {}, order, device) : null), [validScope, drawnSections, page.media, order, device])
   // B6: at most one sticky section, and only in page-like documents (never the header or footer).
@@ -432,16 +455,26 @@ export function PageRenderer({
     return sections.find((section) => section.type !== 'global_section' && section.props?.sticky === true)?.id ?? null
   }, [sections, page.document?.key])
 
+  const drawn = (
+    <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
+      <style data-testid="builder-styles">{css}</style>
+      {drawnSections.map((section) => (
+        <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
+      ))}
+    </div>
+  )
+
   return (
     <PageCtx.Provider value={context}>
       <DeviceOrderCtx value={orderContext}>
         <ImagePriorityCtx value={priorityImage}>
-          <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
-            <style data-testid="builder-styles">{css}</style>
-            {drawnSections.map((section) => (
-              <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
-            ))}
-          </div>
+          {kinds.size > 0 ? (
+            <LiveAudienceProvider kinds={kinds} device={device} timezone={typeof page.timezone === 'string' ? page.timezone : null} campaigns={page.audience_campaigns ?? null}>
+              {drawn}
+            </LiveAudienceProvider>
+          ) : (
+            drawn
+          )}
         </ImagePriorityCtx>
       </DeviceOrderCtx>
     </PageCtx.Provider>

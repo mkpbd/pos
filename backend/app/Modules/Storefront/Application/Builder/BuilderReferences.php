@@ -4,10 +4,13 @@ namespace App\Modules\Storefront\Application\Builder;
 
 use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\BlogReferences;
+use App\Modules\Geography\Application\Contracts\GeoDirectory;
+use App\Modules\Marketing\Application\Contracts\MarketingLinks;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Promotions\Application\Contracts\PromotionShowcase;
+use App\Modules\Storefront\Domain\Builder\AudienceRules;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
@@ -44,6 +47,9 @@ class BuilderReferences
         // B4.
         'DISCOUNT_NOT_FOUND' => 'Choose a percentage or fixed-amount promotion.',
         'MENU_NOT_FOUND' => 'The selected menu no longer exists.',
+        // B13: audience rules.
+        'DISTRICT_NOT_FOUND' => 'Some selected districts do not exist.',
+        'CAMPAIGN_NOT_FOUND' => 'Some selected campaigns no longer exist.',
     ];
 
     public function __construct(
@@ -52,6 +58,8 @@ class BuilderReferences
         private readonly CatalogPromotions $promotions,
         private readonly BlogDirectory $blog,
         private readonly PromotionShowcase $showcase,
+        private readonly GeoDirectory $geo,
+        private readonly MarketingLinks $marketing,
     ) {}
 
     /**
@@ -71,7 +79,9 @@ class BuilderReferences
                 $missing = array_values(array_diff($entry['ids'], $found));
                 if ($missing !== []) {
                     $baseCode = explode(':', $code)[0];
-                    $errors[] = ['path' => $entry['path'], 'node_id' => $entry['node_id'], 'message' => self::MESSAGES[$baseCode], 'code' => $baseCode, 'ids' => $missing];
+                    // B13: districts are whole numbers.
+                    $errors[] = ['path' => $entry['path'], 'node_id' => $entry['node_id'], 'message' => self::MESSAGES[$baseCode], 'code' => $baseCode,
+                        'ids' => $baseCode === 'DISTRICT_NOT_FOUND' ? array_map('intval', $missing) : $missing];
                 }
             }
         }
@@ -105,6 +115,14 @@ class BuilderReferences
         $globals = [];
 
         BuilderDocumentSchema::walk($document, function (array $node, string $path, string $kind) use ($use, &$globals) {
+            // B13: the districts and campaigns of audience rules (district ids as strings here).
+            $audience = AudienceRules::references(is_array($node['audience'] ?? null) ? $node['audience'] : null);
+            foreach ($audience['districts'] as $rule) {
+                $use('DISTRICT_NOT_FOUND', "{$path}.audience.rules.{$rule['rule']}.in", $node['id'] ?? null, array_map('strval', $rule['ids']));
+            }
+            foreach ($audience['campaigns'] as $rule) {
+                $use('CAMPAIGN_NOT_FOUND', "{$path}.audience.rules.{$rule['rule']}.in", $node['id'] ?? null, $rule['ids']);
+            }
             if ($kind === BuilderDocumentSchema::GLOBAL_SECTION) {
                 // B9: checked below (exists, this organization's, fits the context).
                 $globals[] = ['path' => "{$path}.ref", 'node_id' => $node['id'], 'ref' => $node['ref']];
@@ -246,6 +264,9 @@ class BuilderReferences
             'BLOG_CATEGORY_NOT_FOUND' => $this->blog->existing(BlogReferences::CATEGORY, $ids),
             'DISCOUNT_NOT_FOUND' => array_keys($this->showcase->discounts($ids)),
             'MENU_NOT_FOUND' => Menu::query()->whereIn('id', $ids)->pluck('id')->all(),
+            // B13: Bangladesh's districts (reference data); the organization's campaigns.
+            'DISTRICT_NOT_FOUND' => array_values(array_intersect($ids, array_map(fn (array $d) => (string) $d['id'], $this->geo->districts()))),
+            'CAMPAIGN_NOT_FOUND' => array_values(array_intersect($ids, array_keys($this->marketing->campaigns($ids)))),
         };
     }
 }

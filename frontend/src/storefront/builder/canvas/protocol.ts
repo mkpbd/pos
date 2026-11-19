@@ -1,4 +1,5 @@
 import type { StorefrontBootstrap } from '../../types'
+import type { PreviewContext } from '../audience/types'
 import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderPageSection } from '../types'
 import type { FontSource } from '../../fonts'
 import type { CanvasThemeSettings } from './theme-override'
@@ -116,6 +117,14 @@ export type ParentMessage =
    * selected text, `''` = remove the link, null = the owner cancelled (nothing changes).
    */
   | { type: 'text-edit-link-result'; url: string | null }
+  /**
+   * B13 (additive, v stays 1): the toolbar's "Preview as". null = "Show everything" (every node
+   * drawn as before). With a context the canvas checks each section's / element's `audience`
+   * against it (../audience/evaluate.ts `evaluateAudience`) and draws the nodes that would be hidden
+   * faded (`data-b-audience-out`, still clickable and selectable). Sent on change and after each `ready`.
+   * The canvas never drops a node by audience or A/B arm: the editor sends only the arm it shows.
+   */
+  | { type: 'preview-as'; context: PreviewContext | null }
 
 /** Canvas → parent. Rects are in the canvas viewport's CSS pixels. */
 export type CanvasMessage =
@@ -174,7 +183,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as'])
 const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {

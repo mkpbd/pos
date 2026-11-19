@@ -38,4 +38,14 @@ interface MarketingLinks
      * Whether a value is a store path a short link may point to (`/p/eid-sale`, `/product/x`).
      */
     public function isStorePath(mixed $path): bool;
+
+    /**
+     * B13: how a shopper's session attribution matches these campaigns (store builder audience
+     * rules): each campaign's `utm_campaign` and the codes of its short links, keyed by id
+     * (others' and unknown ids left out).
+     *
+     * @param  list<string>  $ids
+     * @return array<string, array{utm_campaign: string, short_links: list<string>}>
+     */
+    public function audienceMatches(array $ids): array;
 }

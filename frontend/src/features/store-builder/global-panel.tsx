@@ -10,7 +10,11 @@ import type { DocumentContext, Section } from '@/storefront/builder/types'
 import type { GlobalUsage } from './api'
 import { useCommands, useEditorUi } from './commands'
 import { useBackTo, useGlobalsQuery, type GlobalSummary } from './global-api'
-import { globalFits, referenceFor, unavailableReason, usageText, type GlobalContext, type GlobalSectionRef } from './global-sections'
+import { globalFits, referenceFor, replaceSectionNode, unavailableReason, usageText, type GlobalContext, type GlobalSectionRef } from './global-sections'
+import { audienceProblems } from './audience/words'
+import { errorMap } from './inspector/errors'
+import type { BuilderNode } from './inspector/types'
+import { WhoSeesThis } from './inspector/who-sees-this'
 import { useEditor, useEditorStoreApi } from './store'
 import { collectIds, findNode, insertSection, newId } from './tree'
 
@@ -123,6 +127,10 @@ export function GlobalRefPanel({ node }: { node: GlobalSectionRef }) {
   const others = (summary?.used_in ?? []).filter((u) => u.id !== documentId)
   const reason = unavailableReason(entry, context)
   const hidden = node.hidden === true
+  // B13: who sees this reference (the client's checks and the server's problems for it).
+  const store = useEditorStoreApi()
+  const serverProblems = useEditor((s) => s.errors[node.id])
+  const audienceErrors = useMemo(() => errorMap(node as unknown as BuilderNode, audienceProblems(node.audience), serverProblems ?? []), [node, serverProblems])
 
   return (
     <aside aria-label="Inspector" className="flex min-h-0 flex-col gap-4 overflow-y-auto p-4" data-testid="global-ref-panel">
@@ -167,6 +175,18 @@ export function GlobalRefPanel({ node }: { node: GlobalSectionRef }) {
         </Button>
       </div>
       {!reason && <p className="text-xs text-muted-foreground">Detach turns it into a normal section of this page only; the other pages keep the global one.</p>}
+      <WhoSeesThis
+        nodeId={node.id}
+        noun="section on this page"
+        audience={node.audience}
+        errors={audienceErrors}
+        onChange={(audience, opts) => {
+          const next: GlobalSectionRef = { ...node }
+          if (audience) next.audience = audience
+          else delete next.audience
+          store.getState().apply((content) => replaceSectionNode(content, node.id, next), { coalesceKey: opts?.coalesceKey })
+        }}
+      />
     </aside>
   )
 }

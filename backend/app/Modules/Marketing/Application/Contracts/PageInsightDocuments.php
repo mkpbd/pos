@@ -38,4 +38,21 @@ interface PageInsightDocuments
      * @return list<string>
      */
     public function existing(array $documentIds): array;
+
+    /**
+     * B13: the A/B tests running in a published version of a tracked document (as
+     * trackableSections() finds it) with the top-level section ids of each version (arm); empty
+     * when there are none or the document / version is not tracked.
+     *
+     * @return array<string, array{A: list<string>, B: list<string>}>
+     */
+    public function runningExperiments(string $documentId, int $version): array;
+
+    /**
+     * B13: an A/B test of a tracked document of this store — as in the draft, else as in the live
+     * version — or null.
+     *
+     * @return array{id: string, name: string, status: string, goal: string, split: int, started_at: ?string, ended_at: ?string, winner: ?string}|null
+     */
+    public function experiment(string $documentId, string $experimentId): ?array;
 }

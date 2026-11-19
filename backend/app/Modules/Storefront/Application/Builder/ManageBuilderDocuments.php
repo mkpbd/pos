@@ -10,6 +10,7 @@ use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Builder\Templates\ManageBuilderTemplates;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
+use App\Modules\Storefront\Domain\Builder\Experiments;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
 use Carbon\CarbonImmutable;
@@ -178,6 +179,8 @@ class ManageBuilderDocuments
     private function createGlobal(string $title, string $context, ?array $section): BuilderDocument
     {
         $key = BuilderDocument::GLOBAL_PREFIX.strtolower((string) Str::uuid());
+        // B13: a global section is no version of an A/B test.
+        unset($section['experiment']);
         $content = $section === null
             ? BuilderDocumentSchema::blankGlobal('s_'.Str::lower(Str::random(8)), 'c_'.Str::lower(Str::random(8)))
             : ['schema_version' => BuilderDocumentSchema::SCHEMA_VERSION, 'sections' => [$section]];
@@ -246,6 +249,9 @@ class ManageBuilderDocuments
      */
     public function saveDraft(BuilderDocument $document, int $revision, array $content, bool $mayEditCustomHtml = true): BuilderDocument
     {
+        // B13: the A/B tests' status, dates and winner are the server's (start / stop / keep);
+        // they come from the stored draft (a newer one is a conflict below anyway).
+        $content = Experiments::withManagedFields($content, $document->draft);
         // B9: a global section is validated as one section in its own context.
         $content = ($this->prepare)($content, $document->contentContext(), $document->isGlobal());
 

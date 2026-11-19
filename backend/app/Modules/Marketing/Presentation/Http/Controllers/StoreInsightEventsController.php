@@ -29,6 +29,9 @@ class StoreInsightEventsController
      * published pages of this store, or unknown versions; unknown nodes and malformed events are
      * ignored. Nothing personal is stored (no ip, user agent or cookie); `path` and `el` are not
      * kept. 413 PAYLOAD_TOO_LARGE above 64 KB; 422 for malformed top-level fields.
+     *
+     * B13: `arms?: {<A/B test id>: A|B}` (at most 3 used) on every beacon of a page view — the
+     * versions it shows; tests not running in that version and bad entries are ignored.
      */
     public function __invoke(Request $request, RecordPageEvents $record): JsonResponse
     {
@@ -48,6 +51,8 @@ class StoreInsightEventsController
             'scroll' => ['sometimes', 'nullable', 'integer', Rule::in($milestones)],
             'scroll_from' => ['sometimes', 'nullable', 'integer', Rule::in($milestones)],
             'vitals' => ['sometimes', 'nullable', 'array'],
+            // B13: the A/B test versions shown (entries checked by RecordPageEvents).
+            'arms' => ['sometimes', 'nullable', 'array'],
         ])->validate();
 
         return ApiResponse::success($record($data, $request->ip(), $request->userAgent()), 202);

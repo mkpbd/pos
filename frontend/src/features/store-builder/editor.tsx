@@ -58,6 +58,11 @@ import { CanvasFrame, type CanvasEditMessage, type CanvasHandle, type NodeUpload
 import { CheckPanel } from './check-panel'
 import { InsightsPanel } from './insights/insights-panel'
 import { useInsights } from './insights/use-insights'
+import { useExperimentsUi } from './experiments/experiments-context'
+import { ExperimentsProvider } from './experiments/experiments-provider'
+import { ExperimentsPanel } from './experiments/experiments-panel'
+import { canHaveExperiments, experimentsOf } from './experiments/experiments-model'
+import { useCanvasArms } from './experiments/use-canvas-arms'
 import { usePageCheck } from './use-page-check'
 import { applyTextEdit, firstInlineField } from './inline-edit'
 import { dropTargetOf, pictureFileProblem, setNodePicture, uploadErrorMessage, uploadPicture } from './media-upload'
@@ -81,6 +86,8 @@ import { flattenLayers } from './layers'
 import { LayersPanel, type LayerIndicator } from './layers-panel'
 import { MiniToolbar } from './mini-toolbar'
 import { toRenderTree } from './render-tree'
+import { useAudienceBadges } from './audience/badges'
+import { usePreviewContext } from './audience/use-preview'
 import { useEditor, useEditorStoreApi, useSelectedIds } from './store'
 import { selectedNodes } from './selection'
 import { CommandBox } from './command-box'
@@ -231,7 +238,9 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
     <EditorUiContext value={ui}>
       {/* Its own provider: the editor renders outside the admin shell. */}
       <TooltipProvider delayDuration={300}>
-        <EditorLayout autosave={autosave} canPublish={canPublish} canSubmit={canSubmit} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
+        <ExperimentsProvider autosave={autosave}>
+          <EditorLayout autosave={autosave} canPublish={canPublish} canSubmit={canSubmit} canCustomHtml={canCustomHtml} canvasContext={canvasContext} registry={registry} queryClient={queryClient} />
+        </ExperimentsProvider>
         <DeleteConfirm ids={deleteIds} onClose={() => setDeleteIds([])} />
         <CopyToPages id={copySectionId} onClose={() => setCopySectionId(null)} />
         <SaveTemplate id={saveTemplateId} onClose={() => setSaveTemplateId(null)} />
@@ -389,6 +398,10 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const canViewInsights = useCan()('storefront.view')
   const insights = useInsights({ documentId: documentInfo.id, available: documentInfo.kind === 'page' && canViewInsights, timeZone })
   const setInsightsOpen = insights.setOpen
+  // B13: the A/B tests panel (pages and shop areas).
+  const ab = useExperimentsUi()
+  const abAvailable = ab !== null && canHaveExperiments(documentInfo.kind)
+  const abCount = useEditor((s) => experimentsOf(s.content).length)
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitPending, setSubmitPending] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -443,6 +456,11 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     () => toRenderTree(expanded.content, { locale: canvasLocale, now, reveal: revealKey ? revealKey.split(',') : null }),
     [expanded, revealKey, now, canvasLocale],
   )
+  // B13: "Preview as" (null = show everything) and the "Who sees this" badges on the canvas.
+  const previewContext = usePreviewContext()
+  const audience = useAudienceBadges(expanded.content, previewContext)
+  // B13: one version of each A/B test on the canvas, with its "Showing version A | B" switch.
+  const canvasArms = useCanvasArms(sections)
   // B12: the phone / tablet order the canvas draws with (globals' column orders merged in).
   const canvasDeviceOrder = useMemo(() => mergedDeviceOrder(content, globals ?? new Map()), [content, globals])
   // The inspector looks things up in the drawn document; nodes it can't show (unavailable globals) are left out.
@@ -606,6 +624,15 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
 
   /* ---------------------------------------------------------------- B10 page check --------- */
   const [checkOpen, setCheckOpen] = useState(false)
+  // B13: opening the A/B tests panel puts away Check page and Insights.
+  const setAbBeforeOpen = ab?.setBeforeOpen
+  useLayoutEffect(() => {
+    setAbBeforeOpen?.(() => {
+      setCheckOpen(false)
+      setInsightsOpen(false)
+    })
+    return () => setAbBeforeOpen?.(null)
+  }, [setAbBeforeOpen, setInsightsOpen])
   const checkTheme = useMemo(() => {
     // B15: the fonts in use feed the speed check ("Use fewer fonts").
     const typo = (themeSettings?.typography ?? canvasContext.bootstrap.theme.typography) as
@@ -1222,6 +1249,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck],
   )
   const insightsShown = insights.open && !checkOpen
+  const abShown = abAvailable && ab.open && !checkOpen && !insightsShown
   const commandItems = useCommandItems(commandOpen, commandActions, single ? null : templates)
 
   const labelOf = useCallback((id: string) => {
@@ -1286,14 +1314,16 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                   onToggle: () => {
                     const next = !(insights.open && !checkOpen)
                     if (next) setCheckOpen(false)
+                    if (next) ab?.setOpen(false)
                     insights.setOpen(next)
                   },
                 }
               : undefined
           }
+          abTests={abAvailable ? { open: abShown, count: abCount, onToggle: () => ab.setOpen(!abShown) } : undefined}
         />
         <div className="flex min-h-0 flex-1">
-          <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown ? 'w-96' : 'w-72')}>
+          <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown || abShown ? 'w-96' : 'w-72')}>
             {checkOpen && (
               <CheckPanel
                 check={check}
@@ -1325,7 +1355,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 onClose={() => insights.setOpen(false)}
               />
             )}
-            <Tabs hidden={checkOpen || insightsShown} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
+            {abShown && <ExperimentsPanel canPublish={canPublish} canView={canViewInsights} timeZone={timeZone} onClose={() => ab.setOpen(false)} />}
+            <Tabs hidden={checkOpen || insightsShown || abShown} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
               <TabsList className={cn('m-2 grid w-auto', showGlobalTab && showTemplatesTab ? 'grid-cols-4' : showGlobalTab || showTemplatesTab ? 'grid-cols-3' : 'grid-cols-2')}>
                 <TabsTrigger value="add">Add</TabsTrigger>
                 <TabsTrigger value="layers">Layers</TabsTrigger>
@@ -1376,7 +1407,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               emptyText={info.empty}
               bootstrap={canvasContext.bootstrap}
               locale={canvasLocale}
-              sections={sections}
+              sections={canvasArms.sections}
               data={preview.data}
               media={preview.media}
               pending={preview.pending}
@@ -1409,6 +1440,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               spacing={spacing}
               uploads={uploads}
               heat={checkOpen ? null : insights.heat}
+              previewAs={previewContext}
+              audienceBadges={audience.badges}
+              arms={canvasArms.layer}
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">

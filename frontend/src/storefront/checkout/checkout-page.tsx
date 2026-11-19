@@ -27,6 +27,7 @@ import { checkoutSchema, formFieldFor, initialCheckoutValues, NEW_ADDRESS, toPla
 import { SummaryLines, SummaryTotals } from './summary-totals'
 import { useDebouncedValue } from './use-debounced-value'
 import { withBuilderAttribution } from '../insights/builder-attribution'
+import { rememberDistrict } from '../builder/audience/context'
 import { readAttribution } from '../landing/attribution'
 
 /** How long the form must be still before the summary is recomputed. */
@@ -157,6 +158,11 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
 
   const divisions = useDivisionsQuery()
   const districts = useDistrictsQuery(divisionId)
+  // B13: the district last chosen here (or of the saved address picked) decides "Only shoppers in …" sections; it stays in this browser.
+  const chosenDistrict = addresses.find((address) => address.id === addressChoice)?.district.id ?? districtId
+  useEffect(() => {
+    if (chosenDistrict !== '' && chosenDistrict !== undefined && chosenDistrict !== null) rememberDistrict(chosenDistrict)
+  }, [chosenDistrict])
   const geoId: GeoIdLookup = (kind, value) => {
     const list: { id: GeoId }[] | undefined = kind === 'division' ? divisions.data : districts.data
     return list?.find((item) => String(item.id) === value)?.id ?? value

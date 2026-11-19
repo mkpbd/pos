@@ -38,6 +38,7 @@ import {
 } from '@/storefront/builder/validate'
 import type { BuilderNode, Problem } from './types'
 import { B17_TYPES, b17Message } from './b17-model'
+import { audienceProblems } from '../audience/words'
 
 /** Text limits of the basic elements (backend ElementRegistry::TEXT_LIMITS). */
 export const TEXT_LIMITS = { heading: 200, text: 20000, buttonLabel: 60, alt: 200 } as const
@@ -656,6 +657,8 @@ export function validateNode(node: BuilderNode, options: { icons?: readonly stri
     validateElement(node, add, options.icons ?? ICON_NAMES, options.context)
   }
   validateSchedule(node, add)
+  // B13: who sees it (the server also checks that districts and campaigns exist).
+  for (const problem of audienceProblems(node.audience)) add(problem.path, problem.message)
   validateTranslations(node, add)
   return problems
 }

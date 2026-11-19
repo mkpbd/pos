@@ -55,6 +55,22 @@ class EloquentMarketingLinks implements MarketingLinks
             ->all();
     }
 
+    public function audienceMatches(array $ids): array
+    {
+        $ids = $this->uuids($ids);
+        if ($ids === []) {
+            return [];
+        }
+        $codes = [];
+        foreach (ShortLink::query()->whereIn('campaign_id', $ids)->orderBy('code')->get(['campaign_id', 'code']) as $link) {
+            $codes[$link->campaign_id][] = $link->code;
+        }
+
+        return Campaign::query()->whereKey($ids)->orderBy('id')->get(['id', 'utm_campaign'])
+            ->mapWithKeys(fn (Campaign $c) => [$c->id => ['utm_campaign' => $c->utm_campaign, 'short_links' => $codes[$c->id] ?? []]])
+            ->all();
+    }
+
     public function isStorePath(mixed $path): bool
     {
         return ShortLinkTarget::isValid($path);

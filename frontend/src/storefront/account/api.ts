@@ -8,10 +8,11 @@ import type { AddressInput, Customer, CustomerAddress, GeoDistrict, GeoDivision,
 import { clearLocalWishlist, readLocalWishlist } from '../wishlist/local-wishlist'
 
 /** The signed-in customer, null for guests (GET /store/account/me also issues the CSRF cookie). */
-export function useMeQuery() {
+export function useMeQuery(enabled = true) {
   const { locale } = useLocale()
   return useQuery({
     queryKey: localized(customerKeys.me, locale),
+    enabled,
     queryFn: ({ signal }) => storeApi.get<Customer | null>('/store/account/me', { signal }).then((r) => r.data ?? null),
     staleTime: 5 * 60_000,
     retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,

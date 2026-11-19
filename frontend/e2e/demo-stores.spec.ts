@@ -1275,6 +1275,99 @@ test('B15: Circuit Bazar — a shopper\'s visit, scroll and clicks show in the p
   await adminContext.close()
 })
 
+test('B13: Blush & Bloom — a members-only section stays hidden for guests; an A/B test shows a shopper version B, counts it, and Keep B makes it the page', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('beauty.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@beauty.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { id: string; type?: string; props?: Record<string, unknown>; translations?: Record<string, unknown>; columns?: { elements: Node[] }[]; audience?: unknown; experiment?: unknown }
+  const firstHeading = (node: Node): Node | null => {
+    for (const column of node.columns ?? []) for (const element of column.elements) {
+      if (element.type === 'heading') return element
+      const inner = firstHeading(element)
+      if (inner) return inner
+    }
+    return null
+  }
+  const section = async (heading: string, extra: Partial<Node> = {}) => {
+    const node = (await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })).body.data.nodes[0] as Node
+    const h = firstHeading(node)!
+    h.props = { ...h.props, text: heading }
+    h.translations = {}
+    return { ...node, ...extra }
+  }
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b13-audience', title: 'B13 audience', from: 'blank' })
+  if (doc.status === 409) {
+    // A rerun on the same database: reuse the page.
+    const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === 'landing:b13-audience')
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const docId = doc.body.data.id as string
+  const sections = [
+    await section('Welcome, glow friends'),
+    await section('Members only: early access', { audience: { match: 'all', rules: [{ kind: 'account', is: 'signed_in' }] } }),
+    await section('Version A headline', { experiment: { id: 'x_hero', arm: 'A' } }),
+    await section('Version B headline', { experiment: { id: 'x_hero', arm: 'B' } }),
+  ]
+  const content = { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections, experiments: [{ id: 'x_hero', name: 'Hero test', goal: 'orders', split: 50 }] }
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content })
+  expect(saved.status).toBe(200)
+  // A malformed rule is refused.
+  const bad = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: saved.body.data.draft_revision, content: { ...content, sections: [{ ...sections[0], audience: { match: 'all', rules: [{ kind: 'cart', min: '500.00', max: '100.00' }] } }, ...sections.slice(1)] } })
+  expect(bad.status).toBe(422)
+  const started = await call('POST', `/api/v1/storefront/builder/documents/${docId}/experiments/x_hero/start`, { revision: saved.body.data.draft_revision })
+  expect(started.status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B13' })).status).toBe(200)
+
+  // A guest who was put in version B: the members section stays hidden, version B shows, the beacons say "B".
+  const shopper = await browser.newContext({ viewport: { width: 1366, height: 800 } })
+  await shopper.addInitScript(`try { localStorage.setItem('sf.ab.${docId}.x_hero', 'B') } catch {}`)
+  const beacons: string[] = []
+  await shopper.route('**/store/insights/events', async (route) => {
+    beacons.push(route.request().postData() ?? '')
+    await route.continue()
+  })
+  const visit = await shopper.newPage()
+  await visit.goto(`${base}/p/b13-audience`)
+  await expect(visit.getByRole('heading', { name: 'Welcome, glow friends' })).toBeVisible({ timeout: 30_000 })
+  await expect(visit.getByRole('heading', { name: 'Version B headline' })).toBeVisible()
+  await expect(visit.getByRole('heading', { name: 'Version A headline' })).toHaveCount(0)
+  await expect(visit.getByRole('heading', { name: 'Members only: early access' })).toHaveCount(0)
+  await visit.waitForTimeout(1500)
+  await visit.evaluate(`Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide'))`)
+  await expect.poll(() => beacons.some((b) => /"arms":\{"x_hero":"B"\}/.test(b)), { timeout: 20_000 }).toBe(true)
+  await shopper.close()
+
+  // The results count that visitor under version B; Keep B makes version B the page's own section.
+  await expect
+    .poll(async () => (await call('GET', `/api/v1/storefront/builder/documents/${docId}/experiments/x_hero/results`)).body.data?.arms?.B?.visitors ?? 0, { timeout: 30_000 })
+    .toBeGreaterThan(0)
+  const results = (await call('GET', `/api/v1/storefront/builder/documents/${docId}/experiments/x_hero/results`)).body.data
+  expect(results.enough_data).toBe(false)
+  expect(results.recommendation).toBe('keep_running')
+  const current = await call('GET', `/api/v1/storefront/builder/documents/${docId}`)
+  const kept = await call('POST', `/api/v1/storefront/builder/documents/${docId}/experiments/x_hero/keep`, { revision: current.body.data.draft_revision, arm: 'B' })
+  expect(kept.status).toBe(200)
+  const headings = (kept.body.data.content.sections as Node[]).map((s) => firstHeading(s)?.props?.text)
+  expect(headings).toContain('Version B headline')
+  expect(headings).not.toContain('Version A headline')
+  expect((kept.body.data.content.sections as Node[]).some((s) => s.experiment)).toBe(false)
+  expect(kept.body.data.content.experiments[0]).toMatchObject({ status: 'ended', winner: 'B' })
+  await adminContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

@@ -5,6 +5,7 @@ namespace App\Modules\Storefront\Application\Builder;
 use App\Modules\Marketing\Application\Contracts\PageInsightDocuments;
 use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
+use App\Modules\Storefront\Domain\Builder\Experiments;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
 use Illuminate\Support\Facades\Cache;
@@ -86,6 +87,44 @@ class BuilderInsightDocuments implements OrderPageAttribution, PageInsightDocume
         }
 
         return BuilderDocument::query()->whereIn('kind', self::KINDS)->whereIn('id', $ids)->pluck('id')->all();
+    }
+
+    public function runningExperiments(string $documentId, int $version): array
+    {
+        $document = $this->find($documentId);
+        if ($document === null || $document->published_version_id === null || $version < 1) {
+            return [];
+        }
+
+        // Versions never change, so neither do their tests.
+        return Cache::remember('builder-insights:experiments:'.$document->id.':'.$version, now()->addDay(), function () use ($document, $version) {
+            $content = BuilderVersion::query()->publishedOnly()->where('document_id', $document->id)->where('number', $version)->value('content');
+            $content = is_string($content) ? json_decode($content, true) : $content;
+            $running = [];
+            foreach (is_array($content) ? ($content['experiments'] ?? []) : [] as $experiment) {
+                if (is_array($experiment) && ($experiment['status'] ?? null) === 'running' && is_string($experiment['id'] ?? null)) {
+                    $running[$experiment['id']] = Experiments::armSections($content, $experiment['id']);
+                }
+            }
+
+            return $running;
+        });
+    }
+
+    public function experiment(string $documentId, string $experimentId): ?array
+    {
+        $document = $this->find($documentId);
+        if ($document === null) {
+            return null;
+        }
+        foreach ([$document->draft, $document->publishedVersion?->content] as $content) {
+            $found = is_array($content) ? Experiments::find($content, $experimentId) : null;
+            if ($found !== null) {
+                return $found[1];
+            }
+        }
+
+        return null;
     }
 
     public function isStorePage(string $documentId): bool

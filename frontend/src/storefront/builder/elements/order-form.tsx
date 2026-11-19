@@ -51,6 +51,7 @@ import { DraftPlaceholder, PreviewMark } from '../preview-mark'
 import { NODE_ID } from '../registry'
 import { DeviceOrderCtx, useOwnerDocumentId, usePage } from '../render-context'
 import { builderAttributionAt } from '../../insights/builder-attribution'
+import { rememberDistrict } from '../audience/context'
 import type { OrderFormData } from '../types'
 import { isUuid, oneOf, ORDER_FORM_ENUMS } from '../validate'
 import { useB8aData } from './b8a-shared'
@@ -369,7 +370,12 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
         id={id(field)}
         value={values[field]}
         disabled={disabled}
-        onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value, ...(field === 'division_id' ? { district_id: '' } : {}) }))}
+        onChange={(e) => {
+          const value = e.target.value
+          // B13: the district chosen here decides "Only shoppers in …" sections (kept in this browser only).
+          if (field === 'district_id' && !canvas) rememberDistrict(value)
+          setValues((v) => ({ ...v, [field]: value, ...(field === 'division_id' ? { district_id: '' } : {}) }))
+        }}
         aria-invalid={errors[field] ? true : undefined}
         aria-required
         aria-describedby={describedBy(field)}

@@ -11,10 +11,11 @@ import type { Cart } from '../types'
  * it on every read and answers every change with the whole repriced cart, which replaces the
  * cached one — nothing is computed here.
  */
-export function useCartQuery() {
+export function useCartQuery(enabled = true) {
   const { locale } = useLocale()
   return useQuery({
     queryKey: localized(customerKeys.cart, locale),
+    enabled,
     queryFn: ({ signal }) => storeApi.get<Cart>('/store/cart', { signal }).then((r) => r.data),
     staleTime: 30_000,
     retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 1,

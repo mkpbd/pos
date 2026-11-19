@@ -84,4 +84,28 @@ class EloquentAttributedOrders implements AttributedOrders
             'revenue' => Decimal::round((string) $r->revenue, 2),
         ])->values()->all();
     }
+
+    public function experimentGroups(CarbonImmutable $from, CarbonImmutable $to, string $timezone, string $documentId, string $experimentId, ?string $device = null): array
+    {
+        $rows = Order::query()->toBase()
+            ->where('orders.placed_at', '>=', $from)
+            ->where('orders.placed_at', '<', $to)
+            ->whereNotIn('orders.status', [OrderStatus::Cancelled->value, OrderStatus::Failed->value])
+            ->whereRaw("orders.attribution->'builder'->>'document_id' = ?", [strtolower($documentId)])
+            ->whereRaw("orders.attribution->'builder'->'experiments'->>? IN ('A', 'B')", [$experimentId])
+            ->when($device !== null, fn ($q) => $q->whereRaw("orders.attribution->'builder'->>'device' = ?", [$device]))
+            ->selectRaw("to_char((orders.placed_at AT TIME ZONE ?)::date, 'YYYY-MM-DD') AS day", [$timezone])
+            ->selectRaw("orders.attribution->'builder'->'experiments'->>? AS arm", [$experimentId])
+            ->selectRaw('COUNT(*) AS orders')
+            ->selectRaw('COALESCE(SUM(orders.total), 0) AS revenue')
+            ->groupByRaw('1, 2')
+            ->get();
+
+        return $rows->map(fn (object $r) => [
+            'day' => (string) $r->day,
+            'arm' => (string) $r->arm,
+            'orders' => (int) $r->orders,
+            'revenue' => Decimal::round((string) $r->revenue, 2),
+        ])->values()->all();
+    }
 }

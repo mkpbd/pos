@@ -520,3 +520,17 @@ Original questions:
 - **Speed:** page check "Speed" group with a 0–100 score (`page-check-speed.ts`: page weight from served renditions, first-screen
   pictures, background video, slideshows, embeds, scripts in custom HTML, pictures in text, fonts, long pages) and Fix it; the
   renderer gives the first picture of the first screen `fetchpriority="high"` + eager, lazy-loads the rest and reserves picture space.
+
+### As built — B13 audiences & A/B tests (2026-11-19)
+
+- **Audiences:** `AudienceRules` validates and normalizes `audience` on sections, global refs and elements; the storefront's pure
+  `evaluateAudience` decides in the browser (visitor flag and district in localStorage, campaign touch from the URL / P2a session,
+  cart subtotal, store time from the payload `timezone`) — a node with rules renders only once its context is known (no flash);
+  presentation only, never a lock. Editor: Advanced → *Who sees this* (one rule per kind, plain sentence, not-for-secrets note),
+  badges on canvas and Layers, toolbar *Preview as* (canvas `preview-as` message fades non-matching nodes; never filters).
+- **A/B tests:** `Experiments` (document list + section arms, contiguous blocks, server-managed status) and
+  `ManageBuilderExperiments` (start / stop / keep on the draft with revision checks). The storefront assigns a sticky arm by split
+  (localStorage), renders only that arm, sends `arms` on beacons and `experiments` in attribution; DNT / GPC → A, not counted.
+  `ExperimentResults` + `BetaBinomial` (exact Beta posterior probability, no dependency); add-to-cart via a Cart event. Editor:
+  *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
+  the editor sends the canvas only the shown arm (the canvas never filters).

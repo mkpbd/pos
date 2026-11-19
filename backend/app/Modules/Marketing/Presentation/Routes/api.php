@@ -25,6 +25,9 @@ Route::middleware(['storefront', 'throttle:insights'])->withoutMiddleware([Ensur
 Route::prefix('storefront/builder')->middleware(['auth:sanctum', 'tenant', 'can:storefront.view'])->group(function () {
     Route::get('insights', [PageInsightsController::class, 'index']);
     Route::get('documents/{document}/insights', [PageInsightsController::class, 'show'])->whereUuid('document');
+    // B13: A/B test results.
+    Route::get('documents/{document}/experiments/{experiment}/results', [PageInsightsController::class, 'experiment'])
+        ->whereUuid('document')->where('experiment', '[a-z][a-z0-9_-]{1,31}');
 });
 
 // P2a: Marketing — campaigns, short links and their stats.

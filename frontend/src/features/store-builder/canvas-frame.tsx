@@ -13,6 +13,10 @@ import { SpacingHandles, type SpacingPhase, type SpacingValues } from './spacing
 import type { SpacingGuide } from './snapping'
 import type { SpacingBox, SpacingSide } from './spacing-drag'
 import { HeatOverlay, type HeatLayer } from './insights/heat-overlay'
+import { ArmSwitchers, type ArmSwitchLayer } from './experiments/arm-switchers'
+import type { PreviewContext } from '@/storefront/builder/audience/types'
+import { AudienceCanvasBadges } from './audience/audience-badge'
+import type { CanvasAudienceBadge } from './audience/badges'
 
 /*
  * The canvas iframe (/admin/builder-canvas) at the device width, scaled to fit, with the editor's
@@ -111,10 +115,16 @@ export type CanvasFrameProps = {
   deviceOrder?: DeviceOrder | null
   /** B15: the Insights heat map (clicks per section and scroll reach) drawn over the page; null = off. */
   heat?: HeatLayer | null
+  /** B13: the "Showing version A | B" switch on each A/B test's sections (null: no tests). */
+  arms?: ArmSwitchLayer | null
+  /** B13: the toolbar's "Preview as" (null = show everything): the canvas fades what that shopper wouldn't see. */
+  previewAs?: PreviewContext | null
+  /** B13: "Who sees this" badges drawn on the nodes that have rules. */
+  audienceBadges?: CanvasAudienceBadge[]
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -222,6 +232,21 @@ export function CanvasFrame(props: CanvasFrameProps) {
     sentLocale.current = locale
   }, [ready, locale, send])
 
+  // B13: "Preview as" on change and after every `ready` — a new canvas page starts with "Show
+  // everything", so that needs no message.
+  const sentPreview = useRef<{ ready: number; context: PreviewContext | null }>({ ready: 0, context: null })
+  useEffect(() => {
+    if (ready === 0) return
+    const last = sentPreview.current
+    if (last.ready === ready && last.context === previewAs) return
+    if (last.ready !== ready && previewAs === null) {
+      sentPreview.current = { ready, context: null }
+      return
+    }
+    send({ type: 'preview-as', context: previewAs })
+    sentPreview.current = { ready, context: previewAs }
+  }, [ready, previewAs, send])
+
   useEffect(() => {
     if (ready > 0 && theme) send(fonts ? { type: 'theme', settings: theme, fonts } : { type: 'theme', settings: theme })
   }, [ready, theme, fonts, send])
@@ -323,6 +348,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
           aria-hidden={dragging ? true : undefined}
         >
           {!dragging && heat && <HeatOverlay layer={heat} rects={rects} scale={scale} />}
+          {!dragging && audienceBadges && audienceBadges.length > 0 && <AudienceCanvasBadges badges={audienceBadges} rects={rects} scale={scale} hide={editingNow ? editing : null} />}
+          {!dragging && !editingNow && arms && <ArmSwitchers layer={arms} rects={rects} scale={scale} height={frameHeight * scale} />}
           {!dragging && hovered && hover && hovered.h > 0 && (
             <span className="absolute rounded-sm bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium text-white" style={{ left: Math.max(0, hovered.x * scale), top: Math.max(0, hovered.y * scale) }}>
               {hoverLabel(hover)}

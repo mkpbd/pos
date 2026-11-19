@@ -1,6 +1,7 @@
 import { ClipboardCopyIcon, ClipboardPasteIcon, CopyPlusIcon, GlobeIcon, PaintbrushIcon, PaintBucketIcon, PencilIcon, UnlinkIcon } from 'lucide-react'
 import { DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut } from '@/components/ui/dropdown-menu'
 import { useCommands, useEditorUi } from './commands'
+import { ExperimentMenuItems } from './experiments/experiment-menu'
 import { globalRefOf } from './global-sections'
 import { useEditorStoreApi } from './store'
 import type { NodeKind } from './tree'
@@ -81,6 +82,7 @@ export function NodeClipboardItems({ id, kind }: { id: string; kind: NodeKind })
           )}
         </>
       )}
+      <ExperimentMenuItems id={id} kind={kind} />
     </>
   )
 }

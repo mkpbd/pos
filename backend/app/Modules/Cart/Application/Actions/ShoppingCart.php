@@ -2,6 +2,7 @@
 
 namespace App\Modules\Cart\Application\Actions;
 
+use App\Modules\Cart\Application\Events\ProductAddedFromBuilderPage;
 use App\Modules\Cart\Application\Services\CartPricer;
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Domain\CartRules;
@@ -43,8 +44,8 @@ class ShoppingCart
     }
 
     /**
-     * @param  array<string, string>|null  $builder  B15: the builder page the product was added from
-     *                                               (sanitized; kept on the cart, the last one wins)
+     * @param  array<string, mixed>|null  $builder  B15: the builder page the product was added from
+     *                                              (sanitized; kept on the cart, the last one wins)
      * @return array{0: Cart, 1: ?string} the cart and, when a guest cart was created, its new cookie token
      */
     public function add(CartOwner $owner, string $variantId, string $quantity, ?array $builder = null): array
@@ -52,7 +53,7 @@ class ShoppingCart
         $quantity = Decimal::round($quantity, 3);
         $variant = $this->catalog->variantsForCart([$variantId])[$variantId] ?? null;
 
-        return DB::transaction(function () use ($owner, $variantId, $quantity, $variant, $builder) {
+        $result = DB::transaction(function () use ($owner, $variantId, $quantity, $variant, $builder) {
             [$cart, $token] = $this->lockOrCreate($owner);
             /** @var CartItem|null $line */
             $line = $cart->items()->where('variant_id', $variantId)->first();
@@ -75,6 +76,12 @@ class ShoppingCart
 
             return [$cart, $token];
         });
+        // B13: an add-to-cart for the A/B test versions the shopper saw on that page.
+        if (is_array($builder['experiments'] ?? null) && $builder['experiments'] !== []) {
+            event(new ProductAddedFromBuilderPage($result[0]->organization_id, (string) $builder['document_id'], $builder['device'] ?? null, $builder['experiments']));
+        }
+
+        return $result;
     }
 
     public function update(CartOwner $owner, string $itemId, string $quantity): Cart

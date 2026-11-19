@@ -4,6 +4,7 @@ use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderAiController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderExperimentController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderPublishingController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderReviewController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
@@ -148,6 +149,13 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('documents/{document}/check', [BuilderDocumentController::class, 'check'])->whereUuid('document');
         Route::post('documents/{document}/publish', [BuilderDocumentController::class, 'publish'])->whereUuid('document')->middleware('can:storefront.publish');
         Route::post('documents/{document}/discard', [BuilderDocumentController::class, 'discard'])->whereUuid('document');
+        // B13: A/B tests — start, stop, keep a version (the draft; storefront.publish).
+        Route::middleware('can:storefront.publish')->group(function () {
+            foreach (['start', 'stop', 'keep'] as $action) {
+                Route::post("documents/{document}/experiments/{experiment}/{$action}", [BuilderExperimentController::class, $action])
+                    ->whereUuid('document')->where('experiment', '[a-z][a-z0-9_-]{1,31}');
+            }
+        });
         Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
             ->whereUuid(['document', 'version'])->scopeBindings();
         Route::delete('documents/{document}', [BuilderDocumentController::class, 'destroy'])->whereUuid('document');

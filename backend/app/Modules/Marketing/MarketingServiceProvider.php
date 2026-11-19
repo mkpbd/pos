@@ -2,7 +2,9 @@
 
 namespace App\Modules\Marketing;
 
+use App\Modules\Cart\Application\Events\ProductAddedFromBuilderPage;
 use App\Modules\Marketing\Application\Contracts\MarketingLinks;
+use App\Modules\Marketing\Application\Listeners\RecordExperimentAddToCart;
 use App\Modules\Marketing\Infrastructure\Console\PrunePageInsightsCommand;
 use App\Modules\Marketing\Infrastructure\Console\PruneVisitorHashesCommand;
 use App\Modules\Marketing\Infrastructure\EloquentMarketingLinks;
@@ -11,6 +13,7 @@ use App\Modules\Orders\Application\Contracts\OrderCampaigns;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -36,6 +39,8 @@ class MarketingServiceProvider extends ModuleServiceProvider
         // B15: a page sends a beacon every 15 s and when hidden; room for a few open tabs. The
         // address is only the (hashed) limiter key in the cache, never stored.
         RateLimiter::for('insights', fn (Request $request) => Limit::perMinute(60)->by('insights:'.$request->ip()));
+        // B13: add-to-carts per A/B test version.
+        Event::listen(ProductAddedFromBuilderPage::class, RecordExperimentAddToCart::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([PruneVisitorHashesCommand::class, PrunePageInsightsCommand::class]);

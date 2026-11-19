@@ -40,6 +40,10 @@ use Illuminate\Support\Facades\Validator;
  *
  * B12: any document may carry `device_order` (the order of sections and of a column's elements
  * on tablets and phones, DeviceOrder) — canonical, kept only when set.
+ *
+ * B13: sections, global section references and elements may carry `audience` (AudienceRules);
+ * pages, content pages and shop areas may carry `experiments` and their top-level sections an
+ * `experiment` version (Experiments) — all kept only when set.
  */
 final class BuilderDocumentSchema
 {
@@ -290,6 +294,8 @@ final class BuilderDocumentSchema
             ['sections' => $sections],
             fn (string $path, ?string $nodeId, string $message, string $code) => $this->error($path, $nodeId, $message, $code),
         );
+        // B13: A/B tests (pages, content pages and shop areas; kept only when there are any).
+        $experiments = $this->experiments($document['experiments'] ?? null, $sections);
         if ($this->errors !== []) {
             throw new InvalidBuilderDocument($this->errors);
         }
@@ -304,8 +310,31 @@ final class BuilderDocumentSchema
         if ($deviceOrder !== null) {
             $result['device_order'] = $deviceOrder;
         }
+        if ($experiments !== []) {
+            $result['experiments'] = $experiments;
+        }
 
         return $result;
+    }
+
+    /**
+     * B13: the document's A/B tests (Experiments), checked against its sections.
+     *
+     * @param  list<array<string, mixed>>  $sections  normalized
+     * @return list<array<string, mixed>>
+     */
+    private function experiments(mixed $value, array $sections): array
+    {
+        $error = fn (string $path, ?string $nodeId, string $message) => $this->error($path, $nodeId, $message, Experiments::ERROR_CODE);
+        if ($value !== null && $value !== [] && ($this->global || ! in_array($this->context, Experiments::CONTEXTS, true))) {
+            $error('experiments', null, 'Only pages, content pages and shop areas can have A/B tests.');
+
+            return [];
+        }
+        $experiments = Experiments::normalize($value, $error);
+        Experiments::check($experiments, $sections, $error);
+
+        return $experiments;
     }
 
     /**
@@ -340,6 +369,8 @@ final class BuilderDocumentSchema
             'ref' => strtolower($ref),
             'hidden' => $hidden,
             'schedule' => $this->schedule($node['schedule'] ?? null, "{$path}.schedule", $id),
+            // B13: who sees the global section here.
+            ...$this->audience($node, $path, $id),
         ];
     }
 
@@ -491,7 +522,29 @@ final class BuilderDocumentSchema
             // B9: sections may have a parallax background.
             ...$this->common($node, $path, $id, [], true, true),
             'columns' => $this->columns($node['columns'] ?? null, "{$path}.columns", $id, false),
+            ...$this->experimentArm($node['experiment'] ?? null, "{$path}.experiment", $id),
         ];
+    }
+
+    /**
+     * B13: the A/B test version a top-level section is (`['experiment' => {id, arm}]` when set);
+     * whether the test exists is checked with the document's tests (Experiments::check()).
+     *
+     * @return array{experiment?: array{id: string, arm: string}}
+     */
+    private function experimentArm(mixed $value, string $path, ?string $id): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if ($this->global || ! in_array($this->context, Experiments::CONTEXTS, true)) {
+            $this->error($path, $id, 'Only sections of pages, content pages and shop areas can be part of an A/B test.', Experiments::ERROR_CODE);
+
+            return [];
+        }
+        $arm = Experiments::arm($value, $path, $id, fn (string $at, ?string $node, string $message) => $this->error($at, $node, $message, Experiments::ERROR_CODE));
+
+        return $arm === null ? [] : ['experiment' => $arm];
     }
 
     /**
@@ -702,7 +755,25 @@ final class BuilderDocumentSchema
             'hidden' => $hidden,
             'schedule' => $this->schedule($node['schedule'] ?? null, "{$path}.schedule", $id),
             'translations' => $this->translations($node['translations'] ?? null, $translatable, "{$path}.translations", $id),
+            ...$this->audience($node, $path, $id),
         ];
+    }
+
+    /**
+     * B13: who sees the node — `['audience' => …]` when set, else nothing (older documents
+     * normalize unchanged).
+     *
+     * @param  array<string, mixed>  $node
+     * @return array{audience?: array<string, mixed>}
+     */
+    private function audience(array $node, string $path, ?string $id): array
+    {
+        $audience = AudienceRules::normalize(
+            $node['audience'] ?? null,
+            fn (string $at, string $message) => $this->error("{$path}.{$at}", $id, $message, AudienceRules::ERROR_CODE),
+        );
+
+        return $audience === null ? [] : ['audience' => $audience];
     }
 
     /**

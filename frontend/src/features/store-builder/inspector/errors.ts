@@ -68,6 +68,8 @@ export function isInlineProblem(node: BuilderNode, problem: Problem, bangla: boo
   if (key.startsWith('translations.')) return bangla && key.startsWith('translations.bn.')
   if (node.type === 'column') return false
   if (ADVANCED_FIELDS.includes(key)) return true
+  // B13: the audience's problems show at their rule in "Who sees this".
+  if (key === 'audience' || key.startsWith('audience.')) return true
   if (node.type === 'section' && (key === 'anchor' || key === 'sticky' || key === 'shape_top' || key === 'shape_bottom')) return true
   if (isWrappedSectionType(node.type)) {
     if (key === 'title' || key === 'subtitle') return node.type !== 'hero_slider'

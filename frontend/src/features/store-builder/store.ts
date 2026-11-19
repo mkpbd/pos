@@ -5,6 +5,7 @@ import type { BuilderContent, BuilderMedia, Device } from '@/storefront/builder/
 import { documentPath, type CmsPageRef, type DocumentDetail, type DocumentKind, type GlobalUsage, type PreviewProduct, type Problem, type PublishedRef, type ZoneTarget } from './api'
 import type { DocumentReview, DocumentSchedule } from './publishing-api'
 import { many, pruned, ranged, single, toggled, type SelectionState } from './selection'
+import type { PreviewSettings } from './audience/preview'
 
 /*
  * The editor's state (one store per open document). Content edits go through `apply` with a pure
@@ -71,6 +72,8 @@ export type EditorState = {
   device: Device
   /** B10: the language texts are edited in on the canvas ("Edit in: English | বাংলা"). */
   editLocale: 'en' | 'bn'
+  /** B13: "Preview as" — the shopper the canvas pretends to be (null = "Show everything"). Not saved. */
+  previewAs: PreviewSettings | null
   history: { past: Snapshot[]; future: Snapshot[] }
   saveState: SaveState
   /** Server problems per node id (`''` = the page). */
@@ -105,6 +108,8 @@ export type EditorActions = {
   setHover: (id: string | null) => void
   setDevice: (device: Device) => void
   setEditLocale: (locale: 'en' | 'bn') => void
+  /** B13: "Preview as" a shopper, or null for "Show everything". */
+  setPreviewAs: (previewAs: PreviewSettings | null) => void
   undo: () => void
   redo: () => void
   /** Replaces everything with a document from the server (open, discard, restore, "load their version"): history is cleared. */
@@ -161,6 +166,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       hover: null,
       device: 'desktop',
       editLocale: 'en',
+      previewAs: null,
       history: { past: [], future: [] },
       saveState: { status: 'saved', savedAt: detail.draft_updated_at ? Date.parse(detail.draft_updated_at) : null },
       errors: {},
@@ -201,6 +207,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       },
       setDevice: (device) => set({ device }),
       setEditLocale: (editLocale) => set({ editLocale }),
+      setPreviewAs: (previewAs) => set({ previewAs }),
 
       undo: () => {
         const state = get()

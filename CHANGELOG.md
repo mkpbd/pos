@@ -21,6 +21,21 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B13 — Store builder: the right content for each shopper, A/B tests
+
+#### Added
+- **Who sees this** (Advanced tab of any section, element or global reference): rules for new / returning visitors, signed in / guest, device, districts, campaigns or link sources, cart value (৳), days and times (store time, can cross midnight) and language; all or any; read back as one plain sentence; an always-visible note that it is not a lock for secret prices or codes. Badges on the canvas and in Layers. Rules run in the shopper's browser (pages stay cacheable) and a section with rules appears only once it is known to apply — no flash.
+- **Preview as:** pick a kind of shopper (new / returning, account, device, district, campaign, cart, day and time, language) and the canvas fades what they wouldn't see.
+- **A/B tests:** section ⋯ *Test a different version* makes version B next to A; the *A/B tests* panel sets the goal (orders, add-to-cart, clicks) and split, starts / stops (live on publish) and shows honest plain-word results ("Version B gets 23 % more orders — 96 % sure it's better", "Too early to tell" until each version has 100 visitors and 10 goal events), a per-day chart and *Keep A / Keep B* (removes the other version from the draft). Shoppers keep their version on later visits; Do-Not-Track / GPC → version A and not counted.
+- API: `audience` and `experiments` in builder documents, results and start / stop / keep endpoints, `audience_campaigns`, `experiments` and `timezone` on render payloads, `store.timezone` on bootstrap (see API docs).
+
+#### Tests
+- Backend 1416 (PostgreSQL: 1415 pass, 1 opt-in skip; new `StoreBuilderB13Test`, `BuilderB13SchemaTest`, `ExperimentResultsTest`, `ExperimentMathsTest`); Pint clean. vitest 2286; mocked Playwright 387 (new `storefront-audience-b13`, `store-builder-b13a`, `store-builder-b13b`).
+- Full-stack (PostgreSQL, desktop) 48 — new **B13**: a members-only section stays hidden for a guest, a malformed rule is refused, a started and published A/B test shows a shopper put in version B only that version and reports `arms: B`, the results count the visitor under B with "keep running", and Keep B leaves only version B in the draft with the test ended. Builder acceptance 5.
+
+#### Upgrade
+- `php artisan migrate` (A/B test tables).
+
 ### B15 — Store builder: know what works
 
 #### Added

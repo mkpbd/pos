@@ -21,6 +21,7 @@ import {
   KeyboardIcon,
   SearchIcon,
   ChartColumnIcon,
+  FlaskConicalIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -33,6 +34,7 @@ import { DEVICE_WIDTHS } from './canvas-config'
 import { IS_MAC, useRelativeTime } from './format'
 import { EDIT_LOCALES } from './inline-edit'
 import { isDirty, useEditor, type SaveState } from './store'
+import { PreviewAsMenu } from './audience/preview-as-menu'
 
 const DEVICES: { device: Device; label: string; icon: typeof MonitorIcon }[] = [
   { device: 'desktop', label: 'Desktop', icon: MonitorIcon },
@@ -172,12 +174,23 @@ type ToolbarProps = {
   onShortcuts?: () => void
   /** B15: the Insights panel (pages only); absent = no Insights button. */
   insights?: { open: boolean; onToggle: () => void }
+  /** B13: the A/B tests panel (page documents only; `count` = the document's tests); absent = no button. */
+  abTests?: { open: boolean; count: number; onToggle: () => void }
+  /** B13: "Preview as" a shopper (audiences); false = no control (e.g. compare screens). Default on. */
+  previewAs?: boolean
 }
 
 /** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
 function LocaleToggle() {
   const locale = useEditor((s) => s.editLocale)
-  const setLocale = useEditor((s) => s.setEditLocale)
+  const setEditLocale = useEditor((s) => s.setEditLocale)
+  const previewAs = useEditor((s) => s.previewAs)
+  const setPreviewAs = useEditor((s) => s.setPreviewAs)
+  // B13: a "Preview as" shopper reads the language the canvas shows.
+  const setLocale = (value: 'en' | 'bn') => {
+    setEditLocale(value)
+    if (previewAs && previewAs.language !== value) setPreviewAs({ ...previewAs, language: value })
+  }
   return (
     <div role="group" aria-label="Edit in" className="flex items-center gap-1 rounded-md border p-0.5" data-testid="edit-locale">
       <span className="hidden px-1.5 text-xs text-muted-foreground xl:inline" aria-hidden>
@@ -202,7 +215,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -237,6 +250,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       </div>
 
       {bangla && <LocaleToggle />}
+      {previewAs && <PreviewAsMenu bangla={bangla} />}
 
       {onCommandBox && (
         <Hint label={`Find an element, a page or an action (${MOD}+K)`}>
@@ -266,6 +280,19 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
         <Hint label="How many people saw this page, where they clicked and what they ordered">
           <Button type="button" variant={insights.open ? 'secondary' : 'outline'} aria-pressed={insights.open} onClick={insights.onToggle} data-testid="insights-button">
             <ChartColumnIcon /> Insights
+          </Button>
+        </Hint>
+      )}
+      {abTests && (
+        <Hint label="Try two versions of a section and see which one gets more orders">
+          <Button type="button" variant={abTests.open ? 'secondary' : 'outline'} aria-pressed={abTests.open} onClick={abTests.onToggle} data-testid="ab-tests-button">
+            <FlaskConicalIcon /> A/B tests
+            {abTests.count > 0 && (
+              <span data-testid="ab-tests-count" className="ml-0.5 rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground tabular-nums">
+                <span aria-hidden>{abTests.count}</span>
+                <span className="sr-only">{`${abTests.count} ${abTests.count === 1 ? 'test' : 'tests'}`}</span>
+              </span>
+            )}
           </Button>
         </Hint>
       )}

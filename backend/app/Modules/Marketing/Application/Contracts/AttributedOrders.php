@@ -30,4 +30,13 @@ interface AttributedOrders
      * @return list<array{day: string, document_id: string, node_id: ?string, orders: int, revenue: string}>
      */
     public function builderGroups(CarbonImmutable $from, CarbonImmutable $to, string $timezone, ?string $documentId = null, ?string $device = null): array;
+
+    /**
+     * B13: orders placed in [$from, $to) that are attributed to a store builder page's A/B test
+     * (`attribution.builder.document_id` and `attribution.builder.experiments.<test id>` A | B) and
+     * still stand, grouped by the local day ($timezone) and version. Optionally one device.
+     *
+     * @return list<array{day: string, arm: string, orders: int, revenue: string}>
+     */
+    public function experimentGroups(CarbonImmutable $from, CarbonImmutable $to, string $timezone, string $documentId, string $experimentId, ?string $device = null): array;
 }

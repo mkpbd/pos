@@ -35,6 +35,8 @@ import { sanitizeHtml } from './sanitize'
 import { FormatBar } from './format-bar'
 import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
 import { isEditUi, useCanvasEditing } from './use-canvas-editing'
+import { audienceVerdicts } from '../audience/nodes'
+import type { PreviewContext } from '../audience/types'
 
 /*
  * The store builder canvas (B2), inside the editor's iframe at /admin/builder-canvas. It draws the
@@ -78,6 +80,13 @@ function outlineCss(frame: RenderFrame | null, dropTarget: string | null = null)
   if (hover && hover !== selection) rules.push(`[data-b="${hover}"]{outline:1px dashed #2563eb !important;outline-offset:-1px}`)
   if (selection) rules.push(`[data-b="${selection}"]{outline:2px solid #2563eb !important;outline-offset:-2px}`)
   return rules.join('\n')
+}
+
+/** B13 "Preview as": nodes the previewed shopper would not see are faded (still selectable). */
+function audienceCss(hidden: readonly string[]): string {
+  return safeIds(hidden)
+    .map((id) => `[data-b="${id}"]{opacity:.35 !important}`)
+    .join('\n')
 }
 
 /** Editor-only affordances: empty columns get room to drop into; nothing looks clickable. */
@@ -427,6 +436,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   // B10: the store's uploaded fonts the Site styles draft may name; the language the editor edits in.
   const [themeFonts, setThemeFonts] = useState<FontSource[] | undefined>(undefined)
   const [localeOverride, setLocaleOverride] = useState<Locale | null>(null)
+  // B13: the toolbar's "Preview as" (null = show everything).
+  const [previewAs, setPreviewAs] = useState<PreviewContext | null>(null)
   const pendingRects = useRef(false)
   const sectionsRef = useRef<readonly unknown[]>([])
   const queryClient = useQueryClient()
@@ -527,7 +538,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
           return current
         })
         setLocaleOverride(next)
-      }
+      } else if (message.type === 'preview-as') setPreviewAs(typeof message.context === 'object' && message.context !== null ? message.context : null)
     }
     window.addEventListener('message', onMessage)
     post({ type: 'ready' })
@@ -655,6 +666,18 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const placeholder = useCallback((element: RenderElement) => (pending.has(element.id) ? <Skeleton element={element} /> : null), [pending])
   const popupSettings = useMemo(() => (surroundings === 'popup' ? normalizeStorePopupSettings(frame?.popup) : null), [surroundings, frame?.popup])
 
+  // B13: which drawn nodes carry audience rules and which the previewed shopper would not see.
+  const verdicts = useMemo(() => audienceVerdicts(page?.sections ?? [], previewAs), [page, previewAs])
+  useLayoutEffect(() => {
+    const ruled = new Set(verdicts.ruled)
+    const hidden = new Set(verdicts.hidden)
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-b]'))) {
+      const id = el.dataset.b ?? ''
+      el.toggleAttribute('data-b-audience', ruled.has(id))
+      el.toggleAttribute('data-b-audience-out', hidden.has(id))
+    }
+  })
+
   // Report positions after every drawn frame.
   useLayoutEffect(() => {
     if (page) reportRects()
@@ -696,6 +719,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         <NoticeProvider>
           <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
           <style data-testid="canvas-outlines">{outlineCss(frame, editor.dropTarget)}</style>
+          <style data-testid="canvas-audience">{audienceCss(verdicts.hidden)}</style>
           <main id="main" className="min-h-screen" data-surroundings={surroundings}>
             {surroundings === 'header' && frame?.device === 'mobile' && (
               <p role="note" data-testid="canvas-compact-note" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
