@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlertIcon, CircleCheckIcon, Loader2Icon, PackageCheckIcon, TruckIcon } from 'lucide-react'
@@ -49,7 +49,8 @@ import { customerKeys, localized } from '../../store-keys'
 import type { CheckoutPreview, Customer, GeoDistrict, GeoDivision, ProductDetail, ShippingMethod } from '../../types'
 import { DraftPlaceholder, PreviewMark } from '../preview-mark'
 import { NODE_ID } from '../registry'
-import { useOwnerDocumentId, usePage } from '../render-context'
+import { DeviceOrderCtx, useOwnerDocumentId, usePage } from '../render-context'
+import { builderAttributionAt } from '../../insights/builder-attribution'
 import type { OrderFormData } from '../types'
 import { isUuid, oneOf, ORDER_FORM_ENUMS } from '../validate'
 import { useB8aData } from './b8a-shared'
@@ -133,6 +134,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   const uid = useId()
   const { t, translateMessage, digits, locale } = useLocale()
   const { page, draft } = usePage()
+  const { device } = useContext(DeviceOrderCtx)
   const { pathname } = useLocation()
   const queryClient = useQueryClient()
   const p = (element.props ?? {}) as Partial<El<'order_form'>['props']>
@@ -242,6 +244,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    // B15: the page and section this order is placed from (read now: the event ends with this tick).
+    const builder = builderAttributionAt(page.document?.id, event.currentTarget instanceof Element ? event.currentTarget : null, device)
     if (inactive || busy || unavailable) return
     const local = orderFormErrors(values, rules, variant)
     if (Object.keys(local).length > 0) return fail(local, null)
@@ -259,7 +263,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     if (priced.issues.length > 0) return fail({ quantity: 'landing.orderForm.issues' }, { code: 'ITEMS_UNAVAILABLE', message: t('landing.orderForm.problem.itemsUnavailable') })
     setErrors({})
     setProblem(null)
-    const input = toDirectOrderInput(base, values, rules, priced.total, geoId, readAttribution())
+    const touch = readAttribution()
+    const input = toDirectOrderInput(base, values, rules, priced.total, geoId, builder ? { ...(touch ?? {}), builder } : touch)
     const idempotencyKey = attempts.keyFor(input)
     place.mutate(
       { input, idempotencyKey },

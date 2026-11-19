@@ -8,10 +8,20 @@ namespace App\Modules\Shared\Domain;
  * sends with a checkout or a visit. Sanitized, never rejected: unknown keys and invalid values
  * are dropped, texts trimmed and stripped of control characters; `utm_source`, `utm_medium`
  * and `utm_campaign` lower-cased so reports group them. Nothing personal is kept.
+ *
+ * B15: `builder` — the store builder page (and top-level section) the shopper last clicked
+ * toward a product, `{document_id, node_id?, device?}` (format only here; whether the document
+ * is the store's is checked when the order is placed).
  */
 final class CampaignAttribution
 {
     public const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+
+    /** B15: a builder node id (BuilderDocumentSchema::ID_PATTERN). */
+    public const NODE_PATTERN = '/^[a-z][a-z0-9_-]{1,31}$/';
+
+    /** B15: the devices of page insights. */
+    public const DEVICES = ['desktop', 'tablet', 'mobile'];
 
     /** Lower-cased UTM keys (grouped in reports). */
     public const LOWERCASE = ['utm_source', 'utm_medium', 'utm_campaign'];
@@ -25,7 +35,7 @@ final class CampaignAttribution
     /**
      * The sanitized attribution, or null when nothing usable is left.
      *
-     * @return array<string, string>|null
+     * @return array<string, string|array<string, string>>|null
      */
     public static function sanitize(mixed $input): ?array
     {
@@ -52,8 +62,39 @@ final class CampaignAttribution
         if (is_string($seen) && strlen($seen) <= 40 && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:?\d{2})$/', $seen) === 1) {
             $result['first_seen_at'] = $seen;
         }
+        if (($builder = self::builder($input['builder'] ?? null)) !== null) {
+            $result['builder'] = $builder;
+        }
 
         return $result === [] ? null : $result;
+    }
+
+    /**
+     * B15: `{document_id (lower-case uuid), node_id?, device?}`, or null without a valid
+     * document id (an invalid node id or device is dropped).
+     *
+     * @return array{document_id: string, node_id?: string, device?: string}|null
+     */
+    public static function builder(mixed $value): ?array
+    {
+        if (! is_array($value) || ! is_string($value['document_id'] ?? null)) {
+            return null;
+        }
+        $document = strtolower(trim($value['document_id']));
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $document) !== 1) {
+            return null;
+        }
+        $result = ['document_id' => $document];
+        $node = $value['node_id'] ?? null;
+        if (is_string($node) && preg_match(self::NODE_PATTERN, $node) === 1) {
+            $result['node_id'] = $node;
+        }
+        $device = $value['device'] ?? null;
+        if (is_string($device) && in_array($device, self::DEVICES, true)) {
+            $result['device'] = $device;
+        }
+
+        return $result;
     }
 
     /**

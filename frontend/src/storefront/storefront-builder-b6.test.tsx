@@ -52,12 +52,17 @@ function environment({ width = 1366, reduced = false }: { width?: number; reduce
   )
 }
 
+/** B15: the insights collector's observer (thresholds 0, 25, 50, 75, 100 %), not the motion runtime's. */
+const isInsightsObserver = (observer: FakeIntersectionObserver) => Array.isArray(observer.options.threshold) && observer.options.threshold.length === 5
+
 class FakeIntersectionObserver {
   static all: FakeIntersectionObserver[] = []
   targets = new Set<Element | globalThis.Element>()
   callback: IntersectionObserverCallback
-  constructor(callback: IntersectionObserverCallback) {
+  options: IntersectionObserverInit
+  constructor(callback: IntersectionObserverCallback, options: IntersectionObserverInit = {}) {
     this.callback = callback
+    this.options = options
     FakeIntersectionObserver.all.push(this)
   }
   observe(target: globalThis.Element) {
@@ -528,7 +533,8 @@ describe('B6 motion runtime', () => {
     expect(node).toHaveAttribute('data-b-motion', 'start')
     act(() => FakeIntersectionObserver.enterAll())
     expect(node).toHaveAttribute('data-b-motion', 'run')
-    expect(FakeIntersectionObserver.all).toHaveLength(1)
+    // The motion runtime's one observer (B15's insights collector has its own, with five thresholds).
+    expect(FakeIntersectionObserver.all.filter((o) => !isInsightsObserver(o))).toHaveLength(1)
   })
 
   it('leaves content visible for reduced motion, without IntersectionObserver and in the editor canvas', async () => {

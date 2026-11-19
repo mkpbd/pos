@@ -29,6 +29,8 @@ import { useLocale } from '../i18n/locale'
 import type { BuilderPage, Device, DeviceOrder, NodeState, RenderColumn, RenderElement, RenderPageSection, RenderSection } from './types'
 import { buttonAction, ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
 import { globalInfo, isUnavailableGlobalSection } from './global-sections'
+import { ImagePriorityCtx, priorityImageElement, useImagePriority } from './image-priority'
+import { usePageInsights } from '../insights/use-page-insights'
 
 /*
  * Draws a builder render payload: sections → columns (flex rows that wrap) → elements, styled by
@@ -243,6 +245,7 @@ function Image({ element }: { element: Extract<RenderElement, { type: 'image' }>
   const fit = oneOf(element.props?.fit, ENUMS.imageFit) ?? 'cover'
   const alt = typeof element.props?.alt === 'string' ? element.props.alt : ''
   const url = safeLink(element.props?.link)
+  const priority = useImagePriority(element.id)
 
   if (!media) {
     // A missing image keeps its place in a draft preview only.
@@ -253,6 +256,7 @@ function Image({ element }: { element: Extract<RenderElement, { type: 'image' }>
     <MediaImage
       media={{ id: mediaId as string, ...media, alt: alt || media.alt }}
       sizes={imageSizes(width)}
+      priority={priority}
       className={cn('block w-full', ratio ? (fit === 'contain' ? 'h-full object-contain' : 'h-full object-cover') : 'h-auto')}
     />
   )
@@ -372,6 +376,7 @@ export function PageRenderer({
   scope,
   motion,
   device: forcedDevice,
+  insights = false,
 }: {
   page: BuilderPage
   placeholder?: (element: RenderElement) => ReactNode
@@ -395,6 +400,12 @@ export function PageRenderer({
    * until matchMedia answers).
    */
   device?: Device
+  /**
+   * B15: count this page view for the store's Insights (published store pages only: the front page,
+   * landing and CMS pages pass it; never a draft, a staff preview or the canvas — the collector
+   * checks again, and honours Do Not Track / Global Privacy Control).
+   */
+  insights?: boolean
 }) {
   const draft = page.document?.source === 'draft'
   const rootRef = useRef<HTMLDivElement>(null)
@@ -411,6 +422,9 @@ export function PageRenderer({
   const drawnSections = useMemo(() => orderedChildren(DEVICE_ORDER_ROOT, sections, order, device), [sections, order, device])
   const targets = useMemo(() => motionTargets(sections), [sections])
   useMotionRuntime(rootRef, targets, motion ?? page.document?.key !== 'canvas')
+  usePageInsights(rootRef, page, device, insights && !draft)
+  // B15: the store page's first above-the-fold picture loads first; the header, footer, zones, popups and canvas have none.
+  const priorityImage = useMemo(() => (validScope === 'page' ? priorityImageElement(drawnSections, page.media ?? {}, order, device) : null), [validScope, drawnSections, page.media, order, device])
   // B6: at most one sticky section, and only in page-like documents (never the header or footer).
   const stickyId = useMemo(() => {
     const key = page.document?.key
@@ -421,12 +435,14 @@ export function PageRenderer({
   return (
     <PageCtx.Provider value={context}>
       <DeviceOrderCtx value={orderContext}>
-        <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
-          <style data-testid="builder-styles">{css}</style>
-          {drawnSections.map((section) => (
-            <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
-          ))}
-        </div>
+        <ImagePriorityCtx value={priorityImage}>
+          <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
+            <style data-testid="builder-styles">{css}</style>
+            {drawnSections.map((section) => (
+              <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
+            ))}
+          </div>
+        </ImagePriorityCtx>
       </DeviceOrderCtx>
     </PageCtx.Provider>
   )

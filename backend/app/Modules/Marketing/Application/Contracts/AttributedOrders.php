@@ -20,4 +20,14 @@ interface AttributedOrders
      *   landing_path: ?string, lost: bool, orders: int, items: string, revenue: string}>
      */
     public function groups(CarbonImmutable $from, CarbonImmutable $to, string $timezone): array;
+
+    /**
+     * B15: orders placed in [$from, $to) that are attributed to a store builder page
+     * (`attribution.builder`) and still stand (not cancelled or failed), grouped by the local day
+     * ($timezone), page and section (`node_id` null: the page only). Optionally one page and one
+     * device (orders without a device are left out then).
+     *
+     * @return list<array{day: string, document_id: string, node_id: ?string, orders: int, revenue: string}>
+     */
+    public function builderGroups(CarbonImmutable $from, CarbonImmutable $to, string $timezone, ?string $documentId = null, ?string $device = null): array;
 }

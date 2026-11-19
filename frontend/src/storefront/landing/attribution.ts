@@ -6,6 +6,8 @@
  * validates, trims and keeps it on the order. Storage that is blocked or full is ignored.
  */
 
+import type { WithBuilderAttribution } from '../insights/types'
+
 export const ATTRIBUTION_KEY = 'sf.attribution'
 export const ATTRIBUTION_DAYS = 30
 
@@ -23,6 +25,9 @@ export type Attribution = Partial<Record<UtmKey, string>> & {
   /** When this touch happened (ISO 8601). */
   first_seen_at: string
 }
+
+/** What an order's `attribution` holds: P2a's touch fields (absent without a campaign) plus B15's `builder`. */
+export type OrderAttribution = Partial<Attribution> & WithBuilderAttribution
 
 /** Longest value kept per field (the server trims again). */
 const MAX = { utm: 100, path: 255, host: 255 }

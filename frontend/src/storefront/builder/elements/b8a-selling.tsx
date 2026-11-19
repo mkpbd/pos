@@ -17,6 +17,7 @@ import { usePriceFormat } from '../../money'
 import { Countdown } from '../../promotions/countdown-timer'
 import { useDeadline } from '../../promotions/countdown'
 import type { ProductCard as Card, ProductDetail } from '../../types'
+import { useImagePriority } from '../image-priority'
 import { DraftPlaceholder, PreviewMark } from '../preview-mark'
 import { MARK_LABELS, type MarkState } from '../render-context'
 import type { BundleData, ComparisonCellKind, FlashSaleBarData } from '../types'
@@ -158,6 +159,7 @@ export function BeforeAfterElement({ element }: { element: El<'before_after'> })
 
 function BeforeAfterBody({ element, start }: { element: El<'before_after'>; start: number }) {
   const { t, formatNumber } = useLocale()
+  const priority = useImagePriority(element.id)
   const p = element.props ?? {}
   const L = B8A_TEXT_LIMITS.before_after
   const beforeSide: Record<string, unknown> = isObject(p.before) ? p.before : {}
@@ -222,9 +224,9 @@ function BeforeAfterBody({ element, start }: { element: El<'before_after'>; star
         onPointerCancel={() => (dragging.current = false)}
         data-testid="before-after-frame"
       >
-        <BuilderImg media={after} alt={afterAlt} sizes={sizes} className="absolute inset-0 size-full object-cover" />
+        <BuilderImg media={after} alt={afterAlt} sizes={sizes} priority={priority} className="absolute inset-0 size-full object-cover" />
         <div className="absolute inset-0" style={{ clipPath: vertical ? `inset(0 0 ${100 - position}% 0)` : `inset(0 ${100 - position}% 0 0)` }} data-testid="before-layer">
-          <BuilderImg media={before} alt={beforeAlt} sizes={sizes} className="absolute inset-0 size-full object-cover" />
+          <BuilderImg media={before} alt={beforeAlt} sizes={sizes} eager={priority} className="absolute inset-0 size-full object-cover" />
         </div>
         {beforeLabel && (
           <span aria-hidden className={cn(chip, 'top-3 left-3')}>

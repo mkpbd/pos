@@ -31,7 +31,8 @@ export function BuilderPageView({ pageKey, notFound, meta, children, shareUrl }:
   const page = usePageQuery(pageKey)
   const draft = useDraftPreview()
   const { t } = useLocale()
-  const { store } = useStorefront()
+  const bootstrap = useStorefront()
+  const { store } = bootstrap
   // B9: the page's own SEO (title, description, image, noindex) over the page's defaults.
   useDocumentMeta(page.data ? withPageSeo(meta(page.data, draft), page.data) : null)
 
@@ -64,7 +65,8 @@ export function BuilderPageView({ pageKey, notFound, meta, children, shareUrl }:
           {t('content.builder.preview')}
         </p>
       )}
-      <PageRenderer page={page.data} scope="page" />
+      {/* B15: a visitor's page view counts for Insights (never a staff preview). */}
+      <PageRenderer page={page.data} scope="page" insights={!draft && !bootstrap.preview} />
       {shareUrl && !draft && page.data.document?.source !== 'draft' && (
         <div className="mx-auto max-w-sf px-4 py-8">
           <ShareBar

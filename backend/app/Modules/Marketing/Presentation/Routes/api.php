@@ -2,13 +2,29 @@
 
 use App\Modules\Marketing\Presentation\Http\Controllers\CampaignController;
 use App\Modules\Marketing\Presentation\Http\Controllers\MarketingStatsController;
+use App\Modules\Marketing\Presentation\Http\Controllers\PageInsightsController;
 use App\Modules\Marketing\Presentation\Http\Controllers\ShortLinkController;
+use App\Modules\Marketing\Presentation\Http\Controllers\StoreInsightEventsController;
 use App\Modules\Marketing\Presentation\Http\Controllers\StoreVisitController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 // P2a: the storefront reports campaign visits (no session or CSRF; per-IP throttle).
 Route::middleware(['storefront', 'throttle:storefront', 'throttle:visits'])->prefix('store')->group(function () {
     Route::post('visits', StoreVisitController::class)->name('store.visits');
+});
+
+// B15: store builder pages send insight beacons (sendBeacon: no session, cookies or CSRF — even
+// from a Sanctum stateful origin; per-IP throttle).
+Route::middleware(['storefront', 'throttle:insights'])->withoutMiddleware([EnsureFrontendRequestsAreStateful::class])
+    ->prefix('store')->group(function () {
+        Route::post('insights/events', StoreInsightEventsController::class)->name('store.insights.events');
+    });
+
+// B15: page insights for the store builder (storefront staff).
+Route::prefix('storefront/builder')->middleware(['auth:sanctum', 'tenant', 'can:storefront.view'])->group(function () {
+    Route::get('insights', [PageInsightsController::class, 'index']);
+    Route::get('documents/{document}/insights', [PageInsightsController::class, 'show'])->whereUuid('document');
 });
 
 // P2a: Marketing — campaigns, short links and their stats.

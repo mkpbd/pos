@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useContext, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { FileTextIcon, Loader2Icon, PaintbrushIcon, PanelBottomIcon, PanelTopIcon, PlusIcon, Trash2Icon, Undo2Icon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,8 @@ import { useCmsPagesQuery, type BuilderCmsPage, type DocumentSummary, type ZoneD
 import { LISTING_ZONE_KEYS, ZONE_TITLES } from '../document-kind'
 import type { MessageKey } from './messages'
 import { lastEdited } from './page-helpers'
-import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
+import { EditLink, ListRow, PageStats, SortSelect, StatusBadges, ViewLink } from './page-rows'
+import { PageStatsContext, sortRows, type PageSort } from './page-stats'
 import { useScreenText } from './screen-language'
 import { useStartDocument } from './use-start-document'
 
@@ -41,6 +42,10 @@ export function CmsPagesCard({ documents, canManage, canManageContent, onRemove 
     const id = doc.key.slice('cms:'.length)
     if (!listed.has(id)) rows.push({ page: doc.cms_page ? { ...doc.cms_page, template: doc.cms_page.template ?? null } : null, doc, id })
   }
+  // B15: sort by name (the list's own order) or by the last 30 days' views / orders.
+  const stats = useContext(PageStatsContext)
+  const [sort, setSort] = useState<PageSort>('name')
+  const sorted = sort === 'name' ? rows : sortRows(rows, sort, (r) => r.page?.title ?? r.doc?.title ?? '', (r) => r.doc?.id, stats)
 
   return (
     <Card>
@@ -51,11 +56,14 @@ export function CmsPagesCard({ documents, canManage, canManageContent, onRemove 
           </CardTitle>
           <CardDescription>{t('cms.text')}</CardDescription>
         </div>
-        {canManageContent && (
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/content/pages">{t('cms.manage')}</Link>
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {rows.length > 1 && <SortSelect id="cms-sort" value={sort} onChange={setSort} />}
+          {canManageContent && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/content/pages">{t('cms.manage')}</Link>
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {pages.isPending ? (
@@ -69,7 +77,7 @@ export function CmsPagesCard({ documents, canManage, canManageContent, onRemove 
           </p>
         ) : (
           <ul className="divide-y" aria-label={t('cms.listLabel')}>
-            {rows.map(({ page, doc, id }) => {
+            {sorted.map(({ page, doc, id }) => {
               const title = page?.title ?? doc?.title ?? t('cms.page')
               const hint = page?.template ? TEMPLATE_HINT[page.template] : undefined
               const key = `cms:${id}`
@@ -91,6 +99,7 @@ export function CmsPagesCard({ documents, canManage, canManageContent, onRemove 
                     </>
                   }
                   status={doc ? <StatusBadges summary={doc} /> : undefined}
+                  stats={doc ? <PageStats id={doc.id} name={title} /> : undefined}
                 >
                   {doc ? (
                     <>

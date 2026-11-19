@@ -22,6 +22,9 @@ Schedule::command('pos:affinities:compute --nightly')->hourly()->withoutOverlapp
 // P2a: campaign visitor hashes only count a day's unique visitors; deleted after two days.
 Schedule::command('marketing:prune-visitor-hashes')->daily();
 
+// B15: store builder page insights are kept 90 days; their visitor hashes two days.
+Schedule::command('marketing:prune-page-insights')->daily();
+
 // Guest carts expire 30 days after their last change.
 Schedule::command('cart:prune')->daily();
 

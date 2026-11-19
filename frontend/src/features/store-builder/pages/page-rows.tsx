@@ -1,10 +1,13 @@
-import type { ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { CalendarClockIcon, CalendarX2Icon, ClockIcon, ExternalLinkIcon, MessageSquareWarningIcon, PencilIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCurrentUserQuery } from '@/features/auth/api'
 import type { DocumentSummary } from '../api'
+import { PageStatsContext, type PageSort } from './page-stats'
 import { failureText } from '../publishing-api'
 import { formatStoreDateTime } from './messages'
 import { liveUrl } from './page-helpers'
@@ -94,15 +97,60 @@ export function ViewLink({ summary, name }: { summary: DocumentSummary; name: st
 }
 
 /** One row: name, a line under it, the status (when there is a document) and actions. */
-export function ListRow({ testId, title, detail, status, children }: { testId: string; title: ReactNode; detail: ReactNode; status?: ReactNode; children?: ReactNode }) {
+export function ListRow({ testId, title, detail, status, stats, children }: { testId: string; title: ReactNode; detail: ReactNode; status?: ReactNode; stats?: ReactNode; children?: ReactNode }) {
   return (
     <li className="flex flex-wrap items-center gap-3 py-3" data-testid={testId}>
       <div className="min-w-0 flex-1">
         <p className="font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{detail}</p>
       </div>
+      {stats}
       {status}
       {children && <div className="flex flex-wrap items-center gap-1">{children}</div>}
     </li>
+  )
+}
+
+/* ---------------------------------------------------------------- B15 views and orders ------ */
+
+/** "Views (30 days)" and "Orders" figures of a builder page row (nothing when the stats aren't there). */
+export function PageStats({ id, name }: { id: string | undefined; name: string }) {
+  const stats = useContext(PageStatsContext)
+  const { t, num } = useScreenText()
+  if (!stats) return null
+  const row = id ? stats[id] : undefined
+  const views = row?.views ?? 0
+  const orders = row?.orders ?? 0
+  return (
+    <dl className="flex shrink-0 gap-4 text-right" aria-label={t('stats.aria', { name, views, orders })} data-testid={id ? `page-stats-${id}` : undefined}>
+      <div className="w-24">
+        <dt className="text-xs text-muted-foreground">{t('stats.views')}</dt>
+        <dd className="font-medium tabular-nums">{id ? num(views) : '—'}</dd>
+      </div>
+      <div className="w-14">
+        <dt className="text-xs text-muted-foreground">{t('stats.orders')}</dt>
+        <dd className="font-medium tabular-nums">{id ? num(orders) : '—'}</dd>
+      </div>
+    </dl>
+  )
+}
+
+/** "Sort by: Name | Views (30 days) | Orders" — only while the figures are there. */
+export function SortSelect({ id, value, onChange }: { id: string; value: PageSort; onChange: (sort: PageSort) => void }) {
+  const stats = useContext(PageStatsContext)
+  const { t } = useScreenText()
+  if (!stats) return null
+  return (
+    <div className="flex items-center gap-2">
+      <Label htmlFor={id} className="text-xs text-muted-foreground">{t('sort.label')}</Label>
+      <Select value={value} onValueChange={(v) => onChange(v as PageSort)}>
+        <SelectTrigger id={id} size="sm" className="w-40" data-testid={id}><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="name">{t('sort.name')}</SelectItem>
+          <SelectItem value="views">{t('stats.views')}</SelectItem>
+          <SelectItem value="orders">{t('stats.orders')}</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   )
 }

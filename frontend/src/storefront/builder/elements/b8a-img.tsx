@@ -9,12 +9,15 @@ export function BuilderImg({
   sizes,
   className,
   eager = false,
+  priority = false,
 }: {
   media: BuilderMedia
   alt: string
   sizes: string
   className?: string
   eager?: boolean
+  /** B15: the page's first above-the-fold picture: eager and fetched at high priority. */
+  priority?: boolean
 }) {
   return (
     <img
@@ -24,7 +27,8 @@ export function BuilderImg({
       width={media.width}
       height={media.height}
       alt={alt}
-      loading={eager ? 'eager' : 'lazy'}
+      loading={eager || priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : undefined}
       decoding="async"
       draggable={false}
       className={cn('block', className)}

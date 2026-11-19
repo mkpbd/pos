@@ -1,8 +1,10 @@
 import { contrastRatio } from '@/storefront/color'
-import { documentContext, elementMeta } from '@/storefront/builder/registry'
-import type { Breakpoint, BuilderContent, Column, DocumentContext, ResponsiveStyle } from '@/storefront/builder/types'
+import { documentContext } from '@/storefront/builder/registry'
+import type { Breakpoint, BuilderContent, Column, DocumentContext } from '@/storefront/builder/types'
 import { safeUrl } from '@/storefront/builder/validate'
 import { hasSeo, readSeo } from './inspector/seo-panel-model'
+import { Collector, focus, isObj, label, list, megabytes, pictures, str, visibleAnywhere, type Obj, type Place, type StyledNode } from './page-check-core'
+import { runSpeedCheck, type CheckFonts } from './page-check-speed'
 import { resolveStyleValue } from './inspector/style-model'
 
 /*
@@ -15,6 +17,8 @@ import { resolveStyleValue } from './inspector/style-model'
  *  - `apply`: `store.apply((c) => applyPageCheckFix(c, fix))` (./page-check-fix.ts), one undo step;
  *  - `site-styles`: open the Site styles drawer.
  * `mergeCheckIssues` adds the server's checks (POST …/documents/{id}/check, ./page-check-api.ts).
+ * B15: the "Speed" issues (group `speed`, ./page-check-speed.ts) come with them; their points
+ * (`details.penalty`) make the speed score (`speedScore(issues)`).
  * Errors don't block publishing: the owner decides.
  */
 
@@ -31,6 +35,8 @@ export type PageCheckAction =
   | { type: 'show-on-all-devices' }
   /** A heading element's level. */
   | { type: 'set-heading-level'; level: 1 | 2 | 3 | 4 | 5 | 6 }
+  /** B15: one step down among its siblings (a section below the next one). */
+  | { type: 'move-down' }
 
 export type PageCheckFix =
   /** Select `node_id` (null: the page settings, e.g. `seo.title`) and focus `field` (a form key; null: just select). */
@@ -49,13 +55,18 @@ export type PageCheckIssue = {
   source: 'client' | 'server'
   fix: PageCheckFix | null
   details?: Record<string, unknown>
+  /** B15: `speed` for the Speed group (absent: the B10 checks and the server's). */
+  group?: 'speed'
 }
 
 /** One issue of POST /storefront/builder/documents/{id}/check. */
 export type ServerCheckIssue = { code: string; severity: PageCheckSeverity; node_id: string | null; message: string; details?: Record<string, unknown> }
 
-/** What is known about a picture: the canvas media (width, height, alt) and, from the media library, its size in bytes. */
-export type CheckMedia = { width?: number; height?: number; size?: number; alt?: string | null }
+/**
+ * What is known about a picture: the canvas media (width, height, alt; B15: `url` and `srcset` —
+ * the original and its WebP copies) and, from the media library, its size in bytes.
+ */
+export type CheckMedia = { width?: number; height?: number; size?: number; alt?: string | null; url?: string; srcset?: string }
 
 export type PageCheckInput = {
   /** The draft with global sections drawn (editor `expanded.content`); plain content works too. */
@@ -63,7 +74,7 @@ export type PageCheckInput = {
   /** The document (its key decides the context and whether it has page SEO). */
   document: { kind?: string; key?: string }
   /** The draft theme: colour roles (`primary`, `text`, …; B3 roles may be null) and the content width. */
-  theme: { colors: Record<string, string | null | undefined>; container_width?: number } | null
+  theme: { colors: Record<string, string | null | undefined>; container_width?: number; /** B15: the fonts in use (speed check). */ fonts?: CheckFonts } | null
   media: Record<string, CheckMedia>
 }
 
@@ -90,10 +101,6 @@ export const SEVERITY_LABELS: Record<PageCheckSeverity, string> = { error: 'Erro
  * Small helpers
  * -------------------------------------------------------------------------------------------- */
 
-type Obj = Record<string, unknown>
-const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
-const str = (v: unknown): string => (typeof v === 'string' ? v : '')
-const list = (v: unknown): Obj[] => (Array.isArray(v) ? v.filter(isObj) : [])
 const BREAKPOINTS: readonly Breakpoint[] = ['base', 'tablet', 'mobile']
 const DEVICE_WORDS: Record<Breakpoint, string> = { base: 'on computers', tablet: 'on tablets', mobile: 'on phones' }
 
@@ -113,10 +120,6 @@ export function lengthPx(value: unknown): number | null {
   if (!m) return null
   const n = Number(m[1])
   return m[2] === 'px' ? n : m[2] === '%' ? (n / 100) * 16 : n * 16
-}
-
-function megabytes(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -173,115 +176,11 @@ const ROLE_WORDS: Record<string, string> = {
 }
 
 /* ----------------------------------------------------------------------------------------------
- * The walk
- * -------------------------------------------------------------------------------------------- */
-
-type StyledNode = { id: string; type: string; style?: ResponsiveStyle; props?: unknown }
-
-type Place = {
-  /** The nodes around the element, nearest first (column, inner row, column, section). */
-  chain: StyledNode[]
-  /** The share of the content width (columns, inner rows). */
-  fraction: number
-  /** The section is full width. */
-  wide: boolean
-  /** The id issues are reported on when the node is inside a drawn global section (the reference). */
-  owner: string | null
-  /** The global's name, for messages. */
-  ownerTitle: string | null
-}
-
-class Collector {
-  issues: PageCheckIssue[] = []
-  private keys = new Set<string>()
-
-  add(issue: Omit<PageCheckIssue, 'key' | 'source'>, place: Place | null): void {
-    let { node_id, fix, message } = issue
-    // Inside a global section: report on the reference; it's changed in the global itself.
-    if (place?.owner) {
-      node_id = place.owner
-      fix = { kind: 'focus', label: 'Select the global section', node_id: place.owner, tab: 'content', field: null }
-      message = `${message} It is inside the global section${place.ownerTitle ? ` “${place.ownerTitle}”` : ''}: change it there.`
-    }
-    const key = `${issue.code}:${issue.node_id ?? ''}:${issue.field ?? ''}`
-    if (this.keys.has(key)) return
-    this.keys.add(key)
-    this.issues.push({ ...issue, node_id, fix, message, key, source: 'client' })
-  }
-}
-
-const focus = (label: string, node_id: string | null, field: string | null, tab: PageCheckTab = 'content'): PageCheckFix => ({ kind: 'focus', label, node_id, tab, field })
-
-function label(type: string): string {
-  if (type === 'section') return 'section'
-  if (type === 'inner_row') return 'inner row'
-  return (elementMeta(type)?.label ?? type).toLowerCase()
-}
-
-const visibleAnywhere = (node: { visibility?: Partial<Record<string, boolean>> }) =>
-  !node.visibility || node.visibility.desktop !== false || node.visibility.tablet !== false || node.visibility.mobile !== false
-
-/* ----------------------------------------------------------------------------------------------
  * Checks per element
  * -------------------------------------------------------------------------------------------- */
 
 /** Types whose `alt` falls back to the media library's description (the storefront draws it so). */
 const ALT_FALLS_BACK = new Set(['image', 'logo_carousel'])
-
-type PictureRef = { field: string; itemId: string | null; media_id: string; alt: string | null; slot: number; linked: boolean; altField: string | null }
-
-/** The pictures an element shows, with the alt text field and the width of their slot (px). */
-function pictures(element: StyledNode, slot: number): PictureRef[] {
-  const p = isObj(element.props) ? element.props : {}
-  const out: PictureRef[] = []
-  const one = (media: unknown, alt: string | null, field: string, altField: string | null, linked = false, width = slot) => {
-    if (typeof media === 'string' && media !== '') out.push({ field, itemId: null, media_id: media, alt, slot: width, linked, altField })
-  }
-  const items = (key: string, columns: number, altKey = 'alt') => {
-    for (const item of list(p[key])) {
-      const id = str(item.id)
-      if (typeof item.media_id === 'string' && item.media_id !== '') {
-        out.push({ field: `${key}.${id}.media_id`, itemId: id, media_id: item.media_id, alt: str(item[altKey]), slot: slot / columns, linked: isObj(item.link), altField: `${key}.${id}.${altKey}` })
-      }
-    }
-  }
-  const cols = (value: unknown, fallback: number) => (isObj(value) && typeof value.base === 'number' ? value.base : fallback)
-  switch (element.type) {
-    case 'image':
-      one(p.media_id, str(p.alt), 'media_id', 'alt', isObj(p.link))
-      break
-    case 'shop_the_look':
-      one(p.media_id, str(p.alt), 'media_id', 'alt')
-      break
-    case 'gallery':
-      items('images', cols(p.columns, 3))
-      break
-    case 'photo_grid':
-      items('images', cols(p.columns, 4))
-      break
-    case 'image_carousel':
-      items('images', 1)
-      break
-    case 'logo_carousel':
-      items('logos', 6)
-      break
-    case 'before_after':
-      for (const side of ['before', 'after'] as const) {
-        const value = isObj(p[side]) ? (p[side] as Obj) : {}
-        one(value.media_id, str(value.alt), `${side}.media_id`, `${side}.alt`)
-      }
-      break
-    case 'category_card':
-      one(p.media_id, null, 'media_id', null)
-      break
-    case 'team':
-      for (const member of list(p.members)) {
-        if (typeof member.media_id === 'string' && member.media_id) out.push({ field: `members.${str(member.id)}.media_id`, itemId: str(member.id), media_id: member.media_id, alt: null, slot: slot / cols(p.columns, 3), linked: false, altField: null })
-      }
-      break
-  }
-  return out
-}
 
 /** The links and labels of an element: `{field, url, text}` (url null: not a link; text null: no text of its own). */
 type LinkRef = { field: string; textField: string | null; url: string | null; text: string | null; what: string }
@@ -770,7 +669,7 @@ export function runPageCheck(input: PageCheckInput): PageCheckIssue[] {
   }
 
   checkHeadings(headings, context, out)
-  return sortIssues(out.issues, nodeOrder(input.content))
+  return sortIssues([...out.issues, ...runSpeedCheck(input).issues], nodeOrder(input.content))
 }
 
 /* ----------------------------------------------------------------------------------------------

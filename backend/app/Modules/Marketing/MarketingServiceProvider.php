@@ -3,6 +3,7 @@
 namespace App\Modules\Marketing;
 
 use App\Modules\Marketing\Application\Contracts\MarketingLinks;
+use App\Modules\Marketing\Infrastructure\Console\PrunePageInsightsCommand;
 use App\Modules\Marketing\Infrastructure\Console\PruneVisitorHashesCommand;
 use App\Modules\Marketing\Infrastructure\EloquentMarketingLinks;
 use App\Modules\Marketing\Infrastructure\EloquentOrderCampaigns;
@@ -32,9 +33,12 @@ class MarketingServiceProvider extends ModuleServiceProvider
 
         // The storefront reports a campaign visit once per session; a little headroom per IP.
         RateLimiter::for('visits', fn (Request $request) => Limit::perMinute(20)->by('visits:'.$request->ip()));
+        // B15: a page sends a beacon every 15 s and when hidden; room for a few open tabs. The
+        // address is only the (hashed) limiter key in the cache, never stored.
+        RateLimiter::for('insights', fn (Request $request) => Limit::perMinute(60)->by('insights:'.$request->ip()));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneVisitorHashesCommand::class]);
+            $this->commands([PruneVisitorHashesCommand::class, PrunePageInsightsCommand::class]);
         }
     }
 

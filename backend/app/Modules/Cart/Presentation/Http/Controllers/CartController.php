@@ -5,6 +5,7 @@ namespace App\Modules\Cart\Presentation\Http\Controllers;
 use App\Modules\Cart\Application\Actions\ShoppingCart;
 use App\Modules\Cart\Application\Services\CartPricer;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
+use App\Modules\Shared\Domain\CampaignAttribution;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,11 +48,20 @@ class CartController
      * Adds to the line of the same variant. Errors: `VARIANT_NOT_PURCHASABLE`, `OUT_OF_STOCK`,
      * `INSUFFICIENT_STOCK` (details.max_quantity), `CART_FULL`; whole units unless the unit
      * allows decimals (3 places), at most 999.
+     *
+     * B15: `attribution.builder` (optional) — `{document_id, node_id?, device?}`, the store
+     * builder page and section the product was added from; kept on the cart (the last one wins)
+     * for the order's attribution. Sanitized, never an error.
      */
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate(['variant_id' => ['required', 'uuid'], 'quantity' => self::QUANTITY]);
-        [$cart, $token] = $this->carts->add(CartCookie::owner($request), $data['variant_id'], (string) $data['quantity']);
+        $data = $request->validate([
+            'variant_id' => ['required', 'uuid'],
+            'quantity' => self::QUANTITY,
+            'attribution' => ['sometimes', 'nullable'],
+        ]);
+        $builder = is_array($data['attribution'] ?? null) ? CampaignAttribution::builder($data['attribution']['builder'] ?? null) : null;
+        [$cart, $token] = $this->carts->add(CartCookie::owner($request), $data['variant_id'], (string) $data['quantity'], $builder);
 
         $response = ApiResponse::success($this->pricer->price($cart));
 

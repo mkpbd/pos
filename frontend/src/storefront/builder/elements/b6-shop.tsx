@@ -18,6 +18,7 @@ import { initialVariant } from '../../catalog/variant-selection'
 import { MediaImage } from '../../components/media-image'
 import { useLocale } from '../../i18n/locale'
 import type { ProductCard as Card } from '../../types'
+import { useImagePriority } from '../image-priority'
 import { DraftPlaceholder } from '../preview-mark'
 import { usePage } from '../render-context'
 import type { CategoryCardData, Hotspot, ProductSpotlightData, ShopTheLookData } from '../types'
@@ -156,6 +157,7 @@ export function ShopTheLookElement({ element }: { element: El<'shop_the_look'> }
 
 function LookBody({ element, data }: { element: El<'shop_the_look'>; data: ShopTheLookData }) {
   const { t } = useLocale()
+  const priority = useImagePriority(element.id)
   const p = element.props ?? {}
   const image = useMediaById(p.media_id)
   const spots = spotsOf(p.hotspots, Array.isArray(data.products) ? {} : (data.products ?? {}))
@@ -196,7 +198,7 @@ function LookBody({ element, data }: { element: El<'shop_the_look'>; data: ShopT
           }
         }}
       >
-        <MediaImage media={image} alt={alt || image.alt || ''} sizes="(max-width: 1023px) 100vw, 60vw" className="block h-auto w-full rounded-sf-card" />
+        <MediaImage media={image} alt={alt || image.alt || ''} sizes="(max-width: 1023px) 100vw, 60vw" priority={priority} className="block h-auto w-full rounded-sf-card" />
         {spots.map((spot) => {
           const expanded = open === spot.id
           const cardId = `${base}-${spot.id}`

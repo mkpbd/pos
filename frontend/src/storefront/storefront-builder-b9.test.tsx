@@ -52,12 +52,17 @@ function environment({ reduced = false, pointer = true }: { reduced?: boolean; p
   )
 }
 
+/** B15: the insights collector's observer (thresholds 0, 25, 50, 75, 100 %), not the motion runtime's. */
+const isInsightsObserver = (observer: FakeIntersectionObserver) => Array.isArray(observer.options.threshold) && observer.options.threshold.length === 5
+
 class FakeIntersectionObserver {
   static all: FakeIntersectionObserver[] = []
   targets = new Set<globalThis.Element>()
   callback: IntersectionObserverCallback
-  constructor(callback: IntersectionObserverCallback) {
+  options: IntersectionObserverInit
+  constructor(callback: IntersectionObserverCallback, options: IntersectionObserverInit = {}) {
     this.callback = callback
+    this.options = options
     FakeIntersectionObserver.all.push(this)
   }
   observe(target: globalThis.Element) {
@@ -349,7 +354,8 @@ describe('B9 motion runtime', () => {
     renderCms(payloadOf(staggerDoc(), { key: 'cms:x', media }))
     const one = (await screen.findByRole('heading', { name: 'One' })).closest<HTMLElement>('[data-b]')!
     expect(one).not.toHaveAttribute('data-b-motion')
-    expect(FakeIntersectionObserver.all).toHaveLength(0)
+    // No motion observer (B15's insights collector has its own, with five thresholds).
+    expect(FakeIntersectionObserver.all.filter((o) => !isInsightsObserver(o))).toHaveLength(0)
   })
 
   it('previews a node’s whole motion on request (entrance, staggered children, loop)', () => {

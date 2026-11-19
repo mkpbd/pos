@@ -5,6 +5,7 @@ namespace App\Modules\Orders\Application\Actions;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Cart\Application\Actions\ShoppingCart;
 use App\Modules\Cart\Domain\CartOwner;
+use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Customers\Application\Actions\CustomerAddressBook;
 use App\Modules\Geography\Application\Contracts\GeoDirectory;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
@@ -12,6 +13,7 @@ use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
+use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Orders\Application\Events\OrderPlaced;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
@@ -28,6 +30,7 @@ use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\CampaignAttribution;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Shared\Domain\ValueObjects\Money;
@@ -79,6 +82,7 @@ class PlaceOrder
         private readonly SequenceGenerator $sequences,
         private readonly PromotionRedemptions $redemptions,
         private readonly LocaleContext $locale,
+        private readonly OrderPageAttribution $pages,
     ) {}
 
     /**
@@ -245,7 +249,7 @@ class PlaceOrder
                 'locale' => $locale,
                 // P2a.
                 'source' => $data['source'] ?? Order::SOURCE_STOREFRONT,
-                'attribution' => $data['attribution'] ?? null,
+                'attribution' => $this->attribution($data['attribution'] ?? null, $cart),
             ]);
 
             foreach ($quote['lines'] as $i => $line) {
@@ -338,6 +342,25 @@ class PlaceOrder
         }
 
         return ['order' => $order, 'access_token' => $token];
+    }
+
+    /**
+     * B15: the order's attribution — the sanitized P2a attribution with its `builder` page, else
+     * the page the cart was last added to from; a page that is not this store's is dropped.
+     *
+     * @param  array<string, mixed>|null  $attribution  sanitized (CampaignAttribution)
+     * @return array<string, mixed>|null
+     */
+    private function attribution(?array $attribution, ?Cart $cart): ?array
+    {
+        $attribution ??= [];
+        $builder = $attribution['builder'] ?? CampaignAttribution::builder($cart?->builder_attribution);
+        unset($attribution['builder']);
+        if (is_array($builder) && is_string($builder['document_id'] ?? null) && $this->pages->isStorePage($builder['document_id'])) {
+            $attribution['builder'] = $builder;
+        }
+
+        return $attribution === [] ? null : $attribution;
     }
 
     /**

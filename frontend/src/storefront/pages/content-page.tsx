@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api/client'
-import { useStorePageQuery } from '../api'
+import { useStorePageQuery, useStorefront } from '../api'
 import { useDraftPreview } from '../builder/api'
 import { FaqFallbackCtx } from '../builder/elements/faq-fallback'
 import { hasHeadingLevel } from '../builder/payload'
@@ -95,6 +95,8 @@ export function ContentPage() {
 
 function BuilderContentPage({ page }: { page: StorePage }) {
   const { t } = useLocale()
+  const draft = useDraftPreview()
+  const { preview } = useStorefront()
   const builder = page.builder!
   return (
     <article data-testid="content-page" data-builder="true">
@@ -105,7 +107,8 @@ function BuilderContentPage({ page }: { page: StorePage }) {
       )}
       {!hasHeadingLevel(builder.sections, 1) && <PageTitle title={page.title} />}
       <FaqFallbackCtx value={page.faq ?? null}>
-        <PageRenderer page={builder} scope="page" />
+        {/* B15: a visitor's page view counts for Insights (never a staff preview). */}
+        <PageRenderer page={builder} scope="page" insights={!draft && !preview} />
       </FaqFallbackCtx>
     </article>
   )

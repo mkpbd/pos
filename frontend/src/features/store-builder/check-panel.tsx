@@ -3,11 +3,14 @@ import { CircleAlertIcon, InfoIcon, LightbulbIcon, Loader2Icon, RefreshCwIcon, T
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { countsText, groupBySeverity, type PageCheckIssue, type PageCheckSeverity } from './page-check'
+import { speedScore } from './page-check-speed'
+import { SpeedScore } from './speed-score'
 import type { PageCheck, ServerCheckState } from './use-page-check'
 
 /*
  * B10 Check page panel (contract §2): the issues by severity with a Fix it action, the server
  * checks' state, and the summary the publish dialog shows too. Errors never block publishing.
+ * B15: a "Speed" group under them — the speed score and its issues (most points first).
  */
 
 const SEVERITY_ICON: Record<PageCheckSeverity, typeof CircleAlertIcon> = { error: CircleAlertIcon, warning: TriangleAlertIcon, tip: LightbulbIcon }
@@ -60,6 +63,8 @@ export function IssueRow({ issue, label, onShow, onFix }: { issue: PageCheckIssu
   )
 }
 
+const penalty = (issue: PageCheckIssue) => (typeof issue.details?.penalty === 'number' ? issue.details.penalty : 0)
+
 /** The Check page panel (in place of the left panel while it is open). */
 export function CheckPanel({ check, labelOf, onShow, onFix, onClose }: {
   check: PageCheck
@@ -69,7 +74,9 @@ export function CheckPanel({ check, labelOf, onShow, onFix, onClose }: {
   onFix: (issue: PageCheckIssue) => void
   onClose: () => void
 }) {
-  const groups = groupBySeverity(check.issues)
+  const groups = groupBySeverity(check.issues.filter((issue) => issue.group !== 'speed'))
+  const speed = speedScore(check.issues)
+  const speedIssues = [...speed.issues].sort((a, b) => penalty(b) - penalty(a))
   const headingRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => headingRef.current?.focus(), [])
   return (
@@ -108,6 +115,17 @@ export function CheckPanel({ check, labelOf, onShow, onFix, onClose }: {
             </div>
           ))
         )}
+        <div className="flex flex-col gap-2 border-t pt-3" data-testid="check-speed">
+          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Speed</h3>
+          <SpeedScore score={speed.score} rating={speed.rating} label={speed.label} />
+          {speedIssues.length > 0 && (
+            <ul className="divide-y" aria-label="Speed">
+              {speedIssues.map((issue) => (
+                <IssueRow key={issue.key} issue={issue} label={issue.node_id ? labelOf(issue.node_id) : null} onShow={onShow} onFix={onFix} />
+              ))}
+            </ul>
+          )}
+        </div>
         <p className="mt-auto pt-2 text-xs text-muted-foreground">Errors don’t stop you publishing — you decide. Fix them first so every shopper can use the page.</p>
       </div>
     </section>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
+import { readBuilderAttribution } from '../insights/builder-attribution'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { Cart } from '../types'
@@ -38,8 +39,15 @@ function useCartMutation<V>(request: (variables: V) => Promise<Cart>) {
   })
 }
 
+/**
+ * POST /store/cart/items. B15: with the builder page and section the shopper last clicked toward a
+ * product (30 minutes, this tab) as `attribution.builder`; the cart keeps the last one for the order.
+ */
 export function useAddToCartMutation() {
-  return useCartMutation((input: { variant_id: string; quantity: string }) => storeApi.post<Cart>('/store/cart/items', input).then((r) => r.data))
+  return useCartMutation((input: { variant_id: string; quantity: string }) => {
+    const builder = readBuilderAttribution()
+    return storeApi.post<Cart>('/store/cart/items', builder ? { ...input, attribution: { builder } } : input).then((r) => r.data)
+  })
 }
 
 export function useUpdateCartItemMutation() {

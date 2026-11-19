@@ -180,6 +180,8 @@ test.describe('B12 faster building (editor)', () => {
     await page.keyboard.press('ArrowUp')
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('mini-toolbar')).toContainText('Order now')
+    // Let the command box finish closing: while it fades out it still takes the next Escape.
+    await expect(box).toHaveCount(0)
 
     await page.keyboard.press('?')
     const sheet = page.getByTestId('shortcut-sheet')

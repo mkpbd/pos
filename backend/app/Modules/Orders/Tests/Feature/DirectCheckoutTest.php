@@ -185,6 +185,8 @@ class DirectCheckoutTest extends TestCase
         $this->assertEquals([
             'utm_source' => 'facebook', 'utm_medium' => 'cpc', 'utm_campaign' => 'eid-offer', 'short_link' => 'eid',
             'landing_path' => '/p/shirt-offer', 'referrer_host' => 'm.facebook.com', 'order_page' => '/p/shirt-offer',
+            // B15: the order form's own page and section.
+            'builder' => ['document_id' => $this->document, 'node_id' => 's_main'],
         ], $order->attribution);
         $this->assertNull($order->contact_email);
         $this->assertSame('Call before coming', $order->notes);

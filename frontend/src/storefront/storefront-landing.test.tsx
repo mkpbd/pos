@@ -620,6 +620,8 @@ describe('order form on a landing page', () => {
         short_link: 'eid-fb',
         landing_path: '/p/eid-sale',
         first_seen_at: expect.any(String),
+        // B15: the page and section the order was placed from.
+        builder: { document_id: DOC_ID, node_id: 's_row0', device: 'desktop' },
       },
     })
     // The cart was never written to, nor the cart checkout used.

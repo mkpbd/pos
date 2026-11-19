@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B15 — Store builder: know what works
+
+#### Added
+- **Insights for every builder page** (toolbar *Insights*): a plain headline ("1,240 people saw this page; 38 ordered (3.1 %)"), people / orders and revenue / clicks / scroll tiles, a daily views-or-orders chart with publish markers and a table view, every section's seen / clicked / orders, speed traffic lights (LCP, CLS, INP from real visits), 7 / 30 / 90 days or own dates, by device. Pages list: *Views (30 days)* and *Orders* columns, sortable.
+- **Heat map:** clicks drawn over the canvas per section (single-blue scale with legend), "72 % reached here" markers between sections, and *Clicks as a list* for screen readers.
+- **Orders per page and section:** the page and section a shopper clicked through to a product travel with add-to-cart, checkout and the order form (`attribution.builder`); insights count orders and revenue per page and section.
+- **Speed:** page check *Speed* group with a 0–100 score and Fix it (smaller pictures, video lower down, fewer fonts, fewer slideshows / embeds, scripts in custom HTML, long pages); the storefront now loads the first picture of the first screen first and lazy-loads the rest, with reserved space so the page doesn't jump.
+- **Privacy:** anonymous beacons only (`POST /store/insights/events`) — no cookies, no personal data, no IP or user agent stored, daily counts kept 90 days; Do-Not-Track / Global Privacy Control, drafts, staff previews and the builder are never counted.
+
+#### Fixed
+- Page builder: Escape that reached the editor from the canvas didn't close the command box or the shortcut sheet; `store-builder-b12a` command-box test waited too little for the command box to close (it took the next Escape while fading out) — now 10 / 10.
+
+#### Tests
+- Backend 1403 (PostgreSQL: 1402 pass, 1 opt-in skip; new `PageInsightsTest`, `WebVitalsTest`); Pint clean. vitest 2210; mocked Playwright 369 + the fixed command-box test (new `storefront-insights-b15`, `store-builder-b15`, `store-builder-b15-speed`).
+- Full-stack (PostgreSQL, desktop) 47 — new **B15**: a shopper's visit, scroll and click on a published campaign page reach the server as anonymous beacons (no e-mail, phone or cookie in them), and the page's views, section clicks, heat map and scroll reach go up; the Insights panel shows the figures. Builder acceptance 5.
+
+#### Upgrade
+- `php artisan migrate` (insight tables, `carts.builder_attribution`); the scheduler runs `marketing:prune-page-insights` daily.
+
 ### B17 — Store builder: festival packs & Bangladesh trust blocks
 
 #### Added

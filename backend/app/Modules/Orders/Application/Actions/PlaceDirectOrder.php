@@ -6,6 +6,7 @@ use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Geography\Application\Contracts\GeoDirectory;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Orders\Application\Contracts\OrderForms;
+use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
@@ -38,6 +39,7 @@ class PlaceDirectOrder
         private readonly StorefrontConfig $storefront,
         private readonly BranchDirectory $branches,
         private readonly TenantContext $tenant,
+        private readonly OrderPageAttribution $pages,
     ) {}
 
     /**
@@ -102,6 +104,11 @@ class PlaceDirectOrder
         // The page the order was placed on (for "top landing pages"), set by the server.
         if ($form['path'] !== null) {
             $attribution['order_page'] = $form['path'];
+        }
+        // B15: without a builder page from the shopper, the order form's own page and section.
+        if (! isset($attribution['builder'])) {
+            $section = $this->pages->sectionOf($form['document_id'], $form['element_id']);
+            $attribution['builder'] = ['document_id' => $form['document_id']] + ($section === null ? [] : ['node_id' => $section]);
         }
 
         $name = trim((string) $data['contact']['name']);

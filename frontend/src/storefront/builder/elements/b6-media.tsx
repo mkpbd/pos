@@ -6,6 +6,7 @@ import { withFocal } from '../../focal'
 import { useLocale } from '../../i18n/locale'
 import { useReducedMotion } from '../motion'
 import { DraftPlaceholder } from '../preview-mark'
+import { useImagePriority } from '../image-priority'
 import { usePage } from '../render-context'
 import type { BuilderMedia, GalleryAspect, MotionSpeed } from '../types'
 import { B6_ENUMS, B6_LIMITS, B6_TEXT_LIMITS, boundedInt, listItems, normalizeGalleryColumns, oneOf, safeLink } from '../validate'
@@ -41,7 +42,8 @@ function useImages(value: unknown, max: number, limits: { alt: number; caption?:
 
 const ASPECTS: Record<GalleryAspect, string | undefined> = { square: '1 / 1', '4:3': '4 / 3', '3:4': '3 / 4', '16:9': '16 / 9', auto: undefined }
 
-function Img({ image, alt, aspect, sizes, className, eager = false }: { image: BuilderMedia; alt: string; aspect: string | undefined; sizes: string; className?: string; eager?: boolean }) {
+/** B15: `priority` = the page's first above-the-fold picture (eager, high priority); every other one is lazy. */
+function Img({ image, alt, aspect, sizes, className, priority = false }: { image: BuilderMedia; alt: string; aspect: string | undefined; sizes: string; className?: string; priority?: boolean }) {
   return (
     <img
       src={image.url}
@@ -50,7 +52,8 @@ function Img({ image, alt, aspect, sizes, className, eager = false }: { image: B
       width={image.width}
       height={image.height}
       alt={alt}
-      loading={eager ? 'eager' : 'lazy'}
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : undefined}
       decoding="async"
       className={cn('block w-full', aspect ? 'h-full object-cover' : 'h-auto', className)}
       style={aspect ? withFocal(image) : undefined}
@@ -68,6 +71,7 @@ const GAPS = { sm: '0.5rem', md: '1rem', lg: '1.5rem' } as const
  */
 export function GalleryElement({ element }: { element: El<'gallery'> }) {
   const { t } = useLocale()
+  const priority = useImagePriority(element.id)
   const p = element.props ?? {}
   const L = B6_TEXT_LIMITS.gallery
   const images = useImages(p.images, B6_LIMITS.galleryImages.max, { alt: L['images.*.alt'], caption: L['images.*.caption'] })
@@ -107,10 +111,10 @@ export function GalleryElement({ element }: { element: El<'gallery'> }) {
                     aria-haspopup="dialog"
                     className="group block size-full cursor-zoom-in focus-visible:outline-4 focus-visible:-outline-offset-4 focus-visible:outline-sf-accent"
                   >
-                    <Img image={image.media} alt="" aspect={aspect} sizes={sizes} className="transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                    <Img image={image.media} alt="" aspect={aspect} sizes={sizes} priority={priority && i === 0} className="transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                   </button>
                 ) : (
-                  <Img image={image.media} alt={image.alt} aspect={aspect} sizes={sizes} />
+                  <Img image={image.media} alt={image.alt} aspect={aspect} sizes={sizes} priority={priority && i === 0} />
                 )}
               </div>
               {image.caption && <figcaption className="text-sm">{image.caption}</figcaption>}
@@ -173,6 +177,7 @@ function PauseButton({ paused, onToggle, label, className }: { paused: boolean; 
  */
 export function ImageCarouselElement({ element }: { element: El<'image_carousel'> }) {
   const { t } = useLocale()
+  const priority = useImagePriority(element.id)
   const p = element.props ?? {}
   const L = B6_TEXT_LIMITS.image_carousel
   const images = useImages(p.images, B6_LIMITS.carouselImages.max, { alt: L['images.*.alt'], caption: L['images.*.caption'] })
@@ -215,7 +220,7 @@ export function ImageCarouselElement({ element }: { element: El<'image_carousel'
       <div className="relative overflow-hidden rounded-sf-card" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
         <div aria-live={playing ? 'off' : 'polite'} className="flex transition-transform duration-500 ease-out motion-reduce:transition-none" style={{ transform: `translateX(-${current * 100}%)` }}>
           {images.map((image, i) => {
-            const picture = <Img image={image.media} alt={image.alt} aspect={aspect} sizes="100vw" eager={i === 0} />
+            const picture = <Img image={image.media} alt={image.alt} aspect={aspect} sizes="100vw" priority={priority && i === 0} />
             return (
               <div
                 key={image.id}
@@ -366,6 +371,8 @@ export function LogoCarouselElement({ element }: { element: El<'logo_carousel'> 
         src={item.media.url}
         srcSet={item.media.srcset || undefined}
         sizes="160px"
+        width={item.media.width}
+        height={item.media.height}
         alt={item.alt || item.media.alt || ''}
         loading="lazy"
         decoding="async"

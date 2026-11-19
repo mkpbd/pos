@@ -2,7 +2,7 @@
 
 import type { BootstrapBuilder, BuilderPage, ProductZoneKey } from './builder/types'
 import type { ThemePresetKey } from './demos/presets'
-import type { Attribution } from './landing/attribution'
+import type { OrderAttribution } from './landing/attribution'
 
 /**
  * B4: products per row on shop, category, brand and search listings. Desktop ≥ 1024 px, tablet
@@ -751,8 +751,8 @@ export type PlaceOrderInput = {
   payment_method: PaymentMethodCode
   notes?: string
   expected_total: string
-  /** P2a: the visitor's last campaign touch (UTM / short link) of the past 30 days. */
-  attribution?: Attribution
+  /** P2a: the visitor's last campaign touch (UTM / short link) of the past 30 days; B15: `builder`, the page and section clicked toward a product. */
+  attribution?: OrderAttribution
 }
 
 /** The pricing part of the place body; the preview tolerates partial input. */

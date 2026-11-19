@@ -3,6 +3,7 @@
 namespace App\Modules\Marketing\Application\Actions;
 
 use App\Modules\Marketing\Application\Contracts\LandingPages;
+use App\Modules\Marketing\Application\Support\DailyVisitorHash;
 use App\Modules\Marketing\Domain\BotUserAgents;
 use App\Modules\Marketing\Infrastructure\Models\Campaign;
 use App\Modules\Marketing\Infrastructure\Models\ShortLink;
@@ -10,7 +11,6 @@ use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\CampaignAttribution;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -69,8 +69,7 @@ class RecordVisit
         $timezone = (string) ($this->organizations->summary($organizationId)['timezone'] ?? config('app.timezone'));
         $day = CarbonImmutable::now($timezone)->toDateString();
         $bucket = hash('sha256', implode('|', [$campaignId ?? '', $link?->id ?? '', $path, $source ?? '', $medium ?? '']));
-        $salt = Cache::remember('marketing:visit-salt:'.$day, now()->addDays(2), fn () => Str::random(40));
-        $visitor = hash('sha256', $salt.'|'.($ip ?? '').'|'.($userAgent ?? ''));
+        $visitor = DailyVisitorHash::of($day, $ip, $userAgent);
         $now = now();
 
         DB::transaction(function () use ($organizationId, $day, $bucket, $visitor, $campaignId, $link, $path, $source, $medium, $now) {

@@ -12,6 +12,7 @@ import type { DropIndicator } from './drop-targets'
 import { SpacingHandles, type SpacingPhase, type SpacingValues } from './spacing-handles'
 import type { SpacingGuide } from './snapping'
 import type { SpacingBox, SpacingSide } from './spacing-drag'
+import { HeatOverlay, type HeatLayer } from './insights/heat-overlay'
 
 /*
  * The canvas iframe (/admin/builder-canvas) at the device width, scaled to fit, with the editor's
@@ -108,10 +109,12 @@ export type CanvasFrameProps = {
   uploads?: Record<string, NodeUpload>
   /** B12: the draft's phone / tablet order (globals merged), drawn in Tablet and Mobile view. */
   deviceOrder?: DeviceOrder | null
+  /** B15: the Insights heat map (clicks per section and scroll reach) drawn over the page; null = off. */
+  heat?: HeatLayer | null
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -319,6 +322,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
           data-file-drag={fileDrag || undefined}
           aria-hidden={dragging ? true : undefined}
         >
+          {!dragging && heat && <HeatOverlay layer={heat} rects={rects} scale={scale} />}
           {!dragging && hovered && hover && hovered.h > 0 && (
             <span className="absolute rounded-sm bg-blue-600 px-1.5 py-0.5 text-[11px] font-medium text-white" style={{ left: Math.max(0, hovered.x * scale), top: Math.max(0, hovered.y * scale) }}>
               {hoverLabel(hover)}

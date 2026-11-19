@@ -1207,6 +1207,74 @@ test('B17: Bazar Fresh sets up Victory Day in one go; the home banner, campaign 
   await adminContext.close()
 })
 
+test('B15: Circuit Bazar — a shopper\'s visit, scroll and clicks show in the page\'s insights and heat map; nothing personal is kept', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('electronics.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@electronics.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  // A campaign page with two template sections, published.
+  const sections: { id: string }[] = []
+  for (const id of ['neutral-how-it-works', 'neutral-how-it-works']) sections.push((await call('POST', `/api/v1/storefront/builder/templates/${id}/instantiate`, { context: 'page' })).body.data.nodes[0])
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b15-insights', title: 'B15 insights', from: 'blank' })
+  if (doc.status === 409) {
+    // A rerun on the same database: reuse the page.
+    const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === 'landing:b15-insights')
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const docId = doc.body.data.id as string
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content: { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections } })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B15' })).status).toBe(200)
+  const before = (await call('GET', `/api/v1/storefront/builder/documents/${docId}/insights`)).body.data
+
+  // A shopper visits, sees both sections, scrolls to the end, clicks in the first one, then leaves (the beacon goes on pagehide).
+  const beacons: string[] = []
+  await page.context().route('**/store/insights/events', async (route) => {
+    beacons.push(route.request().postData() ?? '')
+    await route.continue()
+  })
+  await page.setViewportSize({ width: 1366, height: 700 })
+  await page.goto(`${base}/p/b15-insights`)
+  const first = page.locator(`[data-b="${sections[0].id}"]`)
+  await expect(first).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500)
+  await first.click({ position: { x: 40, y: 40 } })
+  await page.mouse.wheel(0, 4000)
+  await page.waitForTimeout(1500)
+  // The shopper switches tab: the page sends what it collected (a report from an unloading page isn't visible to the test).
+  await page.evaluate(`Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide'))`)
+  await expect.poll(() => beacons.length, { timeout: 20_000 }).toBeGreaterThan(0)
+  // Nothing personal travels: no e-mail, phone, IP or cookie-like value in the beacons.
+  expect(beacons.join('\n')).not.toMatch(/@|\b01\d{9}\b|cookie/i)
+
+  await expect
+    .poll(async () => (await call('GET', `/api/v1/storefront/builder/documents/${docId}/insights`)).body.data.totals.views, { timeout: 30_000 })
+    .toBeGreaterThan(before.totals.views)
+  const after = (await call('GET', `/api/v1/storefront/builder/documents/${docId}/insights`)).body.data
+  const firstStats = after.sections.find((s: { node_id: string }) => s.node_id === sections[0].id)
+  expect(firstStats.views).toBeGreaterThan(0)
+  expect(firstStats.clicks).toBeGreaterThan(0)
+  expect(after.heat[sections[0].id]?.length ?? 0).toBeGreaterThan(0)
+  expect(Number(after.totals.scroll_reach['25'] ?? 0)).toBeGreaterThan(0)
+  // The page's figures appear in the builder's Insights panel.
+  await admin.goto(`${base}/admin/storefront/builder/${docId}`)
+  await expect(admin.frameLocator('[data-testid="builder-canvas"]').locator(`[data-b="${sections[0].id}"]`)).toBeVisible({ timeout: 60_000 })
+  await admin.getByRole('button', { name: /Insights/ }).first().click()
+  await expect(admin.getByText(/saw this page/).first()).toBeVisible({ timeout: 30_000 })
+  await adminContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

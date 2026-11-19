@@ -20,6 +20,7 @@ import {
   SendIcon,
   KeyboardIcon,
   SearchIcon,
+  ChartColumnIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -169,6 +170,8 @@ type ToolbarProps = {
   onCommandBox?: () => void
   /** B12: opens the keyboard shortcut sheet (?). */
   onShortcuts?: () => void
+  /** B15: the Insights panel (pages only); absent = no Insights button. */
+  insights?: { open: boolean; onToggle: () => void }
 }
 
 /** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
@@ -199,7 +202,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -259,6 +262,13 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       <SaveStatus onShowProblem={onShowProblem} />
       {status}
 
+      {insights && (
+        <Hint label="How many people saw this page, where they clicked and what they ordered">
+          <Button type="button" variant={insights.open ? 'secondary' : 'outline'} aria-pressed={insights.open} onClick={insights.onToggle} data-testid="insights-button">
+            <ChartColumnIcon /> Insights
+          </Button>
+        </Hint>
+      )}
       {check && (
         <Hint label="Look for missing picture descriptions, hard-to-read text, broken links and more">
           <Button type="button" variant={check.open ? 'secondary' : 'outline'} aria-pressed={check.open} onClick={check.onToggle} data-testid="check-page-button">

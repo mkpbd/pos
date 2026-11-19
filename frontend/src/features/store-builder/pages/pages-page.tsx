@@ -23,7 +23,11 @@ import { ReviewsCard } from './reviews-card'
 import type { ScreenLang } from './messages'
 import { NewLandingDialog } from './new-landing-dialog'
 import { lastEdited } from './page-helpers'
-import { EditLink, ListRow, StatusBadges, ViewLink } from './page-rows'
+import { EditLink, ListRow, PageStats, SortSelect, StatusBadges, ViewLink } from './page-rows'
+import { PageStatsContext, sortRows, type PageSort } from './page-stats'
+import { useInsightsSummaryQuery } from '../insights/insights-api'
+import { presetPeriod } from '../insights/insights-model'
+import { useCurrentUserQuery } from '@/features/auth/api'
 import { rememberScreenLang, ScreenLangContext, storedScreenLang, useScreenText } from './screen-language'
 import { LanguageToggle, ScreenConfirm } from './screen-ui'
 import { StartGuide } from './start-guide'
@@ -60,6 +64,7 @@ function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; c
         </>
       }
       status={<StatusBadges summary={summary} />}
+      stats={<PageStats id={summary.id} name={summary.title} />}
     >
       {canManage && <EditLink summary={summary} name={summary.title} />}
       <ViewLink summary={summary} name={summary.title} />
@@ -187,6 +192,11 @@ function PagesScreen() {
   const openReview = canPublish ? params.get('review') : null
   const [tab, setTab] = useState<'all' | 'reviews'>(() => (params.get('tab') === 'reviews' || params.get('review') ? 'reviews' : 'all'))
   const reviewCount = reviews.data?.length ?? 0
+  // B15: views and orders of the last 30 days per page (store calendar); no columns when they can't be loaded.
+  const timeZone = useCurrentUserQuery().data?.organization?.timezone
+  const [statsRange] = useState(() => presetPeriod('30', timeZone))
+  const stats = useInsightsSummaryQuery(statsRange, can('storefront.view'))
+  const [landingSort, setLandingSort] = useState<PageSort>('name')
   const setReview = (id: string | null) =>
     setParams(
       (current) => {
@@ -201,7 +211,7 @@ function PagesScreen() {
   const all = documents.data ?? []
   const pages = all.filter((d) => d.kind === 'page')
   const home = pages.find((d) => d.key === 'home')
-  const landings = pages.filter((d) => d.key.startsWith('landing:')).sort((a, b) => a.title.localeCompare(b.title))
+  const landings = sortRows(pages.filter((d) => d.key.startsWith('landing:')), landingSort, (d) => d.title, (d) => d.id, stats.data ?? null)
   const cmsDocs = pages.filter((d) => d.key.startsWith('cms:'))
   const parts = all.filter((d) => d.kind === 'header' || d.kind === 'footer')
   const zones = all.filter((d) => d.kind === 'zone')
@@ -238,6 +248,7 @@ function PagesScreen() {
         ) : documents.error ? (
           <ErrorState title={t('screen.error')} error={documents.error} onRetry={() => void documents.refetch()} />
         ) : (
+          <PageStatsContext value={stats.data ?? null}>
           <PagesTabs canPublish={canPublish} tab={tab} onTab={setTab} count={reviews.data ? reviewCount : null} reviews={<ReviewsCard reviews={reviews} onOpen={(review) => setReview(review.id)} />}>
             <>
             {canManage && <StartGuide documents={all} canPublish={canPublish} />}
@@ -254,11 +265,14 @@ function PagesScreen() {
                     </CardTitle>
                     <CardDescription>{t('landing.text')}</CardDescription>
                   </div>
-                  {canManage && (
-                    <Button onClick={() => setCreating(true)}>
-                      <PlusIcon aria-hidden /> {t('landing.new')}
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    {landings.length > 1 && <SortSelect id="landing-sort" value={landingSort} onChange={setLandingSort} />}
+                    {canManage && (
+                      <Button onClick={() => setCreating(true)}>
+                        <PlusIcon aria-hidden /> {t('landing.new')}
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {landings.length === 0 ? (
@@ -294,6 +308,7 @@ function PagesScreen() {
             </section>
             </>
           </PagesTabs>
+          </PageStatsContext>
         )}
       </div>
       <NewLandingDialog open={creating} onOpenChange={setCreating} />

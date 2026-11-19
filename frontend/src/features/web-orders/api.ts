@@ -24,6 +24,8 @@ export type OrderAttribution = {
   landing_path?: string | null
   referrer_host?: string | null
   first_seen_at?: string | null
+  /** B15: the store builder page (and section) the shopper came through. */
+  builder?: { document_id: string; node_id?: string | null; device?: 'desktop' | 'tablet' | 'mobile' | null } | null
 }
 
 /** Source, tags and campaign of an order (P2a); absent on servers before P2a. */

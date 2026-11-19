@@ -1,7 +1,7 @@
 import type { BuilderContent, BuilderNode, HeadingElement, ResponsiveStyle } from '@/storefront/builder/types'
 import { writeStyleValue } from './inspector/style-model'
 import type { PageCheckFix } from './page-check'
-import { findNode, setNode } from './tree'
+import { findNode, moveBy, setNode } from './tree'
 
 /*
  * B10: executes an `apply` Fix it of the page check (./page-check.ts) on the draft, purely:
@@ -28,5 +28,8 @@ export function applyPageCheckFix(content: BuilderContent, fix: PageCheckFix): B
     case 'set-heading-level':
       if (node.type !== 'heading') return content
       return setNode(content, { ...(node as HeadingElement), props: { ...(node as HeadingElement).props, level: action.level } })
+    case 'move-down':
+      // B15 "Move the video lower": a section below the next one (the last stays put).
+      return moveBy(content, node.id, 1)
   }
 }

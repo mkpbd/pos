@@ -6,15 +6,18 @@ use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Contracts\PageDesigns;
 use App\Modules\Cms\Application\Contracts\PageReferences;
 use App\Modules\Marketing\Application\Contracts\LandingPages;
+use App\Modules\Marketing\Application\Contracts\PageInsightDocuments;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Media\Application\Contracts\MediaReferences;
 use App\Modules\OnlineCatalog\Application\Contracts\ProductPageZones;
 use App\Modules\Orders\Application\Contracts\OrderForms;
+use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Shared\Application\Contracts\DocumentLetterhead;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use App\Modules\Storefront\Application\Builder\BuilderInsightDocuments;
 use App\Modules\Storefront\Application\Builder\BuilderLandingPages;
 use App\Modules\Storefront\Application\Builder\BuilderProductZones;
 use App\Modules\Storefront\Application\Builder\PublishedOrderForms;
@@ -66,6 +69,9 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         // P2a: landing page order forms (declared by Orders) and landing pages (declared by Marketing).
         $this->app->bind(OrderForms::class, PublishedOrderForms::class);
         $this->app->bind(LandingPages::class, BuilderLandingPages::class);
+        // B15: pages for page insights (declared by Marketing) and order attribution (declared by Orders).
+        $this->app->bind(PageInsightDocuments::class, BuilderInsightDocuments::class);
+        $this->app->bind(OrderPageAttribution::class, BuilderInsightDocuments::class);
     }
 
     public function boot(): void

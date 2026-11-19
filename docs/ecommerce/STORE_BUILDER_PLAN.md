@@ -503,3 +503,20 @@ Original questions:
   a bar popup with the dates switched on (visible once published) — and overwrites countdown ends and discounts; `publish_ids` feed
   the existing publish-all. One `storefront_festival_setups` row per store, occasion and year. Admin: Online store → Festivals
   (calendar, setup dialog, review & publish); templates browser "Festivals" category.
+
+### As built — B15 know what works: insights, heat map, orders per page, speed (2026-11-19)
+
+- **Collecting:** `storefront/insights/*` — section views (half visible ≥ 1 s, once per page view), clicks with their position inside
+  the section (throttled), deepest scroll milestone and LCP / CLS / INP (PerformanceObserver) go in batched beacons (`seq` 0 counts
+  the page view) via sendBeacon / keepalive fetch without credentials; never from drafts, previews, the canvas, or with DNT / GPC.
+  Server (Marketing `RecordPageEvents`): validates the published version's top-level sections, skips bots, aggregates into daily
+  rows with upserts, web vitals as histogram buckets (p75 on read), nothing personal kept; `marketing:prune-page-insights`.
+- **Orders:** the last builder page + section clicked toward a product (sessionStorage, 30 min, not with DNT / GPC) travels as
+  `attribution.builder` on add-to-cart, checkout and the order form → `orders.attribution.builder`; insights count non-cancelled
+  orders and revenue per page / section / day.
+- **Admin:** Insights panel (headline sentence, figure tiles, daily chart with publish markers and a table view, sections with
+  seen / clicked / orders bars, speed traffic lights), heat map overlay (single-hue 5-step scale, legend, scroll-reach markers,
+  "Clicks as a list" alternative), Pages list "Views (30 days)" / "Orders" columns.
+- **Speed:** page check "Speed" group with a 0–100 score (`page-check-speed.ts`: page weight from served renditions, first-screen
+  pictures, background video, slideshows, embeds, scripts in custom HTML, pictures in text, fonts, long pages) and Fix it; the
+  renderer gives the first picture of the first screen `fetchpriority="high"` + eager, lazy-loads the rest and reserves picture space.

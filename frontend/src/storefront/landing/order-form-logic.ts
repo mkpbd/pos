@@ -6,7 +6,7 @@ import { isEmailAddress } from '../builder/validate'
 import type { MessageKey } from '../i18n/en'
 import type { Translate } from '../i18n/translate'
 import type { CheckoutPreview, GeoId, OrderView, PaymentMethodCode, ProductDetail, ProductVariant } from '../types'
-import type { Attribution } from './attribution'
+import type { OrderAttribution } from './attribution'
 
 /*
  * P2a one-product order form: the shopper's answers, checked in the browser the way the server
@@ -37,7 +37,8 @@ export type DirectOrderInput = {
   payment_method: PaymentMethodCode
   note?: string
   expected_total: string
-  attribution?: Attribution
+  /** P2a campaign touch and/or (B15) the builder page and section it was placed from. */
+  attribution?: OrderAttribution
 }
 
 /** 201 of POST /store/checkout/direct: the order, a guest's access token and the order page link (with the token). */
@@ -183,7 +184,7 @@ export function toDirectOrderInput(
   rules: OrderFormRules,
   expectedTotal: string,
   geoId: GeoIdLookup,
-  attribution: Attribution | null,
+  attribution: OrderAttribution | null,
 ): DirectOrderInput {
   const input: DirectOrderInput = {
     document_id: base.documentId,

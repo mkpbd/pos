@@ -56,6 +56,8 @@ import { VersionHistoryDialog, type CompareSupport } from './publishing/versions
 import { Autosave, problemCount, problemsByNode } from './autosave'
 import { CanvasFrame, type CanvasEditMessage, type CanvasHandle, type NodeUpload, type SpacingTarget } from './canvas-frame'
 import { CheckPanel } from './check-panel'
+import { InsightsPanel } from './insights/insights-panel'
+import { useInsights } from './insights/use-insights'
 import { usePageCheck } from './use-page-check'
 import { applyTextEdit, firstInlineField } from './inline-edit'
 import { dropTargetOf, pictureFileProblem, setNodePicture, uploadErrorMessage, uploadPicture } from './media-upload'
@@ -376,8 +378,17 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   // B12: the command box (Ctrl/Cmd+K) and the keyboard shortcut sheet (?).
   const [commandOpen, setCommandOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  // Escape that reaches the editor from the canvas (focus not yet moved into the dialog) closes them too.
+  const overlaysOpen = useRef(false)
+  useEffect(() => {
+    overlaysOpen.current = commandOpen || shortcutsOpen
+  }, [commandOpen, shortcutsOpen])
   // B11: approval and the store's timezone (planned publishes are chosen in it).
   const timeZone = useCurrentUserQuery().data?.organization?.timezone
+  // B15: Insights for builder pages (home, campaign and content pages).
+  const canViewInsights = useCan()('storefront.view')
+  const insights = useInsights({ documentId: documentInfo.id, available: documentInfo.kind === 'page' && canViewInsights, timeZone })
+  const setInsightsOpen = insights.setOpen
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitPending, setSubmitPending] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -595,17 +606,32 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
 
   /* ---------------------------------------------------------------- B10 page check --------- */
   const [checkOpen, setCheckOpen] = useState(false)
-  const checkTheme = useMemo(
-    () => ({ colors: inspectorTheme.colors, container_width: (themeSettings?.layout as { container_width?: number } | undefined)?.container_width ?? canvasContext.bootstrap.theme.layout?.container_width }),
-    [inspectorTheme.colors, themeSettings, canvasContext.bootstrap.theme.layout],
-  )
+  const checkTheme = useMemo(() => {
+    // B15: the fonts in use feed the speed check ("Use fewer fonts").
+    const typo = (themeSettings?.typography ?? canvasContext.bootstrap.theme.typography) as
+      | { heading_font?: string; body_font?: string; bangla_heading_font?: string | null; bangla_body_font?: string | null }
+      | undefined
+    return {
+      colors: inspectorTheme.colors,
+      container_width: (themeSettings?.layout as { container_width?: number } | undefined)?.container_width ?? canvasContext.bootstrap.theme.layout?.container_width,
+      fonts: {
+        heading: typo?.heading_font,
+        body: typo?.body_font,
+        bangla_heading: typo?.bangla_heading_font ?? null,
+        bangla_body: typo?.bangla_body_font ?? null,
+        // Unknown (undefined) while the list loads: an empty list would count fonts in use as deleted.
+        custom: fonts?.map((f) => ({ key: f.key, name: f.name, size: f.size })),
+      },
+    }
+  }, [inspectorTheme.colors, themeSettings, canvasContext.bootstrap.theme.layout, canvasContext.bootstrap.theme.typography, fonts])
   const check = usePageCheck({ content: expanded.content, draft: content, documentId: documentInfo.id, document: { kind: documentInfo.kind, key: documentInfo.key }, theme: checkTheme, media: preview.media })
   const runServerCheck = check.runServer
   const [focus, setFocus] = useState<{ nodeId: string | null; tab: PageCheckTab; field: string | null; token: number } | null>(null)
   const openCheck = useCallback(() => {
     setCheckOpen(true)
+    setInsightsOpen(false)
     void runServerCheck(store.getState().content)
-  }, [runServerCheck, store, setCheckOpen])
+  }, [runServerCheck, store, setCheckOpen, setInsightsOpen])
   const showIssue = useCallback(
     (issue: PageCheckIssue) => {
       const id = issue.node_id ? ownerOf(issue.node_id) : null
@@ -647,6 +673,11 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       const state = store.getState()
       const mod = key.ctrl || key.meta
       const k = key.key.toLowerCase()
+      if (key.key === 'Escape' && overlaysOpen.current) {
+        setCommandOpen(false)
+        setShortcutsOpen(false)
+        return true
+      }
       if (mod && k === 'z') {
         if (key.shift) state.redo()
         else state.undo()
@@ -1190,6 +1221,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     }),
     [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck],
   )
+  const insightsShown = insights.open && !checkOpen
   const commandItems = useCommandItems(commandOpen, commandActions, single ? null : templates)
 
   const labelOf = useCallback((id: string) => {
@@ -1247,9 +1279,21 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           check={{ errors: check.counts.errors, warnings: check.counts.warnings, open: checkOpen, onToggle: () => (checkOpen ? setCheckOpen(false) : openCheck()) }}
           onCommandBox={() => setCommandOpen(true)}
           onShortcuts={() => setShortcutsOpen(true)}
+          insights={
+            insights.available
+              ? {
+                  open: insights.open && !checkOpen,
+                  onToggle: () => {
+                    const next = !(insights.open && !checkOpen)
+                    if (next) setCheckOpen(false)
+                    insights.setOpen(next)
+                  },
+                }
+              : undefined
+          }
         />
         <div className="flex min-h-0 flex-1">
-          <nav aria-label="Add elements, page layers and templates" className="flex w-72 shrink-0 flex-col border-r bg-background">
+          <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown ? 'w-96' : 'w-72')}>
             {checkOpen && (
               <CheckPanel
                 check={check}
@@ -1262,7 +1306,26 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 onClose={() => setCheckOpen(false)}
               />
             )}
-            <Tabs hidden={checkOpen} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
+            {insightsShown && (
+              <InsightsPanel
+                insights={insights}
+                noun={info.noun}
+                published={documentInfo.published !== null}
+                timeZone={timeZone}
+                device={device}
+                onDevice={(next) => store.getState().setDevice(next)}
+                nameOf={(id) => {
+                  const found = findNode(content, id)
+                  return found ? nodeName(found.node, registry, globals) : null
+                }}
+                onShowSection={(id) => {
+                  store.getState().select(id)
+                  commands.reveal(id)
+                }}
+                onClose={() => insights.setOpen(false)}
+              />
+            )}
+            <Tabs hidden={checkOpen || insightsShown} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
               <TabsList className={cn('m-2 grid w-auto', showGlobalTab && showTemplatesTab ? 'grid-cols-4' : showGlobalTab || showTemplatesTab ? 'grid-cols-3' : 'grid-cols-2')}>
                 <TabsTrigger value="add">Add</TabsTrigger>
                 <TabsTrigger value="layers">Layers</TabsTrigger>
@@ -1345,6 +1408,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               onEdit={onCanvasEdit}
               spacing={spacing}
               uploads={uploads}
+              heat={checkOpen ? null : insights.heat}
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">

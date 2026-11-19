@@ -43,14 +43,16 @@ class ShoppingCart
     }
 
     /**
+     * @param  array<string, string>|null  $builder  B15: the builder page the product was added from
+     *                                               (sanitized; kept on the cart, the last one wins)
      * @return array{0: Cart, 1: ?string} the cart and, when a guest cart was created, its new cookie token
      */
-    public function add(CartOwner $owner, string $variantId, string $quantity): array
+    public function add(CartOwner $owner, string $variantId, string $quantity, ?array $builder = null): array
     {
         $quantity = Decimal::round($quantity, 3);
         $variant = $this->catalog->variantsForCart([$variantId])[$variantId] ?? null;
 
-        return DB::transaction(function () use ($owner, $variantId, $quantity, $variant) {
+        return DB::transaction(function () use ($owner, $variantId, $quantity, $variant, $builder) {
             [$cart, $token] = $this->lockOrCreate($owner);
             /** @var CartItem|null $line */
             $line = $cart->items()->where('variant_id', $variantId)->first();
@@ -65,6 +67,9 @@ class ShoppingCart
                 $cart->items()->create(['variant_id' => $variantId, 'quantity' => $total]);
             } else {
                 $line->update(['quantity' => $total]);
+            }
+            if ($builder !== null) {
+                $cart->builder_attribution = $builder;
             }
             $this->touch($cart);
 
