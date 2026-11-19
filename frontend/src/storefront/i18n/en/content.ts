@@ -152,6 +152,13 @@ export const content = {
   'content.notFound.title': 'Page not found',
   'content.notFound.text': 'The page you are looking for does not exist or has moved.',
   'content.notFound.back': 'Back to the home page',
+  'content.notFound.shop': 'Browse the shop',
+  'content.notFound.links': 'Where to go next',
+  'content.builder.template.field': 'Text from this page: {field}',
+  'content.builder.template.noSample': 'Pick a sample in the toolbar to see this part with real content.',
+  'content.builder.template.listing': 'Product listing',
+  'content.builder.template.post': 'Blog post',
+  'content.builder.template.order': 'Order summary',
 
   'content.section.openOffer': 'Open offer',
   'content.section.fromBlog': 'From the blog',

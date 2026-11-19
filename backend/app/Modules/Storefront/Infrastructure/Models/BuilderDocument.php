@@ -89,6 +89,13 @@ class BuilderDocument extends Model
 
     public const FOOTER = 'footer';
 
+    /**
+     * B14: a store page template (`template:<key>`, kind page, ElementRegistry::TEMPLATES): the
+     * design of the shop, category, brand, search, blog post, order or "page not found" page,
+     * shown instead of the standard page while it is published.
+     */
+    public const TEMPLATE_PREFIX = BuilderDocumentSchema::TEMPLATE_PREFIX;
+
     /** B4: `zone:<zone>`. */
     public const ZONE_PREFIX = 'zone:';
 
@@ -296,6 +303,14 @@ class BuilderDocument extends Model
     public function cmsPageId(): ?string
     {
         return str_starts_with($this->key, self::CMS_PREFIX) ? substr($this->key, strlen(self::CMS_PREFIX)) : null;
+    }
+
+    /**
+     * B14: the template key (`shop`, `category`, …) of a store page template, or null.
+     */
+    public function templateKey(): ?string
+    {
+        return BuilderDocumentSchema::splitContext($this->key)[1] ?? null;
     }
 
     /**

@@ -145,12 +145,12 @@ class BuilderB8aSchemaTest extends TestCase
             }
         }
         foreach (ElementRegistry::B8A as $type) {
-            $expected = $type === 'store_hours' ? ['page', 'cms', 'zone', 'footer'] : ['page', 'cms', 'zone'];
+            $expected = $type === 'store_hours' ? ['page', 'cms', 'zone', 'footer', 'template'] : ['page', 'cms', 'zone', 'template'];
             $this->assertEqualsCanonicalizing($expected, ElementRegistry::allowedIn($type), $type);
             $this->assertSame(in_array($type, ['comparison_table', 'flash_sale_bar', 'bundle', 'review_wall', 'store_hours'], true), $byType[$type]['has_data'], $type);
         }
         $this->assertFalse($byType['chart']['has_data']);
-        $this->assertSame(['chart' => 'data_source!=manual'], $meta['data_when']);
+        $this->assertSame(['chart' => 'data_source!=manual', 'product_listing' => 'scope in categories,brands'], $meta['data_when']);
         $this->assertTrue(ElementRegistry::needsData('chart', ['data_source' => 'store.rating_breakdown']));
         $this->assertFalse(ElementRegistry::needsData('chart', ElementRegistry::defaults('chart')));
 

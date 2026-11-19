@@ -60,11 +60,11 @@ class BuilderB17SchemaTest extends TestCase
 
         $this->assertSame(['media', 'commerce', 'commerce', 'content'], array_map(fn (string $t) => $byType[$t]['group'], ElementRegistry::B17));
         $this->assertSame([false, true, true, true], array_map(fn (string $t) => $byType[$t]['has_data'], ElementRegistry::B17));
-        $this->assertEqualsCanonicalizing(['page', 'cms', 'header', 'footer', 'zone', 'popup'], ElementRegistry::allowedIn('ornament'));
-        $this->assertEqualsCanonicalizing(['page', 'cms', 'header', 'footer', 'zone', 'popup'], ElementRegistry::allowedIn('bangla_date'));
-        $this->assertEqualsCanonicalizing(['page', 'cms', 'zone', 'footer'], ElementRegistry::allowedIn('payment_badges'));
-        $this->assertEqualsCanonicalizing(['page', 'cms', 'zone', 'footer'], ElementRegistry::allowedIn('delivery_promise'));
-        $this->assertEqualsCanonicalizing(['page', 'cms', 'zone', 'footer', 'popup'], ElementRegistry::allowedIn('trust_badges'));
+        $this->assertEqualsCanonicalizing(['page', 'cms', 'header', 'footer', 'zone', 'popup', 'template'], ElementRegistry::allowedIn('ornament'));
+        $this->assertEqualsCanonicalizing(['page', 'cms', 'header', 'footer', 'zone', 'popup', 'template'], ElementRegistry::allowedIn('bangla_date'));
+        $this->assertEqualsCanonicalizing(['page', 'cms', 'zone', 'footer', 'template'], ElementRegistry::allowedIn('payment_badges'));
+        $this->assertEqualsCanonicalizing(['page', 'cms', 'zone', 'footer', 'template'], ElementRegistry::allowedIn('delivery_promise'));
+        $this->assertEqualsCanonicalizing(['page', 'cms', 'zone', 'footer', 'popup', 'template'], ElementRegistry::allowedIn('trust_badges'));
 
         $this->assertSame([], $byType['ornament']['translatable']);
         $this->assertSame(['title', 'note'], $byType['payment_badges']['translatable']);

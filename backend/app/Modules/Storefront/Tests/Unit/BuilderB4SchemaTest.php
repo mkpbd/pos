@@ -124,14 +124,15 @@ class BuilderB4SchemaTest extends TestCase
 
         $cases = [
             // type, allowed contexts, refused contexts
-            ['hero_slider', ['page', 'cms', 'zone'], ['header', 'footer', 'popup']],
-            ['heading', ['page', 'cms', 'zone', 'header', 'footer', 'popup'], []],
-            ['search_box', ['page', 'cms', 'zone', 'header'], ['footer']],
-            ['newsletter_form', ['page', 'cms', 'zone', 'footer', 'popup'], ['header']],
-            ['cart_icon', ['header'], ['page', 'cms', 'zone', 'footer']],
-            ['copyright', ['footer'], ['page', 'cms', 'zone', 'header']],
-            ['faq_list', ['cms'], ['page', 'zone', 'header', 'footer']],
-            ['custom_html', ['page', 'cms', 'zone', 'header', 'footer', 'popup'], []],
+            // B14: whatever a page takes, a store page template takes too.
+            ['hero_slider', ['page', 'cms', 'zone', 'template'], ['header', 'footer', 'popup']],
+            ['heading', ['page', 'cms', 'zone', 'header', 'footer', 'popup', 'template'], []],
+            ['search_box', ['page', 'cms', 'zone', 'header', 'template'], ['footer']],
+            ['newsletter_form', ['page', 'cms', 'zone', 'footer', 'popup', 'template'], ['header']],
+            ['cart_icon', ['header'], ['page', 'cms', 'zone', 'footer', 'template']],
+            ['copyright', ['footer'], ['page', 'cms', 'zone', 'header', 'template']],
+            ['faq_list', ['cms'], ['page', 'zone', 'header', 'footer', 'template']],
+            ['custom_html', ['page', 'cms', 'zone', 'header', 'footer', 'popup', 'template'], []],
         ];
         foreach ($cases as [$type, $allowed, $refused]) {
             $this->assertEqualsCanonicalizing($allowed, ElementRegistry::allowedIn($type), $type);
@@ -155,7 +156,7 @@ class BuilderB4SchemaTest extends TestCase
             $this->assertNotEmpty($type['allowed_in'], $type['type']);
             $this->assertSame([], array_diff($type['allowed_in'], ElementRegistry::CONTEXTS));
         }
-        $this->assertSame(['page', 'cms', 'zone'], $byType['product_grid']['allowed_in']);
+        $this->assertSame(['page', 'cms', 'zone', 'template'], $byType['product_grid']['allowed_in']);
         $this->assertSame(['header', 'footer'], $byType['logo']['allowed_in']);
         $this->assertSame(['cms'], $byType['contact_form']['allowed_in']);
         $this->assertSame([

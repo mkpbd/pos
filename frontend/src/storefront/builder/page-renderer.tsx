@@ -12,6 +12,8 @@ import { B6ElementContent } from './elements/b6'
 import { isB6Type } from './elements/b6-types'
 import { B8aElementContent } from './elements/b8a'
 import { B17ElementContent } from './elements/b17'
+import { B14ElementContent } from './elements/b14'
+import { isB14Type } from './elements/b14-types'
 import { isB17Type } from './elements/b17-types'
 import { isB8aType } from './elements/b8a-types'
 import { FormElement } from './elements/form'
@@ -197,6 +199,7 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
       if (isB6Type(element.type)) return <B6ElementContent element={element} />
       if (isB8aType(element.type)) return <B8aElementContent element={element} />
       if (isB17Type(element.type)) return <B17ElementContent element={element} />
+      if (isB14Type(element.type)) return <B14ElementContent element={element} />
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
   }

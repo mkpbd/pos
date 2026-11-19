@@ -66,6 +66,14 @@ interface BlogDirectory
     public function postMeta(string $slug, bool $includeUnpublished = false): ?array;
 
     /**
+     * B14: a readable post by id or slug — or, for null, the newest readable post — exactly as
+     * GET /store/blog/{slug} shows it, plus its `id`; null when there is none.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function postSample(?string $idOrSlug): ?array;
+
+    /**
      * The next instant a published post becomes readable (after now), or null (E12 caching).
      */
     public function nextPublicationAt(): ?CarbonImmutable;

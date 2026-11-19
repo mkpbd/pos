@@ -50,10 +50,26 @@ class BuilderTemplateLibrary
     {
         if ($this->manifest === null) {
             $manifest = $this->json(self::directory().'/manifest.json');
-            $this->manifest = array_values(array_map(fn (array $t) => $t + ['thumbnail' => null, 'preview' => null, 'requires' => []], $manifest['templates'] ?? []));
+            $this->manifest = array_values(array_map(fn (array $t) => ['allowed_in' => self::withTemplates($t['scope'] ?? '', $t['allowed_in'] ?? [])] + $t + ['thumbnail' => null, 'preview' => null, 'requires' => []], $manifest['templates'] ?? []));
         }
 
         return $this->manifest;
+    }
+
+    /**
+     * B14: section templates made for pages fit store page templates too (`template` added at
+     * the end; whole-page, site and popup templates are unchanged).
+     *
+     * @param  list<string>  $allowedIn
+     * @return list<string>
+     */
+    public static function withTemplates(string $scope, array $allowedIn): array
+    {
+        if ($scope !== 'section' || ! in_array('page', $allowedIn, true) || in_array('template', $allowedIn, true)) {
+            return $allowedIn;
+        }
+
+        return [...$allowedIn, 'template'];
     }
 
     /**

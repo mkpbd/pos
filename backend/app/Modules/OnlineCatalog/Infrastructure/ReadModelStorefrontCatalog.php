@@ -284,6 +284,16 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
         return $this->catalog->latestProductSlug($categoryId);
     }
 
+    public function pageSample(string $type, ?string $idOrSlug): ?array
+    {
+        return $this->navigation->pageSample($type, $idOrSlug);
+    }
+
+    public function listing(array $params): array
+    {
+        return $this->browse->search($params);
+    }
+
     public function sitemapEntries(string $type): array
     {
         return match ($type) {

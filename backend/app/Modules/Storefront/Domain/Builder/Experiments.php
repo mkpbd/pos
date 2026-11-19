@@ -38,8 +38,8 @@ final class Experiments
 
     public const NAME_MAX = 60;
 
-    /** The contexts whose documents may have A/B tests. */
-    public const CONTEXTS = ['page', 'cms', 'zone'];
+    /** The contexts whose documents may have A/B tests (B14: store page templates too). */
+    public const CONTEXTS = ['page', 'cms', 'zone', 'template'];
 
     /** The fields only the server changes. */
     public const MANAGED = ['status', 'started_at', 'ended_at', 'winner'];

@@ -47,6 +47,8 @@ export type DocumentSummary = {
   target?: ZoneTarget | null
   /** B9 global sections: where the global may be used (`page`, `header` or `footer`); absent for other documents. */
   context?: 'page' | 'header' | 'footer' | null
+  /** B14: a store page template's page (`shop`, `category`, …); absent / null for other documents. */
+  template?: string | null
   /** B11: the planned publish (pending, or the last failed one); null / absent = none. */
   schedule?: DocumentSchedule | null
   /** B11: the latest approval request (pending or sent back); null / absent = none. */
@@ -139,6 +141,8 @@ export function documentPath(summary: Pick<DocumentSummary, 'key' | 'path'> & { 
   if (summary.key === 'home') return '/'
   if (summary.key.startsWith('landing:')) return `/p/${summary.key.slice('landing:'.length)}`
   if (summary.key.startsWith('cms:')) return summary.cms_page ? `/pages/${summary.cms_page.slug}` : null
+  // B14: a store page design shows on many addresses (its category, brand, post …).
+  if (summary.key.startsWith('template:')) return null
   return '/'
 }
 
@@ -222,6 +226,8 @@ export type CreateDocumentInput =
    */
   | { kind: 'page'; key: `landing:${string}`; title: string; from: 'template'; template: string; product_id?: string }
   | { kind: 'header' | 'footer'; key: 'header' | 'footer'; title: string; from: 'blank' | 'current' }
+  /** B14: a store page template (`template:shop`, …) from its starter or blank (409 DOCUMENT_EXISTS when it exists). */
+  | { kind: 'page'; key: `template:${string}`; title: string; from: 'starter' | 'blank' }
   | { kind: 'zone'; key: ZoneDocumentKey | TargetedZoneKey; title: string; from: 'blank' }
   /** B8b: the server makes the key (`popup:<uuid>`); `template` = a popup template's id (null = blank). */
   | { kind: 'popup'; key?: undefined; from?: undefined; title: string; template: string | null }

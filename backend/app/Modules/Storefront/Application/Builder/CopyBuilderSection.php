@@ -91,7 +91,7 @@ class CopyBuilderSection
         $copy = $this->freshIds($section, $existing);
         if (is_array($copy['props'] ?? null)) {
             $copy['props']['anchor'] = null;
-            if (($copy['props']['sticky'] ?? false) === true && (! in_array($context, BuilderDocumentSchema::STICKY_CONTEXTS, true) || $this->hasSticky($content))) {
+            if (($copy['props']['sticky'] ?? false) === true && (! in_array(BuilderDocumentSchema::baseContext($context), BuilderDocumentSchema::STICKY_CONTEXTS, true) || $this->hasSticky($content))) {
                 unset($copy['props']['sticky']);
             }
         }

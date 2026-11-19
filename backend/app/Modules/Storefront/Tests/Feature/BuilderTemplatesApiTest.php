@@ -192,6 +192,8 @@ class BuilderTemplatesApiTest extends TestCase
             'zone' => $this->createDoc('zone', 'zone:listing.top', 'Listing top'),
             // B8b: popup templates go into a popup.
             'popup' => $this->createDoc('popup', 'popup', 'Popup'),
+            // B14: section and page templates go into store page designs too.
+            'template' => $this->createDoc('page', 'template:shop', 'Shop'),
         ];
 
         $assets = [];
@@ -313,7 +315,7 @@ class BuilderTemplatesApiTest extends TestCase
             $saved['scope'], $saved['preset'], $saved['category'], $saved['name'], $saved['description'], $saved['thumbnail_url'], $saved['source'], $saved['requires'],
         ]);
         // Headings and text are allowed everywhere.
-        $this->assertSame(['page', 'cms', 'header', 'footer', 'zone', 'popup'], $saved['allowed_in']);
+        $this->assertSame(['page', 'cms', 'header', 'footer', 'zone', 'popup', 'template'], $saved['allowed_in']);
         $this->assertNotNull($saved['created_at']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'storefront.builder_template_saved']);
 

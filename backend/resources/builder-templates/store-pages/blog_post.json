@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_post", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_post", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_post", "type": "blog_post_body", "props": {} }
+      ] }]
+    },
+    {
+      "id": "s_more", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_more", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_more", "type": "button", "props": { "label": "আরও লেখা পড়ুন", "link": { "url": "/blog" }, "variant": "outline" } }
+      ] }]
+    }
+  ]
+}

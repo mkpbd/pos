@@ -57,7 +57,7 @@ class LandingPagesTest extends TestCase
     public function test_order_form_props_are_normalized_and_checked(): void
     {
         $meta = collect($this->getJson('/api/v1/storefront/builder/elements')->assertOk()->json('data.types'))->firstWhere('type', 'order_form');
-        $this->assertSame(['commerce', 'Order form', ['page', 'cms', 'zone'], true], [$meta['group'], $meta['label'], $meta['allowed_in'], $meta['has_data']]);
+        $this->assertSame(['commerce', 'Order form', ['page', 'cms', 'zone', 'template'], true], [$meta['group'], $meta['label'], $meta['allowed_in'], $meta['has_data']]);
         $this->assertSame(['title', 'text', 'button_label', 'success_message', 'upsell.label'], $meta['translatable']);
         $this->assertNull($meta['props']['product_id']);
 

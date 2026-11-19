@@ -145,8 +145,9 @@ class BuilderB6SchemaTest extends TestCase
                 $this->assertSame($group, $byType[$type]['group'], $type);
             }
         }
-        $all = ['page', 'cms', 'header', 'footer', 'zone'];
-        $withFooter = ['page', 'cms', 'zone', 'footer'];
+        // B14: store page templates take what pages take.
+        $all = ['page', 'cms', 'header', 'footer', 'zone', 'template'];
+        $withFooter = ['page', 'cms', 'zone', 'footer', 'template'];
         foreach (ElementRegistry::B6 as $type) {
             $expected = match ($type) {
                 'icon_list', 'marquee' => [...$all, 'popup'],
@@ -154,8 +155,8 @@ class BuilderB6SchemaTest extends TestCase
                 // B17: trust badges go in bars too.
                 'trust_badges' => [...$withFooter, 'popup'],
                 // B8b: notices go in popups too.
-                'notice' => ['page', 'cms', 'zone', 'popup'],
-                default => ['page', 'cms', 'zone'],
+                'notice' => ['page', 'cms', 'zone', 'popup', 'template'],
+                default => ['page', 'cms', 'zone', 'template'],
             };
             $this->assertEqualsCanonicalizing($expected, ElementRegistry::allowedIn($type), $type);
             $this->assertSame(in_array($type, ['category_card', 'product_spotlight', 'shop_the_look'], true), $byType[$type]['has_data'], $type);

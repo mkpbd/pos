@@ -5,6 +5,7 @@ namespace App\Modules\Cms\Infrastructure;
 use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\BlogReferences;
 use App\Modules\Cms\Application\Queries\BlogPostCards;
+use App\Modules\Cms\Application\Queries\BlogPostDetail;
 use App\Modules\Cms\Domain\BlogPostStatus;
 use App\Modules\Cms\Infrastructure\Models\BlogCategory;
 use App\Modules\Cms\Infrastructure\Models\BlogPost;
@@ -18,6 +19,7 @@ class EloquentBlogDirectory implements BlogDirectory
     public function __construct(
         private readonly BlogPostCards $cards,
         private readonly MediaLibrary $media,
+        private readonly BlogPostDetail $detail,
     ) {}
 
     public function existing(string $type, array $ids): array
@@ -109,6 +111,19 @@ class EloquentBlogDirectory implements BlogDirectory
             'author' => $this->cards->authorNames(collect([$post]))[$post->author_user_id ?? ''] ?? null,
             'category' => $post->category === null ? null : ['name' => Translations::pick($post->category, 'name', $this->cards->locale()), 'slug' => $post->category->slug],
         ];
+    }
+
+    public function postSample(?string $idOrSlug): ?array
+    {
+        $needle = $idOrSlug === null ? null : mb_strtolower(trim($idOrSlug));
+        $post = BlogPost::query()->visible()->with('category')
+            ->when($needle !== null, fn ($q) => preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $needle) === 1
+                ? $q->where(fn ($w) => $w->whereKey($needle)->orWhereRaw('lower(slug) = ?', [$needle]))
+                : $q->whereRaw('lower(slug) = ?', [$needle]))
+            ->orderByDesc('published_at')->orderByDesc('id')
+            ->first();
+
+        return $post === null ? null : ['id' => $post->id] + $this->detail->detail($post);
     }
 
     public function nextPublicationAt(): ?CarbonImmutable

@@ -221,7 +221,8 @@ class BuilderFestivalTemplatesTest extends TestCase
         }
 
         // Offered wherever a festival template is meant to go.
-        $contexts = ['landing' => ['page', 'cms'], 'hero' => ['page', 'cms', 'zone'], 'bar' => ['popup']][substr($id, strrpos($id, '-') + 1)];
+        // B14: section templates also go on store page designs.
+        $contexts = ['landing' => ['page', 'cms'], 'hero' => ['page', 'cms', 'zone', 'template'], 'bar' => ['popup']][substr($id, strrpos($id, '-') + 1)];
         $this->assertSame($contexts, $meta['allowed_in'], $id);
     }
 

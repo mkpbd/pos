@@ -8,11 +8,13 @@ use App\Modules\Storefront\Application\Builder\BuilderCanvasContext;
 use App\Modules\Storefront\Application\Builder\BuilderPageCheck;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
+use App\Modules\Storefront\Application\Builder\BuilderSampleContext;
 use App\Modules\Storefront\Application\Builder\CopyBuilderSection;
 use App\Modules\Storefront\Application\Builder\EditBuilderBanner;
 use App\Modules\Storefront\Application\Builder\ManageBuilderDocuments;
 use App\Modules\Storefront\Application\Builder\Publishing\BuilderPublishSchedules;
 use App\Modules\Storefront\Application\Builder\ResolveBuilderElements;
+use App\Modules\Storefront\Application\Builder\UnpublishStorePage;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
@@ -211,6 +213,41 @@ class BuilderDocumentController
         $published = $schedules->publishNow($document, $data['note'] ?? null, (bool) ($data['cancel_schedule'] ?? false));
 
         return ApiResponse::success(BuilderPresenter::document($published->load('publishedVersion')));
+    }
+
+    /**
+     * Use the standard page (unpublish a store page design)
+     *
+     * B14: takes a store page template (`template:<page>`) off the store — the standard page shows
+     * again. The draft and the versions stay (publish again to bring it back); a pending "publish
+     * later" is cancelled. 422 NOT_A_TEMPLATE for other documents, 409 NOTHING_PUBLISHED when it
+     * is not live. Audited (`storefront.builder_unpublished`). Returns the document.
+     */
+    public function unpublish(BuilderDocument $document, UnpublishStorePage $unpublish): JsonResponse
+    {
+        return ApiResponse::success(BuilderPresenter::document($unpublish($document)->load('publishedVersion')));
+    }
+
+    /**
+     * Sample page context
+     *
+     * B14: what a store page template shows in the editor's canvas: `{context, sample, choices}`
+     * for `template` (shop | category | brand | search | blog_post | order | not_found) and `id`
+     * (category / brand / post: id or slug; search: the words; order: id, number or `sample`;
+     * omitted = a sensible default). `context` is the page context the storefront builds,
+     * `sample` the store API answers the main part draws (`listing` — GET /store/products —,
+     * `post` — GET /store/blog/{slug} —, or the masked `order`), `choices` the recent orders to
+     * pick from (order only). 404 NOT_FOUND for an unknown id. `lang` picks the language.
+     */
+    public function sampleContext(Request $request, BuilderSampleContext $samples, BuilderPreviewLocale $locale): JsonResponse
+    {
+        $data = $request->validate([
+            'template' => ['required', Rule::in(ElementRegistry::TEMPLATES)],
+            'id' => ['sometimes', 'nullable', 'string', 'max:120'],
+        ]);
+
+        return ApiResponse::success($locale->using($request->query('lang'), fn () => $samples->build($data['template'], $data['id'] ?? null)))
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /**

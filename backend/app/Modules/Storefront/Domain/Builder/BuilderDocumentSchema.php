@@ -44,6 +44,12 @@ use Illuminate\Support\Facades\Validator;
  * B13: sections, global section references and elements may carry `audience` (AudienceRules);
  * pages, content pages and shop areas may carry `experiments` and their top-level sections an
  * `experiment` version (Experiments) — all kept only when set.
+ *
+ * B14: store page templates — context `template:<key>` (contextOf(`template:<key>`)): what a
+ * page may hold (globals, sticky, audiences, A/B tests; no `seo`) plus the template's main part
+ * (ElementRegistry::TEMPLATE_CORE) at most once (TEMPLATE_CORE_DUPLICATE; publishing needs it
+ * exactly once), and `dynamic_text` fields of that template (B14ElementProps). Plain `template`
+ * accepts any template's parts and fields (section templates checked for where they fit).
  */
 final class BuilderDocumentSchema
 {
@@ -77,8 +83,16 @@ final class BuilderDocumentSchema
     /** B6: a shape divider's height, px. */
     public const SHAPE_HEIGHT = [16, 200];
 
-    /** B6: the contexts where a section may be sticky (at most one per document). */
-    public const STICKY_CONTEXTS = ['page', 'cms', 'zone'];
+    /** B6: the contexts where a section may be sticky (at most one per document; B14: templates too). */
+    public const STICKY_CONTEXTS = ['page', 'cms', 'zone', 'template'];
+
+    /** B14: a store page template's document key prefix (`template:<key>`). */
+    public const TEMPLATE_PREFIX = 'template:';
+
+    /** B14: the error codes of a template's main part (more than once; missing on publish). */
+    public const CORE_DUPLICATE = 'TEMPLATE_CORE_DUPLICATE';
+
+    public const CORE_MISSING = 'TEMPLATE_CORE_MISSING';
 
     private const UUID = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
@@ -90,7 +104,7 @@ final class BuilderDocumentSchema
     public const GLOBAL_SECTION = 'global_section';
 
     /** B9: the contexts whose documents may refer to global sections. */
-    public const GLOBAL_SECTION_CONTEXTS = ['page', 'cms', 'zone', 'header', 'footer'];
+    public const GLOBAL_SECTION_CONTEXTS = ['page', 'cms', 'zone', 'header', 'footer', 'template'];
 
     /** B9: the contexts whose documents have search & sharing settings (`seo`). */
     public const SEO_CONTEXTS = ['page', 'cms'];
@@ -118,11 +132,13 @@ final class BuilderDocumentSchema
      * B4: the document context (ElementRegistry::CONTEXTS) — which element types are allowed.
      * B9: `$global` — the content of a global section (one section, no references, no seo).
      */
-    private function __construct(private readonly string $context, private readonly bool $global = false) {}
+    private function __construct(private readonly string $context, private readonly bool $global = false, private readonly ?string $template = null) {}
 
     /**
      * @param  array<string, mixed>  $document
-     * @param  string  $context  B4: `page` (home / landing), `cms`, `header`, `footer` or `zone`
+     * @param  string  $context  B4: `page` (home / landing), `cms`, `header`, `footer` or `zone`;
+     *                           B14: `template:<key>` for a store page template (its own rules:
+     *                           main part, fields), plain `template` for any template
      * @param  bool  $global  B9: the content of a global section used in `$context`
      * @return array{schema_version: int, sections: list<array<string, mixed>>}
      *
@@ -130,16 +146,43 @@ final class BuilderDocumentSchema
      */
     public static function normalize(array $document, string $context = 'page', bool $global = false): array
     {
-        if (! in_array($context, ElementRegistry::CONTEXTS, true)) {
+        [$base, $template] = self::splitContext($context);
+        if (! in_array($base, ElementRegistry::CONTEXTS, true)) {
             throw new \InvalidArgumentException("Unknown builder document context \"{$context}\".");
         }
 
-        return (new self($context, $global))->document($document);
+        return (new self($base, $global, $template))->document($document);
+    }
+
+    /**
+     * B14: `[context, template key|null]` of a context (`template:shop` → `['template', 'shop']`;
+     * an unknown template key stays the whole string, which is no context).
+     *
+     * @return array{0: string, 1: ?string}
+     */
+    public static function splitContext(string $context): array
+    {
+        if (str_starts_with($context, self::TEMPLATE_PREFIX)) {
+            $key = substr($context, strlen(self::TEMPLATE_PREFIX));
+
+            return in_array($key, ElementRegistry::TEMPLATES, true) ? ['template', $key] : [$context, null];
+        }
+
+        return [$context, null];
+    }
+
+    /**
+     * B14: the context without the template key (`template:shop` → `template`).
+     */
+    public static function baseContext(string $context): string
+    {
+        return self::splitContext($context)[0];
     }
 
     /**
      * B4: the context of a document key — `cms:<uuid>` → cms, `header`, `footer`, `zone:*` →
-     * zone, everything else (home, landing pages) → page.
+     * zone, everything else (home, landing pages) → page. B14: `template:<key>` → itself (a
+     * store page template, validated with its own rules).
      */
     public static function contextOf(string $key): string
     {
@@ -149,8 +192,40 @@ final class BuilderDocumentSchema
             str_starts_with($key, 'zone:') => 'zone',
             // B8b.
             str_starts_with($key, 'popup:') => 'popup',
+            // B14.
+            str_starts_with($key, self::TEMPLATE_PREFIX) && self::splitContext($key)[1] !== null => $key,
             default => 'page',
         };
+    }
+
+    /**
+     * B14: the element ids of a template's main part in a (normalized) document, in document
+     * order (sections, columns, inner rows; global sections are not looked into).
+     *
+     * `hidden`: the element or a section / column / inner row around it is hidden (eye icon).
+     *
+     * @param  array<string, mixed>  $document
+     * @return list<array{id: string, path: string, hidden: bool}>
+     */
+    public static function coreElements(array $document, string $template): array
+    {
+        $core = ElementRegistry::TEMPLATE_CORE[$template] ?? null;
+        $found = [];
+        $hiddenPaths = [];
+        self::walk($document, function (array $node, string $path, string $kind) use ($core, &$found, &$hiddenPaths) {
+            $hidden = ($node['hidden'] ?? false) === true;
+            foreach ($hiddenPaths as $hiddenPath) {
+                $hidden = $hidden || str_starts_with($path, $hiddenPath.'.');
+            }
+            if ($hidden) {
+                $hiddenPaths[] = $path;
+            }
+            if ($kind === 'element' && ($node['type'] ?? null) === $core && is_string($node['id'] ?? null)) {
+                $found[] = ['id' => $node['id'], 'path' => $path, 'hidden' => $hidden];
+            }
+        });
+
+        return $found;
     }
 
     /**
@@ -296,6 +371,12 @@ final class BuilderDocumentSchema
         );
         // B13: A/B tests (pages, content pages and shop areas; kept only when there are any).
         $experiments = $this->experiments($document['experiments'] ?? null, $sections);
+        // B14: a store page template holds its main part at most once (exactly once to publish).
+        if ($this->template !== null) {
+            foreach (array_slice(self::coreElements(['sections' => $sections], $this->template), 1) as $extra) {
+                $this->error($extra['path'], $extra['id'], 'This store page can hold its main part only once.', self::CORE_DUPLICATE);
+            }
+        }
         if ($this->errors !== []) {
             throw new InvalidBuilderDocument($this->errors);
         }
@@ -692,8 +773,12 @@ final class BuilderDocumentSchema
 
             return null;
         }
-        if (! in_array($this->context, ElementRegistry::allowedIn($type), true)) {
-            $noun = ['page' => 'this page', 'cms' => 'a content page', 'header' => 'the header', 'footer' => 'the footer', 'zone' => 'a shop area', 'popup' => 'a popup'][$this->context];
+        // B14: a template's main part only in its own template (the product listing in the
+        // listing templates).
+        $otherTemplate = $this->template !== null && in_array($type, ElementRegistry::TEMPLATE_CORE, true)
+            && ElementRegistry::TEMPLATE_CORE[$this->template] !== $type;
+        if ($otherTemplate || ! in_array($this->context, ElementRegistry::allowedIn($type), true)) {
+            $noun = ['page' => 'this page', 'cms' => 'a content page', 'header' => 'the header', 'footer' => 'the footer', 'zone' => 'a shop area', 'popup' => 'a popup', 'template' => 'this store page'][$this->context];
             $this->error("{$path}.type", $id, 'The '.ElementRegistry::label($type).' element cannot be used in '.$noun.'.', 'ELEMENT_NOT_ALLOWED');
 
             return null;
@@ -916,6 +1001,13 @@ final class BuilderDocumentSchema
         }
         if (in_array($type, ElementRegistry::B17, true)) {
             return (new B17ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
+        }
+        if (in_array($type, ElementRegistry::B14, true)) {
+            return (new B14ElementProps(
+                fn (string $key, string $message, ?string $code = null) => $this->error("{$path}.{$key}", $id, $message, $code),
+                $this->context,
+                $this->template,
+            ))->normalize($type, $props);
         }
 
         // Optional texts (alt, html) may arrive as null (empty strings become null on input).

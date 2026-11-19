@@ -70,6 +70,9 @@ use Carbon\CarbonImmutable;
  *   `missing: [id]` (chosen zones that are gone, switched off or without methods).
  * - B17 bangla_date: `{timezone}` of the organization (the storefront computes the date).
  *
+ * - B14 product_listing with scope `categories` / `brands`: `{category_slugs, brand_slugs}` of
+ *   the visible chosen ones (none visible → no data, so the listing is left out publicly).
+ *
  * In a draft (preview) an element that would be left out publicly keeps its data with
  * `state: expired | inactive | unavailable`; an element whose record is gone has no data.
  */
@@ -268,6 +271,9 @@ class BuilderElementData
                     break;
                 case 'bangla_date':
                     $data = ['timezone' => $this->timezone()];
+                    break;
+                case 'product_listing':
+                    $data = ElementRegistry::needsData('product_listing', $props) ? $this->listingScope($props) : null;
                     break;
             }
 
@@ -768,6 +774,24 @@ class BuilderElementData
     private function timezone(): string
     {
         return $this->timezone ??= (string) ($this->organizations->summary($this->tenant->requireOrganization())['timezone'] ?? config('app.timezone'));
+    }
+
+    /**
+     * B14: a product listing of chosen categories or brands — the slugs of the visible ones in
+     * the chosen order (the storefront asks the listing API with them); none visible → no data.
+     *
+     * @param  array<string, mixed>  $props
+     * @return array{category_slugs: list<string>, brand_slugs: list<string>}|null
+     */
+    private function listingScope(array $props): ?array
+    {
+        $slugs = function (array $ids, array $visible): array {
+            return array_values(array_map(fn (string $id) => $visible[$id]['slug'], array_filter($ids, fn (string $id) => isset($visible[$id]))));
+        };
+        $categories = $props['scope'] === 'categories' ? $slugs($props['category_ids'], $this->catalog->visibleCategories($props['category_ids'])) : [];
+        $brands = $props['scope'] === 'brands' ? $slugs($props['brand_ids'], $this->catalog->visibleBrands($props['brand_ids'])) : [];
+
+        return $categories === [] && $brands === [] ? null : ['category_slugs' => $categories, 'brand_slugs' => $brands];
     }
 
     /**

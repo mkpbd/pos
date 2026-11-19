@@ -3,6 +3,7 @@ import type { PreviewContext } from '../audience/types'
 import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderPageSection } from '../types'
 import type { FontSource } from '../../fonts'
 import type { CanvasThemeSettings } from './theme-override'
+import type { StorePageContext, StorePageSample } from '../templates/types'
 
 /*
  * postMessage protocol between the store builder editor (admin, parent window) and its canvas
@@ -125,6 +126,16 @@ export type ParentMessage =
    * The canvas never drops a node by audience or A/B arm: the editor sends only the arm it shows.
    */
   | { type: 'preview-as'; context: PreviewContext | null }
+  /**
+   * B14 (additive, v stays 1): the page context the canvas draws `dynamic_text` and the template
+   * main parts with — the toolbar's sample (a category, brand, search words, blog post, recent order
+   * or a fake order), as GET /storefront/builder/sample-context returns it. `context: null` = no
+   * sample yet (dynamic_text shows its fallback or the field's name; main parts are drawn as an
+   * outline); `sample` carries the API data the main parts draw (listing, post, masked order).
+   * Sent on change and after each `ready`; a normal page may send `{ context: null }` or a context
+   * with `template: null` (store fields only).
+   */
+  | { type: 'page-context'; context: StorePageContext | null; sample?: StorePageSample | null }
 
 /** Canvas → parent. Rects are in the canvas viewport's CSS pixels. */
 export type CanvasMessage =
@@ -183,7 +194,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as', 'page-context'])
 const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {

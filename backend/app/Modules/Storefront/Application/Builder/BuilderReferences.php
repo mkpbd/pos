@@ -166,6 +166,11 @@ class BuilderReferences
                 'chart' => $use('PRODUCT_NOT_FOUND', "{$path}.props.source_product_id", $node['id'], [$props['source_product_id'] ?? null]),
                 // P2a: the product the order form sells and its add-on.
                 'order_form' => $use('PRODUCT_NOT_FOUND', "{$path}.props.product_id", $node['id'], [$props['product_id'], $props['upsell']['product_id'] ?? null]),
+                // B14: a listing of chosen categories or brands.
+                'product_listing' => [
+                    $use('CATEGORY_NOT_FOUND', "{$path}.props.category_ids", $node['id'], $props['category_ids'] ?? []),
+                    $use('BRAND_NOT_FOUND', "{$path}.props.brand_ids", $node['id'], $props['brand_ids'] ?? []),
+                ],
                 default => null,
             };
             $type = ElementRegistry::sectionType($node['type']);
@@ -239,8 +244,11 @@ class BuilderReferences
      */
     public static function globalFits(string $globalContext, string $documentContext): bool
     {
+        // B14: store page templates (`template:<key>`) take the page globals.
+        $documentContext = BuilderDocumentSchema::baseContext($documentContext);
+
         return $globalContext === 'page'
-            ? in_array($documentContext, ['page', 'cms', 'zone'], true)
+            ? in_array($documentContext, ['page', 'cms', 'zone', 'template'], true)
             : $globalContext === $documentContext;
     }
 

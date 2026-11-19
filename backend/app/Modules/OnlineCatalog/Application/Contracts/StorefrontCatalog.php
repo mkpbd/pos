@@ -183,4 +183,23 @@ interface StorefrontCatalog
      * @return list<string>
      */
     public function liveProductIds(): array;
+
+    /**
+     * B14: a visible category or brand by id or slug — or, for null, the one with the most live
+     * products — for the store builder's sample page: `{id, slug, name, description (plain
+     * text), product_count}`; null when there is none.
+     *
+     * @param  'category'|'brand'  $type
+     * @return array{id: string, slug: string, name: string, description: ?string, product_count: int}|null
+     */
+    public function pageSample(string $type, ?string $idOrSlug): ?array;
+
+    /**
+     * B14: exactly what GET /store/products answers for these (validated) parameters —
+     * `{data, meta, facets, context}` (an unknown `category` throws ModelNotFoundException).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{data: list<array<string, mixed>>, meta: array<string, int>, facets: array<string, mixed>, context: array<string, mixed>}
+     */
+    public function listing(array $params): array;
 }

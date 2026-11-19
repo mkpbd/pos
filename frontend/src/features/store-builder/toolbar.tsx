@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
+import { SamplePicker } from './template-sample'
 import {
   ArrowLeftIcon,
   CircleAlertIcon,
@@ -178,6 +179,8 @@ type ToolbarProps = {
   abTests?: { open: boolean; count: number; onToggle: () => void }
   /** B13: "Preview as" a shopper (audiences); false = no control (e.g. compare screens). Default on. */
   previewAs?: boolean
+  /** B14: show a store page design's "Preview with" sample picker (a flag, not an element: an inline element prop kept the React Compiler from optimizing the editor). */
+  sample?: boolean
 }
 
 /** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
@@ -215,7 +218,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -250,6 +253,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       </div>
 
       {bangla && <LocaleToggle />}
+      {sample && <SamplePicker />}
       {previewAs && <PreviewAsMenu bangla={bangla} />}
 
       {onCommandBox && (

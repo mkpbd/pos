@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { coreInsertRefusal } from './store-page-core'
 import { useNavigate } from 'react-router'
 import type { Device } from '@/storefront/builder/types'
 import { useDocumentsQuery, type DocumentSummary } from './api'
@@ -33,7 +34,7 @@ export type CommandActions = {
 const DEVICE_NAMES: Record<Device, string> = { desktop: 'Computer view', tablet: 'Tablet view', mobile: 'Phone view' }
 
 export function documentHint(doc: Pick<DocumentSummary, 'kind' | 'key' | 'path' | 'target'>): string {
-  if (doc.kind === 'page') return doc.path ? `Page · ${doc.path}` : 'Page'
+  if (doc.kind === 'page') return doc.key.startsWith('template:') ? 'Store page' : doc.path ? `Page · ${doc.path}` : 'Page'
   if (doc.kind === 'popup') return 'Popup'
   if (doc.kind === 'global') return 'Global section'
   return kindInfo({ kind: doc.kind, key: doc.key, target: doc.target ?? null }).noun.replace(/^./, (c) => c.toUpperCase())
@@ -42,7 +43,7 @@ export function documentHint(doc: Pick<DocumentSummary, 'kind' | 'key' | 'path' 
 export function useCommandItems(open: boolean, actions: CommandActions, inserter: TemplateInserter | null): CommandItem[] {
   const store = useEditorStoreApi()
   const commands = useCommands()
-  const { registry, context = 'page', canCustomHtml = true, globals } = useEditorUi()
+  const { registry, context = 'page', template = null, canCustomHtml = true, globals } = useEditorUi()
   const navigate = useNavigate()
   const content = useEditor((s) => s.content)
   const documentId = useEditor((s) => s.document.id)
@@ -74,14 +75,14 @@ export function useCommandItems(open: boolean, actions: CommandActions, inserter
     action('shortcuts', 'Keyboard shortcuts', actions.shortcuts)
 
     for (const meta of registry.types) {
-      if (!allowedIn(meta, context)) continue
+      if (!allowedIn(meta, context, template)) continue
       items.push({
         id: `add:${meta.type}`,
         group: 'add',
         label: meta.label,
         hint: ELEMENT_HINTS[meta.type],
         words: `${meta.type.replace(/_/g, ' ')} ${ELEMENT_WORDS[meta.type] ?? ''}`,
-        disabled: meta.type === 'custom_html' && !canCustomHtml ? CUSTOM_HTML_DENIED : null,
+        disabled: meta.type === 'custom_html' && !canCustomHtml ? CUSTOM_HTML_DENIED : coreInsertRefusal(content, meta.type, template),
         run: () => void commands.insert(meta.type),
       })
     }
@@ -115,5 +116,5 @@ export function useCommandItems(open: boolean, actions: CommandActions, inserter
       items.push({ id: `page:${doc.id}`, group: 'page', label: doc.title, hint: documentHint(doc), words: doc.key, run: () => void navigate(`/storefront/builder/${doc.id}`, back) })
     }
     return items
-  }, [open, actions, inserter, registry, context, canCustomHtml, globals, content, documentId, documentTitle, device, canUndo, canRedo, documents.data, globalsList.data, templates.data, store, commands, navigate])
+  }, [open, actions, inserter, registry, context, template, canCustomHtml, globals, content, documentId, documentTitle, device, canUndo, canRedo, documents.data, globalsList.data, templates.data, store, commands, navigate])
 }

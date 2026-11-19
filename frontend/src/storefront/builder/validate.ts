@@ -7,6 +7,7 @@
 
 import type { ListingColumns, ThemeColors } from '../types'
 import { ICON_NAMES } from './icons'
+import { fieldsFor, STORE_FIELDS, TEMPLATE_FIELDS, type StoreTemplateKey } from './templates/types'
 import type {
   Background,
   BackgroundVideo,
@@ -1280,7 +1281,13 @@ export function b8aPropProblems(type: string, props: unknown): PropProblem[] {
 
 /** Every problem with an element's props, B6, B8a and B8b rules (empty = valid; unknown types []). */
 export function elementPropProblems(type: string, props: unknown): PropProblem[] {
-  return [...b6PropProblems(type, props), ...b8bPropProblems(type, props), ...(type === 'order_form' ? orderFormPropProblems(props) : []), ...b17PropProblems(type, props)]
+  return [
+    ...b6PropProblems(type, props),
+    ...b8bPropProblems(type, props),
+    ...(type === 'order_form' ? orderFormPropProblems(props) : []),
+    ...b17PropProblems(type, props),
+    ...b14PropProblems(type, props),
+  ]
 }
 
 /* ----------------------------------------------------------------------------------------------
@@ -1749,7 +1756,8 @@ export function isUnavailableGlobal(value: unknown): value is RenderUnavailableG
 
 /** Which document contexts a global of each context may be referenced from (never from a global or a popup). */
 export const GLOBAL_CONTEXT_USES: Record<GlobalContext, readonly DocumentContext[]> = {
-  page: ['page', 'cms', 'zone'],
+  // B14: page globals also in store page templates.
+  page: ['page', 'cms', 'zone', 'template'],
   header: ['header'],
   footer: ['footer'],
 }
@@ -1876,4 +1884,98 @@ export function b17PropProblems(type: string, props: unknown): PropProblem[] {
       return []
   }
   return problems
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B14: live text and the store page templates' main parts (contract §2, §3)
+ * -------------------------------------------------------------------------------------------- */
+
+export const B14_ENUMS = {
+  dynamicTag: ['p', 'h1', 'h2', 'h3', 'span'],
+  dynamicFormat: ['default', 'money', 'number', 'date'],
+  dynamicField: [...STORE_FIELDS, ...Object.values(TEMPLATE_FIELDS).flat()],
+  listingScope: ['current', 'all', 'categories', 'brands', 'on_sale', 'new_arrivals'],
+  filterLayout: ['sidebar', 'top', 'drawer'],
+  listingSort: ['featured', 'popularity', 'latest', 'price_asc', 'price_desc', 'name', 'rating'],
+  listingPagination: ['pages', 'load_more'],
+  listingFilters: ['price', 'brand', 'category', 'attributes', 'availability', 'on_sale'],
+} as const
+
+export const B14_LIMITS = {
+  perPage: [12, 24, 36, 48],
+  scopeIds: { min: 1, max: 20 },
+  columns: { desktop: { min: 3, max: 5 }, tablet: { min: 2, max: 4 }, mobile: { min: 1, max: 2 } },
+} as const
+
+/** Maximum length of each B14 text prop (✱ translatable). */
+export const B14_TEXT_LIMITS = {
+  dynamic_text: { prefix: 80, suffix: 80, fallback: 200 },
+  not_found_message: { heading: 120, text: 400 },
+} as const
+
+/** The client mirror of the server's B14 prop rules (empty = valid; other types []). Field-per-template checks: dynamicFieldAllowed. */
+export function b14PropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const E = B14_ENUMS
+  switch (type) {
+    case 'dynamic_text': {
+      const L = B14_TEXT_LIMITS.dynamic_text
+      enumOf(problems, 'field', p.field, E.dynamicField)
+      enumOf(problems, 'tag', p.tag, E.dynamicTag)
+      text(problems, 'prefix', p.prefix, L.prefix)
+      text(problems, 'suffix', p.suffix, L.suffix)
+      text(problems, 'fallback', p.fallback, L.fallback)
+      enumOf(problems, 'format', p.format, E.dynamicFormat)
+      break
+    }
+    case 'product_listing': {
+      enumOf(problems, 'scope', p.scope, E.listingScope)
+      for (const [key, wanted] of [['category_ids', 'categories'], ['brand_ids', 'brands']] as const) {
+        const ids = p[key]
+        if (!Array.isArray(ids)) {
+          problems.push({ path: key, code: 'invalid' })
+          continue
+        }
+        if (p.scope === wanted && ids.length < B14_LIMITS.scopeIds.min) problems.push({ path: key, code: 'too_few' })
+        if (ids.length > B14_LIMITS.scopeIds.max) problems.push({ path: key, code: 'too_many' })
+        const seen = new Set<unknown>()
+        ids.forEach((id, i) => {
+          if (!isUuid(id)) problems.push({ path: `${key}.${i}`, code: 'invalid' })
+          else if (seen.has(id)) problems.push({ path: `${key}.${i}`, code: 'duplicate' })
+          seen.add(id)
+        })
+      }
+      if (!isObject(p.filters)) problems.push({ path: 'filters', code: 'invalid' })
+      else for (const key of E.listingFilters) flag(problems, `filters.${key}`, p.filters[key])
+      enumOf(problems, 'filter_layout', p.filter_layout, E.filterLayout)
+      enumOf(problems, 'sort_default', p.sort_default, E.listingSort)
+      if (!(B14_LIMITS.perPage as readonly unknown[]).includes(p.per_page)) problems.push({ path: 'per_page', code: isNumber(p.per_page) ? 'out_of_range' : 'invalid' })
+      if (!isObject(p.columns)) problems.push({ path: 'columns', code: 'invalid' })
+      else for (const device of ['desktop', 'tablet', 'mobile'] as const) int(problems, `columns.${device}`, p.columns[device], B14_LIMITS.columns[device])
+      flag(problems, 'show_count', p.show_count)
+      enumOf(problems, 'pagination', p.pagination, E.listingPagination)
+      break
+    }
+    case 'blog_post_body':
+      for (const key of ['show_cover', 'show_meta', 'show_share', 'show_related']) flag(problems, key, p[key])
+      break
+    case 'order_summary':
+      for (const key of ['show_timeline', 'show_items', 'show_address', 'show_delivery']) flag(problems, key, p[key])
+      break
+    case 'not_found_message':
+      text(problems, 'heading', p.heading, B14_TEXT_LIMITS.not_found_message.heading)
+      text(problems, 'text', p.text, B14_TEXT_LIMITS.not_found_message.text)
+      flag(problems, 'show_search', p.show_search)
+      flag(problems, 'show_links', p.show_links)
+      break
+    default:
+      return []
+  }
+  return problems
+}
+
+/** B14: whether a dynamic_text field may be used in a document of this template (null = a normal page: store fields only). */
+export function dynamicFieldAllowed(field: unknown, template: StoreTemplateKey | null): boolean {
+  return typeof field === 'string' && (fieldsFor(template) as readonly string[]).includes(field)
 }

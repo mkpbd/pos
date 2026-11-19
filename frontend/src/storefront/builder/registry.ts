@@ -6,6 +6,7 @@
  */
 
 import type { DocumentContext, ElementType, FormField, FormFieldKind, WrappedSectionType } from './types'
+import { TEMPLATE_CORE_ELEMENT, type StoreTemplateKey } from './templates/types'
 
 /** B4: `site` = header / footer parts (logo, menu, account, cart, social icons, …). B6: `media` (gallery, carousels, map). */
 export type ElementGroup = 'layout' | 'content' | 'media' | 'commerce' | 'marketing' | 'site'
@@ -600,6 +601,64 @@ const B17: BaseMeta[] = [
   },
 ]
 
+/**
+ * B14 (contract §2, §3): live text from the page and the store page templates' main parts.
+ * `product_listing` also works on normal pages (scope all / categories / brands / on sale / new).
+ */
+const B14: BaseMeta[] = [
+  {
+    type: 'dynamic_text',
+    group: 'content',
+    label: 'Text from this page',
+    translatable: ['prefix', 'suffix', 'fallback'],
+    props: { field: 'store.name', tag: 'p', prefix: '', suffix: '', fallback: '', format: 'default' },
+    children: null,
+  },
+  {
+    type: 'product_listing',
+    group: 'commerce',
+    label: 'Product listing',
+    translatable: [],
+    props: {
+      scope: 'all',
+      category_ids: [],
+      brand_ids: [],
+      filters: { price: true, brand: true, category: true, attributes: true, availability: true, on_sale: true },
+      filter_layout: 'sidebar',
+      sort_default: 'featured',
+      per_page: 24,
+      columns: { desktop: 3, tablet: 3, mobile: 2 },
+      show_count: true,
+      pagination: 'pages',
+    },
+    children: null,
+  },
+  {
+    type: 'blog_post_body',
+    group: 'content',
+    label: 'Blog post',
+    translatable: [],
+    props: { show_cover: true, show_meta: true, show_share: true, show_related: true },
+    children: null,
+  },
+  {
+    type: 'order_summary',
+    group: 'commerce',
+    label: 'Order summary',
+    translatable: [],
+    props: { show_timeline: true, show_items: true, show_address: true, show_delivery: true },
+    children: null,
+  },
+  {
+    type: 'not_found_message',
+    group: 'content',
+    label: 'Page not found message',
+    translatable: ['heading', 'text'],
+    props: { heading: '', text: '', show_search: true, show_links: true },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] =['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 /** B8b: what may sit in a popup (contract §1): simple content, offers and forms; never shop grids, sliders, charts, maps or site parts. */
@@ -673,6 +732,17 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   payment_badges: ['page', 'cms', 'zone', 'footer'],
   delivery_promise: ['page', 'cms', 'zone', 'footer'],
   bangla_date: IN_POPUP(ALL),
+  // B14: the main parts belong to their templates (TEMPLATE_CORE_ELEMENT); the listing also on normal pages; live text everywhere a page goes.
+  dynamic_text: ['page', 'cms', 'template'],
+  product_listing: ['page', 'cms', 'template'],
+  blog_post_body: ['template'],
+  order_summary: ['template'],
+  not_found_message: ['template'],
+}
+
+/** B14: a store page template holds everything a page may (plus its own elements). */
+function withTemplate(contexts: readonly DocumentContext[]): readonly DocumentContext[] {
+  return contexts.includes('page') && !contexts.includes('template') ? [...contexts, 'template'] : contexts
 }
 
 export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
@@ -692,20 +762,33 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...B8B,
   ...P2A,
   ...B17,
-].map((meta) => ({ ...meta, allowed_in: ALLOWED_IN[meta.type] }))
+  ...B14,
+].map((meta) => ({ ...meta, allowed_in: withTemplate(ALLOWED_IN[meta.type]) }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */
 export function isAllowedIn(type: string, context: DocumentContext): boolean {
   return elementMeta(type)?.allowed_in.includes(context) ?? false
 }
 
-/** The document context of a builder document key: `home` / `landing:*` → page, `cms:*`, `header`, `footer`, `zone:*`, B8b `popup:*`. */
+/** The document context of a builder document key: `home` / `landing:*` → page, `cms:*`, `header`, `footer`, `zone:*`, B8b `popup:*`, B14 `template:*`. */
 export function documentContext(key: string): DocumentContext {
   if (key === 'header' || key === 'footer') return key
   if (key.startsWith('cms:')) return 'cms'
   if (key.startsWith('zone:')) return 'zone'
   if (key.startsWith('popup:')) return 'popup'
+  if (key.startsWith('template:')) return 'template'
   return 'page'
+}
+
+/**
+ * B14: whether a type may sit in this store page template: a template's main part only in its own
+ * templates (the listing in shop / category / brand / search), everything else as in any template.
+ */
+export function isAllowedInTemplate(type: string, template: StoreTemplateKey): boolean {
+  if (!isAllowedIn(type, 'template')) return false
+  const cores = Object.entries(TEMPLATE_CORE_ELEMENT) as [StoreTemplateKey, string][]
+  if (!cores.some(([, core]) => core === type)) return true
+  return TEMPLATE_CORE_ELEMENT[template] === type
 }
 
 const BY_TYPE = new Map<string, ElementMeta>(ELEMENT_REGISTRY.map((meta) => [meta.type, meta]))

@@ -78,7 +78,9 @@ import { DetachConfirm, MakeGlobalDialog } from './global-dialogs'
 import { GlobalDocBar, GlobalDocPanel, GlobalRefPanel, GlobalSectionsPanel } from './global-panel'
 import { expandGlobals, globalContextFor, globalRefOf, isGlobalRef, mergedDeviceOrder, referencedGlobals } from './global-sections'
 import { ConflictDialog, LeaveDialog, LinkPrompt, PublishDialog } from './dialogs'
-import { elementContext, isProductZone, kindInfo } from './document-kind'
+import { documentTemplate, elementContext, isProductZone, kindInfo } from './document-kind'
+import { TemplateSampleContext, useTemplateSampleState } from './template-sample-state'
+import { hasSamplePicker, templateLivePath } from './store-pages-api'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector, withSeo } from './inspector'
 import { BREAKPOINT, DEVICE_LABEL, widthAt } from './inspector/style-model'
@@ -223,6 +225,7 @@ export function Editor({ registry, canvasContext, autosaveOverrides }: EditorPro
       requestCopyToPages: single || !canCopySectionsFrom(documentKind) ? undefined : setCopySectionId,
       canCustomHtml,
       context,
+      template: documentTemplate({ kind: documentKind, key: documentKey }),
       requestSaveTemplate: setSaveTemplateId,
       org,
       single,
@@ -329,6 +332,9 @@ type LayoutProps = {
 function livePath(doc: { kind: string; key: string; path: string | null; preview_product?: { slug: string } | null }): string | null {
   if (doc.path) return doc.path
   if (doc.kind === 'header' || doc.kind === 'footer') return '/'
+  // B14: a store page design on a page that needs no record (shop, search).
+  const template = documentTemplate(doc)
+  if (template) return templateLivePath(template)
   if (doc.key === 'zone:listing.top' || doc.key === 'zone:listing.bottom') return '/shop'
   // P1b: a product zone (or one of its versions) on the matching live product.
   if (doc.kind === 'zone' && doc.preview_product?.slug) return `/product/${encodeURIComponent(doc.preview_product.slug)}`
@@ -358,6 +364,12 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   // B4: what this document is (page, header, footer, zone) and which elements it may hold.
   const info = useMemo(() => kindInfo(documentInfo), [documentInfo])
   const context = elementContext(documentInfo)
+  // B14: a store page design previews with a sample (category, brand, post, order …); normal pages give live text the store's fields.
+  // Only the two fields it needs (passing documentInfo itself makes the React Compiler treat it as mutable).
+  const template = documentTemplate({ kind: documentInfo.kind, key: documentInfo.key })
+  const templateSample = useTemplateSampleState({ template, lang: canvasLocale, bootstrap: canvasContext.bootstrap })
+  const showSample = hasSamplePicker(template)
+  const livesText = context === 'page' || context === 'cms' || context === 'template'
   const surroundings = canvasSurroundings(documentInfo)
   // P1b: a product page zone is previewed on a matching live product (a version: one of its category's, or that product).
   const productZone = documentInfo.kind === 'zone' && isProductZone(surroundings)
@@ -396,7 +408,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const timeZone = useCurrentUserQuery().data?.organization?.timezone
   // B15: Insights for builder pages (home, campaign and content pages).
   const canViewInsights = useCan()('storefront.view')
-  const insights = useInsights({ documentId: documentInfo.id, available: documentInfo.kind === 'page' && canViewInsights, timeZone })
+  const insights = useInsights({ documentId: documentInfo.id, available: documentInfo.kind === 'page' && template === null && canViewInsights, timeZone })
   const setInsightsOpen = insights.setOpen
   // B13: the A/B tests panel (pages and shop areas).
   const ab = useExperimentsUi()
@@ -674,6 +686,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       if (!fix) return
       const state = store.getState()
       if (fix.kind === 'site-styles') return setStylesOpen(true)
+      // B14: a store page's missing main part, added as from the Add panel.
+      if (fix.kind === 'insert') return void commands.insert(fix.type)
       if (fix.kind === 'apply') {
         if (insideGlobal(fix.node_id)) return void toast.info(GLOBAL_NOTE)
         if (state.apply((c) => applyPageCheckFix(c, fix), { select: fix.node_id })) {
@@ -1258,6 +1272,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   }, [registry, store, ownerOf, globals])
 
   return (
+    <TemplateSampleContext value={templateSample}>
     <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={(e) => onDragMove(e as unknown as DragMoveEvent)} onDragEnd={onDragEnd} onDragCancel={resetDrag} autoScroll={{ layoutShiftCompensation: false }}>
       <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground" data-testid="store-builder-editor">
         <Toolbar
@@ -1321,6 +1336,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               : undefined
           }
           abTests={abAvailable ? { open: abShown, count: abCount, onToggle: () => ab.setOpen(!abShown) } : undefined}
+          sample={showSample}
         />
         <div className="flex min-h-0 flex-1">
           <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown || abShown ? 'w-96' : 'w-72')}>
@@ -1364,7 +1380,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 {showGlobalTab && <TabsTrigger value="global">Global</TabsTrigger>}
               </TabsList>
               <TabsContent value="add" className="flex min-h-0 flex-1 flex-col">
-                <AddPanel registry={registry} context={context} canCustomHtml={canCustomHtml} />
+                <AddPanel registry={registry} context={context} template={template} canCustomHtml={canCustomHtml} />
               </TabsContent>
               <TabsContent value="layers" className="flex min-h-0 flex-1 flex-col">
                 <LayersPanel indicator={layerDrop?.indicator ?? null} />
@@ -1443,6 +1459,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               previewAs={previewContext}
               audienceBadges={audience.badges}
               arms={canvasArms.layer}
+              pageContext={livesText ? templateSample.context : undefined}
+              pageSample={templateSample.sample}
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
@@ -1605,5 +1623,6 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         }}
       />
     </DndContext>
+    </TemplateSampleContext>
   )
 }

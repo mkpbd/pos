@@ -40,9 +40,24 @@ class BrowseCatalog
                 ?? throw (new ModelNotFoundException)->setModel(CategoryListing::class);
         }
 
-        $records = $this->catalog->products(array_filter([
+        $categoryIds = $category === null ? null : $tree->withDescendants($category);
+        // B14: `categories` — several category slugs (store builder listings), OR-ed with their
+        // subcategories; unknown and hidden ones are ignored; together with `category`, both apply.
+        if (array_key_exists('categories', $params) && is_array($params['categories'])) {
+            $chosen = [];
+            foreach (array_values(array_unique(array_map(fn ($s) => mb_strtolower((string) $s), $params['categories']))) as $slug) {
+                $id = $this->visibleCategoryBySlug($slug);
+                if ($id !== null) {
+                    array_push($chosen, ...$tree->withDescendants($id));
+                }
+            }
+            $chosen = array_values(array_unique($chosen));
+            $categoryIds = $categoryIds === null ? $chosen : array_values(array_intersect($categoryIds, $chosen));
+        }
+
+        $records = $categoryIds === [] ? [] : $this->catalog->products(array_filter([
             'q' => $q,
-            'category_ids' => $category === null ? null : $tree->withDescendants($category),
+            'category_ids' => $categoryIds,
         ], fn ($v) => $v !== null));
 
         $visibleBrands = $this->catalog->visibleBrands();

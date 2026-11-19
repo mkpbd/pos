@@ -49,6 +49,8 @@ class StoreCatalogController
      * Filters: `q`, `category` (slug, includes subcategories; unknown → 404), `brand[]`, `price_min`,
      * `price_max`, `attr[<slug>][]`, `in_stock=1`, `on_sale=1`. Sorts: featured (default), popularity,
      * latest, price_asc, price_desc, name. `facets` are disjunctive (each ignores its own filter).
+     * B14: `categories[]` (or `categories=a,b`, ≤ 20 slugs) narrows to several categories (OR-ed,
+     * with subcategories; unknown or hidden slugs are ignored) — store builder listings.
      * `slugs=a,b,c` (≤ 12) returns exactly those live products in that order, without facets.
      */
     public function products(BrowseCatalogRequest $request, BrowseCatalog $browse): JsonResponse

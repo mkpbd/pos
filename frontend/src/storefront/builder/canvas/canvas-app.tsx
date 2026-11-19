@@ -37,6 +37,8 @@ import { mergeThemeSettings, type CanvasThemeSettings } from './theme-override'
 import { isEditUi, useCanvasEditing } from './use-canvas-editing'
 import { audienceVerdicts } from '../audience/nodes'
 import type { PreviewContext } from '../audience/types'
+import { StorePageCtx, type StorePageRuntime } from '../templates/runtime'
+import { readPageContext, readSample } from '../templates/sample'
 
 /*
  * The store builder canvas (B2), inside the editor's iframe at /admin/builder-canvas. It draws the
@@ -50,6 +52,9 @@ type RenderFrame = Extract<ParentMessage, { type: 'render' }>
 type InitFrame = Extract<ParentMessage, { type: 'init' }>
 
 const noop = () => {}
+
+/** B14: no sample yet (live text shows where its value goes; the main parts are outlined). */
+const NO_SAMPLE: StorePageRuntime = { context: null, sample: null, canvas: true }
 
 /** Text and custom HTML elements from the unsaved draft are cleaned here too (the canvas shares the admin's origin). */
 function cleanSections(sections: RenderPageSection[]): RenderPageSection[] {
@@ -438,6 +443,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const [localeOverride, setLocaleOverride] = useState<Locale | null>(null)
   // B13: the toolbar's "Preview as" (null = show everything).
   const [previewAs, setPreviewAs] = useState<PreviewContext | null>(null)
+  // B14: the toolbar's sample for a store page template (live text and the main parts draw it).
+  const [storePage, setStorePage] = useState<StorePageRuntime>(NO_SAMPLE)
   const pendingRects = useRef(false)
   const sectionsRef = useRef<readonly unknown[]>([])
   const queryClient = useQueryClient()
@@ -539,6 +546,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         })
         setLocaleOverride(next)
       } else if (message.type === 'preview-as') setPreviewAs(typeof message.context === 'object' && message.context !== null ? message.context : null)
+      else if (message.type === 'page-context') setStorePage({ context: readPageContext(message.context), sample: readSample(message.sample), canvas: true })
     }
     window.addEventListener('message', onMessage)
     post({ type: 'ready' })
@@ -717,6 +725,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     <LocaleContext value={localeValue}>
       <BootstrapContext value={bootstrap}>
         <NoticeProvider>
+         <StorePageCtx value={storePage}>
           <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
           <style data-testid="canvas-outlines">{outlineCss(frame, editor.dropTarget)}</style>
           <style data-testid="canvas-audience">{audienceCss(verdicts.hidden)}</style>
@@ -748,6 +757,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
           </main>
           {editor.editing?.kind === 'html' &&
             createPortal(<FormatBar target={editor.editing.element} onCommand={editor.format} onLink={editor.requestLink} />, document.body)}
+         </StorePageCtx>
         </NoticeProvider>
       </BootstrapContext>
     </LocaleContext>

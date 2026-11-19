@@ -1,8 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { CircleCheckIcon, PackageSearchIcon } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
 import { useCustomer } from '../account/api'
+import { useStorefront } from '../api'
+import { orderContext, storeContext } from '../builder/templates/context'
+import type { StorePageRuntime } from '../builder/templates/runtime'
+import { useTemplateEnabled } from '../builder/templates/enabled'
+import { StoreTemplateView } from '../builder/templates/template-view'
 import { Spinner, primaryButtonClass, secondaryButtonClass } from '../account/form-controls'
 import { loginPathFor } from '../account/safe-next'
 import { useOrderQuery } from '../checkout/api'
@@ -35,6 +40,7 @@ export function OrderPage() {
   const order = useOrderQuery(number, token)
   const customer = useCustomer()
   const { t } = useLocale()
+  const template = useTemplateEnabled('order')
 
   useEffect(() => {
     if (urlToken) rememberOrderToken(number, urlToken)
@@ -50,7 +56,11 @@ export function OrderPage() {
   useDocumentMeta(privatePage(order.data ? (thankYou ? t('orders.page.thankYouTitle') : t('orders.title', { number: order.data.number })) : notFound ? t('orders.notFoundTitle') : null))
 
   // A signed-in customer's own order (opened without a guest token) is also in the account area.
-  if (order.data) return <OrderDetails order={order.data} thankYou={thankYou} accountLink={customer !== null && !token} />
+  if (order.data) {
+    const details = <OrderDetails order={order.data} thankYou={thankYou} accountLink={customer !== null && !token} />
+    // B14: a published "Order / thank you" template draws the page around the same order (never cached: loaded here, client-side).
+    return template ? <OrderTemplatePage order={order.data} thankYou={thankYou} accountLink={customer !== null && !token} fallback={details} /> : details
+  }
   if (notFound) {
     return (
       <OrderMessage title={t('orders.page.notFoundHeading')}>
@@ -91,12 +101,46 @@ function OrderMessage({ title, children }: { title: string; children: ReactNode 
   )
 }
 
-function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; thankYou: boolean; accountLink: boolean }) {
+function OrderTemplatePage({ order, thankYou, accountLink, fallback }: { order: OrderView; thankYou: boolean; accountLink: boolean; fallback: ReactNode }) {
+  const bootstrap = useStorefront()
+  const { t } = useLocale()
+  const runtime = useMemo<StorePageRuntime>(
+    () => ({
+      context: { template: 'order', store: storeContext(bootstrap), order: orderContext(order, orderStatusLabel(t, order.status, order.status_label)) },
+      order: { order, thankYou, accountLink },
+    }),
+    [bootstrap, order, thankYou, accountLink, t],
+  )
+  return <StoreTemplateView template="order" runtime={runtime} fallback={fallback} heading={thankYou ? t('orders.page.thankYouTitle') : t('orders.title', { number: order.number })} />
+}
+
+export type OrderSummaryShow = { timeline: boolean; items: boolean; address: boolean; delivery: boolean }
+
+const SHOW_ALL: OrderSummaryShow = { timeline: true, items: true, address: true, delivery: true }
+
+/**
+ * The order's status page content. B14: also the store builder's order summary element (`show`
+ * switches parts off; totals and payment details always show; `className` = its own container).
+ */
+export function OrderDetails({
+  order,
+  thankYou,
+  accountLink,
+  show = SHOW_ALL,
+  className = 'mx-auto max-w-sf px-4 py-8 lg:py-12',
+}: {
+  order: OrderView
+  thankYou: boolean
+  accountLink: boolean
+  show?: OrderSummaryShow
+  className?: string
+}) {
   const firstName = order.contact.name.trim().split(/\s+/)[0] ?? ''
   const { t } = useLocale()
+  const side = show.address || show.delivery
 
   return (
-    <section className="mx-auto max-w-sf px-4 py-8 lg:py-12" data-testid="order-page">
+    <section className={className} data-testid="order-page">
       <header className="flex flex-col gap-2">
         {thankYou ? (
           <>
@@ -136,16 +180,18 @@ function OrderDetails({ order, thankYou, accountLink }: { order: OrderView; than
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          <OrderItemsCard lines={order.lines} currency={order.currency} />
-          <div className="grid gap-6 md:grid-cols-2">
-            <OrderAddressCard address={order.shipping_address} />
-            <OrderDeliveryCard order={order} />
-          </div>
+          {show.items && <OrderItemsCard lines={order.lines} currency={order.currency} />}
+          {side && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {show.address && <OrderAddressCard address={order.shipping_address} />}
+              {show.delivery && <OrderDeliveryCard order={order} />}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-6">
           <OrderTotalsCard order={order} />
-          <OrderTimeline order={order} />
+          {show.timeline && <OrderTimeline order={order} />}
           <Link to="/shop" className={secondaryButtonClass}>
             {t('orders.continueShopping')}
           </Link>

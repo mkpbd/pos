@@ -47,8 +47,22 @@ export type ListingState = {
   view: ListingView
 }
 
-/** Which listing the page shows: the slug comes from the path for category and brand pages. */
-export type ListingScope = { kind: 'shop' } | { kind: 'search' } | { kind: 'category'; slug: string } | { kind: 'brand'; slug: string }
+/**
+ * Which listing the page shows: the slug comes from the path for category and brand pages. B14:
+ * `selection` is a store builder product listing on a normal page — chosen categories (OR-ed,
+ * `categories[]`), chosen brands, or on-sale products only; empty lists = every product.
+ */
+export type ListingScope =
+  | { kind: 'shop' }
+  | { kind: 'search' }
+  | { kind: 'category'; slug: string }
+  | { kind: 'brand'; slug: string }
+  | { kind: 'selection'; categories: string[]; brands: string[]; onSale: boolean }
+
+/** B14: a listing's own defaults (a store builder listing's sort and page size); omitted from the URL like the standard ones. */
+export type ListingDefaults = { sort: SortKey; perPage: PerPage }
+
+export const STANDARD_DEFAULTS: ListingDefaults = { sort: DEFAULT_SORT, perPage: DEFAULT_PER_PAGE }
 
 const ATTR_PREFIX = 'attr.'
 const PRICE = /^\d{1,12}(\.\d{1,2})?$/
@@ -78,7 +92,7 @@ function unique(values: string[]): string[] {
 }
 
 /** Reads the listing state from the page's query string; invalid values fall back to defaults. */
-export function parseListingState(params: URLSearchParams): ListingState {
+export function parseListingState(params: URLSearchParams, defaults: ListingDefaults = STANDARD_DEFAULTS): ListingState {
   const sort = params.get('sort')
   const perPage = Number(params.get('per_page'))
   const page = Number(params.get('page'))
@@ -103,15 +117,15 @@ export function parseListingState(params: URLSearchParams): ListingState {
     priceMax: price('price_max'),
     inStock: params.get('in_stock') === '1',
     onSale: params.get('on_sale') === '1',
-    sort: SORT_OPTIONS.some((o) => o.value === sort) ? (sort as SortKey) : DEFAULT_SORT,
+    sort: SORT_OPTIONS.some((o) => o.value === sort) ? (sort as SortKey) : defaults.sort,
     page: Number.isInteger(page) && page > 1 ? page : 1,
-    perPage: (PER_PAGE_OPTIONS as readonly number[]).includes(perPage) ? (perPage as PerPage) : DEFAULT_PER_PAGE,
+    perPage: (PER_PAGE_OPTIONS as readonly number[]).includes(perPage) ? (perPage as PerPage) : defaults.perPage,
     view: params.get('view') === 'list' ? 'list' : 'grid',
   }
 }
 
 /** The page query string for a state; defaults are left out so URLs stay short. */
-export function serializeListingState(state: ListingState): URLSearchParams {
+export function serializeListingState(state: ListingState, defaults: ListingDefaults = STANDARD_DEFAULTS): URLSearchParams {
   const params = new URLSearchParams()
   if (state.q) params.set('q', state.q)
   if (state.category) params.set('category', state.category)
@@ -123,8 +137,8 @@ export function serializeListingState(state: ListingState): URLSearchParams {
   if (state.priceMax) params.set('price_max', state.priceMax)
   if (state.inStock) params.set('in_stock', '1')
   if (state.onSale) params.set('on_sale', '1')
-  if (state.sort !== DEFAULT_SORT) params.set('sort', state.sort)
-  if (state.perPage !== DEFAULT_PER_PAGE) params.set('per_page', String(state.perPage))
+  if (state.sort !== defaults.sort) params.set('sort', state.sort)
+  if (state.perPage !== defaults.perPage) params.set('per_page', String(state.perPage))
   if (state.view !== 'grid') params.set('view', state.view)
   if (state.page > 1) params.set('page', String(state.page))
   return params
@@ -136,8 +150,9 @@ export function toApiQuery(state: ListingState, scope: ListingScope): string {
   if (scope.kind === 'search' && state.q) params.set('q', state.q)
   if (scope.kind === 'category') params.set('category', scope.slug)
   else if (state.category) params.set('category', state.category)
+  if (scope.kind === 'selection') for (const slug of scope.categories) params.append('categories[]', slug)
 
-  const brands = scope.kind === 'brand' ? [scope.slug] : state.brands
+  const brands = scope.kind === 'brand' ? [scope.slug] : scope.kind === 'selection' && scope.brands.length > 0 ? scope.brands : state.brands
   for (const brand of brands) params.append('brand[]', brand)
   for (const slug of Object.keys(state.attrs).sort()) {
     for (const value of state.attrs[slug] ?? []) params.append(`attr[${slug}][]`, value)
@@ -145,7 +160,7 @@ export function toApiQuery(state: ListingState, scope: ListingScope): string {
   if (state.priceMin) params.set('price_min', state.priceMin)
   if (state.priceMax) params.set('price_max', state.priceMax)
   if (state.inStock) params.set('in_stock', '1')
-  if (state.onSale) params.set('on_sale', '1')
+  if (state.onSale || (scope.kind === 'selection' && scope.onSale)) params.set('on_sale', '1')
   params.set('sort', state.sort)
   params.set('page', String(state.page))
   params.set('per_page', String(state.perPage))

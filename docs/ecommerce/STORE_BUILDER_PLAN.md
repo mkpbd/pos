@@ -534,3 +534,18 @@ Original questions:
   `ExperimentResults` + `BetaBinomial` (exact Beta posterior probability, no dependency); add-to-cart via a Cart event. Editor:
   *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
   the editor sends the canvas only the shown arm (the canvas never filters).
+
+### As built — B14 design the whole store (2026-11-19)
+
+- **Store page templates:** seven `template:*` page keys validated in `template:<key>` (main part rules; `seo` not allowed), starters
+  in `resources/builder-templates/store-pages/`, bootstrap `builder.templates`, public `GET /store/builder/templates/{key}`,
+  `unpublish` for "Use the standard page". The storefront routes switch to a published template with a page context and fall back to
+  the standard page on any error; SEO, canonical, noindex and 404 status stay with the route (`pages/listing-meta.ts`).
+- **Live data:** `dynamic_text` reads the page context (category, brand, search, post, order, store) in the browser —
+  `formatDynamicText` joins prefix / value / suffix (the server trims edge spaces).
+- **Main parts:** `product_listing` reuses the standard listing (`catalog/listing-body.tsx` + `listing-controller.ts`; filters on /
+  off, layouts, URL state, load more; scoped listings use `categories[]` / `brand[]`), `blog_post_body` and `order_summary` reuse
+  `BlogPostView` / `OrderDetails` (the order stays client-side), `not_found_message` replaces the 404 everywhere when published.
+- **Editor:** Pages list "Store pages" group (design from starter / empty, edit, view, use the standard page), toolbar "Preview with"
+  (sample category / brand / search / post / masked order via `sample-context`; the canvas stays offline and draws from `sample`),
+  element forms with live values, main part only where allowed, page check fixes (insert / select).

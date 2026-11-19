@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useMemo, type RefObject } from 
 import { toast } from 'sonner'
 import { elementMeta } from '@/storefront/builder/registry'
 import type { BuilderContent, BuilderNode, Column, DocumentContext, Element, InnerRowElement, Section } from '@/storefront/builder/types'
+import type { StoreTemplateKey } from '@/storefront/builder/templates/types'
+import { coreInsertRefusal } from './store-page-core'
 import type { ElementsMetadata } from './api'
 import type { CanvasHandle } from './canvas-frame'
 import { clipSize, copyNode, copyNodes, copyStyle, parseClip, pasteClip, pasteStyle, readNodesClip, readStyleClip, rememberClip, stylesCompatible, writeSystemClipboard, type NodesClip } from './clipboard'
@@ -28,6 +30,8 @@ export type EditorUi = {
   canCustomHtml?: boolean
   /** B4: the open document's element context (new elements' setup and defaults). */
   context?: DocumentContext
+  /** B14: the store page a template document designs (its main part goes in once); null / absent otherwise. */
+  template?: StoreTemplateKey | null
   /** B5: opens Save as template for a section (absent: not offered). */
   requestSaveTemplate?: (sectionId: string) => void
   /** B9: the store (clipboard key and same-store check); '' when unknown. */
@@ -162,7 +166,7 @@ export const SINGLE_SECTION_NOTE = 'A global section always has exactly one sect
 export function useCommands() {
   const store = useEditorStoreApi()
   const ui = useEditorUi()
-  const { registry, canvas, requestDelete: askDelete, canCustomHtml = true, context = 'page', requestSaveTemplate, org = '', single = false, noun = 'page', globals, requestMakeGlobal, requestDetach, openGlobal } = ui
+  const { registry, canvas, requestDelete: askDelete, canCustomHtml = true, context = 'page', template = null, requestSaveTemplate, org = '', single = false, noun = 'page', globals, requestMakeGlobal, requestDetach, openGlobal } = ui
 
   const reveal = useCallback(
     (id: string | null) => {
@@ -180,6 +184,12 @@ export function useCommands() {
         return false
       }
       const state = store.getState()
+      // B14: a store page holds its main part once.
+      const refusal = coreInsertRefusal(state.content, type, template)
+      if (refusal) {
+        toast.error(refusal)
+        return false
+      }
       const existing = collectIds(state.content)
       const node = await createElement(type, { registry, existingIds: existing, context })
       if (!node) return false
@@ -190,7 +200,7 @@ export function useCommands() {
       if (ok) reveal(node.id)
       return ok
     },
-    [registry, reveal, store, canCustomHtml, context, single],
+    [registry, reveal, store, canCustomHtml, context, single, template],
   )
 
   const move = useCallback(

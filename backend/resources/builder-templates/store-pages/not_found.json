@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_message", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_message", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_message", "type": "not_found_message", "props": {
+          "heading": "দুঃখিত, পেজটি খুঁজে পাওয়া যায়নি",
+          "text": "ঠিকানাটি হয়তো বদলে গেছে বা মুছে ফেলা হয়েছে। নিচে খুঁজে দেখুন বা দোকানে ফিরে যান।"
+        } }
+      ] }]
+    }
+  ]
+}

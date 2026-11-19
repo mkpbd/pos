@@ -76,6 +76,22 @@ export function useProductListingQuery(query: string, enabled = true) {
   })
 }
 
+/**
+ * B14 "Load more": every page of a listing up to the last one asked for (API query strings, page 1
+ * first). Pages already loaded come from the cache, so only the new page is fetched.
+ */
+export function useProductListingPagesQuery(queries: string[], enabled = true) {
+  const { locale } = useLocale()
+  return useQueries({
+    queries: queries.map((query) => ({
+      queryKey: localized(catalogKeys.products(query), locale),
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchListing(query, signal),
+      enabled,
+      retry: retryUnlessNotFound,
+    })),
+  })
+}
+
 /** Live products by slug, in the given order (recently viewed); slugs that are not live any more drop out. */
 export function useProductsBySlugsQuery(slugs: string[]) {
   const limited = slugs.slice(0, 12)

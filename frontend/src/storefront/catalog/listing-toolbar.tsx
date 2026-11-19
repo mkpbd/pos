@@ -17,7 +17,10 @@ export function ListingToolbar({
   onSort,
   onPerPage,
   onView,
+  showCount = true,
 }: {
+  /** B14: false = the result count is read to screen readers only (a store builder listing without the visible count). */
+  showCount?: boolean
   pagination: ListingPagination | null
   sort: SortKey
   perPage: PerPage
@@ -31,7 +34,7 @@ export function ListingToolbar({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p role="status" aria-live="polite" className="text-sm" data-testid="result-count">
+      <p role="status" aria-live="polite" className={showCount ? 'text-sm' : 'sr-only'} data-testid="result-count">
         {pagination ? resultSummary(pagination, t) : ''}
       </p>
       <div className="flex flex-wrap items-center gap-3">

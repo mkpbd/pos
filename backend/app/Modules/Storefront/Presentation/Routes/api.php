@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderAiController;
@@ -32,6 +33,9 @@ Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group
     // B1: published store builder pages — `home` or a landing page slug (`?preview=draft` for staff).
     Route::get('builder/pages/{slug}', StoreBuilderPageController::class)->middleware('storefront.cache')
         ->where('slug', '[a-z0-9-]{2,60}')->name('store.builder-page');
+    // B14: published store page templates (shop, category, … `?preview=draft` for staff).
+    Route::get('builder/templates/{template}', [StoreBuilderPageController::class, 'template'])->middleware('storefront.cache')
+        ->whereIn('template', ElementRegistry::TEMPLATES)->name('store.builder-template');
     // B8b: live popups and bars (`?preview=draft&popup=<id>` for staff).
     Route::get('builder/popups', StoreBuilderPopupsController::class)->middleware('storefront.cache')->name('store.builder-popups');
     // B8b: a visitor sends a builder form (published documents only).
@@ -133,6 +137,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::get('documents/{document}/compare', [BuilderPublishingController::class, 'compare'])->whereUuid('document');
         // B2: the editor canvas — the store bootstrap of the staff member's own organization.
         Route::get('canvas-context', [BuilderDocumentController::class, 'canvasContext']);
+        // B14: the page context a store page template is designed with (orders masked).
+        Route::get('sample-context', [BuilderDocumentController::class, 'sampleContext']);
         // B5: built-in and own templates (no content).
         Route::get('templates', [BuilderTemplateController::class, 'index']);
     });
@@ -149,6 +155,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('documents/{document}/check', [BuilderDocumentController::class, 'check'])->whereUuid('document');
         Route::post('documents/{document}/publish', [BuilderDocumentController::class, 'publish'])->whereUuid('document')->middleware('can:storefront.publish');
         Route::post('documents/{document}/discard', [BuilderDocumentController::class, 'discard'])->whereUuid('document');
+        // B14: "Use the standard page" — a store page design off the store (draft kept).
+        Route::post('documents/{document}/unpublish', [BuilderDocumentController::class, 'unpublish'])->whereUuid('document')->middleware('can:storefront.publish');
         // B13: A/B tests — start, stop, keep a version (the draft; storefront.publish).
         Route::middleware('can:storefront.publish')->group(function () {
             foreach (['start', 'stop', 'keep'] as $action) {

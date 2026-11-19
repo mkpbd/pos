@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B14 — Store builder: design the whole store
+
+#### Added
+- **Store pages** (Pages list → *Store pages*): design the Shop, Category, Brand, Search, Blog post, Order / thank-you and Page-not-found pages with the builder, starting from a ready Bangla design or empty. Published designs replace the standard pages everywhere; *Use the standard page* switches back and keeps the design as a draft. Search titles, descriptions, canonical links, noindex and 404 status stay as they are; any loading problem falls back to the standard page.
+- **Main parts:** each store page keeps its own — *Product listing* (the real listing with filters, sort, count and pagination / load more), *Blog post*, *Order details* (still loaded privately in the shopper's browser) or *Page not found message* — exactly once and visible, or publishing stops with a plain message; the page check offers *Add it* / *Select it*.
+- **Text from this page:** live text from the page — category / brand name, description and product count, search words and result count, post title, author, date and reading time, order number, status, total, first name, payment and delivery time, the store's name, phone, e-mail and address — with words before / after and a fallback.
+- **Product listing on any page:** all products, chosen categories or brands (several at once — `GET /store/products` accepts `categories[]`), on sale or new arrivals; filters on / off, filters in a sidebar, on top or in a drawer, columns per device, page size.
+- **Preview with:** the editor previews a store page with a chosen category, brand, search, blog post or order (personal details masked; or a made-up sample order). The section library works on store pages.
+
+#### Fixed
+- Page builder: the React Compiler again optimizes the editor (a toolbar prop built as an inline element had made it skip the whole component).
+
+#### Tests
+- Backend 1428 (PostgreSQL: 1427 pass, 1 opt-in skip; new `StoreBuilderB14Test`, `StoreBuilderB14OrderSampleTest`, `BuilderB14SchemaTest`); Pint clean. vitest 2332; mocked Playwright 400 + 1 reduced-motion zoom test that timed out under the full run's load (passes 6 / 6 alone) (new `storefront-templates-b14`, `store-builder-b14`).
+- Full-stack (PostgreSQL, desktop) 49 — new **B14**: a store's category and not-found pages designed from the starters show to shoppers with the real products and the designed 404, publishing without the main part is refused, sorting lives in the address, and *Use the standard page* brings the standard category page back. Builder acceptance 5.
+
+#### Upgrade
+- No migration; `php artisan cache:clear` makes published store page designs take effect at once.
+
 ### B13 — Store builder: the right content for each shopper, A/B tests
 
 #### Added

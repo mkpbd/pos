@@ -175,6 +175,7 @@ export const catalog = {
   'catalog.listing.subcategories': 'Subcategories',
   'catalog.listing.loadingProducts': 'Loading products',
   'catalog.listing.loadFailed': 'The products could not be loaded.',
+  'catalog.listing.loadMore': 'Load more',
 
   'catalog.empty.filteredTitle': 'No products match these filters',
   'catalog.empty.searchTitle': 'Nothing found for “{q}”',

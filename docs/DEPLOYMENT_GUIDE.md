@@ -41,6 +41,8 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Store builder upgrade (B9):** `php artisan migrate` adds the nullable `builder_documents.context` (global sections). The AI writer uses the existing AI settings and budget (usage feature `builder_writer`); nothing else to configure.
 
+**Store builder upgrade (B14):** no migration. Bootstraps cached before the deploy lack `builder.templates` until the next content change (the storefront treats a missing flag as "standard page"); run `php artisan cache:clear` to make store page designs take effect at once.
+
 **Store builder upgrade (B13):** `php artisan migrate` (A/B test stats). No new job: `marketing:prune-page-insights` also clears the A/B tables (90 days). Audience rules and A/B versions are evaluated in shoppers' browsers, so builder pages stay cacheable — don't vary caches by cookie for them.
 
 **Store builder upgrade (B15):** `php artisan migrate` (page insight tables, `carts.builder_attribution`). The scheduler runs `marketing:prune-page-insights` daily (90-day retention, 2-day visitor hashes). `POST /api/v1/store/insights/events` receives anonymous beacons from shoppers' browsers (60/min per IP, 64 KB): keep it reachable on every store host and out of any cache; if a CDN/WAF sits in front, allow `text/plain` and `application/json` POST bodies there. No cookies are set and nothing personal is stored, so no consent banner change is needed for it; the storefront honours Do-Not-Track and Global Privacy Control.

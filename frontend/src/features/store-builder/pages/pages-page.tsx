@@ -31,6 +31,7 @@ import { useCurrentUserQuery } from '@/features/auth/api'
 import { rememberScreenLang, ScreenLangContext, storedScreenLang, useScreenText } from './screen-language'
 import { LanguageToggle, ScreenConfirm } from './screen-ui'
 import { StartGuide } from './start-guide'
+import { StorePagesCard } from './store-pages-card'
 
 /*
  * Online store → Page builder (/admin/storefront/pages), in three groups (B4):
@@ -49,6 +50,7 @@ import { StartGuide } from './start-guide'
  * B11: rows show planned publishes and approval states; people who may publish get a
  * "Waiting for approval" tab (with its count) and open a request in the review screen
  * (`?review=<id>` opens one directly, e.g. from a notification; `?tab=reviews` the tab).
+ * B14: Store pages — designs of the shop's own pages (shop, category, …; ./store-pages-card.tsx).
  */
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
@@ -221,6 +223,7 @@ function PagesScreen() {
     return parsed !== null && isProductZone(parsed.zone)
   })
   const popups = all.filter((d) => d.kind === 'popup')
+  const storePages = pages.filter((d) => d.key.startsWith('template:'))
 
   const deleteLanding = (summary: DocumentSummary) =>
     setRemoving({
@@ -286,6 +289,10 @@ function PagesScreen() {
                   )}
                 </CardContent>
               </Card>
+            </section>
+            <section aria-labelledby="group-store" className="flex flex-col gap-4">
+              <GroupHeading id="group-store" title={t('group.store.title')} description={t('group.store.text')} />
+              <StorePagesCard documents={storePages} canManage={canManage} canPublish={canPublish} />
             </section>
             <section aria-labelledby="group-parts" className="flex flex-col gap-4">
               <GroupHeading id="group-parts" title={t('group.parts.title')} description={t('group.parts.text')} />

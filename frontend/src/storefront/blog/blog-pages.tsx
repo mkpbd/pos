@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ArrowLeftIcon, ArrowRightIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,12 @@ import { NotFoundPage } from '../pages/not-found-page'
 import { ShareBar } from '../social/share-bar'
 import { useLocale } from '../i18n/locale'
 import { rich } from '../i18n/rich'
-import type { BlogCategory, Breadcrumb } from '../types'
+import type { BlogCategory, BlogPostDetail, Breadcrumb } from '../types'
+import { useStorefront } from '../api'
+import { postContext, storeContext } from '../builder/templates/context'
+import type { StorePageRuntime } from '../builder/templates/runtime'
+import { useTemplateEnabled } from '../builder/templates/enabled'
+import { StoreTemplateView } from '../builder/templates/template-view'
 import { useDocumentMeta } from '../use-document-meta'
 import { useBlogCategoriesQuery, useBlogListQuery, useBlogPostQuery } from './api'
 import { BlogGrid, CategoryChip, PostMeta } from './blog-card'
@@ -162,9 +167,9 @@ export function BlogPostPage() {
   const { slug = '' } = useParams()
   const [params] = useSearchParams()
   const preview = params.get('preview') === '1'
-  const { t } = useLocale()
   const query = useBlogPostQuery(slug, preview)
   const post = query.data
+  const template = useTemplateEnabled('blog_post')
   useDocumentMeta(
     post
       ? {
@@ -181,7 +186,30 @@ export function BlogPostPage() {
   if (query.isPending) return <Loading />
   if (isNotFound(query.error)) return <NotFoundPage />
   if (query.error || !post) return <LoadError onRetry={() => void query.refetch()} />
+  if (template) return <BlogPostTemplate post={post} preview={preview} fallback={<BlogPostView post={post} preview={preview} />} />
+  return <BlogPostView post={post} preview={preview} />
+}
 
+/** B14: the post drawn from the published "Blog post" template (meta and 404s stay the route's). */
+function BlogPostTemplate({ post, preview, fallback }: { post: BlogPostDetail; preview: boolean; fallback: ReactNode }) {
+  const bootstrap = useStorefront()
+  const runtime = useMemo<StorePageRuntime>(
+    () => ({ context: { template: 'blog_post', store: storeContext(bootstrap), post: postContext(post) }, post: { post, preview } }),
+    [bootstrap, post, preview],
+  )
+  return <StoreTemplateView template="blog_post" runtime={runtime} fallback={fallback} heading={post.title} />
+}
+
+export type BlogPostShow = { cover: boolean; meta: boolean; share: boolean; related: boolean }
+
+const SHOW_ALL: BlogPostShow = { cover: true, meta: true, share: true, related: true }
+
+/**
+ * The standard post page: title band, cover, body, share bar, category, previous / next and
+ * related posts. B14: also the store builder's blog post element (`show` switches parts off).
+ */
+export function BlogPostView({ post, preview, show = SHOW_ALL }: { post: BlogPostDetail; preview: boolean; show?: BlogPostShow }) {
+  const { t } = useLocale()
   const crumbs: Breadcrumb[] = [{ name: t('blog.home'), url: '/' }, { name: t('blog.title'), url: '/blog' }]
   if (post.category) crumbs.push({ name: post.category.name, url: blogCategoryUrl(post.category.slug) })
   crumbs.push({ name: post.title, url: null })
@@ -192,20 +220,20 @@ export function BlogPostPage() {
       <article className="mx-auto max-w-3xl px-4 py-10">
         <header className="flex flex-col gap-4">
           <Breadcrumbs items={crumbs} />
-          {post.category && (
+          {show.meta && post.category && (
             <div>
               <CategoryChip category={post.category} />
             </div>
           )}
           <h1 className="text-3xl leading-tight font-extrabold lg:text-5xl">{post.title}</h1>
-          <PostMeta post={post} />
+          {show.meta && <PostMeta post={post} />}
         </header>
-        {post.cover && (
+        {show.cover && post.cover && (
           <MediaImage media={post.cover} alt="" priority sizes="(min-width: 768px) 768px, 100vw" className="mt-8 aspect-[16/9] w-full rounded-sf-card object-cover" />
         )}
         <RichText html={post.body_html} className="mt-8" />
         {/* P2b: not on a staff preview of a draft or scheduled post. */}
-        {!preview && (
+        {!preview && show.share && (
           <ShareBar target={{ url: blogPostUrl(post.slug), title: post.title, image: post.cover?.url ?? null }} label={t('social.share.post')} className="mt-10" />
         )}
         {post.category && (
@@ -226,7 +254,7 @@ export function BlogPostPage() {
           </nav>
         )}
       </article>
-      {related.length > 0 && (
+      {show.related && related.length > 0 && (
         <section aria-labelledby="related-posts" className="bg-sf-surface/60">
           <div className="mx-auto max-w-sf px-4 py-12">
             <h2 id="related-posts" className="mb-8 text-center text-3xl font-extrabold">{t('blog.related')}</h2>

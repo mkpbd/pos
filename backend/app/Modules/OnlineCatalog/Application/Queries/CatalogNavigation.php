@@ -267,6 +267,74 @@ class CatalogNavigation
     }
 
     /**
+     * B14: a visible category or brand for the store builder's sample page — by id or slug, or
+     * (null) the one with the most live products — `{id, slug, name, description (plain text),
+     * product_count}` in the current language; null when there is none.
+     *
+     * @param  'category'|'brand'  $type
+     * @return array{id: string, slug: string, name: string, description: ?string, product_count: int}|null
+     */
+    public function pageSample(string $type, ?string $idOrSlug): ?array
+    {
+        $needle = $idOrSlug === null ? null : mb_strtolower(trim($idOrSlug));
+        if ($type === 'category') {
+            $tree = $this->catalog->categoryTree();
+            $best = null;
+            foreach ($this->catalog->categoryListings() as $id => $listing) {
+                if (! $tree->isVisible($id) || ($needle !== null && $needle !== mb_strtolower($id) && $needle !== mb_strtolower($listing->slug))) {
+                    continue;
+                }
+                $count = $this->productCount($id);
+                if ($best === null || $count > $best[1]) {
+                    $best = [$id, $count];
+                }
+            }
+            if ($best === null) {
+                return null;
+            }
+            $listing = $this->catalog->categoryListings()[$best[0]];
+            $description = Translations::pick($listing, 'description_html', $this->catalog->locale());
+
+            return [
+                'id' => $best[0],
+                'slug' => $listing->slug,
+                'name' => $tree->node($best[0])['name'],
+                'description' => PlainText::excerpt($description, 1000),
+                'product_count' => $best[1],
+            ];
+        }
+
+        $counts = [];
+        foreach ($this->catalog->products() as $record) {
+            if ($record['brand_id'] !== null) {
+                $counts[$record['brand_id']] = ($counts[$record['brand_id']] ?? 0) + 1;
+            }
+        }
+        $best = null;
+        foreach ($this->catalog->visibleBrands() as $brand) {
+            if ($needle !== null && $needle !== mb_strtolower($brand['id']) && $needle !== mb_strtolower($brand['slug'])) {
+                continue;
+            }
+            $count = $counts[$brand['id']] ?? 0;
+            if ($best === null || $count > $best[1] || ($count === $best[1] && strcasecmp($brand['name'], $best[0]['name']) < 0)) {
+                $best = [$brand, $count];
+            }
+        }
+        if ($best === null) {
+            return null;
+        }
+        $description = Translations::pick($best[0]['listing'], 'description', $this->catalog->locale());
+
+        return [
+            'id' => $best[0]['id'],
+            'slug' => $best[0]['slug'],
+            'name' => $best[0]['name'],
+            'description' => PlainText::excerpt($description, 1000),
+            'product_count' => $best[1],
+        ];
+    }
+
+    /**
      * Search metadata of a storefront page, or null when it does not exist: title (SEO title
      * or name), description (SEO description, else a plain-text excerpt of at most 160
      * characters), the first image, the name and, for categories and brands, the breadcrumb

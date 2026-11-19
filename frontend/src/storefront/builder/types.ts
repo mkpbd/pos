@@ -5,6 +5,7 @@
  */
 
 import type { Audience, AudienceCampaigns, Experiment, SectionExperiment } from './audience/types'
+import type { BlogPostBodyProps, BootstrapTemplates, DynamicTextProps, NotFoundMessageProps, OrderSummaryProps, ProductListingData, ProductListingProps } from './templates/types'
 import type { CatalogImage, FaqGroup, MediaRef, ProductCard, ProductDetail, ShippingMethod, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
@@ -697,6 +698,18 @@ export type BanglaDateElement = ElementOf<'bangla_date', BanglaDateProps>
 
 export type B17Element = OrnamentElement | PaymentBadgesElement | DeliveryPromiseElement | BanglaDateElement
 
+/* ----------------------------------------------------------------------------------------------
+ * B14: store page templates — live text and the templates' main parts. Props: ./templates/types.ts.
+ * -------------------------------------------------------------------------------------------- */
+
+export type DynamicTextElement = ElementOf<'dynamic_text', DynamicTextProps>
+export type ProductListingElement = ElementOf<'product_listing', ProductListingProps>
+export type BlogPostBodyElement = ElementOf<'blog_post_body', BlogPostBodyProps>
+export type OrderSummaryElement = ElementOf<'order_summary', OrderSummaryProps>
+export type NotFoundMessageElement = ElementOf<'not_found_message', NotFoundMessageProps>
+
+export type B14Element = DynamicTextElement | ProductListingElement | BlogPostBodyElement | OrderSummaryElement | NotFoundMessageElement
+
 export type Element =
   | HeadingElement
   | TextElement
@@ -712,6 +725,7 @@ export type Element =
   | B8bElement
   | OrderFormElement
   | B17Element
+  | B14Element
 
 export type ElementType = Element['type']
 
@@ -1061,6 +1075,7 @@ export type ElementData =
   | PaymentBadgesData
   | DeliveryPromiseData
   | BanglaDateData
+  | ProductListingData
 
 /** One entry of a payload's `data` map. */
 export type BuilderData = StoreSection | ElementData
@@ -1089,8 +1104,8 @@ export type BuilderPage = {
  * B4: document contexts, zones and the bootstrap's builder block
  * -------------------------------------------------------------------------------------------- */
 
-/** Where an element may be used (registry `allowed_in`): home / landing pages, CMS pages, header, footer, zones; B8b popups. */
-export type DocumentContext = 'page' | 'cms' | 'header' | 'footer' | 'zone' | 'popup'
+/** Where an element may be used (registry `allowed_in`): home / landing pages, CMS pages, header, footer, zones; B8b popups; B14 store page templates (`template:<key>`). */
+export type DocumentContext = 'page' | 'cms' | 'header' | 'footer' | 'zone' | 'popup' | 'template'
 
 export type ZoneKey = 'listing.top' | 'listing.bottom' | 'product.after'
 
@@ -1112,6 +1127,8 @@ export type BootstrapBuilder = {
   header?: BuilderPage | null
   footer?: BuilderPage | null
   zones?: Partial<Record<ZoneKey, BuilderPage | null>>
+  /** B14: which store page templates are published (staff `?preview=draft`: have a draft); absent = none. */
+  templates?: BootstrapTemplates | null
 }
 
 /* ----------------------------------------------------------------------------------------------

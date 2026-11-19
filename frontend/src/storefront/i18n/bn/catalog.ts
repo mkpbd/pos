@@ -175,6 +175,7 @@ export const catalog: Translations<typeof en> = {
   'catalog.listing.subcategories': 'সাব-ক্যাটাগরি',
   'catalog.listing.loadingProducts': 'পণ্য লোড হচ্ছে',
   'catalog.listing.loadFailed': 'পণ্যগুলো লোড করা যায়নি।',
+  'catalog.listing.loadMore': 'আরও দেখুন',
 
   'catalog.empty.filteredTitle': 'এই ফিল্টারগুলোর সাথে মেলে এমন কোনো পণ্য নেই',
   'catalog.empty.searchTitle': '“{q}” এর জন্য কিছু পাওয়া যায়নি',

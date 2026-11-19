@@ -167,7 +167,9 @@ class StorefrontBootstrap
             // B1: `home` true once a builder home page is published (the SPA then renders it instead
             // of the legacy homepage sections). B4: the published (draft preview: drafted) builder
             // header, footer and shop / product zones as render payloads, null = classic rendering.
-            'builder' => ['home' => $this->builder->hasPublishedHome()] + $this->builder->parts($draftBuilder),
+            // B14: `templates` — which store pages use their builder design (template key → bool).
+            'builder' => ['home' => $this->builder->hasPublishedHome()] + $this->builder->parts($draftBuilder)
+                + ['templates' => $this->builder->templates($draftBuilder)],
         ];
     }
 

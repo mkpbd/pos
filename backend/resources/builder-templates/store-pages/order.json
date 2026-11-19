@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_thanks", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_thanks", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_thanks", "type": "dynamic_text", "props": { "field": "order.customer_first_name", "tag": "h1", "prefix": "ধন্যবাদ,", "suffix": "!", "fallback": "ধন্যবাদ!" } },
+        { "id": "e_number", "type": "dynamic_text", "props": { "field": "order.number", "tag": "p", "prefix": "আপনার অর্ডার নম্বর:" } }
+      ] }]
+    },
+    {
+      "id": "s_order", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_order", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_order", "type": "order_summary", "props": {} }
+      ] }]
+    },
+    {
+      "id": "s_help", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_help", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_help", "type": "dynamic_text", "props": { "field": "store.phone", "tag": "p", "prefix": "কোনো প্রশ্ন থাকলে কল করুন:" } },
+        { "id": "e_shop", "type": "button", "props": { "label": "আরও কেনাকাটা করুন", "link": { "url": "/shop" }, "variant": "primary" } }
+      ] }]
+    }
+  ]
+}

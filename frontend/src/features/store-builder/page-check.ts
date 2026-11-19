@@ -6,6 +6,8 @@ import { hasSeo, readSeo } from './inspector/seo-panel-model'
 import { Collector, focus, isObj, label, list, megabytes, pictures, str, visibleAnywhere, type Obj, type Place, type StyledNode } from './page-check-core'
 import { runSpeedCheck, type CheckFonts } from './page-check-speed'
 import { resolveStyleValue } from './inspector/style-model'
+import { templateKeyOf } from '@/storefront/builder/templates/types'
+import { CORE_NAMES, coreElementOf, elementsOfTypeWithState } from './store-page-core'
 
 /*
  * B10 page check (spec §2), the pure part: what a shop owner should look at before publishing.
@@ -41,6 +43,8 @@ export type PageCheckAction =
 export type PageCheckFix =
   /** Select `node_id` (null: the page settings, e.g. `seo.title`) and focus `field` (a form key; null: just select). */
   | { kind: 'focus'; label: string; node_id: string | null; tab: PageCheckTab; field: string | null }
+  /** B14: add an element of `type` (a store page's missing main part) as the Add panel would. */
+  | { kind: 'insert'; label: string; type: string }
   | { kind: 'apply'; label: string; node_id: string; action: PageCheckAction }
   | { kind: 'site-styles'; label: string }
 
@@ -669,7 +673,68 @@ export function runPageCheck(input: PageCheckInput): PageCheckIssue[] {
   }
 
   checkHeadings(headings, context, out)
+  checkStorePage(input, out)
   return sortIssues([...out.issues, ...runSpeedCheck(input).issues], nodeOrder(input.content))
+}
+
+/**
+ * B14: a store page design holds its main part exactly once (the server refuses to publish it
+ * without, and to save it twice). Codes as the server's check, so its issues merge with these.
+ */
+function checkStorePage(input: PageCheckInput, out: Collector): void {
+  if ((input.document.kind ?? 'page') !== 'page') return
+  const template = templateKeyOf(input.document.key ?? '')
+  if (!template) return
+  const type = coreElementOf(template)
+  const name = CORE_NAMES[type] ?? 'its main part'
+  const found = elementsOfTypeWithState(input.content, type)
+  const ids = found.map((e) => e.id)
+  if (ids.length === 1 && found[0]!.hidden) {
+    // Hidden with the eye: shoppers would get a page without it (the server counts it as missing).
+    const id = ids[0]!
+    out.add(
+      {
+        code: 'TEMPLATE_CORE_MISSING',
+        severity: 'error',
+        message: `The main part of this store page, ${name}, is hidden, so shoppers wouldn’t see it. Show it again (the eye in Layers).`,
+        node_id: id,
+        field: null,
+        fix: focus('Select it', id, null),
+        details: { element: type, hidden: true },
+      },
+      null,
+    )
+    return
+  }
+  if (ids.length === 0) {
+    out.add(
+      {
+        code: 'TEMPLATE_CORE_MISSING',
+        severity: 'error',
+        message: `This store page needs its main part: ${name}. Without it the page can’t be published. Add it, then design around it.`,
+        node_id: null,
+        field: null,
+        fix: { kind: 'insert', label: 'Add it', type },
+        details: { element: type },
+      },
+      null,
+    )
+    return
+  }
+  for (const id of ids.slice(1)) {
+    out.add(
+      {
+        code: 'TEMPLATE_CORE_DUPLICATE',
+        severity: 'error',
+        message: `This store page has ${name} more than once. Keep one and delete the others.`,
+        node_id: id,
+        field: null,
+        fix: focus('Select it', id, null),
+        details: { element: type },
+      },
+      null,
+    )
+  }
 }
 
 /* ----------------------------------------------------------------------------------------------

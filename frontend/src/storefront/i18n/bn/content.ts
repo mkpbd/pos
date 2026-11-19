@@ -152,6 +152,13 @@ export const content: Translations<typeof en> = {
   'content.notFound.title': 'পেজটি পাওয়া যায়নি',
   'content.notFound.text': 'আপনি যে পেজটি খুঁজছেন সেটি নেই অথবা অন্য কোথাও সরানো হয়েছে।',
   'content.notFound.back': 'হোম পেজে ফিরে যান',
+  'content.notFound.shop': 'শপে ঘুরে দেখুন',
+  'content.notFound.links': 'এরপর কোথায় যাবেন',
+  'content.builder.template.field': 'এই পেজের লেখা: {field}',
+  'content.builder.template.noSample': 'আসল কনটেন্ট দিয়ে এই অংশটি দেখতে টুলবার থেকে একটি নমুনা বেছে নিন।',
+  'content.builder.template.listing': 'পণ্যের তালিকা',
+  'content.builder.template.post': 'ব্লগ পোস্ট',
+  'content.builder.template.order': 'অর্ডারের সারাংশ',
 
   'content.section.openOffer': 'অফারটি দেখুন',
   'content.section.fromBlog': 'ব্লগ থেকে',

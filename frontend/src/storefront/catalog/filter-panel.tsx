@@ -17,7 +17,14 @@ type Props = {
   onClear: () => void
   /** Link to a category page carrying the current filters. */
   categoryHref: (slug: string) => string
+  /** B14: which filter groups a store builder listing offers (absent = all). */
+  show?: Partial<Record<FilterKind, boolean>>
+  /** B14: `row` lays the groups side by side (a filter bar above the results); default one column. */
+  layout?: 'column' | 'row'
 }
+
+/** B14: the filters a store builder product listing can switch off. */
+export type FilterKind = 'price' | 'brand' | 'category' | 'attributes' | 'availability' | 'on_sale'
 
 function Group({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -117,19 +124,25 @@ function PriceFilter({ state, facets, onChange }: Pick<Props, 'state' | 'facets'
  * The listing filters (desktop sidebar and mobile drawer). Counts come from the API's
  * disjunctive facets; every change goes to the URL.
  */
-export function FilterPanel({ scope, state, facets, onChange, onClear, categoryHref }: Props) {
-  const categoryAsParam = scope.kind === 'brand' || scope.kind === 'search' || scope.kind === 'shop'
+export function FilterPanel({ scope, state, facets, onChange, onClear, categoryHref, show, layout = 'column' }: Props) {
+  const categoryAsParam = scope.kind === 'brand' || scope.kind === 'search' || scope.kind === 'shop' || scope.kind === 'selection'
+  // B14: a builder listing of chosen brands or on-sale products has those fixed; links stay on the page (`selection`).
+  const fixedBrands = scope.kind === 'brand' || (scope.kind === 'selection' && scope.brands.length > 0)
+  const fixedOnSale = scope.kind === 'selection' && scope.onSale
+  const on = (kind: FilterKind) => show?.[kind] !== false
   const { t, formatNumber } = useLocale()
+  const inStockRow = on('availability')
+  const onSaleRow = on('on_sale') && !fixedOnSale
 
   return (
-    <div className="flex flex-col" data-testid="filter-panel">
+    <div className={layout === 'row' ? 'grid gap-x-6 sm:grid-cols-2 lg:grid-cols-4' : 'flex flex-col'} data-testid="filter-panel">
       {hasActiveFilters(state) && (
-        <button type="button" onClick={onClear} className="mb-2 self-start text-sm font-semibold text-sf-link underline-offset-4 hover:underline">
+        <button type="button" onClick={onClear} className={cn('mb-2 self-start text-sm font-semibold text-sf-link underline-offset-4 hover:underline', layout === 'row' && 'col-span-full justify-self-start')}>
           {t('catalog.filter.clearAll')}
         </button>
       )}
 
-      {(facets.categories.length > 0 || state.category) && (
+      {on('category') && (facets.categories.length > 0 || state.category) && (
         <Group title={t('catalog.filter.categories')}>
           <ul className="flex flex-col gap-1 text-sm">
             {state.category && categoryAsParam && (
@@ -141,7 +154,7 @@ export function FilterPanel({ scope, state, facets, onChange, onClear, categoryH
             )}
             {facets.categories.map((c) => (
               <li key={c.slug}>
-                {scope.kind === 'search' || scope.kind === 'brand' ? (
+                {scope.kind === 'search' || scope.kind === 'brand' || scope.kind === 'selection' ? (
                   <button type="button" className="flex w-full justify-between gap-2 py-1 text-left hover:text-sf-accent" onClick={() => onChange({ category: c.slug })}>
                     <span>{c.name}</span>
                     <span className="tabular-nums">({formatNumber(c.count)})</span>
@@ -158,7 +171,7 @@ export function FilterPanel({ scope, state, facets, onChange, onClear, categoryH
         </Group>
       )}
 
-      {scope.kind !== 'brand' && facets.brands.length > 0 && (
+      {on('brand') && !fixedBrands && facets.brands.length > 0 && (
         <Group title={t('catalog.filter.brands')}>
           <ul>
             {facets.brands.map((b) => (
@@ -174,14 +187,14 @@ export function FilterPanel({ scope, state, facets, onChange, onClear, categoryH
         </Group>
       )}
 
-      {(facets.price?.min || state.priceMin || state.priceMax) && (
+      {on('price') && (facets.price?.min || state.priceMin || state.priceMax) && (
         <Group title={t('catalog.filter.price')}>
           {/* Keyed by the URL values: back button and "clear all" reset the inputs. */}
           <PriceFilter key={`${state.priceMin}|${state.priceMax}`} state={state} facets={facets} onChange={onChange} />
         </Group>
       )}
 
-      {facets.attributes.map((attribute) => (
+      {on('attributes') && facets.attributes.map((attribute) => (
         <Group key={attribute.slug} title={attribute.name}>
           {attribute.display === 'swatch' ? (
             <ul className="flex flex-wrap gap-2" aria-label={attribute.name}>
@@ -221,12 +234,14 @@ export function FilterPanel({ scope, state, facets, onChange, onClear, categoryH
         </Group>
       ))}
 
-      <Group title={t('catalog.filter.availability')}>
-        <ul>
-          <CheckRow label={t('catalog.stock.in')} count={facets.in_stock.count} checked={state.inStock} onToggle={() => onChange({ inStock: !state.inStock })} />
-          <CheckRow label={t('catalog.filter.onSale')} count={facets.on_sale.count} checked={state.onSale} onToggle={() => onChange({ onSale: !state.onSale })} />
-        </ul>
-      </Group>
+      {(inStockRow || onSaleRow) && (
+        <Group title={t('catalog.filter.availability')}>
+          <ul>
+            {inStockRow && <CheckRow label={t('catalog.stock.in')} count={facets.in_stock.count} checked={state.inStock} onToggle={() => onChange({ inStock: !state.inStock })} />}
+            {onSaleRow && <CheckRow label={t('catalog.filter.onSale')} count={facets.on_sale.count} checked={state.onSale} onToggle={() => onChange({ onSale: !state.onSale })} />}
+          </ul>
+        </Group>
+      )}
     </div>
   )
 }

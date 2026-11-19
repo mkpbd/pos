@@ -38,6 +38,8 @@ function metaOf(type: string, registry: ElementsMetadata): ElementMeta | undefin
 /** B4: starting props that depend on where the element goes (a footer menu is a list). */
 function contextProps(type: string, context: DocumentContext | undefined): Record<string, unknown> {
   if (type === 'menu' && context === 'footer') return { layout: 'vertical', show_children: 'list' }
+  // B14: on a store page the list shows the page's own products; on a normal page all products to start with.
+  if (type === 'product_listing') return { scope: context === 'template' ? 'current' : 'all' }
   return {}
 }
 

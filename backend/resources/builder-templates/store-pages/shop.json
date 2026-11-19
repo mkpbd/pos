@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_title", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_title", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_heading", "type": "heading", "props": { "text": "সব পণ্য", "level": 1 } },
+        { "id": "e_intro", "type": "text", "props": { "html": "<p>আমাদের সব পণ্য এক জায়গায় — দাম, ব্র্যান্ড বা ক্যাটাগরি দিয়ে বেছে নিন।</p>" } }
+      ] }]
+    },
+    {
+      "id": "s_listing", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_listing", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_listing", "type": "product_listing", "props": { "scope": "current" } }
+      ] }]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_title", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_title", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_name", "type": "dynamic_text", "props": { "field": "brand.name", "tag": "h1", "fallback": "ব্র্যান্ড" } },
+        { "id": "e_description", "type": "dynamic_text", "props": { "field": "brand.description", "tag": "p" } },
+        { "id": "e_count", "type": "dynamic_text", "props": { "field": "brand.product_count", "tag": "p", "suffix": "টি পণ্য", "format": "number" } }
+      ] }]
+    },
+    {
+      "id": "s_listing", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_listing", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_listing", "type": "product_listing", "props": { "scope": "current" } }
+      ] }]
+    }
+  ]
+}

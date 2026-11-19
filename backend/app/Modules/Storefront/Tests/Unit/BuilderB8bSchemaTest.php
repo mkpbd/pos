@@ -183,7 +183,7 @@ class BuilderB8bSchemaTest extends TestCase
             $this->assertContains('ELEMENT_NOT_ALLOWED', array_column($errors, 'code'), $type);
             $this->assertStringContainsString('cannot be used in a popup', $errors[0]['message']);
         }
-        $this->assertSame(['page', 'cms', 'zone', 'popup'], ElementRegistry::allowedIn('form'));
+        $this->assertSame(['page', 'cms', 'zone', 'template', 'popup'], ElementRegistry::allowedIn('form'));
         $this->assertSame('content', ElementRegistry::group('form'));
 
         $button = fn (?string $action) => ['id' => 'e_b', 'type' => 'button', 'props' => ['label' => 'OK', 'link' => ['url' => '/']] + ($action === null ? [] : ['action' => $action])];

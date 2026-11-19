@@ -2,6 +2,7 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
+use App\Modules\Cms\Application\Contracts\BlogDirectory;
 use App\Modules\Cms\Application\Contracts\PageContent;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Storefront\Application\Builder\BuilderGlobals;
@@ -63,6 +64,8 @@ final class BuilderPresenter
             in_array($document->key, [BuilderDocument::HEADER, BuilderDocument::FOOTER], true) => '/',
             in_array($zone, ['listing.top', 'listing.bottom'], true) => '/shop',
             in_array($zone, BuilderDocument::PRODUCT_ZONES, true) => $productSlug === null ? null : '/product/'.$productSlug,
+            // B14: a store page template on a page of its kind.
+            $document->templateKey() !== null && $storeUrl !== null => self::templatePreviewPath((string) $document->templateKey()),
             default => null,
         };
         $previewUrl = $storeUrl === null || $previewPath === null ? null : $storeUrl.$previewPath.'?preview=draft';
@@ -88,6 +91,8 @@ final class BuilderPresenter
             'status' => $document->popupStatus(),
             // B9: a global section's context (page | header | footer); null for other documents.
             'context' => $document->isGlobal() ? $document->context : null,
+            // B14: the store page a template designs (shop | category | …); null for other documents.
+            'template' => $document->templateKey(),
             'popup' => $document->isPopup() ? [
                 'layout' => $settings['layout'] ?? 'modal',
                 'trigger' => $settings['trigger']['kind'] ?? 'on_load',
@@ -107,6 +112,23 @@ final class BuilderPresenter
             'schedule' => $publishing[$document->id]['schedule'] ?? null,
             'review' => $publishing[$document->id]['review'] ?? null,
         ];
+    }
+
+    /**
+     * B14: where a store page template's draft shows — the shop, search and an address that
+     * does not exist as they are; the category / brand with the most products and the newest
+     * blog post (null when there is none); null for the order page (it needs an order).
+     */
+    private static function templatePreviewPath(string $template): ?string
+    {
+        return match ($template) {
+            'shop' => '/shop',
+            'search' => '/search',
+            'not_found' => '/this-page-does-not-exist',
+            'category', 'brand' => ($slug = app(StorefrontCatalog::class)->pageSample($template, null)['slug'] ?? null) === null ? null : "/{$template}/{$slug}",
+            'blog_post' => ($slug = app(BlogDirectory::class)->postCards(null, 1)[0]['slug'] ?? null) === null ? null : "/blog/{$slug}",
+            default => null,
+        };
     }
 
     /**

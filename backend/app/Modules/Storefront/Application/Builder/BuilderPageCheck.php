@@ -7,6 +7,7 @@ use App\Modules\Cms\Application\Contracts\PageDirectory;
 use App\Modules\OnlineCatalog\Application\Contracts\StorefrontCatalog;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
+use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
@@ -121,6 +122,20 @@ class BuilderPageCheck
         ['uses' => $uses, 'globals' => $globals] = $this->references->collect($tree);
         $this->checkReferences($uses, $nodes, $issue, $shown);
         $this->checkGlobals($globals, $context, $issue);
+        // B14: a store page template needs its main part, shown.
+        $template = $document->templateKey();
+        if ($template !== null) {
+            $core = ElementRegistry::TEMPLATE_CORE[$template];
+            $found = BuilderDocumentSchema::coreElements($tree, $template);
+            $label = ElementRegistry::label($core);
+            if ($found === []) {
+                $issue(BuilderDocumentSchema::CORE_MISSING, 'error', null, "This store page needs its main part ({$label}). Add it before publishing.", 'sections', ['element' => $core]);
+            } elseif ($found[0]['hidden']) {
+                $issue(BuilderDocumentSchema::CORE_MISSING, 'error', $found[0]['id'], "This store page's main part ({$label}) is hidden. Show it before publishing.", $found[0]['path'], ['element' => $core]);
+            } elseif (isset($nodes[$found[0]['id']]) && (($nodes[$found[0]['id']]['node']['schedule'] ?? null) !== null || ($nodes[$found[0]['id']]['node']['audience'] ?? null) !== null)) {
+                $issue('TEMPLATE_CORE_CONDITIONAL', 'warning', $found[0]['id'], "This store page's main part ({$label}) shows only at some times or to some visitors. The others get the page without it.", $found[0]['path'], ['element' => $core]);
+            }
+        }
 
         foreach ($nodes as $id => $entry) {
             if ($entry['hidden']) {

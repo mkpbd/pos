@@ -55,7 +55,8 @@ export function referencedGlobals(content: BuilderContent): string[] {
 
 /** The context a global made in (or inserted into) a document of this context has; null: no global sections here (popups, globals). */
 export function globalContextFor(context: DocumentContext): GlobalContext | null {
-  if (context === 'page' || context === 'cms' || context === 'zone') return 'page'
+  // B14: page globals also in store page designs.
+  if (context === 'page' || context === 'cms' || context === 'zone' || context === 'template') return 'page'
   if (context === 'header' || context === 'footer') return context
   return null
 }

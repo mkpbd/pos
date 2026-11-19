@@ -21,8 +21,9 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { elementMeta, isWrappedSectionType } from '@/storefront/builder/registry'
+import type { StoreTemplateKey } from '@/storefront/builder/templates/types'
 import type { ButtonElement, DividerElement, Element, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, TextElement, WrappedElement } from '@/storefront/builder/types'
-import { elementContext, kindInfo } from '../document-kind'
+import { documentTemplate, elementContext, kindInfo } from '../document-kind'
 import { AdvancedTab } from './advanced-tab'
 import { focusFieldSoon } from './check-focus'
 import { AiWriterBar } from './ai-writer'
@@ -32,6 +33,8 @@ import { B8aForm } from './b8a-forms'
 import { B8bForm } from './b8b-forms'
 import { B17Form } from './b17-forms'
 import { B17_TYPES } from './b17-model'
+import { B14Form } from './b14-forms'
+import { B14_TYPES } from './b14-model'
 import { P2aForm } from './order-form'
 import { ButtonForm, ColumnInfo, DividerForm, HeadingForm, ImageForm, InnerRowForm, SectionForm, SpacerForm, TextForm } from './content-forms'
 import { errorMap, isInlineProblem } from './errors'
@@ -84,7 +87,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   errors: Record<string, string>
   bangla: boolean
   content: InspectorProps['content']
-  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'> & { enums?: Record<string, unknown> }
+  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'> & { enums?: Record<string, unknown>; template: StoreTemplateKey | null }
 }) {
   const common = { onChange, errors, bangla } as const
   if (B4_TYPES.has(node.type)) return <B4Form key={node.id} node={node as Element} {...common} {...b4} />
@@ -92,6 +95,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   if (B8A_TYPES.has(node.type)) return <B8aForm key={node.id} node={node as Element} {...common} context={b4.context} icons={b4.icons} />
   if (B8B_TYPES.has(node.type)) return <B8bForm key={node.id} node={node as Element} {...common} context={b4.context} />
   if (P2A_TYPES.has(node.type)) return <P2aForm key={node.id} node={node as Element} {...common} context={b4.context} />
+  if (B14_TYPES.has(node.type)) return <B14Form key={node.id} node={node as Element} {...common} context={b4.context} template={b4.template} />
   if (B17_TYPES.has(node.type)) return <B17Form key={node.id} node={node as Element} {...common} context={b4.context} enums={b4.enums} />
   switch (node.type) {
     case 'section':
@@ -138,7 +142,8 @@ function PageSettings({ document, content, locales, onCommand, errors }: Pick<In
   const sections = content.sections.length
   const kind = document.kind ?? 'page'
   const info = kindInfo({ kind, key: document.key ?? '', target: document.target })
-  const heading = kind === 'header' ? 'Header' : kind === 'footer' ? 'Footer' : kind === 'zone' ? 'Area' : 'Page'
+  const template = documentTemplate({ kind, key: document.key })
+  const heading = kind === 'header' ? 'Header' : kind === 'footer' ? 'Footer' : kind === 'zone' ? 'Area' : template ? 'Store page' : 'Page'
   const cms = (document.key ?? '').startsWith('cms:')
   return (
     <div className="flex flex-col gap-5 p-4">
@@ -184,6 +189,12 @@ function PageSettings({ document, content, locales, onCommand, errors }: Pick<In
         <p className="text-sm text-muted-foreground">
           The page’s title, address and whether it is published are set on the{' '}
           <Link to="/content/pages" className="underline underline-offset-2">Content pages</Link> screen; search texts set there are used when Search & sharing below is empty. Deleting this design brings the classic page back.
+        </p>
+      )}
+      {template && (
+        <p className="text-sm text-muted-foreground" data-testid="store-page-seo-note">
+          Search titles, descriptions and sharing pictures of this page come from {template === 'blog_post' ? 'each post' : template === 'category' ? 'each category' : template === 'brand' ? 'each brand' : 'your store settings'}, as before.
+          {template === 'order' || template === 'search' ? ' Search engines don’t list this page.' : ''} Choose “Use the standard page” on the Page builder screen to go back to the standard page.
         </p>
       )}
       {(kind === 'header' || kind === 'footer') && (
@@ -288,7 +299,8 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
   const bangla = locales.includes('bn')
   const icons = registryIcons(registry)
   const context = elementContext({ kind: document.kind ?? 'page', key: document.key ?? '' })
-  const problems = validateNode(node, { icons, context })
+  const template = documentTemplate({ kind: document.kind ?? 'page', key: document.key })
+  const problems = validateNode(node, { icons, context, template })
   const errors = errorMap(node, problems, serverProblems)
   const hasAdvanced = node.type !== 'column'
   const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
@@ -357,7 +369,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
             bangla={bangla}
             content={content}
             documentId={document.id}
-            b4={{ context, theme, icons, canCustomHtml, enums: registry.enums }}
+            b4={{ context, theme, icons, canCustomHtml, enums: registry.enums, template }}
           />
         </TabsContent>
         <TabsContent value="style" className="pt-4">

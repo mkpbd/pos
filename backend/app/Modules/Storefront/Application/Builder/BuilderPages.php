@@ -207,6 +207,27 @@ class BuilderPages
         return $version === null ? null : $this->renderer->render($document, $version->content, $version->number, 'published');
     }
 
+    /**
+     * B14: which store page templates the storefront uses (bootstrap `builder.templates`), every
+     * template key → published (`$draft`, staff preview and canvas: a design exists).
+     *
+     * @return array<string, bool>
+     */
+    public function templates(bool $draft): array
+    {
+        $keys = BuilderDocument::query()->where('kind', BuilderDocument::KIND_PAGE)
+            ->where('key', 'like', BuilderDocument::TEMPLATE_PREFIX.'%')
+            ->when(! $draft, fn (Builder $q) => $q->whereNotNull('published_version_id'))
+            ->pluck('key')->all();
+
+        $result = [];
+        foreach (ElementRegistry::TEMPLATES as $template) {
+            $result[$template] = in_array(BuilderDocument::TEMPLATE_PREFIX.$template, $keys, true);
+        }
+
+        return $result;
+    }
+
     public function hasPublishedHome(): bool
     {
         return BuilderDocument::query()->where('key', BuilderDocument::HOME)->whereNotNull('published_version_id')->exists();

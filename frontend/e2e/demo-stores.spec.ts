@@ -1368,6 +1368,95 @@ test('B13: Blush & Bloom — a members-only section stays hidden for guests; an 
   await adminContext.close()
 })
 
+test('B14: Kath & Home designs its category and not-found pages from the starters; shoppers get them with live data, and "Use the standard page" brings the old page back', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('furniture.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@furniture.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { id: string; type?: string; hidden?: boolean; columns?: { elements: Node[] }[] }
+  const find = (sections: Node[], type: string): Node | null => {
+    const walk = (nodes: Node[]): Node | null => {
+      for (const n of nodes) {
+        if (n.type === type) return n
+        for (const c of n.columns ?? []) {
+          const inner = walk(c.elements)
+          if (inner) return inner
+        }
+      }
+      return null
+    }
+    return walk(sections)
+  }
+  const ensureTemplate = async (key: string) => {
+    let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: `template:${key}`, title: `Store page: ${key}`, from: 'starter' })
+    if (doc.status === 409) {
+      // A rerun on the same database: reuse the design.
+      const existing = (await call('GET', '/api/v1/storefront/builder/documents')).body.data.find((d: { key: string }) => d.key === `template:${key}`)
+      doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+    }
+    expect([200, 201]).toContain(doc.status)
+    return doc.body.data as { id: string; content: { sections: Node[] } }
+  }
+
+  // A category to look at, and its standard page first.
+  const categories = (await call('GET', '/api/v1/storefront/link-targets')).body.data.categories as { url: string | null }[]
+  const categoryPath = new URL(categories.find((c) => c.url)!.url!, base).pathname
+  await page.goto(`${base}${categoryPath}`)
+  await expect(page.locator('[data-b-scope="page"]')).toHaveCount(0, { timeout: 30_000 })
+
+  // The category page from its starter: a main product listing, published.
+  const category = await ensureTemplate('category')
+  const listing = find(category.content.sections, 'product_listing')!
+  expect(listing).toBeTruthy()
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${category.id}/publish`, { note: 'B14' })).status).toBe(200)
+  // Its main part can't be removed for publishing.
+  const withoutMain = { ...category.content, sections: category.content.sections.map((s) => ({ ...s, columns: s.columns?.map((c) => ({ ...c, elements: c.elements.filter((e) => e.type !== 'product_listing') })) })) }
+  const detail = await call('GET', `/api/v1/storefront/builder/documents/${category.id}`)
+  const draftWithout = await call('PUT', `/api/v1/storefront/builder/documents/${category.id}/draft`, { revision: detail.body.data.draft_revision, content: withoutMain })
+  if (draftWithout.status === 200) {
+    const refused = await call('POST', `/api/v1/storefront/builder/documents/${category.id}/publish`, { note: 'no main part' })
+    expect(refused.status).toBe(422)
+    expect(refused.body.error.code).toBe('TEMPLATE_CORE_MISSING')
+    await call('PUT', `/api/v1/storefront/builder/documents/${category.id}/draft`, { revision: draftWithout.body.data.draft_revision, content: category.content })
+  }
+
+  // Shoppers: the designed category page with the real products of that category; filters live in the address.
+  await page.goto(`${base}${categoryPath}`)
+  const main = page.locator(`[data-b="${listing.id}"]`)
+  await expect(main).toBeVisible({ timeout: 30_000 })
+  await expect(main.locator('a[href*="/product/"]').first()).toBeVisible()
+  await page.goto(`${base}${categoryPath}?sort=price_asc`)
+  await expect(page.locator(`[data-b="${listing.id}"]`)).toBeVisible({ timeout: 30_000 })
+  await expect(page).toHaveURL(/sort=price_asc/)
+
+  // The not-found page from its starter.
+  const notFound = await ensureTemplate('not_found')
+  const message = find(notFound.content.sections, 'not_found_message')!
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${notFound.id}/publish`, { note: 'B14' })).status).toBe(200)
+  await page.goto(`${base}/this-page-does-not-exist`)
+  await expect(page.locator(`[data-b="${message.id}"]`)).toBeVisible({ timeout: 30_000 })
+
+  // "Use the standard page": the category page goes back to the store's own.
+  const unpublished = await call('POST', `/api/v1/storefront/builder/documents/${category.id}/unpublish`, {})
+  expect(unpublished.status).toBe(200)
+  await page.goto(`${base}${categoryPath}`)
+  await expect(page.locator(`[data-b="${listing.id}"]`)).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.locator('a[href*="/product/"]').first()).toBeVisible()
+  await adminContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

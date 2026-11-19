@@ -9,7 +9,9 @@ use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Storefront\Application\Builder\Templates\ManageBuilderTemplates;
+use App\Modules\Storefront\Application\Builder\Templates\StorePageStarters;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
+use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\Experiments;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\BuilderVersion;
@@ -38,6 +40,7 @@ class ManageBuilderDocuments
         private readonly TenantContext $tenant,
         private readonly BuilderGlobals $globals,
         private readonly BuilderReferences $references,
+        private readonly StorePageStarters $starters,
     ) {}
 
     /**
@@ -83,6 +86,8 @@ class ManageBuilderDocuments
         }
         $content = $content !== null ? ($this->prepare)($content, $context) : match ($attributes['from'] ?? 'blank') {
             'homepage' => ($this->prepare)($this->importer->document(), $context),
+            // B14: a store page template's starter design.
+            'starter' => ($this->prepare)($this->starters->content((string) BuilderDocumentSchema::splitContext($key)[1]), $context),
             'cms' => ($this->prepare)($this->cmsImporter->document($page), $context),
             'current' => ($this->prepare)($key === BuilderDocument::HEADER ? $this->siteParts->header() : $this->siteParts->footer(), $context),
             default => BuilderDocumentSchema::blank(),
@@ -103,6 +108,7 @@ class ManageBuilderDocuments
                         : 'This area already has a version for this product.',
                     $attributes['kind'] === BuilderDocument::KIND_ZONE => 'This area already has a builder design.',
                     str_starts_with($attributes['key'], BuilderDocument::CMS_PREFIX) => 'This content page is already designed with the builder.',
+                    str_starts_with($attributes['key'], BuilderDocument::TEMPLATE_PREFIX) => 'This store page already has a design.',
                     default => 'Another landing page already uses this address.',
                 }, ['key' => $attributes['key']], 409);
             }
@@ -366,6 +372,19 @@ class ManageBuilderDocuments
     {
         if (($content['sections'] ?? []) === []) {
             throw new BusinessRuleViolation('DOCUMENT_EMPTY', 'Add at least one section before publishing this page.');
+        }
+        // B14: a store page template goes live only with its main part.
+        $template = $locked->templateKey();
+        if ($template !== null) {
+            $core = ElementRegistry::TEMPLATE_CORE[$template];
+            $found = BuilderDocumentSchema::coreElements($content, $template);
+            if ($found === []) {
+                throw new BusinessRuleViolation(BuilderDocumentSchema::CORE_MISSING, 'This store page needs its main part ('.ElementRegistry::label($core).'). Add it before publishing.', ['element' => $core]);
+            }
+            // Shoppers would get the page without it (a category page with no products).
+            if ($found[0]['hidden']) {
+                throw new BusinessRuleViolation(BuilderDocumentSchema::CORE_MISSING, 'This store page\'s main part is hidden. Show it before publishing.', ['element' => $core, 'node_id' => $found[0]['id']]);
+            }
         }
 
         $version = BuilderVersion::query()->create([

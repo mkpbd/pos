@@ -263,7 +263,8 @@ class ManageBuilderTemplates
             'description' => $template->content['description'] ?? null,
             'thumbnail_url' => null,
             'preview_url' => null,
-            'allowed_in' => $template->content['allowed_in'] ?? [$template->content['context'] ?? 'page'],
+            // B14: sections saved before store page templates existed fit them wherever they fit pages.
+            'allowed_in' => BuilderTemplateLibrary::withTemplates((string) $template->scope, $template->content['allowed_in'] ?? [$template->content['context'] ?? 'page']),
             'requires' => [],
             'source' => 'mine',
             'created_at' => $template->created_at?->toIso8601String(),

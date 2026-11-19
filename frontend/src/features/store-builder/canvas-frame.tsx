@@ -17,6 +17,7 @@ import { ArmSwitchers, type ArmSwitchLayer } from './experiments/arm-switchers'
 import type { PreviewContext } from '@/storefront/builder/audience/types'
 import { AudienceCanvasBadges } from './audience/audience-badge'
 import type { CanvasAudienceBadge } from './audience/badges'
+import type { StorePageContext, StorePageSample } from '@/storefront/builder/templates/types'
 
 /*
  * The canvas iframe (/admin/builder-canvas) at the device width, scaled to fit, with the editor's
@@ -121,10 +122,17 @@ export type CanvasFrameProps = {
   previewAs?: PreviewContext | null
   /** B13: "Who sees this" badges drawn on the nodes that have rules. */
   audienceBadges?: CanvasAudienceBadge[]
+  /**
+   * B14: the page context live text and the store page main parts draw with (the toolbar's
+   * sample; a normal page: the store's own fields), and the data the main part draws. Undefined =
+   * no `page-context` message (documents without live text).
+   */
+  pageContext?: StorePageContext | null
+  pageSample?: StorePageSample | null
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -246,6 +254,12 @@ export function CanvasFrame(props: CanvasFrameProps) {
     send({ type: 'preview-as', context: previewAs })
     sentPreview.current = { ready, context: previewAs }
   }, [ready, previewAs, send])
+
+  // B14: the page context after every `ready` and on change (before the render that uses it).
+  useEffect(() => {
+    if (ready === 0 || pageContext === undefined) return
+    send({ type: 'page-context', context: pageContext, sample: pageSample })
+  }, [ready, pageContext, pageSample, send])
 
   useEffect(() => {
     if (ready > 0 && theme) send(fonts ? { type: 'theme', settings: theme, fonts } : { type: 'theme', settings: theme })

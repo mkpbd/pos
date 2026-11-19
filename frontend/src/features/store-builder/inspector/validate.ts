@@ -12,6 +12,7 @@ import type { Column, DocumentContext, Element, Section, WrappedElement, Wrapped
 import { ICON_NAMES } from '@/storefront/builder/icons'
 import { B8A_TYPES as B8A_TYPE_LIST } from '@/storefront/builder/elements/b8a-types'
 import {
+  B14_TEXT_LIMITS,
   B4_ENUMS,
   B17_TEXT_LIMITS,
   b17PropProblems,
@@ -38,6 +39,8 @@ import {
 } from '@/storefront/builder/validate'
 import type { BuilderNode, Problem } from './types'
 import { B17_TYPES, b17Message } from './b17-model'
+import { B14_TYPES, b14Problems } from './b14-model'
+import type { StoreTemplateKey } from '@/storefront/builder/templates/types'
 import { audienceProblems } from '../audience/words'
 
 /** Text limits of the basic elements (backend ElementRegistry::TEXT_LIMITS). */
@@ -111,6 +114,9 @@ export function translatableFields(type: string): Record<string, number> {
   if (b6) return Object.fromEntries(Object.entries(b6).filter(([field]) => !(B6_NOT_TRANSLATED[type] ?? []).includes(field)))
   const b4 = B4_TEXT_LIMITS[type]
   if (b4) return b4
+  // B14: live text (words before / after, text when empty) and the page-not-found message.
+  const b14 = (B14_TEXT_LIMITS as Record<string, Record<string, number>>)[type]
+  if (b14) return b14
   switch (type) {
     case 'heading':
       return { text: TEXT_LIMITS.heading }
@@ -545,7 +551,12 @@ export function orderFormMessage(problem: PropProblem): string {
   return 'Choose one of the options.'
 }
 
-function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[], context?: DocumentContext) {
+function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[], context?: DocumentContext, template: StoreTemplateKey | null = null) {
+  if (B14_TYPES.has(node.type)) {
+    // B14: live text and the store page main parts (the field and the listing scope depend on the page).
+    for (const problem of b14Problems(node.type, node.props, template, context === 'template')) add(problem.path, problem.message)
+    return
+  }
   if (P2A_TYPES.has(node.type)) {
     for (const problem of orderFormPropProblems(node.props)) add(`props.${problem.path}`, orderFormMessage(problem))
     return
@@ -631,7 +642,7 @@ function validateColumn(node: Column, add: (path: string, message: string) => vo
 }
 
 /** Client-side checks of one node; empty = valid. `icons`: the icon names the server accepts (default: the storefront's). B8b `context`: a button's "close the popup" is for popups only. */
-export function validateNode(node: BuilderNode, options: { icons?: readonly string[]; context?: DocumentContext } = {}): Problem[] {
+export function validateNode(node: BuilderNode, options: { icons?: readonly string[]; context?: DocumentContext; /** B14: the store page of a template document (null / absent: a normal page). */ template?: StoreTemplateKey | null } = {}): Problem[] {
   const problems: Problem[] = []
   const add = (path: string, message: string) => {
     if (!problems.some((p) => p.path === path)) problems.push({ path, message })
@@ -654,7 +665,7 @@ export function validateNode(node: BuilderNode, options: { icons?: readonly stri
       if (shape != null && normalizeSectionShape(shape) === null) add(`props.${edge}`, `Choose a shape, a colour and a height from ${B6_LIMITS.shapeHeight.min} to ${B6_LIMITS.shapeHeight.max} px.`)
     }
   } else {
-    validateElement(node, add, options.icons ?? ICON_NAMES, options.context)
+    validateElement(node, add, options.icons ?? ICON_NAMES, options.context, options.template ?? null)
   }
   validateSchedule(node, add)
   // B13: who sees it (the server also checks that districts and campaigns exist).

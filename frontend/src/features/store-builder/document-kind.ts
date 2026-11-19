@@ -1,4 +1,5 @@
 import { documentContext, elementMeta } from '@/storefront/builder/registry'
+import { TEMPLATE_CORE_ELEMENT, templateKeyOf, type StoreTemplateKey } from '@/storefront/builder/templates/types'
 import type { DocumentContext } from '@/storefront/builder/types'
 import type { DocumentKind, ProductZoneKey, TargetedZoneKey, ZoneDocumentKey as ZoneKey, ZoneTarget } from './api'
 
@@ -49,9 +50,19 @@ export function elementContext(doc: { kind: DocumentKind; key: string; context?:
  * Whether an element type may be added to a document of this context: the server's `allowed_in`,
  * else the storefront registry's; unknown types go on pages only.
  */
-export function allowedIn(meta: { type: string; allowed_in?: readonly string[] }, context: ElementContext): boolean {
-  return (meta.allowed_in ?? elementMeta(meta.type)?.allowed_in ?? ['page', 'cms', 'zone']).includes(context)
+export function allowedIn(meta: { type: string; allowed_in?: readonly string[] }, context: ElementContext, template: StoreTemplateKey | null = null): boolean {
+  if (!(meta.allowed_in ?? elementMeta(meta.type)?.allowed_in ?? ['page', 'cms', 'zone']).includes(context)) return false
+  // B14: a store page's main part only in its own templates (the product listing also on normal pages).
+  return context !== 'template' || !isCoreElement(meta.type) || (template !== null && TEMPLATE_CORE_ELEMENT[template] === meta.type)
 }
+
+/** B14: the main parts of the store page templates (product listing, blog post, order summary, page-not-found message). */
+const CORE_TYPES: ReadonlySet<string> = new Set(Object.values(TEMPLATE_CORE_ELEMENT))
+
+export const isCoreElement = (type: string) => CORE_TYPES.has(type)
+
+/** B14: the store page a template document designs (`template:category` → `category`), else null. */
+export const documentTemplate = (doc: { kind?: string; key?: string | null }): StoreTemplateKey | null => ((doc.kind ?? 'page') === 'page' ? templateKeyOf(doc.key ?? '') : null)
 
 export type KindInfo = {
   /** "page", "header", "footer", "area". */
@@ -120,6 +131,19 @@ function zonePlacement(key: string, target: ZoneTarget | null | undefined): stri
   return type === 'category' ? `${words.category(name)} A product’s own version wins over this one.` : words.product(name)
 }
 
+/** B14: where a store page design shows (the strip above the canvas). */
+const TEMPLATE_PLACEMENT: Record<StoreTemplateKey, string> = {
+  shop: 'Your design for the shop page (/shop), with all your products. Once published, shoppers see it instead of the standard shop page.',
+  category: 'Your design for every category page. Once published, shoppers see it instead of the standard category page; the canvas shows it with the category chosen under “Preview with”.',
+  brand: 'Your design for every brand page. Once published, shoppers see it instead of the standard brand page; the canvas shows it with the brand chosen under “Preview with”.',
+  search: 'Your design for the search results page. Once published, shoppers see it instead of the standard one; the canvas shows it with the words chosen under “Preview with”.',
+  blog_post: 'Your design for every blog post. Once published, readers see it instead of the standard post page; the canvas shows the post chosen under “Preview with”.',
+  order: 'Your design for the order page shoppers see after ordering and when they check their order. Each shopper sees only their own order; the canvas shows the order chosen under “Preview with”, with personal details hidden.',
+  not_found: 'Your design for the page shoppers see when an address doesn’t exist. Once published, it replaces the standard “Page not found” page.',
+}
+
+const TEMPLATE_EMPTY = 'This store page is empty. Add its main part from the Add panel, then anything else around it — banners, text, trust badges.'
+
 export function kindInfo(doc: { kind: DocumentKind; key: string; target?: ZoneTarget | null }): KindInfo {
   switch (doc.kind) {
     case 'header':
@@ -159,6 +183,11 @@ export function kindInfo(doc: { kind: DocumentKind; key: string; target?: ZoneTa
         empty: 'This popup is empty. Drag a heading, a text, a button or a form from the Add panel into it.',
         sample: 'behind',
       }
+    case 'page': {
+      const template = documentTemplate(doc)
+      if (template) return { noun: 'store page', placement: TEMPLATE_PLACEMENT[template], empty: TEMPLATE_EMPTY, sample: 'none' }
+      return { noun: 'page', placement: null, empty: 'This page is empty. Drag an element from the Add panel onto this area, or click one to add it.', sample: 'none' }
+    }
     default:
       return { noun: 'page', placement: null, empty: 'This page is empty. Drag an element from the Add panel onto this area, or click one to add it.', sample: 'none' }
   }

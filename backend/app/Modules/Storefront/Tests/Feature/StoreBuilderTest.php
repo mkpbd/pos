@@ -249,6 +249,8 @@ class StoreBuilderTest extends TestCase
             'header' => null,
             'footer' => null,
             'zones' => ['listing.top' => null, 'listing.bottom' => null, 'product.after' => null],
+            // B14: every store page uses its standard design.
+            'templates' => ['shop' => false, 'category' => false, 'brand' => false, 'search' => false, 'blog_post' => false, 'order' => false, 'not_found' => false],
         ]);
 
         $this->actingAsUser($admin);

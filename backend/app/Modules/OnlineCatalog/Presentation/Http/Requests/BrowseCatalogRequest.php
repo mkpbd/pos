@@ -16,6 +16,9 @@ class BrowseCatalogRequest extends FormRequest
 {
     public const MAX_SLUGS = 12;
 
+    /** B14: `categories` — at most this many category slugs. */
+    public const MAX_CATEGORIES = 20;
+
     private const DECIMAL = 'regex:/^\d{1,16}(\.\d{1,2})?$/';
 
     protected function prepareForValidation(): void
@@ -23,6 +26,10 @@ class BrowseCatalogRequest extends FormRequest
         $merge = [];
         if (is_string($this->query('brand'))) {
             $merge['brand'] = array_values(array_filter(explode(',', $this->query('brand'))));
+        }
+        // B14: several categories (store builder listings).
+        if (is_string($this->query('categories'))) {
+            $merge['categories'] = array_values(array_filter(explode(',', $this->query('categories'))));
         }
         $attr = $this->query('attr');
         if (is_array($attr)) {
@@ -41,6 +48,8 @@ class BrowseCatalogRequest extends FormRequest
             'category' => ['sometimes', 'nullable', 'string', 'max:120'],
             'brand' => ['sometimes', 'array', 'max:50'],
             'brand.*' => ['string', 'max:120'],
+            'categories' => ['sometimes', 'array', 'max:'.self::MAX_CATEGORIES],
+            'categories.*' => ['string', 'max:120'],
             'price_min' => ['sometimes', 'nullable', self::DECIMAL],
             'price_max' => ['sometimes', 'nullable', self::DECIMAL],
             'attr' => ['sometimes', 'array', 'max:20'],

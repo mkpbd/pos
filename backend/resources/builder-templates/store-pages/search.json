@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "id": "s_title", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_title", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_query", "type": "dynamic_text", "props": { "field": "search.query", "tag": "h1", "prefix": "খোঁজার ফল: “", "suffix": "”", "fallback": "পণ্য খুঁজুন" } },
+        { "id": "e_count", "type": "dynamic_text", "props": { "field": "search.result_count", "tag": "p", "suffix": "টি পণ্য পাওয়া গেছে", "format": "number" } },
+        { "id": "e_search", "type": "search_box", "props": { "placeholder": "আবার খুঁজুন", "button_label": "খুঁজুন" } }
+      ] }]
+    },
+    {
+      "id": "s_listing", "type": "section", "props": { "layout": "boxed" },
+      "columns": [{ "id": "c_listing", "type": "column", "width": { "base": 100 }, "elements": [
+        { "id": "e_listing", "type": "product_listing", "props": { "scope": "current" } }
+      ] }]
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 import { isWrappedSectionType } from '@/storefront/builder/registry'
 import { B4_TYPES, B6_TYPES, B8A_TYPES, P2A_TYPES } from './validate'
 import type { BuilderNode, Problem } from './types'
+import { B14_TYPES } from './b14-model'
 
 /** Drops the `sections.0.columns.1.elements.2.` chain of a document path. */
 export function localPath(path: string): string {
@@ -76,6 +77,6 @@ export function isInlineProblem(node: BuilderNode, problem: Problem, bangla: boo
     return key === 'banner_ids' || key === 'item_ids' || key.startsWith('config.')
   }
   // B4 elements show every prop's problem next to its field.
-  if (B4_TYPES.has(node.type) || B6_TYPES.has(node.type) || B8A_TYPES.has(node.type) || P2A_TYPES.has(node.type)) return key !== '' && key !== 'id' && key !== 'type'
+  if (B4_TYPES.has(node.type) || B6_TYPES.has(node.type) || B8A_TYPES.has(node.type) || P2A_TYPES.has(node.type) || B14_TYPES.has(node.type)) return key !== '' && key !== 'id' && key !== 'type'
   return (BASIC_FIELDS[node.type] ?? []).includes(key)
 }

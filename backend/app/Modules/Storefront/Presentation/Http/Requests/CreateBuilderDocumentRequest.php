@@ -27,10 +27,12 @@ use Illuminate\Validation\Validator;
  * (cms keys only: import the CMS page) or `current` (header / footer only: today's layout);
  * P2a: `template` (landing pages only) with `template` (a built-in page template id) and an
  * optional `product_id` (one of the store's products) the campaign page is made for.
+ * B14: page keys `template:<shop|category|brand|search|blog_post|order|not_found>` (store page
+ * templates), with `from` blank or `starter` (the template's built-in starter design).
  */
 class CreateBuilderDocumentRequest extends FormRequest
 {
-    private const PAGE_KEY = '/^(home|landing:[a-z0-9-]{2,60}|cms:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/';
+    private const PAGE_KEY = '/^(home|landing:[a-z0-9-]{2,60}|cms:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|template:(shop|category|brand|search|blog_post|order|not_found))$/';
 
     protected function prepareForValidation(): void
     {
@@ -67,7 +69,7 @@ class CreateBuilderDocumentRequest extends FormRequest
             'kind' => ['required', Rule::in(BuilderDocument::BUILDER_KINDS)],
             'key' => ['required', 'string', 'max:120', Rule::notIn(['landing:home'])],
             'title' => ['required', 'string', 'max:160'],
-            'from' => ['sometimes', 'nullable', Rule::in(['blank', 'homepage', 'cms', 'current', 'template'])],
+            'from' => ['sometimes', 'nullable', Rule::in(['blank', 'homepage', 'cms', 'current', 'template', 'starter'])],
             // P2a: a new campaign page from a built-in page template, for a product.
             'template' => ['required_if:from,template', 'nullable', 'string', Rule::in($this->pageTemplates())],
             'product_id' => ['sometimes', 'nullable', 'uuid'],
@@ -120,7 +122,7 @@ class CreateBuilderDocumentRequest extends FormRequest
                     BuilderDocument::KIND_HEADER => 'The key of the header is "header".',
                     BuilderDocument::KIND_FOOTER => 'The key of the footer is "footer".',
                     BuilderDocument::KIND_ZONE => 'The key of an area is zone:listing.top, zone:listing.bottom, zone:product.below_price, zone:product.after or zone:product.bottom; a product area\'s version for a category or a product adds @category:<id> or @product:<id>.',
-                    default => 'The key is "home", "landing:" followed by 2–60 lower-case letters, digits and dashes, or "cms:" followed by a content page id.',
+                    default => 'The key is "home", "landing:" followed by 2–60 lower-case letters, digits and dashes, "cms:" followed by a content page id, or a store page template (template:shop, template:category, template:brand, template:search, template:blog_post, template:order, template:not_found).',
                 });
 
                 return;
@@ -132,6 +134,8 @@ class CreateBuilderDocumentRequest extends FormRequest
                 'cms' => str_starts_with($key, BuilderDocument::CMS_PREFIX),
                 'current' => in_array($kind, [BuilderDocument::KIND_HEADER, BuilderDocument::KIND_FOOTER], true),
                 'template' => str_starts_with($key, BuilderDocument::LANDING_PREFIX),
+                // B14: a store page template starts from its built-in starter or blank.
+                'starter' => str_starts_with($key, BuilderDocument::TEMPLATE_PREFIX),
                 default => true,
             };
             if (! $allowed) {
@@ -139,6 +143,7 @@ class CreateBuilderDocumentRequest extends FormRequest
                     'homepage' => 'Only the home page can start from the current homepage.',
                     'cms' => 'Only a content page design can start from the content page.',
                     'template' => 'Only a campaign page (landing:<address>) can start from a page template.',
+                    'starter' => 'Only a store page (template:<page>) can start from its starter design.',
                     default => 'Only the header and the footer can start from the current design.',
                 });
 

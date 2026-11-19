@@ -10,6 +10,9 @@ import { CUSTOM_HTML_DENIED, useCommands } from './commands'
 import { allowedIn, type ElementContext } from './document-kind'
 import type { Dragged } from './drop-targets'
 import { ElementIcon } from './element-icon'
+import { coreInsertRefusal } from './store-page-core'
+import { useEditor } from './store'
+import type { StoreTemplateKey } from '@/storefront/builder/templates/types'
 
 type TypeMeta = ElementsMetadata['types'][number]
 
@@ -55,16 +58,20 @@ function CatalogueItem({ meta, disabledReason }: { meta: TypeMeta; disabledReaso
  * The element catalogue: grouped, searchable; drag onto the canvas or click to insert. B4: only
  * the types the document may hold (`allowed_in` of its context); custom HTML is greyed out for
  * people without `storefront.custom_html`.
+ * B14: a store page design shows its own main part only (the product list on shop, category,
+ * brand and search; the blog post; the order details; the page-not-found message), greyed out
+ * once it is on the page.
  */
-export function AddPanel({ registry, context = 'page', canCustomHtml = true }: { registry: ElementsMetadata; context?: ElementContext; canCustomHtml?: boolean }) {
+export function AddPanel({ registry, context = 'page', template = null, canCustomHtml = true }: { registry: ElementsMetadata; context?: ElementContext; template?: StoreTemplateKey | null; canCustomHtml?: boolean }) {
   const [query, setQuery] = useState('')
+  const content = useEditor((s) => s.content)
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const matches = registry.types.filter((meta) => allowedIn(meta, context) && (!q || meta.label.toLowerCase().includes(q) || (ELEMENT_HINTS[meta.type] ?? '').toLowerCase().includes(q)))
+    const matches = registry.types.filter((meta) => allowedIn(meta, context, template) && (!q || meta.label.toLowerCase().includes(q) || (ELEMENT_HINTS[meta.type] ?? '').toLowerCase().includes(q)))
     // A group the editor doesn't know goes under Content rather than disappearing.
     const groupOf = (meta: TypeMeta) => ((GROUP_ORDER as string[]).includes(meta.group) ? meta.group : 'content')
     return GROUP_ORDER.map((group) => ({ group, items: matches.filter((meta) => groupOf(meta) === group) })).filter((entry) => entry.items.length > 0)
-  }, [query, registry.types, context])
+  }, [query, registry.types, context, template])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -82,7 +89,7 @@ export function AddPanel({ registry, context = 'page', canCustomHtml = true }: {
             </h3>
             <ul className="grid grid-cols-2 gap-2">
               {items.map((meta) => (
-                <CatalogueItem key={meta.type} meta={meta} disabledReason={meta.type === 'custom_html' && !canCustomHtml ? CUSTOM_HTML_DENIED : undefined} />
+                <CatalogueItem key={meta.type} meta={meta} disabledReason={meta.type === 'custom_html' && !canCustomHtml ? CUSTOM_HTML_DENIED : (coreInsertRefusal(content, meta.type, template) ?? undefined)} />
               ))}
             </ul>
           </section>

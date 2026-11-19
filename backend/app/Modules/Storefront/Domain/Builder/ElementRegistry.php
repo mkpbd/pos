@@ -57,6 +57,63 @@ final class ElementRegistry
      */
     public const B17 = ['ornament', 'payment_badges', 'delivery_promise', 'bangla_date'];
 
+    /**
+     * B14: store page templates — text from the page (`dynamic_text`) and the main parts of the
+     * store pages (the product listing, a blog post's body, the order summary, the 404 message).
+     */
+    public const B14 = ['dynamic_text', 'product_listing', 'blog_post_body', 'order_summary', 'not_found_message'];
+
+    /** B14: the store pages a template (`template:<key>`, kind page, context `template`) designs. */
+    public const TEMPLATES = ['shop', 'category', 'brand', 'search', 'blog_post', 'order', 'not_found'];
+
+    /** B14: the element each store page template holds exactly once (its main part). */
+    public const TEMPLATE_CORE = [
+        'shop' => 'product_listing', 'category' => 'product_listing', 'brand' => 'product_listing', 'search' => 'product_listing',
+        'blog_post' => 'blog_post_body', 'order' => 'order_summary', 'not_found' => 'not_found_message',
+    ];
+
+    /** B14: the templates showing a product listing of their own (product_listing scope `current`). */
+    public const LISTING_TEMPLATES = ['shop', 'category', 'brand', 'search'];
+
+    /** B14: the store's own fields, on every page (dynamic_text). */
+    public const STORE_FIELDS = ['store.name', 'store.phone', 'store.email', 'store.address'];
+
+    /** B14: the page context fields of each store page template besides `store.*` (dynamic_text). */
+    public const TEMPLATE_FIELDS = [
+        'shop' => [],
+        'category' => ['category.name', 'category.description', 'category.product_count'],
+        'brand' => ['brand.name', 'brand.description', 'brand.product_count'],
+        'search' => ['search.query', 'search.result_count'],
+        'blog_post' => ['post.title', 'post.excerpt', 'post.author', 'post.published_at', 'post.reading_time', 'post.category'],
+        'order' => ['order.number', 'order.status', 'order.total', 'order.placed_at', 'order.customer_first_name', 'order.payment_method', 'order.delivery_eta'],
+        'not_found' => [],
+    ];
+
+    public const DYNAMIC_TEXT_TAGS = ['p', 'h1', 'h2', 'h3', 'span'];
+
+    public const DYNAMIC_TEXT_FORMATS = ['default', 'money', 'number', 'date'];
+
+    /** B14: `current` = the template's own listing; the others on normal pages. */
+    public const LISTING_SCOPES = ['current', 'all', 'categories', 'brands', 'on_sale', 'new_arrivals'];
+
+    public const LISTING_FILTERS = ['price', 'brand', 'category', 'attributes', 'availability', 'on_sale'];
+
+    public const LISTING_FILTER_LAYOUTS = ['sidebar', 'top', 'drawer'];
+
+    /** B14: the listing API's sort keys (OnlineCatalog CatalogSort). */
+    public const LISTING_SORTS = ['featured', 'popularity', 'latest', 'price_asc', 'price_desc', 'name', 'rating'];
+
+    /** B14: the listing API's page sizes. */
+    public const LISTING_PER_PAGE = [12, 24, 36, 48];
+
+    /** B14: products per row (the theme's `listing_columns` choices). */
+    public const LISTING_COLUMNS = ['desktop' => [3, 4, 5], 'tablet' => [2, 3, 4], 'mobile' => [1, 2]];
+
+    public const LISTING_PAGINATIONS = ['pages', 'load_more'];
+
+    /** B14: a listing of chosen categories or brands names 1–20 of them. */
+    public const LISTING_IDS = [1, 20];
+
     /** B17: the built-in ornament drawings (original simple SVGs in the storefront). */
     public const ORNAMENT_NAMES = [
         'crescent_star', 'lantern', 'mosque_dome', 'alpona_border', 'alpona_round', 'kash_flower', 'dhak', 'diya',
@@ -109,9 +166,10 @@ final class ElementRegistry
     /**
      * B4: the document contexts an element can be placed in: home / landing pages, CMS pages
      * (`cms:<uuid>`), the store header and footer, and the shop / product zones. B8b: popups and
-     * bars (`popup:<uuid>`).
+     * bars (`popup:<uuid>`). B14: store page templates (`template:<key>`; BuilderDocumentSchema
+     * validates in `template:<key>` for the template's own rules).
      */
-    public const CONTEXTS = ['page', 'cms', 'header', 'footer', 'zone', 'popup'];
+    public const CONTEXTS = ['page', 'cms', 'header', 'footer', 'zone', 'popup', 'template'];
 
     /**
      * B8b: the elements a popup or bar may hold (basics, calls to action, offers, the newsletter
@@ -123,6 +181,8 @@ final class ElementRegistry
         'video', 'social_icons', 'payment_icons', 'custom_html', 'form',
         // B17: festival bars.
         'ornament', 'trust_badges', 'bangla_date',
+        // B14: the store's name, phone… in a bar.
+        'dynamic_text',
     ];
 
     /** B8b: a button's optional action (`link` is the default and is not stored). */
@@ -168,7 +228,7 @@ final class ElementRegistry
      * B4: elements the canvas resolver accepts besides wrapped sections (contact_form resolves
      * to no data; B8a: a chart has data only with a store `data_source`).
      */
-    public const RESOLVABLE = [...self::DATA_TYPES, 'contact_form', 'chart'];
+    public const RESOLVABLE = [...self::DATA_TYPES, 'contact_form', 'chart', 'product_listing'];
 
     /**
      * B4: the storefront icon set (icon element `name`): the features-strip icons plus contact and
@@ -500,6 +560,9 @@ final class ElementRegistry
         'payment_badges' => ['title' => 80, 'note' => 200],
         'delivery_promise' => ['title' => 80],
         'bangla_date' => ['prefix' => 60],
+        // B14.
+        'dynamic_text' => ['prefix' => 80, 'suffix' => 80, 'fallback' => 200],
+        'not_found_message' => ['heading' => 120, 'text' => 400],
     ];
 
     /** Translatable fields stored in a nested prop (dot keys in `translations`): field => [prop, key]. */
@@ -544,7 +607,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17, ...self::B14];
     }
 
     public static function exists(mixed $type): bool
@@ -558,7 +621,7 @@ final class ElementRegistry
     public static function sectionType(string $type): ?SectionType
     {
         return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true) || in_array($type, self::B8B, true)
-            || in_array($type, self::P2A, true) || in_array($type, self::B17, true)
+            || in_array($type, self::P2A, true) || in_array($type, self::B17, true) || in_array($type, self::B14, true)
             ? null
             : SectionType::tryFrom($type);
     }
@@ -580,7 +643,9 @@ final class ElementRegistry
     public static function needsData(string $type, array $props): bool
     {
         return in_array($type, self::DATA_TYPES, true)
-            || ($type === 'chart' && ($props['data_source'] ?? 'manual') !== 'manual');
+            || ($type === 'chart' && ($props['data_source'] ?? 'manual') !== 'manual')
+            // B14: a listing of chosen categories or brands gets their slugs.
+            || ($type === 'product_listing' && in_array($props['scope'] ?? null, ['categories', 'brands'], true));
     }
 
     /**
@@ -604,9 +669,18 @@ final class ElementRegistry
             'account_link', 'wishlist_link', 'cart_icon', 'announcement' => ['header'],
             'copyright' => ['footer'],
             'faq_list', 'contact_form' => ['cms'],
+            // B14: text from the page anywhere; the store pages' main parts in their templates
+            // (the product listing also on pages and content pages).
+            'dynamic_text' => ['page', 'cms', 'header', 'footer', 'zone'],
+            'product_listing' => ['page', 'cms'],
+            'blog_post_body', 'order_summary', 'not_found_message' => [],
             // Wrapped sections, the other B4 page elements and (B8b) the form.
             default => ['page', 'cms', 'zone'],
         };
+        // B14: store page templates take whatever a page takes, plus their main parts.
+        if (in_array('page', $contexts, true) || in_array($type, ['blog_post_body', 'order_summary', 'not_found_message'], true)) {
+            $contexts[] = 'template';
+        }
 
         // B8b: popups and bars take a fixed set of elements.
         return in_array($type, self::POPUP_ELEMENTS, true) ? [...$contexts, 'popup'] : $contexts;
@@ -619,7 +693,9 @@ final class ElementRegistry
             'heading', 'text', 'image', 'button', 'rich_text', 'blog_posts',
             'video', 'icon', 'cta', 'custom_html', 'faq_list', 'contact_form',
             'accordion', 'tabs', 'icon_box', 'icon_list', 'quote', 'notice', 'counter', 'steps', 'chart',
-            'team', 'store_hours', 'progress_bars', 'form', 'bangla_date' => 'content',
+            'team', 'store_hours', 'progress_bars', 'form', 'bangla_date',
+            'dynamic_text', 'blog_post_body', 'not_found_message' => 'content',
+            'product_listing', 'order_summary' => 'commerce',
             'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid', 'ornament' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
             'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
@@ -697,6 +773,11 @@ final class ElementRegistry
             'payment_badges' => 'How you can pay',
             'delivery_promise' => 'Delivery promise',
             'bangla_date' => 'Bangla date',
+            'dynamic_text' => 'Text from this page',
+            'product_listing' => 'Product listing',
+            'blog_post_body' => 'Blog post',
+            'order_summary' => 'Order summary',
+            'not_found_message' => 'Page not found message',
             default => SectionType::from($type)->label(),
         };
     }
@@ -1194,6 +1275,23 @@ final class ElementRegistry
             'payment_badges' => ['title' => 'How you can pay', 'show_store_methods' => true, 'wallets' => [], 'note' => '', 'style' => 'chips', 'align' => 'left'],
             'delivery_promise' => ['title' => 'Delivery', 'zones' => 'all', 'show_price' => true, 'show_cod' => true, 'show_free_over' => true, 'layout' => 'cards'],
             'bangla_date' => ['prefix' => '', 'show_gregorian' => false, 'show_hijri' => false, 'style' => 'plain', 'align' => 'left'],
+            // B14.
+            'dynamic_text' => ['field' => 'store.name', 'tag' => 'p', 'prefix' => '', 'suffix' => '', 'fallback' => '', 'format' => 'default'],
+            'product_listing' => [
+                'scope' => 'all',
+                'category_ids' => [],
+                'brand_ids' => [],
+                'filters' => array_fill_keys(self::LISTING_FILTERS, true),
+                'filter_layout' => 'sidebar',
+                'sort_default' => 'featured',
+                'per_page' => 24,
+                'columns' => ['desktop' => 3, 'tablet' => 3, 'mobile' => 2],
+                'show_count' => true,
+                'pagination' => 'pages',
+            ],
+            'blog_post_body' => ['show_cover' => true, 'show_meta' => true, 'show_share' => true, 'show_related' => true],
+            'order_summary' => ['show_timeline' => true, 'show_items' => true, 'show_address' => true, 'show_delivery' => true],
+            'not_found_message' => ['heading' => '', 'text' => '', 'show_search' => true, 'show_links' => true],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
     }
@@ -1303,9 +1401,14 @@ final class ElementRegistry
                 'ornament_size' => ['min' => self::ORNAMENT_SIZE[0], 'max' => self::ORNAMENT_SIZE[1]],
                 'ornament_opacity' => ['min' => self::ORNAMENT_OPACITY[0], 'max' => self::ORNAMENT_OPACITY[1]],
                 'delivery_zones' => ['min' => self::DELIVERY_ZONES[0], 'max' => self::DELIVERY_ZONES[1]],
+                // B14.
+                'product_listing_ids' => ['min' => self::LISTING_IDS[0], 'max' => self::LISTING_IDS[1]],
+                'dynamic_text' => self::TRANSLATABLE['dynamic_text'],
+                'not_found_message' => self::TRANSLATABLE['not_found_message'],
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
-            'data_when' => ['chart' => 'data_source!=manual'],
+            // B14: a product listing only for chosen categories or brands.
+            'data_when' => ['chart' => 'data_source!=manual', 'product_listing' => 'scope in categories,brands'],
             'enums' => [
                 'section_layouts' => BuilderDocumentSchema::SECTION_LAYOUTS,
                 'breakpoints' => StyleSchema::BREAKPOINTS,
@@ -1416,6 +1519,19 @@ final class ElementRegistry
                 'payment_badge_styles' => self::PAYMENT_BADGE_STYLES,
                 'delivery_layouts' => self::DELIVERY_LAYOUTS,
                 'bangla_date_styles' => self::BANGLA_DATE_STYLES,
+                // B14.
+                'templates' => self::TEMPLATES,
+                'template_core' => self::TEMPLATE_CORE,
+                'template_fields' => ['store' => self::STORE_FIELDS, ...self::TEMPLATE_FIELDS],
+                'dynamic_text_tags' => self::DYNAMIC_TEXT_TAGS,
+                'dynamic_text_formats' => self::DYNAMIC_TEXT_FORMATS,
+                'product_listing_scopes' => self::LISTING_SCOPES,
+                'product_listing_filters' => self::LISTING_FILTERS,
+                'product_listing_layouts' => self::LISTING_FILTER_LAYOUTS,
+                'product_listing_sorts' => self::LISTING_SORTS,
+                'product_listing_per_page' => self::LISTING_PER_PAGE,
+                'product_listing_columns' => self::LISTING_COLUMNS,
+                'product_listing_paginations' => self::LISTING_PAGINATIONS,
             ],
             // B8b: the settings a new popup starts with.
             'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),
