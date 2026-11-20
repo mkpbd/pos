@@ -7,6 +7,7 @@ use App\Modules\OnlineCatalog\Application\Queries\ListingEditor;
 use App\Modules\OnlineCatalog\Infrastructure\Models\BrandListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
+use App\Modules\Shared\Application\Events\PublicAddressChanged;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -53,8 +54,11 @@ class SaveBrandListing
                 $data['translations'] = TranslationInput::apply($listing->translations, $data['translations'], array_keys(self::TRANSLATABLE));
             }
             $listing->fill(ListingMedia::blankToNull($data));
+            $oldSlug = $listing->slug;
             $listing->slug = $slug ?? $listing->slug ?? ListingEditor::suggestSlug($brand['name'], BrandListing::class, $listing->id);
             $listing->save();
+            // B16: an automatic redirect from the old address (Storefront).
+            PublicAddressChanged::dispatchFor($listing->organization_id, '/brand/', $oldSlug, $listing->slug);
 
             [$old, $new] = Changes::between($before, $listing->only(ListingMedia::AUDITED_BRAND));
             if ($creating || $new !== []) {

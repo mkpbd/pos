@@ -9,6 +9,7 @@ use App\Modules\Storefront\Application\Builder\BuilderPageCheck;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\BuilderPreviewLocale;
 use App\Modules\Storefront\Application\Builder\BuilderSampleContext;
+use App\Modules\Storefront\Application\Builder\Collaboration\BuilderEditSessions;
 use App\Modules\Storefront\Application\Builder\CopyBuilderSection;
 use App\Modules\Storefront\Application\Builder\EditBuilderBanner;
 use App\Modules\Storefront\Application\Builder\ManageBuilderDocuments;
@@ -143,7 +144,7 @@ class BuilderDocumentController
      * Adding a custom HTML element or changing its HTML needs storefront.custom_html: 403
      * CUSTOM_HTML_FORBIDDEN with `details.errors[]` {path, node_id, message, code}.
      */
-    public function saveDraft(SaveBuilderDraftRequest $request, BuilderDocument $document, ManageBuilderDocuments $documents): JsonResponse
+    public function saveDraft(SaveBuilderDraftRequest $request, BuilderDocument $document, ManageBuilderDocuments $documents, BuilderEditSessions $sessions): JsonResponse
     {
         $saved = $documents->saveDraft(
             $document,
@@ -151,6 +152,8 @@ class BuilderDocumentController
             (array) $request->validated('content'),
             (bool) $request->user()?->can('storefront.custom_html'),
         );
+        // B16: counted in the editor's edit session for the activity log (saves are not audited).
+        $sessions->recordSave($saved);
 
         return ApiResponse::success(BuilderPresenter::document($saved->load('publishedVersion')));
     }

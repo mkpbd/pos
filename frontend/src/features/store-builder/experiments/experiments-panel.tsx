@@ -90,6 +90,8 @@ export function ExperimentsPanel({ canPublish, canView, timeZone, onClose }: Pro
   const content = useEditor((s) => s.content)
   const selection = useEditor((s) => s.selection)
   const documentKind = useEditor((s) => s.document.kind)
+  // B16: while someone else edits, the tests can be read, not started, stopped or kept.
+  const readOnly = useEditor((s) => s.readOnly)
   const { single = false } = useEditorUi()
   const commands = useCommands()
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -123,6 +125,7 @@ export function ExperimentsPanel({ canPublish, canView, timeZone, onClose }: Pro
         </Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-3">
+        <fieldset disabled={readOnly} className="m-0 flex min-w-0 flex-1 flex-col gap-4 border-0 p-0">
         <p className="text-sm text-muted-foreground">Show some shoppers a different version of a section and see which one gets more orders. Each shopper always sees the same version.</p>
         {!canHaveExperiments(documentKind) || single ? (
           <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">A/B tests are for pages and shop areas.</p>
@@ -144,6 +147,7 @@ export function ExperimentsPanel({ canPublish, canView, timeZone, onClose }: Pro
           <ShieldCheckIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           Shoppers are split in their own browser, without cookies or personal details. People who ask not to be tracked always see version A and aren’t counted.
         </p>
+        </fieldset>
       </div>
     </section>
   )

@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B16 — Store builder: teamwork & safety
+
+#### Added
+- **One editor at a time:** the editor shows who else is on the page (initials; editing / viewing) and holds an edit lease while someone edits (heartbeat every 20 s; viewers expire after 60 s, the lease after 90 s; released on leave). Everyone else gets a view-only page with "*Rima is editing this page*" — **Ask to edit** (bell to the editor) or **Take over** (publishers, or anyone once the lease has lapsed; the previous editor is told and their unsaved changes stay copyable). Draft-writing calls by anyone else are refused with 423 `DOCUMENT_LOCKED` — draft saves, publish, discard, restore, delete, checkpoints, approval requests, publish later, A/B test actions, banner edits, B12 copy-to-pages, B17 festival setup, imports and address changes.
+- **Comments pinned on the page:** a Comments mode (toolbar, or **C** on the selection) drops numbered pins on sections / elements or comments on the whole page; threads with one level of replies, edit (author, 15 min), resolve / reopen, delete (author or publisher); `@name` mentions with autocomplete. Mentions and replies ring the bell with a link that opens the editor at the comment. Comments on removed parts stay listed. Shoppers never see comments.
+- **Activity:** an Activity tab in Version history — created, renamed, published (with version links), publish later, approvals, checkpoints, restores, A/B tests, take-overs, comments resolved — plus edit sessions ("*Edited the draft (12 saves)*": saves are grouped per person with a 15-minute gap, not audited one by one).
+- **Export / import:** ⋯ → **Download a copy (.json)** (pictures embedded, ≤ 25 MB; products, categories, brands, banners, menus referenced by SKU / slug; campaign audience rules dropped; no customer data). Pages → **Import a page…** brings a copy in as a new campaign page or over the draft of a page of the same kind, with a plain report of what was brought over, what isn't in this shop and what was left out. Pictures are re-used by checksum; imports never publish.
+- **Redirects:** when the address of a campaign page, content page, blog post, product, category or brand changes, the old address forwards to the new one (301; chains collapse, loops are dropped, an address that becomes live again stops forwarding). Campaign pages get **Change address…** in the editor. New *Online store → Redirects* page: list with search and source (automatic / added by you), hits and last used, add / edit / delete (301 or 302, a site path or an outside link), test a path, CSV. The server answers old addresses with a real 301/302 (query kept) — only when nothing live sits at that address — and the storefront's not-found page asks `GET /store/redirects/resolve` for client-side navigations.
+
+#### Changed
+- Shared: `AuditHistory` contract (a subject's audit entries), `PublicAddressChanged` event dispatched by the Cms and OnlineCatalog save actions when a public slug changes. `MediaLibrary::originalFile`, `StorefrontCatalog::portableReferences` / `findPortable`.
+
+#### Tests
+- Backend 1444 (PostgreSQL: 1443 pass, 1 opt-in skip; new `StoreBuilderB16CollaborationTest`, `BuilderPortabilityB16Test`, `StorefrontRedirectsB16Test`; `ExportableListsTest` covers the redirects list); Pint clean. vitest 2377; mocked Playwright 412 (new `store-builder-b16`, `storefront-redirects-b16`).
+- Full-stack (PostgreSQL, desktop) 50 — new **B16**: while the owner edits, a staff editor sees the lock and is refused (423), can't take over without publishing rights but can ask; her comment mentioning the owner rings the owner's bell; the owner leaves and she can edit; the page's activity lists published / edited / comment resolved; an exported copy imports as a new unpublished page with the same text; after *Change address* the old address lands on the new one, and a hand-made redirect does too. Builder acceptance 5.
+
+#### Upgrade
+- `php artisan migrate` (`builder_comments`, `builder_edit_sessions`, `storefront_redirects`). Presence and edit leases live in the cache: production needs a shared cache store that supports atomic locks (Redis or database — not `file` across several app servers, not `array`).
+
 ### B14 — Store builder: design the whole store
 
 #### Added

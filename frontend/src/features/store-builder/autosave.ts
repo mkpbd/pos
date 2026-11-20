@@ -12,6 +12,8 @@ import { isDirty, type EditorStore } from './store'
  *    the same content is not sent again — the next change retries. B4: a 403
  *    CUSTOM_HTML_FORBIDDEN (adding or changing custom HTML without the permission) is the same.
  *  - Network errors and 5xx → status `offline`, retried with exponential back-off (2 s … 30 s).
+ *  - B16: 423 DOCUMENT_LOCKED (someone else took over editing) → status `locked`; nothing is
+ *    saved until `reset()` (the editor turns read-only and keeps the unsaved changes aside).
  *  - Any other error → status `error` with its message, retried on the next change.
  */
 
@@ -19,6 +21,8 @@ export type AutosaveOptions = {
   save: (id: string, revision: number, content: BuilderContent) => Promise<DocumentDetail>
   fetchDocument: (id: string) => Promise<DocumentDetail>
   delay?: number
+  /** B16: a save was refused with 423 DOCUMENT_LOCKED. */
+  onLocked?: (error: ApiError) => void
 }
 
 export const AUTOSAVE_DELAY = 1500
@@ -61,6 +65,9 @@ export class Autosave {
   /** Content the server refused (422) or another error stopped: not re-sent until it changes. */
   private stuck: BuilderContent | null = null
   private conflict = false
+  /** B16: someone else holds the edit lock (423). */
+  private locked = false
+  private lockedListener: ((error: ApiError) => void) | null = null
   private unsubscribe: (() => void) | null = null
   private readonly delay: number
   private readonly store: EditorStore
@@ -75,6 +82,7 @@ export class Autosave {
   start(): void {
     this.unsubscribe = this.store.subscribe((state, previous) => {
       if (state.content === previous.content) return
+      if (state.readOnly) return
       if (!isDirty(state)) {
         // Undone back to what the server has.
         this.clearTimer()
@@ -109,8 +117,21 @@ export class Autosave {
     if (this.inFlight) await this.inFlight
     const state = this.store.getState()
     if (!isDirty(state)) return true
-    if (this.conflict || state.content === this.stuck) return false
+    if (this.conflict || this.locked || state.readOnly || state.content === this.stuck) return false
     return this.run()
+  }
+
+  /** B16: who hears about a 423 (the presence hook); null = the option's. Returns the cleanup. */
+  listenLocked(listener: (error: ApiError) => void): () => void {
+    this.lockedListener = listener
+    return () => {
+      if (this.lockedListener === listener) this.lockedListener = null
+    }
+  }
+
+  /** B16: whether a save was refused because someone else is editing. */
+  get isLocked(): boolean {
+    return this.locked
   }
 
   /** After a 409: take the server's draft (mine is lost) or keep mine (save it over theirs). */
@@ -131,12 +152,13 @@ export class Autosave {
   reset(): void {
     this.clearTimer()
     this.conflict = false
+    this.locked = false
     this.stuck = null
     this.failures = 0
   }
 
   private schedule(delay = this.delay): void {
-    if (this.conflict) return
+    if (this.conflict || this.locked) return
     this.clearTimer()
     this.timer = setTimeout(() => {
       this.timer = null
@@ -174,6 +196,12 @@ export class Autosave {
       if (error instanceof ApiError && error.status === 409) {
         this.conflict = true
         current.setSaveState({ status: 'conflict', savedAt })
+        return false
+      }
+      if (error instanceof ApiError && error.status === 423) {
+        this.locked = true
+        current.setSaveState({ status: 'locked', savedAt })
+        ;(this.lockedListener ?? this.options.onLocked)?.(error)
         return false
       }
       if (error instanceof ApiError && (error.status === 422 || isCustomHtmlForbidden(error))) {

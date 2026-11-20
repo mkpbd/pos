@@ -535,6 +535,27 @@ Original questions:
   *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
   the editor sends the canvas only the shown arm (the canvas never filters).
 
+### As built — B16 teamwork & safety (2026-11-20)
+
+- **Presence & lock:** `Collaboration\BuilderPresence` (cache; viewers 60 s, lease 90 s) and `BuilderEditLock::assertCanWrite`
+  (423 `DOCUMENT_LOCKED`) on every draft-writing action, plus the `EnsureBuilderEditLock` middleware on the routes; take-over needs
+  storefront.publish while the lease is live. Polling only (no websockets): the editor heartbeats every 20 s and on focus
+  (`collab/use-presence.ts`), turns view-only (canvas, inspector, layers, keyboard) when another person holds the lock, refreshes the
+  draft when its revision moves, and keeps the person's unsaved changes copyable after a take-over.
+- **Comments:** `builder_comments` (node + anchor 0–1, one reply level, mentions, soft delete), `BuilderComments` +
+  `BuilderCollaborationNotifier` (bell notifications with an editor deep link `?comment=`). Editor: comment mode and numbered pins
+  over the canvas (`collab/comment-pins.tsx`), threads panel, `@` autocomplete (`mention-textarea.tsx`), canvas key `c` forwarded.
+- **Activity:** the Shared `AuditHistory` contract reads a subject's audit entries; `BuilderActivity` merges them with
+  `builder_edit_sessions` (per-person rolling save sessions, 15-minute gap) — Activity tab in Version history.
+- **Export / import:** `Portability\ExportBuilderDocument` / `ImportBuilderDocument` with `Domain\Builder\Portable\PortableRefs`
+  (`@ref:<type>:<n>`); media through `MediaLibrary::originalFile` and checksum de-duplication; catalog mapping through
+  `StorefrontCatalog::portableReferences` / `findPortable`; missing references drop the element, then `PrepareBuilderContent` is
+  re-run until the content validates. Never publishes.
+- **Redirects:** `storefront_redirects` + `Redirects\StorefrontRedirects` (normalize, collapse chains, drop loops, hits batched per
+  minute) fed by the Shared `PublicAddressChanged` event from Cms / OnlineCatalog saves and `ChangeLandingAddress`; the shell
+  controller answers would-be 404s with 301 / 302, and the storefront not-found page calls `/store/redirects/resolve`. Admin page
+  *Online store → Redirects*.
+
 ### As built — B14 design the whole store (2026-11-19)
 
 - **Store page templates:** seven `template:*` page keys validated in `template:<key>` (main part rules; `seo` not allowed), starters

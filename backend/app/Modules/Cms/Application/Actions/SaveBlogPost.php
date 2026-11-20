@@ -10,6 +10,7 @@ use App\Modules\Cms\Infrastructure\Models\BlogPost;
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
+use App\Modules\Shared\Application\Events\PublicAddressChanged;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
 use App\Modules\Shared\Application\Support\StaffActor;
@@ -87,6 +88,8 @@ class SaveBlogPost
             }
             $post->reading_minutes = ReadingTime::minutes($post->body_html);
             $post->save();
+            // B16: an automatic redirect from the old address (Storefront).
+            PublicAddressChanged::dispatchFor($post->organization_id, '/blog/', $before['slug'] ?? null, $post->slug);
 
             [$old, $new] = Changes::between($before, $this->snapshot($post));
             if ($creating || $new !== []) {

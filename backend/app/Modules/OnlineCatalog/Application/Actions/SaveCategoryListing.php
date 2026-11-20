@@ -8,6 +8,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\CategoryListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
+use App\Modules\Shared\Application\Events\PublicAddressChanged;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -59,8 +60,11 @@ class SaveCategoryListing
                 $data['translations'] = TranslationInput::apply($listing->translations, $data['translations'], array_keys(self::TRANSLATABLE), ['description_html'], $this->sanitizer);
             }
             $listing->fill(ListingMedia::blankToNull($data));
+            $oldSlug = $listing->slug;
             $listing->slug = $slug ?? $listing->slug ?? ListingEditor::suggestSlug($node['name'], CategoryListing::class, $listing->id);
             $listing->save();
+            // B16: an automatic redirect from the old address (Storefront).
+            PublicAddressChanged::dispatchFor($listing->organization_id, '/category/', $oldSlug, $listing->slug);
 
             [$old, $new] = Changes::between($before, $listing->only(ListingMedia::AUDITED_CATEGORY));
             if ($creating || $new !== []) {

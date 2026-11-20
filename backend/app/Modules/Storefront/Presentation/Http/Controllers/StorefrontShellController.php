@@ -11,12 +11,13 @@ use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
+use App\Modules\Storefront\Application\Redirects\StorefrontRedirects;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use App\Modules\Storefront\Presentation\Http\Support\StaffPreview;
 use App\Modules\Storefront\Presentation\Http\Support\StructuredData;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Serves the built storefront page (frontend/dist/storefront.html) for every storefront
@@ -52,6 +53,9 @@ use Illuminate\Http\Response;
  * page or content page design; the draft in a staff preview): the title as written (no store
  * suffix), the description and the share image replace the fallbacks; `noindex` makes the page
  * noindex. Products and the blog are unchanged.
+ *
+ * B16: a path that would be a 404 and has a storefront redirect answers with that 301 / 302
+ * (the request's query string kept), counted at most once a minute; live pages always win.
  */
 class StorefrontShellController
 {
@@ -73,7 +77,7 @@ class StorefrontShellController
 
     public const ROBOTS_NOINDEX = 'noindex, follow';
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder, ManageThemeDraft $themeDraft): Response
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder, ManageThemeDraft $themeDraft, StorefrontRedirects $redirects): SymfonyResponse
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
@@ -222,6 +226,13 @@ class StorefrontShellController
             if ($found['breadcrumbs'] !== []) {
                 $documents[] = $ld->breadcrumbs($found['breadcrumbs']);
             }
+        }
+
+        // B16: an old address that is no live page answers with its redirect (before the SPA renders).
+        if ($status === 404 && ($redirect = $redirects->find($path)) !== null) {
+            $redirects->hit($redirect);
+
+            return redirect(StorefrontRedirects::location($redirect, $request->getQueryString()), $redirect->type);
         }
 
         // Listings: the canonical URL drops filters, sort and tracking but keeps ?page=N (N > 1);

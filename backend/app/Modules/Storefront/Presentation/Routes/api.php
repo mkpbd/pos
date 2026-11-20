@@ -4,8 +4,10 @@ use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Presentation\Http\Controllers\BannerController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderAiController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderCollaborationController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderDocumentController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderExperimentController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderPortabilityController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderPublishingController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderReviewController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
@@ -16,13 +18,16 @@ use App\Modules\Storefront\Presentation\Http\Controllers\FormSubmissionControlle
 use App\Modules\Storefront\Presentation\Http\Controllers\HomepageSectionController;
 use App\Modules\Storefront\Presentation\Http\Controllers\LinkTargetController;
 use App\Modules\Storefront\Presentation\Http\Controllers\MenuController;
+use App\Modules\Storefront\Presentation\Http\Controllers\RedirectController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBootstrapController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBuilderPageController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreBuilderPopupsController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreFormController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StorefrontAdminController;
 use App\Modules\Storefront\Presentation\Http\Controllers\StoreHomepageController;
+use App\Modules\Storefront\Presentation\Http\Controllers\StoreRedirectController;
 use App\Modules\Storefront\Presentation\Http\Controllers\ThemeDraftController;
+use App\Modules\Storefront\Presentation\Http\Middleware\EnsureBuilderEditLock;
 use Illuminate\Support\Facades\Route;
 
 // Public storefront API: organization from the host name, no authentication.
@@ -141,6 +146,17 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::get('sample-context', [BuilderDocumentController::class, 'sampleContext']);
         // B5: built-in and own templates (no content).
         Route::get('templates', [BuilderTemplateController::class, 'index']);
+        // B16: presence (heartbeats; the edit lock), comments pinned on the page, the activity log.
+        Route::post('documents/{document}/presence', [BuilderCollaborationController::class, 'heartbeat'])->whereUuid('document');
+        Route::delete('documents/{document}/presence', [BuilderCollaborationController::class, 'leave'])->whereUuid('document');
+        Route::get('documents/{document}/comments', [BuilderCollaborationController::class, 'comments'])->whereUuid('document');
+        Route::post('documents/{document}/comments', [BuilderCollaborationController::class, 'storeComment'])->whereUuid('document');
+        Route::patch('documents/{document}/comments/{comment}', [BuilderCollaborationController::class, 'updateComment'])->whereUuid(['document', 'comment']);
+        Route::post('documents/{document}/comments/{comment}/resolve', [BuilderCollaborationController::class, 'resolveComment'])->whereUuid(['document', 'comment']);
+        Route::post('documents/{document}/comments/{comment}/reopen', [BuilderCollaborationController::class, 'reopenComment'])->whereUuid(['document', 'comment']);
+        Route::delete('documents/{document}/comments/{comment}', [BuilderCollaborationController::class, 'destroyComment'])->whereUuid(['document', 'comment']);
+        Route::get('mentionable', [BuilderCollaborationController::class, 'mentionable']);
+        Route::get('documents/{document}/activity', [BuilderCollaborationController::class, 'activity'])->whereUuid('document');
     });
 
     Route::middleware('can:storefront.manage')->group(function () {
@@ -158,31 +174,34 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         // B14: "Use the standard page" — a store page design off the store (draft kept).
         Route::post('documents/{document}/unpublish', [BuilderDocumentController::class, 'unpublish'])->whereUuid('document')->middleware('can:storefront.publish');
         // B13: A/B tests — start, stop, keep a version (the draft; storefront.publish).
-        Route::middleware('can:storefront.publish')->group(function () {
+        Route::middleware(['can:storefront.publish', EnsureBuilderEditLock::class])->group(function () {
             foreach (['start', 'stop', 'keep'] as $action) {
                 Route::post("documents/{document}/experiments/{experiment}/{$action}", [BuilderExperimentController::class, $action])
                     ->whereUuid('document')->where('experiment', '[a-z][a-z0-9_-]{1,31}');
             }
         });
+        // B16: the edit lock — take over (storefront.publish while the lease is live), ask to edit.
+        Route::post('documents/{document}/lock/take-over', [BuilderCollaborationController::class, 'takeOver'])->whereUuid('document');
+        Route::post('documents/{document}/lock/request', [BuilderCollaborationController::class, 'requestEdit'])->whereUuid('document');
         Route::post('documents/{document}/versions/{version}/restore', [BuilderDocumentController::class, 'restore'])
             ->whereUuid(['document', 'version'])->scopeBindings();
         Route::delete('documents/{document}', [BuilderDocumentController::class, 'destroy'])->whereUuid('document');
         // B11: publish later (storefront.publish), draft checkpoints and version names, reviews.
-        Route::post('documents/{document}/schedule', [BuilderPublishingController::class, 'schedule'])->whereUuid('document')->middleware('can:storefront.publish');
-        Route::delete('documents/{document}/schedule', [BuilderPublishingController::class, 'cancelSchedule'])->whereUuid('document')->middleware('can:storefront.publish');
-        Route::post('documents/{document}/checkpoints', [BuilderPublishingController::class, 'checkpoint'])->whereUuid('document');
+        Route::post('documents/{document}/schedule', [BuilderPublishingController::class, 'schedule'])->whereUuid('document')->middleware(['can:storefront.publish', EnsureBuilderEditLock::class]);
+        Route::delete('documents/{document}/schedule', [BuilderPublishingController::class, 'cancelSchedule'])->whereUuid('document')->middleware(['can:storefront.publish', EnsureBuilderEditLock::class]);
+        Route::post('documents/{document}/checkpoints', [BuilderPublishingController::class, 'checkpoint'])->whereUuid('document')->middleware(EnsureBuilderEditLock::class);
         Route::patch('documents/{document}/versions/{version}', [BuilderPublishingController::class, 'renameVersion'])
             ->whereUuid(['document', 'version'])->scopeBindings();
         Route::delete('documents/{document}/versions/{version}', [BuilderPublishingController::class, 'deleteVersion'])
             ->whereUuid(['document', 'version'])->scopeBindings();
-        Route::post('documents/{document}/reviews', [BuilderPublishingController::class, 'submitReview'])->whereUuid('document');
+        Route::post('documents/{document}/reviews', [BuilderPublishingController::class, 'submitReview'])->whereUuid('document')->middleware(EnsureBuilderEditLock::class);
         Route::get('reviews', [BuilderReviewController::class, 'index']);
         Route::get('reviews/{review}', [BuilderReviewController::class, 'show'])->whereUuid('review');
         Route::post('reviews/{review}/approve', [BuilderReviewController::class, 'approve'])->whereUuid('review')->middleware('can:storefront.publish');
         Route::post('reviews/{review}/send-back', [BuilderReviewController::class, 'sendBack'])->whereUuid('review')->middleware('can:storefront.publish');
         Route::post('reviews/{review}/withdraw', [BuilderReviewController::class, 'withdraw'])->whereUuid('review');
         // A banner of the page, edited in place or copied when anything else shows it (copy-on-write).
-        Route::post('documents/{document}/banners/{banner}', [BuilderDocumentController::class, 'editBanner'])->whereUuid(['document', 'banner']);
+        Route::post('documents/{document}/banners/{banner}', [BuilderDocumentController::class, 'editBanner'])->whereUuid(['document', 'banner'])->middleware(EnsureBuilderEditLock::class);
         // B5: templates — apply (built-in id or own uuid), save a section, delete an own one.
         Route::post('templates/{template}/instantiate', [BuilderTemplateController::class, 'instantiate'])
             ->where('template', '[A-Za-z0-9-]{2,80}')->middleware('throttle:builder-templates');
@@ -195,4 +214,21 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         // B9: the AI writer (through the AI module's gate and budget; nothing is saved).
         Route::post('ai/write', BuilderAiController::class)->middleware('throttle:builder-ai');
     });
+});
+
+// B16: where an old address went (the storefront's 404 page asks; public, HTTP-cached).
+Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group(function () {
+    Route::get('redirects/resolve', StoreRedirectController::class)->middleware('storefront.cache')->name('store.redirect-resolve');
+});
+
+// B16: export / import of builder pages, a landing page's new address, and the store's redirects.
+Route::middleware(['auth:sanctum', 'tenant', 'can:storefront.manage'])->prefix('storefront')->group(function () {
+    Route::get('builder/documents/{document}/export', [BuilderPortabilityController::class, 'export'])->whereUuid('document');
+    Route::post('builder/import', [BuilderPortabilityController::class, 'import'])->middleware('throttle:builder-templates');
+    Route::post('builder/documents/{document}/address', [BuilderPortabilityController::class, 'changeAddress'])->whereUuid('document');
+    Route::get('redirects', [RedirectController::class, 'index']);
+    Route::get('redirects/test', [RedirectController::class, 'test']);
+    Route::post('redirects', [RedirectController::class, 'store']);
+    Route::patch('redirects/{redirect}', [RedirectController::class, 'update'])->whereUuid('redirect');
+    Route::delete('redirects/{redirect}', [RedirectController::class, 'destroy'])->whereUuid('redirect');
 });

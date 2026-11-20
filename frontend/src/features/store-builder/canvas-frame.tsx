@@ -18,6 +18,7 @@ import type { PreviewContext } from '@/storefront/builder/audience/types'
 import { AudienceCanvasBadges } from './audience/audience-badge'
 import type { CanvasAudienceBadge } from './audience/badges'
 import type { StorePageContext, StorePageSample } from '@/storefront/builder/templates/types'
+import { CommentPins, type CommentPinLayer } from './collab/comment-pins'
 
 /*
  * The canvas iframe (/admin/builder-canvas) at the device width, scaled to fit, with the editor's
@@ -129,10 +130,17 @@ export type CanvasFrameProps = {
    */
   pageContext?: StorePageContext | null
   pageSample?: StorePageSample | null
+  /** B16: numbered comment pins over the page (null: none). */
+  pins?: CommentPinLayer | null
+  /**
+   * B16 comment mode: a click on the page drops a comment there (the point in canvas pixels) instead
+   * of selecting; the wheel still scrolls the page. Null: off.
+   */
+  onCommentAt?: ((point: { x: number; y: number }) => void) | null
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -405,6 +413,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
               </div>
             )
           })}
+          {!dragging && pins && pins.pins.length > 0 && <CommentPins layer={pins} rects={rects} scale={scale} />}
           {dragging && indicator && (
             <div
               data-testid="drop-indicator"
@@ -413,6 +422,18 @@ export function CanvasFrame(props: CanvasFrameProps) {
             />
           )}
         </div>
+        {onCommentAt && !dragging && (
+          <div
+            aria-hidden
+            data-testid="comment-catcher"
+            className="absolute inset-0 z-[5] cursor-crosshair"
+            onClick={(event) => {
+              const box = event.currentTarget.getBoundingClientRect()
+              onCommentAt({ x: (event.clientX - box.left) / scale, y: (event.clientY - box.top) / scale })
+            }}
+            onWheel={(event) => send({ type: 'scroll-by', dy: event.deltaY / scale })}
+          />
+        )}
       </div>
     </div>
   )

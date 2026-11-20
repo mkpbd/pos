@@ -1457,6 +1457,142 @@ test('B14: Kath & Home designs its category and not-found pages from the starter
   await adminContext.close()
 })
 
+test('B16: Green Basket — one editor at a time, a comment with a mention, the activity log, a page copied by export / import, and old addresses that forward', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('vegan.shop.localhost')
+  const caller = (context: import('@playwright/test').BrowserContext, tab: Page) => async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return tab.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        const text = await res.text()
+        let json: unknown = null
+        try { json = JSON.parse(text) } catch { json = text }
+        return { status: res.status, body: json as { data: any; error?: any; meta?: any }, raw: text }
+      },
+      { method, url, body, token },
+    )
+  }
+  const ownerContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const owner = await ownerContext.newPage()
+  await signIn(owner, base, 'owner@greenbasket.test')
+  const call = caller(ownerContext, owner)
+  type Node = { id: string; type?: string; props?: Record<string, unknown>; translations?: Record<string, unknown>; columns?: { elements: Node[] }[] }
+  const firstHeading = (node: Node): Node | null => {
+    for (const column of node.columns ?? []) for (const element of column.elements) {
+      if (element.type === 'heading') return element
+      const inner = firstHeading(element)
+      if (inner) return inner
+    }
+    return null
+  }
+
+  // A campaign page at /p/b16-sale, published.
+  const section = (await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })).body.data.nodes[0] as Node
+  const heading = firstHeading(section)!
+  heading.props = { ...heading.props, text: 'Fresh boxes every Friday' }
+  heading.translations = {}
+  // A rerun on the same database reuses the page, moving it back from /p/b16-fresh-boxes first.
+  const all = (await call('GET', '/api/v1/storefront/builder/documents')).body.data as { id: string; key: string }[]
+  const existing = all.find((d) => d.key === 'landing:b16-sale' || d.key === 'landing:b16-fresh-boxes')
+  if (existing?.key === 'landing:b16-fresh-boxes') expect((await call('POST', `/api/v1/storefront/builder/documents/${existing.id}/address`, { slug: 'b16-sale' })).status).toBe(200)
+  const doc = existing
+    ? await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+    : await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b16-sale', title: 'B16 sale', from: 'blank' })
+  const docId = doc.body.data.id as string
+  const content = { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections: [section] }
+  expect((await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content })).status).toBe(200)
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B16' })).status).toBe(200)
+
+  // A staff editor who may change pages (no publishing).
+  const roles = (await call('GET', '/api/v1/roles')).body.data as { id: string; name: string }[]
+  const role = roles.find((r) => r.name === 'B16 Page editor') ?? (await call('POST', '/api/v1/roles', { name: 'B16 Page editor', description: null, permissions: ['storefront.view', 'storefront.manage', 'media.manage'] })).body.data
+  const branches = (await call('GET', '/api/v1/branches')).body.data as { id: string }[]
+  const editorEmail = 'pages@greenbasket.test'
+  await call('POST', '/api/v1/users', { name: 'Rima Akter', email: editorEmail, phone: null, password: 'Pages-Edit-2026!', role_ids: [role.id], branch_ids: [branches[0]!.id] })
+  const editorContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const editor = await editorContext.newPage()
+  await editor.goto(`${base}/admin/login`)
+  await editor.getByLabel('E-mail').fill(editorEmail)
+  await editor.getByLabel('Password').fill('Pages-Edit-2026!')
+  await editor.getByRole('button', { name: 'Sign in' }).click()
+  await expect(editor).not.toHaveURL(/\/admin\/login/, { timeout: 30_000 })
+  const editorCall = caller(editorContext, editor)
+
+  // One editor at a time: the owner holds the page; Rima sees it and is refused when saving.
+  const mine = await call('POST', `/api/v1/storefront/builder/documents/${docId}/presence`, { editing: true })
+  expect(mine.body.data.mine).toBe(true)
+  const hers = await editorCall('POST', `/api/v1/storefront/builder/documents/${docId}/presence`, { editing: true })
+  expect(hers.body.data.mine).toBe(false)
+  expect(hers.body.data.lock.user.name).toBeTruthy()
+  const current = await editorCall('GET', `/api/v1/storefront/builder/documents/${docId}`)
+  const refused = await editorCall('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: current.body.data.draft_revision, content })
+  expect(refused.status).toBe(423)
+  expect(refused.body.error.code).toBe('DOCUMENT_LOCKED')
+  // Without publishing rights she can't take over a live lease, but she can ask.
+  expect((await editorCall('POST', `/api/v1/storefront/builder/documents/${docId}/lock/take-over`, {})).status).toBe(403)
+  expect((await editorCall('POST', `/api/v1/storefront/builder/documents/${docId}/lock/request`, {})).status).toBe(200)
+
+  // She comments on the heading and mentions the owner, who gets a bell notification.
+  const me = (await call('GET', '/api/v1/auth/me')).body.data.user as { id: string; name: string }
+  const ownerName = me.name
+  const mentionable = (await editorCall('GET', `/api/v1/storefront/builder/mentionable?q=${encodeURIComponent(ownerName.split(' ')[0]!)}`)).body.data as { id: string; name: string }[]
+  expect(mentionable.map((u) => u.id)).toContain(me.id)
+  const comment = await editorCall('POST', `/api/v1/storefront/builder/documents/${docId}/comments`, { node_id: heading.id, anchor: { x: 0.5, y: 0.5 }, body: `@${ownerName} can we say "every Friday morning"?`, mentions: [me.id] })
+  expect(comment.status).toBe(201)
+  expect((comment.body.data.mentions as { name: string }[]).map((m) => m.name)).toContain(ownerName)
+  await expect.poll(async () => JSON.stringify((await call('GET', '/api/v1/notifications')).body.data ?? []), { timeout: 15_000 }).toContain('builder_comment_mention')
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/comments/${comment.body.data.id}/resolve`, {})).status).toBe(200)
+  // The owner leaves; Rima can edit now.
+  expect((await call('DELETE', `/api/v1/storefront/builder/documents/${docId}/presence`)).status).toBe(204)
+  expect((await editorCall('POST', `/api/v1/storefront/builder/documents/${docId}/presence`, { editing: true })).body.data.mine).toBe(true)
+  await editorCall('DELETE', `/api/v1/storefront/builder/documents/${docId}/presence`)
+
+  // The page's activity tells the story.
+  const activity = await call('GET', `/api/v1/storefront/builder/documents/${docId}/activity`)
+  const actions = (activity.body.data as { action: string }[]).map((a) => a.action)
+  expect(actions).toEqual(expect.arrayContaining(['published', 'edited', 'comment_resolved']))
+
+  // Export a copy and import it as a new page.
+  const exported = await call('GET', `/api/v1/storefront/builder/documents/${docId}/export`)
+  expect(exported.status).toBe(200)
+  const file = JSON.parse(exported.raw) as { format: string; version: number }
+  expect(file).toMatchObject({ format: 'pos-builder-page', version: 1 })
+  const imported = await owner.evaluate(
+    async ({ raw, token }) => {
+      const form = new FormData()
+      form.append('file', new Blob([raw], { type: 'application/json' }), 'b16-sale.json')
+      form.append('target', 'new')
+      form.append('title', 'B16 copy')
+      form.append('key', `landing:b16-copy-${Date.now()}`)
+      const res = await fetch('/api/v1/storefront/builder/import', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-XSRF-TOKEN': token }, body: form })
+      return { status: res.status, body: (await res.json()) as { data: { created_document: { id: string }; missing: unknown[] } } }
+    },
+    { raw: exported.raw, token: decodeURIComponent((await ownerContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '') },
+  )
+  expect(imported.status).toBe(201)
+  const copy = await call('GET', `/api/v1/storefront/builder/documents/${imported.body.data.created_document.id}`)
+  expect(firstHeading((copy.body.data.content.sections as Node[])[0]!)?.props?.text).toBe('Fresh boxes every Friday')
+  expect(imported.body.data.created_document).toMatchObject({ published: null })
+
+  // The page moves to a new address: the old one forwards; a hand-made redirect does too.
+  const moved = await call('POST', `/api/v1/storefront/builder/documents/${docId}/address`, { slug: 'b16-fresh-boxes' })
+  expect(moved.status).toBe(200)
+  await page.goto(`${base}/p/b16-sale`)
+  await expect(page).toHaveURL(/\/p\/b16-fresh-boxes/, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'Fresh boxes every Friday' })).toBeVisible({ timeout: 30_000 })
+  const manual = await call('POST', '/api/v1/storefront/redirects', { from_path: '/friday-boxes', to_path: '/p/b16-fresh-boxes', type: 301 })
+  expect([201, 422]).toContain(manual.status) // 422 = a rerun: the redirect exists already
+  await page.goto(`${base}/friday-boxes`)
+  await expect(page).toHaveURL(/\/p\/b16-fresh-boxes/, { timeout: 30_000 })
+  const list = await call('GET', '/api/v1/storefront/redirects?search=b16')
+  expect((list.body.data as { from_path: string; source: string }[]).some((r) => r.from_path === '/p/b16-sale' && r.source === 'auto')).toBe(true)
+
+  await editorContext.close()
+  await ownerContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

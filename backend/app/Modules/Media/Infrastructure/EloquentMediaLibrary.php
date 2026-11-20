@@ -99,6 +99,34 @@ class EloquentMediaLibrary implements MediaLibrary
         return 'data:'.$mime.';base64,'.base64_encode($contents);
     }
 
+    public function originalFile(string $id): ?array
+    {
+        $media = preg_match('/^[0-9a-f-]{36}$/i', $id) === 1 ? Media::query()->find(strtolower($id)) : null;
+        if ($media === null) {
+            return null;
+        }
+        try {
+            $contents = Storage::disk($media->disk)->get($media->path);
+        } catch (Throwable) {
+            return null;
+        }
+        if (! is_string($contents)) {
+            return null;
+        }
+
+        return [
+            'id' => $media->id,
+            'name' => $media->original_name,
+            'mime_type' => $media->mime_type,
+            'width' => $media->width,
+            'height' => $media->height,
+            'alt' => $media->alt,
+            'size' => strlen($contents),
+            'sha256' => hash('sha256', $contents),
+            'contents' => $contents,
+        ];
+    }
+
     public function import(string $path, string $name, ?string $alt): array
     {
         $size = is_file($path) ? filesize($path) : false;

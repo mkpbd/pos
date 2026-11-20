@@ -302,4 +302,69 @@ class ReadModelStorefrontCatalog implements StorefrontCatalog
             'brand' => $this->navigation->sitemapBrands(),
         };
     }
+
+    public function portableReferences(string $type, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, 'is_string')));
+        if ($ids === []) {
+            return [];
+        }
+        $organizationId = $this->catalog->organizationId();
+        [$table, $listings, $key] = self::portableTables($type);
+        $rows = DB::table($table)->where("{$table}.organization_id", $organizationId)->whereIn("{$table}.id", $ids)
+            ->when($type === 'product', fn ($q) => $q->whereNull("{$table}.deleted_at"))
+            ->leftJoin($listings, "{$listings}.{$key}", '=', "{$table}.id")
+            ->get(["{$table}.id", "{$table}.name", "{$listings}.slug"]);
+        $skus = $type !== 'product' ? [] : DB::table('product_variants')->where('organization_id', $organizationId)
+            ->whereIn('product_id', $ids)->whereNull('deleted_at')->orderBy('sort_order')->orderBy('created_at')
+            ->get(['product_id', 'sku'])->groupBy('product_id')->map(fn ($v) => $v->first()->sku)->all();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row->id] = ['sku' => $skus[$row->id] ?? null, 'slug' => $row->slug, 'name' => (string) $row->name];
+        }
+
+        return $result;
+    }
+
+    public function findPortable(string $type, ?string $sku, ?string $slug, ?string $name): ?string
+    {
+        $organizationId = $this->catalog->organizationId();
+        [$table, $listings, $key] = self::portableTables($type);
+        if ($type === 'product' && is_string($sku) && $sku !== '') {
+            $id = DB::table('product_variants')->join('products', 'products.id', '=', 'product_variants.product_id')
+                ->where('product_variants.organization_id', $organizationId)->whereNull('product_variants.deleted_at')->whereNull('products.deleted_at')
+                ->whereRaw('lower(product_variants.sku) = ?', [mb_strtolower($sku)])->orderBy('product_variants.sort_order')->value('products.id');
+            if (is_string($id)) {
+                return $id;
+            }
+        }
+        if (is_string($slug) && $slug !== '') {
+            $id = DB::table($listings)->join($table, "{$table}.id", '=', "{$listings}.{$key}")
+                ->where("{$listings}.organization_id", $organizationId)->where("{$listings}.slug", mb_strtolower($slug))
+                ->when($type === 'product', fn ($q) => $q->whereNull("{$table}.deleted_at"))->value("{$table}.id");
+            if (is_string($id)) {
+                return $id;
+            }
+        }
+        if ($type !== 'product' && is_string($name) && trim($name) !== '') {
+            $id = DB::table($table)->where('organization_id', $organizationId)->whereRaw('lower(name) = ?', [mb_strtolower(trim($name))])->orderBy('id')->value('id');
+
+            return is_string($id) ? $id : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string} the record table, its listing table and the listing's key
+     */
+    private static function portableTables(string $type): array
+    {
+        return match ($type) {
+            'product' => ['products', 'product_listings', 'product_id'],
+            'category' => ['categories', 'category_listings', 'category_id'],
+            'brand' => ['brands', 'brand_listings', 'brand_id'],
+        };
+    }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowUpLeftIcon,
   CircleAlertIcon,
@@ -157,7 +157,15 @@ function PageSettings({ document, content, locales, onCommand, errors }: Pick<In
         {document.path ? (
           <>
             <dt className="text-muted-foreground">Address</dt>
-            <dd className="min-w-0 font-mono break-all">{document.path}</dd>
+            <dd className="flex min-w-0 flex-col items-start gap-1">
+              <span className="font-mono break-all">{document.path}</span>
+              {/* B16: a campaign page's address can change; old links forward to the new one. */}
+              {(document.key ?? '').startsWith('landing:') && (
+                <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => onCommand({ type: 'change-address' })}>
+                  Change address…
+                </Button>
+              )}
+            </dd>
           </>
         ) : (
           info.placement && (
@@ -236,6 +244,20 @@ export function Inspector(props: InspectorProps) {
   )
 }
 
+/**
+ * B16: while someone else edits, every field and button inside is disabled (a disabled fieldset)
+ * but still readable; the tabs above stay usable so everything can be looked at.
+ */
+function ReadOnlyFields({ readOnly, children }: { readOnly?: boolean; children: ReactNode }) {
+  if (!readOnly) return <>{children}</>
+  return (
+    <fieldset disabled className="m-0 min-w-0 border-0 p-0" data-testid="inspector-read-only">
+      <legend className="sr-only">Read only: someone else is editing this page</legend>
+      {children}
+    </fieldset>
+  )
+}
+
 /** The icon names the server accepts (GET /elements `enums.icons`), else the storefront's. */
 function registryIcons(registry: InspectorProps['registry']): readonly string[] | undefined {
   const icons = registry.enums?.icons
@@ -243,9 +265,10 @@ function registryIcons(registry: InspectorProps['registry']): readonly string[] 
 }
 
 function InspectorPanel(props: InspectorProps) {
-  const { nodes, onChangeMany, content, node, registry, device = 'desktop', theme, onCommand } = props
+  const { nodes, onChangeMany, content, node, registry, device = 'desktop', theme, onCommand, readOnly } = props
   if (nodes && nodes.length > 1 && onChangeMany) {
     return (
+      <ReadOnlyFields readOnly={readOnly}>
       <MultiInspector
         key={nodes.map((n) => n.id).join(',')}
         content={content}
@@ -257,12 +280,13 @@ function InspectorPanel(props: InspectorProps) {
         onChangeMany={onChangeMany}
         onCommand={onCommand}
       />
+      </ReadOnlyFields>
     )
   }
   return <SingleInspector {...props} />
 }
 
-function SingleInspector({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false, focus }: InspectorProps) {
+function SingleInspector({ content, node, document, registry, locales, errors: serverProblems, onChange, onCommand, device = 'desktop', theme, canCustomHtml = false, focus, readOnly }: InspectorProps) {
   const [tab, setTab] = useState<Tab>('content')
   const panel = useRef<HTMLElement | null>(null)
   const nodeId = node?.id ?? null
@@ -287,11 +311,13 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
   if (!node) {
     return (
       <aside ref={panel} aria-label="Inspector" className="flex min-h-0 flex-col overflow-y-auto">
-        {document.kind === 'popup' ? (
-          <PopupSettingsPanel settings={readPopupSettings(content.popup)} document={document} problems={serverProblems} bangla={locales.includes('bn')} onCommand={onCommand} />
-        ) : (
-          <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} errors={serverProblems} />
-        )}
+        <ReadOnlyFields readOnly={readOnly}>
+          {document.kind === 'popup' ? (
+            <PopupSettingsPanel settings={readPopupSettings(content.popup)} document={document} problems={serverProblems} bangla={locales.includes('bn')} onCommand={onCommand} />
+          ) : (
+            <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} errors={serverProblems} />
+          )}
+        </ReadOnlyFields>
       </aside>
     )
   }
@@ -360,6 +386,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
           )}
         </TabsList>
         <TabsContent value="content" className="pt-4">
+          <ReadOnlyFields readOnly={readOnly}>
           <AiWriterBar key={node.id} node={node} documentId={document.id} bangla={bangla} onChange={onChange} labelOf={(type) => nodeLabel({ type } as BuilderNode, registry)} />
           <ContentForm
             node={node}
@@ -371,12 +398,16 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
             documentId={document.id}
             b4={{ context, theme, icons, canCustomHtml, enums: registry.enums, template }}
           />
+          </ReadOnlyFields>
         </TabsContent>
         <TabsContent value="style" className="pt-4">
-          <StyleTab node={node} device={device} onChange={onChange} onCommand={onCommand} theme={theme} />
+          <ReadOnlyFields readOnly={readOnly}>
+            <StyleTab node={node} device={device} onChange={onChange} onCommand={onCommand} theme={theme} />
+          </ReadOnlyFields>
         </TabsContent>
         {hasAdvanced && (
           <TabsContent value="advanced" className="pt-4">
+            <ReadOnlyFields readOnly={readOnly}>
             <AdvancedTab
               key={node.id}
               node={node as Section | Element}
@@ -384,6 +415,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
               errors={errors}
               takenAnchors={node.type === 'section' ? otherAnchors(content, node.id) : undefined}
             />
+            </ReadOnlyFields>
           </TabsContent>
         )}
       </Tabs>

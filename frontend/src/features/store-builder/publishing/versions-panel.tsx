@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookmarkPlusIcon, CalendarClockIcon, ClipboardCheckIcon, ColumnsIcon, ExternalLinkIcon, HistoryIcon, Loader2Icon, PencilIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApiError } from '@/lib/api/client'
+import { cn } from '@/lib/utils'
 import type { CanvasSurroundings } from '@/storefront/builder/canvas/protocol'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { StorefrontBootstrap } from '@/storefront/types'
@@ -32,6 +34,7 @@ import {
 } from '../publishing-api'
 import { SideBySide, type ChangesState, type Side } from './side-by-side'
 import { entryTitle } from './version-names'
+import { ActivityList } from '../collab/activity-list'
 
 /*
  * B11 version history: published versions and the draft's named copies ("checkpoints"), newest
@@ -64,6 +67,8 @@ type Props = {
   /** Saves the editor's latest changes first (named copies and compares use the saved draft). */
   flush?: () => Promise<boolean>
   compare?: CompareSupport
+  /** B16: an Activity tab (what happened to the page, in plain words). */
+  activity?: boolean
 }
 
 function RenameForm({ entry, onDone, documentId }: { entry: VersionEntry; onDone: () => void; documentId: string }) {
@@ -186,7 +191,40 @@ function CheckpointForm({ documentId, count, flush }: { documentId: string; coun
   )
 }
 
-export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersionId, liveUrl, canRestore, canManage = true, onRestore, flush, compare }: Props) {
+export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersionId, liveUrl, canRestore, canManage = true, onRestore, flush, compare, activity = false }: Props) {
+  const [tab, setTab] = useState<'versions' | 'activity'>('versions')
+  // B16: "See version N" from the activity: the versions tab, that row scrolled to and focused.
+  const [highlight, setHighlight] = useState<string | null>(null)
+  const listRef = useRef<HTMLUListElement | null>(null)
+  const focusPending = useRef<string | null>(null)
+  /** Focuses the row asked for once the list is there (the tab's content mounts a moment later). */
+  const focusRow = (list: HTMLUListElement | null) => {
+    listRef.current = list
+    const id = focusPending.current
+    if (!id || !list) return
+    const row = list.querySelector<HTMLElement>(`[data-version-id="${CSS.escape(id)}"]`)
+    if (!row) return
+    focusPending.current = null
+    row.scrollIntoView({ block: 'nearest' })
+    // The Activity button goes away under the focus and the dialog's focus trap then focuses the
+    // dialog itself: for a moment, put the focus back on the row whenever it lands there or nowhere.
+    const dialog = row.closest<HTMLElement>('[role="dialog"]')
+    let ticks = 0
+    const keep = () => {
+      const active = document.activeElement
+      if (active === null || active === document.body || active === dialog) row.focus()
+      if (++ticks < 10) setTimeout(keep, 30)
+    }
+    keep()
+  }
+  useEffect(() => {
+    if (tab === 'versions') focusRow(listRef.current)
+  })
+  const showVersion = (id: string) => {
+    focusPending.current = id
+    setHighlight(id)
+    setTab('versions')
+  }
   const versions = useVersionEntries(documentId, open)
   const timeZone = useCurrentUserQuery().data?.organization?.timezone
   const [restoring, setRestoring] = useState<VersionEntry | null>(null)
@@ -210,6 +248,7 @@ export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersi
             </DialogTitle>
             <DialogDescription>Every publish is kept, and so are the copies you save. Restoring copies one into your draft; the store changes only when you publish.</DialogDescription>
           </DialogHeader>
+          <VersionTabs activity={activity} tab={tab} onTab={setTab} activityPanel={<ActivityList documentId={documentId} enabled={open && tab === 'activity'} timeZone={timeZone} onShowVersion={showVersion} />}>
           {canManage && <CheckpointForm documentId={documentId} count={checkpoints} flush={flush} />}
           {versions.isPending ? (
             <LoadingState rows={3} label="Loading versions" />
@@ -218,14 +257,20 @@ export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersi
           ) : entries.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Nothing published or saved yet. Your first publish appears here.</p>
           ) : (
-            <ul className="max-h-[55vh] divide-y overflow-y-auto" aria-label="Versions and saved copies">
+            <ul ref={focusRow} className="max-h-[55vh] divide-y overflow-y-auto" aria-label="Versions and saved copies">
               {entries.map((entry) => {
                 const live = entry.kind === 'version' && entry.id === liveVersionId
                 const title = entryTitle(entry)
                 const numbered = entry.kind === 'version' && entry.number !== null
                 const subject = numbered ? `version ${entry.number}` : `the saved copy “${title}”`
                 return (
-                  <li key={entry.id} className="flex flex-wrap items-center gap-3 py-3" data-testid={numbered ? `version-${entry.number}` : `checkpoint-${entry.id}`}>
+                  <li
+                    key={entry.id}
+                    tabIndex={-1}
+                    data-version-id={entry.id}
+                    className={cn('flex flex-wrap items-center gap-3 py-3 outline-none', highlight === entry.id && 'rounded-md bg-blue-50 px-2 ring-2 ring-blue-600/40 dark:bg-blue-950')}
+                    data-testid={numbered ? `version-${entry.number}` : `checkpoint-${entry.id}`}
+                  >
                     <div className="min-w-0 flex-1">
                       {renaming === entry.id ? (
                         <RenameForm entry={entry} documentId={documentId} onDone={() => setRenaming(null)} />
@@ -295,6 +340,7 @@ export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersi
               })}
             </ul>
           )}
+          </VersionTabs>
         </DialogContent>
       </Dialog>
       {compare && comparing && (
@@ -349,6 +395,25 @@ export function VersionHistoryDialog({ documentId, open, onOpenChange, liveVersi
         }}
       />
     </>
+  )
+}
+
+/** B16: "Versions" and "Activity" tabs (just the versions without the activity). */
+function VersionTabs({ activity, tab, onTab, activityPanel, children }: { activity: boolean; tab: 'versions' | 'activity'; onTab: (tab: 'versions' | 'activity') => void; activityPanel: ReactNode; children: ReactNode }) {
+  if (!activity) return <>{children}</>
+  return (
+    <Tabs value={tab} onValueChange={(value) => onTab(value as 'versions' | 'activity')} className="min-w-0 gap-3">
+      <TabsList className="w-full">
+        <TabsTrigger value="versions">Versions</TabsTrigger>
+        <TabsTrigger value="activity">Activity</TabsTrigger>
+      </TabsList>
+      <TabsContent value="versions" className="flex min-w-0 flex-col gap-4">
+        {children}
+      </TabsContent>
+      <TabsContent value="activity" className="min-w-0">
+        {activityPanel}
+      </TabsContent>
+    </Tabs>
   )
 }
 

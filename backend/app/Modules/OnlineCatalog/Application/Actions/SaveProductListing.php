@@ -9,6 +9,7 @@ use App\Modules\OnlineCatalog\Infrastructure\Models\VariantListing;
 use App\Modules\OnlineCatalog\Infrastructure\ReadModels\CatalogReadModel;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
+use App\Modules\Shared\Application\Events\PublicAddressChanged;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
 use App\Modules\Shared\Application\Support\TranslationInput;
@@ -91,11 +92,14 @@ class SaveProductListing
                 $data['translations'] = TranslationInput::apply($listing->translations, $data['translations'], array_keys(self::TRANSLATABLE), ['description_html'], $this->sanitizer);
             }
             $listing->fill($data);
+            $oldSlug = $listing->slug;
             $listing->slug = $slug ?? $listing->slug ?? ListingEditor::suggestSlug($product['name'], ProductListing::class, $listing->id);
             if ($listing->published_at !== null && $listing->unpublished_at !== null && $listing->unpublished_at <= $listing->published_at) {
                 throw new BusinessRuleViolation('SCHEDULE_INVALID', 'The end of the publishing window must be after its start.');
             }
             $listing->save();
+            // B16: an automatic redirect from the old address (Storefront).
+            PublicAddressChanged::dispatchFor($listing->organization_id, '/product/', $oldSlug, $listing->slug);
 
             $variantChanges = [];
             foreach ($variantData ?? [] as $row) {

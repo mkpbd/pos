@@ -7,6 +7,7 @@ use App\Modules\Cms\Domain\PageStatus;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\HtmlSanitizer;
+use App\Modules\Shared\Application\Events\PublicAddressChanged;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\Instants;
 use App\Modules\Shared\Application\Support\TranslationInput;
@@ -61,6 +62,8 @@ class SavePage
                 $page->published_at = now()->toImmutable();
             }
             $page->save();
+            // B16: an automatic redirect from the old address (Storefront).
+            PublicAddressChanged::dispatchFor($page->organization_id, '/pages/', $before['slug'] ?? null, $page->slug);
 
             [$old, $new] = Changes::between($before, $this->snapshot($page));
             if ($creating || $new !== []) {

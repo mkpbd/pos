@@ -53,6 +53,8 @@ export type InspectorCommand =
   | { type: 'set-popup-active'; active: boolean }
   /** B9: the page's Search & sharing settings (`content.seo`; null removes them; one undo step per coalesce key). Apply with `withSeo`. */
   | { type: 'set-seo'; seo: SeoValue | null; coalesceKey?: string }
+  /** B16: change a campaign page's address (`landing:<slug>`; the old one forwards to it). */
+  | { type: 'change-address' }
 
 export type InspectorChangeOptions = {
   /** Edits with the same key within a short time are one undo step (typing). */
@@ -118,4 +120,6 @@ export type InspectorProps = {
   nodes?: BuilderNode[]
   /** B12: replace several nodes at once (same ids) — ONE undo step. */
   onChangeMany?(next: BuilderNode[], opts?: InspectorChangeOptions): void
+  /** B16: someone else is editing — every field is shown but can't be changed. */
+  readOnly?: boolean
 }

@@ -8,6 +8,7 @@ use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Storefront\Application\Builder\Collaboration\BuilderEditLock;
 use App\Modules\Storefront\Application\Builder\Templates\ManageBuilderTemplates;
 use App\Modules\Storefront\Application\Builder\Templates\StorePageStarters;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
@@ -41,6 +42,7 @@ class ManageBuilderDocuments
         private readonly BuilderGlobals $globals,
         private readonly BuilderReferences $references,
         private readonly StorePageStarters $starters,
+        private readonly BuilderEditLock $editLock,
     ) {}
 
     /**
@@ -255,6 +257,8 @@ class ManageBuilderDocuments
      */
     public function saveDraft(BuilderDocument $document, int $revision, array $content, bool $mayEditCustomHtml = true): BuilderDocument
     {
+        // B16: 423 DOCUMENT_LOCKED while someone else is editing (also publish, discard, restore, delete).
+        $this->editLock->assertCanWrite($document);
         // B13: the A/B tests' status, dates and winner are the server's (start / stop / keep);
         // they come from the stored draft (a newer one is a conflict below anyway).
         $content = Experiments::withManagedFields($content, $document->draft);
@@ -338,6 +342,8 @@ class ManageBuilderDocuments
      */
     public function publish(BuilderDocument $document, ?string $note): BuilderDocument
     {
+        $this->editLock->assertCanWrite($document);
+
         return DB::transaction(function () use ($document, $note) {
             $locked = $this->lock($document);
 
@@ -416,6 +422,8 @@ class ManageBuilderDocuments
      */
     public function discard(BuilderDocument $document): BuilderDocument
     {
+        $this->editLock->assertCanWrite($document);
+
         return DB::transaction(function () use ($document) {
             $locked = $this->lock($document);
             $published = $locked->publishedVersion;
@@ -435,6 +443,8 @@ class ManageBuilderDocuments
      */
     public function restore(BuilderDocument $document, BuilderVersion $version): BuilderDocument
     {
+        $this->editLock->assertCanWrite($document);
+
         return DB::transaction(function () use ($document, $version) {
             $locked = $this->writeDraft($this->lock($document), $version->content);
             // B11: a draft checkpoint restores the same way (kind checkpoint, no number).
@@ -454,6 +464,7 @@ class ManageBuilderDocuments
         if ($document->isHome()) {
             throw new BusinessRuleViolation('CANNOT_DELETE_HOME', 'The home page cannot be deleted. Discard its changes or publish another version instead.');
         }
+        $this->editLock->assertCanWrite($document);
 
         DB::transaction(function () use ($document) {
             $locked = $this->lock($document);

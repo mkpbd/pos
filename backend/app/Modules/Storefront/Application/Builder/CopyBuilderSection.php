@@ -5,6 +5,7 @@ namespace App\Modules\Storefront\Application\Builder;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\StaffActor;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Storefront\Application\Builder\Collaboration\BuilderEditLock;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\DeviceOrder;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
@@ -30,6 +31,7 @@ class CopyBuilderSection
     public function __construct(
         private readonly PrepareBuilderContent $prepare,
         private readonly AuditTrail $audit,
+        private readonly BuilderEditLock $editLock,
     ) {}
 
     /**
@@ -63,6 +65,8 @@ class CopyBuilderSection
                 continue;
             }
             try {
+                // B16: someone else is editing that page (DOCUMENT_LOCKED for this target only).
+                $this->editLock->assertCanWrite($document);
                 $results[] = DB::transaction(fn () => $this->copyInto($document, $section, $position));
             } catch (InvalidBuilderDocument $e) {
                 $results[] = $this->failed($id, $document->title, 'DOCUMENT_INVALID', $e->errors[0]['message'] ?? $e->getMessage(), $e->errors);

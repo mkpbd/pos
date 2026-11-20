@@ -49,7 +49,7 @@ export type EditorDocument = {
 
 export type Snapshot = { content: BuilderContent; selection: string | null; selectedIds: string[] }
 
-export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'offline' | 'conflict' | 'error'
+export type SaveStatus = 'saved' | 'dirty' | 'saving' | 'invalid' | 'offline' | 'conflict' | 'error' | 'locked'
 
 export type SaveState = {
   status: SaveStatus
@@ -81,6 +81,13 @@ export type EditorState = {
   /** Media picked in the inspector, shown before the canvas resolves them. */
   localMedia: Record<string, BuilderMedia>
   lastEdit: { key: string; at: number } | null
+  /**
+   * B16: someone else is editing (they hold the edit lock): the draft can be looked at and
+   * commented on, not changed — `apply`, undo and redo do nothing and count `blockedEdits`.
+   */
+  readOnly: boolean
+  /** B16: edits refused while read-only (the editor says why once per attempt). */
+  blockedEdits: number
 }
 
 export type ApplyOptions = {
@@ -120,6 +127,13 @@ export type EditorActions = {
   setSaveState: (state: SaveState) => void
   setErrors: (errors: Record<string, Problem[]>) => void
   setRevision: (revision: number) => void
+  /** B16: read-only while someone else edits. */
+  setReadOnly: (readOnly: boolean) => void
+  /**
+   * B16: the server's newer draft replaces this one while looking on (read-only live refresh):
+   * like `load`, but the selection, device and language stay (ids that are gone drop out).
+   */
+  refresh: (detail: DocumentDetail) => void
 }
 
 export type EditorStore = StoreApi<EditorState & EditorActions>
@@ -172,6 +186,8 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       errors: {},
       localMedia: {},
       lastEdit: null,
+      readOnly: false,
+      blockedEdits: 0,
 
       apply: (edit, options = {}) => {
         const state = get()
@@ -179,6 +195,10 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
         const wanted: SelectionState | null = options.selectMany !== undefined ? many(options.selectMany) : options.select !== undefined ? single(options.select) : null
         if (next === state.content) {
           if (wanted && (wanted.selection !== state.selection || !sameIds(wanted.selectedIds, state.selectedIds))) set({ selection: wanted.selection, selectedIds: wanted.selectedIds })
+          return false
+        }
+        if (state.readOnly) {
+          set({ blockedEdits: state.blockedEdits + 1 })
           return false
         }
         const at = now()
@@ -211,6 +231,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
 
       undo: () => {
         const state = get()
+        if (state.readOnly) return void set({ blockedEdits: state.blockedEdits + 1 })
         const previous = state.history.past[state.history.past.length - 1]
         if (!previous) return
         const selected = pruned(previous.content, previous)
@@ -224,6 +245,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       },
       redo: () => {
         const state = get()
+        if (state.readOnly) return void set({ blockedEdits: state.blockedEdits + 1 })
         const next = state.history.future[0]
         if (!next) return
         const selected = pruned(next.content, next)
@@ -263,6 +285,26 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       setSaveState: (saveState) => set({ saveState }),
       setErrors: (errors) => set({ errors }),
       setRevision: (revision) => set({ revision }),
+      setReadOnly: (readOnly) => {
+        if (get().readOnly !== readOnly) set({ readOnly, lastEdit: null })
+      },
+      refresh: (doc) => {
+        const state = get()
+        const selected = pruned(doc.content, { selection: state.selection, selectedIds: state.selectedIds })
+        set({
+          document: documentFromDetail(doc),
+          content: doc.content,
+          savedContent: doc.content,
+          revision: doc.draft_revision,
+          selection: selected.selection,
+          selectedIds: selected.selectedIds,
+          hover: null,
+          history: { past: [], future: [] },
+          saveState: { status: 'saved', savedAt: doc.draft_updated_at ? Date.parse(doc.draft_updated_at) : now() },
+          errors: {},
+          lastEdit: null,
+        })
+      },
     }
   })
 }

@@ -13,4 +13,5 @@ export const STOREFRONT_TABS: SectionTab[] = [
   { to: '/storefront/categories', label: 'Categories', permission: 'online_catalog.view' },
   { to: '/storefront/brands', label: 'Brands', permission: 'online_catalog.view' },
   { to: '/storefront/size-guides', label: 'Size guides', permission: 'online_catalog.view' },
+  { to: '/storefront/redirects', label: 'Redirects', permission: 'storefront.manage' },
 ]

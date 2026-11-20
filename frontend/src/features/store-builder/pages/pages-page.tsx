@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { FilePlusIcon, HouseIcon, Loader2Icon, MegaphoneIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { FilePlusIcon, FileUpIcon, HouseIcon, Loader2Icon, MegaphoneIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,8 @@ import { isProductZone, parseZoneKey } from '../document-kind'
 import { CmsPagesCard, SitePartsCard, ZonesCard, type RemoveRequest } from './builder-parts'
 import { DemoLooksCard } from './demo-looks'
 import { GlobalSectionsCard } from './global-sections-card'
+import { ImportPageDialog } from './import-page-dialog'
+import { importWord } from './import-words'
 import { ListingColumnsCard } from './listing-columns-card'
 import { PopupsCard } from './popups-card'
 import { ProductZonesCard } from './product-zones-card'
@@ -51,6 +53,7 @@ import { StorePagesCard } from './store-pages-card'
  * "Waiting for approval" tab (with its count) and open a request in the review screen
  * (`?review=<id>` opens one directly, e.g. from a notification; `?tab=reviews` the tab).
  * B14: Store pages — designs of the shop's own pages (shop, category, …; ./store-pages-card.tsx).
+ * B16: "Import a page…" brings in a page copy (.json) as a new campaign page or over a draft (./import-page-dialog.tsx).
  */
 
 function PageRow({ summary, canManage, onDelete }: { summary: DocumentSummary; canManage: boolean; onDelete?: () => void }) {
@@ -187,6 +190,7 @@ function PagesScreen() {
   const documents = useDocumentsQuery()
   const remove = useDeleteDocumentMutation()
   const [creating, setCreating] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [removing, setRemoving] = useState<RemoveRequest | null>(null)
   // B11: approval requests (publishers only).
   const reviews = useReviewsQuery('pending', canPublish)
@@ -244,7 +248,14 @@ function PagesScreen() {
             <h2 className="text-xl font-semibold">{t('screen.title')}</h2>
             <p className="text-sm text-muted-foreground">{t('screen.intro')}</p>
           </div>
-          <LanguageToggle />
+          <div className="flex flex-wrap items-center gap-2">
+            {canManage && (
+              <Button variant="outline" onClick={() => setImporting(true)} disabled={!documents.data}>
+                <FileUpIcon aria-hidden /> {importWord(lang, 'open')}
+              </Button>
+            )}
+            <LanguageToggle />
+          </div>
         </div>
         {documents.isPending ? (
           <LoadingState rows={3} label={t('screen.loading')} />
@@ -319,6 +330,7 @@ function PagesScreen() {
         )}
       </div>
       <NewLandingDialog open={creating} onOpenChange={setCreating} />
+      {canManage && <ImportPageDialog open={importing} onOpenChange={setImporting} documents={all} />}
       {canPublish && <ReviewScreen reviewId={openReview} onClose={() => setReview(null)} />}
       <ScreenConfirm
         open={removing !== null}

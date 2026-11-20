@@ -53,4 +53,12 @@ interface MediaLibrary
      * @return array{id: string, created: bool}
      */
     public function import(string $path, string $name, ?string $alt): array;
+
+    /**
+     * B16: the stored original of a media item with its bytes (a store builder page exported as
+     * a file); null when unknown (current organization) or unreadable. `sha256` is of the bytes.
+     *
+     * @return array{id: string, name: string, mime_type: string, width: int, height: int, alt: ?string, size: int, sha256: string, contents: string}|null
+     */
+    public function originalFile(string $id): ?array;
 }

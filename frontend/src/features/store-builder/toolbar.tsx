@@ -23,6 +23,9 @@ import {
   SearchIcon,
   ChartColumnIcon,
   FlaskConicalIcon,
+  LockIcon,
+  MessageSquareIcon,
+  DownloadIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -36,6 +39,8 @@ import { IS_MAC, useRelativeTime } from './format'
 import { EDIT_LOCALES } from './inline-edit'
 import { isDirty, useEditor, type SaveState } from './store'
 import { PreviewAsMenu } from './audience/preview-as-menu'
+import { PresenceAvatars } from './collab/presence-ui'
+import type { Viewer } from './collab/collab-api'
 
 const DEVICES: { device: Device; label: string; icon: typeof MonitorIcon }[] = [
   { device: 'desktop', label: 'Desktop', icon: MonitorIcon },
@@ -88,6 +93,13 @@ export function SaveStatus({ onShowProblem }: { onShowProblem: () => void }) {
       body = (
         <span className="flex items-center gap-1.5 text-destructive">
           <CircleAlertIcon className="size-3.5" aria-hidden /> Not saved — changed elsewhere
+        </span>
+      )
+      break
+    case 'locked':
+      body = (
+        <span className="flex items-center gap-1.5 text-destructive">
+          <LockIcon className="size-3.5" aria-hidden /> Not saved — someone else is editing
         </span>
       )
       break
@@ -181,6 +193,14 @@ type ToolbarProps = {
   previewAs?: boolean
   /** B14: show a store page design's "Preview with" sample picker (a flag, not an element: an inline element prop kept the React Compiler from optimizing the editor). */
   sample?: boolean
+  /** B16: someone else is editing — undo, redo, renaming, publishing and discarding are off. */
+  readOnly?: boolean
+  /** B16: the other people on the page (avatars). */
+  people?: Viewer[]
+  /** B16: the Comments panel and the number of open comments; absent = no button. */
+  comments?: { open: boolean; count: number; onToggle: () => void }
+  /** B16: ⋯ "Download a copy (.json)"; absent = not offered. */
+  onDownload?: () => void
 }
 
 /** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
@@ -218,12 +238,12 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample, readOnly = false, people, comments, onDownload }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
-  const canUndo = useEditor((s) => s.history.past.length > 0)
-  const canRedo = useEditor((s) => s.history.future.length > 0)
+  const canUndo = useEditor((s) => s.history.past.length > 0) && !readOnly
+  const canRedo = useEditor((s) => s.history.future.length > 0) && !readOnly
   const undo = useEditor((s) => s.undo)
   const redo = useEditor((s) => s.redo)
   const isPopup = document.kind === 'popup'
@@ -238,7 +258,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
         </Button>
       </Hint>
       <div className="flex min-w-0 flex-col">
-        <TitleField title={document.title} canEdit onRename={onRename} />
+        <TitleField title={document.title} canEdit={!readOnly} onRename={onRename} />
       </div>
       <span className="hidden truncate text-xs text-muted-foreground lg:inline">{document.path}</span>
 
@@ -251,6 +271,8 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
           </Hint>
         ))}
       </div>
+
+      {people && people.length > 0 && <PresenceAvatars viewers={people} />}
 
       {bangla && <LocaleToggle />}
       {sample && <SamplePicker />}
@@ -284,6 +306,20 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
         <Hint label="How many people saw this page, where they clicked and what they ordered">
           <Button type="button" variant={insights.open ? 'secondary' : 'outline'} aria-pressed={insights.open} onClick={insights.onToggle} data-testid="insights-button">
             <ChartColumnIcon /> Insights
+          </Button>
+        </Hint>
+      )}
+      {comments && (
+        <Hint label="Notes for your team on this page (C adds one on the selected part)">
+          <Button type="button" variant={comments.open ? 'secondary' : 'outline'} aria-pressed={comments.open} onClick={comments.onToggle} data-testid="comments-button">
+            <MessageSquareIcon /> <span className="hidden xl:inline">Comments</span>
+            <span className="sr-only xl:hidden">Comments</span>
+            {comments.count > 0 && (
+              <span data-testid="comments-count" className="ml-0.5 rounded-full bg-blue-700 px-1.5 text-xs font-semibold text-white tabular-nums">
+                <span aria-hidden>{comments.count}</span>
+                <span className="sr-only">{`${comments.count} open`}</span>
+              </span>
+            )}
           </Button>
         </Hint>
       )}
@@ -327,15 +363,15 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
         </span>
       </Hint>
       {!canPublish && canSubmit ? (
-        <Hint label="Send this draft to someone who can publish it">
-          <Button type="button" onClick={onSubmitReview}>
+        <Hint label={readOnly ? 'Someone else is editing this page' : 'Send this draft to someone who can publish it'}>
+          <Button type="button" onClick={onSubmitReview} disabled={readOnly}>
             <SendIcon /> Submit for review
           </Button>
         </Hint>
       ) : (
-        <Hint label={canPublish ? 'Make this draft live on your store, now or later' : 'You don’t have permission to publish'}>
-          <span tabIndex={canPublish ? undefined : 0}>
-            <Button type="button" disabled={!canPublish} onClick={onPublish}>
+        <Hint label={readOnly ? 'Someone else is editing this page' : canPublish ? 'Make this draft live on your store, now or later' : 'You don’t have permission to publish'}>
+          <span tabIndex={canPublish && !readOnly ? undefined : 0}>
+            <Button type="button" disabled={!canPublish || readOnly} onClick={onPublish}>
               <RocketIcon /> Publish
             </Button>
           </span>
@@ -351,9 +387,14 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
           <DropdownMenuItem onSelect={onHistory}>
             <HistoryIcon /> Version history
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={!document.published} onSelect={onDiscard} className={cn(!document.published && 'opacity-50')}>
+          <DropdownMenuItem disabled={!document.published || readOnly} onSelect={onDiscard} className={cn((!document.published || readOnly) && 'opacity-50')}>
             <UndoDotIcon /> Discard changes
           </DropdownMenuItem>
+          {onDownload && (
+            <DropdownMenuItem onSelect={onDownload}>
+              <DownloadIcon /> Download a copy (.json)
+            </DropdownMenuItem>
+          )}
           {onShortcuts && (
             <>
               <DropdownMenuSeparator />

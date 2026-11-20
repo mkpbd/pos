@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { useStorefront } from '../api'
+import { PageLoadingView } from '../components/state-views'
+import { useNotFoundRedirect } from '../redirects'
 import { storeContext } from '../builder/templates/context'
 import type { StorePageRuntime } from '../builder/templates/runtime'
 import { useTemplateEnabled } from '../builder/templates/enabled'
@@ -11,8 +13,15 @@ import { useDocumentMeta } from '../use-document-meta'
 /**
  * "Page not found". B14: drawn from the published "Page not found" template when there is one
  * (the meta stays noindex; crawlers get the 404 status from the server for unknown paths).
+ * B16: an address with a redirect (an old page, post or product address) goes on to its new
+ * address instead; the redirect is looked up first, with the loading view meanwhile.
  */
 export function NotFoundPage() {
+  const redirect = useNotFoundRedirect()
+  return redirect === 'checking' ? <PageLoadingView /> : <NotFoundContent />
+}
+
+function NotFoundContent() {
   const { t } = useLocale()
   useDocumentMeta({ title: t('content.notFound.title'), noindex: true })
   const template = useTemplateEnabled('not_found')

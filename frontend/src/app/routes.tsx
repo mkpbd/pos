@@ -92,6 +92,7 @@ const pages = {
   webCategories: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebCategoriesPage'),
   webBrands: page(() => import('@/features/online-catalog/pages/web-taxonomy-pages'), 'WebBrandsPage'),
   sizeGuides: page(() => import('@/features/storefront/pages/size-guides-page'), 'SizeGuidesPage'),
+  storefrontRedirects: page(() => import('@/features/storefront/pages/redirects-page'), 'RedirectsPage'),
   productListing: page(() => import('@/features/online-catalog/pages/product-listing-page'), 'ProductListingPage'),
   contentPages: page(() => import('@/features/content/pages/pages-page'), 'PagesPage'),
   contentPage: page(() => import('@/features/content/pages/page-editor-page'), 'PageEditorPage'),
@@ -280,6 +281,7 @@ export const routes: RouteObject[] = [
               guarded('online_catalog.view', 'storefront/brands', pages.webBrands),
               // P1a: viewers see guides read-only; creating, editing and deleting need online_catalog.manage.
               guarded('online_catalog.view', 'storefront/size-guides', pages.sizeGuides),
+              guarded('storefront.manage', 'storefront/redirects', pages.storefrontRedirects),
               { path: 'content', element: <ContentRedirect /> },
               guarded('cms.manage', 'content/pages', pages.contentPages),
               guarded('cms.manage', 'content/pages/new', pages.contentPage),

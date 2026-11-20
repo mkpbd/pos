@@ -14,6 +14,7 @@ use App\Modules\Orders\Application\Contracts\OrderForms;
 use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Shared\Application\Contracts\DocumentLetterhead;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Application\Events\PublicAddressChanged;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
@@ -24,6 +25,7 @@ use App\Modules\Storefront\Application\Builder\PublishedOrderForms;
 use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
 use App\Modules\Storefront\Application\Events\FormSubmitted;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
+use App\Modules\Storefront\Application\Redirects\StorefrontRedirects;
 use App\Modules\Storefront\Infrastructure\BuilderBlogReferences;
 use App\Modules\Storefront\Infrastructure\BuilderMediaReferences;
 use App\Modules\Storefront\Infrastructure\BuilderPageDesigns;
@@ -31,6 +33,7 @@ use App\Modules\Storefront\Infrastructure\Caching\CacheStorefrontContentVersion;
 use App\Modules\Storefront\Infrastructure\Console\PublishScheduledBuilderCommand;
 use App\Modules\Storefront\Infrastructure\MenuBlogReferences;
 use App\Modules\Storefront\Infrastructure\MenuPageReferences;
+use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Notifications\SendFormSubmissionNotifications;
 use App\Modules\Storefront\Infrastructure\SectionBlogReferences;
 use App\Modules\Storefront\Infrastructure\SectionMediaReferences;
@@ -96,6 +99,11 @@ class StorefrontServiceProvider extends ModuleServiceProvider
 
         // B8b: staff hear about form submissions (queued, after commit).
         Event::listen(FormSubmitted::class, SendFormSubmissionNotifications::class);
+        // B16: automatic redirects when a page, post, product, category or brand gets a new address
+        // (in the owner's transaction); a new landing page's address is live, so no redirect stays from it.
+        Event::listen(PublicAddressChanged::class, [StorefrontRedirects::class, 'onAddressChanged']);
+        BuilderDocument::created(fn (BuilderDocument $document) => $document->landingSlug() === null ? null
+            : app(StorefrontRedirects::class)->addressChanged($document->organization_id, null, (string) $document->storePath()));
 
         // B11: "publish later" for builder pages and the theme (scheduled every minute in routes/console.php).
         if ($this->app->runningInConsole()) {

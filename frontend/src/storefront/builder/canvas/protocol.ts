@@ -248,6 +248,6 @@ export function isEditorShortcut(event: { key: string; ctrlKey: boolean; metaKey
   const key = event.key.toLowerCase()
   // B9: c / v (copy and paste nodes) too, so they work while focus is in the canvas. B12: k (the command box).
   if (mod && ['z', 'y', 'd', 'c', 'v', 'k'].includes(key)) return true
-  // B12: `?` opens the shortcut sheet (typed with Shift on most layouts, so Shift is not checked).
-  return !mod && ['delete', 'backspace', 'escape', 'arrowup', 'arrowdown', '?'].includes(key)
+  // B12: `?` opens the shortcut sheet (typed with Shift on most layouts, so Shift is not checked). B16: `c` comments on the selection.
+  return !mod && !event.altKey && ['delete', 'backspace', 'escape', 'arrowup', 'arrowdown', '?', 'c'].includes(key)
 }

@@ -76,6 +76,8 @@ class ExportableListsTest extends TestCase
             'newsletter subscribers' => ['cms/newsletter-subscribers', 'cms/newsletter-subscribers', 'E-mail', 'newsletter-subscribers', 0],
             // B8b.
             'form submissions' => ['forms/submissions', 'forms/submissions?status=new', 'Received', 'form-submissions', 0],
+            // B16.
+            'store redirects' => ['storefront/redirects', 'storefront/redirects?source=manual', 'Old address', 'store-redirects', 0],
             // Phase 7: every report of the registry exports the same way (one route).
             'reports' => ['reports/{key}', 'reports/sales_by_product?date_from=2026-01-01&date_to=2026-12-31', 'Product', 'report-sales-by-product', 1],
         ];

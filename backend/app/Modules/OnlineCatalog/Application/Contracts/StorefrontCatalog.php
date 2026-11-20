@@ -202,4 +202,24 @@ interface StorefrontCatalog
      * @return array{data: list<array<string, mixed>>, meta: array<string, int>, facets: array<string, mixed>, context: array<string, mixed>}
      */
     public function listing(array $params): array;
+
+    /**
+     * B16: how a store builder page file names catalogue records (no ids): products by SKU (the
+     * first variant's) and web address, categories and brands by web address — keyed by id; ids
+     * that are not the organization's are absent. `slug` is null without a web listing.
+     *
+     * @param  'product'|'category'|'brand'  $type
+     * @param  list<string>  $ids
+     * @return array<string, array{sku: ?string, slug: ?string, name: string}>
+     */
+    public function portableReferences(string $type, array $ids): array;
+
+    /**
+     * B16: the organization's record a page file refers to — a product by SKU, then by web
+     * address; a category or brand by web address, then by name (case-insensitive). Null when
+     * there is none.
+     *
+     * @param  'product'|'category'|'brand'  $type
+     */
+    public function findPortable(string $type, ?string $sku, ?string $slug, ?string $name): ?string;
 }

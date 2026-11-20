@@ -44,13 +44,16 @@ describe('builder canvas protocol', () => {
   it('hands only the editor shortcuts to the editor', () => {
     expect(isEditorShortcut({ key: 'z', ctrlKey: true, metaKey: false })).toBe(true)
     expect(isEditorShortcut({ key: 'Z', ctrlKey: false, metaKey: true })).toBe(true)
+    // B16: a plain C comments on the selection (not with Alt).
+    expect(isEditorShortcut({ key: 'c', ctrlKey: false, metaKey: false })).toBe(true)
+    expect(isEditorShortcut({ key: 'c', ctrlKey: false, metaKey: false, altKey: true })).toBe(false)
     expect(isEditorShortcut({ key: 'Delete', ctrlKey: false, metaKey: false })).toBe(true)
     expect(isEditorShortcut({ key: 'a', ctrlKey: false, metaKey: false })).toBe(false)
     // B9: copy and paste of nodes reach the editor too; select-all and plain letters stay in the canvas.
     expect(isEditorShortcut({ key: 'c', ctrlKey: true, metaKey: false })).toBe(true)
     expect(isEditorShortcut({ key: 'V', ctrlKey: false, metaKey: true })).toBe(true)
     expect(isEditorShortcut({ key: 'a', ctrlKey: true, metaKey: false })).toBe(false)
-    expect(isEditorShortcut({ key: 'c', ctrlKey: false, metaKey: false })).toBe(false)
+    expect(isEditorShortcut({ key: 'x', ctrlKey: false, metaKey: false })).toBe(false)
     // B12: Ctrl/Cmd+K opens the command box, `?` the shortcut sheet; a plain k stays in the canvas.
     expect(isEditorShortcut({ key: 'k', ctrlKey: true, metaKey: false })).toBe(true)
     expect(isEditorShortcut({ key: 'K', ctrlKey: false, metaKey: true })).toBe(true)

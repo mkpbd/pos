@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { useBlocker, useNavigate } from 'react-router'
+import { useBlocker, useNavigate, useSearchParams } from 'react-router'
 import {
   closestCenter,
   DndContext,
@@ -110,6 +110,14 @@ import { useTemplateInserter } from './templates/use-insert-template'
 import type { BuilderNode, Column, DocumentSection, InnerRowElement, Section } from '@/storefront/builder/types'
 import { usePreviewData } from './use-preview-data'
 import { readPopupSettings } from './popup-model'
+import { downloadExport } from './collab/collab-api'
+import { anchorIn, hitNode, isOpen, KEYBOARD_ANCHOR, otherViewers } from './collab/collab-model'
+import { AddressDialog } from './collab/address-dialog'
+import type { CommentPinLayer } from './collab/comment-pins'
+import { CommentsPanel } from './collab/comments-panel'
+import { PresenceBanner } from './collab/presence-ui'
+import { useComments } from './collab/use-comments'
+import { noteBlocked, usePresence } from './collab/use-presence'
 
 /*
  * The full-screen store builder editor (B2): toolbar, Add / Layers panel, canvas, inspector;
@@ -150,6 +158,9 @@ const layerKeyboardCoordinates: KeyboardCoordinateGetter = (event, { currentCoor
   if (event.code === 'ArrowDown' || event.key === 'ArrowDown') return { ...currentCoordinates, y: currentCoordinates.y + LAYER_ROW }
   return undefined
 }
+
+/** B16: no drag sensors while someone else edits the page. */
+const NO_SENSORS: ReturnType<typeof useSensors> = []
 
 const collision: CollisionDetection = (args) => (args.pointerCoordinates ? pointerWithin(args) : closestCenter(args))
 
@@ -419,6 +430,18 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [reviewId, setReviewId] = useState<string | null>(null)
 
+  /* ---------------------------------------------------------------- B16 presence & comments - */
+  const currentUser = useCurrentUserQuery().data
+  const meId = currentUser?.user.id ?? null
+  const canManage = useCan()('storefront.manage')
+  const presenceUi = usePresence({ store, autosave, org: currentUser?.organization?.id ?? '', canManage, canPublish })
+  const readOnly = useEditor((s) => s.readOnly)
+  const presence = presenceUi.presence
+  const people = useMemo(() => otherViewers(presence?.viewers ?? [], meId), [presence, meId])
+  const comments = useComments({ documentId: documentInfo.id, stamp: presence?.comments?.updated_at, presenceOpen: presence?.comments?.open })
+  const setCommentsOpen = comments.setOpen
+  const [addressOpen, setAddressOpen] = useState(false)
+
   /* ---------------------------------------------------------------- site styles (B3) ------- */
   const siteStyles = useSiteStyles()
   const themeSettings = siteStyles.settings
@@ -507,6 +530,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
 
   const dropPicture = useCallback(
     async (id: string, file: File) => {
+      if (store.getState().readOnly) return void noteBlocked(store)
       if (insideGlobal(id)) return void toast.info(GLOBAL_NOTE)
       const problem = pictureFileProblem(file)
       if (problem) return void toast.error(problem)
@@ -533,6 +557,12 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const onCanvasEdit = useCallback(
     (message: CanvasEditMessage) => {
       const state = store.getState()
+      // B16: someone else is editing — nothing changes on the page; say why.
+      if (state.readOnly && message.type !== 'text-edit-cancel' && message.type !== 'text-edit-link') {
+        if (message.type === 'text-edit-start') onCanvas(canvas, (c) => c.endTextEdit(false))
+        if (message.type === 'text-edit-commit') onCanvas(canvas, (c) => c.rerender())
+        return void noteBlocked(store)
+      }
       switch (message.type) {
         case 'text-edit-start':
           if (insideGlobal(message.id)) {
@@ -597,6 +627,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   /** Starts editing the selected element's text on the canvas (Enter, the mini toolbar). */
   const editText = useCallback(
     (id: string) => {
+      if (store.getState().readOnly) return void noteBlocked(store)
       if (insideGlobal(id)) return void toast.info(GLOBAL_NOTE)
       const field = firstInlineField(store.getState().content, id)
       if (field === null) return
@@ -642,9 +673,10 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     setAbBeforeOpen?.(() => {
       setCheckOpen(false)
       setInsightsOpen(false)
+      setCommentsOpen(false)
     })
     return () => setAbBeforeOpen?.(null)
-  }, [setAbBeforeOpen, setInsightsOpen])
+  }, [setAbBeforeOpen, setInsightsOpen, setCommentsOpen])
   const checkTheme = useMemo(() => {
     // B15: the fonts in use feed the speed check ("Use fewer fonts").
     const typo = (themeSettings?.typography ?? canvasContext.bootstrap.theme.typography) as
@@ -669,8 +701,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const openCheck = useCallback(() => {
     setCheckOpen(true)
     setInsightsOpen(false)
+    setCommentsOpen(false)
     void runServerCheck(store.getState().content)
-  }, [runServerCheck, store, setCheckOpen, setInsightsOpen])
+  }, [runServerCheck, store, setCheckOpen, setInsightsOpen, setCommentsOpen])
   const showIssue = useCallback(
     (issue: PageCheckIssue) => {
       const id = issue.node_id ? ownerOf(issue.node_id) : null
@@ -709,6 +742,21 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   )
 
   /* ---------------------------------------------------------------- shortcuts -------------- */
+  // B16: "C" adds a comment on the selection (or the page); Esc leaves comment mode.
+  const commentKeys = useRef<{ mode: boolean; add: () => void; stop: () => void }>({ mode: false, add: () => undefined, stop: () => undefined })
+  const startComment = comments.startDraft
+  const setCommentMode = comments.setMode
+  useLayoutEffect(() => {
+    commentKeys.current = {
+      mode: comments.mode,
+      add: () => {
+        const selected = store.getState().selection
+        const owner = ownerOf(selected)
+        startComment(owner ? { nodeId: owner, anchor: KEYBOARD_ANCHOR } : { nodeId: null, anchor: null })
+      },
+      stop: () => setCommentMode(false),
+    }
+  })
   const handleKey = useCallback(
     (key: { key: string; ctrl: boolean; shift: boolean; meta: boolean }): boolean => {
       const state = store.getState()
@@ -717,6 +765,20 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       if (key.key === 'Escape' && overlaysOpen.current) {
         setCommandOpen(false)
         setShortcutsOpen(false)
+        return true
+      }
+      if (key.key === 'Escape' && commentKeys.current.mode) {
+        commentKeys.current.stop()
+        return true
+      }
+      if (!mod && k === 'c') {
+        takeFocusFromCanvas()
+        commentKeys.current.add()
+        return true
+      }
+      // B16: someone else is editing — undo, redo, duplicate, paste, delete and text editing are off.
+      if (state.readOnly && ((mod && ['z', 'y', 'd', 'v'].includes(k)) || (!mod && ['delete', 'backspace', 'enter'].includes(k)))) {
+        noteBlocked(store)
         return true
       }
       if (mod && k === 'z') {
@@ -932,6 +994,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     const count = problemCount(state.errors)
     if (state.saveState.status === 'invalid') return `Fix the ${count} ${count === 1 ? 'problem' : 'problems'} on this page first (marked in red), then ${verb}.`
     if (state.saveState.status === 'conflict') return 'This page changed somewhere else. Choose which version to keep first.'
+    if (state.saveState.status === 'locked' || state.readOnly) return 'Someone else is editing this page. Ask to edit or take over first.'
     return 'Your latest changes could not be saved. Check your connection and try again.'
   }
 
@@ -1239,7 +1302,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   /* ---------------------------------------------------------------- B12 command box --------- */
   const commandActions = useMemo<CommandActions>(
     () => ({
-      publish: canPublish
+      publish: canPublish && !readOnly
         ? () => {
             setPublishError(null)
             setPublishOpen(true)
@@ -1247,7 +1310,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           }
         : null,
       submit:
-        !canPublish && canSubmit
+        !canPublish && canSubmit && !readOnly
           ? () => {
               setSubmitError(null)
               setSubmitOpen(true)
@@ -1260,10 +1323,11 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       styles: () => setStylesOpen(true),
       shortcuts: () => setShortcutsOpen(true),
     }),
-    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck],
+    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck, readOnly],
   )
   const insightsShown = insights.open && !checkOpen
   const abShown = abAvailable && ab.open && !checkOpen && !insightsShown
+  const commentsShown = comments.open && !checkOpen && !insightsShown && !abShown
   const commandItems = useCommandItems(commandOpen, commandActions, single ? null : templates)
 
   const labelOf = useCallback((id: string) => {
@@ -1271,9 +1335,125 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
     return info ? nodeName(info.node, registry, globals) : ''
   }, [registry, store, ownerOf, globals])
 
+  /* ---------------------------------------------------------------- B16 comments ----------- */
+  /** A global section reference is drawn as its global's section: the first drawn id it owns. */
+  const drawIds = useMemo(() => {
+    const result = new Map<string, string>()
+    for (const [inner, owner] of expanded.owners) if (!result.has(owner)) result.set(owner, inner)
+    return result
+  }, [expanded])
+  const showNode = useCallback(
+    (id: string) => {
+      const state = store.getState()
+      if (!findNode(state.content, id)) return
+      state.select(id)
+      commands.reveal(id)
+    },
+    [store, commands],
+  )
+  const commentLabel = useCallback((id: string) => {
+    const found = findNode(content, id)
+    return found ? nodeName(found.node, registry, globals) : null
+  }, [content, registry, globals])
+  const { threads: commentThreads, numbers: commentNumbers, activeId: activeThread, setActiveId: setActiveThread, setFilter: setCommentFilter } = comments
+  const pickThread = useCallback(
+    (id: string) => {
+      const thread = commentThreads.find((t) => t.id === id)
+      setActiveThread(id)
+      setCommentFilter(thread && !isOpen(thread) ? 'resolved' : 'open')
+      if (thread?.node_id) showNode(thread.node_id)
+    },
+    [commentThreads, setActiveThread, setCommentFilter, showNode],
+  )
+  const pinLayer = useMemo<CommentPinLayer | null>(() => {
+    if (!commentsShown) return null
+    const pins = commentThreads
+      .filter((t) => (isOpen(t) || t.id === activeThread) && t.node_id !== null && !t.node_removed && findNode(content, t.node_id) !== null)
+      .map((t) => {
+        const number = commentNumbers.get(t.id) ?? 0
+        const nodeId = t.node_id!
+        return {
+          id: t.id,
+          number,
+          drawId: drawIds.get(nodeId) ?? nodeId,
+          anchor: t.anchor,
+          active: t.id === activeThread,
+          label: `Comment ${number}${t.author ? ` by ${t.author.name}` : ''}: ${t.body.length > 80 ? `${t.body.slice(0, 80)}…` : t.body}`,
+        }
+      })
+    return { pins, onPick: pickThread }
+  }, [commentsShown, commentThreads, activeThread, commentNumbers, content, drawIds, pickThread])
+  /** Comment mode: the part of the page clicked on gets a pin where it was clicked. */
+  const dropComment = useCallback(
+    (point: { x: number; y: number }) => {
+      const rects = canvas.current?.rects() ?? {}
+      const hit = hitNode(rects, point, (id) => {
+        const found = findNode(expanded.content, id)
+        return found !== null && found.kind !== 'column'
+      })
+      if (!hit) return void toast.info('Click on a section or an element of the page.')
+      const owner = ownerOf(hit) ?? hit
+      const rect = rects[owner === hit ? hit : (drawIds.get(owner) ?? hit)] ?? rects[hit]!
+      store.getState().select(owner)
+      startComment({ nodeId: owner, anchor: anchorIn(rect, point) })
+    },
+    [canvas, expanded, ownerOf, drawIds, store, startComment],
+  )
+  // B16: a bell notification opens the editor at a comment (`?comment=<thread id>`).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const deepComment = searchParams.get('comment')
+  const deepTried = useRef<string | null>(null)
+  const refreshComments = comments.refresh
+  const commentsLoading = comments.loading
+  useEffect(() => {
+    if (!deepComment || commentsLoading) return
+    const thread = commentThreads.find((t) => t.id === deepComment || t.replies.some((r) => r.id === deepComment))
+    if (!thread && deepTried.current !== deepComment) {
+      // Maybe newer than what we have: fetch again once.
+      deepTried.current = deepComment
+      void refreshComments()
+      return
+    }
+    setSearchParams((params) => {
+      params.delete('comment')
+      return params
+    }, { replace: true })
+    setCheckOpen(false)
+    setInsightsOpen(false)
+    ab?.setOpen(false)
+    setCommentsOpen(true)
+    if (!thread) return void toast.info('That comment was deleted.')
+    pickThread(thread.id)
+  }, [deepComment, commentsLoading, commentThreads, refreshComments, setSearchParams, setInsightsOpen, ab, setCommentsOpen, pickThread])
+  const toggleComments = () => {
+    if (commentsShown) return comments.setOpen(false)
+    setCheckOpen(false)
+    setInsightsOpen(false)
+    ab?.setOpen(false)
+    comments.setOpen(true)
+  }
+  const selectionForComment = useMemo(() => {
+    const owner = ownerOf(selection)
+    const found = owner ? findNode(content, owner) : null
+    return found && found.kind !== 'column' ? { id: found.node.id, label: nodeName(found.node, registry, globals) } : null
+  }, [selection, ownerOf, content, registry, globals])
+
+  /* ---------------------------------------------------------------- B16 download a copy ---- */
+  const downloadCopy = async () => {
+    if (!(await autosave.flush())) toast.warning('Your latest changes are not saved yet — the copy has the last saved draft.')
+    try {
+      const name = await downloadExport(documentInfo.id, documentInfo.title)
+      toast.success(`“${name}” is downloaded. Import it from the Page builder screen of this store or another one.`)
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'EXPORT_TOO_LARGE') {
+        toast.error('This page is too big to download as one file (over 25 MB, mostly pictures). Use smaller pictures and try again.')
+      } else toast.error(error instanceof Error ? error.message : 'The copy could not be downloaded.')
+    }
+  }
+
   return (
     <TemplateSampleContext value={templateSample}>
-    <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={(e) => onDragMove(e as unknown as DragMoveEvent)} onDragEnd={onDragEnd} onDragCancel={resetDrag} autoScroll={{ layoutShiftCompensation: false }}>
+    <DndContext sensors={readOnly ? NO_SENSORS : sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={(e) => onDragMove(e as unknown as DragMoveEvent)} onDragEnd={onDragEnd} onDragCancel={resetDrag} autoScroll={{ layoutShiftCompensation: false }}>
       <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground" data-testid="store-builder-editor">
         <Toolbar
           canPublish={canPublish}
@@ -1330,6 +1510,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                     const next = !(insights.open && !checkOpen)
                     if (next) setCheckOpen(false)
                     if (next) ab?.setOpen(false)
+                    if (next) comments.setOpen(false)
                     insights.setOpen(next)
                   },
                 }
@@ -1337,9 +1518,14 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           }
           abTests={abAvailable ? { open: abShown, count: abCount, onToggle: () => ab.setOpen(!abShown) } : undefined}
           sample={showSample}
+          readOnly={readOnly}
+          people={people}
+          comments={{ open: commentsShown, count: comments.openCount, onToggle: toggleComments }}
+          onDownload={canManage && documentInfo.kind !== 'theme' ? () => void downloadCopy() : undefined}
         />
+        <PresenceBanner ui={presenceUi} />
         <div className="flex min-h-0 flex-1">
-          <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown || abShown ? 'w-96' : 'w-72')}>
+          <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown || abShown || commentsShown ? 'w-96' : 'w-72')}>
             {checkOpen && (
               <CheckPanel
                 check={check}
@@ -1372,7 +1558,19 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               />
             )}
             {abShown && <ExperimentsPanel canPublish={canPublish} canView={canViewInsights} timeZone={timeZone} onClose={() => ab.setOpen(false)} />}
-            <Tabs hidden={checkOpen || insightsShown || abShown} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
+            {commentsShown && (
+              <CommentsPanel
+                ui={comments}
+                documentId={documentInfo.id}
+                labelOf={commentLabel}
+                onShowNode={showNode}
+                selection={selectionForComment}
+                timeZone={timeZone}
+                flush={() => autosave.flush()}
+                onClose={() => comments.setOpen(false)}
+              />
+            )}
+            <Tabs hidden={checkOpen || insightsShown || abShown || commentsShown} value={tab} onValueChange={(value) => setTab(value as 'add' | 'layers' | 'templates')} className="flex min-h-0 flex-1 flex-col gap-0">
               <TabsList className={cn('m-2 grid w-auto', showGlobalTab && showTemplatesTab ? 'grid-cols-4' : showGlobalTab || showTemplatesTab ? 'grid-cols-3' : 'grid-cols-2')}>
                 <TabsTrigger value="add">Add</TabsTrigger>
                 <TabsTrigger value="layers">Layers</TabsTrigger>
@@ -1380,18 +1578,25 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 {showGlobalTab && <TabsTrigger value="global">Global</TabsTrigger>}
               </TabsList>
               <TabsContent value="add" className="flex min-h-0 flex-1 flex-col">
-                <AddPanel registry={registry} context={context} template={template} canCustomHtml={canCustomHtml} />
+                {/* B16: nothing can be added while someone else edits. */}
+                <fieldset disabled={readOnly} className="m-0 flex min-h-0 min-w-0 flex-1 flex-col border-0 p-0">
+                  <AddPanel registry={registry} context={context} template={template} canCustomHtml={canCustomHtml} />
+                </fieldset>
               </TabsContent>
               <TabsContent value="layers" className="flex min-h-0 flex-1 flex-col">
                 <LayersPanel indicator={layerDrop?.indicator ?? null} />
               </TabsContent>
               {showGlobalTab && (
                 <TabsContent value="global" className="flex min-h-0 flex-1 flex-col">
-                  <GlobalSectionsPanel context={context} enabled={tab === 'global'} />
+                  <fieldset disabled={readOnly} className="m-0 flex min-h-0 min-w-0 flex-1 flex-col border-0 p-0">
+                    <GlobalSectionsPanel context={context} enabled={tab === 'global'} />
+                  </fieldset>
                 </TabsContent>
               )}
               <TabsContent value="templates" className="flex min-h-0 flex-1 flex-col">
-                <TemplatesPanel context={context} currentPreset={themeSettings?.preset ?? null} inserter={templates} enabled={tab === 'templates'} />
+                <fieldset disabled={readOnly} className="m-0 flex min-h-0 min-w-0 flex-1 flex-col border-0 p-0">
+                  <TemplatesPanel context={context} currentPreset={themeSettings?.preset ?? null} inserter={templates} enabled={tab === 'templates'} />
+                </fieldset>
               </TabsContent>
             </Tabs>
           </nav>
@@ -1445,15 +1650,15 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               }}
               onHover={(id) => setHover(ownerOf(id))}
               onKey={handleKey}
-              toolbar={() => <MiniToolbar theme={inspectorTheme} onEditText={editText} onReplacePicture={setReplaceId} />}
+              toolbar={() => (readOnly ? null : <MiniToolbar theme={inspectorTheme} onEditText={editText} onReplacePicture={setReplaceId} />)}
               hoverLabel={labelOf}
               handleRef={canvas}
               theme={themeSettings as CanvasThemeSettings | null}
-              resizeRow={resizeRow}
+              resizeRow={readOnly ? null : resizeRow}
               onResize={onResize}
               fonts={fonts}
               onEdit={onCanvasEdit}
-              spacing={spacing}
+              spacing={readOnly ? null : spacing}
               uploads={uploads}
               heat={checkOpen ? null : insights.heat}
               previewAs={previewContext}
@@ -1461,6 +1666,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               arms={canvasArms.layer}
               pageContext={livesText ? templateSample.context : undefined}
               pageSample={templateSample.sample}
+              pins={pinLayer}
+              onCommentAt={comments.mode && commentsShown ? dropComment : null}
             />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
@@ -1482,6 +1689,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 theme={inspectorTheme}
                 canCustomHtml={canCustomHtml}
                 focus={focus}
+                readOnly={readOnly}
                 onCommand={(command) => {
                   const state = store.getState()
                   switch (command.type) {
@@ -1516,6 +1724,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                       const seo = command.seo
                       return void state.apply((c) => withSeo(c, seo), { coalesceKey: command.coalesceKey })
                     }
+                    case 'change-address':
+                      return setAddressOpen(true)
                     case 'banner-edited': {
                       // A copy: this draft shows it instead of the original (one undo step, autosaved as usual).
                       if (command.replaced) {
@@ -1587,6 +1797,21 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           if (id && ids[0] && applyPicture(id, ids[0])) toast.success('Picture replaced. Undo puts the old one back.')
         }}
       />
+      <AddressDialog
+        open={addressOpen}
+        onOpenChange={setAddressOpen}
+        documentId={documentInfo.id}
+        slug={documentInfo.key.startsWith('landing:') ? documentInfo.key.slice('landing:'.length) : ''}
+        storeUrl={canvasContext.store_url}
+        onChanged={(result) => {
+          const previous = store.getState().document
+          const oldSlug = previous.key.slice('landing:'.length)
+          const newSlug = result.key.slice('landing:'.length)
+          store.getState().setDocument({ key: result.key, path: result.path, preview_url: result.preview_url ?? previous.preview_url?.replace(`/p/${oldSlug}`, `/p/${newSlug}`) ?? null })
+          refreshList()
+          toast.success(`The page is now at ${result.path ?? `/p/${newSlug}`}. Old links forward to it.`)
+        }}
+      />
       <ConflictDialog open={saveStatus === 'conflict'} pending={conflictPending} onChoose={chooseConflict} />
       <VersionHistoryDialog
         documentId={documentInfo.id}
@@ -1594,8 +1819,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         onOpenChange={setHistoryOpen}
         liveVersionId={documentInfo.published?.version_id ?? null}
         liveUrl={canvasContext.store_url && livePath(documentInfo) ? `${canvasContext.store_url}${livePath(documentInfo)}` : null}
-        canRestore
-        canManage
+        canRestore={!readOnly}
+        canManage={!readOnly}
+        activity
         onRestore={restore}
         flush={() => autosave.flush()}
         compare={compareSupport}
