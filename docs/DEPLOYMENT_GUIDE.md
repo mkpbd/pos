@@ -286,6 +286,13 @@ Online store AI for staff (AI2a, optional — same switch, key and budget as AI1
 - **The scheduler** also runs `online-catalog:prune-ai-drafts` daily (drafts older than 30 days).
 - *Write with AI*, category suggestions and *Describe with AI* call the model in the request (structured JSON answers), so the egress and timeout notes above apply; two-language writes are the longest — raise `AI_TIMEOUT` if they time out with a real key.
 
+Shop assistant on the online store (AI2b, optional — same switch, key and budget):
+- **Migration** (additive): assistant columns on `storefront_settings`, `assistant_conversations`, `assistant_messages`. Off for every store until the owner switches it on in *Online store → Assistant*.
+- **Public endpoint:** `POST /api/v1/store/assistant/messages` on every store host calls the model in the request (up to 4 calls per shopper message). Keep it reachable and **never cached** (it sends `Cache-Control: no-store, private`; exclude `/api/v1/store/assistant/*` from any CDN cache rule). Per-IP limits `AI_STORE_ASSISTANT_PER_MINUTE` (10) and `AI_STORE_ASSISTANT_PER_HOUR` (60) use the cache store — keep `TRUSTED_PROXIES` right behind a proxy, or every shopper shares one limit. Size PHP-FPM and the proxy read timeout like `/api/v1/ai/*`.
+- **Costs:** each store's daily new-conversation limit (default 200) and the organization's monthly token budget cap spending; when either is reached shoppers get a polite message with the WhatsApp / contact hand-off.
+- **The scheduler** runs `storefront:prune-assistant` daily (conversations deleted 30 days after their last message). No IP address or user agent is stored.
+- **Before announcing it:** try it on the live store with a real key and read the first conversations in *Online store → Assistant*.
+
 ## Release steps
 
 ```bash

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect } from 'react'
 import { Outlet } from 'react-router'
 import { ApiError } from '@/lib/api/client'
 import { BootstrapContext } from '../api'
+import { AssistantLauncher } from '../assistant/launcher'
 import { CartDrawerProvider } from '../cart/mini-cart'
 import { QuickViewProvider } from '../catalog/quick-view'
 import { LocaleContext, useLocale } from '../i18n/locale'
@@ -40,6 +41,8 @@ export function StorefrontLayout() {
               <PopupHost />
               {/* P2b: the floating WhatsApp chat button, when the owner turned it on. */}
               <WhatsAppChatButton />
+              {/* AI2b: the shop assistant's chat button, when the store's assistant is on (its panel is a lazy chunk). */}
+              <AssistantLauncher />
             </CartDrawerProvider>
           </NoticeProvider>
         </BootstrapContext>

@@ -1,4 +1,5 @@
 import { account } from './en/account'
+import { assistant } from './en/assistant'
 import { blog } from './en/blog'
 import { cart } from './en/cart'
 import { catalog } from './en/catalog'
@@ -37,6 +38,7 @@ export const en = {
   ...demos,
   ...landing,
   ...social,
+  ...assistant,
 }
 
 export type MessageKey = keyof typeof en

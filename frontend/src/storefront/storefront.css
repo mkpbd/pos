@@ -358,8 +358,26 @@ header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
 :root[data-sf-chat] [data-testid="site-footer"]::after { content: ""; display: block; height: 5rem; }
 /* On phones the share row keeps the chat button's corner free, so its last buttons wrap instead of hiding under it. */
 @media (max-width: 639px) {
-  :root[data-sf-chat] [data-testid="share-bar"] { padding-inline-end: 4.5rem; }
+  :root[data-sf-chat] [data-testid="share-bar"],
+  :root[data-sf-assistant] [data-testid="share-bar"] { padding-inline-end: 4.5rem; }
 }
+
+/*
+ * AI2b shop assistant chat button: the same corner, moving with the same bars; with the WhatsApp button
+ * it stacks above it (3.5rem button + 0.75rem gap), never on top of it. The footer keeps room for both.
+ */
+.sf-assistant-launcher {
+  bottom: calc(var(--sf-popup-bar-bottom, 0px) + var(--sf-quick-buy-space, 0px) + max(1rem, env(safe-area-inset-bottom, 0px)));
+  transition: bottom 220ms ease, filter 150ms ease;
+}
+:root[data-sf-chat] .sf-assistant-launcher {
+  bottom: calc(var(--sf-popup-bar-bottom, 0px) + var(--sf-quick-buy-space, 0px) + max(1rem, env(safe-area-inset-bottom, 0px)) + 4.25rem);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sf-assistant-launcher { transition: none; }
+}
+:root[data-sf-assistant] [data-testid="site-footer"]::after { content: ""; display: block; height: 5rem; }
+:root[data-sf-assistant][data-sf-chat] [data-testid="site-footer"]::after { height: 9.25rem; }
 
 .b-layered { position: relative; isolation: isolate; }
 .b-layered > .b-container, .b-layered > .b-row { position: relative; z-index: 1; }

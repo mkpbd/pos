@@ -2428,6 +2428,21 @@ All under `/api/v1`, `auth:sanctum` + tenant. Nothing here saves or publishes on
 - `POST /online-catalog/bundle-ideas/apply` (`online_catalog.manage`) `{anchor_id, product_ids 1–12}` → `{anchor_id, added, frequently_bought [{id, name, image_url, sku}]}`; 422 `TOO_MANY_PICKS {limit 12, room}`, `PRODUCT_NOT_FOUND`.
 - **Upgrade:** `php artisan migrate` (`ai_content_batches`, `ai_content_drafts`); a queue worker runs AI draft batches.
 
+### Shop assistant on the online store (AI2b)
+
+**Settings** — `GET/PATCH /storefront/settings` key `assistant: {enabled (false), name ≤ 40 ("Shop assistant" when blank), greeting|null ≤ 200, daily_conversation_limit 1–2000 (200), handoff whatsapp|contact|none, translations: {bn: {greeting}}}` (partial PATCH; tags stripped; 422 on limits, unknown keys). Bootstrap (and the staff draft preview): `assistant: {enabled, name, greeting (payload language, bn → en fallback), handoff, handoff_url|null}` — `enabled` only when the switch, the organization's AI and a provider are all on; hand-off resolved to one that works (`https://wa.me/<digits>`, or `/pages/contact` when that visible page exists, else `none`). Limits and usage are never exposed.
+
+**Store** (store host, session, optional shopper sign-in, `Cache-Control: no-store, private`)
+- `POST /store/assistant/messages {conversation_token?: [A-Za-z0-9_-]{20,100}, message: 1–500 (trimmed), language: en|bn, page?: {type: product|category|other, slug?}}` → `{conversation_token|null, reply: {text, products: [{slug, name, image_url, price_text, in_stock}] ≤ 4, links: [{label, path}] ≤ 3, handoff: {type: whatsapp|contact, url}|null}, status: ok|unavailable|limit|budget, remaining_messages}`. An unknown token, or one belonging to another customer / used by a guest after sign-in, starts a new conversation with a new token. Fallbacks (assistant or AI off, provider error → `unavailable`; budget → `budget`; 20 messages or the store's daily limit → `limit`) are 200 with a fallback text and the hand-off; the daily limit returns `conversation_token: null`. 422 `VALIDATION_FAILED`; 429 beyond 10/min or 60/h per IP (`AI_STORE_ASSISTANT_PER_MINUTE` / `_PER_HOUR`).
+- `GET /store/assistant/conversations/current?conversation_token=` → `{conversation_token, messages: [{id, role user|assistant, text, products, links, handoff, status, created_at}] (last 20, oldest first), remaining_messages}`; unknown / not yours → `{conversation_token: null, messages: [], remaining_messages: 20}`.
+- Reply text: paragraphs, bullets, bold; links only `[label](/product/<slug>)` for products the tools returned in this conversation (still live) and own-store paths the tools returned; any other link or URL is reduced to its label. Cards and links are built by the server.
+
+**Admin** (`storefront.manage`)
+- `GET /storefront/assistant/conversations?search=&from=&to=&handed_off=1|0&page=&per_page=(≤ 100, 20)` → `[{id, started_at, last_message_at, language, signed_in, customer_name (only with customers.view), message_count, handed_off, status open|closed, preview ≤ 80}]`; `search` matches message text.
+- `GET /storefront/assistant/conversations/{id}` → row + `messages: [{id, role, text, tools: [names], status, created_at}]` (404 for other organizations).
+- `GET /storefront/assistant/summary?from=&to=` (store-local dates, default last 30 days) → `{from, to, conversations, messages, handed_off, handed_off_share (0–1), unavailable, limit, budget, top_tools: [{name, count}] ≤ 5}`.
+- Usage feature `store_assistant` (one row per AI turn, no user). `storefront:prune-assistant` (daily) removes conversations 30 days after their last message. **Upgrade:** `php artisan migrate` (assistant settings columns, `assistant_conversations`, `assistant_messages`).
+
 ### Visual store builder — engine (B1)
 
 Plan and as-built notes: [STORE_BUILDER_PLAN.md](ecommerce/STORE_BUILDER_PLAN.md) (§4 document format, §11). Documents are validated JSON trees: section → columns → elements, with sparse per-breakpoint styles. They are never stored as HTML.

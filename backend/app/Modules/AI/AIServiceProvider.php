@@ -7,6 +7,7 @@ use App\Modules\AI\Application\Services\AiJsonService;
 use App\Modules\AI\Application\Services\AiTextService;
 use App\Modules\AI\Domain\Contracts\LanguageModel;
 use App\Modules\AI\Infrastructure\Console\GenerateDailyInsightsCommand;
+use App\Modules\AI\Infrastructure\Console\PruneAssistantConversationsCommand;
 use App\Modules\AI\Infrastructure\Providers\AnthropicLanguageModel;
 use App\Modules\AI\Infrastructure\Providers\FakeLanguageModel;
 use App\Modules\AI\Infrastructure\Providers\NullLanguageModel;
@@ -45,8 +46,14 @@ class AIServiceProvider extends ModuleServiceProvider
         RateLimiter::for('ai', fn (Request $request) => Limit::perMinute(max(1, (int) config('ai.ask_rate_limit', 20)))
             ->by('ai|'.($request->user()?->getAuthIdentifier() ?: $request->ip())));
 
+        // AI2b: the online store's shopper assistant, per visitor IP (AI_STORE_ASSISTANT_PER_MINUTE / _PER_HOUR).
+        RateLimiter::for('store-assistant', fn (Request $request) => [
+            Limit::perMinute(max(1, (int) config('ai.store_assistant.per_minute', 10)))->by('store-assistant-m|'.$request->ip()),
+            Limit::perHour(max(1, (int) config('ai.store_assistant.per_hour', 60)))->by('store-assistant-h|'.$request->ip()),
+        ]);
+
         if ($this->app->runningInConsole()) {
-            $this->commands([GenerateDailyInsightsCommand::class]);
+            $this->commands([GenerateDailyInsightsCommand::class, PruneAssistantConversationsCommand::class]);
         }
     }
 

@@ -43,4 +43,15 @@ interface PromotionShowcase
      * templates that show "a coupon" (the exit-offer popup).
      */
     public function runningCouponPromotion(): ?string;
+
+    /**
+     * AI2b: the live automatic promotions (active, inside their schedule, usage limit not
+     * reached) for the shop assistant, ending first first (open-ended last), at most $limit.
+     * Never coupon promotions or codes. `target_type` is null for the order scope, else
+     * product | category | brand with the chosen `target_ids` (sub-categories not expanded).
+     * Name and description in the request's language; `flash_sale` = shown with a countdown.
+     *
+     * @return list<array{name: string, description: ?string, kind: string, value: string, scope: string, target_type: ?string, target_ids: list<string>, min_subtotal: ?string, max_discount: ?string, ends_at: ?string, flash_sale: bool}>
+     */
+    public function liveAutomatic(int $limit): array;
 }

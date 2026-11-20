@@ -33,4 +33,23 @@ interface PageContent
      * @return list<array{group: ?string, items: list<array{id: string, question: string, answer_html: string}>}>
      */
     public function publicFaq(): array;
+
+    /**
+     * AI2b: help content matching a shopper's words — active FAQ entries and visible
+     * (published, publication time reached) pages, in the request's language (base text as
+     * fallback; both are searched), best matches first, at most $limit. `path` is the storefront
+     * address: a page's `/pages/<slug>`; an FAQ entry's FAQ page (the first visible page with the
+     * `faq` template) or null when there is none. `excerpt` is plain text, at most 400 characters.
+     *
+     * @return list<array{type: 'faq'|'page', title: string, path: ?string, excerpt: ?string}>
+     */
+    public function searchHelp(string $query, int $limit): array;
+
+    /**
+     * AI2b: the first visible page with the template (`faq`, `contact`), as `{slug, title}`
+     * (title in the request's language), or null.
+     *
+     * @return array{slug: string, title: string}|null
+     */
+    public function templatePage(string $template): ?array;
 }

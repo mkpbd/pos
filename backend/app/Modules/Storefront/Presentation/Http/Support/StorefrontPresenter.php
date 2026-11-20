@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Presentation\Http\Support;
 
 use App\Modules\Shared\Application\Support\TranslationInput;
+use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
@@ -38,6 +39,15 @@ final class StorefrontPresenter
             'whatsapp_number' => $s->whatsapp_number,
             'whatsapp_order_button' => $s->whatsapp_order_button,
             'whatsapp_chat_button' => $s->whatsapp_chat_button,
+            // AI2b: the shopper assistant (handoff: the choice; unset = WhatsApp with a number, else contact).
+            'assistant' => [
+                'enabled' => (bool) $s->assistant_enabled,
+                'name' => trim((string) $s->assistant_name) === '' ? StoreAssistantSettings::DEFAULT_NAME : (string) $s->assistant_name,
+                'greeting' => $s->assistant_greeting,
+                'daily_conversation_limit' => (int) ($s->assistant_daily_limit ?? StoreAssistantSettings::DEFAULT_DAILY_LIMIT),
+                'handoff' => $s->assistantHandoffChoice(),
+                'translations' => TranslationInput::present($s->assistant_translations),
+            ],
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

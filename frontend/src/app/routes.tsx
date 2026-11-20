@@ -97,6 +97,8 @@ const pages = {
   productListing: page(() => import('@/features/online-catalog/pages/product-listing-page'), 'ProductListingPage'),
   // AI2a: Online store → AI help (drafts, category suggestions, bundle ideas).
   onlineAiHelp: page(() => import('@/features/online-catalog/pages/ai-help-page'), 'AiHelpPage'),
+  // AI2b: Online store → Assistant (shopper support assistant settings, summary and chats).
+  storefrontAssistant: page(() => import('@/features/storefront/pages/assistant-page'), 'AssistantPage'),
   contentPages: page(() => import('@/features/content/pages/pages-page'), 'PagesPage'),
   contentPage: page(() => import('@/features/content/pages/page-editor-page'), 'PageEditorPage'),
   contentBlog: page(() => import('@/features/content/pages/blog-posts-page'), 'BlogPostsPage'),
@@ -287,6 +289,8 @@ export const routes: RouteObject[] = [
               guarded('storefront.manage', 'storefront/redirects', pages.storefrontRedirects),
               // AI2a: viewers see drafts and bundle ideas; writing, approving and applying need online_catalog.manage (page and API).
               guarded('online_catalog.view', 'storefront/ai', pages.onlineAiHelp),
+              // AI2b: settings and chats both need storefront.manage (page and API); the tab also needs AI on.
+              guarded('storefront.manage', 'storefront/assistant', pages.storefrontAssistant),
               { path: 'online-store/ai', element: <OnlineStoreAiRedirect /> },
               { path: 'content', element: <ContentRedirect /> },
               guarded('cms.manage', 'content/pages', pages.contentPages),

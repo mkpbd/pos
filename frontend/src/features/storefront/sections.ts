@@ -18,3 +18,6 @@ export const STOREFRONT_TABS: SectionTab[] = [
 
 /** AI2a: Online store → AI help; listed only while AI is on for the organization (see StorefrontHeader). */
 export const STOREFRONT_AI_TAB: SectionTab = { to: '/storefront/ai', label: 'AI help', permission: 'online_catalog.view' }
+
+/** AI2b: Online store → Assistant; listed only while AI is on for the organization (see StorefrontHeader). */
+export const STOREFRONT_ASSISTANT_TAB: SectionTab = { to: '/storefront/assistant', label: 'Assistant', permission: 'storefront.manage' }

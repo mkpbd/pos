@@ -224,6 +224,26 @@ export type StorefrontBootstrap = {
   builder?: BootstrapBuilder
   /** P2a: the requesting host's entry page (`/p/eid-sale`): its `/` shows that page; null / absent = the front page. */
   entry_path?: string | null
+  /** AI2b: the shopper support assistant; absent / null / `enabled: false` = no chat button. */
+  assistant?: StoreAssistantBootstrap | null
+}
+
+/** AI2b: who a shopper is handed to when the assistant cannot help. */
+export type AssistantHandoffType = 'whatsapp' | 'contact' | 'none'
+
+/**
+ * AI2b bootstrap `assistant`: `enabled` is the effective switch (the store's setting AND AI on for the
+ * organization AND a provider configured). Never carries limits or usage.
+ */
+export type StoreAssistantBootstrap = {
+  enabled: boolean
+  /** The assistant's name (≤ 40 characters, "Shop assistant"). */
+  name: string
+  /** The greeting in the payload's language; null = the widget's own. */
+  greeting: string | null
+  handoff: AssistantHandoffType
+  /** Where the hand-off goes: the contact page's path or the store's wa.me link; absent on older payloads. */
+  handoff_url?: string | null
 }
 
 /** GET /api/v1/store/homepage — see backend Storefront\Application\Queries\StorefrontHomepage. */

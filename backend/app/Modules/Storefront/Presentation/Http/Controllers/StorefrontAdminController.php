@@ -3,12 +3,14 @@
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontSettings;
 use App\Modules\Storefront\Application\Actions\SaveTheme;
 use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
+use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
 use App\Modules\Storefront\Presentation\Http\Requests\SaveThemeRequest;
@@ -45,10 +47,20 @@ class StorefrontAdminController
      * stored as digits without "+" ("8801712345678"); null or "" clears it; anything else → 422
      * `whatsapp_number`. `whatsapp_order_button` / `whatsapp_chat_button` (default true) only show
      * while a number is set.
+     * AI2b: `assistant` {enabled (default false), name ≤ 40 (blank = "Shop assistant"), greeting
+     * ≤ 200 (blank clears), daily_conversation_limit 1–2000 (200), handoff whatsapp|contact|none,
+     * translations: {bn: {greeting}}} — partial, audited with the other settings.
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save): JsonResponse
     {
         $data = $request->validate([
+            'assistant' => ['sometimes', 'array:enabled,name,greeting,daily_conversation_limit,handoff,translations'],
+            'assistant.enabled' => ['sometimes', 'boolean'],
+            'assistant.name' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'assistant.greeting' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'assistant.daily_conversation_limit' => ['sometimes', 'integer', 'min:1', 'max:2000'],
+            'assistant.handoff' => ['sometimes', Rule::in(StoreAssistantSettings::HANDOFFS)],
+            ...TranslationInput::rules(['greeting' => ['max:200']], 'assistant.translations'),
             'share_buttons' => ['sometimes', 'boolean'],
             'whatsapp_number' => ['sometimes', 'nullable', 'string', 'max:30'],
             'whatsapp_order_button' => ['sometimes', 'boolean'],

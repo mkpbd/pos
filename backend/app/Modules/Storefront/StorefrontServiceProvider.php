@@ -23,7 +23,9 @@ use App\Modules\Storefront\Application\Builder\BuilderLandingPages;
 use App\Modules\Storefront\Application\Builder\BuilderProductZones;
 use App\Modules\Storefront\Application\Builder\PublishedOrderForms;
 use App\Modules\Storefront\Application\Builder\Templates\BuilderTemplateLibrary;
+use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
 use App\Modules\Storefront\Application\Events\FormSubmitted;
+use App\Modules\Storefront\Application\Queries\AssistantSettingsReader;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Application\Redirects\StorefrontRedirects;
 use App\Modules\Storefront\Infrastructure\BuilderBlogReferences;
@@ -75,6 +77,8 @@ class StorefrontServiceProvider extends ModuleServiceProvider
         // B15: pages for page insights (declared by Marketing) and order attribution (declared by Orders).
         $this->app->bind(PageInsightDocuments::class, BuilderInsightDocuments::class);
         $this->app->bind(OrderPageAttribution::class, BuilderInsightDocuments::class);
+        // AI2b: the shopper assistant's store settings (for the AI module).
+        $this->app->bind(StoreAssistantSettings::class, AssistantSettingsReader::class);
     }
 
     public function boot(): void

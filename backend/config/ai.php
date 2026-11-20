@@ -36,6 +36,12 @@ return [
     // Questions per minute per user on POST /ai/ask and /ai/explain-reorder.
     'ask_rate_limit' => (int) env('AI_ASK_RATE_LIMIT', 20),
 
+    // AI2b: shopper messages per visitor IP on POST /store/assistant/messages.
+    'store_assistant' => [
+        'per_minute' => (int) env('AI_STORE_ASSISTANT_PER_MINUTE', 10),
+        'per_hour' => (int) env('AI_STORE_ASSISTANT_PER_HOUR', 60),
+    ],
+
     'anthropic' => [
         'base_url' => env('AI_ANTHROPIC_BASE_URL', 'https://api.anthropic.com'),
         'version' => env('AI_ANTHROPIC_VERSION', '2026-10-21'),

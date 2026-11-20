@@ -10,6 +10,7 @@ use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\Translations;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 class EloquentPromotionShowcase implements PromotionShowcase
@@ -104,6 +105,45 @@ class EloquentPromotionShowcase implements PromotionShowcase
         }
 
         return null;
+    }
+
+    public function liveAutomatic(int $limit): array
+    {
+        $now = CarbonImmutable::now();
+        $promotions = Promotion::query()
+            ->where('trigger', PromotionTrigger::Automatic)
+            ->where('is_active', true)
+            ->where(fn (Builder $q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
+            ->where(fn (Builder $q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $now))
+            ->with('targets')
+            ->orderByRaw('ends_at is null')->orderBy('ends_at')->orderBy('created_at')->orderBy('id')
+            ->get();
+        $claimed = $this->claimed($promotions->pluck('id')->all());
+
+        $result = [];
+        foreach ($promotions as $promotion) {
+            if (isset($claimed[$promotion->id]) && $claimed[$promotion->id]['used'] >= $claimed[$promotion->id]['limit']) {
+                continue;
+            }
+            $result[] = [
+                'name' => $this->name($promotion),
+                'description' => Translations::pick($promotion, 'description', $this->locale->current()),
+                'kind' => $promotion->type->value,
+                'value' => (string) $promotion->value,
+                'scope' => $promotion->scope->value,
+                'target_type' => $promotion->scope->targetType(),
+                'target_ids' => $promotion->scope->targetType() === null ? [] : $promotion->targets->pluck('target_id')->map(fn ($id) => (string) $id)->values()->all(),
+                'min_subtotal' => $promotion->min_subtotal === null ? null : (string) $promotion->min_subtotal,
+                'max_discount' => $promotion->max_discount === null ? null : (string) $promotion->max_discount,
+                'ends_at' => $promotion->ends_at?->toIso8601String(),
+                'flash_sale' => $promotion->show_countdown && $promotion->ends_at !== null,
+            ];
+            if (count($result) >= $limit) {
+                break;
+            }
+        }
+
+        return $result;
     }
 
     /**

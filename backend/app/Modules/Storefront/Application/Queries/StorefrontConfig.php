@@ -52,4 +52,24 @@ class StorefrontConfig
 
         return $theme;
     }
+
+    /**
+     * AI2b: what the shop assistant may tell shoppers about the store itself — the return
+     * window (days after delivery, 0 = no online returns), the contact details shown in the
+     * store footer (theme) and whether a WhatsApp number is set. All public on the store.
+     *
+     * @return array{return_window_days: int, contact: array{email: ?string, phone: ?string, address: ?string}, whatsapp: bool}
+     */
+    public function shopperFacts(): array
+    {
+        $settings = $this->settings();
+        $contact = $this->theme()->settings['footer']['contact'] ?? [];
+        $text = fn (mixed $v) => is_string($v) && trim($v) !== '' ? trim($v) : null;
+
+        return [
+            'return_window_days' => (int) ($settings->return_window_days ?? 7),
+            'contact' => ['email' => $text($contact['email'] ?? null), 'phone' => $text($contact['phone'] ?? null), 'address' => $text($contact['address'] ?? null)],
+            'whatsapp' => is_string($settings->whatsapp_number) && $settings->whatsapp_number !== '',
+        ];
+    }
 }

@@ -1,6 +1,7 @@
 import type { Translations } from './types'
 import type { en } from './en'
 import { account } from './bn/account'
+import { assistant } from './bn/assistant'
 import { blog } from './bn/blog'
 import { cart } from './bn/cart'
 import { catalog } from './bn/catalog'
@@ -35,4 +36,5 @@ export const bn: Translations<typeof en> = {
   ...demos,
   ...landing,
   ...social,
+  ...assistant,
 }

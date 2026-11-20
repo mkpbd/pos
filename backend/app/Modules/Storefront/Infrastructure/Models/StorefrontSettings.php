@@ -26,9 +26,16 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $whatsapp_number E.164 digits without "+" for wa.me links (P2b)
  * @property bool $whatsapp_order_button "Order on WhatsApp" on product pages while a number is set (P2b)
  * @property bool $whatsapp_chat_button the floating WhatsApp chat button while a number is set (P2b)
+ * @property bool $assistant_enabled the shopper support assistant is switched on for the store (AI2b)
+ * @property ?string $assistant_name its name (null = "Shop assistant"; AI2b)
+ * @property ?string $assistant_greeting its greeting (AI2b)
+ * @property ?array<string, array<string, string>> $assistant_translations {bn: {greeting}} (AI2b)
+ * @property int $assistant_daily_limit new assistant conversations per store-local day (AI2b)
+ * @property ?string $assistant_handoff whatsapp | contact | none (null = WhatsApp when a number is set, else contact; AI2b)
  */
 #[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing', 'bangla_enabled', 'default_locale', 'bangla_digits',
-    'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button'])]
+    'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button',
+    'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -46,12 +53,15 @@ class StorefrontSettings extends Model
         'share_buttons' => true,
         'whatsapp_order_button' => true,
         'whatsapp_chat_button' => true,
+        'assistant_enabled' => false,
+        'assistant_daily_limit' => 200,
     ];
 
     protected function casts(): array
     {
         return ['is_enabled' => 'boolean', 'guest_checkout_enabled' => 'boolean', 'return_window_days' => 'integer', 'allow_indexing' => 'boolean', 'bangla_enabled' => 'boolean', 'bangla_digits' => 'boolean',
-            'share_buttons' => 'boolean', 'whatsapp_order_button' => 'boolean', 'whatsapp_chat_button' => 'boolean'];
+            'share_buttons' => 'boolean', 'whatsapp_order_button' => 'boolean', 'whatsapp_chat_button' => 'boolean',
+            'assistant_enabled' => 'boolean', 'assistant_translations' => 'array', 'assistant_daily_limit' => 'integer'];
     }
 
     /**
@@ -68,5 +78,14 @@ class StorefrontSettings extends Model
     public function showsWhatsAppChatButton(): bool
     {
         return $this->whatsapp_chat_button && $this->whatsapp_number !== null;
+    }
+
+    /**
+     * AI2b: the chosen hand-off of the shopper assistant (unset: WhatsApp when a number is set,
+     * else the contact page).
+     */
+    public function assistantHandoffChoice(): string
+    {
+        return $this->assistant_handoff ?? ($this->whatsapp_number !== null ? 'whatsapp' : 'contact');
     }
 }

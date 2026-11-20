@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
+import type { AssistantSettingsInput } from '@/features/storefront/assistant/model'
 import { THEME_PRESET_KEYS, type ThemePresetKey } from '@/storefront/demos/presets'
 import { BANGLA_FONTS, BODY_FONT_KEYS, HEADING_FONT_KEYS } from '@/storefront/fonts'
 import type { BanglaRoleFont, BanglaTypography, BodyFont, CustomFontKey, HeadingFont, ThemeFonts } from '@/storefront/types'
@@ -31,6 +32,8 @@ export type StorefrontSettings = {
   whatsapp_order_button?: boolean
   /** P2b: floating WhatsApp chat button on every store page (default on; works once a number is set). */
   whatsapp_chat_button?: boolean
+  /** AI2b: the shopper support assistant (read with `readAssistantSettings`; off by default). */
+  assistant?: unknown
   updated_at: string | null
 }
 
@@ -409,7 +412,7 @@ export function useSaveStorefrontSettingsMutation() {
           | 'whatsapp_order_button'
           | 'whatsapp_chat_button'
         >
-      >,
+      > & { assistant?: AssistantSettingsInput },
     ) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),

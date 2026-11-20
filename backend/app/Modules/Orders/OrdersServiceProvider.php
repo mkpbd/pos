@@ -6,6 +6,7 @@ use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
 use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
 use App\Modules\Marketing\Application\Contracts\AttributedOrders;
+use App\Modules\Orders\Application\Contracts\CustomerOrderStatus;
 use App\Modules\Orders\Application\Contracts\OrderBaskets;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
 use App\Modules\Orders\Application\Contracts\OrderPreviews;
@@ -18,6 +19,7 @@ use App\Modules\Orders\Application\Events\OrderReturnUpdated;
 use App\Modules\Orders\Application\Services\NoOrderLineReviews;
 use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
 use App\Modules\Orders\Infrastructure\EloquentAttributedOrders;
+use App\Modules\Orders\Infrastructure\EloquentCustomerOrderStatus;
 use App\Modules\Orders\Infrastructure\EloquentCustomerWebOrders;
 use App\Modules\Orders\Infrastructure\EloquentOrderBaskets;
 use App\Modules\Orders\Infrastructure\EloquentOrderPreviews;
@@ -60,6 +62,8 @@ class OrdersServiceProvider extends ModuleServiceProvider
         $this->app->bind(AttributedOrders::class, EloquentAttributedOrders::class);
         // B14: masked orders for the store builder's order page sample (Storefront).
         $this->app->bind(OrderPreviews::class, EloquentOrderPreviews::class);
+        // AI2b: the signed-in shopper's own orders for the shop assistant (AI).
+        $this->app->bind(CustomerOrderStatus::class, EloquentCustomerOrderStatus::class);
     }
 
     public function boot(): void

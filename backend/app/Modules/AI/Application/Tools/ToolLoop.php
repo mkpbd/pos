@@ -49,9 +49,12 @@ final class ToolLoop
     }
 
     /**
+     * AI2b: `$effort` / `$maxTokens` override the configured values for every call of the loop
+     * (the shopper assistant answers with low effort and short replies).
+     *
      * @param  array<string, AiTool>  $tools
      */
-    public function run(Conversation $conversation, array $tools, ?int $maxRounds = null): ToolLoopResult
+    public function run(Conversation $conversation, array $tools, ?int $maxRounds = null, ?string $effort = null, ?int $maxTokens = null): ToolLoopResult
     {
         $maxRounds = max(0, $maxRounds ?? (int) config('ai.max_tool_rounds', 4));
         $definitions = array_values(array_map(fn (AiTool $t) => $t->definition(), $tools));
@@ -62,7 +65,7 @@ final class ToolLoop
 
         for ($round = 0; ; $round++) {
             $allowTools = $round < $maxRounds && $definitions !== [];
-            $completion = $this->model->complete($conversation, $definitions, new CompletionOptions(allowTools: $allowTools));
+            $completion = $this->model->complete($conversation, $definitions, new CompletionOptions(maxTokens: $maxTokens, allowTools: $allowTools, effort: $effort));
             $usage = $this->consumed = $usage->add($completion->usage);
             $conversation = $conversation->with($completion->message);
             $calls = $completion->toolCalls();

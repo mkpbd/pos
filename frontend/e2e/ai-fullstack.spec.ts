@@ -7,7 +7,7 @@ const expect = baseExpect.configure({ timeout: 15_000 })
 /**
  * AI2a full-stack: staff catalog writing against a real backend whose AI provider is the Fake
  * (schema-synthesized answers such as "Sample short_description"). Opt-in: start the backend with
- * E2E_AI=true (AI_PROVIDER=fake) and run with E2E_BACKEND=1 E2E_AI=1.
+ * E2E_AI=true (AI_PROVIDER=fake, DEMOS=1 for AI2b) and run with E2E_BACKEND=1 E2E_AI=1 (E2E_DEMOS=1).
  */
 test.skip(!process.env.E2E_BACKEND || !process.env.E2E_AI, 'Set E2E_BACKEND=1 E2E_AI=1 against a backend started with E2E_AI=true (Fake AI provider)')
 test.describe.configure({ mode: 'serial', timeout: 180_000 })
@@ -119,4 +119,63 @@ test('AI2a: write a listing with AI, approve AI drafts, apply a category suggest
   const usage = JSON.stringify((await call(page, 'GET', '/api/v1/ai/usage')).body.data)
   expect(usage).toContain('catalog_writer')
   expect(usage).toContain('catalog_drafts')
+})
+
+test('AI2b: the owner switches the shop assistant on; a shopper chats on the store; staff read the chat', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.skip(!process.env.E2E_DEMOS, 'Needs the demo stores (backend started with DEMOS=1)')
+  const base = `http://vegan.shop.localhost:${Number(process.env.E2E_PORT ?? 5173)}`
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await admin.goto(`${base}/admin/login`)
+  await admin.getByLabel('E-mail').fill('owner@greenbasket.test')
+  await admin.getByLabel('Password').fill('password')
+  await admin.getByRole('button', { name: 'Sign in' }).click()
+  await expect(admin.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible()
+  expect((await call(admin, 'PATCH', '/api/v1/ai/settings', { enabled: true })).status).toBe(200)
+
+  // Online store → Assistant: switch it on with a name.
+  await admin.goto(`${base}/admin/storefront/assistant`)
+  const form = admin.getByRole('form', { name: 'Assistant settings' })
+  const toggle = form.getByRole('switch', { name: 'Show the assistant on my store' })
+  if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click()
+  await form.getByLabel('Assistant name').fill('Basket helper')
+  await form.getByRole('button', { name: 'Save assistant settings' }).click()
+  await expect.poll(async () => (await call(admin, 'GET', '/api/v1/storefront/settings')).body.data.assistant?.enabled).toBe(true)
+
+  // A shopper opens the store, asks a suggested question and gets an answer (Fake provider).
+  const shopperContext = await browser.newContext({ viewport: { width: 1366, height: 900 } })
+  const shopper = await shopperContext.newPage()
+  await shopper.goto(`${base}/`)
+  await shopper.getByRole('button', { name: 'Ask Basket helper, our AI shop assistant' }).click()
+  const panel = shopper.getByRole('dialog', { name: 'Basket helper' })
+  await expect(panel.getByText('AI assistant — answers can be wrong')).toBeVisible()
+  await panel.getByRole('button', { name: 'What is the delivery charge?' }).click()
+  await expect(panel.getByTestId('assistant-messages').getByText('This is a test answer.')).toBeVisible({ timeout: 30_000 })
+  // Reopening the store restores the chat from the server.
+  await shopper.reload()
+  await shopper.getByRole('button', { name: 'Ask Basket helper, our AI shop assistant' }).click()
+  await expect(shopper.getByRole('dialog', { name: 'Basket helper' }).getByTestId('assistant-messages').getByText('This is a test answer.')).toBeVisible()
+
+  // Staff see the chat (no personal data for a guest) and the summary counts it.
+  const list = await call(admin, 'GET', '/api/v1/storefront/assistant/conversations')
+  const row = (list.body.data as { id: string; signed_in: boolean; preview: string; message_count: number }[]).find((c) => c.preview.includes('delivery'))!
+  expect(row.signed_in).toBe(false)
+  const transcript = await call(admin, 'GET', `/api/v1/storefront/assistant/conversations/${row.id}`)
+  expect((transcript.body.data.messages as { role: string; text: string }[]).map((m) => m.role)).toEqual(['user', 'assistant'])
+  await admin.reload()
+  await expect(admin.getByRole('table', { name: 'Assistant chats' })).toContainText('delivery')
+  const usage = JSON.stringify((await call(admin, 'GET', '/api/v1/ai/usage')).body.data)
+  expect(usage).toContain('store_assistant')
+
+  // Switched off again: the button disappears from the store.
+  await form.getByRole('switch', { name: 'Show the assistant on my store' }).click()
+  await form.getByRole('button', { name: 'Save assistant settings' }).click()
+  await expect.poll(async () => (await call(admin, 'GET', '/api/v1/storefront/settings')).body.data.assistant?.enabled).toBe(false)
+  await expect.poll(async () => {
+    await shopper.reload()
+    return shopper.getByRole('button', { name: 'Ask Basket helper, our AI shop assistant' }).count()
+  }, { timeout: 30_000 }).toBe(0)
+  await shopperContext.close()
+  await adminContext.close()
 })

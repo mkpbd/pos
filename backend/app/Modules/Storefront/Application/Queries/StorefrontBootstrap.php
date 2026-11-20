@@ -4,11 +4,13 @@ namespace App\Modules\Storefront\Application\Queries;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Shared\Application\Contracts\AiFeatures;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Translations;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
+use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use App\Modules\Storefront\Domain\MenuLocation;
 use App\Modules\Storefront\Domain\ThemeSchema;
@@ -28,6 +30,9 @@ use Carbon\CarbonImmutable;
  * B4: `builder.header`, `builder.footer` and `builder.zones` (render payloads or null).
  * B10: `theme.fonts` — `{heading, body, bangla_heading, bangla_body, custom: [{id, name, family,
  * url, format, weight_min, weight_max}]}` (CustomFonts::themeFonts).
+ * AI2b: `assistant` {enabled (the store's switch AND AI available for the organization), name,
+ * greeting (this language), handoff, handoff_url} — computed outside the content cache (the AI
+ * switch is not storefront content); never limits or usage.
  */
 class StorefrontBootstrap
 {
@@ -42,6 +47,8 @@ class StorefrontBootstrap
         private readonly BuilderPages $builder,
         private readonly MenuTrees $menuTrees,
         private readonly CustomFonts $fonts,
+        private readonly StoreAssistantSettings $assistant,
+        private readonly AiFeatures $ai,
     ) {}
 
     /**
@@ -56,7 +63,25 @@ class StorefrontBootstrap
             'bootstrap',
             fn () => $this->compute(),
             fn () => self::earliest($this->schedule->nextChange(), $this->builder->partsNextChange()),
-        );
+        ) + ['assistant' => $this->assistant()];
+    }
+
+    /**
+     * AI2b: the shopper assistant as the store widget needs it.
+     *
+     * @return array{enabled: bool, name: string, greeting: ?string, handoff: string, handoff_url: ?string}
+     */
+    public function assistant(): array
+    {
+        $settings = $this->assistant->current($this->locale->current());
+
+        return [
+            'enabled' => $settings['enabled'] && $this->ai->enabledFor($this->tenant->requireOrganization()),
+            'name' => $settings['name'],
+            'greeting' => $settings['greeting'],
+            'handoff' => $settings['handoff'],
+            'handoff_url' => $settings['handoff_url'],
+        ];
     }
 
     /**
@@ -69,7 +94,7 @@ class StorefrontBootstrap
      */
     public function buildWithTheme(array $theme): array
     {
-        return $this->compute($theme, true);
+        return $this->compute($theme, true) + ['assistant' => $this->assistant()];
     }
 
     /**

@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### AI2b — Shop assistant on the online store
+
+Optional and **off by default**: each store switches it on in *Online store → Assistant*. Same AI switch, key and monthly budget as AI1/AI2a. Details: [AI_INTEGRATION.md](docs/AI_INTEGRATION.md#ai2b--shopper-support-assistant-as-built-2026-11-20).
+
+#### Added
+- **Store chat:** a chat button on the store (its own lazy chunk; stacks above the WhatsApp button; side panel on computers, full screen on phones; English / Bangla; reduced motion; never in the builder or previews). Greeting, suggested questions, answers with product cards and links to the store's own pages, "Talk to a person" (WhatsApp with the question prefilled, or the contact page), "AI assistant — answers can be wrong", New chat; the conversation comes back when the shopper returns.
+- **What it knows** (read-only tools, store's organization only): product search and details (storefront prices with promotions, in stock yes / no, options), delivery areas, fees and times, payment methods, return rules, store contact, FAQ and published pages, live automatic offers (never coupon codes); for **signed-in shoppers only**, their own recent orders and order status (another customer's order and an unknown number both answer "not found"; no address, phone or e-mail).
+- **Safety:** shopper text and tool results are data, not instructions; the server keeps only links to products and own-store pages the tools returned (anything else is reduced to its label) and builds the cards itself; no invented prices, discounts or promises; tracking via the shopper's order page. Limits: 500 characters per message, 20 messages per chat, a daily new-chat limit per store (200), 10/min and 60/h per IP, the monthly budget — over a limit, with AI off or on provider errors the shopper gets a polite message and the hand-off.
+- **Admin:** *Online store → Assistant* — switch, name, greeting (English / Bangla), new chats per day, hand-off; summary (chats, hand-off share, standard replies, most used lookups); chats list with search and a transcript drawer (lookups used per reply; customer name only with `customers.view`). Chats are kept 30 days (`storefront:prune-assistant`); only a hash of the browser's chat token is stored — no IP or user agent.
+- AI plumbing: `ToolLoop` takes a per-call effort and token limit; usage feature `store_assistant`; new read contracts `PageContent::searchHelp` / `templatePage`, `PromotionShowcase::liveAutomatic`, `CustomerOrderStatus`, `StorefrontConfig::shopperFacts`, `StoreAssistantSettings`.
+
+#### Tests
+- Backend 1506 (PostgreSQL: 1505 pass, 1 opt-in skip; new `StoreAssistantTest`, `StoreAssistantSettingsTest`, `AssistantConversationsAdminTest`, `ShopperToolsTest`, `ShopperReplyTextTest`); Pint clean. vitest 2445; mocked Playwright 434 (new `storefront-assistant-ai2b`, `storefront-assistant-admin-ai2b`).
+- Full-stack (PostgreSQL, desktop, AI off): 50 + builder acceptance 5. Opt-in AI full-stack (`e2e/ai-fullstack.spec.ts`, Fake provider, demo stores) 2 — new **AI2b**: the owner switches the assistant on, a guest asks a suggested question and gets an answer, the chat comes back after a reload, staff read it (no personal data for a guest), usage counts it, and switching it off removes the button.
+- Not verified against the live API (no key on the dev box).
+
+#### Upgrade
+- `php artisan migrate` (assistant columns on `storefront_settings`, `assistant_conversations`, `assistant_messages`). The scheduler runs `storefront:prune-assistant` daily. Never cache `/api/v1/store/assistant/*`; keep `TRUSTED_PROXIES` right (per-IP limits). Optional env `AI_STORE_ASSISTANT_PER_MINUTE` (10), `AI_STORE_ASSISTANT_PER_HOUR` (60).
+
 ### AI2a — Online store AI for staff: write with AI, AI drafts, category suggestions, bundle ideas
 
 Optional, behind the AI1 switch, key and monthly budget. Everything the model writes is a suggestion or a draft staff approve; the normal listing actions save it; nothing is published by the model. Details: [AI_INTEGRATION.md](docs/AI_INTEGRATION.md#ai2a--online-store-texts-for-staff-as-built-2026-11-20).
@@ -35,7 +54,7 @@ Optional, behind the AI1 switch, key and monthly budget. Everything the model wr
 
 #### Tests
 - Backend 1476 (PostgreSQL: 1475 pass, 1 opt-in skip; new `AiJsonWriterTest`, `CatalogAiWriterTest`, `AiDraftsTest`, `CategorySuggestionsTest`, `BundleIdeasTest`, structured-output request test); Pint clean. vitest 2414; mocked Playwright 426 (new `listing-ai-writer`, `online-ai-ai2a`).
-- Full-stack (PostgreSQL, desktop) 50 + builder acceptance 5, with AI off. New opt-in **AI2a** full-stack test (`e2e/ai2a-fullstack.spec.ts`; backend started with `E2E_AI=true`, Fake provider): Write with AI fills and saves a listing, an AI draft batch is approved from the AI help page, a category suggestion is applied, a bundle idea is described and added.
+- Full-stack (PostgreSQL, desktop) 50 + builder acceptance 5, with AI off. New opt-in **AI2a** full-stack test (`e2e/ai-fullstack.spec.ts`; backend started with `E2E_AI=true`, Fake provider): Write with AI fills and saves a listing, an AI draft batch is approved from the AI help page, a category suggestion is applied, a bundle idea is described and added.
 - Not verified against the live API (no key on the dev box).
 
 #### Upgrade
