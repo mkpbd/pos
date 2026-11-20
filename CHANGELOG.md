@@ -21,6 +21,26 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### AI2a — Online store AI for staff: write with AI, AI drafts, category suggestions, bundle ideas
+
+Optional, behind the AI1 switch, key and monthly budget. Everything the model writes is a suggestion or a draft staff approve; the normal listing actions save it; nothing is published by the model. Details: [AI_INTEGRATION.md](docs/AI_INTEGRATION.md#ai2a--online-store-texts-for-staff-as-built-2026-11-20).
+
+#### Added
+- **Write with AI** on the product online listing (descriptions; search engine texts) and in the category / brand listing dialogs: English, Bangla or both, tone, length and staff notes. Suggestions appear next to the current texts, ticked per field; *Use selected* fills the unsaved form (with Undo). The model gets catalog facts only (no prices, stock, costs, suppliers, SKUs or sales), must not invent facts, and lists what is missing ("Things to add"). The server builds and sanitizes the description HTML and clamps texts to the field limits.
+- **Online store → AI help** (`/storefront/ai`): **Drafts** — write drafts for up to 200 products, categories or brands at once (chosen ones, or those missing a description, SEO or Bangla) on the queue, with progress and cancel; review side by side, edit, approve (only the chosen fields; warned when the text changed since), reject, approve several; *Write AI drafts* bulk action on the products list. **Categories** — suggestions for products without a category, only from the store's own categories (the model answers with refs, never ids), with confidence and reason; *Apply* needs `products.manage` and is audited on the product. **Bundle ideas** — top co-purchased partners from the nightly scores, *Describe with AI* (title and pitch, Bangla when on), *Add to frequently bought together*.
+- AI plumbing: structured JSON answers (`output_config.format` json_schema) in the Claude adapter, Shared `AiJsonWriter` contract, Fake provider JSON (scripted or synthesized from the schema, so `AI_PROVIDER=fake` works end to end). New usage features `catalog_writer`, `catalog_drafts`, `category_suggestions`, `bundle_ideas` on the AI usage card.
+
+#### Fixed
+- `ListExportTest::test_exports_are_audited` failed about once in 250 runs: its search term also matched the random customer code of the other customer. The test now searches a full name.
+
+#### Tests
+- Backend 1476 (PostgreSQL: 1475 pass, 1 opt-in skip; new `AiJsonWriterTest`, `CatalogAiWriterTest`, `AiDraftsTest`, `CategorySuggestionsTest`, `BundleIdeasTest`, structured-output request test); Pint clean. vitest 2414; mocked Playwright 426 (new `listing-ai-writer`, `online-ai-ai2a`).
+- Full-stack (PostgreSQL, desktop) 50 + builder acceptance 5, with AI off. New opt-in **AI2a** full-stack test (`e2e/ai2a-fullstack.spec.ts`; backend started with `E2E_AI=true`, Fake provider): Write with AI fills and saves a listing, an AI draft batch is approved from the AI help page, a category suggestion is applied, a bundle idea is described and added.
+- Not verified against the live API (no key on the dev box).
+
+#### Upgrade
+- `php artisan migrate` (`ai_content_batches`, `ai_content_drafts`). A queue worker runs AI draft batches; the scheduler runs `online-catalog:prune-ai-drafts` daily. No new permission.
+
 ### B16 — Store builder: teamwork & safety
 
 #### Added

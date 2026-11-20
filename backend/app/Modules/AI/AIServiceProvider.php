@@ -3,6 +3,7 @@
 namespace App\Modules\AI;
 
 use App\Modules\AI\Application\Services\AiGate;
+use App\Modules\AI\Application\Services\AiJsonService;
 use App\Modules\AI\Application\Services\AiTextService;
 use App\Modules\AI\Domain\Contracts\LanguageModel;
 use App\Modules\AI\Infrastructure\Console\GenerateDailyInsightsCommand;
@@ -10,6 +11,7 @@ use App\Modules\AI\Infrastructure\Providers\AnthropicLanguageModel;
 use App\Modules\AI\Infrastructure\Providers\FakeLanguageModel;
 use App\Modules\AI\Infrastructure\Providers\NullLanguageModel;
 use App\Modules\Shared\Application\Contracts\AiFeatures;
+use App\Modules\Shared\Application\Contracts\AiJsonWriter;
 use App\Modules\Shared\Application\Contracts\AiTextWriter;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -32,6 +34,8 @@ class AIServiceProvider extends ModuleServiceProvider
         $this->app->bind(AiFeatures::class, AiGate::class);
         // P2b: short texts for other modules (social captions), gated and metered.
         $this->app->bind(AiTextWriter::class, AiTextService::class);
+        // AI2a: structured (JSON) answers for other modules (online store texts, drafts, suggestions).
+        $this->app->bind(AiJsonWriter::class, AiJsonService::class);
     }
 
     public function boot(): void

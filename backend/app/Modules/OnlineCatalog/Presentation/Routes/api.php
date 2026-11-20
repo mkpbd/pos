@@ -1,6 +1,9 @@
 <?php
 
+use App\Modules\OnlineCatalog\Presentation\Http\Controllers\AiDraftController;
 use App\Modules\OnlineCatalog\Presentation\Http\Controllers\BackInStockController;
+use App\Modules\OnlineCatalog\Presentation\Http\Controllers\CatalogAiWriterController;
+use App\Modules\OnlineCatalog\Presentation\Http\Controllers\CatalogAssistantController;
 use App\Modules\OnlineCatalog\Presentation\Http\Controllers\ProductListingController;
 use App\Modules\OnlineCatalog\Presentation\Http\Controllers\SizeGuideController;
 use App\Modules\OnlineCatalog\Presentation\Http\Controllers\StoreCatalogController;
@@ -50,5 +53,34 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('online-catalog')->group(f
         Route::post('size-guides', [SizeGuideController::class, 'store']);
         Route::put('size-guides/{sizeGuideId}', [SizeGuideController::class, 'update'])->whereUuid('sizeGuideId');
         Route::delete('size-guides/{sizeGuideId}', [SizeGuideController::class, 'destroy'])->whereUuid('sizeGuideId');
+    });
+});
+
+// AI2a: category suggestions and bundle ideas (Backend B). AI calls go through the AI module's gate and budget.
+Route::middleware(['auth:sanctum', 'tenant'])->prefix('online-catalog')->group(function () {
+    Route::get('bundle-ideas', [CatalogAssistantController::class, 'bundleIdeas'])->middleware('can:online_catalog.view');
+    Route::middleware('can:online_catalog.manage')->group(function () {
+        Route::post('ai/category-suggestions', [CatalogAssistantController::class, 'suggestCategories'])->middleware('throttle:ai');
+        // Moving products to a category edits the products: products.manage as well.
+        Route::post('ai/category-suggestions/apply', [CatalogAssistantController::class, 'applyCategories'])->middleware('can:products.manage');
+        Route::post('bundle-ideas/describe', [CatalogAssistantController::class, 'describeBundle'])->middleware('throttle:ai');
+        Route::post('bundle-ideas/apply', [CatalogAssistantController::class, 'applyBundle']);
+    });
+});
+
+// AI2a: Write with AI and AI drafts (Backend A). Nothing the model writes is saved until staff approve it.
+Route::middleware(['auth:sanctum', 'tenant'])->prefix('online-catalog/ai')->group(function () {
+    Route::middleware('can:online_catalog.view')->group(function () {
+        Route::get('batches', [AiDraftController::class, 'index']);
+        Route::get('batches/{batchId}', [AiDraftController::class, 'show'])->whereUuid('batchId');
+        Route::get('drafts', [AiDraftController::class, 'drafts']);
+    });
+    Route::middleware('can:online_catalog.manage')->group(function () {
+        Route::post('write', CatalogAiWriterController::class)->middleware('throttle:ai');
+        Route::post('batches', [AiDraftController::class, 'store'])->middleware('throttle:ai');
+        Route::post('batches/{batchId}/cancel', [AiDraftController::class, 'cancel'])->whereUuid('batchId');
+        Route::post('drafts/approve-many', [AiDraftController::class, 'approveMany']);
+        Route::post('drafts/{draftId}/approve', [AiDraftController::class, 'approve'])->whereUuid('draftId');
+        Route::post('drafts/{draftId}/reject', [AiDraftController::class, 'reject'])->whereUuid('draftId');
     });
 });

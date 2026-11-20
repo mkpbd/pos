@@ -29,6 +29,7 @@ import {
   type WebBrandRow,
   type WebCategoryRow,
 } from '@/features/online-catalog/api'
+import { ListingAiWriter, type AiTarget } from '@/features/online-catalog/components/listing-ai-writer'
 import { counter, SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from '@/features/online-catalog/listing-form'
 import {
   BRAND_DESCRIPTION_MAX,
@@ -102,6 +103,20 @@ function DialogShell({ title, description, formId, pending, onClose, children }:
   )
 }
 
+/** AI2a: the texts "Write with AI" can fill on the category and brand forms. */
+const SEO_TARGETS: readonly AiTarget[] = [
+  { field: 'seo_title', label: 'SEO title', path: 'seo_title', bnPath: 'translations.bn.seo_title', max: SEO_TITLE_MAX },
+  { field: 'seo_description', label: 'Meta description', path: 'seo_description', bnPath: 'translations.bn.seo_description', max: SEO_DESCRIPTION_MAX },
+]
+const CATEGORY_AI_TARGETS: readonly AiTarget[] = [
+  { field: 'description', label: 'Description', path: 'description_html', bnPath: 'translations.bn.description_html', html: true },
+  ...SEO_TARGETS,
+]
+const BRAND_AI_TARGETS: readonly AiTarget[] = [
+  { field: 'description', label: 'Description', path: 'description', bnPath: 'translations.bn.description', max: BRAND_DESCRIPTION_MAX },
+  ...SEO_TARGETS,
+]
+
 const CATEGORY_FIELDS = ['is_visible', 'slug', 'image_media_id', 'banner_media_id', 'description_html', 'seo_title', 'seo_description', 'translations'] as const
 
 function CategoryForm({ data, onClose }: { data: CategoryListingResponse; onClose: () => void }) {
@@ -109,6 +124,7 @@ function CategoryForm({ data, onClose }: { data: CategoryListingResponse; onClos
   const form = useForm<CategoryListingValues>({ resolver: zodResolver(categoryListingSchema), defaultValues: toCategoryValues(data) })
   const { errors } = form.formState
   const [descriptionHtml, seoTitle, seoDescription] = useWatch({ control: form.control, name: ['description_html', 'seo_title', 'seo_description'] })
+  const [bnKey, setBnKey] = useState(0)
 
   const submit = form.handleSubmit((values) =>
     save.mutate(
@@ -139,6 +155,7 @@ function CategoryForm({ data, onClose }: { data: CategoryListingResponse; onClos
               {errors.banner_media_id?.message && <p className="text-sm text-destructive">{errors.banner_media_id.message}</p>}
             </div>
           </div>
+          <ListingAiWriter subject="category" id={data.category.id} form={form} targets={CATEGORY_AI_TARGETS} onApplied={(langs) => langs.includes('bn') && setBnKey((k) => k + 1)} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="category-description">Description</Label>
             <Controller control={form.control} name="description_html" render={({ field }) => (
@@ -147,7 +164,7 @@ function CategoryForm({ data, onClose }: { data: CategoryListingResponse; onClos
             {errors.description_html?.message && <p className="text-sm text-destructive">{errors.description_html.message}</p>}
           </div>
         </CommonFields>
-        <Controller control={form.control} name="translations.bn" render={({ field }) => (
+        <Controller key={bnKey} control={form.control} name="translations.bn" render={({ field }) => (
           <BanglaTranslations
             fields={[
               { name: 'name', label: 'Category name', base: data.category.name, max: TERM_NAME_MAX },
@@ -172,6 +189,7 @@ function BrandForm({ data, onClose }: { data: BrandListingResponse; onClose: () 
   const form = useForm<BrandListingValues>({ resolver: zodResolver(brandListingSchema), defaultValues: toBrandValues(data) })
   const { errors } = form.formState
   const [description, seoTitle, seoDescription] = useWatch({ control: form.control, name: ['description', 'seo_title', 'seo_description'] })
+  const [bnKey, setBnKey] = useState(0)
 
   const submit = form.handleSubmit((values) =>
     save.mutate(
@@ -195,11 +213,12 @@ function BrandForm({ data, onClose }: { data: BrandListingResponse; onClose: () 
             <Controller control={form.control} name="logo_media_id" render={({ field }) => <MediaField value={field.value} onChange={field.onChange} title="Brand logo" />} />
             {errors.logo_media_id?.message && <p className="text-sm text-destructive">{errors.logo_media_id.message}</p>}
           </div>
+          <ListingAiWriter subject="brand" id={data.brand.id} form={form} targets={BRAND_AI_TARGETS} onApplied={(langs) => langs.includes('bn') && setBnKey((k) => k + 1)} />
           <FormField label="Description" error={errors.description?.message} hint={counter(description, BRAND_DESCRIPTION_MAX)}>
             <Textarea rows={3} maxLength={BRAND_DESCRIPTION_MAX} {...form.register('description')} />
           </FormField>
         </CommonFields>
-        <Controller control={form.control} name="translations.bn" render={({ field }) => (
+        <Controller key={bnKey} control={form.control} name="translations.bn" render={({ field }) => (
           <BanglaTranslations
             fields={[
               { name: 'name', label: 'Brand name', base: data.brand.name, max: TERM_NAME_MAX },

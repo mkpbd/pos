@@ -28,6 +28,9 @@ Schedule::command('marketing:prune-page-insights')->daily();
 // Guest carts expire 30 days after their last change.
 Schedule::command('cart:prune')->daily();
 
+// AI2a: AI drafts of online store texts are kept 30 days.
+Schedule::command('online-catalog:prune-ai-drafts')->daily();
+
 // SC1: daily "items need reordering" inbox alert per store, from 07:00 in each organization's
 // timezone (hourly runs; one notification per store and local day).
 Schedule::command('purchasing:reorder-notifications')->hourly()->withoutOverlapping();

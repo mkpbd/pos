@@ -14,9 +14,11 @@ final class AiRequestLog
 {
     /**
      * P2b: `social_captions` (Social module, through Shared's AiTextWriter). B9: `builder_writer`
-     * (the store builder's AI writer, Storefront module, same contract).
+     * (the store builder's AI writer, Storefront module, same contract). AI2a (OnlineCatalog, through
+     * Shared's AiJsonWriter): `catalog_writer` (Write with AI), `catalog_drafts` (AI drafts),
+     * `category_suggestions`, `bundle_ideas`.
      */
-    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions', 'builder_writer'];
+    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions', 'builder_writer', 'catalog_writer', 'catalog_drafts', 'category_suggestions', 'bundle_ideas'];
 
     /**
      * @param  list<array{name: string, params: array<string, mixed>, ok: bool}>  $tools

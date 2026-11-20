@@ -18,9 +18,14 @@ use RuntimeException;
 
 /**
  * Scripted model for tests (and AI_PROVIDER=fake outside production): each call takes the next
- * scripted reply — a text answer, tool calls, an exception or a closure that builds a
- * Completion from the conversation. Every request is recorded so tests can assert what the
- * model was shown (tools, tool results, prompts).
+ * scripted reply — a text answer, a JSON answer, tool calls, an exception or a closure that
+ * builds a Completion from the conversation. Every request is recorded so tests can assert what
+ * the model was shown (tools, tool results, prompts).
+ *
+ * AI2a: with nothing scripted, a call that asks for structured output (CompletionOptions
+ * outputSchema) gets a deterministic answer synthesized from the schema — strings
+ * `"Sample <property>"`, the first enum / const value, one item per array, numbers 1, booleans
+ * true — so AI_PROVIDER=fake works end to end; other calls get the fallback text.
  */
 final class FakeLanguageModel implements LanguageModel
 {
@@ -45,6 +50,16 @@ final class FakeLanguageModel implements LanguageModel
         $this->script[] = self::completion([new TextBlock($text)], StopReason::EndTurn, $inputTokens, $outputTokens);
 
         return $this;
+    }
+
+    /**
+     * AI2a: replies with a JSON document (a structured answer), encoded as the provider sends it.
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    public function answerJson(array $data, int $inputTokens = 100, int $outputTokens = 20): self
+    {
+        return $this->answer((string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $inputTokens, $outputTokens);
     }
 
     /**
@@ -93,7 +108,11 @@ final class FakeLanguageModel implements LanguageModel
         $next = $this->script[$this->calls++] ?? null;
 
         if ($next === null) {
-            return self::completion([new TextBlock($this->fallbackAnswer)], StopReason::EndTurn, 100, 20);
+            $text = $options->outputSchema !== null
+                ? (string) json_encode(self::synthesize($options->outputSchema), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                : $this->fallbackAnswer;
+
+            return self::completion([new TextBlock($text)], StopReason::EndTurn, 100, 20);
         }
         if ($next instanceof \Throwable) {
             throw $next;
@@ -113,6 +132,55 @@ final class FakeLanguageModel implements LanguageModel
     public function callCount(): int
     {
         return count($this->requests);
+    }
+
+    /**
+     * A deterministic value that follows a JSON schema (the subset structured outputs accept).
+     *
+     * @param  array<string, mixed>  $schema
+     */
+    public static function synthesize(array $schema, string $name = 'value'): mixed
+    {
+        if (array_key_exists('const', $schema)) {
+            return $schema['const'];
+        }
+        if (is_array($schema['enum'] ?? null) && $schema['enum'] !== []) {
+            return array_values($schema['enum'])[0];
+        }
+        foreach (['anyOf', 'oneOf', 'allOf'] as $key) {
+            if (is_array($schema[$key] ?? null) && $schema[$key] !== []) {
+                $first = array_values($schema[$key])[0];
+
+                return is_array($first) ? self::synthesize($first, $name) : null;
+            }
+        }
+        $type = $schema['type'] ?? (isset($schema['properties']) ? 'object' : 'string');
+        if (is_array($type)) {
+            $types = array_values(array_filter($type, fn ($t) => $t !== 'null'));
+            $type = $types[0] ?? 'null';
+        }
+
+        return match ($type) {
+            'object' => self::object($schema),
+            'array' => [is_array($schema['items'] ?? null) ? self::synthesize($schema['items'], $name) : 'Sample '.$name],
+            'integer', 'number' => 1,
+            'boolean' => true,
+            'null' => null,
+            default => 'Sample '.$name,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $schema
+     */
+    private static function object(array $schema): object
+    {
+        $result = [];
+        foreach ((array) ($schema['properties'] ?? []) as $key => $property) {
+            $result[(string) $key] = is_array($property) ? self::synthesize($property, (string) $key) : null;
+        }
+
+        return (object) $result;
     }
 
     /**

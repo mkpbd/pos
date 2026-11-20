@@ -280,6 +280,12 @@ AI assistant and insights (Phase 8 / AI1, optional — [AI_INTEGRATION.md](AI_IN
 - **Not yet verified:** no call to the live Anthropic API has been made from this codebase (the adapter is tested against recorded responses); make one test question in staging with a real key before enabling AI in production. (The AI tables, their CHECKs and the daily insights job ran with the full suite on PostgreSQL 18 on 2026-11-11.)
 - No queue job and no new dependency (the provider is called with Laravel's HTTP client).
 
+Online store AI for staff (AI2a, optional — same switch, key and budget as AI1):
+- **Migration** (additive): `ai_content_batches`, `ai_content_drafts` (OnlineCatalog). No permission sync needed: it uses `online_catalog.manage` (and `products.manage` to apply category suggestions).
+- **A queue worker must run** for *AI drafts* (`WriteAiDrafts`, one model call per item, in sequence). Without a worker a batch stays *queued*; a batch with no progress for 60 minutes is cancelled the next time someone starts one. Give the worker a timeout above `AI_TIMEOUT × (AI_MAX_RETRIES + 1)` per item.
+- **The scheduler** also runs `online-catalog:prune-ai-drafts` daily (drafts older than 30 days).
+- *Write with AI*, category suggestions and *Describe with AI* call the model in the request (structured JSON answers), so the egress and timeout notes above apply; two-language writes are the longest — raise `AI_TIMEOUT` if they time out with a real key.
+
 ## Release steps
 
 ```bash

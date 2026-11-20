@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router'
 import { HomeRedirect } from '@/app/home-redirect'
 import { ContentRedirect } from '@/app/content-redirect'
 import { MarketingRedirect } from '@/app/marketing-redirect'
+import { OnlineStoreAiRedirect } from '@/app/online-store-ai-redirect'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { NotFoundPage, RouteError } from '@/app/route-error'
 import { LoadingState } from '@/components/common/state-views'
@@ -94,6 +95,8 @@ const pages = {
   sizeGuides: page(() => import('@/features/storefront/pages/size-guides-page'), 'SizeGuidesPage'),
   storefrontRedirects: page(() => import('@/features/storefront/pages/redirects-page'), 'RedirectsPage'),
   productListing: page(() => import('@/features/online-catalog/pages/product-listing-page'), 'ProductListingPage'),
+  // AI2a: Online store → AI help (drafts, category suggestions, bundle ideas).
+  onlineAiHelp: page(() => import('@/features/online-catalog/pages/ai-help-page'), 'AiHelpPage'),
   contentPages: page(() => import('@/features/content/pages/pages-page'), 'PagesPage'),
   contentPage: page(() => import('@/features/content/pages/page-editor-page'), 'PageEditorPage'),
   contentBlog: page(() => import('@/features/content/pages/blog-posts-page'), 'BlogPostsPage'),
@@ -282,6 +285,9 @@ export const routes: RouteObject[] = [
               // P1a: viewers see guides read-only; creating, editing and deleting need online_catalog.manage.
               guarded('online_catalog.view', 'storefront/size-guides', pages.sizeGuides),
               guarded('storefront.manage', 'storefront/redirects', pages.storefrontRedirects),
+              // AI2a: viewers see drafts and bundle ideas; writing, approving and applying need online_catalog.manage (page and API).
+              guarded('online_catalog.view', 'storefront/ai', pages.onlineAiHelp),
+              { path: 'online-store/ai', element: <OnlineStoreAiRedirect /> },
               { path: 'content', element: <ContentRedirect /> },
               guarded('cms.manage', 'content/pages', pages.contentPages),
               guarded('cms.manage', 'content/pages/new', pages.contentPage),

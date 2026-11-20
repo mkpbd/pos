@@ -26,7 +26,8 @@ use Illuminate\Support\Sleep;
  *
  * Request: `x-api-key`, `anthropic-version` (2026-10-21 by default), JSON body with `model`,
  * `max_tokens`, `system`, `messages`, `tools` (name, description, input_schema),
- * `output_config.effort`, top-level `cache_control` (the system prompt and the tool list are the
+ * `output_config.effort` (per-call override) and, for a structured answer (AI2a),
+ * `output_config.format: {type: json_schema, schema}`, top-level `cache_control` (the system prompt and the tool list are the
  * stable prefix of a tool loop) and, unless disabled, `fallbacks: "default"` with the beta header
  * `server-side-fallback-2026-07-01` (a safety decline is retried server-side on the recommended
  * model). No sampling parameters (the 2026-10-21 version rejects them). A final round sends
@@ -105,8 +106,16 @@ final class AnthropicLanguageModel implements LanguageModel
                 $body['tool_choice'] = ['type' => 'none'];
             }
         }
-        if (($effort = $this->options['effort'] ?? null) !== null && $effort !== '') {
-            $body['output_config'] = ['effort' => $effort];
+        $outputConfig = [];
+        if (($effort = $options->effort ?? $this->options['effort'] ?? null) !== null && $effort !== '') {
+            $outputConfig['effort'] = $effort;
+        }
+        if ($options->outputSchema !== null) {
+            // AI2a: structured output — the answer is one text block of JSON following the schema.
+            $outputConfig['format'] = ['type' => 'json_schema', 'schema' => self::outputSchema($options->outputSchema)];
+        }
+        if ($outputConfig !== []) {
+            $body['output_config'] = $outputConfig;
         }
         if ($this->options['refusal_fallback']) {
             $body['fallbacks'] = 'default';
@@ -260,6 +269,31 @@ final class AnthropicLanguageModel implements LanguageModel
     {
         if (array_key_exists('properties', $schema) && $schema['properties'] === []) {
             $schema['properties'] = (object) [];
+        }
+
+        return $schema;
+    }
+
+    /**
+     * An output schema with every empty `properties` (at any depth) encoded as an object.
+     *
+     * @param  array<string, mixed>  $schema
+     * @return array<string, mixed>
+     */
+    private static function outputSchema(array $schema): array
+    {
+        foreach ($schema as $key => $value) {
+            if ($key === 'properties' && $value === []) {
+                $schema[$key] = (object) [];
+            } elseif ($key === 'properties' && is_array($value)) {
+                $schema[$key] = array_map(fn ($property) => is_array($property) ? self::outputSchema($property) : $property, $value);
+            } elseif (in_array($key, ['items', 'additionalItems'], true) && is_array($value)) {
+                $schema[$key] = self::outputSchema($value);
+            } elseif (in_array($key, ['anyOf', 'allOf', 'oneOf'], true) && is_array($value)) {
+                $schema[$key] = array_map(fn ($part) => is_array($part) ? self::outputSchema($part) : $part, $value);
+            } elseif (in_array($key, ['$defs', 'definitions'], true) && is_array($value)) {
+                $schema[$key] = array_map(fn ($part) => is_array($part) ? self::outputSchema($part) : $part, $value);
+            }
         }
 
         return $schema;

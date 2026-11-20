@@ -212,11 +212,11 @@ class ListExportTest extends TestCase
         $this->customer($org, 'Rafi');
         $this->actingAsUser($admin);
 
-        $this->get('/api/v1/customers?export=xlsx&search=Ri&sort=-name&page=3')->assertOk();
+        $this->get('/api/v1/customers?export=xlsx&search=Rina&sort=-name&page=3')->assertOk();
 
         $log = AuditLog::query()->where('action', 'export.created')->sole();
         $this->assertSame($admin->id, $log->user_id);
-        $this->assertEquals(['list' => 'customers', 'format' => 'xlsx', 'filters' => ['search' => 'Ri', 'sort' => '-name'], 'rows' => 1], $log->context);
+        $this->assertEquals(['list' => 'customers', 'format' => 'xlsx', 'filters' => ['search' => 'Rina', 'sort' => '-name'], 'rows' => 1], $log->context);
     }
 
     public function test_exports_are_throttled_per_user(): void

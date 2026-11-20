@@ -2400,7 +2400,33 @@ Optional module ([AI_INTEGRATION.md](AI_INTEGRATION.md)). It is off unless `AI_E
           "by_feature": [{"feature": "ask", "requests": 10, "failed": 1, "input_tokens": 340000, "output_tokens": 80000, "tokens": 420000}]}}
 ```
 
-`budget_source`: `default` | `organization`. With an unlimited budget `remaining_tokens` and `used_pct` are `null`. Features: `ask`, `explain_reorder`, `insights`, `daily_insights`, `customer_insights`. Failed requests count with the tokens they used. Requests refused because AI is off are not recorded.
+`budget_source`: `default` | `organization`. With an unlimited budget `remaining_tokens` and `used_pct` are `null`. Features (AI2a adds `catalog_writer`, `catalog_drafts`, `category_suggestions`, `bundle_ideas`): `ask`, `explain_reorder`, `insights`, `daily_insights`, `customer_insights`. Failed requests count with the tokens they used. Requests refused because AI is off are not recorded.
+
+### Online store AI for staff (AI2a)
+
+All under `/api/v1`, `auth:sanctum` + tenant. Nothing here saves or publishes on its own except the approve / apply endpoints, which go through the normal listing and product actions. AI off → 422 `AI_UNAVAILABLE` with `details.reason` `disabled`; other reasons `budget_exceeded`, `unavailable`, `refused`, `empty`, `invalid`. Usage features: `catalog_writer`, `catalog_drafts`, `category_suggestions`, `bundle_ideas`.
+
+**Write with AI** — `POST /online-catalog/ai/write` (`online_catalog.manage`, `throttle:ai`)
+- Body `{subject: product|category|brand, id, fields: [short_description|description|seo_title|seo_description] (1–4; short_description products only), languages: ["en"]|["bn"]|["en","bn"], tone?: friendly|formal|festive|simple, length?: short|medium|long, notes?: ≤ 1000}`.
+- 200 `{subject, id, suggestions: {<lang>: {<field>: string}}, missing_info: [string ≤ 5], current: {<lang>: {<field>: string|null}}}`. `description` = sanitized `description_html` for products / categories (server-built `<p>` / `<ul><li>`), plain text for brands; `bn` = the E12b `translations.bn.*`. Limits: short 500, SEO title 70, SEO description 160 (cut at a word boundary).
+- Errors: 404, 422 `NOTHING_TO_WRITE`, 422 `AI_UNAVAILABLE`, 429. Audited `online_catalog.ai_written` (counts only).
+
+**AI drafts** (`online_catalog.view` to read, `online_catalog.manage` to change)
+- Batch `{id, subject, criteria {missing|null, ids}, fields, languages, tone, length, notes, total, done, failed, status queued|running|done|cancelled|budget_stopped, progress_percent, drafts {pending, approved, rejected, failed, stale}, created_by, created_at, updated_at}`.
+- `POST /online-catalog/ai/batches` (`throttle:ai`) `{subject, ids? (≤ 200) | missing? [description|seo|bangla], fields, languages, tone?, length?, notes?}` → 201; 422 `BATCH_TOO_LARGE {limit, count}`, 409 `BATCH_RUNNING {batch_id}`, 422 `NOTHING_TO_WRITE`, 404. `missing` takes the first 200 active items by name that lack the text and have no pending draft. `GET /online-catalog/ai/batches?page=`, `GET …/batches/{id}`, `POST …/batches/{id}/cancel` (409 `BATCH_NOT_RUNNING`).
+- Draft `{id, batch_id, subject, subject_id, subject_name, language en|bn, status pending|approved|rejected|failed|stale, error, fields {<field>: {proposed, current, changed}}, missing_info, stale, reviewed_by, reviewed_at, created_at}`. `GET /online-catalog/ai/drafts?status=&subject=&batch_id=&search=&page=&per_page=(≤ 100)`.
+- `POST …/drafts/{id}/approve {fields: {<field>: string}, force?}` → Draft (only the given fields saved; never publishes; a new category / brand listing is created hidden); 409 `DRAFT_STALE {fields}`, 409 `DRAFT_NOT_PENDING {status}`. `POST …/drafts/{id}/reject`. `POST /online-catalog/ai/drafts/approve-many {ids ≤ 100}` → `{approved, skipped [{id, reason not_found|not_pending|stale|failed|invalid}]}`.
+- `online-catalog:prune-ai-drafts` (daily) removes drafts older than 30 days.
+
+**Category suggestions**
+- `POST /online-catalog/ai/category-suggestions` (`online_catalog.manage`, `throttle:ai`) `{product_ids?: uuid[] ≤ 20}` (default: up to 20 active products without a category) → `{suggestions: [{product {id, name}, category {id, path "Parent › Child"} | null, confidence high|medium|low, reason ≤ 200}], categories_considered}`. No product to suggest → empty list, no model call. 422 `PRODUCT_NOT_FOUND {product_ids}`, `NO_CATEGORIES`, `TOO_MANY_CATEGORIES {limit 400, count}`.
+- `POST /online-catalog/ai/category-suggestions/apply` (`online_catalog.manage` **and** `products.manage`) `{items: [{product_id, category_id}] 1–20}` → `{applied: [product_id], skipped: [{product_id, reason product_not_found|category_not_found|unchanged}]}`; one transaction; audit `product.updated` with `source: ai_category_suggestions`.
+
+**Bundle ideas**
+- `GET /online-catalog/bundle-ideas?search=&page=` (`online_catalog.view`, 20 per page) → `[{anchor {id, name, image_url}, frequently_bought_count, products [{id, name, image_url, score, orders_together}] (top 3)}]`, meta `{pagination, last_run (null = no nightly run yet), computed_at}`; live products only, hand-picked pairs left out.
+- `POST /online-catalog/bundle-ideas/describe` (`online_catalog.manage`, `throttle:ai`) `{anchor_id, product_ids 1–3}` → `{title ≤ 60, pitch ≤ 160, translations: {bn: {title, pitch}} | {}}`; nothing saved.
+- `POST /online-catalog/bundle-ideas/apply` (`online_catalog.manage`) `{anchor_id, product_ids 1–12}` → `{anchor_id, added, frequently_bought [{id, name, image_url, sku}]}`; 422 `TOO_MANY_PICKS {limit 12, room}`, `PRODUCT_NOT_FOUND`.
+- **Upgrade:** `php artisan migrate` (`ai_content_batches`, `ai_content_drafts`); a queue worker runs AI draft batches.
 
 ### Visual store builder — engine (B1)
 

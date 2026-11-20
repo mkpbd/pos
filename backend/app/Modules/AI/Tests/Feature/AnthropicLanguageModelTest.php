@@ -238,6 +238,50 @@ class AnthropicLanguageModelTest extends TestCase
         $this->assertCount(1, $fallback->message->content); // declined thinking and the marker are not echoed
     }
 
+    public function test_structured_output_sends_the_json_schema_and_an_effort_override(): void
+    {
+        // AI2a: a recorded structured-output reply — the JSON arrives as one text block.
+        Http::fake(['api.anthropic.com/*' => Http::response(self::reply(
+            [['type' => 'text', 'text' => '{"en":{"seo_title":"Cotton kids T-shirt"},"missing_info":["material"]}']],
+            'end_turn',
+            ['input_tokens' => 310, 'output_tokens' => 42, 'cache_read_input_tokens' => 0],
+        ))]);
+        $schema = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => ['en', 'missing_info', 'extra'],
+            'properties' => [
+                'en' => ['type' => 'object', 'additionalProperties' => false, 'required' => ['seo_title'], 'properties' => ['seo_title' => ['type' => 'string']]],
+                'missing_info' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'extra' => ['type' => 'object', 'additionalProperties' => false, 'required' => [], 'properties' => []],
+            ],
+        ];
+
+        $completion = $this->model()->complete(new Conversation('Write.', [Message::user('Facts')]), [], new CompletionOptions(maxTokens: 3000, outputSchema: $schema, effort: 'medium'));
+
+        $this->assertSame(['en' => ['seo_title' => 'Cotton kids T-shirt'], 'missing_info' => ['material']], json_decode($completion->text(), true));
+        $this->assertSame(['input_tokens' => 310, 'output_tokens' => 42], $completion->usage->toArray());
+        Http::assertSent(function (Request $request) use ($schema) {
+            $body = $request->data();
+
+            return $body['max_tokens'] === 3000
+                && $body['output_config']['effort'] === 'medium' // the per-call override wins over the configured `low`
+                && $body['output_config']['format']['type'] === 'json_schema'
+                && $body['output_config']['format']['schema']['required'] === $schema['required']
+                && $body['output_config']['format']['schema']['properties']['en'] === $schema['properties']['en']
+                && str_contains($request->body(), '"extra":{"type":"object","additionalProperties":false,"required":[],"properties":{}}')
+                && ! array_key_exists('tools', $body)
+                && ! array_key_exists('tool_choice', $body);
+        });
+
+        // Without a schema or an override: effort only, from the configuration.
+        $this->model()->complete(new Conversation('S', [Message::user('Q')]), [], new CompletionOptions);
+        Http::assertSent(fn (Request $request) => $request->data()['output_config'] === ['effort' => 'low']);
+        // No configured effort and no schema: no output_config at all.
+        $this->model(['effort' => null])->complete(new Conversation('S', [Message::user('Q')]), [], new CompletionOptions);
+        Http::assertSent(fn (Request $request) => ! array_key_exists('output_config', $request->data()));
+    }
+
     public function test_disabled_or_unconfigured_ai_binds_the_null_model(): void
     {
         config(['ai.enabled' => false]);

@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowDownIcon, ArrowUpIcon, ExternalLinkIcon, Loader2Icon, PlusIcon, Trash2Icon } from 'lucide-react'
@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
 import { RichTextEditor } from '@/features/content/components/rich-text-editor'
 import { useProductListingQuery, useSaveProductListingMutation, type ProductListingResponse } from '@/features/online-catalog/api'
+import { ListingAiWriter, type AiTarget } from '@/features/online-catalog/components/listing-ai-writer'
 import { ListingBadgesField } from '@/features/online-catalog/components/listing-badges-field'
 import { ProductPicker } from '@/features/online-catalog/components/ordered-picker'
 import { ProductVideoField } from '@/features/online-catalog/components/product-video-field'
@@ -77,6 +78,14 @@ function Heading({ children }: { children: string }) {
   return <h3 className="text-sm font-semibold tracking-tight">{children}</h3>
 }
 
+/** AI2a: the texts "Write with AI" can fill, with their form paths (English and Bangla). */
+const AI_TARGETS: readonly AiTarget[] = [
+  { field: 'short_description', label: 'Short description', path: 'short_description', bnPath: 'translations.bn.short_description', max: SHORT_DESCRIPTION_MAX },
+  { field: 'description', label: 'Web description', path: 'description_html', bnPath: 'translations.bn.description_html', html: true },
+  { field: 'seo_title', label: 'SEO title', path: 'seo_title', bnPath: 'translations.bn.seo_title', max: SEO_TITLE_MAX },
+  { field: 'seo_description', label: 'Meta description', path: 'seo_description', bnPath: 'translations.bn.seo_description', max: SEO_DESCRIPTION_MAX },
+]
+
 function ListingForm({ productId, data, canManage }: { productId: string; data: ProductListingResponse; canManage: boolean }) {
   const save = useSaveProductListingMutation(productId)
   const ids = useId()
@@ -91,6 +100,11 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
   const state = LISTING_STATE[listing.state]
   const variantIds = product.variants.map((v) => v.id)
   const disabled = !canManage
+  // Remounting the Bangla section after AI filled Bangla texts opens it, so they can be checked.
+  const [bnKey, setBnKey] = useState(0)
+  const onAiApplied = (languages: string[]) => {
+    if (languages.includes('bn')) setBnKey((k) => k + 1)
+  }
 
   const onSubmit = form.handleSubmit((values) =>
     save.mutate(toListingInput(values, { bn: form.formState.defaultValues?.translations?.bn }), {
@@ -154,6 +168,7 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
 
             <section className="flex flex-col gap-3">
               <Heading>Web address & text</Heading>
+              <ListingAiWriter subject="product" id={productId} form={form} targets={AI_TARGETS} preset={['short_description', 'description']} buttonLabel="Write with AI: descriptions" onApplied={onAiApplied} />
               <FormField
                 label="Web address"
                 error={errors.slug?.message}
@@ -323,6 +338,7 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
 
             <section className="flex flex-col gap-3">
               <Heading>Search engines</Heading>
+              <ListingAiWriter subject="product" id={productId} form={form} targets={AI_TARGETS} preset={['seo_title', 'seo_description']} buttonLabel="Write with AI: search engine texts" onApplied={onAiApplied} />
               <FormField label="SEO title" error={errors.seo_title?.message} hint={`${counter(seoTitle, SEO_TITLE_MAX)} · empty: the product name.`}>
                 <Input maxLength={SEO_TITLE_MAX} {...form.register('seo_title')} />
               </FormField>
@@ -331,9 +347,9 @@ function ListingForm({ productId, data, canManage }: { productId: string; data: 
               </FormField>
             </section>
 
-            <Controller control={form.control} name="translations.bn" render={({ field }) => (
+            <Controller key={bnKey} control={form.control} name="translations.bn" render={({ field }) => (
               <BanglaTranslations
-                fields={[
+                    fields={[
                   { name: 'name', label: 'Product name', base: product.name, max: PRODUCT_NAME_MAX },
                   { name: 'short_description', label: 'Short description', base: shortDescription, kind: 'textarea', max: SHORT_DESCRIPTION_MAX },
                   { name: 'description_html', label: 'Web description', base: descriptionHtml, kind: 'rich' },

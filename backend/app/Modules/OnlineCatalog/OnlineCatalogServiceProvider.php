@@ -13,6 +13,7 @@ use App\Modules\OnlineCatalog\Application\Services\NoProductPageZones;
 use App\Modules\OnlineCatalog\Application\Services\NoProductQuestions;
 use App\Modules\OnlineCatalog\Application\Services\NoProductRatings;
 use App\Modules\OnlineCatalog\Infrastructure\Console\ComputeAffinitiesCommand;
+use App\Modules\OnlineCatalog\Infrastructure\Console\PruneAiDraftsCommand;
 use App\Modules\OnlineCatalog\Infrastructure\Console\RefreshProductStatsCommand;
 use App\Modules\OnlineCatalog\Infrastructure\ListingMediaReferences;
 use App\Modules\OnlineCatalog\Infrastructure\ListingVariantWebData;
@@ -58,7 +59,7 @@ class OnlineCatalogServiceProvider extends ModuleServiceProvider
         RateLimiter::for('back-in-stock', fn (Request $request) => Limit::perHour(10)->by('back-in-stock:'.$request->ip()));
 
         if ($this->app->runningInConsole()) {
-            $this->commands([RefreshProductStatsCommand::class, ComputeAffinitiesCommand::class]);
+            $this->commands([RefreshProductStatsCommand::class, ComputeAffinitiesCommand::class, PruneAiDraftsCommand::class]);
         }
     }
 

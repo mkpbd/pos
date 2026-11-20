@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Link } from 'react-router'
-import { ImageIcon, PlusIcon, SearchIcon } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
+import { ImageIcon, PlusIcon, SearchIcon, SparklesIcon } from 'lucide-react'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -15,6 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { flattenCategoryTree, useCatalogList } from '@/features/catalog/api'
+import { AI_HELP_PATH, aiSwitchedOn, MAX_BATCH_SUBJECTS } from '@/features/online-catalog/ai-help/model'
 import { productListQuery, useProductsQuery, useRestoreProductMutation } from '@/features/products/api'
 import { formatRange } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -27,6 +29,10 @@ export function ProductsPage() {
   const canEdit = can('products.manage') && can('products.view_cost')
   // Online store staff without product editing still reach the web listing.
   const canListOnline = can('online_catalog.view')
+  // AI2a: "Write AI drafts" for the chosen products (AI on, online_catalog.manage).
+  const canWriteDrafts = aiSwitchedOn(me) && can('online_catalog.manage')
+  const navigate = useNavigate()
+  const [chosen, setChosen] = useState<{ id: string; name: string }[]>([])
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState(ALL)
@@ -39,6 +45,18 @@ export function ProductsPage() {
 
   const filters = { search: debouncedSearch || undefined, category_id: categoryId === ALL ? undefined : categoryId, archived }
   const { data, error, isPending, refetch } = useProductsQuery({ page, ...filters })
+  const selectable = canWriteDrafts && !archived ? (data?.items ?? []) : []
+  const showSelect = selectable.length > 0
+  const pageAllChosen = showSelect && selectable.every((p) => chosen.some((c) => c.id === p.id))
+  const pageSomeChosen = selectable.some((p) => chosen.some((c) => c.id === p.id))
+  const toggle = (product: { id: string; name: string }, on: boolean) =>
+    setChosen((list) => (on ? (list.length >= MAX_BATCH_SUBJECTS || list.some((c) => c.id === product.id) ? list : [...list, { id: product.id, name: product.name }]) : list.filter((c) => c.id !== product.id)))
+  const togglePage = (on: boolean) =>
+    setChosen((list) =>
+      on
+        ? [...list, ...selectable.filter((p) => !list.some((c) => c.id === p.id)).map((p) => ({ id: p.id, name: p.name }))].slice(0, MAX_BATCH_SUBJECTS)
+        : list.filter((c) => !selectable.some((p) => p.id === c.id)),
+    )
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,6 +93,16 @@ export function ProductsPage() {
         </div>
       </div>
 
+      {canWriteDrafts && chosen.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2" role="region" aria-label="Bulk actions">
+          <span className="px-1 text-sm font-medium" aria-live="polite">{chosen.length} selected{chosen.length >= MAX_BATCH_SUBJECTS && ` (the most for one run)`}</span>
+          <Button size="sm" onClick={() => navigate(`${AI_HELP_PATH}?tab=drafts`, { state: { aiDraftProducts: chosen } })}>
+            <SparklesIcon data-icon="inline-start" /> Write AI drafts
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setChosen([])}>Clear</Button>
+        </div>
+      )}
+
       {isPending ? (
         <LoadingState rows={6} label="Loading products" />
       ) : error ? (
@@ -91,6 +119,11 @@ export function ProductsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {showSelect && (
+                    <TableHead className="w-10">
+                      <Checkbox aria-label="Select all products on this page" checked={pageAllChosen ? true : pageSomeChosen ? 'indeterminate' : false} onCheckedChange={(v) => togglePage(v === true)} />
+                    </TableHead>
+                  )}
                   <TableHead className="w-14"><span className="sr-only">Image</span></TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead className="hidden md:table-cell">Category</TableHead>
@@ -104,7 +137,17 @@ export function ProductsPage() {
                   const first = product.variants[0]
                   const thumb = product.images[0]?.url
                   return (
-                    <TableRow key={product.id}>
+                    <TableRow key={product.id} data-state={chosen.some((c) => c.id === product.id) ? 'selected' : undefined}>
+                      {showSelect && (
+                        <TableCell>
+                          <Checkbox
+                            aria-label={`Select ${product.name}`}
+                            checked={chosen.some((c) => c.id === product.id)}
+                            disabled={chosen.length >= MAX_BATCH_SUBJECTS && !chosen.some((c) => c.id === product.id)}
+                            onCheckedChange={(v) => toggle(product, v === true)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         {thumb ? (
                           <img src={thumb} alt="" className="size-10 rounded object-cover" loading="lazy" />

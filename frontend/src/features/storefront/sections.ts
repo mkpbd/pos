@@ -15,3 +15,6 @@ export const STOREFRONT_TABS: SectionTab[] = [
   { to: '/storefront/size-guides', label: 'Size guides', permission: 'online_catalog.view' },
   { to: '/storefront/redirects', label: 'Redirects', permission: 'storefront.manage' },
 ]
+
+/** AI2a: Online store → AI help; listed only while AI is on for the organization (see StorefrontHeader). */
+export const STOREFRONT_AI_TAB: SectionTab = { to: '/storefront/ai', label: 'AI help', permission: 'online_catalog.view' }

@@ -556,6 +556,11 @@ export const FEATURE_LABELS: Record<string, string> = {
   insights: 'Business insights',
   daily_insights: 'Daily insights',
   customer_insights: 'Customer insights',
+  // AI2a (online store, staff).
+  catalog_writer: 'Online store texts',
+  catalog_drafts: 'AI drafts',
+  category_suggestions: 'Category suggestions',
+  bundle_ideas: 'Bundle ideas',
 }
 
 export function useAiSettingsQuery(enabled = true) {
