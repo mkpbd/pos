@@ -4,7 +4,7 @@ import { api } from '@/lib/api/client'
 import type { AssistantSettingsInput } from '@/features/storefront/assistant/model'
 import { THEME_PRESET_KEYS, type ThemePresetKey } from '@/storefront/demos/presets'
 import { BANGLA_FONTS, BODY_FONT_KEYS, HEADING_FONT_KEYS } from '@/storefront/fonts'
-import type { BanglaRoleFont, BanglaTypography, BodyFont, CustomFontKey, HeadingFont, ThemeFonts } from '@/storefront/types'
+import type { BanglaRoleFont, BanglaTypography, BodyFont, CustomFontKey, HeadingFont, ThemeEffects, ThemeFonts } from '@/storefront/types'
 
 export type StorefrontSettings = {
   is_enabled: boolean
@@ -125,6 +125,8 @@ export type ThemeDocument = {
     social: Record<SocialNetwork, string | null>
     payment_logo_media_ids: string[]
   }
+  /** B20: store-wide add-to-cart effects; absent / null = the defaults (bump, button feedback on). */
+  effects?: ThemeEffects | null
 }
 
 export type ThemeResponse = {

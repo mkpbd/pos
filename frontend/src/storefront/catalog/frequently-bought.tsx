@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { primaryButtonClass } from '../account/form-controls'
 import { currentPrice, startVariant, useAddSeveral } from '../cart/add-several'
 import { AddSeveralStatus } from '../cart/add-several-status'
+import { AddedMark } from '../effects/added-mark'
 import { useLocale } from '../i18n/locale'
 import { usePriceFormat } from '../money'
 import type { CatalogImage, ProductCard, ProductDetail, ProductVariant } from '../types'
@@ -73,7 +74,7 @@ export function FrequentlyBought({
 }) {
   const { t, locale } = useLocale()
   const format = usePriceFormat()
-  const { busy, result, addAll } = useAddSeveral()
+  const { busy, result, addAll, added } = useAddSeveral()
   const rootRef = useRef<HTMLElement>(null)
   const near = useNearViewport(rootRef)
   const titleId = useId()
@@ -201,13 +202,14 @@ export function FrequentlyBought({
           {/* Not disabled while adding (a disabled button would lose focus). */}
           <button
             type="button"
-            className={cn(primaryButtonClass, 'w-full sm:w-auto')}
+            className={cn(primaryButtonClass, 'relative w-full sm:w-auto')}
             aria-disabled={busy || undefined}
-            onClick={(event) => void addAll(ticked.map((line) => ({ name: line.name, variantId: line.variantId! })), event.currentTarget)}
+            onClick={(event) => void addAll(ticked.map((line) => ({ name: line.name, variantId: line.variantId!, image: line.image?.url ?? null })), event.currentTarget)}
             data-testid="fbt-add"
           >
             {busy ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
             {busy ? t('catalog.fbt.adding') : t('catalog.fbt.add')}
+            <AddedMark show={added} />
           </button>
         </div>
         <AddSeveralStatus

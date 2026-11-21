@@ -6,6 +6,8 @@ import { primaryButtonClass } from '../account/form-controls'
 import { useLocale } from '../i18n/locale'
 import type { ProductCard, ProductDetail, ProductVariant } from '../types'
 import { NotifyMeForm } from '../catalog/notify-me'
+import { AddedMark } from '../effects/added-mark'
+import { useCartEffects } from '../effects/cart-effects'
 import { useAddToCartMutation } from './api'
 import { prefetchCheckout, useBuyBox, type BuyBox } from './buy-box'
 import { useCartDrawer } from './cart-drawer-context'
@@ -66,12 +68,13 @@ export function BuyForm({
         {/* Not disabled while adding: a disabled button would lose focus, which returns to it from the mini-cart. */}
         <button
           type="submit"
-          className={cn(primaryButtonClass, buyNow ? 'min-w-0 flex-1 basis-32 px-4 sm:px-6' : 'min-w-44 flex-1 sm:flex-none')}
+          className={cn(primaryButtonClass, 'relative', buyNow ? 'min-w-0 flex-1 basis-32 px-4 sm:px-6' : 'min-w-44 flex-1 sm:flex-none')}
           disabled={box.unavailable}
           aria-disabled={box.busy || undefined}
         >
           {adding ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
           {adding ? t('cart.add.adding') : t('cart.add.button')}
+          <AddedMark show={box.addedOn('form')} />
         </button>
         {buyNow && !box.soldOut && (
           <button
@@ -118,6 +121,7 @@ const CARD_ACTION_CLASS = {
 export function CardCartAction({ product, appearance = 'outline', className: rootClassName }: { product: ProductCard; appearance?: keyof typeof CARD_ACTION_CLASS; className?: string }) {
   const add = useAddToCartMutation()
   const drawer = useCartDrawer()
+  const effects = useCartEffects()
   const { t } = useLocale()
   const [error, setError] = useState<string | null>(null)
   const className = CARD_ACTION_CLASS[appearance]
@@ -138,7 +142,7 @@ export function CardCartAction({ product, appearance = 'outline', className: roo
     <div className={round ? cn('relative', rootClassName) : 'flex flex-col gap-1'}>
       <button
         type="button"
-        className={className}
+        className={cn(className, 'relative')}
         disabled={!product.in_stock}
         aria-disabled={add.isPending || undefined}
         aria-label={product.in_stock ? t('cart.card.addLabel', { name: product.name }) : t('cart.card.outOfStockLabel', { name: product.name })}
@@ -146,11 +150,22 @@ export function CardCartAction({ product, appearance = 'outline', className: roo
           if (add.isPending) return
           const button = event.currentTarget
           setError(null)
-          add.mutate({ variant_id: variantId, quantity: '1' }, { onSuccess: () => drawer?.open(button), onError: (e) => setError(cartErrorMessage(e, t)) })
+          add.mutate(
+            { variant_id: variantId, quantity: '1' },
+            {
+              onSuccess: () => {
+                // B20: the theme's add-to-cart effect plays alongside the mini-cart (which opens at once).
+                effects.celebrate(button, product.image?.url ?? null)
+                drawer?.open(button)
+              },
+              onError: (e) => setError(cartErrorMessage(e, t)),
+            },
+          )
         }}
       >
         {icon}
         {!round && (product.in_stock ? (add.isPending ? t('cart.add.adding') : t('cart.add.button')) : t('cart.card.outOfStock'))}
+        <AddedMark show={effects.addedOn()} iconOnly={round} />
       </button>
       {error && (
         <p

@@ -21,6 +21,26 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B20 — Store builder: Animated graphics
+
+#### Added
+- **Animated icons** (new element): 48 original line icons in 9 groups (delivery, payment, returns & trust, offers, time, contact, shopping, love & praise, natural & handmade) — draw themselves, pop, bounce, spin, pulse, wiggle or float, when seen, on hover or looping; size, line weight, colour (theme role or own hex with a contrast hint), background shape, description or decorative. Searchable picker in English and Bangla with live previews. No brand logos.
+- **Illustrations** (new element): 8 original animated scenes in the shop's colours — delivery van, shopping bag, sale tag, gift, phone order, parcel journey, happy shopper, Eid lanterns; play when seen, on hover or looping; theme or one-colour palette.
+- **Moving backgrounds** (Style → Background, sections and inner rows): flowing gradient, floating shapes, bubbles, sparkles, snow, petals, lanterns, confetti, stars — density, speed, 1–3 colours; decorative only, drawn between the background and its overlay so text contrast is unchanged.
+- **Add to cart animation** (Online store → Theme): *Fly to cart*, *Bump the cart* (default, as before) or *None*, and *Button feedback* ("Added" for a moment, button size unchanged) — on product cards, the product page, quick view, the quick-buy bar, "add selected" and bundles.
+- Starter sections *Why shop with us* and *Fast delivery to your door* (en + bn). Page check: more than 2 moving backgrounds, more than 6 looping icons, a looping illustration at the top (*Play once when seen*).
+- Everything respects *reduce motion*, the Pause animations button and stops off-screen. Drawings load only on pages that use them (none in the store's first load); the fly animation is a 0.8 kB lazy chunk with a bump fallback. No new dependencies.
+
+#### Fixed
+- Editor picker tiles (icons, illustrations, moving backgrounds, add-to-cart) could miss a quick tap or click while their preview drawing was still loading; previews now sit in a layer that ignores the pointer.
+
+#### Tests
+- Backend 1555 (PostgreSQL: 1554 pass, 1 opt-in skip; new `BuilderB20SchemaTest`, `StoreBuilderB20Test`, theme effects in old / new / draft / preset / bootstrap); Pint clean. vitest 2683; mocked Playwright 482 (new `storefront-graphics-b20`, `storefront-effects-b20`, `store-builder-b20` incl. slow-press and touch-tap tests).
+- Full-stack (PostgreSQL, desktop) 53 — new **B20**: Green Basket builds a page from both starters with one described icon (English + Bangla), a bad custom colour is refused, the page publishes; the theme switches to fly-to-cart; shoppers hear the icon's description in both languages, the page fits without sideways scroll, adding a product shows "Added" and fills the cart; the theme is set back. Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- No migration. Themes keep their exact settings until the owner chooses an add-to-cart animation; the store behaves as before (bump + "Added") by default.
+
 ### B19 — Store builder: Scroll stories
 
 #### Added

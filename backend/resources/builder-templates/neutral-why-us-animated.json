@@ -1,0 +1,320 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 100
+                    },
+                    "style": {
+                        "base": {
+                            "typography": {
+                                "align": "center"
+                            }
+                        }
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": {
+                                "text": "Why shop with us",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "কেন আমাদের থেকে কিনবেন"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Small promises we keep on every order.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>প্রতিটি অর্ডারে আমরা যে ছোট ছোট প্রতিশ্রুতি রাখি।</p>"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "inner_row",
+                            "props": {},
+                            "style": {
+                                "base": {
+                                    "layout": {
+                                        "gap": "32px"
+                                    }
+                                }
+                            },
+                            "columns": [
+                                {
+                                    "id": "c_i1",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 25,
+                                        "tablet": 50,
+                                        "mobile": 100
+                                    },
+                                    "style": {
+                                        "base": {
+                                            "typography": {
+                                                "align": "center"
+                                            }
+                                        }
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_i1",
+                                            "type": "animated_icon",
+                                            "props": {
+                                                "name": "delivery_truck",
+                                                "animation": "draw",
+                                                "trigger": "view",
+                                                "size": 64,
+                                                "stroke": 2,
+                                                "color_role": "primary",
+                                                "background": "soft",
+                                                "label": ""
+                                            }
+                                        },
+                                        {
+                                            "id": "e_h1",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Fast delivery",
+                                                "level": 3,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "দ্রুত ডেলিভারি"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_t1",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>Orders leave our shop quickly and reach your door in a few days.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>অর্ডার দ্রুত আমাদের দোকান থেকে রওনা হয় এবং কয়েক দিনের মধ্যে আপনার দরজায় পৌঁছায়।</p>"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_i2",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 25,
+                                        "tablet": 50,
+                                        "mobile": 100
+                                    },
+                                    "style": {
+                                        "base": {
+                                            "typography": {
+                                                "align": "center"
+                                            }
+                                        }
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_i2",
+                                            "type": "animated_icon",
+                                            "props": {
+                                                "name": "cash_on_delivery",
+                                                "animation": "draw",
+                                                "trigger": "view",
+                                                "size": 64,
+                                                "stroke": 2,
+                                                "color_role": "primary",
+                                                "background": "soft",
+                                                "label": ""
+                                            }
+                                        },
+                                        {
+                                            "id": "e_h2",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Cash on delivery",
+                                                "level": 3,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "ক্যাশ অন ডেলিভারি"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_t2",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>Pay when your parcel arrives. No card needed.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>পার্সেল হাতে পেয়ে টাকা দিন। কোনো কার্ড লাগবে না।</p>"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_i3",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 25,
+                                        "tablet": 50,
+                                        "mobile": 100
+                                    },
+                                    "style": {
+                                        "base": {
+                                            "typography": {
+                                                "align": "center"
+                                            }
+                                        }
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_i3",
+                                            "type": "animated_icon",
+                                            "props": {
+                                                "name": "return_box",
+                                                "animation": "draw",
+                                                "trigger": "view",
+                                                "size": 64,
+                                                "stroke": 2,
+                                                "color_role": "primary",
+                                                "background": "soft",
+                                                "label": ""
+                                            }
+                                        },
+                                        {
+                                            "id": "e_h3",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Easy returns",
+                                                "level": 3,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "সহজ রিটার্ন"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_t3",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>Changed your mind? Send it back and we will sort it out.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>মত বদলেছেন? ফেরত পাঠান, আমরা বিষয়টি সমাধান করে দেব।</p>"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "c_i4",
+                                    "type": "column",
+                                    "width": {
+                                        "base": 25,
+                                        "tablet": 50,
+                                        "mobile": 100
+                                    },
+                                    "style": {
+                                        "base": {
+                                            "typography": {
+                                                "align": "center"
+                                            }
+                                        }
+                                    },
+                                    "elements": [
+                                        {
+                                            "id": "e_i4",
+                                            "type": "animated_icon",
+                                            "props": {
+                                                "name": "headset",
+                                                "animation": "draw",
+                                                "trigger": "view",
+                                                "size": 64,
+                                                "stroke": 2,
+                                                "color_role": "primary",
+                                                "background": "soft",
+                                                "label": ""
+                                            }
+                                        },
+                                        {
+                                            "id": "e_h4",
+                                            "type": "heading",
+                                            "props": {
+                                                "text": "Friendly support",
+                                                "level": 3,
+                                                "link": null
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "text": "আন্তরিক সহায়তা"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "id": "e_t4",
+                                            "type": "text",
+                                            "props": {
+                                                "html": "<p>Call or message us and a real person will help you.</p>"
+                                            },
+                                            "translations": {
+                                                "bn": {
+                                                    "html": "<p>আমাদের ফোন বা মেসেজ করুন, একজন মানুষ আপনাকে সাহায্য করবেন।</p>"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

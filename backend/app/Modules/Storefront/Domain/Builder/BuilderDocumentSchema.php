@@ -55,6 +55,9 @@ use Illuminate\Support\Facades\Validator;
  * (+ `ken_burns_direction`), the document `scroll_progress` (pages, content pages, templates);
  * the scroll_story and horizontal_gallery elements (B19ElementProps). All kept only when set.
  *
+ * B20: animated graphics — the animated_icon and illustration elements (B20ElementProps);
+ * StyleSchema knows `style.base.background_fx` (sections and inner rows), kept only when set.
+ *
  * B14: store page templates — context `template:<key>` (contextOf(`template:<key>`)): what a
  * page may hold (globals, sticky, audiences, A/B tests; no `seo`) plus the template's main part
  * (ElementRegistry::TEMPLATE_CORE) at most once (TEMPLATE_CORE_DUPLICATE; publishing needs it
@@ -1307,6 +1310,9 @@ final class BuilderDocumentSchema
         }
         if (in_array($type, ElementRegistry::B19, true)) {
             return (new B19ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
+        }
+        if (in_array($type, ElementRegistry::B20, true)) {
+            return (new B20ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
         }
         if (in_array($type, ElementRegistry::B14, true)) {
             return (new B14ElementProps(

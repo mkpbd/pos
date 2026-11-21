@@ -35,6 +35,8 @@ import { B17Form } from './b17-forms'
 import { B17_TYPES } from './b17-model'
 import { B19Form } from './b19-forms'
 import { B19_TYPES } from './b19-model'
+import { B20Form } from './b20-forms'
+import { B20_TYPES } from './b20-model'
 import { B14Form } from './b14-forms'
 import { B14_TYPES } from './b14-model'
 import { P2aForm } from './order-form'
@@ -104,6 +106,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   if (B14_TYPES.has(node.type)) return <B14Form key={node.id} node={node as Element} {...common} context={b4.context} template={b4.template} />
   if (B17_TYPES.has(node.type)) return <B17Form key={node.id} node={node as Element} {...common} context={b4.context} enums={b4.enums} />
   if (B19_TYPES.has(node.type)) return <B19Form key={node.id} node={node as Element} {...common} context={b4.context} limits={b4.limits} />
+  if (B20_TYPES.has(node.type)) return <B20Form key={node.id} node={node as Element} {...common} context={b4.context} enums={b4.enums} theme={b4.theme} />
   switch (node.type) {
     case 'section':
       return (

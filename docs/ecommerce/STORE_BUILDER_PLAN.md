@@ -535,6 +535,25 @@ Original questions:
   *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
   the editor sends the canvas only the shown arm (the canvas never filters).
 
+### As built — B20 animated graphics (2026-11-21)
+
+- **Schema:** `B20ElementProps` (animated icon, illustration), `StyleSchema` `background_fx` (sections / inner rows, base only),
+  `ThemeSchema` `effects` (kept only when sent; bootstrap resolves defaults), registry groups / keywords (en + bn), page check
+  (`BACKGROUND_FX_MANY`, `ICON_LOOP_MANY`, `ILLUSTRATION_TOP`), starters `neutral-why-us-animated`, `neutral-delivery-banner`.
+- **Drawings** (`storefront/builder/graphics/`): 48 original line icons on a 48 × 48 grid (`icons/*.ts`, one path per part, `pathLength="1"`;
+  no brand marks — generic mobile wallet and chat bubble) and 8 original scenes (`illustrations/*`, one lazy chunk each, theme or mono
+  palette from `--sf-*`). `play.ts` drives view / hover / loop through the B18 viewport watcher and long-motion registry; every animation
+  ends on the drawn pose. CSS ships inside the lazy chunks (`<style precedence="b20">`), so the entry CSS is unchanged.
+- **Moving backgrounds** (`background-fx*.ts(x)`): deterministic placement from the node id, density caps 8 / 16 / 28 (halved on
+  phones), transform / opacity only, `gradient_flow` via `background-position`; the section's overlay moves into `--b-fx-scrim`, drawn
+  once above the moving layer and below the content.
+- **Cart effects** (`storefront/effects/`): `cart-effects.ts` dispatches on every add (product card, product page, quick view, quick-buy
+  bar, add selected, bundle) to `[data-sf-cart-target]`; `cart-fly.ts` lazy; `added-mark.tsx` overlays "Added" without resizing the
+  button; reduced motion → no flight, no bump.
+- **Editor:** `b20-forms.tsx` (searchable icon picker in English / Bangla, animation tiles, colour role or own hex with a contrast hint,
+  decorative switches; illustration picker), `b20-background-fx.tsx` (Style → Background), theme page *Add to cart* card. Picker
+  drawings sit in a `pointer-events: none` layer so a tap during lazy loading still selects the tile.
+
 ### As built — B19 scroll stories (2026-11-21)
 
 - **Schema:** `StyleSchema` scroll group (base only, silent drop), `B19ElementProps` (`scroll_story`, `horizontal_gallery`; nullable

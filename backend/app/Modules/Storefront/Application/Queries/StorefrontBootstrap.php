@@ -30,6 +30,8 @@ use Carbon\CarbonImmutable;
  * B4: `builder.header`, `builder.footer` and `builder.zones` (render payloads or null).
  * B10: `theme.fonts` — `{heading, body, bangla_heading, bangla_body, custom: [{id, name, family,
  * url, format, weight_min, weight_max}]}` (CustomFonts::themeFonts).
+ * B20: `theme.effects` — `{add_to_cart: fly|bump|none, button_feedback}` (ThemeSchema::effects:
+ * the defaults while the theme sets none).
  * AI2b: `assistant` {enabled (the store's switch AND AI available for the organization), name,
  * greeting (this language), handoff, handoff_url} — computed outside the content cache (the AI
  * switch is not storefront content); never limits or usage.
@@ -169,6 +171,8 @@ class StorefrontBootstrap
                     'payment_logos' => array_values(array_filter(array_map($ref, $t['footer']['payment_logo_media_ids']))),
                 ],
                 'custom_css' => $theme->custom_css,
+                // B20: store-wide add-to-cart effects, resolved (defaults when the theme sets none).
+                'effects' => ThemeSchema::effects($t),
             ],
             'menus' => $menus
                 ->mapWithKeys(fn (Menu $menu) => [$menu->location->value => [

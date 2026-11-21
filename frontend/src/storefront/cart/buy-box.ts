@@ -4,6 +4,7 @@ import { useLocale } from '../i18n/locale'
 import type { ProductDetail, ProductVariant } from '../types'
 import { useAddToCartMutation } from './api'
 import { useCartDrawer } from './cart-drawer-context'
+import { useCartEffects } from '../effects/cart-effects'
 import { cartErrorMessage, maxQuantityHint } from './quantity'
 
 /** Where a buy action was pressed: the product's own form or the quick-buy bar (P1b). Errors show where they happened. */
@@ -27,6 +28,12 @@ export function prefetchCheckout() {
   void import('../checkout/checkout-page')
 }
 
+/** The picture that flies to the cart: the chosen variant's photo, else the product's first. */
+function productImage(product: ProductDetail, variant: ProductVariant | null): string | null {
+  const own = variant?.image_id ? product.images.find((image) => image.id === variant.image_id) : undefined
+  return (own ?? product.images[0])?.url ?? null
+}
+
 /**
  * The buy state of one product view: quantity, stock limit, errors and the pending action, shared by
  * the product page's form and its quick-buy bar (P1b) so both show the same quantity. "Add to cart"
@@ -36,6 +43,7 @@ export function prefetchCheckout() {
 export function useBuyBox(product: ProductDetail, variant: ProductVariant | null, options: { onAdded?: () => void } = {}) {
   const add = useAddToCartMutation()
   const drawer = useCartDrawer()
+  const effects = useCartEffects()
   const navigate = useNavigate()
   const { t } = useLocale()
   const key = variant?.id ?? ''
@@ -59,7 +67,11 @@ export function useBuyBox(product: ProductDetail, variant: ProductVariant | null
           settle(forKey, { max: null, pressed: null })
           options.onAdded?.()
           if (intent === 'buy') void navigate('/checkout')
-          else drawer?.open(button)
+          else {
+            // B20: the theme's add-to-cart effect (the variant's picture, else the product's) plays alongside the mini-cart.
+            effects.celebrate(button, productImage(product, variant), source)
+            drawer?.open(button)
+          }
         },
         onError: (error) => {
           const hint = maxQuantityHint(error)
@@ -81,6 +93,8 @@ export function useBuyBox(product: ProductDetail, variant: ProductVariant | null
     errorFor: (source: BuySource) => (current.error?.source === source ? current.error.message : null),
     soldOut,
     unavailable,
+    /** B20: whether the "Added" check shows on this source's button right now. */
+    addedOn: (source: BuySource) => effects.addedOn(source),
     /** Why the buttons are disabled (no variant chosen, or it is sold out); null when buyable. */
     reason: !variant ? t('cart.add.chooseOptionsFirst') : soldOut ? t('cart.add.optionOutOfStock') : null,
     addToCart: (source: BuySource, button: HTMLElement | null) => submit('cart', source, button),

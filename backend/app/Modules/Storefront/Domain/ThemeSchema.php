@@ -150,6 +150,17 @@ final class ThemeSchema
     public const MAX_PAYMENT_LOGOS = 10;
 
     /**
+     * B20: store-wide shopping effects (`effects`, optional — kept only when set, so themes saved
+     * before keep their exact document): what a successful add to cart shows (`fly` — the
+     * product picture flies to the cart, `bump` — the cart count bumps, `none`) and whether the
+     * button briefly shows "Added" (`button_feedback`). The storefront gets them resolved
+     * (effects()).
+     */
+    public const ADD_TO_CART_EFFECTS = ['fly', 'bump', 'none'];
+
+    public const EFFECTS_DEFAULTS = ['add_to_cart' => 'bump', 'button_feedback' => true];
+
+    /**
      * @return array<string, mixed>
      */
     public static function defaults(): array
@@ -293,7 +304,30 @@ final class ThemeSchema
             $result['layout']['product'] = $layout;
         }
 
+        // B20: optional store-wide effects — only when set (null = unset); values outside their
+        // choices take the default.
+        if (is_array($settings['effects'] ?? null)) {
+            $effects = $settings['effects'];
+            $result['effects'] = [
+                'add_to_cart' => in_array($effects['add_to_cart'] ?? null, self::ADD_TO_CART_EFFECTS, true) ? $effects['add_to_cart'] : self::EFFECTS_DEFAULTS['add_to_cart'],
+                'button_feedback' => is_bool($effects['button_feedback'] ?? null)
+                    ? $effects['button_feedback']
+                    : (in_array($effects['button_feedback'] ?? null, [0, '0', 'false'], true) ? false : self::EFFECTS_DEFAULTS['button_feedback']),
+            ];
+        }
+
         return $result;
+    }
+
+    /**
+     * B20: the store-wide effects as the storefront applies them (the defaults when unset).
+     *
+     * @param  array<string, mixed>  $settings  normalized
+     * @return array{add_to_cart: string, button_feedback: bool}
+     */
+    public static function effects(array $settings): array
+    {
+        return is_array($settings['effects'] ?? null) ? $settings['effects'] + self::EFFECTS_DEFAULTS : self::EFFECTS_DEFAULTS;
     }
 
     /**

@@ -1,0 +1,119 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": {
+                "layout": "boxed"
+            },
+            "style": {
+                "base": {
+                    "spacing": {
+                        "padding": {
+                            "top": "64px",
+                            "bottom": "64px"
+                        }
+                    },
+                    "layout": {
+                        "gap": "40px",
+                        "align": "center"
+                    },
+                    "background_fx": {
+                        "type": "floating_shapes",
+                        "density": "low",
+                        "speed": "slow"
+                    }
+                },
+                "mobile": {
+                    "spacing": {
+                        "padding": {
+                            "top": "40px",
+                            "bottom": "40px"
+                        }
+                    }
+                }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "illustration",
+                            "props": {
+                                "name": "delivery_scene",
+                                "play": "view",
+                                "size": "large",
+                                "align": "center",
+                                "palette": "theme",
+                                "alt": ""
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c_2",
+                    "type": "column",
+                    "width": {
+                        "base": 50,
+                        "tablet": 50,
+                        "mobile": 100
+                    },
+                    "elements": [
+                        {
+                            "id": "e_2",
+                            "type": "heading",
+                            "props": {
+                                "text": "Fast delivery to your door",
+                                "level": 2,
+                                "link": null
+                            },
+                            "translations": {
+                                "bn": {
+                                    "text": "দ্রুত ডেলিভারি, সোজা আপনার দরজায়"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "text",
+                            "props": {
+                                "html": "<p>Order today and we pack it with care. Pay in cash when it arrives.</p>"
+                            },
+                            "translations": {
+                                "bn": {
+                                    "html": "<p>আজই অর্ডার করুন, আমরা যত্ন করে প্যাক করব। পণ্য হাতে পেয়ে নগদে টাকা দিন।</p>"
+                                }
+                            }
+                        },
+                        {
+                            "id": "e_4",
+                            "type": "button",
+                            "props": {
+                                "label": "Shop now",
+                                "link": {
+                                    "url": "/shop"
+                                },
+                                "variant": "primary",
+                                "size": "lg",
+                                "full_width": false
+                            },
+                            "translations": {
+                                "bn": {
+                                    "label": "এখনই কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

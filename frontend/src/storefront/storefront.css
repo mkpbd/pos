@@ -692,3 +692,98 @@ header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
 @supports (animation-timeline: scroll()) {
   .b-progress-fill { animation: b-progress-grow linear both; animation-timeline: scroll(root block); }
 }
+
+/*
+ * B20 moving backgrounds & add-to-cart effects (./builder/background-fx.tsx, ./effects/cart-effects.ts).
+ * A moving background is a decorative layer under the content: clipped to its node, no pointer
+ * events, fading in after the first paint. Particles move transform / opacity only (gradient_flow:
+ * background-position). Every animation carries a negative delay and stays paused unless the layer
+ * is `data-state="running"` (on screen, motion allowed, not paused, not the calm editor canvas):
+ * the paused layer is a still, spread-out frame. Phones draw every second particle.
+ */
+.b-fx {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; overflow: clip; pointer-events: none;
+  border-radius: inherit; container-type: size; contain: layout paint style;
+  opacity: 0; transition: opacity 600ms ease;
+}
+.b-fx[data-ready] { opacity: 1; }
+.b-fx-scrim { position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; background-image: var(--b-fx-scrim, none); }
+.b-fx-p {
+  position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s);
+  opacity: var(--o); color: var(--c); background: var(--c); border-radius: 50%;
+  animation-duration: var(--d); animation-delay: var(--dl); animation-iteration-count: infinite;
+  animation-play-state: paused;
+}
+.b-fx-gradient {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--c1) 40%, transparent),
+    color-mix(in srgb, var(--c2) 40%, transparent),
+    color-mix(in srgb, var(--c3) 40%, transparent),
+    color-mix(in srgb, var(--c1) 40%, transparent)
+  );
+  background-size: 300% 300%;
+  animation: b-fx-flow var(--d, 18s) ease-in-out infinite alternate paused;
+}
+.b-fx[data-state="running"] :is(.b-fx-p, .b-fx-gradient, .b-fx-lantern) { animation-play-state: running; }
+@keyframes b-fx-flow { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@keyframes b-fx-fall {
+  from { transform: translate3d(0, calc(var(--s) * -2), 0) rotate(0deg); }
+  to { transform: translate3d(var(--dx), calc(100cqh + var(--s)), 0) rotate(var(--r)); }
+}
+@keyframes b-fx-rise {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  10%, 85% { opacity: var(--o); }
+  100% { transform: translate3d(var(--dx), calc(-100cqh - var(--s) * 3), 0); opacity: 0; }
+}
+@keyframes b-fx-drift { from { transform: translate3d(0, 0, 0) rotate(0deg); } to { transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--r)); } }
+@keyframes b-fx-twinkle {
+  0%, 100% { transform: scale(0.35); opacity: 0.15; }
+  50% { transform: scale(1); opacity: var(--o); }
+}
+@keyframes b-fx-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+.b-fx[data-motion="fall"] .b-fx-p { top: 0; animation-name: b-fx-fall; animation-timing-function: linear; }
+.b-fx[data-motion="rise"] .b-fx-p { top: 100%; animation-name: b-fx-rise; animation-timing-function: linear; }
+.b-fx[data-motion="drift"] .b-fx-p { animation-name: b-fx-drift; animation-timing-function: ease-in-out; animation-direction: alternate; }
+.b-fx[data-motion="twinkle"] .b-fx-p { animation-name: b-fx-twinkle; animation-timing-function: ease-in-out; }
+/* Shapes. */
+.b-fx[data-fx="bubbles"] .b-fx-p { background: color-mix(in srgb, var(--c) 16%, transparent); border: 1.5px solid var(--c); }
+.b-fx[data-fx="snow"] .b-fx-p[data-v="1"] { box-shadow: 0 0 6px var(--c); }
+.b-fx[data-fx="floating_shapes"] .b-fx-p[data-v="1"] { border-radius: 22%; }
+.b-fx[data-fx="floating_shapes"] .b-fx-p[data-v="2"] { border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.b-fx[data-fx="floating_shapes"] .b-fx-p[data-v="3"] { background: transparent; border: calc(var(--s) * 0.14) solid var(--c); }
+.b-fx[data-fx="sparkles"] .b-fx-p { border-radius: 0; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+.b-fx[data-fx="stars"] .b-fx-p[data-v="1"] { width: calc(var(--s) * 2); height: calc(var(--s) * 2); border-radius: 0; clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.b-fx[data-fx="petals"] .b-fx-p { height: calc(var(--s) * 0.7); border-radius: 0 100% 0 100%; }
+.b-fx[data-fx="petals"] .b-fx-p[data-v="1"] { border-radius: 100% 0 100% 0; }
+.b-fx[data-fx="confetti_fall"] .b-fx-p { border-radius: 1px; }
+.b-fx[data-fx="confetti_fall"] .b-fx-p[data-v="0"] { height: calc(var(--s) * 0.4); }
+.b-fx[data-fx="confetti_fall"] .b-fx-p[data-v="2"] { border-radius: 50%; }
+.b-fx[data-fx="lanterns"] .b-fx-p { height: calc(var(--s) * 1.67); background: none; border-radius: 0; }
+.b-fx-lantern { display: block; width: 100%; height: 100%; overflow: visible; transform-origin: 50% 0; animation: b-fx-sway 3.2s ease-in-out infinite alternate paused; }
+@media (max-width: 639px) {
+  .b-fx-p:nth-child(even) { display: none; }
+}
+/* Pause animations (WCAG 2.2.2) and reduced motion: the still frame. */
+:root[data-b-paused] .b-fx :is(.b-fx-p, .b-fx-gradient, .b-fx-lantern) { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  .b-fx { transition: none; }
+  .b-fx :is(.b-fx-p, .b-fx-gradient, .b-fx-lantern) { animation-play-state: paused !important; }
+}
+
+/* Add to cart: the flying picture (above the mini-cart) and the button's brief "Added" check (same size: laid over it). */
+.sf-fly {
+  position: fixed; z-index: 70; width: 48px; height: 48px; border-radius: 9999px; object-fit: cover;
+  pointer-events: none; background: var(--sf-accent); box-shadow: 0 8px 20px -6px rgb(0 0 0 / 0.45);
+  border: 2px solid var(--sf-surface); will-change: transform, opacity;
+}
+.sf-added-mark {
+  position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 0.375rem;
+  padding-inline: 0.5rem; overflow: hidden; white-space: nowrap; border-radius: inherit; pointer-events: none;
+  background: var(--sf-accent); color: var(--sf-accent-foreground); font-weight: 700;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sf-added-mark { animation: sf-added-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+}
+@keyframes sf-added-in { from { opacity: 0; transform: scale(0.9); } }

@@ -75,6 +75,8 @@ function baseGroups(node: BuilderNode): GroupSpec[] {
       return [{ id: 'size', open: true }, { id: 'spacing', open: true }]
   }
   if (isWrappedSectionType(node.type)) return [{ id: 'background', open: true }, { id: 'spacing', open: true }, { id: 'border' }]
+  // B20: the animated graphics move by themselves (Content tab); their space around them here.
+  if (node.type === 'animated_icon' || node.type === 'illustration') return [{ id: 'spacing', open: true }]
   return []
 }
 

@@ -130,13 +130,21 @@ export function WishlistLink({ label = 'never' }: { label?: ActionLabel }) {
   )
 }
 
+/** B20: the cart buttons carry `data-sf-cart-target` — where an added product's picture flies and what bumps (../effects/cart-effects.ts). */
 export function CartButton({ showCount = true }: { showCount?: boolean }) {
   const cart = useCartQuery()
   const drawer = useCartDrawer()
   const { t } = useLocale()
   const count = cart.data ? displayQuantity(cart.data.item_count) : '0'
   return (
-    <button type="button" className={iconButton} aria-label={count === '0' ? t('common.cart') : t('common.cartWithCount', { items: t('common.items', { count: Number(count) }) })} aria-haspopup="dialog" onClick={() => drawer?.open()}>
+    <button
+      type="button"
+      className={iconButton}
+      aria-label={count === '0' ? t('common.cart') : t('common.cartWithCount', { items: t('common.items', { count: Number(count) }) })}
+      aria-haspopup="dialog"
+      onClick={() => drawer?.open()}
+      data-sf-cart-target=""
+    >
       <ShoppingBagIcon aria-hidden className="size-6" />
       {showCount && <CountBadge count={count} testId="cart-count" />}
     </button>
@@ -160,7 +168,7 @@ export function CartTotalButton({ showCount = true }: { showCount?: boolean }) {
       onClick={() => drawer?.open()}
       data-testid="cart-total-button"
     >
-      <span className="relative grid size-10 place-items-center group-hover/cart:text-sf-accent">
+      <span className="relative grid size-10 place-items-center group-hover/cart:text-sf-accent" data-sf-cart-target="">
         <ShoppingBagIcon aria-hidden className="size-6" />
         {showCount && <CountBadge count={count} testId="cart-count" />}
       </span>

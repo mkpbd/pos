@@ -143,11 +143,19 @@ function declaration(property: string, value: string | undefined, allowUrl = fal
   return [`${property}:${value}`]
 }
 
-function backgroundDeclarations(background: Background, options: CompileOptions): string[] {
-  if (background.type === 'none') return declaration('background', 'none')
+/**
+ * B20: a node with a moving background draws its overlay above that layer, not in its own
+ * background: `--b-fx-scrim` carries it to the layer's scrim (picture → moving things → overlay →
+ * content), so the overlay still applies exactly once.
+ */
+export const FX_SCRIM_VAR = '--b-fx-scrim'
+
+function backgroundDeclarations(background: Background, options: CompileOptions, fxScrim = false): string[] {
+  if (background.type === 'none') return [...declaration('background', 'none'), ...(fxScrim ? declaration(FX_SCRIM_VAR, 'none') : [])]
   const overlay = typeof background.overlay === 'string' ? colorCss(background.overlay) : background.overlay ? gradientCss(background.overlay) : undefined
-  const overlayLayer = overlay === undefined ? undefined : overlay.includes('gradient(') ? overlay : `linear-gradient(${overlay}, ${overlay})`
-  const out: string[] = []
+  const ownOverlay = overlay === undefined ? undefined : overlay.includes('gradient(') ? overlay : `linear-gradient(${overlay}, ${overlay})`
+  const overlayLayer = fxScrim ? undefined : ownOverlay
+  const out: string[] = fxScrim ? declaration(FX_SCRIM_VAR, ownOverlay ?? 'none') : []
 
   if (background.type === 'color') {
     out.push(...declaration('background-color', colorCss(background.color)))
@@ -188,12 +196,12 @@ function layoutDeclarations(layout: NonNullable<Style['layout']>, kind: Kind): s
 }
 
 /** The declarations of one breakpoint's style: for the node itself, for its row (sections) and on hover. */
-function styleDeclarations(style: Style, kind: Kind, options: CompileOptions): { self: string[]; row: string[]; hover: string[] } {
+function styleDeclarations(style: Style, kind: Kind, options: CompileOptions, fxScrim = false): { self: string[]; row: string[]; hover: string[] } {
   const self: string[] = []
   const row: string[] = []
   const hover: string[] = []
 
-  if (style.background) self.push(...backgroundDeclarations(style.background, options))
+  if (style.background) self.push(...backgroundDeclarations(style.background, options, fxScrim))
   self.push(...declaration('color', colorCss(style.color)))
 
   const t = style.typography
@@ -287,17 +295,22 @@ function compileNodeStyle(
   const style: ResponsiveStyle = normalizeStyle(rawStyle)
   const selector = selectorFor(id, options)
   const breakpoints = ['base', 'tablet', 'mobile'] as const
+  // B20: sections and inner rows with a moving background hand their overlay to that layer (every breakpoint).
+  const fxScrim = kind === 'section' && style.base?.background_fx !== undefined
   const compiled = breakpoints.map((breakpoint) => {
     const value = style[breakpoint]
-    return value ? styleDeclarations(value, kind, options) : { self: [], row: [], hover: [] }
+    return value ? styleDeclarations(value, kind, options, fxScrim) : { self: [], row: [], hover: [] }
   })
   // Transitions only when hover changes something; none (and no movement) for reduced motion.
   const hasHover = compiled.some((declarations) => declarations.hover.length > 0)
   const transition = hasHover ? ['transition:color 0.2s ease,background-color 0.2s ease,box-shadow 0.2s ease,transform 0.2s ease'] : []
 
+  // No background of its own: its layer's scrim stays empty (not an outer moving background's overlay).
+  const scrimReset = fxScrim && !style.base?.background ? declaration(FX_SCRIM_VAR, 'none') : []
+
   breakpoints.forEach((breakpoint, index) => {
     const declarations = compiled[index]!
-    addRule(out[breakpoint], selector, [...(extra[breakpoint] ?? []), ...declarations.self, ...(breakpoint === 'base' ? transition : [])])
+    addRule(out[breakpoint], selector, [...(extra[breakpoint] ?? []), ...(breakpoint === 'base' ? scrimReset : []), ...declarations.self, ...(breakpoint === 'base' ? transition : [])])
     addRule(out[breakpoint], `${scopePrefix(options.scope)}[data-b-row="${id}"]`, declarations.row)
     addRule(out[breakpoint], `${selector}:hover,${selector}:focus-visible`, declarations.hover)
   })

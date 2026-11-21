@@ -99,6 +99,40 @@ final class StyleSchema
     /** B19: the part of the node's trip through the viewport the effect plays in (absent = enter). */
     public const SCROLL_RANGES = ['enter', 'cover', 'exit', 'enter_exit'];
 
+    /**
+     * B20: a moving background behind a section's or inner row's content (`background_fx`, base
+     * only; `none` drops the group): drifting shapes or a flowing gradient, drawn by the storefront
+     * with CSS / SVG only.
+     */
+    public const BACKGROUND_FX_TYPES = ['none', 'gradient_flow', 'floating_shapes', 'bubbles', 'sparkles', 'snow', 'petals', 'lanterns', 'confetti_fall', 'stars'];
+
+    /** B20: how many shapes move (absent = medium). */
+    public const BACKGROUND_FX_DENSITIES = ['low', 'medium', 'high'];
+
+    /** B20: absent = slow. */
+    public const BACKGROUND_FX_SPEEDS = ['slow', 'normal'];
+
+    /** B20: theme colour roles of the moving shapes (`secondary` is the highlight colour), 1–3 of them. */
+    public const BACKGROUND_FX_COLOR_ROLES = ['primary', 'accent', 'secondary', 'surface'];
+
+    public const BACKGROUND_FX_COLORS = [1, 3];
+
+    /** B20: the colours a moving background uses when it names none. */
+    public const BACKGROUND_FX_DEFAULT_COLORS = [
+        'gradient_flow' => ['primary', 'accent', 'secondary'],
+        'floating_shapes' => ['primary', 'accent'],
+        'bubbles' => ['primary', 'surface'],
+        'sparkles' => ['accent', 'secondary'],
+        'snow' => ['surface'],
+        'petals' => ['secondary', 'accent'],
+        'lanterns' => ['primary', 'accent'],
+        'confetti_fall' => ['primary', 'accent', 'secondary'],
+        'stars' => ['accent'],
+    ];
+
+    /** B20: more moving backgrounds than this on one page is too much (page check BACKGROUND_FX_MANY). */
+    public const BACKGROUND_FX_WARN = 2;
+
     public const MAX_SHADOWS = 3;
 
     public const MAX_TEXT_SHADOWS = 2;
@@ -119,6 +153,8 @@ final class StyleSchema
      * (containers: sections and inner rows); `background.parallax` at `base` of sections only.
      *
      * B19: `scroll` (base only, any node) — a scroll-linked effect.
+     *
+     * B20: `background_fx` (base only, containers: sections and inner rows) — a moving background.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -182,6 +218,8 @@ final class StyleSchema
             'hover' => $base ? self::hover($groups['hover'] ?? null) : null,
             // B19: scroll-linked effect (base only).
             'scroll' => $base ? self::scroll($groups['scroll'] ?? null) : null,
+            // B20: moving background (base only, sections and inner rows).
+            'background_fx' => $base && $container ? self::backgroundFx($groups['background_fx'] ?? null) : null,
         ]) ?? [];
     }
 
@@ -249,6 +287,32 @@ final class StyleSchema
             'effect' => $effect,
             'intensity' => self::enum($value['intensity'] ?? null, self::SCROLL_INTENSITIES),
             'range' => self::enum($value['range'] ?? null, self::SCROLL_RANGES),
+        ]);
+    }
+
+    /**
+     * B20: `{type, density?, speed?, colors?}` — a moving background; dropped when the type is
+     * unset, `none` or unknown. Invalid density / speed dropped; `colors` keeps the valid roles
+     * once each (at most 3; dropped when none is left).
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function backgroundFx(mixed $value): ?array
+    {
+        if (! is_array($value) || ($type = self::enum($value['type'] ?? null, self::BACKGROUND_FX_TYPES)) === null || $type === 'none') {
+            return null;
+        }
+        $colors = null;
+        if (is_array($value['colors'] ?? null) && array_is_list($value['colors'])) {
+            $roles = array_values(array_unique(array_filter($value['colors'], fn ($role) => self::enum($role, self::BACKGROUND_FX_COLOR_ROLES) !== null)));
+            $colors = $roles === [] ? null : array_slice($roles, 0, self::BACKGROUND_FX_COLORS[1]);
+        }
+
+        return self::compact([
+            'type' => $type,
+            'density' => self::enum($value['density'] ?? null, self::BACKGROUND_FX_DENSITIES),
+            'speed' => self::enum($value['speed'] ?? null, self::BACKGROUND_FX_SPEEDS),
+            'colors' => $colors,
         ]);
     }
 

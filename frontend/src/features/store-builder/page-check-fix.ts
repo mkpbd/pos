@@ -54,5 +54,12 @@ export function applyPageCheckFix(content: BuilderContent, fix: PageCheckFix): B
       if (props.pin === false) return content
       return setNode(content, { ...node, props: { ...props, pin: false } } as BuilderNode)
     }
+    case 'set-play-view': {
+      // B20 "Play once when seen": a looping illustration plays once when it comes into view.
+      if (node.type !== 'illustration' || !('props' in node)) return content
+      const props = node.props as Record<string, unknown>
+      if (props.play === 'view') return content
+      return setNode(content, { ...node, props: { ...props, play: 'view' } } as BuilderNode)
+    }
   }
 }

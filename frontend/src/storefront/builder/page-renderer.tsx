@@ -15,6 +15,8 @@ import { B17ElementContent } from './elements/b17'
 import { B14ElementContent } from './elements/b14'
 import { B19ElementContent } from './elements/b19'
 import { isB19Type } from './elements/b19-types'
+import { B20ElementContent } from './elements/b20'
+import { isB20Type } from './elements/b20-types'
 import { isB14Type } from './elements/b14-types'
 import { isB17Type } from './elements/b17-types'
 import { isB8aType } from './elements/b8a-types'
@@ -28,6 +30,8 @@ import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
 import { BackgroundVideoLayer, ParallaxLayer, ShapeDivider } from './section-layers'
 import { BackgroundScrollLayer, ReadingProgressBar } from './scroll-layers'
+import { BackgroundFxLayer } from './background-fx'
+import { backgroundFxOf } from './background-fx-model'
 import { SCROLL_GATE_ATTRIBUTE } from './scroll-css'
 import { useKenBurns, useScrollEffects, useScrollMotionOn } from './scroll-link'
 import { isWrappedSectionType, NODE_ID } from './registry'
@@ -135,7 +139,9 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
   const backgroundScroll = video ? undefined : sectionBackgroundScroll(section.props, section.style)
   // B9: a background image that scrolls slower than the page.
   const parallax = video || backgroundScroll ? null : parallaxOf(section.style)
-  const layered = Boolean(shapes.top || shapes.bottom || video || parallax || backgroundScroll)
+  // B20: a moving background (decorative particles or a flowing gradient) behind the content.
+  const fx = backgroundFxOf(section.style)
+  const layered = Boolean(shapes.top || shapes.bottom || video || parallax || backgroundScroll || fx)
   // B9: a section drawn from a global section: its forms submit to the global document; drafts (and the canvas) mark it.
   const owner = globalInfo(section)
   const global = draft ? owner : null
@@ -154,7 +160,9 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
       >
         {parallax && <ParallaxLayer speed={parallax} />}
         {backgroundScroll && <BackgroundScrollLayer kind={backgroundScroll} />}
-        {video && <BackgroundVideoLayer video={video} />}
+        {/* B20: with a moving background, its scrim draws the overlay (once), above the video too. */}
+        {video && <BackgroundVideoLayer video={fx ? { ...video, overlay: undefined } : video} />}
+        {fx && <BackgroundFxLayer fx={fx} seed={section.id} />}
         {shapes.top && <ShapeDivider shape={shapes.top} edge="top" />}
         <div className={cn('b-container', LAYOUT_CLASSES[layout])}>
           <GlobalDocumentCtx value={owner?.id ?? null}>
@@ -227,6 +235,7 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
       if (isB17Type(element.type)) return <B17ElementContent element={element} />
       if (isB14Type(element.type)) return <B14ElementContent element={element} />
       if (isB19Type(element.type)) return <B19ElementContent element={element} />
+      if (isB20Type(element.type)) return <B20ElementContent element={element} />
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
   }
@@ -234,9 +243,11 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
 
 function InnerRow({ element }: { element: Extract<RenderElement, { type: 'inner_row' }> }) {
   const video = backgroundVideoOf(element.style)
+  const fx = backgroundFxOf(element.style)
   return (
-    <div data-b={element.id} className={cn('b-inner-row', video && 'b-layered')}>
-      {video && <BackgroundVideoLayer video={video} />}
+    <div data-b={element.id} className={cn('b-inner-row', (video || fx) && 'b-layered')}>
+      {video && <BackgroundVideoLayer video={fx ? { ...video, overlay: undefined } : video} />}
+      {fx && <BackgroundFxLayer fx={fx} seed={element.id} />}
       <Columns columns={element.columns} rowId={element.id} nested />
     </div>
   )

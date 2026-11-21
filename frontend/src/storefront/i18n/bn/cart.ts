@@ -15,6 +15,7 @@ export const cart: Translations<typeof en> = {
   'cart.add.formLabel': 'কার্টে যোগ করুন',
   'cart.add.button': 'কার্টে যোগ করুন',
   'cart.add.adding': 'যোগ করা হচ্ছে…',
+  'cart.add.added': 'যোগ হয়েছে',
   'cart.add.chooseOptionsFirst': 'পণ্যটি কার্টে যোগ করতে ওপরের অপশনগুলো বেছে নিন।',
   'cart.add.optionOutOfStock': 'এই অপশনটি স্টকে নেই।',
   'cart.add.quantityOf': '{name}-এর পরিমাণ',

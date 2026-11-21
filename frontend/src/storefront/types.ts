@@ -169,7 +169,14 @@ export type StorefrontTheme = {
     payment_logos: MediaRef[]
   }
   custom_css: string | null
+  /** B20: store-wide add-to-cart effects (absent / null = the defaults: bump, button feedback on). */
+  effects?: ThemeEffects | null
 }
+
+/** B20 add-to-cart animation: the product picture flies to the cart, only the cart count bumps, or nothing. */
+export type AddToCartEffect = 'fly' | 'bump' | 'none'
+/** B20 theme group `effects` (defaults: `add_to_cart` bump, `button_feedback` true — a brief "Added" check on the button). */
+export type ThemeEffects = { add_to_cart: AddToCartEffect; button_feedback: boolean }
 
 export type MenuNode = {
   id: string

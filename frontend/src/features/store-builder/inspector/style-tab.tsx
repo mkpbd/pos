@@ -10,7 +10,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRightIcon, MonitorIcon, SmartphoneIcon, TabletIcon } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import type { Background, BackgroundParallax, BackgroundScroll, BackgroundVideo, Breakpoint, HoverStyle, Column, Device, ResponsiveStyle, ScrollStyle, Section, Shadow, Sides, Typography } from '@/storefront/builder/types'
+import type { Background, BackgroundFx, BackgroundParallax, BackgroundScroll, BackgroundVideo, Breakpoint, HoverStyle, Column, Device, ResponsiveStyle, ScrollStyle, Section, Shadow, Sides, Typography } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
 import {
   BackgroundControl,
@@ -34,6 +34,7 @@ import {
 import { HelpTip } from '../controls/control-label'
 import { BackgroundVideoControl } from './b6-style'
 import { MotionControl } from './b9-motion-control'
+import { MovingBackgroundControl } from './b20-background-fx'
 import { ScrollControl } from './b19-scroll-control'
 import { hasBackgroundPicture, withBackgroundScroll, withoutBackgroundScroll } from './b19-scroll'
 import { canParallax, canStagger } from './b9-motion'
@@ -120,7 +121,7 @@ type StyleTabProps = {
 }
 
 const GROUP_PATHS: Record<GroupId, StylePath[]> = {
-  background: [['background']],
+  background: [['background'], ['background_fx']],
   'button-colors': [['background'], ['color'], ['effects', 'hover', 'color'], ['effects', 'hover', 'background_color']],
   color: [['color']],
   typography: [['typography']],
@@ -235,14 +236,20 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
 
   const sections: Record<GroupId, () => ReactNode> = {
     background: () => (
-      <BackgroundControl
-        value={withoutVideo(get<Background>(['background']).value)}
-        onChange={(bg, media) => setBackground(bg, media)}
-        themeColors={themeColors}
-        palette={palette}
-        status={status(['background'], 'Background')}
-        tooltip="A colour, gradient or picture behind this part of the page."
-      />
+      <>
+        <BackgroundControl
+          value={withoutVideo(get<Background>(['background']).value)}
+          onChange={(bg, media) => setBackground(bg, media)}
+          themeColors={themeColors}
+          palette={palette}
+          status={status(['background'], 'Background')}
+          tooltip="A colour, gradient or picture behind this part of the page."
+        />
+        {/* B20: sections and inner rows can have a moving background (desktop style = every device). */}
+        {(node.type === 'section' || node.type === 'inner_row') && (
+          <MovingBackgroundControl value={style.base?.background_fx} onChange={(fx: BackgroundFx | undefined) => setBase(['background_fx'], fx)} themeColors={themeColors} />
+        )}
+      </>
     ),
     'button-colors': () => {
       const bg = get<Background>(['background']).value

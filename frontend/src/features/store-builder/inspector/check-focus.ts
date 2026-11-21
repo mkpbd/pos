@@ -25,6 +25,9 @@ const FIELD_LABELS: Record<string, readonly string[]> = {
   description: ['Description'],
   notify_email: ['Send a copy', 'Notify', 'E-mail'],
   product_id: ['Product'],
+  // B20: when an animated icon / illustration plays (ICON_LOOP_MANY, ILLUSTRATION_TOP).
+  trigger: ['When it plays'],
+  play: ['When it plays'],
   color: ['Text colour', 'Colour', 'Color'],
   size: ['Text size', 'Size', 'Font size'],
   visibility: ['Show on', 'Desktop', 'Visible'],

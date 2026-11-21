@@ -102,6 +102,10 @@ class SaveThemeRequest extends FormRequest
             "{$p}footer.social" => ['sometimes', 'array'],
             "{$p}footer.payment_logo_media_ids" => ['sometimes', 'array', 'max:'.ThemeSchema::MAX_PAYMENT_LOGOS],
             "{$p}footer.payment_logo_media_ids.*" => ['uuid', 'distinct'],
+            // B20: store-wide effects (optional; null = unset).
+            "{$p}effects" => ['sometimes', 'nullable', 'array'],
+            "{$p}effects.add_to_cart" => ['sometimes', Rule::in(ThemeSchema::ADD_TO_CART_EFFECTS)],
+            "{$p}effects.button_feedback" => ['sometimes', 'boolean'],
         ];
 
         // B3: button, button text and link start as copies of primary / accent (ThemeSchema::DERIVED_COLORS).

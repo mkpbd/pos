@@ -146,7 +146,22 @@ export type Style = {
   hover?: HoverStyle
   /** B19: a scroll-linked effect; `base` breakpoint only (normalize drops it from tablet / mobile). */
   scroll?: ScrollStyle
+  /** B20: a moving decorative background (sections and inner rows; `base` breakpoint only). */
+  background_fx?: BackgroundFx
 }
+
+/* B20 moving backgrounds (`style.base.background_fx`). */
+
+/** `none` = no moving background (the server drops the group, like an absent one). */
+export type BackgroundFxType = 'none' | 'gradient_flow' | 'floating_shapes' | 'bubbles' | 'sparkles' | 'snow' | 'petals' | 'lanterns' | 'confetti_fall' | 'stars'
+/** How many moving things (absent = medium): low ≤ 8, medium ≤ 16, high ≤ 28. */
+export type BackgroundFxDensity = 'low' | 'medium' | 'high'
+/** Absent = slow. */
+export type BackgroundFxSpeed = 'slow' | 'normal'
+/** Theme roles a moving background may use (`secondary` = the theme's highlight colour). */
+export type BackgroundFxColorRole = 'primary' | 'accent' | 'secondary' | 'surface'
+/** B20 style group `background_fx` (sparse: absent keys = the defaults; `colors` 1–3 unique roles, absent = the type's own). */
+export type BackgroundFx = { type: Exclude<BackgroundFxType, 'none'>; density?: BackgroundFxDensity; speed?: BackgroundFxSpeed; colors?: BackgroundFxColorRole[] }
 
 /* B19 scroll stories: scroll-linked effects, section background scroll, Ken Burns, reading progress. */
 
@@ -806,6 +821,48 @@ export type HorizontalGalleryElement = ElementOf<'horizontal_gallery', Horizonta
 export type B19Element = ScrollStoryElement | HorizontalGalleryElement
 
 /* ----------------------------------------------------------------------------------------------
+ * B20: animated graphics — an animated line icon and an animated illustration. ✱ text props are
+ * translatable (animated_icon `label` ≤ 80, illustration `alt` ≤ 200; empty = decorative). The
+ * allowed names are ANIMATED_ICON_NAMES / ILLUSTRATION_NAMES (./graphics/names.ts).
+ * -------------------------------------------------------------------------------------------- */
+
+export type AnimatedIconAnimation = 'draw' | 'pop' | 'bounce' | 'spin' | 'pulse' | 'wiggle' | 'float' | 'none'
+/** When it plays: once on entering the viewport, on hover / keyboard focus of its link or button, or looping (long motion). */
+export type AnimatedIconTrigger = 'view' | 'hover' | 'loop'
+/** `secondary` = the theme's highlight colour; `custom` uses `color`. */
+export type AnimatedIconColorRole = 'primary' | 'accent' | 'secondary' | 'text' | 'custom'
+export type AnimatedIconBackground = 'none' | 'circle' | 'square' | 'soft'
+/** `size` px 24–160 (64), `stroke` 1–3 (2) px at 48 px; `color` (`#rrggbb` / `#rrggbbaa`) present only with `color_role: custom`. */
+export type AnimatedIconProps = {
+  name: string
+  animation: AnimatedIconAnimation
+  trigger: AnimatedIconTrigger
+  size: number
+  stroke: number
+  color_role: AnimatedIconColorRole
+  color?: Color
+  background: AnimatedIconBackground
+  label: string
+}
+export type AnimatedIconElement = ElementOf<'animated_icon', AnimatedIconProps>
+
+export type IllustrationPlay = 'view' | 'loop' | 'hover'
+export type IllustrationSize = 'small' | 'medium' | 'large'
+/** `theme`: 3–5 theme colours; `mono`: one role (primary) in tints. */
+export type IllustrationPalette = 'theme' | 'mono'
+export type IllustrationProps = {
+  name: string
+  play: IllustrationPlay
+  size: IllustrationSize
+  align: 'left' | 'center' | 'right'
+  palette: IllustrationPalette
+  alt: string
+}
+export type IllustrationElement = ElementOf<'illustration', IllustrationProps>
+
+export type B20Element = AnimatedIconElement | IllustrationElement
+
+/* ----------------------------------------------------------------------------------------------
  * B14: store page templates — live text and the templates' main parts. Props: ./templates/types.ts.
  * -------------------------------------------------------------------------------------------- */
 
@@ -834,6 +891,7 @@ export type Element =
   | B17Element
   | B14Element
   | B19Element
+  | B20Element
 
 export type ElementType = Element['type']
 

@@ -15,6 +15,7 @@ export const cart = {
   'cart.add.formLabel': 'Add to cart',
   'cart.add.button': 'Add to cart',
   'cart.add.adding': 'Adding…',
+  'cart.add.added': 'Added',
   'cart.add.chooseOptionsFirst': 'Choose the options above to add this product to your cart.',
   'cart.add.optionOutOfStock': 'This option is out of stock.',
   'cart.add.quantityOf': 'Quantity of {name}',

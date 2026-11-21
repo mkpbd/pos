@@ -5,12 +5,25 @@
  * invalid values are dropped, unknown keys are dropped, nothing is filled in.
  */
 
-import type { ListingColumns, ThemeColors } from '../types'
+import type { AddToCartEffect, ListingColumns, ThemeColors, ThemeEffects } from '../types'
 import { ICON_NAMES } from './icons'
+import { ANIMATED_ICON_NAMES, ILLUSTRATION_NAMES } from './graphics/names'
 import { fieldsFor, STORE_FIELDS, TEMPLATE_FIELDS, type StoreTemplateKey } from './templates/types'
 import type {
+  AnimatedIconAnimation,
+  AnimatedIconBackground,
+  AnimatedIconColorRole,
+  AnimatedIconTrigger,
   Background,
+  BackgroundFx,
+  BackgroundFxColorRole,
+  BackgroundFxDensity,
+  BackgroundFxSpeed,
+  BackgroundFxType,
   BackgroundVideo,
+  IllustrationPalette,
+  IllustrationPlay,
+  IllustrationSize,
   DocumentContext,
   GlobalContext,
   GlobalSectionNode,
@@ -343,24 +356,26 @@ export function normalizeStyleValue(value: unknown): Style | undefined {
     motion: normalizeMotion(value.motion),
     hover: normalizeHover(value.hover),
     scroll: normalizeScroll(value.scroll),
+    background_fx: normalizeBackgroundFx(value.background_fx),
   })
 }
 
 /**
  * `{base?, tablet?, mobile?}`; anything else (or invalid) is dropped. Always an object. B6: `motion`
  * and `background.video` are kept on `base` only; B9: so are `hover` and `background.parallax`;
- * B19: and `scroll`.
+ * B19: and `scroll`; B20: and `background_fx`.
  */
 export function normalizeStyle(value: unknown): ResponsiveStyle {
   if (!isObject(value)) return {}
   const style: ResponsiveStyle = {}
   for (const breakpoint of ['base', 'tablet', 'mobile'] as const) {
     let normalized = normalizeStyleValue(value[breakpoint])
-    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.hover || normalized.scroll || normalized.background?.video || normalized.background?.parallax)) {
-      const { motion, hover, scroll, background, ...rest } = normalized
+    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.hover || normalized.scroll || normalized.background_fx || normalized.background?.video || normalized.background?.parallax)) {
+      const { motion, hover, scroll, background_fx, background, ...rest } = normalized
       void motion
       void hover
       void scroll
+      void background_fx
       let kept: Background | undefined = background
       if (background?.video || background?.parallax) {
         const { video, parallax, ...other } = background
@@ -1311,6 +1326,7 @@ export function elementPropProblems(type: string, props: unknown): PropProblem[]
     ...b17PropProblems(type, props),
     ...b14PropProblems(type, props),
     ...b19PropProblems(type, props),
+    ...b20PropProblems(type, props),
   ]
 }
 
@@ -2327,6 +2343,149 @@ export function b19PropProblems(type: string, props: unknown): PropProblem[] {
       flag(problems, 'show_progress', p.show_progress)
       break
     }
+    default:
+      break
+  }
+  return problems
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B20: Animated graphics — the animated_icon and illustration elements, moving section
+ * backgrounds (`style.base.background_fx`) and the store-wide add-to-cart effects (theme
+ * `effects`). All keys optional, kept only when set; an invalid background_fx is dropped silently
+ * like other style keys.
+ * -------------------------------------------------------------------------------------------- */
+
+export const B20_ENUMS = {
+  animatedIconName: ANIMATED_ICON_NAMES,
+  animatedIconAnimation: ['draw', 'pop', 'bounce', 'spin', 'pulse', 'wiggle', 'float', 'none'],
+  animatedIconTrigger: ['view', 'hover', 'loop'],
+  animatedIconColorRole: ['primary', 'accent', 'secondary', 'text', 'custom'],
+  animatedIconBackground: ['none', 'circle', 'square', 'soft'],
+  illustrationName: ILLUSTRATION_NAMES,
+  illustrationPlay: ['view', 'loop', 'hover'],
+  illustrationSize: ['small', 'medium', 'large'],
+  illustrationPalette: ['theme', 'mono'],
+  align: ['left', 'center', 'right'],
+  backgroundFxType: ['none', 'gradient_flow', 'floating_shapes', 'bubbles', 'sparkles', 'snow', 'petals', 'lanterns', 'confetti_fall', 'stars'],
+  backgroundFxDensity: ['low', 'medium', 'high'],
+  backgroundFxSpeed: ['slow', 'normal'],
+  backgroundFxColor: ['primary', 'accent', 'secondary', 'surface'],
+  addToCartEffect: ['fly', 'bump', 'none'],
+} as const satisfies {
+  animatedIconAnimation: readonly AnimatedIconAnimation[]
+  animatedIconTrigger: readonly AnimatedIconTrigger[]
+  animatedIconColorRole: readonly AnimatedIconColorRole[]
+  animatedIconBackground: readonly AnimatedIconBackground[]
+  illustrationPlay: readonly IllustrationPlay[]
+  illustrationSize: readonly IllustrationSize[]
+  illustrationPalette: readonly IllustrationPalette[]
+  backgroundFxType: readonly BackgroundFxType[]
+  backgroundFxDensity: readonly BackgroundFxDensity[]
+  backgroundFxSpeed: readonly BackgroundFxSpeed[]
+  backgroundFxColor: readonly BackgroundFxColorRole[]
+  addToCartEffect: readonly AddToCartEffect[]
+  [key: string]: readonly string[]
+}
+
+/** Bounds of B20 (min / max inclusive). */
+export const B20_LIMITS = {
+  /** animated_icon `size` px. */
+  iconSize: { min: 24, max: 160 },
+  /** animated_icon `stroke` (integer) in units of the 48-unit drawing. */
+  iconStroke: { min: 1, max: 3 },
+  /** background_fx `colors`: 1–3 unique roles. */
+  backgroundFxColors: { min: 1, max: 3 },
+  /** Moving things per background by density. */
+  backgroundFxCount: { low: 8, medium: 16, high: 28 },
+  /** Page check BACKGROUND_FX_MANY: more moving backgrounds than this on one page. */
+  backgroundFxPerPage: 2,
+  /** Page check ICON_LOOP_MANY: more looping animated icons than this on one page. */
+  iconLoopsPerPage: 6,
+} as const
+
+/** Maximum length of each B20 text prop (✱ translatable; empty = decorative). */
+export const B20_TEXT_LIMITS = {
+  animated_icon: { label: 80 },
+  illustration: { alt: 200 },
+} as const
+
+/** What an absent / invalid B20 key means. */
+export const B20_DEFAULTS = {
+  animatedIcon: { name: 'delivery_truck', animation: 'draw', trigger: 'view', size: 64, stroke: 2, color_role: 'primary', background: 'none', label: '' },
+  illustration: { name: 'delivery_scene', play: 'view', size: 'medium', align: 'center', palette: 'theme', alt: '' },
+  backgroundFxDensity: 'medium',
+  backgroundFxSpeed: 'slow',
+  effects: { add_to_cart: 'bump', button_feedback: true },
+} as const satisfies {
+  animatedIcon: { animation: AnimatedIconAnimation; trigger: AnimatedIconTrigger; color_role: AnimatedIconColorRole; background: AnimatedIconBackground; [key: string]: unknown }
+  illustration: { play: IllustrationPlay; size: IllustrationSize; palette: IllustrationPalette; [key: string]: unknown }
+  backgroundFxDensity: BackgroundFxDensity
+  backgroundFxSpeed: BackgroundFxSpeed
+  effects: ThemeEffects
+}
+
+/** B20 `style.base.background_fx` with every key valid, or undefined (absent, `type: none`, invalid type). Sparse; bad colours drop the `colors` key. */
+export function normalizeBackgroundFx(value: unknown): BackgroundFx | undefined {
+  if (!isObject(value)) return undefined
+  const type = oneOf(value.type, B20_ENUMS.backgroundFxType)
+  if (!type || type === 'none') return undefined
+  const fx: BackgroundFx = { type }
+  const density = oneOf(value.density, B20_ENUMS.backgroundFxDensity)
+  if (density) fx.density = density
+  const speed = oneOf(value.speed, B20_ENUMS.backgroundFxSpeed)
+  if (speed) fx.speed = speed
+  if (Array.isArray(value.colors)) {
+    const colors = value.colors.map((color) => oneOf(color, B20_ENUMS.backgroundFxColor))
+    const { min, max } = B20_LIMITS.backgroundFxColors
+    if (colors.length >= min && colors.length <= max && colors.every((color) => color !== undefined) && new Set(colors).size === colors.length) {
+      fx.colors = colors as BackgroundFxColorRole[]
+    }
+  }
+  return fx
+}
+
+/** B20 theme `effects` with the defaults filled in (absent / null / invalid keys = the defaults). */
+export function normalizeThemeEffects(value: unknown): ThemeEffects {
+  const d = B20_DEFAULTS.effects
+  if (!isObject(value)) return { ...d }
+  return {
+    add_to_cart: oneOf(value.add_to_cart, B20_ENUMS.addToCartEffect) ?? d.add_to_cart,
+    button_feedback: typeof value.button_feedback === 'boolean' ? value.button_feedback : d.button_feedback,
+  }
+}
+
+/** A custom icon colour: `#rrggbb`, lower case (never a theme reference). */
+export const B20_HEX_COLOR = /^#[0-9a-f]{6}$/
+
+/** The client mirror of the server's B20 prop rules (empty = valid; other types []). */
+export function b20PropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const E = B20_ENUMS
+  switch (type) {
+    case 'animated_icon':
+      enumOf(problems, 'name', p.name, E.animatedIconName)
+      enumOf(problems, 'animation', p.animation, E.animatedIconAnimation)
+      enumOf(problems, 'trigger', p.trigger, E.animatedIconTrigger)
+      int(problems, 'size', p.size, B20_LIMITS.iconSize)
+      int(problems, 'stroke', p.stroke, B20_LIMITS.iconStroke)
+      enumOf(problems, 'color_role', p.color_role, E.animatedIconColorRole)
+      // `color` is required with custom; the server drops it silently otherwise.
+      if (p.color_role === 'custom' && (typeof p.color !== 'string' || !B20_HEX_COLOR.test(p.color))) {
+        problems.push({ path: 'color', code: p.color === undefined || p.color === null ? 'required' : 'invalid' })
+      }
+      enumOf(problems, 'background', p.background, E.animatedIconBackground)
+      text(problems, 'label', p.label, B20_TEXT_LIMITS.animated_icon.label)
+      break
+    case 'illustration':
+      enumOf(problems, 'name', p.name, E.illustrationName)
+      enumOf(problems, 'play', p.play, E.illustrationPlay)
+      enumOf(problems, 'size', p.size, E.illustrationSize)
+      enumOf(problems, 'align', p.align, E.align)
+      enumOf(problems, 'palette', p.palette, E.illustrationPalette)
+      text(problems, 'alt', p.alt, B20_TEXT_LIMITS.illustration.alt)
+      break
     default:
       break
   }

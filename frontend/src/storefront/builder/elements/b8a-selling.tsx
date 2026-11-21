@@ -12,6 +12,7 @@ import { Price } from '../../catalog/price'
 import { ProductCard } from '../../catalog/product-card'
 import { ProductImage } from '../../catalog/product-image'
 import { MenuLink } from '../../components/menu-link'
+import { AddedMark } from '../../effects/added-mark'
 import { useLocale } from '../../i18n/locale'
 import { usePriceFormat } from '../../money'
 import { Countdown } from '../../promotions/countdown-timer'
@@ -514,7 +515,7 @@ export function BundleElement({ element }: { element: El<'bundle'> }) {
 function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: BundleData; draft: boolean }) {
   const { t } = useLocale()
   const format = usePriceFormat()
-  const { busy, result, addAll } = useAddSeveral()
+  const { busy, result, addAll, added } = useAddSeveral()
   const p = element.props ?? {}
   const L = B8A_TEXT_LIMITS.bundle
   const products: Record<string, ProductDetail> = isObject(data.products) ? (data.products as Record<string, ProductDetail>) : {}
@@ -542,7 +543,11 @@ function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: Bun
   const title = str(p.title).slice(0, L.title).trim()
   const text = str(p.text).slice(0, L.text).trim()
   const label = str(p.button_label).slice(0, L.button_label).trim() || t('content.builder.bundle.button')
-  const addChosen = (button: HTMLElement) => addAll(chosen.map(({ item, variant }) => ({ name: item.product.name, variantId: variant.id })), button)
+  const addChosen = (button: HTMLElement) =>
+    addAll(
+      chosen.map(({ item, variant }) => ({ name: item.product.name, variantId: variant.id, image: (item.product.images.find((image) => image.id === variant.image_id) ?? item.product.images[0])?.url ?? null })),
+      button,
+    )
 
   return (
     <section data-b={element.id} aria-labelledby={title ? titleId : undefined} aria-label={title ? undefined : label} className="b-bundle flex flex-col gap-5" data-testid="builder-bundle">
@@ -626,9 +631,10 @@ function BundleBody({ element, data, draft }: { element: El<'bundle'>; data: Bun
           <p className="text-xs">{t('content.builder.bundle.totalNote')}</p>
         </div>
         {/* Not disabled while adding (a disabled button would lose focus). */}
-        <button type="button" className={PRIMARY_BUTTON} aria-disabled={busy || undefined} onClick={(event) => void addChosen(event.currentTarget)} data-testid="bundle-add">
+        <button type="button" className={cn(PRIMARY_BUTTON, 'relative')} aria-disabled={busy || undefined} onClick={(event) => void addChosen(event.currentTarget)} data-testid="bundle-add">
           {busy ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
           {busy ? t('content.builder.bundle.adding') : label}
+          <AddedMark show={added} />
         </button>
       </div>
       <AddSeveralStatus

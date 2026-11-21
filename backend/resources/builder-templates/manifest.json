@@ -1696,6 +1696,36 @@
       "requires": []
     },
     {
+      "id": "neutral-why-us-animated",
+      "scope": "section",
+      "preset": null,
+      "category": "features",
+      "name": "Why shop with us (animated icons)",
+      "description": "Four promises — fast delivery, cash on delivery, easy returns and friendly support — each with an icon that draws itself when shoppers scroll to it.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-delivery-banner",
+      "scope": "section",
+      "preset": null,
+      "category": "promo",
+      "name": "Fast delivery banner",
+      "description": "An animated delivery scene beside a short message and a Shop now button, over gently floating shapes.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "page-about",
       "scope": "page",
       "preset": null,

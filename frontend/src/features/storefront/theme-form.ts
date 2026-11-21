@@ -19,7 +19,8 @@ import {
   type ThemeTypeScale,
 } from '@/features/storefront/api'
 import { BANGLA_FONTS, BANGLA_TYPE_DEFAULTS, BANGLA_TYPE_LIMITS, isCustomFontKey } from '@/storefront/fonts'
-import type { BanglaRoleFont, BodyFont, HeadingFont } from '@/storefront/types'
+import type { BanglaRoleFont, BodyFont, HeadingFont, ThemeEffects } from '@/storefront/types'
+import { B20_DEFAULTS, B20_ENUMS, normalizeThemeEffects } from '@/storefront/builder/validate'
 import { isSafeLink } from '@/features/storefront/menu-tree'
 import { fromLocalInput, toLocalInput } from '@/features/storefront/schedule'
 import { normalizeProductLayout, productLayoutSchema } from '@/features/storefront/theme/product-layout'
@@ -44,6 +45,14 @@ const banglaRanged = (key: keyof typeof BANGLA_TYPE_LIMITS) => z.number({ error:
 const ranged = (key: keyof ThemeTypeScale) => z.number({ error: 'Enter a number.' }).min(TYPE_LIMITS[key].min).max(TYPE_LIMITS[key].max)
 
 export const PALETTE_NAME_MAX = 40
+
+/** B20: the store-wide add-to-cart animations (theme `effects.add_to_cart`). */
+export const ADD_TO_CART_EFFECTS = B20_ENUMS.addToCartEffect
+/** B20: the effects of a theme without the group (and the API's defaults). */
+export const DEFAULT_THEME_EFFECTS: ThemeEffects = B20_DEFAULTS.effects
+
+/** B20: a stored `effects` group with every key valid (absent / null / unknown keys as the defaults). */
+export const effectsValues = normalizeThemeEffects
 
 export const themeSchema = z
   .object({
@@ -103,6 +112,8 @@ export const themeSchema = z
       social: z.object({ facebook: socialLink, instagram: socialLink, youtube: socialLink, tiktok: socialLink, x: socialLink, linkedin: socialLink }),
       payment_logo_media_ids: z.array(z.string()).max(10),
     }),
+    /** B20: add-to-cart animation and the button's brief "Added" check. */
+    effects: z.object({ add_to_cart: z.enum(ADD_TO_CART_EFFECTS, 'Choose an animation.'), button_feedback: z.boolean() }),
   })
   .superRefine((v, ctx) => {
     if (v.announcement.enabled && !v.announcement.text) ctx.addIssue({ code: 'custom', path: ['announcement', 'text'], message: 'Enter the announcement text.' })
@@ -113,7 +124,7 @@ export const themeSchema = z
 
 export type ThemeFormValues = z.infer<typeof themeSchema>
 
-export const THEME_FIELDS = ['colors', 'palette', 'preset', 'typography', 'shape', 'layout', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer'] as const
+export const THEME_FIELDS = ['colors', 'palette', 'preset', 'typography', 'shape', 'layout', 'logo_media_id', 'favicon_media_id', 'announcement', 'footer', 'effects'] as const
 
 /** Today's look: the layout variants of a document from before T1. */
 export const DEFAULT_LAYOUT: LayoutVariants = Object.fromEntries(LAYOUT_VARIANT_KEYS.map((key) => [key, LAYOUT_OPTIONS[key][0]])) as LayoutVariants
@@ -199,6 +210,7 @@ export function toFormValues(doc: ThemeDocument): ThemeFormValues {
       social: Object.fromEntries(SOCIAL_NETWORKS.map((n) => [n, doc.footer.social[n] ?? ''])) as Record<SocialNetwork, string>,
       payment_logo_media_ids: [...doc.footer.payment_logo_media_ids],
     },
+    effects: effectsValues(doc.effects),
   }
 }
 
@@ -239,7 +251,13 @@ export function toDocument(v: ThemeFormValues, before?: TranslationsMap, base?: 
       social: Object.fromEntries(SOCIAL_NETWORKS.map((n) => [n, blank(v.footer.social[n])])) as Record<SocialNetwork, string | null>,
       payment_logo_media_ids: [...v.footer.payment_logo_media_ids],
     },
+    // B20: optional group — sent when the theme has it or the owner changed it from the defaults (null / absent = the defaults).
+    ...(base?.effects || !sameEffects(v.effects, DEFAULT_THEME_EFFECTS) ? { effects: { ...v.effects } } : {}),
   }
+}
+
+function sameEffects(a: ThemeEffects, b: ThemeEffects): boolean {
+  return a.add_to_cart === b.add_to_cart && a.button_feedback === b.button_feedback
 }
 
 /** The colour roles as the owner reads them (the API keeps `accent` / `canvas` / `surface`). */

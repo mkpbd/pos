@@ -9,6 +9,7 @@ use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Storefront\Domain\Builder\BuilderDocumentSchema;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
 use App\Modules\Storefront\Domain\Builder\InvalidBuilderDocument;
+use App\Modules\Storefront\Domain\Builder\StyleSchema;
 use App\Modules\Storefront\Infrastructure\Models\Banner;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\Menu;
@@ -39,6 +40,10 @@ use Carbon\CarbonImmutable;
  *   (SCROLL_EFFECT_TOP: the top of the page appears late; fix `remove_scroll_effect`), a pinned
  *   horizontal gallery of more than 8 entries (HORIZONTAL_GALLERY_LONG: a long, tiring scroll;
  *   fix `turn_off_pin`).
+ * - B20 animated graphics (warnings): more than 2 moving backgrounds on the page
+ *   (BACKGROUND_FX_MANY), more than 6 animated icons looping on the page (ICON_LOOP_MANY), a
+ *   looping illustration in the first section (ILLUSTRATION_TOP: a heavy first paint; fix
+ *   `set_play_view`).
  *
  * Hidden nodes (and what they contain) are left out, except for records that are gone. Nothing is
  * saved. Errors don't block publishing: the owner decides.
@@ -185,11 +190,15 @@ class BuilderPageCheck
             $this->checkMotionLcp($tree, $nodes, $issue);
             // B19.
             $this->checkScrollEffectTop($tree, $nodes, $issue);
+            // B20.
+            $this->checkIllustrationTop($tree, $nodes, $issue);
         }
         $this->checkMotionAmount($tree, $nodes, $issue);
         $this->checkTextEffects($nodes, $issue);
         // B19: scroll stories.
         $this->checkScrollStories($nodes, $issue);
+        // B20: animated graphics.
+        $this->checkAnimatedGraphics($nodes, $issue);
 
         $rank = array_flip(self::SEVERITIES);
         usort($issues, fn (array $a, array $b) => [$rank[$a['severity']], $a['_order']] <=> [$rank[$b['severity']], $b['_order']]);
@@ -251,6 +260,70 @@ class BuilderPageCheck
                     'fix' => 'remove_scroll_effect',
                 ]);
             }
+        }
+    }
+
+    /**
+     * B20: a looping illustration in the first section keeps the top of the page busy from the
+     * first paint; playing it once when seen is lighter.
+     *
+     * @param  array<string, mixed>  $tree
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkIllustrationTop(array $tree, array $nodes, callable $issue): void
+    {
+        $section = array_search('section', $this->topCandidates($tree, $nodes), true);
+        if (! is_string($section)) {
+            return;
+        }
+        $sectionPath = $nodes[$section]['path'];
+        foreach ($nodes as $id => $entry) {
+            if ($entry['hidden'] || ($entry['node']['type'] ?? null) !== 'illustration' || ! str_starts_with($entry['path'], $sectionPath.'.')) {
+                continue;
+            }
+            if (($entry['node']['props']['play'] ?? null) === 'loop') {
+                $issue('ILLUSTRATION_TOP', 'warning', $id, 'This illustration keeps moving at the top of the page, which makes the page heavier to show first. Let it play once when it is seen.', $entry['path'].'.props.play', [
+                    'play' => 'loop',
+                    'fix' => 'set_play_view',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * B20: too many moving backgrounds, and too many animated icons looping, on one page.
+     *
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkAnimatedGraphics(array $nodes, callable $issue): void
+    {
+        $backgrounds = [];
+        $loops = [];
+        foreach ($nodes as $id => $entry) {
+            if ($entry['hidden']) {
+                continue;
+            }
+            $node = $entry['node'];
+            if (is_array($node['style']['base']['background_fx'] ?? null) && in_array($node['type'] ?? null, ['section', 'inner_row'], true)) {
+                $backgrounds[] = $id;
+            }
+            if (($node['type'] ?? null) === 'animated_icon' && ($node['props']['trigger'] ?? null) === 'loop' && ($node['props']['animation'] ?? 'none') !== 'none') {
+                $loops[] = $id;
+            }
+        }
+        if (count($backgrounds) > StyleSchema::BACKGROUND_FX_WARN) {
+            $issue('BACKGROUND_FX_MANY', 'warning', null, count($backgrounds).' sections on this page have a moving background. Keep at most '.StyleSchema::BACKGROUND_FX_WARN.' so the page stays calm and fast.', 'sections', [
+                'ids' => $backgrounds,
+                'count' => count($backgrounds),
+                'limit' => StyleSchema::BACKGROUND_FX_WARN,
+            ]);
+        }
+        if (count($loops) > ElementRegistry::ICON_LOOP_WARN) {
+            $issue('ICON_LOOP_MANY', 'warning', null, count($loops).' animated icons on this page keep looping. Keep at most '.ElementRegistry::ICON_LOOP_WARN.'; let the others play once when seen.', 'sections', [
+                'ids' => $loops,
+                'count' => count($loops),
+                'limit' => ElementRegistry::ICON_LOOP_WARN,
+            ]);
         }
     }
 

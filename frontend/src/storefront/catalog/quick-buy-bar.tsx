@@ -6,6 +6,7 @@ import { primaryButtonClass } from '../account/form-controls'
 import { buyNowButtonClass } from '../cart/add-to-cart'
 import { prefetchCheckout, type BuyBox } from '../cart/buy-box'
 import { QuantityStepper } from '../cart/quantity-stepper'
+import { AddedMark } from '../effects/added-mark'
 import { useLocale } from '../i18n/locale'
 import { usePriceFormat } from '../money'
 import type { CatalogImage, ProductDetail, ProductVariant } from '../types'
@@ -131,7 +132,7 @@ function Bar({
             {/* Not disabled while adding: a disabled button would lose focus, which returns to it from the mini-cart. */}
             <button
               type="button"
-              className={cn(primaryButtonClass, 'min-h-11 shrink-0 px-3 py-2 sm:px-5')}
+              className={cn(primaryButtonClass, 'relative min-h-11 shrink-0 px-3 py-2 sm:px-5')}
               disabled={box.soldOut}
               aria-disabled={box.busy || undefined}
               onClick={(event) => act('cart', event.currentTarget)}
@@ -140,6 +141,7 @@ function Bar({
               {adding ? <Loader2Icon aria-hidden className="size-4 animate-spin" /> : <ShoppingCartIcon aria-hidden className="size-4" />}
               {/* Phones show the cart icon only; its name stays for screen readers. */}
               <span className="sr-only sm:not-sr-only">{adding ? t('cart.add.adding') : t('cart.add.button')}</span>
+              <AddedMark show={box.addedOn('bar')} labelClassName="hidden sm:inline" />
             </button>
             {!box.soldOut && (
               <button

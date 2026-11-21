@@ -47,6 +47,7 @@ import { StorefrontHeader } from '@/features/storefront/components/storefront-he
 import { contrastRatio, meetsAA } from '@/features/storefront/contrast'
 import { GlobalStylesPanel } from '@/features/storefront/theme/global-styles'
 import { ProductLayoutFields } from '@/features/storefront/theme/product-layout-card'
+import { CartEffectsCard } from '@/features/storefront/theme/cart-effects-card'
 import { ThemeConflictDialog, ThemePublishDialog, ThemeVersionsDialog } from '@/features/storefront/theme/theme-dialogs'
 import { FONT_FAMILIES, FONT_LABELS } from '@/features/storefront/theme/theme-options'
 import { ANNOUNCEMENT_TEXT_MAX, THEME_FIELDS, themeSchema, toDocument, toFormValues, type ThemeFormValues } from '@/features/storefront/theme-form'
@@ -394,6 +395,8 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
               ))}
             </CardContent>
           </Card>
+
+          <Controller control={control} name="effects" render={({ field }) => <CartEffectsCard className="xl:col-span-2" value={field.value} onChange={field.onChange} disabled={!canManage} />} />
 
           {productLayout !== undefined && (
             <div className="xl:col-span-2">

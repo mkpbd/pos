@@ -218,7 +218,10 @@ describe('B19 keyframes', () => {
     const fsModule = 'node:fs'
     const { readFileSync } = (await import(/* @vite-ignore */ fsModule)) as { readFileSync(path: string, encoding: 'utf8'): string }
     const css = readFileSync(`${(globalThis as unknown as { process: { cwd(): string } }).process.cwd()}/src/storefront/storefront.css`, 'utf8')
-    const b19 = css.slice(css.indexOf('B19 scroll stories'))
+    const start = css.indexOf('B19 scroll stories')
+    // Up to the next phase's block (B20 and later blocks follow it in the file).
+    const end = css.indexOf('B20', start)
+    const b19 = css.slice(start, end === -1 ? undefined : end)
     const frames = [...b19.matchAll(/@keyframes ([\w-]+) \{([^@]*?)\}\s*\}/g)]
     expect(frames.length).toBeGreaterThanOrEqual(14)
     for (const [, , body] of frames) {

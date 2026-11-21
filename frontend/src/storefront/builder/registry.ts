@@ -703,6 +703,29 @@ const B19: BaseMeta[] = [
   },
 ]
 
+/**
+ * B20 (contract §1): animated graphics — an original animated line icon (drawn, popping, bouncing,
+ * … on view, hover or in a loop) and an original animated illustration. Drawings load lazily.
+ */
+const B20: BaseMeta[] = [
+  {
+    type: 'animated_icon',
+    group: 'media',
+    label: 'Animated icon',
+    translatable: ['label'],
+    props: { name: 'delivery_truck', animation: 'draw', trigger: 'view', size: 64, stroke: 2, color_role: 'primary', background: 'none', label: '' },
+    children: null,
+  },
+  {
+    type: 'illustration',
+    group: 'media',
+    label: 'Illustration',
+    translatable: ['alt'],
+    props: { name: 'delivery_scene', play: 'view', size: 'medium', align: 'center', palette: 'theme', alt: '' },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] =['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 /** B8b: what may sit in a popup (contract §1): simple content, offers and forms; never shop grids, sliders, charts, maps or site parts. */
@@ -785,6 +808,9 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   // B19: page-like documents (and store page templates, added by withTemplate).
   scroll_story: PAGES,
   horizontal_gallery: PAGES,
+  // B20: the animated icon wherever the icon goes; illustrations in page-like documents and popups.
+  animated_icon: IN_POPUP(ALL),
+  illustration: IN_POPUP(PAGES),
 }
 
 /** B14: a store page template holds everything a page may (plus its own elements). */
@@ -811,6 +837,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...B17,
   ...B14,
   ...B19,
+  ...B20,
 ].map((meta) => ({ ...meta, allowed_in: withTemplate(ALLOWED_IN[meta.type]) }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */

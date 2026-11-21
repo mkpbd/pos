@@ -69,6 +69,117 @@ final class ElementRegistry
      */
     public const B19 = ['scroll_story', 'horizontal_gallery'];
 
+    /**
+     * B20: animated graphics — a line icon that draws / moves (original inline SVGs in the
+     * storefront) and a small animated illustration scene.
+     */
+    public const B20 = ['animated_icon', 'illustration'];
+
+    /**
+     * B20: the animated icon set by group (`key` => [en label, bn label, icons]); every icon has
+     * en + bn search keywords (ANIMATED_ICON_KEYWORDS). The storefront draws each one
+     * (`builder/graphics/icons`).
+     */
+    public const ANIMATED_ICON_GROUPS = [
+        'delivery' => ['Delivery', 'ডেলিভারি', ['delivery_truck', 'delivery_van', 'rickshaw_van', 'motorbike_delivery', 'parcel', 'parcel_open', 'location_pin', 'map']],
+        'payment' => ['Payment', 'পেমেন্ট', ['cash_on_delivery', 'mobile_wallet', 'card_payment', 'secure_payment', 'shield_check']],
+        'returns' => ['Returns & trust', 'রিটার্ন ও আস্থা', ['return_box', 'refund', 'exchange', 'warranty', 'quality_badge', 'check_circle']],
+        'offers' => ['Offers', 'অফার', ['sale_tag', 'percent', 'coupon', 'flash', 'gift', 'fire']],
+        'time' => ['Time', 'সময়', ['clock', 'calendar', 'hourglass']],
+        'contact' => ['Contact', 'যোগাযোগ', ['phone', 'chat', 'whatsapp_bubble', 'mail', 'headset']],
+        'shopping' => ['Shopping', 'কেনাকাটা', ['store', 'shopping_bag', 'cart', 'basket']],
+        'praise' => ['Love & praise', 'ভালোবাসা ও প্রশংসা', ['star', 'heart', 'thumbs_up', 'smile', 'users', 'trophy', 'sparkle', 'rocket']],
+        'nature' => ['Natural & handmade', 'প্রাকৃতিক ও হাতে তৈরি', ['leaf', 'organic', 'handmade']],
+    ];
+
+    /** B20: search words of each animated icon (en, bn) for the editor's icon picker. */
+    public const ANIMATED_ICON_KEYWORDS = [
+        'delivery_truck' => [['delivery', 'truck', 'shipping', 'fast'], ['ডেলিভারি', 'ট্রাক', 'পরিবহন', 'দ্রুত']],
+        'delivery_van' => [['delivery', 'van', 'shipping', 'courier'], ['ডেলিভারি', 'ভ্যান', 'কুরিয়ার']],
+        'rickshaw_van' => [['rickshaw', 'van', 'local delivery', 'cycle'], ['রিকশা', 'ভ্যান', 'স্থানীয় ডেলিভারি']],
+        'motorbike_delivery' => [['motorbike', 'bike', 'rider', 'express'], ['মোটরবাইক', 'বাইক', 'রাইডার', 'এক্সপ্রেস']],
+        'parcel' => [['parcel', 'box', 'package', 'order'], ['পার্সেল', 'বাক্স', 'প্যাকেট', 'অর্ডার']],
+        'parcel_open' => [['open box', 'unboxing', 'package', 'received'], ['খোলা বাক্স', 'আনবক্সিং', 'প্যাকেট']],
+        'location_pin' => [['location', 'pin', 'address', 'place'], ['লোকেশন', 'ঠিকানা', 'জায়গা']],
+        'map' => [['map', 'area', 'route', 'coverage'], ['ম্যাপ', 'মানচিত্র', 'এলাকা', 'পথ']],
+        'cash_on_delivery' => [['cash on delivery', 'cod', 'cash', 'money'], ['ক্যাশ অন ডেলিভারি', 'নগদ', 'টাকা']],
+        'mobile_wallet' => [['mobile wallet', 'mobile banking', 'phone payment'], ['মোবাইল ওয়ালেট', 'মোবাইল ব্যাংকিং', 'মোবাইল পেমেন্ট']],
+        'card_payment' => [['card', 'credit card', 'debit card', 'payment'], ['কার্ড', 'ক্রেডিট কার্ড', 'ডেবিট কার্ড', 'পেমেন্ট']],
+        'secure_payment' => [['secure', 'lock', 'safe payment', 'checkout'], ['নিরাপদ', 'তালা', 'নিরাপদ পেমেন্ট']],
+        'shield_check' => [['shield', 'protected', 'safe', 'guarantee'], ['ঢাল', 'সুরক্ষিত', 'নিরাপদ', 'গ্যারান্টি']],
+        'return_box' => [['return', 'easy returns', 'send back'], ['রিটার্ন', 'সহজ রিটার্ন', 'ফেরত']],
+        'refund' => [['refund', 'money back', 'repay'], ['রিফান্ড', 'টাকা ফেরত']],
+        'exchange' => [['exchange', 'swap', 'replace'], ['এক্সচেঞ্জ', 'বদল', 'পরিবর্তন']],
+        'warranty' => [['warranty', 'guarantee', 'cover'], ['ওয়ারেন্টি', 'গ্যারান্টি']],
+        'quality_badge' => [['quality', 'badge', 'genuine', 'original'], ['মান', 'ব্যাজ', 'আসল', 'অরিজিনাল']],
+        'check_circle' => [['check', 'done', 'verified', 'ok'], ['টিক', 'সম্পন্ন', 'যাচাইকৃত']],
+        'sale_tag' => [['sale', 'tag', 'price', 'discount'], ['সেল', 'ট্যাগ', 'দাম', 'ছাড়']],
+        'percent' => [['percent', 'discount', 'off', 'deal'], ['শতাংশ', 'ছাড়', 'ডিল']],
+        'coupon' => [['coupon', 'voucher', 'code', 'promo'], ['কুপন', 'ভাউচার', 'কোড', 'প্রোমো']],
+        'flash' => [['flash', 'lightning', 'flash sale', 'quick'], ['ফ্ল্যাশ', 'বিদ্যুৎ', 'ফ্ল্যাশ সেল', 'দ্রুত']],
+        'gift' => [['gift', 'present', 'surprise', 'free'], ['উপহার', 'গিফট', 'চমক', 'ফ্রি']],
+        'fire' => [['fire', 'hot', 'trending', 'popular'], ['আগুন', 'হট', 'জনপ্রিয়', 'ট্রেন্ডিং']],
+        'clock' => [['clock', 'time', 'hours', 'on time'], ['ঘড়ি', 'সময়', 'সময়মতো']],
+        'calendar' => [['calendar', 'date', 'schedule', 'day'], ['ক্যালেন্ডার', 'তারিখ', 'দিন']],
+        'hourglass' => [['hourglass', 'limited time', 'countdown', 'wait'], ['বালিঘড়ি', 'সীমিত সময়', 'কাউন্টডাউন']],
+        'phone' => [['phone', 'call', 'hotline', 'contact'], ['ফোন', 'কল', 'হটলাইন', 'যোগাযোগ']],
+        'chat' => [['chat', 'message', 'talk', 'support'], ['চ্যাট', 'মেসেজ', 'কথা', 'সাপোর্ট']],
+        'whatsapp_bubble' => [['message', 'chat', 'phone message', 'text us'], ['মেসেজ', 'চ্যাট', 'ফোনে মেসেজ']],
+        'mail' => [['mail', 'email', 'letter', 'newsletter'], ['মেইল', 'ইমেইল', 'চিঠি']],
+        'headset' => [['headset', 'support', 'help', 'customer care'], ['হেডসেট', 'সাপোর্ট', 'সাহায্য', 'কাস্টমার কেয়ার']],
+        'store' => [['store', 'shop', 'outlet', 'market'], ['দোকান', 'স্টোর', 'শপ', 'বাজার']],
+        'shopping_bag' => [['bag', 'shopping', 'buy', 'purchase'], ['ব্যাগ', 'শপিং', 'কেনা']],
+        'cart' => [['cart', 'trolley', 'add to cart', 'buy'], ['কার্ট', 'ট্রলি', 'কিনুন']],
+        'basket' => [['basket', 'grocery', 'fresh', 'market'], ['ঝুড়ি', 'বাজার', 'মুদি', 'তাজা']],
+        'star' => [['star', 'rating', 'favourite', 'best'], ['তারা', 'রেটিং', 'প্রিয়', 'সেরা']],
+        'heart' => [['heart', 'love', 'like', 'wishlist'], ['হৃদয়', 'ভালোবাসা', 'পছন্দ']],
+        'thumbs_up' => [['thumbs up', 'like', 'approve', 'good'], ['লাইক', 'ভালো', 'সমর্থন']],
+        'smile' => [['smile', 'happy', 'satisfied', 'customer'], ['হাসি', 'খুশি', 'সন্তুষ্ট']],
+        'users' => [['users', 'people', 'community', 'customers'], ['মানুষ', 'কমিউনিটি', 'গ্রাহক']],
+        'trophy' => [['trophy', 'award', 'winner', 'best seller'], ['ট্রফি', 'পুরস্কার', 'বিজয়ী', 'বেস্ট সেলার']],
+        'sparkle' => [['sparkle', 'new', 'shine', 'special'], ['ঝলক', 'নতুন', 'বিশেষ']],
+        'rocket' => [['rocket', 'launch', 'fast', 'new arrival'], ['রকেট', 'লঞ্চ', 'দ্রুত', 'নতুন']],
+        'leaf' => [['leaf', 'natural', 'green', 'eco'], ['পাতা', 'প্রাকৃতিক', 'সবুজ', 'পরিবেশবান্ধব']],
+        'organic' => [['organic', 'natural', 'chemical free', 'pure'], ['অর্গানিক', 'জৈব', 'খাঁটি', 'রাসায়নিকমুক্ত']],
+        'handmade' => [['handmade', 'craft', 'artisan', 'made by hand'], ['হাতে তৈরি', 'কারুশিল্প', 'হস্তশিল্প']],
+    ];
+
+    public const ANIMATED_ICON_ANIMATIONS = ['draw', 'pop', 'bounce', 'spin', 'pulse', 'wiggle', 'float', 'none'];
+
+    /** B20: when an animated icon plays — once on view, on hover / focus of its link or button, or looping. */
+    public const ANIMATED_ICON_TRIGGERS = ['view', 'hover', 'loop'];
+
+    /** B20: theme colour roles of an icon, or `custom` (then `color` holds `#rrggbb`). */
+    public const ANIMATED_ICON_COLOR_ROLES = ['primary', 'accent', 'secondary', 'text', 'custom'];
+
+    public const ANIMATED_ICON_BACKGROUNDS = ['none', 'circle', 'square', 'soft'];
+
+    /** B20: an animated icon's size (px) and line weight (px in the 48-unit drawing). */
+    public const ANIMATED_ICON_SIZE = [24, 160];
+
+    public const ANIMATED_ICON_STROKE = [1, 3];
+
+    /** B20: the illustrations (original animated SVG scenes), with their names (en, bn). */
+    public const ILLUSTRATIONS = [
+        'delivery_scene' => ['Delivery on its way', 'ডেলিভারি পথে'],
+        'shopping_bag_pop' => ['Shopping bag', 'শপিং ব্যাগ'],
+        'sale_tag_swing' => ['Swinging sale tag', 'দোলানো সেল ট্যাগ'],
+        'gift_unwrap' => ['Gift opening', 'উপহার খোলা'],
+        'phone_order' => ['Order by phone', 'ফোনে অর্ডার'],
+        'parcel_journey' => ['Parcel journey', 'পার্সেলের যাত্রা'],
+        'happy_shopper' => ['Happy shopper', 'খুশি ক্রেতা'],
+        'eid_lanterns' => ['Eid lanterns', 'ঈদের লণ্ঠন'],
+    ];
+
+    public const ILLUSTRATION_PLAYS = ['view', 'loop', 'hover'];
+
+    public const ILLUSTRATION_SIZES = ['small', 'medium', 'large'];
+
+    public const ILLUSTRATION_PALETTES = ['theme', 'mono'];
+
+    /** B20: more looping animated icons than this on one page is too much (page check ICON_LOOP_MANY). */
+    public const ICON_LOOP_WARN = 6;
+
     /** B14: the store pages a template (`template:<key>`, kind page, context `template`) designs. */
     public const TEMPLATES = ['shop', 'category', 'brand', 'search', 'blog_post', 'order', 'not_found'];
 
@@ -189,6 +300,8 @@ final class ElementRegistry
         'ornament', 'trust_badges', 'bangla_date',
         // B14: the store's name, phone… in a bar.
         'dynamic_text',
+        // B20: animated graphics.
+        'animated_icon', 'illustration',
     ];
 
     /** B8b: a button's optional action (`link` is the default and is not stored). */
@@ -609,6 +722,9 @@ final class ElementRegistry
         // B14.
         'dynamic_text' => ['prefix' => 80, 'suffix' => 80, 'fallback' => 200],
         'not_found_message' => ['heading' => 120, 'text' => 400],
+        // B20: an icon's accessible name and an illustration's description ('' = decorative).
+        'animated_icon' => ['label' => 80],
+        'illustration' => ['alt' => 200],
     ];
 
     /** Translatable fields stored in a nested prop (dot keys in `translations`): field => [prop, key]. */
@@ -690,7 +806,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17, ...self::B14, ...self::B19];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17, ...self::B14, ...self::B19, ...self::B20];
     }
 
     public static function exists(mixed $type): bool
@@ -705,7 +821,7 @@ final class ElementRegistry
     {
         return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true) || in_array($type, self::B8B, true)
             || in_array($type, self::P2A, true) || in_array($type, self::B17, true) || in_array($type, self::B14, true)
-            || in_array($type, self::B19, true)
+            || in_array($type, self::B19, true) || in_array($type, self::B20, true)
             ? null
             : SectionType::tryFrom($type);
     }
@@ -746,7 +862,9 @@ final class ElementRegistry
             'inner_row', 'heading', 'text', 'button', 'icon', 'image', 'divider', 'spacer',
             'social_icons', 'contact_block', 'custom_html', 'icon_list', 'marquee',
             // B17 (both also in popups).
-            'ornament', 'bangla_date' => ['page', 'cms', 'header', 'footer', 'zone'],
+            'ornament', 'bangla_date',
+            // B20: wherever an icon may be (the illustration: pages, content pages, shop areas).
+            'animated_icon' => ['page', 'cms', 'header', 'footer', 'zone'],
             'payment_badges', 'delivery_promise' => ['page', 'cms', 'zone', 'footer'],
             'search_box' => ['page', 'cms', 'zone', 'header'],
             'payment_icons', 'newsletter_form',
@@ -783,7 +901,7 @@ final class ElementRegistry
             'dynamic_text', 'blog_post_body', 'not_found_message' => 'content',
             'product_listing', 'order_summary' => 'commerce',
             'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid', 'ornament',
-            'scroll_story', 'horizontal_gallery' => 'media',
+            'scroll_story', 'horizontal_gallery', 'animated_icon', 'illustration' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
             'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
             'pricing_table', 'comparison_table', 'bundle', 'order_form', 'payment_badges', 'delivery_promise' => 'commerce',
@@ -867,8 +985,20 @@ final class ElementRegistry
             'not_found_message' => 'Page not found message',
             'scroll_story' => 'Scroll story',
             'horizontal_gallery' => 'Horizontal gallery',
+            'animated_icon' => 'Animated icon',
+            'illustration' => 'Illustration',
             default => SectionType::from($type)->label(),
         };
+    }
+
+    /**
+     * B20: every animated icon name, in group order.
+     *
+     * @return list<string>
+     */
+    public static function animatedIconNames(): array
+    {
+        return array_merge(...array_map(fn (array $group) => $group[2], array_values(self::ANIMATED_ICON_GROUPS)));
     }
 
     /**
@@ -1422,6 +1552,12 @@ final class ElementRegistry
                 'pin' => true,
                 'show_progress' => true,
             ],
+            // B20 (an animated icon's `color` exists only with color_role `custom`).
+            'animated_icon' => [
+                'name' => 'delivery_truck', 'animation' => 'draw', 'trigger' => 'view', 'size' => 64, 'stroke' => 2,
+                'color_role' => 'primary', 'background' => 'none', 'label' => '',
+            ],
+            'illustration' => ['name' => 'delivery_scene', 'play' => 'view', 'size' => 'medium', 'align' => 'center', 'palette' => 'theme', 'alt' => ''],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
     }
@@ -1548,6 +1684,12 @@ final class ElementRegistry
                 'b19_text' => self::B19_TEXT_LIMITS,
                 'scroll_progress_thickness' => ['min' => BuilderDocumentSchema::SCROLL_PROGRESS_THICKNESS[0], 'max' => BuilderDocumentSchema::SCROLL_PROGRESS_THICKNESS[1]],
                 'horizontal_gallery_pin_warn' => self::HORIZONTAL_GALLERY_PIN_WARN,
+                // B20.
+                'animated_icon_size' => ['min' => self::ANIMATED_ICON_SIZE[0], 'max' => self::ANIMATED_ICON_SIZE[1]],
+                'animated_icon_stroke' => ['min' => self::ANIMATED_ICON_STROKE[0], 'max' => self::ANIMATED_ICON_STROKE[1]],
+                'background_fx_colors' => ['min' => StyleSchema::BACKGROUND_FX_COLORS[0], 'max' => StyleSchema::BACKGROUND_FX_COLORS[1]],
+                'background_fx_warn' => StyleSchema::BACKGROUND_FX_WARN,
+                'icon_loop_warn' => self::ICON_LOOP_WARN,
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
             // B14: a product listing only for chosen categories or brands.
@@ -1707,6 +1849,30 @@ final class ElementRegistry
                 'scroll_progress_positions' => BuilderDocumentSchema::SCROLL_PROGRESS_POSITIONS,
                 'scroll_progress_color_roles' => BuilderDocumentSchema::SCROLL_PROGRESS_COLOR_ROLES,
                 'scroll_progress_contexts' => BuilderDocumentSchema::SCROLL_PROGRESS_CONTEXTS,
+                // B20: animated graphics.
+                'animated_icon_names' => self::animatedIconNames(),
+                'animated_icon_groups' => array_map(
+                    fn (string $key, array $group) => ['key' => $key, 'label' => $group[0], 'label_bn' => $group[1], 'icons' => $group[2]],
+                    array_keys(self::ANIMATED_ICON_GROUPS),
+                    array_values(self::ANIMATED_ICON_GROUPS),
+                ),
+                'animated_icon_keywords' => array_map(fn (array $words) => ['en' => $words[0], 'bn' => $words[1]], self::ANIMATED_ICON_KEYWORDS),
+                'animated_icon_animations' => self::ANIMATED_ICON_ANIMATIONS,
+                'animated_icon_triggers' => self::ANIMATED_ICON_TRIGGERS,
+                'animated_icon_color_roles' => self::ANIMATED_ICON_COLOR_ROLES,
+                'animated_icon_backgrounds' => self::ANIMATED_ICON_BACKGROUNDS,
+                'illustration_names' => array_keys(self::ILLUSTRATIONS),
+                'illustration_labels' => array_map(fn (array $names) => ['en' => $names[0], 'bn' => $names[1]], self::ILLUSTRATIONS),
+                'illustration_plays' => self::ILLUSTRATION_PLAYS,
+                'illustration_sizes' => self::ILLUSTRATION_SIZES,
+                'illustration_palettes' => self::ILLUSTRATION_PALETTES,
+                'background_fx_types' => StyleSchema::BACKGROUND_FX_TYPES,
+                'background_fx_densities' => StyleSchema::BACKGROUND_FX_DENSITIES,
+                'background_fx_speeds' => StyleSchema::BACKGROUND_FX_SPEEDS,
+                'background_fx_color_roles' => StyleSchema::BACKGROUND_FX_COLOR_ROLES,
+                'background_fx_default_colors' => StyleSchema::BACKGROUND_FX_DEFAULT_COLORS,
+                'theme_add_to_cart_effects' => ThemeSchema::ADD_TO_CART_EFFECTS,
+                'theme_effects_defaults' => ThemeSchema::EFFECTS_DEFAULTS,
             ],
             // B8b: the settings a new popup starts with.
             'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),

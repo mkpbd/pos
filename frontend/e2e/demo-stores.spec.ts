@@ -1771,6 +1771,92 @@ test('B19: Green Basket tells its story while shoppers scroll — scroll story a
   await ownerContext.close()
 })
 
+test('B20: Green Basket adds animated icons, an animated delivery scene and a moving background from the starters, and turns on fly-to-cart', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+  const ownerContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const owner = await ownerContext.newPage()
+  await signIn(owner, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await ownerContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return owner.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { id: string; type?: string; props?: Record<string, any>; style?: Record<string, any>; translations?: Record<string, any>; columns?: { elements: Node[] }[] }
+  const all = (node: Node, type: string, out: Node[] = []): Node[] => {
+    if (node.type === type) out.push(node)
+    for (const column of node.columns ?? []) for (const element of column.elements) all(element, type, out)
+    return out
+  }
+  const starter = async (id: string) => (await call('POST', `/api/v1/storefront/builder/templates/${id}/instantiate`, { context: 'page' })).body.data.nodes[0] as Node
+  const whyUs = await starter('neutral-why-us-animated')
+  const banner = await starter('neutral-delivery-banner')
+  const icons = all(whyUs, 'animated_icon')
+  expect(icons.length).toBe(4)
+  expect(all(banner, 'illustration')).toHaveLength(1)
+  expect(banner.style?.base?.background_fx?.type).toBe('floating_shapes')
+  // One icon gets its own description (the rest stay decorative next to their headings).
+  icons[0]!.props = { ...icons[0]!.props, label: 'Delivery to your door', animation: 'pop' }
+  icons[0]!.translations = { ...(icons[0]!.translations ?? {}), bn: { ...(icons[0]!.translations?.bn ?? {}), label: 'দরজায় ডেলিভারি' } }
+
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b20-graphics', title: 'B20 graphics', from: 'blank' })
+  if (doc.status === 409) {
+    const existing = ((await call('GET', '/api/v1/storefront/builder/documents')).body.data as { id: string; key: string }[]).find((d) => d.key === 'landing:b20-graphics')!
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const docId = doc.body.data.id as string
+  const content = { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections: [whyUs, banner] }
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content })
+  expect(saved.status).toBe(200)
+  // A custom colour needs a real hex colour.
+  const badColour = structuredClone(content)
+  all(badColour.sections[0] as Node, 'animated_icon')[1]!.props = { ...all(badColour.sections[0] as Node, 'animated_icon')[1]!.props, color_role: 'custom', color: 'green' }
+  const refused = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: saved.body.data.draft_revision, content: badColour })
+  expect(refused.status).toBe(422)
+  expect(JSON.stringify(refused.body.error)).toContain('props.color')
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B20' })).status).toBe(200)
+
+  // Store-wide: fly to cart with button feedback (the rest of the theme unchanged).
+  const theme = (await call('GET', '/api/v1/storefront/theme')).body.data
+  const put = await call('PUT', '/api/v1/storefront/theme', { ...theme.settings, effects: { add_to_cart: 'fly', button_feedback: true } })
+  expect(put.status).toBe(200)
+
+  try {
+    // The page: the described icon is an image with its name, the decorative ones are hidden from screen readers.
+    await page.setViewportSize({ width: 1366, height: 900 })
+    await page.goto(`${base}/p/b20-graphics`)
+    await expect(page.getByRole('img', { name: 'Delivery to your door' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator(`[data-b="${icons[1]!.id}"] [aria-hidden="true"]`).first()).toBeAttached()
+    expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+    await page.goto(`${base}/p/b20-graphics?lang=bn`)
+    await expect(page.getByRole('img', { name: 'দরজায় ডেলিভারি' })).toBeVisible({ timeout: 30_000 })
+
+    // The shopper adds a product: the bootstrap says fly, the button shows "Added", the cart gets the line.
+    const bootstrap = await page.evaluate(async () => (await (await fetch('/api/v1/store/bootstrap', { headers: { Accept: 'application/json' } })).json()) as { data: { theme: { effects: { add_to_cart: string; button_feedback: boolean } } } })
+    expect(bootstrap.data.theme.effects).toEqual({ add_to_cart: 'fly', button_feedback: true })
+    // `?lang=bn` above set the language cookie: switch back for the English labels.
+    await page.goto(`${base}/product/plant-protein?lang=en`)
+    const productPage = page.getByTestId('product-page')
+    const radio = productPage.getByRole('radio', { name: 'Vanilla', exact: true })
+    await productPage.locator(`label[for="${await radio.getAttribute('id')}"]`).click()
+    await expect(radio).toBeChecked()
+    const buy = productPage.getByRole('form', { name: 'Add to cart' })
+    await buy.getByRole('button', { name: 'Add to cart' }).click()
+    await expect(page.getByTestId('added-mark').first()).toBeAttached()
+    await expect(page.getByTestId('mini-cart').getByTestId('cart-line').first()).toBeVisible()
+  } finally {
+    // Back to the store's own setting (unset → bump), so other tests see the default.
+    await call('PUT', '/api/v1/storefront/theme', { ...theme.settings, effects: null })
+    await ownerContext.close()
+  }
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

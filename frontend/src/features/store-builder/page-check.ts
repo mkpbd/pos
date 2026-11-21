@@ -7,6 +7,7 @@ import { Collector, focus, isObj, label, list, megabytes, pictures, str, visible
 import { runSpeedCheck, type CheckFonts } from './page-check-speed'
 import { runMotionCheck } from './page-check-motion'
 import { runScrollCheck } from './page-check-scroll'
+import { runGraphicsCheck } from './page-check-graphics'
 import { resolveStyleValue } from './inspector/style-model'
 import { templateKeyOf } from '@/storefront/builder/templates/types'
 import { CORE_NAMES, coreElementOf, elementsOfTypeWithState } from './store-page-core'
@@ -47,6 +48,8 @@ export type PageCheckAction =
   | { type: 'remove-scroll-effect' }
   /** B19: a horizontal gallery's pinning turned off (`props.pin` false). */
   | { type: 'turn-off-pin' }
+  /** B20: an illustration's `play` set to `view` (plays once when seen). */
+  | { type: 'set-play-view' }
 
 export type PageCheckFix =
   /** Select `node_id` (null: the page settings, e.g. `seo.title`) and focus `field` (a form key; null: just select). */
@@ -682,7 +685,7 @@ export function runPageCheck(input: PageCheckInput): PageCheckIssue[] {
 
   checkHeadings(headings, context, out)
   checkStorePage(input, out)
-  return sortIssues([...out.issues, ...runSpeedCheck(input).issues, ...runMotionCheck(input), ...runScrollCheck(input)], nodeOrder(input.content))
+  return sortIssues([...out.issues, ...runSpeedCheck(input).issues, ...runMotionCheck(input), ...runScrollCheck(input), ...runGraphicsCheck(input)], nodeOrder(input.content))
 }
 
 /**
@@ -812,6 +815,9 @@ export function fromServerIssue(issue: ServerCheckIssue): PageCheckIssue {
     : issue.node_id && details.fix === 'turn_off_pin'
     ? // B19 HORIZONTAL_GALLERY_LONG.
       { kind: 'apply', label: 'Turn off pinning', node_id: issue.node_id, action: { type: 'turn-off-pin' } }
+    : issue.node_id && details.fix === 'set_play_view'
+    ? // B20 ILLUSTRATION_TOP.
+      { kind: 'apply', label: 'Play once when seen', node_id: issue.node_id, action: { type: 'set-play-view' } }
     : issue.node_id
     ? focus(field ? 'Fix it' : 'Select it', issue.node_id, field)
     : field?.startsWith('seo.')

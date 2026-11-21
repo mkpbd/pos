@@ -83,6 +83,8 @@ export const ELEMENT_WORDS: Record<string, string> = {
   bangla_date: 'বাংলা তারিখ বঙ্গাব্দ ক্যালেন্ডার bangla date calendar',
   scroll_story: 'গল্প ধাপ স্ক্রল ছবি story steps scroll scrollytelling sticky',
   horizontal_gallery: 'পাশাপাশি গ্যালারি সোয়াইপ স্ক্রল ছবি পণ্য horizontal gallery swipe scroll sideways carousel',
+  animated_icon: 'চলমান আইকন অ্যানিমেশন ডেলিভারি ক্যাশ অন ডেলিভারি animated icon animation moving draw delivery',
+  illustration: 'ছবি আঁকা চলমান দৃশ্য অ্যানিমেশন illustration drawing scene animated picture',
 }
 
 /** Words of the editor's actions (Bangla and English). */
