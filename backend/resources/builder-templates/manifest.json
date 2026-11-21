@@ -1666,6 +1666,36 @@
       "requires": []
     },
     {
+      "id": "neutral-scroll-story",
+      "scope": "section",
+      "preset": null,
+      "category": "story",
+      "name": "Our story in steps",
+      "description": "Three steps of your story beside a picture that stays in view and changes as shoppers scroll. Replace the photos and texts with your own.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
+      "id": "neutral-swipe-gallery",
+      "scope": "section",
+      "preset": null,
+      "category": "gallery",
+      "name": "Swipe through the collection",
+      "description": "Six photos with short captions that slide sideways while the page scrolls; on phones shoppers swipe. Replace them with your own photos.",
+      "thumbnail": null,
+      "allowed_in": [
+        "page",
+        "cms",
+        "zone"
+      ],
+      "requires": []
+    },
+    {
       "id": "page-about",
       "scope": "page",
       "preset": null,

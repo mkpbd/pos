@@ -144,7 +144,32 @@ export type Style = {
   motion?: Motion
   /** B9: `base` breakpoint only (normalize drops it from tablet / mobile). */
   hover?: HoverStyle
+  /** B19: a scroll-linked effect; `base` breakpoint only (normalize drops it from tablet / mobile). */
+  scroll?: ScrollStyle
 }
+
+/* B19 scroll stories: scroll-linked effects, section background scroll, Ken Burns, reading progress. */
+
+/** B19 `style.base.scroll.effect` (`none` = no effect: the server drops the group). `reveal_*` use clip-path. */
+export type ScrollEffect = 'none' | 'fade' | 'rise' | 'sink' | 'scale_up' | 'scale_down' | 'rotate' | 'slide_left' | 'slide_right' | 'blur' | 'reveal_up' | 'reveal_left' | 'reveal_circle'
+/** How far the effect moves (absent = medium). */
+export type ScrollIntensity = 'subtle' | 'medium' | 'strong'
+/** When it plays (absent = enter): as the node comes in, while on screen, as it leaves, or both in and out. */
+export type ScrollRange = 'enter' | 'cover' | 'exit' | 'enter_exit'
+/** B19 style group `scroll` (any node, `base` only; sparse: absent keys = the defaults). */
+export type ScrollStyle = { effect: Exclude<ScrollEffect, 'none'>; intensity?: ScrollIntensity; range?: ScrollRange }
+/** B19 section `props.background_scroll` (image backgrounds only; wins over B9 parallax). */
+export type BackgroundScroll = 'none' | 'zoom_in' | 'zoom_out' | 'pan_up' | 'pan_down'
+/** B19 Ken Burns slow zoom of `hero_slider`, `image_carousel` and `image` pictures (absent = none). */
+export type KenBurns = 'none' | 'slow' | 'normal'
+/** Absent = alternate (zoom in, then out on the next picture). */
+export type KenBurnsDirection = 'alternate' | 'in' | 'out'
+/** B19 Ken Burns props (kept only when not none). */
+export type KenBurnsProps = { ken_burns?: Exclude<KenBurns, 'none'>; ken_burns_direction?: KenBurnsDirection }
+export type ScrollProgressPosition = 'top' | 'bottom'
+export type ScrollProgressColorRole = 'primary' | 'accent' | 'secondary'
+/** B19 document top-level `scroll_progress` (page, cms and template documents): a thin reading progress bar. `thickness` px 2–6. */
+export type ScrollProgress = { position: ScrollProgressPosition; color_role: ScrollProgressColorRole; thickness: number }
 
 export type ResponsiveStyle = Partial<Record<Breakpoint, Style>>
 
@@ -186,6 +211,9 @@ export type WrappedSectionProps = {
   items: { item_type: string; item_id: string }[]
   /** B18: product_grid / product_carousel / product_tabs (absent = none). */
   card_hover?: CardHover
+  /** B19: hero_slider only (absent = none). */
+  ken_burns?: Exclude<KenBurns, 'none'>
+  ken_burns_direction?: KenBurnsDirection
 }
 
 type ElementOf<T extends string, P> = NodeCommon & { type: T; props: P }
@@ -218,7 +246,7 @@ export type HeadingElement = ElementOf<'heading', { text: string; level: 1 | 2 |
 export type TextElement = ElementOf<'text', { html: string; text_effect?: TextEffect }>
 export type ImageElement = ElementOf<
   'image',
-  { media_id: string | null; alt: string; link: Link; aspect: 'auto' | '1:1' | '4:3' | '3:2' | '16:9' | '3:4'; fit: 'cover' | 'contain' }
+  { media_id: string | null; alt: string; link: Link; aspect: 'auto' | '1:1' | '4:3' | '3:2' | '16:9' | '3:4'; fit: 'cover' | 'contain' } & KenBurnsProps
 >
 /**
  * B8b `action` (context popup only; absent = link — the server normalizes `link` to absent):
@@ -391,7 +419,7 @@ export type GalleryElement = ElementOf<'gallery', { images: GalleryImage[]; colu
 
 export type CarouselImage = { id: string; media_id: string; alt: string; caption: string; link: Link }
 /** `autoplay` in seconds (0 = off, ≤ 15). */
-export type ImageCarouselElement = ElementOf<'image_carousel', { images: CarouselImage[]; autoplay: number; show_dots: boolean; show_arrows: boolean; aspect: GalleryAspect }>
+export type ImageCarouselElement = ElementOf<'image_carousel', { images: CarouselImage[]; autoplay: number; show_dots: boolean; show_arrows: boolean; aspect: GalleryAspect } & KenBurnsProps>
 
 export type MotionSpeed = 'slow' | 'normal' | 'fast'
 export type LogoItem = { id: string; media_id: string; alt: string; link: Link }
@@ -735,6 +763,49 @@ export type BanglaDateElement = ElementOf<'bangla_date', BanglaDateProps>
 export type B17Element = OrnamentElement | PaymentBadgesElement | DeliveryPromiseElement | BanglaDateElement
 
 /* ----------------------------------------------------------------------------------------------
+ * B19: scroll stories — a sticky picture beside steps, and a horizontal gallery pinned to the
+ * scroll. ✱ text props are translatable (`steps.<id>.<field>`, `items.<id>.<field>`).
+ * -------------------------------------------------------------------------------------------- */
+
+export type ScrollStoryMediaSide = 'left' | 'right'
+export type ScrollStoryMediaRatio = 'square' | 'portrait' | 'landscape'
+export type ScrollStoryTransition = 'fade' | 'slide' | 'zoom'
+/** A step's optional link: label ✱ ≤ 40 and a site path or http(s) URL. */
+export type ScrollStoryLink = { label: string; url: string }
+/**
+ * One step (every key always present): its picture (`media_id`; null while none is chosen — page
+ * check SCROLL_STORY_MEDIA; published: the text without a picture), alt ✱ ≤ 200, kicker ✱ ≤ 60,
+ * heading ✱ 1–120 (required), text ✱ ≤ 600 (plain text), link null or `{label ✱ 1–40, url}`.
+ */
+export type ScrollStoryStep = { id: string; media_id: string | null; alt: string; kicker: string; heading: string; text: string; link: ScrollStoryLink | null }
+/** `steps` 2–6. */
+export type ScrollStoryProps = {
+  media_side: ScrollStoryMediaSide
+  media_ratio: ScrollStoryMediaRatio
+  transition: ScrollStoryTransition
+  steps: ScrollStoryStep[]
+  progress_dots: boolean
+}
+export type ScrollStoryElement = ElementOf<'scroll_story', ScrollStoryProps>
+
+export type HorizontalGallerySource = 'images' | 'products'
+export type HorizontalGalleryCardWidth = 'small' | 'medium' | 'large'
+/** A picture of the gallery (source images): alt ✱ ≤ 200, caption ✱ ≤ 120, link null or `{url}`. Published payloads drop items without media. */
+export type HorizontalGalleryItem = { id: string; media_id: string | null; alt: string; caption: string; link: Link }
+/** `items` 2–12 (source images) or `product_ids` 2–12 (source products); the inactive list is `[]`. `pin` = pinned horizontal scroll on desktop. */
+export type HorizontalGalleryProps = {
+  source: HorizontalGallerySource
+  items: HorizontalGalleryItem[]
+  product_ids: string[]
+  card_width: HorizontalGalleryCardWidth
+  pin: boolean
+  show_progress: boolean
+}
+export type HorizontalGalleryElement = ElementOf<'horizontal_gallery', HorizontalGalleryProps>
+
+export type B19Element = ScrollStoryElement | HorizontalGalleryElement
+
+/* ----------------------------------------------------------------------------------------------
  * B14: store page templates — live text and the templates' main parts. Props: ./templates/types.ts.
  * -------------------------------------------------------------------------------------------- */
 
@@ -762,6 +833,7 @@ export type Element =
   | OrderFormElement
   | B17Element
   | B14Element
+  | B19Element
 
 export type ElementType = Element['type']
 
@@ -778,6 +850,8 @@ export type SectionProps = {
   /** B6: shape dividers at the section's top / bottom edge; absent = null. */
   shape_top?: SectionShape | null
   shape_bottom?: SectionShape | null
+  /** B19: the background image moves while scrolling (absent = still; image backgrounds only; replaces parallax). */
+  background_scroll?: Exclude<BackgroundScroll, 'none'>
 }
 
 export type Section = NodeCommon & {
@@ -885,7 +959,17 @@ export type PageSeo = {
  * GlobalSectionNode entries (see DocumentSection) — typed `Section[]` for older code, check with
  * `isGlobalSectionNode`.
  */
-export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo; device_order?: DeviceOrder; experiments?: Experiment[]; motion_theme?: MotionTheme }
+export type BuilderDocument = {
+  schema_version: 1
+  sections: Section[]
+  popup?: PopupSettings
+  seo?: PageSeo
+  device_order?: DeviceOrder
+  experiments?: Experiment[]
+  motion_theme?: MotionTheme
+  /** B19: the reading progress bar (page, cms and template documents; absent = none). */
+  scroll_progress?: ScrollProgress
+}
 
 /**
  * B12: per-device order of a container's children, by container id → the children's ids in the
@@ -1093,6 +1177,13 @@ export type DeliveryPromiseData = {
 /** B17 Bangla date: the store's IANA time zone (today is computed in the browser). */
 export type BanglaDateData = { timezone: string; state?: ElementDataState }
 
+/**
+ * B19 horizontal gallery, source products: storefront product cards by product id (shown in
+ * `product_ids` order; only products on sale — publicly the element is left out when none is).
+ * Drafts add `unavailable` (the chosen ids not on sale) and `state: 'empty'` when none is.
+ */
+export type HorizontalGalleryData = { products: Record<string, ProductCard> | []; unavailable?: string[]; state?: ElementDataState }
+
 export type ElementData =
   | OrderFormData
   | CountdownData
@@ -1112,6 +1203,7 @@ export type ElementData =
   | PaymentBadgesData
   | DeliveryPromiseData
   | BanglaDateData
+  | HorizontalGalleryData
   | ProductListingData
 
 /** One entry of a payload's `data` map. */
@@ -1119,7 +1211,7 @@ export type BuilderData = StoreSection | ElementData
 
 export type BuilderPage = {
   /** B9: `seo` on page and cms documents (null / absent = none set). */
-  document: { id: string; key: string; title: string; version: number | null; source: 'published' | 'draft'; seo?: RenderSeo | null }
+  document: { id: string; key: string; title: string; version: number | null; source: 'published' | 'draft'; seo?: RenderSeo | null; scroll_progress?: ScrollProgress | null }
   sections: RenderSection[]
   media: Record<string, BuilderMedia>
   /**

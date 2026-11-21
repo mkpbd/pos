@@ -83,6 +83,7 @@ import { TemplateSampleContext, useTemplateSampleState } from './template-sample
 import { hasSamplePicker, templateLivePath } from './store-pages-api'
 import { computeDropTarget, layerDropTarget, type Dragged, type DropResult } from './drop-targets'
 import { Inspector, withSeo } from './inspector'
+import { withScrollProgress } from './inspector/b19-scroll'
 import { BREAKPOINT, DEVICE_LABEL, widthAt } from './inspector/style-model'
 import { flattenLayers } from './layers'
 import { LayersPanel, type LayerIndicator } from './layers-panel'
@@ -1638,6 +1639,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               surroundings={surroundings}
               popup={popupSettings}
               product={canvasProduct}
+              scrollProgress={content.scroll_progress}
               emptyText={info.empty}
               bootstrap={canvasContext.bootstrap}
               locale={canvasLocale}
@@ -1730,6 +1732,13 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                     case 'preview-motion':
                       canvas.current?.scrollTo(command.nodeId)
                       return canvas.current?.playMotion(command.nodeId, command.scope)
+                    case 'preview-scroll':
+                      // B19: the canvas scrolls the node through the screen once.
+                      return canvas.current?.previewScroll(command.nodeId)
+                    case 'set-scroll-progress': {
+                      const value = command.value
+                      return void state.apply((c) => withScrollProgress(c, value), { coalesceKey: command.coalesceKey })
+                    }
                     case 'set-popup': {
                       const settings = command.settings
                       return void state.apply((c) => ({ ...c, popup: settings }), { coalesceKey: command.coalesceKey })

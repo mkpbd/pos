@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B19 — Store builder: Scroll stories
+
+#### Added
+- **Scroll effects** (Style → *Scroll*, any part of a page): fade, rise, sink, grow, shrink, rotate, slide in from either side, sharpen from a blur, or wipe in (up, left, circle) while the shopper scrolls — strength (subtle / medium / strong) and when it plays (coming in, while on screen, leaving, both); ▶ *Preview* scrolls the part through the editor once. They work together with B18 entrances and loops on the same part.
+- **Backgrounds that move while scrolling:** a section's background picture zooms in / out or moves up / down (replaces its parallax).
+- **Slow zoom (Ken Burns)** on images, image carousels and hero sliders (with the Pause animations button).
+- **Scroll story** (new element; starter section *Our story in steps*): 2–6 steps, each with a picture, small line, heading, text and link; on computers the picture stays in place and changes with each step as the shopper scrolls, with progress dots; phones, tablets and *reduce motion* get each step with its own picture. Clicking a step on the canvas opens it in the inspector.
+- **Horizontal gallery** (new element; starter *Swipe through the collection*): 2–12 pictures or products; on computers the row moves sideways while scrolling down (pinned); phones get a swipe row with previous / next buttons and a progress bar. Products not on sale are left out of the live page.
+- **Reading progress bar** (page settings): a thin bar at the top or bottom that grows with the reading position — position, colour and thickness.
+- **Page check:** a story step without a picture or description, a scroll effect on the top picture or heading (*Remove scroll effect*), a pinned gallery with more than 8 entries (*Turn off pinning*). Motion themes Lively, Festive and Premium add gentle scroll effects below the first section.
+- **Storefront engine:** CSS scroll-driven animations with a 0.8 kB lazy fallback (one passive listener, one animation frame loop, only parts near the screen measured); transform / filter / clip-path only, no layout shift, nothing on the first paint; off under *reduce motion* and while paused. No new dependencies.
+
+#### Tests
+- Backend 1537 (PostgreSQL: 1536 pass, 1 opt-in skip; new `BuilderB19SchemaTest`, `StoreBuilderB19Test`, both starters checked in every context); Pint clean. vitest 2612; mocked Playwright 459 (new `storefront-scroll-b19`, `store-builder-b19-scroll`, `store-builder-b19-story`).
+- Full-stack (PostgreSQL, desktop) 52 — new **B19**: a Green Basket page built from both starters with a gentle scroll effect and an accent reading bar saves (an out-of-range bar is refused), passes the page check, publishes; on a computer every story step is on the page, the gallery shows its pictures and the reading bar's fill grows while scrolling; on a phone the story is stacked and nothing scrolls sideways. Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- No migration, no new setting. Existing parallax keeps working; choosing a moving background replaces it on that section.
+
 ### B18 — Store builder: Motion studio
 
 #### Added

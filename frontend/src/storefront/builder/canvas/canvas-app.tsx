@@ -15,7 +15,8 @@ import type { StorefrontBootstrap, StorefrontTheme } from '../../types'
 import { PageRenderer } from '../page-renderer'
 import { PopupFrame } from '../popups/popup-frame'
 import { motionTargets } from '../compile-styles'
-import { playMotionScope } from '../motion'
+import { motionAllowed, playMotionScope } from '../motion'
+import { itemAt, runScrollPreview } from './scroll-preview'
 import { MotionModeCtx } from '../motion-pause'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, Device, RenderColumn, RenderElement, RenderPageSection, RenderSection } from '../types'
@@ -446,6 +447,9 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const [previewAs, setPreviewAs] = useState<PreviewContext | null>(null)
   // B18: the toolbar's "Preview motion" (off until the editor says otherwise).
   const [previewMotion, setPreviewMotion] = useState(false)
+  // B19: a `preview-scroll` run (scroll effects on while it lasts, even with "Preview motion" off).
+  const [scrollPreview, setScrollPreview] = useState(false)
+  const stopScrollPreview = useRef<(() => void) | null>(null)
   // B14: the toolbar's sample for a store page template (live text and the main parts draw it).
   const [storePage, setStorePage] = useState<StorePageRuntime>(NO_SAMPLE)
   const pendingRects = useRef(false)
@@ -486,7 +490,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       frame
         ? // B9: unavailable global references ride along in `sections` (BuilderPage types them as sections).
           {
-            document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft' },
+            // B19: the draft's reading progress bar.
+            document: { id: 'draft', key: 'canvas', title: '', version: null, source: 'draft', scroll_progress: frame.scroll_progress ?? null },
             sections: sections as RenderSection[],
             media: frame.media ?? {},
             data: frame.data ?? {},
@@ -537,6 +542,23 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         // B9: the node's whole motion (entrance, staggered children, loop) as the last frame describes it.
         playMotionScope(document, motionTargets(sectionsRef.current), typeof message.id === 'string' ? message.id : '', scope)
       } else if (message.type === 'preview-motion') setPreviewMotion(message.on === true)
+      else if (message.type === 'preview-scroll') {
+        if (typeof message.id !== 'string' || !NODE_ID.test(message.id) || !motionAllowed()) return
+        stopScrollPreview.current?.()
+        setScrollPreview(true)
+        // One frame for the scroll forms (sticky story, pinned gallery) to be drawn, then the run.
+        requestAnimationFrame(() => {
+          const node = document.querySelector<HTMLElement>(`[data-b="${message.id}"]`)
+          if (!node) {
+            setScrollPreview(false)
+            return
+          }
+          stopScrollPreview.current = runScrollPreview(node, () => {
+            stopScrollPreview.current = null
+            setScrollPreview(false)
+          })
+        })
+      }
       else if (message.type === 'edit-text') {
         if (typeof message.id === 'string' && NODE_ID.test(message.id)) editing.startEdit(message.id, typeof message.field === 'string' ? message.field : undefined)
       } else if (message.type === 'end-text-edit') editing.finish(message.commit === true ? 'commit' : 'cancel')
@@ -574,7 +596,12 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       if (isEditUi(event.target)) return
       swallow(event)
       // B12: the modifiers select several nodes (the swallowed mousedown keeps Shift from selecting text).
-      if (event.type === 'click') post({ type: 'click', id: idAt(event.target), ctrl: event.ctrlKey, shift: event.shiftKey, meta: event.metaKey })
+      if (event.type === 'click') {
+        const id = idAt(event.target)
+        // B19: the story step / gallery item clicked inside the node.
+        const item = itemAt(event.target, id)
+        post({ type: 'click', id, ctrl: event.ctrlKey, shift: event.shiftKey, meta: event.metaKey, ...(item ? { item } : {}) })
+      }
     }
     const onDoubleClick = (event: MouseEvent) => {
       if (isEditUi(event.target)) return
@@ -731,7 +758,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
       <BootstrapContext value={bootstrap}>
         <NoticeProvider>
          {/* B18: calm while editing; loops, dividers and text effects run while "Preview motion" is on. */}
-         <MotionModeCtx value={previewMotion ? 'canvas-preview' : 'canvas'}>
+         <MotionModeCtx value={previewMotion || scrollPreview ? 'canvas-preview' : 'canvas'}>
          <StorePageCtx value={storePage}>
           <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
           <style data-testid="canvas-outlines">{outlineCss(frame, editor.dropTarget)}</style>

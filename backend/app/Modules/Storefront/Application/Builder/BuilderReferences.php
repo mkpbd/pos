@@ -30,7 +30,8 @@ use App\Modules\Storefront\Infrastructure\Models\Menu;
  * card's category and image, the spotlight product, the shop-the-look photo and hotspot
  * products, and background-video posters (style media); B8a: before / after photos, team
  * portraits and photo grid images, comparison and bundle products, the flash sale bar's
- * countdown promotion, the review wall's product and a ratings chart's product. Another
+ * countdown promotion, the review wall's product and a ratings chart's product; B19: scroll
+ * story and horizontal gallery pictures, the gallery's products. Another
  * organization's id is reported exactly like a missing one: 422 DOCUMENT_INVALID with the
  * node id, path, a code and the ids.
  */
@@ -146,6 +147,9 @@ class BuilderReferences
                     'gallery', 'image_carousel', 'photo_grid' => 'images',
                     'logo_carousel' => 'logos',
                     'team' => 'members',
+                    // B19.
+                    'scroll_story' => 'steps',
+                    'horizontal_gallery' => 'items',
                     default => 'media_id',
                 };
                 $use('MEDIA_NOT_FOUND', "{$path}.props.{$prop}", $node['id'], $mediaIds);
@@ -171,6 +175,8 @@ class BuilderReferences
                     $use('CATEGORY_NOT_FOUND', "{$path}.props.category_ids", $node['id'], $props['category_ids'] ?? []),
                     $use('BRAND_NOT_FOUND', "{$path}.props.brand_ids", $node['id'], $props['brand_ids'] ?? []),
                 ],
+                // B19: a horizontal gallery of chosen products.
+                'horizontal_gallery' => $use('PRODUCT_NOT_FOUND', "{$path}.props.product_ids", $node['id'], $props['product_ids']),
                 default => null,
             };
             $type = ElementRegistry::sectionType($node['type']);

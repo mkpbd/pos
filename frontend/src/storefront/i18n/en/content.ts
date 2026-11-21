@@ -161,6 +161,15 @@ export const content = {
   'content.builder.template.order': 'Order summary',
   'content.motion.pause': 'Pause animations',
   'content.motion.play': 'Play animations',
+  // B19 scroll stories.
+  'content.scroll.story': 'Story in {count} steps',
+  'content.scroll.step': 'Step {index} of {count}',
+  'content.scroll.goToStep': 'Go to step {index}: {title}',
+  'content.scroll.gallery': 'Gallery',
+  'content.scroll.previous': 'Previous',
+  'content.scroll.next': 'Next',
+  'content.scroll.noPicture': 'Choose a picture for this step',
+  'content.scroll.noPictureItem': 'Choose a picture',
 
   'content.section.openOffer': 'Open offer',
   'content.section.fromBlog': 'From the blog',

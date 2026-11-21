@@ -5,7 +5,7 @@ import { MenuLink } from '../components/menu-link'
 import { RichText } from '../components/rich-text'
 import { SectionItem } from '../sections/section-renderer'
 import type { SectionPreviewState, StoreSection } from '../types'
-import { aspectRatioCss, colorCss, compileStyles, motionTargets, parallaxOf, pointerEffects, scopePrefix } from './compile-styles'
+import { aspectRatioCss, colorCss, compileStyles, motionTargets, parallaxOf, pointerEffects, scopePrefix, scrollRanges } from './compile-styles'
 import { B4ElementContent } from './elements'
 import { isB4Type } from './elements/b4-types'
 import { B6ElementContent } from './elements/b6'
@@ -13,6 +13,8 @@ import { isB6Type } from './elements/b6-types'
 import { B8aElementContent } from './elements/b8a'
 import { B17ElementContent } from './elements/b17'
 import { B14ElementContent } from './elements/b14'
+import { B19ElementContent } from './elements/b19'
+import { isB19Type } from './elements/b19-types'
 import { isB14Type } from './elements/b14-types'
 import { isB17Type } from './elements/b17-types'
 import { isB8aType } from './elements/b8a-types'
@@ -25,6 +27,9 @@ import { useRichTextEffect } from './text-effect'
 import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
 import { BackgroundVideoLayer, ParallaxLayer, ShapeDivider } from './section-layers'
+import { BackgroundScrollLayer, ReadingProgressBar } from './scroll-layers'
+import { SCROLL_GATE_ATTRIBUTE } from './scroll-css'
+import { useKenBurns, useScrollEffects, useScrollMotionOn } from './scroll-link'
 import { isWrappedSectionType, NODE_ID } from './registry'
 import { ColumnWidthCtx, DeviceOrderCtx, GlobalDocumentCtx, PageCtx, usePage } from './render-context'
 import { DEVICE_ORDER_ROOT, orderedChildren } from './device-order'
@@ -32,7 +37,7 @@ import { useViewportDevice } from './use-viewport-device'
 import { PreviewMark } from './preview-mark'
 import { useLocale } from '../i18n/locale'
 import type { BuilderPage, Device, DeviceOrder, NodeState, RenderColumn, RenderElement, RenderPageSection, RenderSection } from './types'
-import { buttonAction, ENUMS, normalizeCardHover, normalizeWidth, oneOf, safeLink } from './validate'
+import { buttonAction, ENUMS, normalizeCardHover, normalizeWidth, oneOf, safeLink, sectionBackgroundScroll } from './validate'
 import { globalInfo, isUnavailableGlobalSection } from './global-sections'
 import { ImagePriorityCtx, priorityImageElement, useImagePriority } from './image-priority'
 import { usePageInsights } from '../insights/use-page-insights'
@@ -126,9 +131,11 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
   // B6 layers: shape dividers and a background video (absent on pre-B6 sections: unchanged markup).
   const shapes = sectionShapes(section.props)
   const video = backgroundVideoOf(section.style)
+  // B19: a background image that zooms / pans while scrolling (replaces parallax).
+  const backgroundScroll = video ? undefined : sectionBackgroundScroll(section.props, section.style)
   // B9: a background image that scrolls slower than the page.
-  const parallax = video ? null : parallaxOf(section.style)
-  const layered = Boolean(shapes.top || shapes.bottom || video || parallax)
+  const parallax = video || backgroundScroll ? null : parallaxOf(section.style)
+  const layered = Boolean(shapes.top || shapes.bottom || video || parallax || backgroundScroll)
   // B9: a section drawn from a global section: its forms submit to the global document; drafts (and the canvas) mark it.
   const owner = globalInfo(section)
   const global = draft ? owner : null
@@ -146,6 +153,7 @@ function SectionNode({ section, sticky }: { section: RenderSection; sticky: bool
         style={sticky ? ({ '--b-sticky-top': `${stickyTop}px` } as CSSProperties) : undefined}
       >
         {parallax && <ParallaxLayer speed={parallax} />}
+        {backgroundScroll && <BackgroundScrollLayer kind={backgroundScroll} />}
         {video && <BackgroundVideoLayer video={video} />}
         {shapes.top && <ShapeDivider shape={shapes.top} edge="top" />}
         <div className={cn('b-container', LAYOUT_CLASSES[layout])}>
@@ -218,6 +226,7 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
       if (isB8aType(element.type)) return <B8aElementContent element={element} />
       if (isB17Type(element.type)) return <B17ElementContent element={element} />
       if (isB14Type(element.type)) return <B14ElementContent element={element} />
+      if (isB19Type(element.type)) return <B19ElementContent element={element} />
       // A type this build does not know yet (newer API): skip it rather than break the page.
       return null
   }
@@ -283,6 +292,8 @@ function Image({ element }: { element: Extract<RenderElement, { type: 'image' }>
   const alt = typeof element.props?.alt === 'string' ? element.props.alt : ''
   const url = safeLink(element.props?.link)
   const priority = useImagePriority(element.id)
+  // B19: a slow zoom (Ken Burns).
+  const kenBurns = useKenBurns(element.type, element.props)
 
   if (!media) {
     // A missing image keeps its place in a draft preview only.
@@ -298,7 +309,7 @@ function Image({ element }: { element: Extract<RenderElement, { type: 'image' }>
     />
   )
   return (
-    <div data-b={element.id} className="b-image overflow-hidden" style={ratio ? { aspectRatio: ratio } : undefined}>
+    <div data-b={element.id} className="b-image overflow-hidden" style={ratio ? { aspectRatio: ratio } : undefined} {...kenBurns}>
       {url ? (
         <MenuLink url={url} className="block h-full">
           {img}
@@ -376,6 +387,8 @@ function Divider({ element }: { element: Extract<RenderElement, { type: 'divider
 
 function WrappedSection({ element, state }: { element: RenderElement; state: NodeState | null }) {
   const { page, draft, placeholder } = usePage()
+  // B19: the hero slider's slow zoom (Ken Burns).
+  const kenBurns = useKenBurns(element.type, element.props)
   const entry = Object.hasOwn(page.data ?? {}, element.id) ? page.data[element.id] : undefined
   const data = entry && 'type' in entry && entry.type === element.type ? (entry as StoreSection) : undefined
 
@@ -394,7 +407,7 @@ function WrappedSection({ element, state }: { element: RenderElement; state: Nod
   // In a draft the element's own state (hidden, scheduled, …) marks the section; published pages carry none.
   const section: StoreSection = { ...data, state: draft ? (sectionState(data.state) ?? (state ? SECTION_STATES[state] : undefined)) : undefined }
   return (
-    <div data-b={element.id} className="b-section-el" data-b-card-hover={normalizeCardHover(element.type, (element.props as { card_hover?: unknown } | undefined)?.card_hover)}>
+    <div data-b={element.id} className="b-section-el" data-b-card-hover={normalizeCardHover(element.type, (element.props as { card_hover?: unknown } | undefined)?.card_hover)} {...kenBurns}>
       <SectionItem section={section} testId="builder-section" />
     </div>
   )
@@ -463,14 +476,18 @@ export function PageRenderer({
   }, [publishedId, reportedKey])
   const kinds = useMemo(() => (canvas ? new Set<never>() : audienceKinds(sections)), [canvas, sections])
   const validScope = scopePrefix(scope) ? scope : undefined
-  const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope }), [sections, page.media, validScope])
-  const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
   // B12: phone / tablet order — sections here, elements in Columns.
   const viewportDevice = useViewportDevice()
   const device = forcedDevice ?? viewportDevice
   const order: DeviceOrder | null = typeof page.device_order === 'object' && page.device_order !== null ? page.device_order : null
-  const orderContext = useMemo(() => ({ device, order }), [device, order])
   const drawnSections = useMemo(() => orderedChildren(DEVICE_ORDER_ROOT, sections, order, device), [sections, order, device])
+  // B15: the store page's first above-the-fold picture loads first; the header, footer, zones, popups and canvas have none.
+  const priorityImage = useMemo(() => (validScope === 'page' ? priorityImageElement(drawnSections, page.media ?? {}, order, device) : null), [validScope, drawnSections, page.media, order, device])
+  // B19: the LCP picture never waits for a scroll effect.
+  const noScroll = useMemo(() => new Set(priorityImage ? [priorityImage] : []), [priorityImage])
+  const css = useMemo(() => compileStyles(sections, { media: page.media ?? {}, scope: validScope, noScroll }), [sections, page.media, validScope, noScroll])
+  const context = useMemo(() => ({ page, draft, placeholder }), [page, draft, placeholder])
+  const orderContext = useMemo(() => ({ device, order }), [device, order])
   const targets = useMemo(() => motionTargets(sections), [sections])
   // B18: the canvas runs no entrances on its own; with "Preview motion" on its loops run.
   const motionMode = useMotionMode()
@@ -485,8 +502,14 @@ export function PageRenderer({
   const longMotion = useMemo(() => targets.some((target) => target.motion.loop !== 'none' && target.motion.loop_forever), [targets])
   useLongMotion(longMotion && motionMode === 'live' && entrances && !reduced)
   usePageInsights(rootRef, page, device, insights && !draft, undefined, arms.reported)
-  // B15: the store page's first above-the-fold picture loads first; the header, footer, zones, popups and canvas have none.
-  const priorityImage = useMemo(() => (validScope === 'page' ? priorityImageElement(drawnSections, page.media ?? {}, order, device) : null), [validScope, drawnSections, page.media, order, device])
+  // B19: scroll-linked motion runs on the store and in the canvas while motion is previewed
+  // (the page wrapper's `data-b-moving` turns the compiled scroll rules on); the fallback engine
+  // drives the scroll effects where CSS scroll-driven animations are missing.
+  const scrollOn = useScrollMotionOn()
+  const ranges = useMemo(() => scrollRanges(sections, noScroll), [sections, noScroll])
+  useScrollEffects(rootRef, ranges, scrollOn)
+  // B19: the reading progress bar (page-like documents; the canvas draws the draft's).
+  const progress = validScope === 'page' || canvas ? page.document?.scroll_progress : null
   // B6: at most one sticky section, and only in page-like documents (never the header or footer).
   const stickyId = useMemo(() => {
     const key = page.document?.key
@@ -495,8 +518,16 @@ export function PageRenderer({
   }, [sections, page.document?.key])
 
   const drawn = (
-    <div ref={rootRef} className={cn('b-page', className)} data-testid={testId} data-document-key={page.document?.key} data-b-scope={validScope}>
+    <div
+      ref={rootRef}
+      className={cn('b-page', className)}
+      data-testid={testId}
+      data-document-key={page.document?.key}
+      data-b-scope={validScope}
+      {...{ [SCROLL_GATE_ATTRIBUTE]: scrollOn ? '' : undefined }}
+    >
       <style data-testid="builder-styles">{css}</style>
+      {progress && <ReadingProgressBar value={progress} />}
       {drawnSections.map((section) => (
         <PageSection key={section.id} section={section} sticky={section.id === stickyId} />
       ))}

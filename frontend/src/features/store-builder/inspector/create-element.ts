@@ -6,6 +6,7 @@
 
 import { elementMeta, isWrappedSectionType, type ElementMeta } from '@/storefront/builder/registry'
 import type { Column, DocumentContext, Element, InnerRowElement, WrappedElement } from '@/storefront/builder/types'
+import { b19StartingProps } from './b19-model'
 import { requestSetup } from './setup-store'
 import type { BuilderNode, ElementsMetadata } from './types'
 import { B4_TYPES, B6_TYPES, B8A_TYPES, P2A_TYPES, validateNode } from './validate'
@@ -58,6 +59,8 @@ export function buildElement(type: string, registry: ElementsMetadata, existingI
     schedule: null,
     translations: {},
   }
+  // B19: a story / gallery from a registry without starting items still starts with some (pictures chosen later).
+  Object.assign(node.props, b19StartingProps(type, node.props))
   if (meta.children === 'columns') {
     const columns: Column[] = [0, 1].map(() => ({ id: newId('c', taken), type: 'column', width: { base: 50, tablet: 50, mobile: 100 }, style: {}, elements: [] }))
     return { ...node, props: {}, columns } as unknown as InnerRowElement

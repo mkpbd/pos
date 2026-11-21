@@ -265,7 +265,7 @@ class BuilderDocumentSchemaTest extends TestCase
     public function test_the_registry_describes_every_element_type(): void
     {
         $meta = ElementRegistry::metadata();
-        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6) + count(ElementRegistry::B8A) + count(ElementRegistry::B8B) + count(ElementRegistry::P2A) + count(ElementRegistry::B17) + count(ElementRegistry::B14), $meta['types']);
+        $this->assertCount(7 + count(SectionType::cases()) + count(ElementRegistry::B4) + count(ElementRegistry::B6) + count(ElementRegistry::B8A) + count(ElementRegistry::B8B) + count(ElementRegistry::P2A) + count(ElementRegistry::B17) + count(ElementRegistry::B14) + count(ElementRegistry::B19), $meta['types']);
         $byType = array_column($meta['types'], null, 'type');
         $this->assertSame('columns', $byType['inner_row']['children']);
         // B18: rotating words of a text effect.

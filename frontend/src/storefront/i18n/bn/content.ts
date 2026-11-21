@@ -161,6 +161,15 @@ export const content: Translations<typeof en> = {
   'content.builder.template.order': 'অর্ডারের সারাংশ',
   'content.motion.pause': 'অ্যানিমেশন থামান',
   'content.motion.play': 'অ্যানিমেশন চালান',
+  // B19 scroll stories.
+  'content.scroll.story': '{count} ধাপের গল্প',
+  'content.scroll.step': '{count} ধাপের {index} নম্বর ধাপ',
+  'content.scroll.goToStep': '{index} নম্বর ধাপে যান: {title}',
+  'content.scroll.gallery': 'গ্যালারি',
+  'content.scroll.previous': 'আগেরটি',
+  'content.scroll.next': 'পরেরটি',
+  'content.scroll.noPicture': 'এই ধাপের জন্য একটি ছবি বেছে নিন',
+  'content.scroll.noPictureItem': 'একটি ছবি বেছে নিন',
 
   'content.section.openOffer': 'অফারটি দেখুন',
   'content.section.fromBlog': 'ব্লগ থেকে',

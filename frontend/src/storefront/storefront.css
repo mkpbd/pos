@@ -586,3 +586,109 @@ header.sticky[data-testid="site-header"] { top: var(--sf-popup-bar-top, 0px); }
 }
 /* The pill never hides the end of the footer (the assistant's own spacing already covers it). */
 :root:not([data-sf-assistant]):has(.sf-motion-toggle) [data-testid="site-footer"]::after { content: ""; display: block; height: 4.5rem; }
+
+/*
+ * B19 scroll stories. Scroll effects (compiled per node, ./builder/scroll-css.ts) use these
+ * keyframes: the hidden state comes from the node's `--b-s-*` variables, the shown state is the
+ * node's own. They move translate / scale / rotate, filter and clip-path only — never transform or
+ * opacity, which entrances, loops and hover effects use — so both compose on one node. Everything scroll-linked stands
+ * still for reduced motion, while animations are paused, and in the editor canvas unless motion is
+ * previewed (the page wrapper's `data-b-moving`).
+ */
+@keyframes b-scroll-in { from { translate: var(--b-s-tr, none); scale: var(--b-s-sc, none); rotate: var(--b-s-ro, none); filter: var(--b-s-f, none); } }
+@keyframes b-scroll-out { to { translate: var(--b-s-tr, none); scale: var(--b-s-sc, none); rotate: var(--b-s-ro, none); filter: var(--b-s-f, none); } }
+@keyframes b-scroll-io {
+  0%, 100% { translate: var(--b-s-tr, none); scale: var(--b-s-sc, none); rotate: var(--b-s-ro, none); filter: var(--b-s-f, none); }
+  40%, 60% { translate: none; scale: none; rotate: none; filter: none; }
+}
+@keyframes b-scroll-clip-in { from { clip-path: var(--b-s-c); } to { clip-path: var(--b-s-c1); } }
+@keyframes b-scroll-clip-out { from { clip-path: var(--b-s-c1); } to { clip-path: var(--b-s-c); } }
+@keyframes b-scroll-clip-io { 0%, 100% { clip-path: var(--b-s-c); } 40%, 60% { clip-path: var(--b-s-c1); } }
+
+/* Section `background_scroll`: a layer inheriting the section's background, zoomed / panned through its time on screen. */
+.b-bgscroll { display: none; position: absolute; inset: 0; z-index: 0; overflow: clip; pointer-events: none; background: inherit; }
+.b-bgscroll > div { position: absolute; inset: -10% 0; background: inherit; will-change: transform; }
+@keyframes b-bg-zoom_in { from { transform: scale(1); } to { transform: scale(1.15); } }
+@keyframes b-bg-zoom_out { from { transform: scale(1.15); } to { transform: scale(1); } }
+@keyframes b-bg-pan_up { from { transform: translateY(6%); } to { transform: translateY(-6%); } }
+@keyframes b-bg-pan_down { from { transform: translateY(-6%); } to { transform: translateY(6%); } }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-b-paused]) [data-b-moving] .b-bgscroll { display: block; }
+  @supports (animation-timeline: view()) {
+    [data-b-moving] .b-bgscroll > div { animation: b-bg-zoom_in linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+  }
+  @supports not (animation-timeline: view()) {
+    [data-b-moving] .b-bgscroll[data-b-sp] > div { animation: b-bg-zoom_in 1s linear both paused; animation-delay: calc(var(--b-p, 0) * -1s); }
+  }
+  [data-b-moving] .b-bgscroll[data-kind="zoom_out"] > div { animation-name: b-bg-zoom_out; }
+  [data-b-moving] .b-bgscroll[data-kind="pan_up"] > div { animation-name: b-bg-pan_up; }
+  [data-b-moving] .b-bgscroll[data-kind="pan_down"] > div { animation-name: b-bg-pan_down; }
+}
+
+/* Ken Burns (`props.ken_burns`): a slow zoom and pan of each picture; alternate = every second slide zooms out. Long motion: pausable. */
+[data-b-kb="slow"] { --b-kb-ms: 24s; }
+[data-b-kb="normal"] { --b-kb-ms: 14s; }
+@keyframes b-kb-in { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.12) translate(-2%, -1.5%); } }
+@keyframes b-kb-out { from { transform: scale(1.12) translate(2%, 1.5%); } to { transform: scale(1) translate(0, 0); } }
+@media (prefers-reduced-motion: no-preference) {
+  [data-b-moving] [data-b-kb] img { animation: b-kb-in var(--b-kb-ms, 24s) ease-in-out infinite alternate both; transform-origin: 50% 50%; }
+  [data-b-moving] [data-b-kb][data-b-kb-dir="out"] img,
+  [data-b-moving] [data-b-kb][data-b-kb-dir="alternate"] [aria-roledescription="slide"]:nth-child(even) img { animation-name: b-kb-out; }
+  :root[data-b-paused] [data-b-kb] img { animation-play-state: paused; }
+}
+
+/* Scroll story: sticky picture beside the steps (desktop), or each step's picture above its text. */
+.b-story-steps, .b-story-stack { list-style: none; margin: 0; padding: 0; }
+.b-story-stack { display: grid; gap: 2.5rem; }
+.b-story-stack > .b-story-step { display: grid; gap: 1rem; }
+.b-story[data-layout="sticky"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: clamp(2rem, 5vw, 4rem); }
+.b-story[data-side="right"] > .b-story-media { order: 2; }
+.b-story-pin { position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; }
+.b-story-frame { position: relative; overflow: hidden; width: min(100%, calc(78svh * var(--b-story-ar, 0.8))); }
+.b-story-slide { position: absolute; inset: 0; opacity: 0; transition: opacity 600ms ease, transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.b-story-slide[data-active] { opacity: 1; transform: none; }
+.b-story[data-transition="slide"] .b-story-slide:not([data-active]) { transform: translateY(8%); }
+.b-story[data-transition="zoom"] .b-story-slide:not([data-active]) { transform: scale(1.08); }
+.b-story-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+.b-story[data-layout="sticky"] .b-story-step { min-height: 80svh; display: flex; flex-direction: column; justify-content: center; gap: 1rem; padding-block: 2rem; }
+.b-story[data-layout="sticky"] .b-story-step:not([data-active]) .b-story-text { opacity: 0.55; }
+.b-story-text { transition: opacity 400ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .b-story-slide, .b-story-text { transition: none; }
+}
+
+/* Horizontal gallery: a pinned row moved by the page's scroll (desktop), or a swipe row. */
+.b-hgallery { --b-hg-gap: 1.5rem; --b-hg-w: 22rem; container-type: inline-size; overflow-x: clip; }
+.b-hgallery[data-width="small"] { --b-hg-w: 16rem; }
+.b-hgallery[data-width="large"] { --b-hg-w: 30rem; }
+.b-hg-row, .b-hg-track { display: flex; gap: var(--b-hg-gap); margin: 0; padding: 0; list-style: none; }
+.b-hg-item { flex: 0 0 min(var(--b-hg-w), 80cqw); min-width: 0; scroll-snap-align: start; }
+.b-hg-image { aspect-ratio: 4 / 5; }
+.b-hg-swipe { overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 0.75rem; }
+.b-hg-swipe:focus-visible { outline: 2px solid var(--sf-accent); outline-offset: 4px; }
+.b-hg-pin {
+  --b-hg-travel: max(0px, calc(var(--b-hg-n, 2) * var(--b-hg-w) + (var(--b-hg-n, 2) - 1) * var(--b-hg-gap) - 100cqw));
+  height: calc(100svh + var(--b-hg-travel));
+  view-timeline: --b-hg block;
+}
+.b-hg-stage { position: sticky; top: 0; height: 100svh; overflow: clip; display: flex; flex-direction: column; justify-content: center; gap: 1.5rem; }
+.b-hg-track { width: max-content; will-change: transform; transform: translateX(calc(-1 * var(--b-hg-travel) * var(--b-p, 0))); }
+.b-hgallery[data-mode="pinned"] .b-hg-item { flex-basis: var(--b-hg-w); }
+.b-hgallery[data-mode="pinned"] .b-hg-image { aspect-ratio: auto; height: min(calc(var(--b-hg-w) * 1.25), 62svh); }
+.b-hg-progress { height: 4px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--sf-border) 70%, transparent); }
+.b-hg-progress-fill { height: 100%; background: var(--sf-accent); transform-origin: left center; transform: scaleX(var(--b-p, 0)); }
+@keyframes b-hg-move { from { transform: translateX(0); } to { transform: translateX(calc(-1 * var(--b-hg-travel))); } }
+@keyframes b-progress-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@supports (animation-timeline: view()) {
+  .b-hg-track { animation: b-hg-move linear both; animation-timeline: --b-hg; animation-range: contain 0% contain 100%; }
+  .b-hg-stage .b-hg-progress-fill { animation: b-progress-grow linear both; animation-timeline: --b-hg; animation-range: contain 0% contain 100%; }
+}
+
+/* Page reading progress bar (`scroll_progress`): decorative, follows the page's scroll (no easing). */
+.b-progress { position: fixed; inset-inline: 0; z-index: 60; pointer-events: none; }
+.b-progress[data-position="top"] { top: 0; }
+.b-progress[data-position="bottom"] { bottom: 0; }
+.b-progress-fill { height: 100%; background: var(--b-progress-color, var(--sf-primary)); transform-origin: left center; transform: scaleX(var(--b-p, 0)); }
+@supports (animation-timeline: scroll()) {
+  .b-progress-fill { animation: b-progress-grow linear both; animation-timeline: scroll(root block); }
+}

@@ -147,8 +147,10 @@ export function ImageListField<T extends ImageItem>(props: {
   make: (id: string, media: MediaItem | undefined, mediaId: string) => T
   onChange: (items: T[], change?: ItemListChange, media?: Record<string, MediaRef>) => void
   children: (item: T, index: number, update: (patch: Partial<T>, coalesce?: string) => void) => ReactNode
+  /** B19: opens an item's card (a canvas click on it). */
+  reveal?: { itemId: string; token: number } | null
 }) {
-  const { label, noun, list, items, range, errors, make, onChange, children } = props
+  const { label, noun, list, items, range, errors, make, onChange, children, reveal } = props
   const [open, setOpen] = useState(false)
   const lookup = useMediaRefs()
   const { byId } = useMediaLookup(items.map((i) => i.media_id).filter((id): id is string => !!id))
@@ -172,6 +174,7 @@ export function ImageListField<T extends ImageItem>(props: {
         errors={errors}
         errorPrefix={list}
         openNew={false}
+        reveal={reveal}
         create={(id) => make(id, undefined, '')}
         summary={(item, i) => item.alt || `${noun[0]!.toUpperCase()}${noun.slice(1)} ${i + 1}`}
         lead={(item) => <ImageThumb id={item.media_id} byId={byId} />}

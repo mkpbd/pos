@@ -5,7 +5,7 @@
 
 import type { MediaRef } from '@/storefront/types'
 import type { ElementMeta } from '@/storefront/builder/registry'
-import type { BuilderDocument, Column, Device, Element, PopupSettings, Section } from '@/storefront/builder/types'
+import type { BuilderDocument, Column, Device, Element, PopupSettings, ScrollProgress, Section } from '@/storefront/builder/types'
 import type { SeoValue } from './seo-panel-model'
 
 /** The whole draft content (schema v1). */
@@ -46,6 +46,10 @@ export type InspectorCommand =
   | { type: 'preview-motion'; nodeId: string; scope?: 'node' | 'section' | 'page' }
   /** B18: open the Motion timeline of a section (an inner row id: its section). Editor B's panel. */
   | { type: 'open-motion-timeline'; sectionId: string }
+  /** B19: scroll the canvas node through the screen once, playing its scroll effect (canvas message `preview-scroll`). */
+  | { type: 'preview-scroll'; nodeId: string }
+  /** B19: the page's reading progress bar (`content.scroll_progress`; null removes it; one undo step per coalesce key). */
+  | { type: 'set-scroll-progress'; value: ScrollProgress | null; coalesceKey?: string }
   /**
    * A banner of the page was edited from the inspector: in place (`replaced` null) or copied by
    * the server (swap `old_id` for `new_id` in the draft, one undo step). Either way the canvas

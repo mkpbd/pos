@@ -19,6 +19,8 @@ import {
   B4_ENUMS,
   B17_TEXT_LIMITS,
   b17PropProblems,
+  B19_TEXT_LIMITS,
+  b19PropProblems,
   B6_LIMITS,
   B6_TEXT_LIMITS,
   B8A_LIMITS,
@@ -43,6 +45,8 @@ import {
 } from '@/storefront/builder/validate'
 import type { BuilderNode, Problem } from './types'
 import { B17_TYPES, b17Message } from './b17-model'
+import { B19_TYPES, b19Message } from './b19-model'
+import { kenBurnsProblems } from './b19-scroll'
 import { B14_TYPES, b14Problems } from './b14-model'
 import type { StoreTemplateKey } from '@/storefront/builder/templates/types'
 import { audienceProblems } from '../audience/words'
@@ -107,7 +111,7 @@ export const P2A_TYPES: ReadonlySet<string> = new Set(['order_form'])
 /** B6 / B8a props that are not translated although they have a text limit (a person's name isn't). */
 const B6_NOT_TRANSLATED: Record<string, readonly string[]> = { counter: ['items.*.prefix'], chart: ['unit'], team: ['members.*.name'] }
 
-const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form, order_form: ORDER_FORM_TEXT_LIMITS, ...B17_TEXT_LIMITS } as Record<string, Record<string, number>>
+const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.form, order_form: ORDER_FORM_TEXT_LIMITS, ...B17_TEXT_LIMITS, ...B19_TEXT_LIMITS } as Record<string, Record<string, number>>
 
 /**
  * Translatable fields of an element type with their maximum length (backend ElementRegistry::translatable).
@@ -592,6 +596,8 @@ export function orderFormMessage(problem: PropProblem): string {
 function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[], context?: DocumentContext, template: StoreTemplateKey | null = null) {
   // B18: the text effect (heading, text, cta) and the card hover (product listings), whatever the type's own rules.
   validateB18(node, add)
+  // B19: the slow zoom (Ken Burns) of pictures (the scroll story and gallery check theirs with their own rules).
+  if (!B19_TYPES.has(node.type)) for (const problem of kenBurnsProblems(node.type, node.props)) add(problem.path, problem.message)
   if (B14_TYPES.has(node.type)) {
     // B14: live text and the store page main parts (the field and the listing scope depend on the page).
     for (const problem of b14Problems(node.type, node.props, template, context === 'template')) add(problem.path, problem.message)
@@ -605,6 +611,11 @@ function validateElement(node: Element, add: (path: string, message: string) => 
   if (B17_TYPES.has(node.type)) {
     // B17: ornament, payment badges, delivery promise, Bangla date.
     for (const problem of b17PropProblems(node.type, node.props)) add(`props.${problem.path}`, b17Message(node.type, problem))
+    return
+  }
+  if (B19_TYPES.has(node.type)) {
+    // B19: scroll story and horizontal gallery (missing pictures are page check warnings, not problems).
+    for (const problem of b19PropProblems(node.type, node.props)) add(`props.${problem.path}`, b19Message(node.type, problem))
     return
   }
   if (B4_TYPES.has(node.type)) return validateB4(node, add, icons)

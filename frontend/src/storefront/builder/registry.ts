@@ -659,6 +659,50 @@ const B14: BaseMeta[] = [
   },
 ]
 
+/**
+ * B19 (contract §1): scroll stories — a sticky picture beside steps that change it, and a
+ * horizontal gallery pinned to the scroll on desktop (a swipe row elsewhere).
+ */
+const B19: BaseMeta[] = [
+  {
+    type: 'scroll_story',
+    group: 'media',
+    label: 'Scroll story',
+    translatable: ['steps.*.alt', 'steps.*.kicker', 'steps.*.heading', 'steps.*.text', 'steps.*.link.label'],
+    // As inserted (the backend's defaults): pictures are chosen afterwards.
+    props: {
+      steps: [
+        { id: 's1', media_id: null, alt: '', kicker: 'Step 1', heading: 'Where it begins', text: 'Tell shoppers how your products start their journey.', link: null },
+        { id: 's2', media_id: null, alt: '', kicker: 'Step 2', heading: 'How it is made', text: 'Show the care that goes into every piece.', link: null },
+        { id: 's3', media_id: null, alt: '', kicker: 'Step 3', heading: 'On its way to you', text: 'Explain how it is packed and delivered.', link: null },
+      ],
+      media_side: 'left',
+      media_ratio: 'portrait',
+      transition: 'fade',
+      progress_dots: true,
+    },
+    children: null,
+  },
+  {
+    type: 'horizontal_gallery',
+    group: 'media',
+    label: 'Horizontal gallery',
+    translatable: ['items.*.alt', 'items.*.caption'],
+    props: {
+      source: 'images',
+      items: [
+        { id: 'i1', media_id: null, alt: '', caption: '', link: null },
+        { id: 'i2', media_id: null, alt: '', caption: '', link: null },
+      ],
+      product_ids: [],
+      card_width: 'medium',
+      pin: true,
+      show_progress: true,
+    },
+    children: null,
+  },
+]
+
 const ALL: readonly DocumentContext[] =['page', 'cms', 'header', 'footer', 'zone']
 const PAGES: readonly DocumentContext[] = ['page', 'cms', 'zone']
 /** B8b: what may sit in a popup (contract §1): simple content, offers and forms; never shop grids, sliders, charts, maps or site parts. */
@@ -738,6 +782,9 @@ const ALLOWED_IN: Record<ElementType, readonly DocumentContext[]> = {
   blog_post_body: ['template'],
   order_summary: ['template'],
   not_found_message: ['template'],
+  // B19: page-like documents (and store page templates, added by withTemplate).
+  scroll_story: PAGES,
+  horizontal_gallery: PAGES,
 }
 
 /** B14: a store page template holds everything a page may (plus its own elements). */
@@ -763,6 +810,7 @@ export const ELEMENT_REGISTRY: readonly ElementMeta[] = [
   ...P2A,
   ...B17,
   ...B14,
+  ...B19,
 ].map((meta) => ({ ...meta, allowed_in: withTemplate(ALLOWED_IN[meta.type]) }))
 
 /** Whether a type may be used in a document of this context (the server answers 422 otherwise). */

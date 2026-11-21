@@ -52,7 +52,13 @@ function ToggleRow({ label, checked, hint, onChange }: { label: string; checked:
   )
 }
 
-export type ParallaxSetting = { value: BackgroundParallax | undefined; available: boolean; onChange: (value: BackgroundParallax | undefined) => void }
+export type ParallaxSetting = {
+  value: BackgroundParallax | undefined
+  available: boolean
+  onChange: (value: BackgroundParallax | undefined) => void
+  /** B19: a note when the section's background moves while scrolling (choosing a parallax turns that off). */
+  replacedBy?: string
+}
 
 /**
  * `value` undefined = nothing moves; a change that leaves nothing moving removes the group.
@@ -210,6 +216,7 @@ export function MotionControl({ nodeType = 'heading', value, onChange, onPreview
             onChange={(p) => parallax.onChange(p === 'none' ? undefined : p)}
           />
           {!parallax.available && <p className="text-xs text-muted-foreground">Choose a background picture for Desktop first (in Background).</p>}
+          {parallax.available && parallax.replacedBy && <p className="text-xs text-muted-foreground" data-testid="parallax-replaced">{parallax.replacedBy}</p>}
         </div>
       )}
     </div>

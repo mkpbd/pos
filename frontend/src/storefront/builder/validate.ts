@@ -27,6 +27,14 @@ import type {
   RenderUnavailableGlobal,
   StorePopupSettings,
   ResponsiveStyle,
+  BackgroundScroll,
+  KenBurns,
+  KenBurnsDirection,
+  ScrollEffect,
+  ScrollIntensity,
+  ScrollProgress,
+  ScrollRange,
+  ScrollStyle,
   SectionShape,
   Shadow,
   Sides,
@@ -334,22 +342,25 @@ export function normalizeStyleValue(value: unknown): Style | undefined {
     effects,
     motion: normalizeMotion(value.motion),
     hover: normalizeHover(value.hover),
+    scroll: normalizeScroll(value.scroll),
   })
 }
 
 /**
  * `{base?, tablet?, mobile?}`; anything else (or invalid) is dropped. Always an object. B6: `motion`
- * and `background.video` are kept on `base` only; B9: so are `hover` and `background.parallax`.
+ * and `background.video` are kept on `base` only; B9: so are `hover` and `background.parallax`;
+ * B19: and `scroll`.
  */
 export function normalizeStyle(value: unknown): ResponsiveStyle {
   if (!isObject(value)) return {}
   const style: ResponsiveStyle = {}
   for (const breakpoint of ['base', 'tablet', 'mobile'] as const) {
     let normalized = normalizeStyleValue(value[breakpoint])
-    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.hover || normalized.background?.video || normalized.background?.parallax)) {
-      const { motion, hover, background, ...rest } = normalized
+    if (normalized && breakpoint !== 'base' && (normalized.motion || normalized.hover || normalized.scroll || normalized.background?.video || normalized.background?.parallax)) {
+      const { motion, hover, scroll, background, ...rest } = normalized
       void motion
       void hover
+      void scroll
       let kept: Background | undefined = background
       if (background?.video || background?.parallax) {
         const { video, parallax, ...other } = background
@@ -1299,6 +1310,7 @@ export function elementPropProblems(type: string, props: unknown): PropProblem[]
     ...(type === 'order_form' ? orderFormPropProblems(props) : []),
     ...b17PropProblems(type, props),
     ...b14PropProblems(type, props),
+    ...b19PropProblems(type, props),
   ]
 }
 
@@ -2124,6 +2136,199 @@ export function b18PropProblems(type: string, props: unknown): PropProblem[] {
   }
   if (Object.hasOwn(p, 'card_hover') && p.card_hover !== null && p.card_hover !== 'none' && !normalizeCardHover(type, p.card_hover)) {
     problems.push({ path: 'card_hover', code: 'invalid' })
+  }
+  return problems
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B19: Scroll stories — scroll-linked effects, section background scroll, Ken Burns, the
+ * scroll_story and horizontal_gallery elements, the page reading progress bar (contract §1). All
+ * keys optional, kept only when set; invalid values are dropped silently like other style keys.
+ * -------------------------------------------------------------------------------------------- */
+
+export const B19_ENUMS = {
+  scrollEffect: ['none', 'fade', 'rise', 'sink', 'scale_up', 'scale_down', 'rotate', 'slide_left', 'slide_right', 'blur', 'reveal_up', 'reveal_left', 'reveal_circle'],
+  scrollIntensity: ['subtle', 'medium', 'strong'],
+  scrollRange: ['enter', 'cover', 'exit', 'enter_exit'],
+  backgroundScroll: ['none', 'zoom_in', 'zoom_out', 'pan_up', 'pan_down'],
+  kenBurns: ['none', 'slow', 'normal'],
+  kenBurnsDirection: ['alternate', 'in', 'out'],
+  /** Elements that take `props.ken_burns` / `ken_burns_direction` (hero_slider: at props top level). */
+  kenBurnsElements: ['hero_slider', 'image_carousel', 'image'],
+  scrollStoryMediaSide: ['left', 'right'],
+  scrollStoryMediaRatio: ['square', 'portrait', 'landscape'],
+  scrollStoryTransition: ['fade', 'slide', 'zoom'],
+  horizontalGallerySource: ['images', 'products'],
+  horizontalGalleryCardWidth: ['small', 'medium', 'large'],
+  scrollProgressPosition: ['top', 'bottom'],
+  scrollProgressColorRole: ['primary', 'accent', 'secondary'],
+} as const satisfies {
+  scrollEffect: readonly ScrollEffect[]
+  scrollIntensity: readonly ScrollIntensity[]
+  scrollRange: readonly ScrollRange[]
+  backgroundScroll: readonly BackgroundScroll[]
+  kenBurns: readonly KenBurns[]
+  kenBurnsDirection: readonly KenBurnsDirection[]
+  [key: string]: readonly string[]
+}
+
+/** Counts and bounds of B19 (min / max inclusive). */
+export const B19_LIMITS = {
+  scrollStorySteps: { min: 2, max: 6 },
+  horizontalGalleryItems: { min: 2, max: 12 },
+  horizontalGalleryProducts: { min: 2, max: 12 },
+  scrollProgressThickness: { min: 2, max: 6 },
+  /** Page check HORIZONTAL_GALLERY_LONG: more items than this with `pin` is a tiring pinned scroll. */
+  horizontalGalleryPinTiring: 8,
+} as const
+
+/** Maximum length of each B19 text prop (✱ translatable). */
+export const B19_TEXT_LIMITS = {
+  scroll_story: { 'steps.*.alt': 200, 'steps.*.kicker': 60, 'steps.*.heading': 120, 'steps.*.text': 600, 'steps.*.link.label': 40 },
+  horizontal_gallery: { 'items.*.alt': 200, 'items.*.caption': 120 },
+} as const
+
+/** What an absent B19 key means (normalize never fills these in). */
+export const B19_DEFAULTS = {
+  scrollIntensity: 'medium',
+  scrollRange: 'enter',
+  kenBurnsDirection: 'alternate',
+  scrollProgress: { position: 'top', color_role: 'primary', thickness: 3 },
+} as const satisfies { scrollIntensity: ScrollIntensity; scrollRange: ScrollRange; kenBurnsDirection: KenBurnsDirection; scrollProgress: ScrollProgress }
+
+/** Documents that may carry `scroll_progress` (elsewhere the server answers 422). */
+export const SCROLL_PROGRESS_CONTEXTS: readonly DocumentContext[] = ['page', 'cms', 'template']
+
+/** B19 `style.base.scroll` with every key valid, or undefined (absent, `effect: none`, invalid effect). Sparse. */
+export function normalizeScroll(value: unknown): ScrollStyle | undefined {
+  if (!isObject(value)) return undefined
+  const effect = oneOf(value.effect, B19_ENUMS.scrollEffect)
+  if (!effect || effect === 'none') return undefined
+  const scroll: ScrollStyle = { effect }
+  const intensity = oneOf(value.intensity, B19_ENUMS.scrollIntensity)
+  if (intensity) scroll.intensity = intensity
+  const range = oneOf(value.range, B19_ENUMS.scrollRange)
+  if (range) scroll.range = range
+  return scroll
+}
+
+/** B19 section `props.background_scroll` as a value, or undefined (none / invalid). Whether it applies also needs an image background: see sectionBackgroundScroll. */
+export function normalizeBackgroundScroll(value: unknown): Exclude<BackgroundScroll, 'none'> | undefined {
+  const scroll = oneOf(value, B19_ENUMS.backgroundScroll)
+  return scroll && scroll !== 'none' ? scroll : undefined
+}
+
+/**
+ * B19: a section's background scroll when it applies — a valid value and a base image background
+ * (no background video). It wins over B9 parallax (the server drops parallax when both are set).
+ */
+export function sectionBackgroundScroll(props: unknown, style: unknown): Exclude<BackgroundScroll, 'none'> | undefined {
+  const scroll = normalizeBackgroundScroll(isObject(props) ? props.background_scroll : undefined)
+  if (!scroll) return undefined
+  const background = normalizeStyle(style).base?.background
+  return background?.type === 'image' && background.image && !background.video ? scroll : undefined
+}
+
+/** B19 Ken Burns of an element type: `{mode, direction}` (direction defaults to alternate), or undefined (none, invalid, or a type without it). */
+export function normalizeKenBurns(type: unknown, props: unknown): { mode: Exclude<KenBurns, 'none'>; direction: KenBurnsDirection } | undefined {
+  if (!(B19_ENUMS.kenBurnsElements as readonly unknown[]).includes(type) || !isObject(props)) return undefined
+  const mode = oneOf(props.ken_burns, B19_ENUMS.kenBurns)
+  if (!mode || mode === 'none') return undefined
+  return { mode, direction: oneOf(props.ken_burns_direction, B19_ENUMS.kenBurnsDirection) ?? B19_DEFAULTS.kenBurnsDirection }
+}
+
+/** B19 document `scroll_progress` with every key valid (defaults filled in for invalid / absent keys), or undefined when not an object. */
+export function normalizeScrollProgress(value: unknown): ScrollProgress | undefined {
+  if (!isObject(value)) return undefined
+  const D = B19_DEFAULTS.scrollProgress
+  const { min, max } = B19_LIMITS.scrollProgressThickness
+  return {
+    position: oneOf(value.position, B19_ENUMS.scrollProgressPosition) ?? D.position,
+    color_role: oneOf(value.color_role, B19_ENUMS.scrollProgressColorRole) ?? D.color_role,
+    thickness: isInt(value.thickness, min, max) ? value.thickness : D.thickness,
+  }
+}
+
+/** What the server would refuse in `scroll_progress` (paths relative to it); with `context`: 422 outside page / cms / template. */
+export function scrollProgressProblems(value: unknown, context?: DocumentContext): PropProblem[] {
+  if (value === undefined || value === null) return []
+  if (!isObject(value) || (context !== undefined && !SCROLL_PROGRESS_CONTEXTS.includes(context))) return [{ path: '', code: 'invalid' }]
+  const problems: Problems = []
+  if (value.position !== undefined) enumOf(problems, 'position', value.position, B19_ENUMS.scrollProgressPosition)
+  if (value.color_role !== undefined) enumOf(problems, 'color_role', value.color_role, B19_ENUMS.scrollProgressColorRole)
+  if (value.thickness !== undefined) int(problems, 'thickness', value.thickness, B19_LIMITS.scrollProgressThickness)
+  return problems
+}
+
+/** A step's link (`{label, url}`; null = none). */
+function storyLink(problems: Problems, path: string, value: unknown) {
+  if (value === undefined || value === null) return
+  button(problems, path, value, B19_TEXT_LIMITS.scroll_story['steps.*.link.label'])
+}
+
+/** The client mirror of the server's B19 prop rules (empty = valid; other types []), including `ken_burns` on any type. */
+export function b19PropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  const E = B19_ENUMS
+  const kenBurnsType = (E.kenBurnsElements as readonly string[]).includes(type)
+  for (const [key, options] of [
+    ['ken_burns', E.kenBurns],
+    ['ken_burns_direction', E.kenBurnsDirection],
+  ] as const) {
+    if (p[key] === undefined || p[key] === null) continue
+    if (!kenBurnsType) problems.push({ path: key, code: 'invalid' })
+    else enumOf(problems, key, p[key], options)
+  }
+  switch (type) {
+    case 'scroll_story': {
+      const L = B19_TEXT_LIMITS.scroll_story
+      enumOf(problems, 'media_side', p.media_side, E.scrollStoryMediaSide)
+      enumOf(problems, 'media_ratio', p.media_ratio, E.scrollStoryMediaRatio)
+      enumOf(problems, 'transition', p.transition, E.scrollStoryTransition)
+      list(problems, 'steps', p.steps, B19_LIMITS.scrollStorySteps, (step, at) => {
+        nullableUuid(problems, `${at}.media_id`, step.media_id ?? null)
+        text(problems, `${at}.alt`, step.alt, L['steps.*.alt'])
+        text(problems, `${at}.kicker`, step.kicker, L['steps.*.kicker'])
+        text(problems, `${at}.heading`, step.heading, L['steps.*.heading'], true)
+        text(problems, `${at}.text`, step.text, L['steps.*.text'])
+        storyLink(problems, `${at}.link`, step.link)
+      })
+      flag(problems, 'progress_dots', p.progress_dots)
+      break
+    }
+    case 'horizontal_gallery': {
+      const L = B19_TEXT_LIMITS.horizontal_gallery
+      enumOf(problems, 'source', p.source, E.horizontalGallerySource)
+      const images = p.source !== 'products'
+      if (images)
+        list(problems, 'items', p.items, B19_LIMITS.horizontalGalleryItems, (item, at) => {
+          nullableUuid(problems, `${at}.media_id`, item.media_id ?? null)
+          text(problems, `${at}.alt`, item.alt, L['items.*.alt'])
+          text(problems, `${at}.caption`, item.caption, L['items.*.caption'])
+          link(problems, `${at}.link`, item.link ?? null)
+        })
+      else if (p.items !== undefined && !Array.isArray(p.items)) problems.push({ path: 'items', code: 'invalid' })
+      if (!Array.isArray(p.product_ids)) {
+        if (!images || p.product_ids !== undefined) problems.push({ path: 'product_ids', code: 'invalid' })
+      } else {
+        const { min, max } = B19_LIMITS.horizontalGalleryProducts
+        if (!images && p.product_ids.length < min) problems.push({ path: 'product_ids', code: 'too_few' })
+        if (p.product_ids.length > max) problems.push({ path: 'product_ids', code: 'too_many' })
+        const seen = new Set<unknown>()
+        p.product_ids.forEach((id: unknown, i: number) => {
+          if (!isUuid(id)) problems.push({ path: `product_ids.${i}`, code: 'invalid' })
+          else if (seen.has(id)) problems.push({ path: `product_ids.${i}`, code: 'duplicate' })
+          seen.add(id)
+        })
+      }
+      enumOf(problems, 'card_width', p.card_width, E.horizontalGalleryCardWidth)
+      flag(problems, 'pin', p.pin)
+      flag(problems, 'show_progress', p.show_progress)
+      break
+    }
+    default:
+      break
   }
   return problems
 }

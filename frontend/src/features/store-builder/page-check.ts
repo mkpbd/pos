@@ -6,6 +6,7 @@ import { hasSeo, readSeo } from './inspector/seo-panel-model'
 import { Collector, focus, isObj, label, list, megabytes, pictures, str, visibleAnywhere, type Obj, type Place, type StyledNode } from './page-check-core'
 import { runSpeedCheck, type CheckFonts } from './page-check-speed'
 import { runMotionCheck } from './page-check-motion'
+import { runScrollCheck } from './page-check-scroll'
 import { resolveStyleValue } from './inspector/style-model'
 import { templateKeyOf } from '@/storefront/builder/templates/types'
 import { CORE_NAMES, coreElementOf, elementsOfTypeWithState } from './store-page-core'
@@ -42,6 +43,10 @@ export type PageCheckAction =
   | { type: 'move-down' }
   /** B18: the node's entrance animation removed (its loop and the rest of its motion stay). */
   | { type: 'remove-entrance' }
+  /** B19: the node's scroll effect removed (`style.base.scroll`). */
+  | { type: 'remove-scroll-effect' }
+  /** B19: a horizontal gallery's pinning turned off (`props.pin` false). */
+  | { type: 'turn-off-pin' }
 
 export type PageCheckFix =
   /** Select `node_id` (null: the page settings, e.g. `seo.title`) and focus `field` (a form key; null: just select). */
@@ -677,7 +682,7 @@ export function runPageCheck(input: PageCheckInput): PageCheckIssue[] {
 
   checkHeadings(headings, context, out)
   checkStorePage(input, out)
-  return sortIssues([...out.issues, ...runSpeedCheck(input).issues, ...runMotionCheck(input)], nodeOrder(input.content))
+  return sortIssues([...out.issues, ...runSpeedCheck(input).issues, ...runMotionCheck(input), ...runScrollCheck(input)], nodeOrder(input.content))
 }
 
 /**
@@ -801,6 +806,12 @@ export function fromServerIssue(issue: ServerCheckIssue): PageCheckIssue {
   const fix: PageCheckFix | null = issue.node_id && details.fix === 'remove_entrance'
     ? // B18 MOTION_LCP: the entrance can be removed right away.
       { kind: 'apply', label: 'Remove animation', node_id: issue.node_id, action: { type: 'remove-entrance' } }
+    : issue.node_id && details.fix === 'remove_scroll_effect'
+    ? // B19 SCROLL_EFFECT_TOP.
+      { kind: 'apply', label: 'Remove scroll effect', node_id: issue.node_id, action: { type: 'remove-scroll-effect' } }
+    : issue.node_id && details.fix === 'turn_off_pin'
+    ? // B19 HORIZONTAL_GALLERY_LONG.
+      { kind: 'apply', label: 'Turn off pinning', node_id: issue.node_id, action: { type: 'turn-off-pin' } }
     : issue.node_id
     ? focus(field ? 'Fix it' : 'Select it', issue.node_id, field)
     : field?.startsWith('seo.')

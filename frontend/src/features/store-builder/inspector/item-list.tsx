@@ -6,7 +6,7 @@
  * minimum and maximum count; per-item problems mark the card.
  */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -41,12 +41,27 @@ export type ItemListProps<T extends ItemWithId> = {
   lead?: (item: T) => ReactNode
   /** Opens the newest item after "Add" (default true). */
   openNew?: boolean
+  /** B19: opens this item's card and scrolls to it (a canvas click on the item); a new `token` asks again. */
+  reveal?: { itemId: string; token: number } | null
 }
 
 export function ItemList<T extends ItemWithId>(props: ItemListProps<T>) {
-  const { label, noun, items, min, max, onChange, create, summary, children, errors = {}, errorPrefix = 'items', lead, openNew = true } = props
+  const { label, noun, items, min, max, onChange, create, summary, children, errors = {}, errorPrefix = 'items', lead, openNew = true, reveal = null } = props
   const headingId = useId()
+  const listRef = useRef<HTMLElement | null>(null)
   const [open, setOpen] = useState<Set<string>>(() => new Set(items.length === 1 && items[0] ? [items[0].id] : []))
+  // B19: a revealed item opens while rendering (once per request), then its card scrolls into view.
+  const revealId = reveal && items.some((i) => i.id === reveal.itemId) ? reveal.itemId : null
+  const revealToken = revealId ? (reveal?.token ?? null) : null
+  const [seenReveal, setSeenReveal] = useState<number | null>(null)
+  if (revealId && revealToken !== null && revealToken !== seenReveal) {
+    setSeenReveal(revealToken)
+    if (!open.has(revealId)) setOpen(new Set(open).add(revealId))
+  }
+  useEffect(() => {
+    if (!revealId || revealToken === null) return
+    listRef.current?.querySelector(`[data-item-id="${globalThis.CSS.escape(revealId)}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [revealId, revealToken])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
   const toggle = (id: string) => setOpen((current) => {
     const next = new Set(current)
@@ -92,7 +107,7 @@ export function ItemList<T extends ItemWithId>(props: ItemListProps<T>) {
   const listError = errors[errorPrefix]
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2" data-testid={`item-list-${errorPrefix}`} data-item-list={errorPrefix}>
+    <section ref={listRef} aria-labelledby={headingId} className="flex flex-col gap-2" data-testid={`item-list-${errorPrefix}`} data-item-list={errorPrefix}>
       <div className="flex items-center gap-2">
         <h3 id={headingId} className="flex-1 text-sm font-medium">{label}</h3>
         <span className="text-xs text-muted-foreground tabular-nums">{items.length} of {max}</span>

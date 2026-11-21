@@ -84,6 +84,21 @@ final class StyleSchema
     /** B9: section background image parallax. */
     public const PARALLAX = ['none', 'slow', 'medium'];
 
+    /**
+     * B19: scroll-linked effects of the `scroll` group (base only, any node) — the node's look
+     * follows its position in the viewport (`none` drops the group).
+     */
+    public const SCROLL_EFFECTS = [
+        'none', 'fade', 'rise', 'sink', 'scale_up', 'scale_down', 'rotate', 'slide_left', 'slide_right', 'blur',
+        'reveal_up', 'reveal_left', 'reveal_circle',
+    ];
+
+    /** B19: how far a scroll effect moves / turns / blurs (absent = medium). */
+    public const SCROLL_INTENSITIES = ['subtle', 'medium', 'strong'];
+
+    /** B19: the part of the node's trip through the viewport the effect plays in (absent = enter). */
+    public const SCROLL_RANGES = ['enter', 'cover', 'exit', 'enter_exit'];
+
     public const MAX_SHADOWS = 3;
 
     public const MAX_TEXT_SHADOWS = 2;
@@ -102,6 +117,8 @@ final class StyleSchema
      *
      * B9: `hover` (base only, any node); `motion.stagger_children` only where `$backgroundVideo`
      * (containers: sections and inner rows); `background.parallax` at `base` of sections only.
+     *
+     * B19: `scroll` (base only, any node) — a scroll-linked effect.
      *
      * @return array<string, array<string, mixed>>
      */
@@ -163,6 +180,8 @@ final class StyleSchema
             'effects' => self::effects($groups['effects'] ?? null),
             'motion' => $base ? self::motion($groups['motion'] ?? null, $container) : null,
             'hover' => $base ? self::hover($groups['hover'] ?? null) : null,
+            // B19: scroll-linked effect (base only).
+            'scroll' => $base ? self::scroll($groups['scroll'] ?? null) : null,
         ]) ?? [];
     }
 
@@ -211,6 +230,25 @@ final class StyleSchema
         return self::compact([
             'effect' => $effect,
             'duration' => is_int($duration) && $duration >= self::HOVER_DURATION[0] && $duration <= self::HOVER_DURATION[1] ? $duration : null,
+        ]);
+    }
+
+    /**
+     * B19: `{effect, intensity?, range?}` — a scroll-linked effect; dropped when the effect is
+     * unset, `none` or unknown; invalid intensity / range dropped silently.
+     *
+     * @return array<string, string>|null
+     */
+    private static function scroll(mixed $value): ?array
+    {
+        if (! is_array($value) || ($effect = self::enum($value['effect'] ?? null, self::SCROLL_EFFECTS)) === null || $effect === 'none') {
+            return null;
+        }
+
+        return self::compact([
+            'effect' => $effect,
+            'intensity' => self::enum($value['intensity'] ?? null, self::SCROLL_INTENSITIES),
+            'range' => self::enum($value['range'] ?? null, self::SCROLL_RANGES),
         ]);
     }
 

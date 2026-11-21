@@ -10,7 +10,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRightIcon, MonitorIcon, SmartphoneIcon, TabletIcon } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import type { Background, BackgroundParallax, BackgroundVideo, Breakpoint, HoverStyle, Column, Device, ResponsiveStyle, Shadow, Sides, Typography } from '@/storefront/builder/types'
+import type { Background, BackgroundParallax, BackgroundScroll, BackgroundVideo, Breakpoint, HoverStyle, Column, Device, ResponsiveStyle, ScrollStyle, Section, Shadow, Sides, Typography } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
 import {
   BackgroundControl,
@@ -34,6 +34,8 @@ import {
 import { HelpTip } from '../controls/control-label'
 import { BackgroundVideoControl } from './b6-style'
 import { MotionControl } from './b9-motion-control'
+import { ScrollControl } from './b19-scroll-control'
+import { hasBackgroundPicture, withBackgroundScroll, withoutBackgroundScroll } from './b19-scroll'
 import { canParallax, canStagger } from './b9-motion'
 import { DeviceStatus } from './device-status'
 import { GROUP_TIPS, GROUP_TITLES, groupsFor, type GroupId } from './style-groups'
@@ -131,6 +133,7 @@ const GROUP_PATHS: Record<GroupId, StylePath[]> = {
   'text-effects': [['effects', 'text_shadow'], ['effects', 'opacity'], ['effects', 'hover', 'color']],
   hover: [['effects', 'hover', 'transform'], ['effects', 'hover', 'shadow']],
   motion: [['motion'], ['hover'], ['background', 'parallax']],
+  scroll: [['scroll']],
   'background-video': [['background', 'video']],
 }
 
@@ -184,7 +187,15 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
   const setParallax = (parallax: BackgroundParallax | undefined) => {
     const current = style.base?.background
     if (!current || current.type !== 'image') return
-    if (parallax) return setBase(['background'], { ...current, parallax })
+    if (parallax) {
+      // B19: the background scroll motion and the parallax don't go together; the parallax replaces it.
+      const section = node as Section
+      if (section.type === 'section' && section.props.background_scroll) {
+        const next = writeStyleValue(style, 'base', ['background'], { ...current, parallax })
+        return onChange({ ...withoutBackgroundScroll(section), style: next }, { coalesceKey: `${node.id}:style:base:background` })
+      }
+      return setBase(['background'], { ...current, parallax })
+    }
     const { parallax: _old, ...rest } = current
     void _old
     setBase(['background'], rest)
@@ -369,7 +380,24 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
         onTimeline={() => onCommand({ type: 'open-motion-timeline', sectionId: node.id })}
         hover={style.base?.hover}
         onHover={(hover: HoverStyle | undefined) => setBase(['hover'], hover)}
-        parallax={canParallax(node.type) ? { value: baseParallax, available: style.base?.background?.type === 'image', onChange: setParallax } : undefined}
+        parallax={canParallax(node.type) ? { value: baseParallax, available: style.base?.background?.type === 'image', onChange: setParallax, replacedBy: (node as Section).props.background_scroll ? 'Background moves while scrolling (in Scroll) is on; choosing one here turns it off.' : undefined } : undefined}
+      />
+    ),
+    scroll: () => (
+      <ScrollControl
+        value={style.base?.scroll}
+        onChange={(scroll: ScrollStyle | undefined) => setBase(['scroll'], scroll)}
+        onPreview={() => onCommand({ type: 'preview-scroll', nodeId: node.id })}
+        background={
+          node.type === 'section'
+            ? {
+                value: (node as Section).props.background_scroll ?? 'none',
+                available: hasBackgroundPicture(node),
+                parallax: !!baseParallax,
+                onChange: (value: BackgroundScroll) => onChange(withBackgroundScroll(node as Section, value), { coalesceKey: `${node.id}:background_scroll` }),
+              }
+            : undefined
+        }
       />
     ),
     'background-video': () => (

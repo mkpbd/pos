@@ -57,6 +57,9 @@ use stdClass;
  *   every version is in the payload); `experiments` (published: `{id, status, split, winner}`,
  *   draft: the full tests), `audience_campaigns` `{<campaign id>: {utm_campaign, short_links}}`
  *   for the campaigns the rules name, and the store's `timezone`.
+ * - B19: `document.scroll_progress` (the reading progress bar, or null); published horizontal
+ *   galleries keep only the pictures that were chosen and the products on sale (a picture
+ *   gallery without any is left out).
  */
 class BuilderPageRenderer
 {
@@ -155,6 +158,8 @@ class BuilderPageRenderer
                 'version' => $version,
                 'source' => $source,
                 'seo' => $this->seo($content['seo'] ?? null, $media),
+                // B19: the page reading progress bar, or null.
+                'scroll_progress' => $content['scroll_progress'] ?? null,
             ],
             'sections' => BuilderJson::present(['sections' => $sections])['sections'],
             // B12: the order on tablets and phones of what is shown (null: the base order everywhere).
@@ -429,6 +434,15 @@ class BuilderPageRenderer
                     // B8a: visitors only see the bundle's products on sale (at least two, or no bundle).
                     $products = $data[$element['id']]['products'];
                     $element['props']['items'] = array_values(array_filter($element['props']['items'], fn (array $item) => isset($products[$item['product_id']])));
+                }
+                if ($element['type'] === 'horizontal_gallery' && ! $preview) {
+                    // B19: visitors only see pictures that were chosen and products on sale.
+                    $element['props']['items'] = array_values(array_filter($element['props']['items'], fn (array $item) => is_string($item['media_id'] ?? null)));
+                    $products = $data[$element['id']]['products'] ?? [];
+                    $element['props']['product_ids'] = array_values(array_filter($element['props']['product_ids'], fn (string $id) => isset($products[$id])));
+                    if ($element['props']['source'] === 'images' && $element['props']['items'] === []) {
+                        continue;
+                    }
                 }
                 $elements[] = $this->withData($element, $data, $preview);
             }

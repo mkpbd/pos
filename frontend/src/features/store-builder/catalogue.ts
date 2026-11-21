@@ -78,6 +78,8 @@ import {
   ChartBarIcon,
   ClipboardListIcon,
   ShoppingBagIcon,
+  BookOpenTextIcon,
+  GalleryThumbnailsIcon,
   type LucideIcon,
 } from 'lucide-react'
 import type { ElementGroup } from '@/storefront/builder/registry'
@@ -169,6 +171,9 @@ export const ELEMENT_ICONS: Record<string, LucideIcon> = {
   payment_badges: WalletIcon,
   delivery_promise: TruckIcon,
   bangla_date: CalendarDaysIcon,
+  // B19
+  scroll_story: BookOpenTextIcon,
+  horizontal_gallery: GalleryThumbnailsIcon,
 }
 
 export function elementIcon(type: string): LucideIcon {
@@ -253,6 +258,8 @@ export const ELEMENT_HINTS: Record<string, string> = {
   payment_badges: 'How shoppers can pay: cash on delivery, bKash, Nagad and more.',
   delivery_promise: 'Delivery times and charges from your shipping settings.',
   bangla_date: 'Today’s date in the Bangla calendar, e.g. ১ বৈশাখ ১৪৩৩.',
+  scroll_story: 'Tell a story in steps: the picture stays in view and changes as shoppers scroll.',
+  horizontal_gallery: 'Pictures or products that move sideways as shoppers scroll down.',
 }
 
 /** B4: the server may group the header / footer parts as `site`. */

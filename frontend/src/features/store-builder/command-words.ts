@@ -81,6 +81,8 @@ export const ELEMENT_WORDS: Record<string, string> = {
   payment_badges: 'পেমেন্ট বিকাশ নগদ রকেট উপায় ক্যাশ অন ডেলিভারি payment bkash nagad cod',
   delivery_promise: 'ডেলিভারি শিপিং সময় চার্জ delivery shipping',
   bangla_date: 'বাংলা তারিখ বঙ্গাব্দ ক্যালেন্ডার bangla date calendar',
+  scroll_story: 'গল্প ধাপ স্ক্রল ছবি story steps scroll scrollytelling sticky',
+  horizontal_gallery: 'পাশাপাশি গ্যালারি সোয়াইপ স্ক্রল ছবি পণ্য horizontal gallery swipe scroll sideways carousel',
 }
 
 /** Words of the editor's actions (Bangla and English). */

@@ -4,7 +4,7 @@ import { isWrappedSectionType } from '@/storefront/builder/registry'
 import type { BuilderNode } from './types'
 import { B6_TYPES, B8A_TYPES, P2A_TYPES } from './validate'
 
-export type GroupId = 'background' | 'button-colors' | 'color' | 'typography' | 'spacing' | 'size' | 'layout' | 'border' | 'shadow' | 'effects' | 'text-effects' | 'hover' | 'motion' | 'background-video'
+export type GroupId = 'background' | 'button-colors' | 'color' | 'typography' | 'spacing' | 'size' | 'layout' | 'border' | 'shadow' | 'effects' | 'text-effects' | 'hover' | 'motion' | 'scroll' | 'background-video'
 
 export type GroupSpec = { id: GroupId; open?: boolean }
 
@@ -22,6 +22,7 @@ export const GROUP_TITLES: Record<GroupId, string> = {
   'text-effects': 'Effects',
   hover: 'Hover',
   motion: 'Animation',
+  scroll: 'Scroll',
   'background-video': 'Background video',
 }
 
@@ -31,15 +32,16 @@ export const GROUP_TIPS: Partial<Record<GroupId, string>> = {
   hover: 'What happens when a shopper points at it with the mouse.',
   effects: 'Shadow and see-through.',
   motion: 'Movement: how it appears when shoppers scroll to it, a small loop to draw the eye, what it does when pointed at and, for sections, how the background picture scrolls.',
+  scroll: 'Effects linked to scrolling: it changes as the shopper scrolls past it and, for sections, the background picture zooms or moves.',
 }
 
 const B6_MEDIA = new Set(['gallery', 'image_carousel', 'logo_carousel', 'map', 'category_card', 'product_spotlight', 'shop_the_look'])
 /** B8a elements drawn mostly from pictures / product cards (no text styles of their own). */
 const B8A_MEDIA = new Set(['before_after', 'photo_grid', 'bundle', 'comparison_table'])
 
-/** The style groups of a node type, most used first (open); B6: every node ends with Animation. */
+/** The style groups of a node type, most used first (open); B6: every node ends with Animation; B19: then Scroll. */
 export function groupsFor(node: BuilderNode): GroupSpec[] {
-  return [...baseGroups(node), { id: 'motion' }]
+  return [...baseGroups(node), { id: 'motion' }, { id: 'scroll' }]
 }
 
 function baseGroups(node: BuilderNode): GroupSpec[] {

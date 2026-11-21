@@ -7,11 +7,12 @@
  * Tab reaches the chosen tile, the arrow keys move between the tiles and choose.
  */
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import type { HoverEffect, MotionEasing, MotionEntrance, MotionLoop } from '@/storefront/builder/types'
 import { ControlLabel } from '../controls'
 import { cssEasing, EASING_HINTS, EASING_LABELS, easingPath, ENTRANCE_PREVIEW, HOVER_HINTS, LOOP_PREVIEW, prefersReducedMotion } from './b18-motion'
+import { canAnimate, useLoop } from './preview-loop'
 
 /* ----------------------------------------------------------------------------------------------
  * A radio group of tiles with roving focus
@@ -96,45 +97,7 @@ export function TileGroup<T extends string>({ label, tooltip, value, options, on
  * Previews
  * -------------------------------------------------------------------------------------------- */
 
-const canAnimate = (el: Element | null): el is HTMLElement => !!el && typeof (el as HTMLElement).animate === 'function'
-
-/**
- * Replays `play` (one run) every `gap` ms while `on`; cancels everything when it stops. A new
- * `key` (what is played) starts over; a re-render alone doesn't.
- */
-function useLoop(ref: RefObject<HTMLElement | null>, on: boolean, play: (el: HTMLElement) => Animation | null, gap: number, key: string) {
-  const playRef = useRef(play)
-  useEffect(() => {
-    playRef.current = play
-  })
-  useEffect(() => {
-    const el = ref.current
-    if (!on || !canAnimate(el) || prefersReducedMotion()) return
-    let stopped = false
-    let current: Animation | null = null
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const run = () => {
-      if (stopped) return
-      try {
-        current = playRef.current(el)
-      } catch {
-        current = null
-      }
-      if (!current) return
-      current.onfinish = () => {
-        timer = setTimeout(run, gap)
-      }
-    }
-    run()
-    return () => {
-      stopped = true
-      clearTimeout(timer)
-      current?.cancel()
-    }
-  }, [ref, on, gap, key])
-}
-
-function Stage({ children, className }: { children: ReactNode; className?: string }) {
+export function Stage({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span aria-hidden className={cn('relative flex h-8 w-full items-center justify-center overflow-hidden rounded-sm bg-muted/60 [perspective:120px]', className)}>
       {children}

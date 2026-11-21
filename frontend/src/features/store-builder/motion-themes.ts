@@ -14,10 +14,13 @@
  * - Idempotent: applying the same theme twice changes nothing the second time.
  * - Loops stay under the page check's limits: at most 6 looping nodes per section; themes never
  *   loop forever (Festive's button shine plays 3 times).
+ * - B19: Lively, Festive and Premium give the sections below the first a subtle scroll effect
+ *   (`style.base.scroll`: rise, or a reveal for Premium) — never the first section shown
+ *   (SCROLL_EFFECT_TOP). A scroll effect counts as the node's own motion like any other.
  */
 
 import { applyOrder, DEVICE_ORDER_ROOT, deviceOrderList } from '@/storefront/builder/device-order'
-import type { BuilderContent, Device, MotionEasing, MotionTheme } from '@/storefront/builder/types'
+import type { BuilderContent, Device, MotionEasing, MotionTheme, ScrollStyle } from '@/storefront/builder/types'
 
 export type MotionThemeId = MotionTheme
 /** A theme, or `none` = "Remove all motion". */
@@ -27,9 +30,9 @@ export const MOTION_THEME_IDS: readonly MotionThemeId[] = ['calm', 'lively', 'fe
 
 export const MOTION_THEME_INFO: Record<MotionThemeChoice, { name: string; description: string }> = {
   calm: { name: 'Calm', description: 'Everything fades in softly. Buttons lift a little when pointed at.' },
-  lively: { name: 'Lively', description: 'Parts slide up with a light spring, the main heading appears word by word, dividers flow.' },
-  festive: { name: 'Festive', description: 'Bouncy headings, buttons that pop and shine, flowing dividers — for sales and holidays.' },
-  premium: { name: 'Premium', description: 'Slow, elegant wipes for headings and pictures; products zoom gently.' },
+  lively: { name: 'Lively', description: 'Parts slide up with a light spring, the main heading appears word by word, sections rise as you scroll, dividers flow.' },
+  festive: { name: 'Festive', description: 'Bouncy headings, buttons that pop and shine, sections that rise as you scroll, flowing dividers — for sales and holidays.' },
+  premium: { name: 'Premium', description: 'Slow, elegant wipes for headings and pictures, sections revealed as you scroll; products zoom gently.' },
   minimal: { name: 'Minimal', description: 'Sections simply fade in. Nothing else moves.' },
   none: { name: 'Remove all motion', description: 'Takes every animation off this page, also the ones you set yourself.' },
 }
@@ -70,7 +73,8 @@ function roleOf(type: string): Role {
 
 type Entrance = { entrance: string; duration: number; easing?: MotionEasing }
 type ThemeSpec = {
-  section: { entrance?: Entrance; stagger?: number; easing?: MotionEasing }
+  /** B19 `scroll`: the sections below the first (never the lead section). */
+  section: { entrance?: Entrance; stagger?: number; easing?: MotionEasing; scroll?: ScrollStyle }
   heading?: Entrance
   text?: Entrance
   image?: Entrance
@@ -91,7 +95,7 @@ export const THEME_SPECS: Record<MotionThemeId, ThemeSpec> = {
     card_hover: 'lift',
   },
   lively: {
-    section: { stagger: 100, easing: 'spring' },
+    section: { stagger: 100, easing: 'spring', scroll: { effect: 'rise', intensity: 'subtle' } },
     heading: { entrance: 'slide-up', duration: 600, easing: 'spring' },
     text: { entrance: 'slide-up', duration: 600, easing: 'spring' },
     image: { entrance: 'zoom', duration: 700, easing: 'spring' },
@@ -101,7 +105,7 @@ export const THEME_SPECS: Record<MotionThemeId, ThemeSpec> = {
     hero_text: 'reveal_words',
   },
   festive: {
-    section: { stagger: 120, easing: 'bounce' },
+    section: { stagger: 120, easing: 'bounce', scroll: { effect: 'rise', intensity: 'subtle' } },
     heading: { entrance: 'bounce-in', duration: 800, easing: 'bounce' },
     text: { entrance: 'slide-up', duration: 600, easing: 'spring' },
     image: { entrance: 'zoom', duration: 700, easing: 'spring' },
@@ -111,7 +115,7 @@ export const THEME_SPECS: Record<MotionThemeId, ThemeSpec> = {
     hero_text: 'reveal_words',
   },
   premium: {
-    section: { entrance: { entrance: 'fade', duration: 1000 }, stagger: 120 },
+    section: { entrance: { entrance: 'fade', duration: 1000 }, stagger: 120, scroll: { effect: 'reveal_up', intensity: 'subtle' } },
     heading: { entrance: 'mask-up', duration: 900 },
     text: { entrance: 'fade', duration: 900 },
     image: { entrance: 'mask-up', duration: 1000 },
@@ -135,6 +139,8 @@ type Obj = Record<string, unknown>
 export type MotionAspects = {
   motion?: Obj
   hover?: Obj
+  /** B19 `style.base.scroll`. */
+  scroll?: Obj
   text_effect?: Obj
   card_hover?: string
   shape_top?: string
@@ -160,6 +166,7 @@ export function readAspects(node: Obj): MotionAspects {
   const out: MotionAspects = {}
   if (isObj(base.motion)) out.motion = base.motion
   if (isObj(base.hover)) out.hover = base.hover
+  if (isObj(base.scroll)) out.scroll = base.scroll
   if (isObj(p.text_effect)) out.text_effect = p.text_effect
   if (typeof p.card_hover === 'string') out.card_hover = p.card_hover
   if (node.type === 'section') {
@@ -192,6 +199,7 @@ function canonicalAspects(a: MotionAspects): Obj {
     }
   }
   if (a.hover && str(a.hover.effect, 'none') !== 'none') out.hover = { effect: a.hover.effect, duration: num(a.hover.duration, 250) }
+  if (a.scroll && str(a.scroll.effect, 'none') !== 'none') out.scroll = { effect: a.scroll.effect, intensity: str(a.scroll.intensity, 'medium'), range: str(a.scroll.range, 'enter') }
   if (a.text_effect && str(a.text_effect.type, 'none') !== 'none') {
     const t = a.text_effect
     out.text_effect = {
@@ -340,6 +348,8 @@ export function themeAspects(theme: MotionThemeId, type: string, ctx: NodeContex
       const entering = motion.entrance !== 'none'
       if (!entering && stagger > 0 && spec.section.easing && spec.section.easing !== 'smooth') motion.easing = spec.section.easing
       if (entering || stagger > 0) out.motion = motion
+      // B19: a scroll effect on the sections below the first only (the top paints at once).
+      if (!still && spec.section.scroll) out.scroll = { ...spec.section.scroll }
       if (spec.divider && node) {
         const p = props(node)
         if (isObj(p.shape_top)) out.shape_top = spec.divider
@@ -387,7 +397,11 @@ export function isOwnMotion(node: Obj, previous: MotionThemeId | null): boolean 
  * Writing
  * -------------------------------------------------------------------------------------------- */
 
-/** The node with exactly these aspects (keys that don't apply to its type are left as they are). */
+/**
+ * The node with exactly these aspects (keys that don't apply to its type are left as they are).
+ * `parallax` ("Remove all motion"): also the B9 background parallax and the B19 background scroll
+ * and slow zoom (Ken Burns).
+ */
 export function withAspects(node: Obj, aspects: MotionAspects, options: { parallax?: boolean } = {}): Obj {
   if (aspectsKey(readAspects(node)) === aspectsKey(aspects) && !(options.parallax && hasParallax(node))) return node
   const type = str(node.type, '')
@@ -397,6 +411,8 @@ export function withAspects(node: Obj, aspects: MotionAspects, options: { parall
   else delete base.motion
   if (aspects.hover) base.hover = aspects.hover
   else delete base.hover
+  if (aspects.scroll) base.scroll = aspects.scroll
+  else delete base.scroll
   if (options.parallax && isObj(base.background) && 'parallax' in base.background) {
     const background = { ...base.background }
     delete background.parallax
@@ -411,6 +427,9 @@ export function withAspects(node: Obj, aspects: MotionAspects, options: { parall
   }
   if (TEXT_EFFECT_TYPES.has(type) || 'text_effect' in p) edit('text_effect', aspects.text_effect)
   if (CARD_HOVER_TYPES.has(type) || 'card_hover' in p) edit('card_hover', aspects.card_hover)
+  if (options.parallax) {
+    for (const key of ['background_scroll', 'ken_burns', 'ken_burns_direction']) if (key in p) edit(key, undefined)
+  }
   if (type === 'section') {
     for (const key of ['shape_top', 'shape_bottom'] as const) {
       const shape = p[key]
@@ -426,9 +445,11 @@ export function withAspects(node: Obj, aspects: MotionAspects, options: { parall
   return next
 }
 
+/** The B9 parallax or a B19 background scroll / slow zoom (removed by "Remove all motion" only). */
 function hasParallax(node: Obj): boolean {
   const background = baseStyle(node).background
-  return isObj(background) && 'parallax' in background
+  const p = props(node)
+  return (isObj(background) && 'parallax' in background) || 'background_scroll' in p || 'ken_burns' in p || 'ken_burns_direction' in p
 }
 
 /** Content with `edit` applied to every section, column and element (unchanged parts keep their identity). */

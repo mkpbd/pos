@@ -9,7 +9,7 @@ const base = (content: BuilderContent, id: string): Obj => ((findNode(content, i
 const motion = (content: BuilderContent, id: string) => base(content, id).motion as Obj | undefined
 const props = (content: BuilderContent, id: string) => (findNode(content, id)!.node as unknown as { props: Obj }).props
 
-function withMotion(content: BuilderContent, id: string, value: Obj, key: 'motion' | 'hover' = 'motion'): BuilderContent {
+function withMotion(content: BuilderContent, id: string, value: Obj, key: 'motion' | 'hover' | 'scroll' = 'motion'): BuilderContent {
   const node = findNode(content, id)!.node as unknown as { style: { base?: Obj } }
   node.style.base = { ...(node.style.base ?? {}), [key]: value }
   return content
@@ -171,5 +171,53 @@ describe('motion themes (B18 §4)', () => {
     expect(themeAspects('minimal', 'heading', { lead: false, hero: true, loopOk: true })).toEqual({})
     expect(themeAspects('minimal', 'section', { lead: false, hero: false, loopOk: true })).toEqual({ motion: { entrance: 'fade', duration: 500, delay: 0, easing: 'snappy' } })
     expect(themeAspects('calm', 'button', { lead: true, hero: false, loopOk: true })).toEqual({ hover: { effect: 'lift-shadow' } })
+  })
+})
+
+describe('motion themes: scroll effects (B19)', () => {
+  const scroll = (content: BuilderContent, id: string) => base(content, id).scroll as Obj | undefined
+
+  it('Lively and Festive give the sections below the first a subtle rise, Premium a subtle reveal; never the first section', () => {
+    for (const [theme, effect] of [['lively', 'rise'], ['festive', 'rise'], ['premium', 'reveal_up']] as const) {
+      const content = applyMotionTheme(cloneSample(), theme).content
+      expect(scroll(content, 's_story')).toEqual({ effect, intensity: 'subtle' })
+      expect(scroll(content, 's_hero')).toBeUndefined()
+      // Only sections get one.
+      expect(scroll(content, 'e_heading')).toBeUndefined()
+    }
+    for (const theme of ['calm', 'minimal'] as const) expect(scroll(applyMotionTheme(cloneSample(), theme).content, 's_story')).toBeUndefined()
+    expect(themeAspects('lively', 'section', { lead: true, hero: false, loopOk: true }).scroll).toBeUndefined()
+  })
+
+  it('switching themes swaps the theme’s scroll effects; idempotent', () => {
+    const lively = applyMotionTheme(cloneSample(), 'lively').content
+    expect(applyMotionTheme(lively, 'lively').content).toBe(lively)
+    const premium = applyMotionTheme(lively, 'premium').content
+    expect(scroll(premium, 's_story')).toEqual({ effect: 'reveal_up', intensity: 'subtle' })
+    const calm = applyMotionTheme(premium, 'calm').content
+    expect(scroll(calm, 's_story')).toBeUndefined()
+  })
+
+  it('a scroll effect the owner set is their own motion: kept, unless they turn Keep my own off', () => {
+    const content = withMotion(cloneSample(), 's_story', { effect: 'scale_up', range: 'cover' }, 'scroll')
+    expect(isOwnMotion(findNode(content, 's_story')!.node as unknown as Obj, null)).toBe(true)
+    const kept = applyMotionTheme(content, 'lively')
+    expect(scroll(kept.content, 's_story')).toEqual({ effect: 'scale_up', range: 'cover' })
+    expect(motion(kept.content, 's_story')).toBeUndefined()
+    const replaced = applyMotionTheme(content, 'lively', { keepOwn: false }).content
+    expect(scroll(replaced, 's_story')).toEqual({ effect: 'rise', intensity: 'subtle' })
+    // The same effect written out with its defaults is still the theme's (not own).
+    const spelled = withMotion(structuredClone(replaced), 's_story', { effect: 'rise', intensity: 'subtle', range: 'enter' }, 'scroll')
+    expect(isOwnMotion(findNode(spelled, 's_story')!.node as unknown as Obj, 'lively')).toBe(false)
+  })
+
+  it('Remove all motion also takes off scroll effects, the background scroll and the slow zoom', () => {
+    const content = applyMotionTheme(cloneSample(), 'festive').content
+    ;(content.sections[1]!.props as Obj).background_scroll = 'zoom_in'
+    ;(findNode(content, 'e_image')!.node as unknown as { props: Obj }).props.ken_burns = 'slow'
+    ;(findNode(content, 'e_image')!.node as unknown as { props: Obj }).props.ken_burns_direction = 'in'
+    const removed = applyMotionTheme(content, 'none').content
+    expect(JSON.stringify(removed)).not.toMatch(/"scroll"|background_scroll|ken_burns/)
+    expect(applyMotionTheme(removed, 'none').content).toBe(removed)
   })
 })

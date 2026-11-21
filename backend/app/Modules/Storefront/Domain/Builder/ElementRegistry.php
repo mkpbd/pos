@@ -63,6 +63,12 @@ final class ElementRegistry
      */
     public const B14 = ['dynamic_text', 'product_listing', 'blog_post_body', 'order_summary', 'not_found_message'];
 
+    /**
+     * B19: scroll stories — a story told in steps beside a sticky picture, and a gallery that
+     * moves sideways while the page scrolls (pictures, or products shown with their cards).
+     */
+    public const B19 = ['scroll_story', 'horizontal_gallery'];
+
     /** B14: the store pages a template (`template:<key>`, kind page, context `template`) designs. */
     public const TEMPLATES = ['shop', 'category', 'brand', 'search', 'blog_post', 'order', 'not_found'];
 
@@ -228,7 +234,7 @@ final class ElementRegistry
      * B4: elements the canvas resolver accepts besides wrapped sections (contact_form resolves
      * to no data; B8a: a chart has data only with a store `data_source`).
      */
-    public const RESOLVABLE = [...self::DATA_TYPES, 'contact_form', 'chart', 'product_listing'];
+    public const RESOLVABLE = [...self::DATA_TYPES, 'contact_form', 'chart', 'product_listing', 'horizontal_gallery'];
 
     /**
      * B4: the storefront icon set (icon element `name`): the features-strip icons plus contact and
@@ -309,7 +315,42 @@ final class ElementRegistry
         // B8b.
         'form.fields' => [1, 20],
         'form.fields.options' => [2, 20],
+        // B19 (`horizontal_gallery.product_ids` is a list of product ids, no item ids).
+        'scroll_story.steps' => [2, 6],
+        'horizontal_gallery.items' => [2, 12],
+        'horizontal_gallery.product_ids' => [2, 12],
     ];
+
+    /** B19: text limits of the B19 elements' list item fields (translatable ones are in LIST_TRANSLATABLE / NESTED_LIST_TRANSLATABLE too). */
+    public const B19_TEXT_LIMITS = [
+        'scroll_story.steps.alt' => 200, 'scroll_story.steps.kicker' => 60, 'scroll_story.steps.heading' => 120,
+        'scroll_story.steps.text' => 600, 'scroll_story.steps.link.label' => 40,
+        'horizontal_gallery.items.alt' => 200, 'horizontal_gallery.items.caption' => 120,
+    ];
+
+    public const SCROLL_STORY_MEDIA_SIDES = ['left', 'right'];
+
+    public const SCROLL_STORY_MEDIA_RATIOS = ['square', 'portrait', 'landscape'];
+
+    public const SCROLL_STORY_TRANSITIONS = ['fade', 'slide', 'zoom'];
+
+    /** B19: what a horizontal gallery shows — its own pictures (`items`) or chosen products (`product_ids`). */
+    public const HORIZONTAL_GALLERY_SOURCES = ['images', 'products'];
+
+    public const HORIZONTAL_GALLERY_CARD_WIDTHS = ['small', 'medium', 'large'];
+
+    /** B19: a pinned gallery with more entries than this makes a long, tiring scroll (page check). */
+    public const HORIZONTAL_GALLERY_PIN_WARN = 8;
+
+    /**
+     * B19: slow zoom and pan of pictures (Ken Burns, `props.ken_burns` + `ken_burns_direction`,
+     * kept only when set; a hero slider's at its props' top level).
+     */
+    public const KEN_BURNS_ELEMENTS = ['image', 'image_carousel', 'hero_slider'];
+
+    public const KEN_BURNS = ['none', 'slow', 'normal'];
+
+    public const KEN_BURNS_DIRECTIONS = ['alternate', 'in', 'out'];
 
     /**
      * B8a: text limits of the B8a elements' list item fields and nested props
@@ -338,6 +379,8 @@ final class ElementRegistry
         'comparison_table' => ['rows.*.cells.*.text' => 60],
         // B8b.
         'form' => ['fields.*.options.*.label' => 60],
+        // B19.
+        'scroll_story' => ['steps.*.link.label' => 40],
     ];
 
     /**
@@ -383,6 +426,9 @@ final class ElementRegistry
         'progress_bars' => ['items' => ['label' => 60]],
         // B8b.
         'form' => ['fields' => ['label' => 80, 'placeholder' => 80, 'help' => 160]],
+        // B19.
+        'scroll_story' => ['steps' => ['alt' => 200, 'kicker' => 60, 'heading' => 120, 'text' => 600]],
+        'horizontal_gallery' => ['items' => ['alt' => 200, 'caption' => 120]],
     ];
 
     /**
@@ -644,7 +690,7 @@ final class ElementRegistry
      */
     public static function types(): array
     {
-        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17, ...self::B14];
+        return [...self::BASIC, ...array_map(fn (SectionType $t) => $t->value, SectionType::cases()), ...self::B4, ...self::B6, ...self::B8A, ...self::B8B, ...self::P2A, ...self::B17, ...self::B14, ...self::B19];
     }
 
     public static function exists(mixed $type): bool
@@ -659,6 +705,7 @@ final class ElementRegistry
     {
         return in_array($type, self::BASIC, true) || in_array($type, self::B4, true) || in_array($type, self::B6, true) || in_array($type, self::B8A, true) || in_array($type, self::B8B, true)
             || in_array($type, self::P2A, true) || in_array($type, self::B17, true) || in_array($type, self::B14, true)
+            || in_array($type, self::B19, true)
             ? null
             : SectionType::tryFrom($type);
     }
@@ -682,7 +729,9 @@ final class ElementRegistry
         return in_array($type, self::DATA_TYPES, true)
             || ($type === 'chart' && ($props['data_source'] ?? 'manual') !== 'manual')
             // B14: a listing of chosen categories or brands gets their slugs.
-            || ($type === 'product_listing' && in_array($props['scope'] ?? null, ['categories', 'brands'], true));
+            || ($type === 'product_listing' && in_array($props['scope'] ?? null, ['categories', 'brands'], true))
+            // B19: a horizontal gallery of products gets their cards.
+            || ($type === 'horizontal_gallery' && ($props['source'] ?? null) === 'products');
     }
 
     /**
@@ -733,7 +782,8 @@ final class ElementRegistry
             'team', 'store_hours', 'progress_bars', 'form', 'bangla_date',
             'dynamic_text', 'blog_post_body', 'not_found_message' => 'content',
             'product_listing', 'order_summary' => 'commerce',
-            'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid', 'ornament' => 'media',
+            'gallery', 'image_carousel', 'logo_carousel', 'map', 'before_after', 'photo_grid', 'ornament',
+            'scroll_story', 'horizontal_gallery' => 'media',
             'product_carousel', 'product_grid', 'product_tabs', 'category_strip', 'brand_strip', 'search_box', 'promo_card',
             'category_card', 'product_spotlight', 'shop_the_look', 'trust_badges', 'recently_viewed',
             'pricing_table', 'comparison_table', 'bundle', 'order_form', 'payment_badges', 'delivery_promise' => 'commerce',
@@ -815,6 +865,8 @@ final class ElementRegistry
             'blog_post_body' => 'Blog post',
             'order_summary' => 'Order summary',
             'not_found_message' => 'Page not found message',
+            'scroll_story' => 'Scroll story',
+            'horizontal_gallery' => 'Horizontal gallery',
             default => SectionType::from($type)->label(),
         };
     }
@@ -1050,6 +1102,9 @@ final class ElementRegistry
             'before_after' => [$props['before']['media_id'] ?? null, $props['after']['media_id'] ?? null],
             'team' => array_column(is_array($props['members'] ?? null) ? $props['members'] : [], 'media_id'),
             'photo_grid' => array_column(is_array($props['images'] ?? null) ? $props['images'] : [], 'media_id'),
+            // B19: story step pictures and gallery pictures.
+            'scroll_story' => array_column(is_array($props['steps'] ?? null) ? $props['steps'] : [], 'media_id'),
+            'horizontal_gallery' => array_column(is_array($props['items'] ?? null) ? $props['items'] : [], 'media_id'),
             default => [],
         };
 
@@ -1343,6 +1398,30 @@ final class ElementRegistry
             'blog_post_body' => ['show_cover' => true, 'show_meta' => true, 'show_share' => true, 'show_related' => true],
             'order_summary' => ['show_timeline' => true, 'show_items' => true, 'show_address' => true, 'show_delivery' => true],
             'not_found_message' => ['heading' => '', 'text' => '', 'show_search' => true, 'show_links' => true],
+            // B19: valid as inserted; the pictures are chosen afterwards (until then a placeholder
+            // in the editor, and the page check reminds).
+            'scroll_story' => [
+                'steps' => [
+                    ['id' => 's1', 'media_id' => null, 'alt' => '', 'kicker' => 'Step 1', 'heading' => 'Where it begins', 'text' => 'Tell shoppers how your products start their journey.', 'link' => null],
+                    ['id' => 's2', 'media_id' => null, 'alt' => '', 'kicker' => 'Step 2', 'heading' => 'How it is made', 'text' => 'Show the care that goes into every piece.', 'link' => null],
+                    ['id' => 's3', 'media_id' => null, 'alt' => '', 'kicker' => 'Step 3', 'heading' => 'On its way to you', 'text' => 'Explain how it is packed and delivered.', 'link' => null],
+                ],
+                'media_side' => 'left',
+                'media_ratio' => 'portrait',
+                'transition' => 'fade',
+                'progress_dots' => true,
+            ],
+            'horizontal_gallery' => [
+                'source' => 'images',
+                'items' => [
+                    ['id' => 'i1', 'media_id' => null, 'alt' => '', 'caption' => '', 'link' => null],
+                    ['id' => 'i2', 'media_id' => null, 'alt' => '', 'caption' => '', 'link' => null],
+                ],
+                'product_ids' => [],
+                'card_width' => 'medium',
+                'pin' => true,
+                'show_progress' => true,
+            ],
             default => ['title' => null, 'subtitle' => null, 'config' => SectionType::from($type)->defaults(), 'items' => []],
         };
     }
@@ -1465,10 +1544,15 @@ final class ElementRegistry
                 'product_listing_ids' => ['min' => self::LISTING_IDS[0], 'max' => self::LISTING_IDS[1]],
                 'dynamic_text' => self::TRANSLATABLE['dynamic_text'],
                 'not_found_message' => self::TRANSLATABLE['not_found_message'],
+                // B19.
+                'b19_text' => self::B19_TEXT_LIMITS,
+                'scroll_progress_thickness' => ['min' => BuilderDocumentSchema::SCROLL_PROGRESS_THICKNESS[0], 'max' => BuilderDocumentSchema::SCROLL_PROGRESS_THICKNESS[1]],
+                'horizontal_gallery_pin_warn' => self::HORIZONTAL_GALLERY_PIN_WARN,
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
             // B14: a product listing only for chosen categories or brands.
-            'data_when' => ['chart' => 'data_source!=manual', 'product_listing' => 'scope in categories,brands'],
+            // B19: a horizontal gallery of products.
+            'data_when' => ['chart' => 'data_source!=manual', 'product_listing' => 'scope in categories,brands', 'horizontal_gallery' => 'source=products'],
             'enums' => [
                 'section_layouts' => BuilderDocumentSchema::SECTION_LAYOUTS,
                 'breakpoints' => StyleSchema::BREAKPOINTS,
@@ -1607,6 +1691,22 @@ final class ElementRegistry
                 'product_listing_per_page' => self::LISTING_PER_PAGE,
                 'product_listing_columns' => self::LISTING_COLUMNS,
                 'product_listing_paginations' => self::LISTING_PAGINATIONS,
+                // B19: scroll stories.
+                'scroll_effects' => StyleSchema::SCROLL_EFFECTS,
+                'scroll_intensities' => StyleSchema::SCROLL_INTENSITIES,
+                'scroll_ranges' => StyleSchema::SCROLL_RANGES,
+                'background_scrolls' => BuilderDocumentSchema::BACKGROUND_SCROLLS,
+                'ken_burns' => self::KEN_BURNS,
+                'ken_burns_directions' => self::KEN_BURNS_DIRECTIONS,
+                'ken_burns_elements' => self::KEN_BURNS_ELEMENTS,
+                'scroll_story_media_sides' => self::SCROLL_STORY_MEDIA_SIDES,
+                'scroll_story_media_ratios' => self::SCROLL_STORY_MEDIA_RATIOS,
+                'scroll_story_transitions' => self::SCROLL_STORY_TRANSITIONS,
+                'horizontal_gallery_sources' => self::HORIZONTAL_GALLERY_SOURCES,
+                'horizontal_gallery_card_widths' => self::HORIZONTAL_GALLERY_CARD_WIDTHS,
+                'scroll_progress_positions' => BuilderDocumentSchema::SCROLL_PROGRESS_POSITIONS,
+                'scroll_progress_color_roles' => BuilderDocumentSchema::SCROLL_PROGRESS_COLOR_ROLES,
+                'scroll_progress_contexts' => BuilderDocumentSchema::SCROLL_PROGRESS_CONTEXTS,
             ],
             // B8b: the settings a new popup starts with.
             'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),

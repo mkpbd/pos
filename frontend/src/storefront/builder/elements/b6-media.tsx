@@ -8,6 +8,7 @@ import { useReducedMotion } from '../motion'
 import { useLongMotion, useMotionMode } from '../motion-pause'
 import { DraftPlaceholder } from '../preview-mark'
 import { useImagePriority } from '../image-priority'
+import { useKenBurns } from '../scroll-link'
 import { usePage } from '../render-context'
 import type { BuilderMedia, GalleryAspect, MotionSpeed } from '../types'
 import { B6_ENUMS, B6_LIMITS, B6_TEXT_LIMITS, boundedInt, listItems, normalizeGalleryColumns, oneOf, safeLink } from '../validate'
@@ -191,6 +192,8 @@ export function ImageCarouselElement({ element }: { element: El<'image_carousel'
   const [stopped, setStopped] = useState(false)
   const { paused: held, handlers } = useHoverPause()
   const swipe = useRef<number | null>(null)
+  // B19: a slow zoom on each slide (Ken Burns).
+  const kenBurns = useKenBurns(element.type, element.props)
   const label = t('content.builder.carousel.label')
   const current = count > 0 ? Math.min(index, count - 1) : 0
   const playing = autoplay && !stopped && !held
@@ -217,7 +220,7 @@ export function ImageCarouselElement({ element }: { element: El<'image_carousel'
   const arrow = 'absolute top-1/2 z-10 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-sf-surface/90 text-sf-heading shadow transition hover:bg-sf-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-accent'
 
   return (
-    <section data-b={element.id} aria-roledescription="carousel" aria-label={label} className="b-image-carousel relative" data-testid="builder-image-carousel" {...handlers}>
+    <section data-b={element.id} aria-roledescription="carousel" aria-label={label} className="b-image-carousel relative" data-testid="builder-image-carousel" {...handlers} {...kenBurns}>
       <div className="relative overflow-hidden rounded-sf-card" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
         <div aria-live={playing ? 'off' : 'polite'} className="flex transition-transform duration-500 ease-out motion-reduce:transition-none" style={{ transform: `translateX(-${current * 100}%)` }}>
           {images.map((image, i) => {

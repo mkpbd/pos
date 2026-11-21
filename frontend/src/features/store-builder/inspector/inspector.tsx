@@ -33,6 +33,8 @@ import { B8aForm } from './b8a-forms'
 import { B8bForm } from './b8b-forms'
 import { B17Form } from './b17-forms'
 import { B17_TYPES } from './b17-model'
+import { B19Form } from './b19-forms'
+import { B19_TYPES } from './b19-model'
 import { B14Form } from './b14-forms'
 import { B14_TYPES } from './b14-model'
 import { P2aForm } from './order-form'
@@ -44,6 +46,8 @@ import { ElementSetupHost } from './setup-dialog'
 import { SeoPanel } from './seo-panel'
 import { hasSeo } from './seo-panel-model'
 import { CardHoverPicker } from './b18-card-hover'
+import { KenBurnsPicker, ReadingProgressPanel } from './b19-scroll-forms'
+import { canHaveScrollProgress, KEN_BURNS_TYPES } from './b19-scroll'
 import { CARD_HOVER_ELEMENTS } from './b18-text-effect'
 import { StyleTab } from './style-tab'
 import { MultiInspector } from './common-style-form'
@@ -89,7 +93,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   errors: Record<string, string>
   bangla: boolean
   content: InspectorProps['content']
-  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'> & { enums?: Record<string, unknown>; template: StoreTemplateKey | null }
+  b4: Pick<B4FormProps<Element>, 'context' | 'theme' | 'icons' | 'canCustomHtml'> & { enums?: Record<string, unknown>; limits?: Record<string, unknown>; template: StoreTemplateKey | null }
 }) {
   const common = { onChange, errors, bangla } as const
   if (B4_TYPES.has(node.type)) return <B4Form key={node.id} node={node as Element} {...common} {...b4} />
@@ -99,6 +103,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   if (P2A_TYPES.has(node.type)) return <P2aForm key={node.id} node={node as Element} {...common} context={b4.context} />
   if (B14_TYPES.has(node.type)) return <B14Form key={node.id} node={node as Element} {...common} context={b4.context} template={b4.template} />
   if (B17_TYPES.has(node.type)) return <B17Form key={node.id} node={node as Element} {...common} context={b4.context} enums={b4.enums} />
+  if (B19_TYPES.has(node.type)) return <B19Form key={node.id} node={node as Element} {...common} context={b4.context} limits={b4.limits} />
   switch (node.type) {
     case 'section':
       return (
@@ -139,7 +144,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
   return <p className="text-sm text-muted-foreground">This element has no settings.</p>
 }
 
-function PageSettings({ document, content, locales, onCommand, errors }: Pick<InspectorProps, 'document' | 'content' | 'locales' | 'onCommand' | 'errors'>) {
+function PageSettings({ document, content, locales, onCommand, errors, theme }: Pick<InspectorProps, 'document' | 'content' | 'locales' | 'onCommand' | 'errors' | 'theme'>) {
   const published = document.published
   const sections = content.sections.length
   const kind = document.kind ?? 'page'
@@ -215,6 +220,14 @@ function PageSettings({ document, content, locales, onCommand, errors }: Pick<In
         </p>
       )}
       {hasSeo({ kind, key: document.key }) && <SeoPanel content={content} document={document} bangla={locales.includes('bn')} problems={errors} onCommand={onCommand} />}
+      {canHaveScrollProgress({ kind, key: document.key }) && (
+        <ReadingProgressPanel
+          value={content.scroll_progress ?? null}
+          onChange={(value, coalesceKey) => onCommand({ type: 'set-scroll-progress', value, coalesceKey })}
+          themeColors={theme?.colors}
+          error={errors.find((p) => p.path === 'scroll_progress' || p.path.startsWith('scroll_progress.'))?.message}
+        />
+      )}
       <div className="flex flex-col gap-2 rounded-md border p-3">
         <h3 className="text-sm font-semibold">Site styles</h3>
         <p className="text-sm text-muted-foreground">
@@ -317,7 +330,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
           {document.kind === 'popup' ? (
             <PopupSettingsPanel settings={readPopupSettings(content.popup)} document={document} problems={serverProblems} bangla={locales.includes('bn')} onCommand={onCommand} />
           ) : (
-            <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} errors={serverProblems} />
+            <PageSettings document={document} content={content} locales={locales} onCommand={onCommand} errors={serverProblems} theme={theme} />
           )}
         </ReadOnlyFields>
       </aside>
@@ -398,9 +411,10 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
             bangla={bangla}
             content={content}
             documentId={document.id}
-            b4={{ context, theme, icons, canCustomHtml, enums: registry.enums, template }}
+            b4={{ context, theme, icons, canCustomHtml, enums: registry.enums, limits: registry.limits, template }}
           />
           {CARD_HOVER_ELEMENTS.has(node.type) && <CardHoverPicker node={node} onChange={onChange} error={errors.card_hover} />}
+          {KEN_BURNS_TYPES.has(node.type) && <KenBurnsPicker node={node} onChange={onChange} error={errors.ken_burns ?? errors.ken_burns_direction} />}
           </ReadOnlyFields>
         </TabsContent>
         <TabsContent value="style" className="pt-4">

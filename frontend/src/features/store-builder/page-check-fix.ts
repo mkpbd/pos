@@ -40,5 +40,19 @@ export function applyPageCheckFix(content: BuilderContent, fix: PageCheckFix): B
       if (!motion || motion.entrance === 'none') return content
       return setNode(content, { ...node, style: writeStyleValue(style, 'base', ['motion'], toMotion({ ...motionState(motion), entrance: 'none' })) } as BuilderNode)
     }
+    case 'remove-scroll-effect': {
+      // B19 "Remove scroll effect": `style.base.scroll` goes (the rest of the motion stays).
+      if (!('style' in node)) return content
+      const style = (node.style ?? {}) as ResponsiveStyle
+      if (!style.base?.scroll) return content
+      return setNode(content, { ...node, style: writeStyleValue(style, 'base', ['scroll'], undefined) } as BuilderNode)
+    }
+    case 'turn-off-pin': {
+      // B19 "Turn off pinning": the horizontal gallery becomes a swipeable row.
+      if (node.type !== 'horizontal_gallery' || !('props' in node)) return content
+      const props = node.props as Record<string, unknown>
+      if (props.pin === false) return content
+      return setNode(content, { ...node, props: { ...props, pin: false } } as BuilderNode)
+    }
   }
 }

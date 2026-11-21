@@ -13,8 +13,9 @@
  */
 
 import { NODE_ID } from './registry'
-import type { Background, Breakpoint, Gradient, HoverStyle, Motion, MotionEasing, ResponsiveStyle, Shadow, Style } from './types'
+import type { Background, Breakpoint, Gradient, HoverStyle, Motion, MotionEasing, ResponsiveStyle, ScrollRange, Shadow, Style } from './types'
 import { B9_DEFAULTS, B9_LIMITS, normalizeColor, normalizeGradient, normalizeStyle, normalizeWidth, oneOf } from './validate'
+import { scrollCss, type ScrollCombo, type ScrollRule } from './scroll-css'
 
 export const TABLET_QUERY = '(max-width: 1023px)'
 export const MOBILE_QUERY = '(max-width: 639px)'
@@ -35,6 +36,11 @@ export type CompileOptions = {
   scope?: string
   /** B9: ids of elements whose entrance a parent staggers (motionTargets' `children`); compileStyles fills it. */
   staggered?: ReadonlySet<string>
+  /**
+   * B19: nodes whose scroll effect is left out — the page's first above-the-fold picture (its
+   * likely LCP never waits for a scroll).
+   */
+  noScroll?: ReadonlySet<string>
 }
 
 const SCOPE = /^[a-z][a-z0-9-]{0,31}$/
@@ -57,6 +63,8 @@ type Output = Record<Breakpoint, Rule[]> & {
   motion: Rule[]
   /** B9: hover effects and parallax, for desktop pointers that allow motion. */
   pointer: Rule[]
+  /** B19: scroll-linked effects (`style.base.scroll`). */
+  scroll: ScrollRule[]
 }
 
 /* -------------------------------------------------------------------------------------------- */
@@ -300,6 +308,9 @@ function compileNodeStyle(
   if (motion) out.motion.push(...motionRules(selector, motion, options.staggered?.has(id) === true))
   const hover = style.base?.hover
   if (hover) hoverRules(out, selector, hover)
+  const scroll = style.base?.scroll
+  // B19: listed together with the node's entrance / loop, so both run (see ./scroll-css.ts).
+  if (scroll && !options.noScroll?.has(id)) out.scroll.push({ id, scroll, combos: motion ? scrollCombos(motion, options.staggered?.has(id) === true) : [] })
   // B9 parallax: real sections only (not inner rows).
   if (isSection && parallaxOf(style)) out.pointer.push({ selector: `${selector} > .b-parallax`, declarations: ['display:block'] })
 }
@@ -396,25 +407,46 @@ function overlayHost(selector: string): Rule[] {
 /** B18: the shopper paused animations (./motion-pause.ts). */
 const PAUSED = ':root[data-b-paused]'
 
-function motionRules(selector: string, motion: Required<Motion>, staggered: boolean): Rule[] {
-  const rules: Rule[] = []
+/** A node's entrance (built for a timing curve) and its loop (with its start and count), as `animation` items. */
+function motionParts(motion: Required<Motion>, staggered: boolean): { entrance: ((curve: string) => string) | null; loop: string | null } {
   // A staggered element waits its turn: the runtime sets `--b-stagger` (its index × the parent's stagger).
   const at = (ms: number) => (staggered ? `calc(${num(ms)}ms + var(--b-stagger, 0ms))` : `${num(ms)}ms`)
   const entrance = motion.entrance === 'none' ? null : (curve: string) => `b-motion-${motion.entrance} ${num(motion.duration)}ms ${curve} ${at(motion.delay)} backwards`
+  if (motion.loop === 'none') return { entrance, loop: null }
+  const timing = LINEAR_LOOPS.has(motion.loop) ? 'linear' : 'ease-in-out'
+  const count = motion.loop_forever ? 'infinite' : String(B9_LIMITS.loopCycles)
+  const start = entrance ? at(motion.delay + motion.duration) : '0ms'
+  return { entrance, loop: `b-loop-${motion.loop} ${num(LOOP_DURATIONS[motion.loop])}ms ${timing} ${start} ${count}` }
+}
+
+/**
+ * B19: the states of a node's motion whose animations are listed with its scroll effect — the
+ * entrance running, entrance + loop, the loop alone. (A `shine` loop runs on `::after`: no clash.)
+ */
+function scrollCombos(motion: Required<Motion>, staggered: boolean): ScrollCombo[] {
+  const { entrance, loop } = motionParts(motion, staggered)
+  const { curve, fallback } = EASINGS[motion.easing] ?? EASINGS.smooth
+  const ownLoop = motion.loop === 'shine' ? null : loop
+  const combos: ScrollCombo[] = []
+  if (entrance) combos.push({ suffix: '[data-b-motion="run"]', items: (c) => [entrance(c)], curve, fallback })
+  if (entrance && ownLoop) combos.push({ suffix: '[data-b-motion="run"][data-b-loop="run"]', items: (c) => [entrance(c), ownLoop], curve, fallback, loopIndex: 1 })
+  if (!entrance && ownLoop) combos.push({ suffix: '[data-b-loop="run"]', items: () => [ownLoop], curve, loopIndex: 0 })
+  return combos
+}
+
+function motionRules(selector: string, motion: Required<Motion>, staggered: boolean): Rule[] {
+  const rules: Rule[] = []
+  const { entrance, loop: loopItem } = motionParts(motion, staggered)
   if (entrance) {
     rules.push({ selector: `${selector}[data-b-motion="start"]`, declarations: ['opacity:0'] })
     rules.push({ selector: `${selector}[data-b-motion="run"]`, declarations: animationDeclarations(motion.easing, entrance) })
   }
-  if (motion.loop !== 'none') {
-    const timing = LINEAR_LOOPS.has(motion.loop) ? 'linear' : 'ease-in-out'
-    const loop = `b-loop-${motion.loop} ${num(LOOP_DURATIONS[motion.loop])}ms ${timing}`
-    const count = motion.loop_forever ? 'infinite' : String(B9_LIMITS.loopCycles)
-    const start = entrance ? at(motion.delay + motion.duration) : '0ms'
+  if (motion.loop !== 'none' && loopItem) {
     if (motion.loop === 'shine') {
       // B18: the sheen is the node's ::after layer; the node itself keeps its entrance.
       rules.push(...overlayHost(selector))
       rules.push({ selector: `${selector}::after`, declarations: ['content:""', 'position:absolute', 'inset:0', 'z-index:1', 'pointer-events:none', `background:${SHEEN}`, 'transform:translateX(-110%)'] })
-      rules.push({ selector: `${selector}[data-b-loop="run"]::after`, declarations: [`animation:${loop} ${start} ${count}`] })
+      rules.push({ selector: `${selector}[data-b-loop="run"]::after`, declarations: [`animation:${loopItem}`] })
       rules.push({ selector: `${selector}[data-b-loop="run"]:hover::after,${selector}[data-b-loop="run"]:focus-within::after`, declarations: ['animation-play-state:paused'] })
       // B18 "Pause animations" (WCAG 2.2.2).
       rules.push({ selector: `${PAUSED} ${selector}[data-b-loop="run"]::after`, declarations: ['animation-play-state:paused'] })
@@ -422,11 +454,11 @@ function motionRules(selector: string, motion: Required<Motion>, staggered: bool
     }
     if (entrance) {
       // The loop starts once the entrance has finished.
-      rules.push({ selector: `${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: animationDeclarations(motion.easing, (curve) => `${entrance(curve)},${loop} ${start} ${count}`) })
+      rules.push({ selector: `${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: animationDeclarations(motion.easing, (curve) => `${entrance(curve)},${loopItem}`) })
       // B18 "Pause animations": the loop stops; an entrance still playing finishes (never frozen half-hidden).
       rules.push({ selector: `${PAUSED} ${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: ['animation-play-state:running,paused'] })
     } else {
-      rules.push({ selector: `${selector}[data-b-loop="run"]`, declarations: [`animation:${loop} 0ms ${count}`] })
+      rules.push({ selector: `${selector}[data-b-loop="run"]`, declarations: [`animation:${loopItem}`] })
       rules.push({ selector: `${PAUSED} ${selector}[data-b-loop="run"]`, declarations: ['animation-play-state:paused'] })
     }
     // Attention loops pause while the visitor points at or focuses the node.
@@ -516,6 +548,23 @@ export function pointerEffects(sections: readonly unknown[]): Record<string, Poi
       const effect = normalizeStyle(n.style).base?.hover?.effect
       if (effect === 'tilt-3d') out[n.id] = 'tilt'
       else if (effect === 'glare') out[n.id] = 'glare'
+    }
+    if (Array.isArray(n.columns)) n.columns.forEach(visit)
+    if (Array.isArray(n.elements)) n.elements.forEach(visit)
+  }
+  sections.forEach(visit)
+  return out
+}
+
+/** B19: the nodes with a scroll effect and its range (absent range = enter), by id; `skip` = ids left out (the LCP picture). */
+export function scrollRanges(sections: readonly unknown[], skip?: ReadonlySet<string>): Record<string, ScrollRange> {
+  const out: Record<string, ScrollRange> = {}
+  const visit = (node: unknown) => {
+    if (typeof node !== 'object' || node === null) return
+    const n = node as NodeLike & { elements?: unknown }
+    if (validId(n.id) && !skip?.has(n.id)) {
+      const scroll = normalizeStyle(n.style).base?.scroll
+      if (scroll) out[n.id] = scroll.range ?? 'enter'
     }
     if (Array.isArray(n.columns)) n.columns.forEach(visit)
     if (Array.isArray(n.elements)) n.elements.forEach(visit)
@@ -620,7 +669,7 @@ function hideCss(selectors: string[]): string[] {
 
 /** The CSS for a document or render tree (sections). Invalid nodes and values produce nothing. */
 export function compileStyles(sections: readonly unknown[], compileOptions: CompileOptions = {}): string {
-  const out: Output = { base: [], tablet: [], mobile: [], hideDesktop: [], hideTablet: [], hideMobile: [], reducedMotion: [], motion: [], pointer: [] }
+  const out: Output = { base: [], tablet: [], mobile: [], hideDesktop: [], hideTablet: [], hideMobile: [], reducedMotion: [], motion: [], pointer: [], scroll: [] }
   const staggered = new Set(motionTargets(sections).flatMap((target) => target.children))
   const options: CompileOptions = { ...compileOptions, staggered }
 
@@ -640,6 +689,8 @@ export function compileStyles(sections: readonly unknown[], compileOptions: Comp
     ...block('(prefers-reduced-motion: reduce)', rulesCss(out.reducedMotion)),
     ...block('(prefers-reduced-motion: no-preference)', rulesCss(out.motion)),
     ...block('(prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine)', rulesCss(out.pointer)),
+    // B19: after the entrances, so a node's scroll effect is what it shows while scrolling.
+    ...scrollCss(out.scroll, scopePrefix(options.scope).trimEnd()),
   ].join('\n')
 }
 

@@ -191,7 +191,8 @@ describe('B18 compiled motion', () => {
     const fsModule = 'node:fs'
     const { readFileSync } = (await import(/* @vite-ignore */ fsModule)) as { readFileSync(path: string, encoding: 'utf8'): string }
     const storefrontCss = readFileSync(`${(globalThis as unknown as { process: { cwd(): string } }).process.cwd()}/src/storefront/storefront.css`, 'utf8')
-    const b18 = storefrontCss.slice(storefrontCss.indexOf('B18 Motion studio'))
+    // B19's keyframes follow (checked in scroll-b19.test.ts: they add the individual transform properties).
+    const b18 = storefrontCss.slice(storefrontCss.indexOf('B18 Motion studio'), storefrontCss.indexOf('B19 scroll stories'))
     const frames: string[] = []
     for (const match of b18.matchAll(/@keyframes [\w-]+ \{/g)) {
       let depth = 1

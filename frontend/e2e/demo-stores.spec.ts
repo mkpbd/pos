@@ -1691,6 +1691,86 @@ test('B18: Green Basket animates a campaign page — rotating words in two langu
   await ownerContext.close()
 })
 
+test('B19: Green Basket tells its story while shoppers scroll — scroll story and sideways gallery from the starters, a reading progress bar, phones get the stacked version', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+  const ownerContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const owner = await ownerContext.newPage()
+  await signIn(owner, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await ownerContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return owner.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { id: string; type?: string; props?: Record<string, any>; style?: Record<string, any>; columns?: { elements: Node[] }[] }
+  const find = (node: Node, type: string): Node | null => {
+    if (node.type === type) return node
+    for (const column of node.columns ?? []) for (const element of column.elements) {
+      const hit = find(element, type)
+      if (hit) return hit
+    }
+    return null
+  }
+  const starter = async (id: string) => (await call('POST', `/api/v1/storefront/builder/templates/${id}/instantiate`, { context: 'page' })).body.data.nodes[0] as Node
+  const storySection = await starter('neutral-scroll-story')
+  const gallerySection = await starter('neutral-swipe-gallery')
+  const story = find(storySection, 'scroll_story')!
+  const gallery = find(gallerySection, 'horizontal_gallery')!
+  const stepHeadings = (story.props!.steps as { heading: string }[]).map((s) => s.heading)
+  expect(stepHeadings.length).toBeGreaterThanOrEqual(2)
+  expect((gallery.props!.items as unknown[]).length).toBeGreaterThanOrEqual(2)
+  // A gentle scroll effect on the gallery section (not the top one).
+  gallerySection.style = { ...(gallerySection.style ?? {}), base: { ...(gallerySection.style?.base ?? {}), scroll: { effect: 'rise', intensity: 'subtle' } } }
+
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b19-story', title: 'B19 story', from: 'blank' })
+  if (doc.status === 409) {
+    const existing = ((await call('GET', '/api/v1/storefront/builder/documents')).body.data as { id: string; key: string }[]).find((d) => d.key === 'landing:b19-story')!
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const docId = doc.body.data.id as string
+  const content = { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections: [storySection, gallerySection], scroll_progress: { position: 'top', color_role: 'accent', thickness: 4 } }
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content })
+  expect(saved.status).toBe(200)
+  expect(saved.body.data.content.scroll_progress).toEqual({ position: 'top', color_role: 'accent', thickness: 4 })
+  // A reading progress bar belongs to pages, not popups: an invalid thickness is refused.
+  const refused = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: saved.body.data.draft_revision, content: { ...content, scroll_progress: { position: 'top', color_role: 'accent', thickness: 9 } } })
+  expect(refused.status).toBe(422)
+  // The starters come with pictures and descriptions: no story warning on the page check.
+  const check = await call('POST', `/api/v1/storefront/builder/documents/${docId}/check`, {})
+  expect(JSON.stringify(check.body.data)).not.toContain('SCROLL_STORY_MEDIA')
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B19' })).status).toBe(200)
+
+  // Desktop: every step's heading is on the page, the gallery shows its pictures, the progress bar grows while scrolling.
+  await page.setViewportSize({ width: 1366, height: 900 })
+  await page.goto(`${base}/p/b19-story`)
+  for (const heading of stepHeadings) await expect(page.getByRole('heading', { name: heading })).toBeAttached({ timeout: 30_000 })
+  await expect(page.locator(`[data-b="${gallery.id}"] [data-builder-item]`).first()).toBeAttached()
+  const bar = page.getByTestId('builder-reading-progress')
+  await expect(bar).toHaveCount(1)
+  // The track spans the page; its fill grows with the reading position.
+  const width = async () => (await bar.locator('.b-progress-fill').boundingBox())?.width ?? 0
+  const before = await width()
+  await page.mouse.wheel(0, 2400)
+  await expect.poll(width, { timeout: 10_000 }).toBeGreaterThan(before)
+
+  // Phone: the story stacks (each step with its own picture), no sideways scrolling of the page.
+  const phone = await browser.newContext({ viewport: { width: 375, height: 812 } })
+  const phonePage = await phone.newPage()
+  await phonePage.goto(`${base}/p/b19-story`)
+  await expect(phonePage.getByRole('heading', { name: stepHeadings[0]! })).toBeVisible({ timeout: 30_000 })
+  for (const heading of stepHeadings) await expect(phonePage.getByRole('heading', { name: heading })).toBeAttached()
+  expect(await phonePage.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+  await phone.close()
+  await ownerContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

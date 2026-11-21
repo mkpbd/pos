@@ -1,0 +1,70 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "full" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "64px", "bottom": "64px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Swipe through the collection", "level": 2, "link": null },
+                            "translations": { "bn": { "text": "কালেকশনটি এক নজরে দেখুন" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": { "html": "<p>A few favourites from this season. Keep scrolling to see them all.</p>" },
+                            "translations": { "bn": { "html": "<p>এই মৌসুমের কয়েকটি প্রিয় জিনিস। সবগুলো দেখতে স্ক্রল করতে থাকুন।</p>" } }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "horizontal_gallery",
+                            "props": {
+                                "source": "images",
+                                "items": [
+                                    { "id": "g1", "media_id": { "asset": "furniture/accent-armchair.jpg" }, "alt": "Mustard yellow accent armchair on a wooden floor in a bright room", "caption": "A chair for slow mornings", "link": null },
+                                    { "id": "g2", "media_id": { "asset": "furniture/pendant-lamp.jpg" }, "alt": "Woven rattan pendant lamp casting a shadow on a wall", "caption": "Soft light for the evening", "link": null },
+                                    { "id": "g3", "media_id": { "asset": "furniture/coffee-table.jpg" }, "alt": "Round light oak coffee table with a ceramic table lamp on a textured rug", "caption": "A table to gather around", "link": null },
+                                    { "id": "g4", "media_id": { "asset": "furniture/jute-rug.jpg" }, "alt": "Half-rolled round jute rug with a scalloped cream border on a wooden floor", "caption": "Natural texture underfoot", "link": null },
+                                    { "id": "g5", "media_id": { "asset": "furniture/ceramic-vase.jpg" }, "alt": "Set of ceramic vases in neutral tones on a wooden surface", "caption": "Small things that finish a room", "link": null },
+                                    { "id": "g6", "media_id": { "asset": "furniture/work-desk.jpg" }, "alt": "Wooden writing desk with a lamp and swivel chair by a window with blinds", "caption": "A calm corner to work", "link": { "url": "/shop" } }
+                                ],
+                                "product_ids": [],
+                                "card_width": "medium",
+                                "pin": true,
+                                "show_progress": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "items.g1.alt": "উজ্জ্বল ঘরে কাঠের মেঝেতে সরষে-হলুদ আরামকেদারা",
+                                    "items.g1.caption": "ধীর সকালের জন্য একটি চেয়ার",
+                                    "items.g2.alt": "দেয়ালে ছায়া ফেলা বেতের ঝুলন্ত বাতি",
+                                    "items.g2.caption": "সন্ধ্যার নরম আলো",
+                                    "items.g3.alt": "নকশাদার গালিচার ওপর সিরামিক বাতিসহ গোল হালকা কাঠের টেবিল",
+                                    "items.g3.caption": "সবাই মিলে বসার টেবিল",
+                                    "items.g4.alt": "কাঠের মেঝেতে আধা গোটানো গোল পাটের গালিচা",
+                                    "items.g4.caption": "পায়ের নিচে প্রাকৃতিক ছোঁয়া",
+                                    "items.g5.alt": "কাঠের ওপর হালকা রঙের কয়েকটি সিরামিক ফুলদানি",
+                                    "items.g5.caption": "ঘর সাজানোর ছোট ছোট জিনিস",
+                                    "items.g6.alt": "জানালার পাশে বাতি ও ঘূর্ণি চেয়ারসহ কাঠের লেখার টেবিল",
+                                    "items.g6.caption": "কাজের জন্য শান্ত এক কোণ"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

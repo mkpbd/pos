@@ -95,7 +95,7 @@ describe('order form: catalogue and checks', () => {
     expect(needsSetup(fresh)).toBe(true)
     expect(validateNode(fresh)).toEqual([{ path: 'props.product_id', message: 'Choose the product this form sells.' }])
     expect(needsSetup(node({ product_id: HONEY }))).toBe(false)
-    expect(groupsFor(fresh).map((g) => g.id)).toEqual(['spacing', 'background', 'border', 'effects', 'motion'])
+    expect(groupsFor(fresh).map((g) => g.id)).toEqual(['spacing', 'background', 'border', 'effects', 'motion', 'scroll'])
   })
 
   it('reports the quantity, the add-on and the required texts in plain words, next to their fields', () => {

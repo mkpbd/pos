@@ -1,6 +1,6 @@
 import type { StorefrontBootstrap } from '../../types'
 import type { PreviewContext } from '../audience/types'
-import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderPageSection } from '../types'
+import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderPageSection, ScrollProgress } from '../types'
 import type { FontSource } from '../../fonts'
 import type { CanvasThemeSettings } from './theme-override'
 import type { PlayScope } from '../motion'
@@ -88,6 +88,8 @@ export type ParentMessage =
        * elements in `device`'s order (mobile → tablet → base). Absent = base order.
        */
       device_order?: DeviceOrder | null
+      /** B19 (additive): the draft's reading progress bar (`scroll_progress`); absent / null = none. */
+      scroll_progress?: ScrollProgress | null
     }
   | { type: 'scroll-to'; id: string }
   /** B3 (additive, v stays 1): the theme draft's settings, laid over the bootstrap theme for instant previews. */
@@ -115,6 +117,12 @@ export type ParentMessage =
    * and text effects run in the canvas; off (the default, also after each `ready`) keeps editing calm.
    */
   | { type: 'preview-motion'; on: boolean }
+  /**
+   * B19 (additive, v stays 1): the inspector's Scroll ▶ Preview — scroll the node through the
+   * viewport once with its scroll effects running (even while "Preview motion" is off), then bring
+   * it back into view. Ignored for visitors who prefer reduced motion.
+   */
+  | { type: 'preview-scroll'; id: string }
   /**
    * B10 (additive, v stays 1): start editing a text field in place (the inspector's "Edit on the
    * page", Enter on the selected node). `field` absent = the node's first field shown on the canvas.
@@ -156,7 +164,15 @@ export type CanvasMessage =
    * B12 (additive, v stays 1): the modifier keys held while clicking, for multi-select (Ctrl / Cmd
    * toggles, Shift selects a range). Absent = not held.
    */
-  | { type: 'click'; id: string | null; ctrl?: boolean; shift?: boolean; meta?: boolean }
+  | {
+      type: 'click'
+      id: string | null
+      ctrl?: boolean
+      shift?: boolean
+      meta?: boolean
+      /** B19 (additive): the list item clicked inside the node (a story step, a gallery item or product id; nearest `[data-builder-item]`). */
+      item?: string
+    }
   | { type: 'hover'; id: string | null }
   | { type: 'key'; key: string; ctrl: boolean; shift: boolean; meta: boolean }
   /**
@@ -205,7 +221,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'preview-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as', 'page-context'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'preview-motion', 'preview-scroll', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as', 'page-context'])
 const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {

@@ -73,6 +73,11 @@ use Carbon\CarbonImmutable;
  * - B14 product_listing with scope `categories` / `brands`: `{category_slugs, brand_slugs}` of
  *   the visible chosen ones (none visible → no data, so the listing is left out publicly).
  *
+ * - B19 horizontal_gallery of products: `{products: {<product id>: product card}}` of the chosen
+ *   products on sale (published payloads also drop the others from `product_ids`); none is
+ *   `state: empty` (left out publicly). Drafts also get `unavailable: [id]` (chosen products not
+ *   on sale).
+ *
  * In a draft (preview) an element that would be left out publicly keeps its data with
  * `state: expired | inactive | unavailable`; an element whose record is gone has no data.
  */
@@ -163,6 +168,14 @@ class BuilderElementData
                 array_push($bundleIds, ...array_filter(array_column($element['props']['items'] ?? [], 'product_id'), 'is_string'));
             }
         }
+        // B19: horizontal galleries of products (cards), one query.
+        $galleryIds = [];
+        foreach ($elements as $element) {
+            if ($element['type'] === 'horizontal_gallery' && ElementRegistry::needsData('horizontal_gallery', $element['props'])) {
+                array_push($galleryIds, ...array_filter($element['props']['product_ids'] ?? [], 'is_string'));
+            }
+        }
+        $galleryCards = $galleryIds === [] ? [] : array_column($this->catalog->productCards(array_values(array_unique($galleryIds))), null, 'id');
         $compareCards = $compareIds === [] ? [] : array_column($this->catalog->productCards(array_values(array_unique($compareIds))), null, 'id');
         $bundleDetails = $bundleIds === [] ? [] : $this->catalog->productDetails(array_values(array_unique($bundleIds)));
 
@@ -274,6 +287,11 @@ class BuilderElementData
                     break;
                 case 'product_listing':
                     $data = ElementRegistry::needsData('product_listing', $props) ? $this->listingScope($props) : null;
+                    break;
+                case 'horizontal_gallery':
+                    if (ElementRegistry::needsData('horizontal_gallery', $props)) {
+                        [$data, $state] = $this->galleryProducts($props, $galleryCards, $preview);
+                    }
                     break;
             }
 
@@ -473,6 +491,33 @@ class BuilderElementData
         }
 
         return [$data, count($products) < 2 ? 'unavailable' : null];
+    }
+
+    /**
+     * B19: a horizontal gallery's products — the cards of those on sale; none is `empty`. A draft
+     * also gets `unavailable: [id]` for the others.
+     *
+     * @param  array<string, mixed>  $props
+     * @param  array<string, array<string, mixed>>  $cards
+     * @return array{0: array<string, mixed>, 1: ?string}
+     */
+    private function galleryProducts(array $props, array $cards, bool $preview): array
+    {
+        $products = [];
+        $unavailable = [];
+        foreach ($props['product_ids'] ?? [] as $productId) {
+            if (isset($cards[$productId])) {
+                $products[$productId] = $cards[$productId];
+            } else {
+                $unavailable[] = $productId;
+            }
+        }
+        $data = ['products' => $products];
+        if ($preview && $unavailable !== []) {
+            $data['unavailable'] = $unavailable;
+        }
+
+        return [$data, $products === [] ? 'empty' : null];
     }
 
     /**

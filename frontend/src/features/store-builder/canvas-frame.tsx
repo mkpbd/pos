@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { envelope, readCanvasMessage, type CanvasMessage, type CanvasProduct, type CanvasSurroundings, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
-import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderSection } from '@/storefront/builder/types'
+import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderSection, ScrollProgress } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
 import type { FontSource } from '@/storefront/fonts'
@@ -19,6 +19,7 @@ import { AudienceCanvasBadges } from './audience/audience-badge'
 import type { CanvasAudienceBadge } from './audience/badges'
 import type { StorePageContext, StorePageSample } from '@/storefront/builder/templates/types'
 import { CommentPins, type CommentPinLayer } from './collab/comment-pins'
+import { revealItem } from './inspector/item-reveal'
 
 /*
  * The canvas iframe (/admin/builder-canvas) at the device width, scaled to fit, with the editor's
@@ -33,6 +34,8 @@ export type CanvasHandle = {
   /** B6: replays the node's entrance animation once. */
   /** B18: `scope` page plays every entrance top to bottom (the id is ignored); section: the id's section in order. */
   playMotion: (id: string, scope?: 'node' | 'section' | 'page') => void
+  /** B19: scrolls the node through the canvas screen once, playing its scroll effect. */
+  previewScroll: (id: string) => void
   /** A client (parent window) point in canvas viewport pixels; null outside the canvas. */
   toCanvasPoint: (clientX: number, clientY: number) => { x: number; y: number } | null
   rects: () => Record<string, Rect>
@@ -106,6 +109,8 @@ export type CanvasFrameProps = {
   popup?: PopupSettings
   /** P1b: a product page zone's preview product (its photo, name and price fill the sample around the zone). */
   product?: CanvasProduct | null
+  /** B19: the draft's reading progress bar (sent with every render; absent = none). */
+  scrollProgress?: ScrollProgress | null
   /** B10: the store's uploaded fonts (sent with the theme; absent = the bootstrap's fonts). */
   fonts?: FontSource[]
   /** B10: text edits, dropped pictures and "Replace picture" from the canvas. */
@@ -143,7 +148,7 @@ export type CanvasFrameProps = {
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null, previewMotion = false } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, scrollProgress = null, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null, previewMotion = false } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -222,6 +227,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
           // B10: not the canvas itself — that would end a text edit the canvas has just started (the
           // double-click's second click arrives after the edit took focus).
           if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body && document.activeElement !== frameRef.current) document.activeElement.blur()
+          // B19: a click on a story step / gallery card opens that item's card in the inspector.
+          revealItem(message.id, message.item)
           callbacks.current.onSelect(message.id, { toggle: message.ctrl === true || message.meta === true, range: message.shift === true })
           break
         case 'hover':
@@ -295,9 +302,10 @@ export function CanvasFrame(props: CanvasFrameProps) {
         ...(popup ? { popup } : {}),
         ...(product ? { product } : {}),
         ...(deviceOrder ? { device_order: deviceOrder } : {}),
+        ...(scrollProgress ? { scroll_progress: scrollProgress } : {}),
       })
     }
-  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, product, deviceOrder, send, renderTick])
+  }, [ready, sections, data, media, selection, hover, errorIds, device, pending, surroundings, emptyText, popup, product, deviceOrder, scrollProgress, send, renderTick])
 
   useEffect(() => {
     const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
@@ -332,6 +340,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
       scrollTo: (id) => send({ type: 'scroll-to', id }),
       scrollBy: (dy) => send({ type: 'scroll-by', dy }),
       playMotion: (id, scope) => send(scope ? { type: 'play-motion', id, scope } : { type: 'play-motion', id }),
+      previewScroll: (id) => send({ type: 'preview-scroll', id }),
       toCanvasPoint: (clientX, clientY) => {
         const frame = frameRef.current
         if (!frame) return null

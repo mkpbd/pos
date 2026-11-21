@@ -34,6 +34,11 @@ use Carbon\CarbonImmutable;
  *   (MOTION_LCP: the top of the page appears late), too many looping nodes (MOTION_TOO_MUCH: more
  *   than 6 in one section, or more than 3 looping forever), text effects on long texts
  *   (TEXT_EFFECT_LONG: rotating words over 24 characters, a typewriter over 160).
+ * - B19 scroll stories (warnings): story steps without a picture or its description
+ *   (SCROLL_STORY_MEDIA), a scroll effect on the first section or its first picture / heading
+ *   (SCROLL_EFFECT_TOP: the top of the page appears late; fix `remove_scroll_effect`), a pinned
+ *   horizontal gallery of more than 8 entries (HORIZONTAL_GALLERY_LONG: a long, tiring scroll;
+ *   fix `turn_off_pin`).
  *
  * Hidden nodes (and what they contain) are left out, except for records that are gone. Nothing is
  * saved. Errors don't block publishing: the owner decides.
@@ -178,9 +183,13 @@ class BuilderPageCheck
         // B18: motion.
         if (! $document->isGlobal() && in_array(BuilderDocumentSchema::baseContext($context), self::MOTION_LCP_CONTEXTS, true)) {
             $this->checkMotionLcp($tree, $nodes, $issue);
+            // B19.
+            $this->checkScrollEffectTop($tree, $nodes, $issue);
         }
         $this->checkMotionAmount($tree, $nodes, $issue);
         $this->checkTextEffects($nodes, $issue);
+        // B19: scroll stories.
+        $this->checkScrollStories($nodes, $issue);
 
         $rank = array_flip(self::SEVERITIES);
         usort($issues, fn (array $a, array $b) => [$rank[$a['severity']], $a['_order']] <=> [$rank[$b['severity']], $b['_order']]);
@@ -202,6 +211,99 @@ class BuilderPageCheck
      */
     private function checkMotionLcp(array $tree, array $nodes, callable $issue): void
     {
+        $messages = [
+            'section' => 'Your top section appears late; remove its animation for a faster store.',
+            'image' => 'Your top picture appears late; remove its animation for a faster store.',
+            'heading' => 'Your top heading appears late; remove its animation for a faster store.',
+        ];
+        foreach ($this->topCandidates($tree, $nodes) as $id => $kind) {
+            $entrance = $nodes[$id]['node']['style']['base']['motion']['entrance'] ?? 'none';
+            if ($entrance !== 'none') {
+                $issue('MOTION_LCP', 'warning', $id, $messages[$kind], $nodes[$id]['path'].'.style.base.motion.entrance', [
+                    'kind' => $kind,
+                    'entrance' => $entrance,
+                    'fix' => 'remove_entrance',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * B19: a scroll effect on the first section, its first picture or its first heading makes the
+     * top of the page appear late (it starts faded / moved until the page scrolls).
+     *
+     * @param  array<string, mixed>  $tree
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkScrollEffectTop(array $tree, array $nodes, callable $issue): void
+    {
+        $messages = [
+            'section' => 'Your top section changes as the page scrolls, so it appears late. Remove its scroll effect.',
+            'image' => 'Your top picture changes as the page scrolls, so it appears late. Remove its scroll effect.',
+            'heading' => 'Your top heading changes as the page scrolls, so it appears late. Remove its scroll effect.',
+        ];
+        foreach ($this->topCandidates($tree, $nodes) as $id => $kind) {
+            $effect = $nodes[$id]['node']['style']['base']['scroll']['effect'] ?? null;
+            if (is_string($effect) && $effect !== 'none') {
+                $issue('SCROLL_EFFECT_TOP', 'warning', $id, $messages[$kind], $nodes[$id]['path'].'.style.base.scroll.effect', [
+                    'kind' => $kind,
+                    'effect' => $effect,
+                    'fix' => 'remove_scroll_effect',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * B19: story steps without a picture or its description, and pinned horizontal galleries
+     * that scroll too long.
+     *
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkScrollStories(array $nodes, callable $issue): void
+    {
+        foreach ($nodes as $id => $entry) {
+            $type = $entry['node']['type'] ?? null;
+            $props = is_array($entry['node']['props'] ?? null) ? $entry['node']['props'] : [];
+            if ($entry['hidden']) {
+                continue;
+            }
+            if ($type === 'scroll_story') {
+                $steps = [];
+                foreach (is_array($props['steps'] ?? null) ? $props['steps'] : [] as $step) {
+                    if (is_array($step) && (! is_string($step['media_id'] ?? null) || trim((string) ($step['alt'] ?? '')) === '')) {
+                        $steps[] = $step['id'] ?? null;
+                    }
+                }
+                if ($steps !== []) {
+                    $issue('SCROLL_STORY_MEDIA', 'warning', $id, 'Some steps of this story have no picture or no picture description. Choose a picture for every step and describe it for people who cannot see it.', $entry['path'].'.props.steps', [
+                        'steps' => $steps,
+                    ]);
+                }
+            } elseif ($type === 'horizontal_gallery' && ($props['pin'] ?? false) === true) {
+                $count = count(($props['source'] ?? 'images') === 'products' ? ($props['product_ids'] ?? []) : ($props['items'] ?? []));
+                if ($count > ElementRegistry::HORIZONTAL_GALLERY_PIN_WARN) {
+                    $issue('HORIZONTAL_GALLERY_LONG', 'warning', $id, 'This gallery has '.$count.' entries, so shoppers scroll a long way sideways before the page goes on. Turn off moving sideways while scrolling, or keep at most '.ElementRegistry::HORIZONTAL_GALLERY_PIN_WARN.'.', $entry['path'].'.props.pin', [
+                        'count' => $count,
+                        'limit' => ElementRegistry::HORIZONTAL_GALLERY_PIN_WARN,
+                        'fix' => 'turn_off_pin',
+                    ]);
+                }
+            }
+        }
+    }
+
+    /**
+     * B18: the top of the page — the first shown section (id => `section`), its first picture
+     * (`image`) and its first heading (`heading`) in reading order; [] when the first shown
+     * section is a global section reference.
+     *
+     * @param  array<string, mixed>  $tree
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     * @return array<string, string>
+     */
+    private function topCandidates(array $tree, array $nodes): array
+    {
         $first = null;
         foreach ($tree['sections'] ?? [] as $section) {
             if (is_array($section) && ($section['hidden'] ?? false) !== true) {
@@ -210,7 +312,7 @@ class BuilderPageCheck
             }
         }
         if ($first === null || ($first['type'] ?? null) !== 'section' || ! isset($nodes[$first['id'] ?? ''])) {
-            return;
+            return [];
         }
         $sectionPath = $nodes[$first['id']]['path'];
         $candidates = [$first['id'] => 'section'];
@@ -227,21 +329,8 @@ class BuilderPageCheck
                 }
             }
         }
-        $messages = [
-            'section' => 'Your top section appears late; remove its animation for a faster store.',
-            'image' => 'Your top picture appears late; remove its animation for a faster store.',
-            'heading' => 'Your top heading appears late; remove its animation for a faster store.',
-        ];
-        foreach ($candidates as $id => $kind) {
-            $entrance = $nodes[$id]['node']['style']['base']['motion']['entrance'] ?? 'none';
-            if ($entrance !== 'none') {
-                $issue('MOTION_LCP', 'warning', $id, $messages[$kind], $nodes[$id]['path'].'.style.base.motion.entrance', [
-                    'kind' => $kind,
-                    'entrance' => $entrance,
-                    'fix' => 'remove_entrance',
-                ]);
-            }
-        }
+
+        return $candidates;
     }
 
     /**

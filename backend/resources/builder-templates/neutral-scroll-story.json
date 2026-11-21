@@ -1,0 +1,93 @@
+{
+    "schema_version": 1,
+    "sections": [
+        {
+            "id": "s_1",
+            "type": "section",
+            "props": { "layout": "boxed" },
+            "style": {
+                "base": { "spacing": { "padding": { "top": "72px", "bottom": "72px" } } },
+                "mobile": { "spacing": { "padding": { "top": "40px", "bottom": "40px" } } }
+            },
+            "columns": [
+                {
+                    "id": "c_1",
+                    "type": "column",
+                    "width": { "base": 100 },
+                    "elements": [
+                        {
+                            "id": "e_1",
+                            "type": "heading",
+                            "props": { "text": "Our story in steps", "level": 2, "link": null },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "text": "ধাপে ধাপে আমাদের গল্প" } }
+                        },
+                        {
+                            "id": "e_2",
+                            "type": "text",
+                            "props": { "html": "<p>Scroll down to follow a piece from the first idea to your door.</p>" },
+                            "style": { "base": { "typography": { "align": "center" } } },
+                            "translations": { "bn": { "html": "<p>নিচে স্ক্রল করে দেখুন, প্রথম ভাবনা থেকে আপনার দরজা পর্যন্ত একটি জিনিসের যাত্রা।</p>" } }
+                        },
+                        {
+                            "id": "e_3",
+                            "type": "scroll_story",
+                            "props": {
+                                "steps": [
+                                    {
+                                        "id": "st1",
+                                        "media_id": { "asset": "handmade/banner-artisan.jpg" },
+                                        "alt": "Potter's hands shaping clay on a wheel",
+                                        "kicker": "Step 1",
+                                        "heading": "It starts with an idea",
+                                        "text": "Every piece begins as a simple sketch and a lump of clay. We try shapes by hand until one feels right to hold.",
+                                        "link": null
+                                    },
+                                    {
+                                        "id": "st2",
+                                        "media_id": { "asset": "handmade/ceramic-vase.jpg" },
+                                        "alt": "Hand-thrown clay vases on a concrete plinth",
+                                        "kicker": "Step 2",
+                                        "heading": "Made slowly, checked carefully",
+                                        "text": "Each piece is shaped, dried and fired, then checked one by one. Small marks of the hand stay; cracks and wobbles do not.",
+                                        "link": null
+                                    },
+                                    {
+                                        "id": "st3",
+                                        "media_id": { "asset": "handmade/gift-box.jpg" },
+                                        "alt": "Kraft gift box tied with twine and greenery",
+                                        "kicker": "Step 3",
+                                        "heading": "Packed with care for you",
+                                        "text": "We wrap every order in recycled paper so it arrives safely, ready to use or to give as a gift.",
+                                        "link": { "label": "Shop now", "url": "/shop" }
+                                    }
+                                ],
+                                "media_side": "left",
+                                "media_ratio": "portrait",
+                                "transition": "fade",
+                                "progress_dots": true
+                            },
+                            "translations": {
+                                "bn": {
+                                    "steps.st1.alt": "চাকায় মাটির পাত্র গড়ছেন একজন কুমোর",
+                                    "steps.st1.kicker": "ধাপ ১",
+                                    "steps.st1.heading": "শুরু একটি ভাবনা থেকে",
+                                    "steps.st1.text": "প্রতিটি জিনিসের শুরু একটি সাধারণ নকশা আর এক দলা মাটি থেকে। হাতে ধরতে ভালো লাগা পর্যন্ত আমরা নানা আকার চেষ্টা করি।",
+                                    "steps.st2.alt": "কংক্রিটের বেদিতে হাতে গড়া মাটির ফুলদানি",
+                                    "steps.st2.kicker": "ধাপ ২",
+                                    "steps.st2.heading": "ধীরে তৈরি, যত্নে যাচাই",
+                                    "steps.st2.text": "প্রতিটি জিনিস গড়া, শুকানো ও পোড়ানোর পর একটি একটি করে দেখা হয়। হাতের ছোট ছাপ থাকে; ফাটল বা বাঁকা থাকে না।",
+                                    "steps.st3.alt": "সুতলি আর সবুজ পাতায় বাঁধা কাগজের উপহারের বাক্স",
+                                    "steps.st3.kicker": "ধাপ ৩",
+                                    "steps.st3.heading": "আপনার জন্য যত্নে মোড়ানো",
+                                    "steps.st3.text": "প্রতিটি অর্ডার আমরা পুনর্ব্যবহৃত কাগজে মুড়ে দিই, যাতে নিরাপদে পৌঁছায় — নিজে ব্যবহার বা উপহার দেওয়ার জন্য তৈরি।",
+                                    "steps.st3.link.label": "এখনই কিনুন"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

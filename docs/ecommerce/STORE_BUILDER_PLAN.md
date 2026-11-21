@@ -535,6 +535,29 @@ Original questions:
   *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
   the editor sends the canvas only the shown arm (the canvas never filters).
 
+### As built — B19 scroll stories (2026-11-21)
+
+- **Schema:** `StyleSchema` scroll group (base only, silent drop), `B19ElementProps` (`scroll_story`, `horizontal_gallery`; nullable
+  media, every list-item key present), `BuilderDocumentSchema` (`background_scroll` wins over parallax, Ken Burns, top-level
+  `scroll_progress`), `BuilderReferences` (media / product checks), `BuilderElementData` (gallery product cards, one query per render),
+  `BuilderPageRenderer` (live pruning, `document.scroll_progress`), `BuilderPageCheck` (shares the B18 top-of-page lookup).
+- **Storefront:** `scroll-css.ts` compiles per node — native `@supports (animation-timeline: view())` rules with the spec ranges, or a
+  paused animation whose delay follows `--b-p` / `--b-q` written by `scroll.ts` (lazy, one passive listener + one rAF loop, only
+  nodes near the viewport measured). Rules apply only without reduced motion, when not paused, and when the page wrapper has
+  `data-b-moving` (store, or canvas while previewing). Scroll keyframes use the individual `translate` / `scale` / `rotate`
+  properties, `filter: opacity()` and `clip-path`, emitted in one combined `animation` list with the entrance / loop
+  (`animation-timeline: auto…, view()`), so both run on one node (blur-in with a filter scroll effect, and a mask entrance with
+  `reveal_*`, still let the scroll effect win while it plays). `scroll-layers.tsx`: background-scroll layer (replaces parallax) and
+  the reading progress bar (`scroll(root)` timeline or the engine). `elements/b19.tsx`: scroll story (sticky 100svh `aria-hidden`
+  media panel, active step by IntersectionObserver `-45% 0px -45% 0px`, dots with `aria-current`; stacked on tablet / phone /
+  reduced motion / canvas) and horizontal gallery (pinned on a named view timeline with CSS-only height and travel; swipe row with
+  scroll-snap and previous / next buttons otherwise). Ken Burns via `data-b-kb` keyframes (long motion → pause toggle).
+- **Editor:** Style → *Scroll* group (`b19-scroll-control.tsx`: tile previews, strength, "when it plays", ▶ Preview), section
+  *Background moves while scrolling*, *Slow zoom* picker, page settings *Reading progress bar*, page-check fixes
+  `remove-scroll-effect` / `turn-off-pin`; `b19-forms.tsx` story and gallery forms (steps / items lists, Bangla per item, product
+  picker, pin hint); a canvas click opens the clicked step / picture (`item-reveal.ts`); motion themes add subtle scroll effects
+  below the first section.
+
 ### As built — B18 Motion studio (2026-11-21)
 
 - **Schema:** `StyleSchema` (easings, new entrances / loops / hover effects; silent drop), `ElementRegistry` (`TEXT_EFFECT_*`,

@@ -50,6 +50,11 @@ use Illuminate\Support\Facades\Validator;
  * dividers an `animate` (and two more shapes); StyleSchema knows the new entrances, easings, loops
  * and hover effects. All kept only when set, so older documents normalize unchanged.
  *
+ * B19: scroll stories — StyleSchema knows `style.base.scroll`; sections may set
+ * `background_scroll` (needs a background image; replaces the parallax), pictures `ken_burns`
+ * (+ `ken_burns_direction`), the document `scroll_progress` (pages, content pages, templates);
+ * the scroll_story and horizontal_gallery elements (B19ElementProps). All kept only when set.
+ *
  * B14: store page templates — context `template:<key>` (contextOf(`template:<key>`)): what a
  * page may hold (globals, sticky, audiences, A/B tests; no `seo`) plus the template's main part
  * (ElementRegistry::TEMPLATE_CORE) at most once (TEMPLATE_CORE_DUPLICATE; publishing needs it
@@ -93,6 +98,24 @@ final class BuilderDocumentSchema
      * only — the motion itself lives on the nodes). Kept only when set.
      */
     public const MOTION_THEMES = ['calm', 'lively', 'festive', 'premium', 'minimal'];
+
+    /**
+     * B19: a section's background image moving with the scroll (`background_scroll`, kept only
+     * when not `none` and the section has a background image; it replaces the parallax).
+     */
+    public const BACKGROUND_SCROLLS = ['none', 'zoom_in', 'zoom_out', 'pan_up', 'pan_down'];
+
+    /** B19: the page reading progress bar (`scroll_progress`) — where it may be, and its options. */
+    public const SCROLL_PROGRESS_CONTEXTS = ['page', 'cms', 'template'];
+
+    public const SCROLL_PROGRESS_POSITIONS = ['top', 'bottom'];
+
+    public const SCROLL_PROGRESS_COLOR_ROLES = ['primary', 'accent', 'secondary'];
+
+    /** B19: the bar's thickness, px. */
+    public const SCROLL_PROGRESS_THICKNESS = [2, 6];
+
+    public const SCROLL_PROGRESS_DEFAULTS = ['position' => 'top', 'color_role' => 'primary', 'thickness' => 3];
 
     /** B6: a shape divider's height, px. */
     public const SHAPE_HEIGHT = [16, 200];
@@ -391,6 +414,8 @@ final class BuilderDocumentSchema
             $this->error('motion_theme', null, 'Choose one of: '.implode(', ', self::MOTION_THEMES).'.');
             $motionTheme = null;
         }
+        // B19: the reading progress bar (pages, content pages, templates; kept only when set).
+        $scrollProgress = $this->scrollProgress($document['scroll_progress'] ?? null);
         // B14: a store page template holds its main part at most once (exactly once to publish).
         if ($this->template !== null) {
             foreach (array_slice(self::coreElements(['sections' => $sections], $this->template), 1) as $extra) {
@@ -417,8 +442,59 @@ final class BuilderDocumentSchema
         if ($motionTheme !== null) {
             $result['motion_theme'] = $motionTheme;
         }
+        if ($scrollProgress !== null) {
+            $result['scroll_progress'] = $scrollProgress;
+        }
 
         return $result;
+    }
+
+    /**
+     * B19: the page reading progress bar `{position, color_role, thickness}` (missing keys take
+     * the defaults) — null when off; pages, content pages and store page templates only.
+     *
+     * @return array{position: string, color_role: string, thickness: int}|null
+     */
+    private function scrollProgress(mixed $value): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        if ($this->global || ! in_array($this->context, self::SCROLL_PROGRESS_CONTEXTS, true)) {
+            $this->error('scroll_progress', null, 'Only pages, content pages and store page templates can show a reading progress bar.');
+
+            return null;
+        }
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
+            $this->error('scroll_progress', null, 'The reading progress bar is null or {position, color_role, thickness}.');
+
+            return null;
+        }
+        $result = self::SCROLL_PROGRESS_DEFAULTS;
+        $valid = true;
+        foreach (['position' => self::SCROLL_PROGRESS_POSITIONS, 'color_role' => self::SCROLL_PROGRESS_COLOR_ROLES] as $key => $allowed) {
+            if (! array_key_exists($key, $value)) {
+                continue;
+            }
+            if (! in_array($value[$key], $allowed, true)) {
+                $this->error("scroll_progress.{$key}", null, 'Choose one of: '.implode(', ', $allowed).'.');
+                $valid = false;
+
+                continue;
+            }
+            $result[$key] = $value[$key];
+        }
+        if (array_key_exists('thickness', $value)) {
+            [$min, $max] = self::SCROLL_PROGRESS_THICKNESS;
+            if (! is_int($value['thickness']) || $value['thickness'] < $min || $value['thickness'] > $max) {
+                $this->error('scroll_progress.thickness', null, "Enter a whole number from {$min} to {$max}.");
+                $valid = false;
+            } else {
+                $result['thickness'] = $value['thickness'];
+            }
+        }
+
+        return $valid ? $result : null;
     }
 
     /**
@@ -619,12 +695,26 @@ final class BuilderDocumentSchema
             }
         }
 
+        // B9: sections may have a parallax background.
+        $common = $this->common($node, $path, $id, [], true, true);
+        // B19: the background image moving with the scroll — only with a background image, and
+        // it replaces the parallax.
+        $backgroundScroll = $props['background_scroll'] ?? null;
+        if ($backgroundScroll !== null && $backgroundScroll !== 'none') {
+            $background = $common['style']['base']['background'] ?? null;
+            if (! in_array($backgroundScroll, self::BACKGROUND_SCROLLS, true)) {
+                $this->error("{$path}.props.background_scroll", $id, 'Choose one of: '.implode(', ', self::BACKGROUND_SCROLLS).'.');
+            } elseif (($background['type'] ?? null) === 'image' && isset($background['image']['media_id'])) {
+                $sectionProps['background_scroll'] = $backgroundScroll;
+                unset($common['style']['base']['background']['parallax']);
+            }
+        }
+
         return [
             'id' => $id,
             'type' => 'section',
             'props' => $sectionProps,
-            // B9: sections may have a parallax background.
-            ...$this->common($node, $path, $id, [], true, true),
+            ...$common,
             'columns' => $this->columns($node['columns'] ?? null, "{$path}.columns", $id, false),
             ...$this->experimentArm($node['experiment'] ?? null, "{$path}.experiment", $id),
         ];
@@ -842,6 +932,10 @@ final class BuilderDocumentSchema
                 $props['card_hover'] = $cardHover;
             }
         }
+        // B19: a slow zoom of the pictures (Ken Burns) — kept only when set.
+        if (in_array($type, ElementRegistry::KEN_BURNS_ELEMENTS, true)) {
+            $props += $this->kenBurns($raw, "{$path}.props", $id);
+        }
         $result = [
             'id' => $id,
             'type' => $type,
@@ -930,6 +1024,37 @@ final class BuilderDocumentSchema
         }
 
         return $valid ? $result : null;
+    }
+
+    /**
+     * B19: `['ken_burns' => slow|normal, 'ken_burns_direction'? => alternate|in|out]`, or [] when
+     * unset / `none` (the direction only with the zoom).
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array{ken_burns?: string, ken_burns_direction?: string}
+     */
+    private function kenBurns(array $raw, string $path, ?string $id): array
+    {
+        $value = $raw['ken_burns'] ?? null;
+        if ($value === null || $value === 'none') {
+            return [];
+        }
+        if (! in_array($value, ElementRegistry::KEN_BURNS, true)) {
+            $this->error("{$path}.ken_burns", $id, 'Choose one of: '.implode(', ', ElementRegistry::KEN_BURNS).'.');
+
+            return [];
+        }
+        $result = ['ken_burns' => $value];
+        $direction = $raw['ken_burns_direction'] ?? null;
+        if ($direction !== null) {
+            if (! in_array($direction, ElementRegistry::KEN_BURNS_DIRECTIONS, true)) {
+                $this->error("{$path}.ken_burns_direction", $id, 'Choose one of: '.implode(', ', ElementRegistry::KEN_BURNS_DIRECTIONS).'.');
+            } else {
+                $result['ken_burns_direction'] = $direction;
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -1179,6 +1304,9 @@ final class BuilderDocumentSchema
         }
         if (in_array($type, ElementRegistry::B17, true)) {
             return (new B17ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
+        }
+        if (in_array($type, ElementRegistry::B19, true)) {
+            return (new B19ElementProps(fn (string $key, string $message) => $this->error("{$path}.{$key}", $id, $message)))->normalize($type, $props);
         }
         if (in_array($type, ElementRegistry::B14, true)) {
             return (new B14ElementProps(
