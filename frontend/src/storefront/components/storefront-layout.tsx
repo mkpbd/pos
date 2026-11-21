@@ -8,6 +8,7 @@ import { QuickViewProvider } from '../catalog/quick-view'
 import { LocaleContext, useLocale } from '../i18n/locale'
 import { useLocaleController } from '../i18n/use-locale-controller'
 import { PopupHost } from '../builder/popups/popup-host'
+import { MotionPauseToggle } from '../builder/pause-toggle'
 import { CampaignTracker } from '../landing/campaign-tracker'
 import { PopupBanner } from '../popup/popup-banner'
 import { WhatsAppChatButton } from '../social/whatsapp'
@@ -71,6 +72,8 @@ function StoreFrame({ bootstrap }: { bootstrap: StorefrontBootstrap }) {
       {bootstrap.preview && <PreviewRibbon />}
       <TopBar />
       <SiteHeader />
+      {/* B18: "Pause animations" (only on pages with long-running motion), early in the tab order. */}
+      <MotionPauseToggle />
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         <QuickViewProvider>
           <Outlet />

@@ -164,7 +164,8 @@ class BuilderB4SchemaTest extends TestCase
             'phone', 'mail', 'map-pin', 'instagram', 'facebook', 'youtube', 'check', 'sparkles',
         ], $meta['enums']['icons']);
         $this->assertSame(SectionType::FEATURE_ICONS, array_slice($meta['enums']['icons'], 0, count(SectionType::FEATURE_ICONS)));
-        $this->assertSame(['title', 'text', 'primary.label', 'secondary.label'], $byType['cta']['translatable']);
+        // B18: rotating words of a text effect on the title.
+        $this->assertSame(['title', 'text', 'primary.label', 'secondary.label', 'text_effect.words.*'], $byType['cta']['translatable']);
         $this->assertSame([], $byType['logo']['translatable']);
         $this->assertSame('site', $byType['cart_icon']['group']);
         $this->assertEquals((object) [], $byType['announcement']['props']);

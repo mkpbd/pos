@@ -20,12 +20,15 @@ export function motionState(value: Motion | undefined): MotionState {
     stagger_children: value?.stagger_children ?? B9_DEFAULTS.staggerChildren,
     loop: value?.loop ?? B9_DEFAULTS.motionLoop,
     loop_forever: value?.loop_forever ?? B9_DEFAULTS.loopForever,
+    // B18: absent = smooth.
+    easing: value?.easing ?? 'smooth',
   }
 }
 
 /**
  * The stored group (key order as the server's): duration and delay only with an entrance, repeat
- * only when not "once", stagger only above 0, loop only when on, loop_forever only when true.
+ * only when not "once", stagger only above 0, loop only when on, loop_forever only when true; B18:
+ * the easing only when not "smooth" and something enters (the node or, staggered, its children).
  * Undefined when nothing moves (the group is removed).
  */
 export function toMotion(state: MotionState): Motion | undefined {
@@ -37,11 +40,10 @@ export function toMotion(state: MotionState): Motion | undefined {
   if (entering) {
     motion.duration = state.duration
     motion.delay = state.delay
-    if (state.repeat !== 'once') motion.repeat = state.repeat
-  } else if (staggering && state.repeat !== 'once') {
-    // The children's sequence replays too.
-    motion.repeat = state.repeat
   }
+  if ((entering || staggering) && state.easing !== 'smooth') motion.easing = state.easing
+  // Without an entrance, "every time" replays the children's sequence.
+  if ((entering || staggering) && state.repeat !== 'once') motion.repeat = state.repeat
   if (staggering) motion.stagger_children = state.stagger_children
   if (looping) {
     motion.loop = state.loop
@@ -78,6 +80,12 @@ export const ENTRANCE_LABELS: Record<MotionEntrance, string> = {
   'bounce-in': 'Bounce in',
   'blur-in': 'Come into focus',
   'rotate-in': 'Turn in',
+  // B18
+  'mask-up': 'Wipe up',
+  'mask-left': 'Wipe in from the side',
+  'drop-in': 'Drop in',
+  swing: 'Swing in',
+  'scale-down': 'Shrink into place',
 }
 
 export const REPEAT_LABELS: Record<MotionRepeat, string> = { once: 'First time only', every_time: 'Every time' }
@@ -88,6 +96,12 @@ export const LOOP_LABELS: Record<MotionLoop, string> = {
   float: 'Float (gently moves up and down)',
   shake: 'Shake',
   glow: 'Glow',
+  // B18
+  wiggle: 'Wiggle',
+  heartbeat: 'Heartbeat',
+  breathe: 'Breathe (slow and soft)',
+  shine: 'Shine (a light sweeps across)',
+  'spin-slow': 'Slow spin',
 }
 
 export const HOVER_LABELS: Record<HoverEffect, string> = {
@@ -98,6 +112,13 @@ export const HOVER_LABELS: Record<HoverEffect, string> = {
   tilt: 'Tilt',
   glow: 'Glow',
   underline: 'Underline (text and links)',
+  // B18
+  'tilt-3d': '3D tilt (follows the pointer)',
+  'zoom-image': 'Zoom the picture',
+  glare: 'Glare',
+  pop: 'Pop',
+  'lift-shadow': 'Lift with a shadow',
+  shine: 'Shine',
 }
 
 /** The stored hover group: undefined for "None"; the duration only when not the default. */

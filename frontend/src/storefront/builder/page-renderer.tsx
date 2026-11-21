@@ -5,7 +5,7 @@ import { MenuLink } from '../components/menu-link'
 import { RichText } from '../components/rich-text'
 import { SectionItem } from '../sections/section-renderer'
 import type { SectionPreviewState, StoreSection } from '../types'
-import { aspectRatioCss, colorCss, compileStyles, motionTargets, parallaxOf, scopePrefix } from './compile-styles'
+import { aspectRatioCss, colorCss, compileStyles, motionTargets, parallaxOf, pointerEffects, scopePrefix } from './compile-styles'
 import { B4ElementContent } from './elements'
 import { isB4Type } from './elements/b4-types'
 import { B6ElementContent } from './elements/b6'
@@ -18,7 +18,10 @@ import { isB17Type } from './elements/b17-types'
 import { isB8aType } from './elements/b8a-types'
 import { FormElement } from './elements/form'
 import { OrderFormElement } from './elements/order-form'
-import { useMotionRuntime } from './motion'
+import { useMotionRuntime, usePointerEffects, useReducedMotion } from './motion'
+import { useLongMotion, useMotionMode } from './motion-pause'
+import { EffectText } from './effect-text'
+import { useRichTextEffect } from './text-effect'
 import { usePopupActions } from './popups/popup-context'
 import { backgroundVideoOf, sectionShapes, useStickyTop } from './section-layer-utils'
 import { BackgroundVideoLayer, ParallaxLayer, ShapeDivider } from './section-layers'
@@ -29,7 +32,7 @@ import { useViewportDevice } from './use-viewport-device'
 import { PreviewMark } from './preview-mark'
 import { useLocale } from '../i18n/locale'
 import type { BuilderPage, Device, DeviceOrder, NodeState, RenderColumn, RenderElement, RenderPageSection, RenderSection } from './types'
-import { buttonAction, ENUMS, normalizeWidth, oneOf, safeLink } from './validate'
+import { buttonAction, ENUMS, normalizeCardHover, normalizeWidth, oneOf, safeLink } from './validate'
 import { globalInfo, isUnavailableGlobalSection } from './global-sections'
 import { ImagePriorityCtx, priorityImageElement, useImagePriority } from './image-priority'
 import { usePageInsights } from '../insights/use-page-insights'
@@ -71,6 +74,21 @@ function visibility(node: { id: unknown; hidden?: boolean; state?: NodeState }, 
   if (state) return draft ? { show: true, state } : { show: false }
   if (node.hidden === true) return draft ? { show: true, state: 'hidden' } : { show: false }
   return { show: true, state: null }
+}
+
+/** B18: whether a listing element's cards follow the pointer (card hover tilt_3d / glare). */
+function hasPointerCards(sections: readonly RenderPageSection[]): boolean {
+  let found = false
+  const visit = (node: unknown) => {
+    if (found || typeof node !== 'object' || node === null) return
+    const n = node as { type?: unknown; props?: { card_hover?: unknown }; columns?: unknown; elements?: unknown }
+    const hover = normalizeCardHover(n.type, n.props?.card_hover)
+    if (hover === 'tilt_3d' || hover === 'glare') found = true
+    if (Array.isArray(n.columns)) n.columns.forEach(visit)
+    if (Array.isArray(n.elements)) n.elements.forEach(visit)
+  }
+  sections.forEach(visit)
+  return found
 }
 
 const LAYOUT_CLASSES = { boxed: 'b-boxed', full: 'b-full', 'full-bleed': 'b-bleed' } as const
@@ -179,7 +197,7 @@ function ElementContent({ element }: { element: RenderElement }): ReactNode {
     case 'heading':
       return <Heading element={element} />
     case 'text':
-      return typeof element.props?.html === 'string' ? <RichText data-b={element.id} html={element.props.html} /> : null
+      return typeof element.props?.html === 'string' ? <TextElement id={element.id} html={element.props.html} effect={element.props.text_effect} /> : null
     case 'image':
       return <Image element={element} />
     case 'button':
@@ -233,13 +251,20 @@ function Heading({ element }: { element: Extract<RenderElement, { type: 'heading
     <Tag data-b={element.id} className={cn('sf-heading-case', HEADING_CLASSES[level])}>
       {url ? (
         <MenuLink url={url} className="hover:underline">
-          {text}
+          <EffectText value={element.props?.text_effect} text={text} />
         </MenuLink>
       ) : (
-        text
+        <EffectText value={element.props?.text_effect} text={text} />
       )}
     </Tag>
   )
+}
+
+/** The text element; B18 with its text effect (./text-effect.tsx). */
+function TextElement({ id, html, effect }: { id: string; html: string; effect: unknown }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const fx = useRichTextEffect(ref, effect, html)
+  return <RichText ref={ref} data-b={id} html={html} className={fx.className} style={fx.style} {...fx.attributes} />
 }
 
 function imageSizes(width: { base: number; tablet?: number; mobile?: number }): string {
@@ -369,7 +394,7 @@ function WrappedSection({ element, state }: { element: RenderElement; state: Nod
   // In a draft the element's own state (hidden, scheduled, …) marks the section; published pages carry none.
   const section: StoreSection = { ...data, state: draft ? (sectionState(data.state) ?? (state ? SECTION_STATES[state] : undefined)) : undefined }
   return (
-    <div data-b={element.id} className="b-section-el">
+    <div data-b={element.id} className="b-section-el" data-b-card-hover={normalizeCardHover(element.type, (element.props as { card_hover?: unknown } | undefined)?.card_hover)}>
       <SectionItem section={section} testId="builder-section" />
     </div>
   )
@@ -447,7 +472,18 @@ export function PageRenderer({
   const orderContext = useMemo(() => ({ device, order }), [device, order])
   const drawnSections = useMemo(() => orderedChildren(DEVICE_ORDER_ROOT, sections, order, device), [sections, order, device])
   const targets = useMemo(() => motionTargets(sections), [sections])
-  useMotionRuntime(rootRef, targets, motion ?? page.document?.key !== 'canvas')
+  // B18: the canvas runs no entrances on its own; with "Preview motion" on its loops run.
+  const motionMode = useMotionMode()
+  const entrances = motion ?? page.document?.key !== 'canvas'
+  useMotionRuntime(rootRef, targets, entrances || motionMode === 'canvas-preview', !entrances)
+  // B18: tilt-3d / glare hover effects and card hover follow the pointer.
+  const pointer = useMemo(() => pointerEffects(sections), [sections])
+  const pointerCards = useMemo(() => hasPointerCards(sections), [sections])
+  usePointerEffects(rootRef, pointer, true, pointerCards)
+  // B18: loops that never stop (and moving strips) offer shoppers the "Pause animations" toggle.
+  const reduced = useReducedMotion()
+  const longMotion = useMemo(() => targets.some((target) => target.motion.loop !== 'none' && target.motion.loop_forever), [targets])
+  useLongMotion(longMotion && motionMode === 'live' && entrances && !reduced)
   usePageInsights(rootRef, page, device, insights && !draft, undefined, arms.reported)
   // B15: the store page's first above-the-fold picture loads first; the header, footer, zones, popups and canvas have none.
   const priorityImage = useMemo(() => (validScope === 'page' ? priorityImageElement(drawnSections, page.media ?? {}, order, device) : null), [validScope, drawnSections, page.media, order, device])

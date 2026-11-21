@@ -85,8 +85,8 @@ const SECTION_META: Record<WrappedSectionType, { group: ElementGroup; label: str
 }
 
 const BASIC: BaseMeta[] = [
-  { type: 'heading', group: 'content', label: 'Heading', translatable: ['text'], props: { text: 'Heading', level: 2, link: null }, children: null },
-  { type: 'text', group: 'content', label: 'Text', translatable: ['html'], props: { html: '<p>Write something here.</p>' }, children: null },
+  { type: 'heading', group: 'content', label: 'Heading', translatable: ['text', 'text_effect.words.*'], props: { text: 'Heading', level: 2, link: null }, children: null },
+  { type: 'text', group: 'content', label: 'Text', translatable: ['html', 'text_effect.words.*'], props: { html: '<p>Write something here.</p>' }, children: null },
   {
     type: 'image',
     group: 'content',
@@ -150,7 +150,7 @@ const B4: BaseMeta[] = [
     type: 'cta',
     group: 'marketing',
     label: 'Call to action',
-    translatable: ['title', 'text', 'primary.label', 'secondary.label'],
+    translatable: ['title', 'text', 'primary.label', 'secondary.label', 'text_effect.words.*'],
     props: { title: 'Ready when you are', text: '', primary: { label: 'Shop now', link: { url: '/shop' } }, secondary: null, align: 'center' },
     children: null,
   },

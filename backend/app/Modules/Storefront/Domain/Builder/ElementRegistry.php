@@ -596,6 +596,43 @@ final class ElementRegistry
 
     public const DIVIDER_WIDTH = [10, 100];
 
+    /**
+     * B18: elements with an optional text effect (`props.text_effect`); a call to action's applies
+     * to its title. Field the effect animates, per type.
+     */
+    public const TEXT_EFFECT_ELEMENTS = ['heading' => 'text', 'text' => 'html', 'cta' => 'title'];
+
+    public const TEXT_EFFECT_TYPES = ['none', 'typewriter', 'rotate_words', 'reveal_words', 'reveal_letters', 'gradient_shimmer', 'highlight_draw', 'underline_draw'];
+
+    public const TEXT_EFFECT_SPEEDS = ['slow', 'normal', 'fast'];
+
+    /** B18: theme colour roles of the highlight / underline / shimmer. */
+    public const TEXT_EFFECT_COLOR_ROLES = ['primary', 'accent', 'secondary'];
+
+    /** B18: rotating words — 1 to 6, each at most 40 characters (translated as `text_effect.words.<index>`). */
+    public const TEXT_EFFECT_WORDS = [1, 6];
+
+    public const TEXT_EFFECT_WORD_MAX = 40;
+
+    /** B18: letter-by-letter reveal only for short texts (characters). */
+    public const TEXT_EFFECT_REVEAL_LETTERS_MAX = 80;
+
+    /** B18: how often a typewriter / rotating words effect runs (null = until paused). */
+    public const TEXT_EFFECT_CYCLES = [1, 5];
+
+    /** B18: the text effects that may repeat (`cycles`). */
+    public const TEXT_EFFECT_CYCLING = ['typewriter', 'rotate_words'];
+
+    public const TEXT_EFFECT_TOO_LONG = 'TEXT_EFFECT_TOO_LONG';
+
+    /** B18: product listing elements with an optional card hover effect (`props.card_hover`). */
+    public const CARD_HOVER_ELEMENTS = ['product_grid', 'product_carousel', 'product_tabs', 'product_listing', 'category_card', 'product_spotlight', 'shop_the_look'];
+
+    public const CARD_HOVER_EFFECTS = ['none', 'lift', 'zoom_image', 'tilt_3d', 'glare', 'second_image'];
+
+    /** B18: the elements whose cards have a second image to show on hover (product cards). */
+    public const CARD_HOVER_SECOND_IMAGE = ['product_grid', 'product_carousel', 'product_tabs', 'product_listing'];
+
     /** Text limits of the basic elements' props (characters). */
     public const TEXT_LIMITS = ['heading.text' => 200, 'text.html' => 20000, 'button.label' => 60, 'image.alt' => 200];
 
@@ -870,6 +907,12 @@ final class ElementRegistry
         foreach (self::nestedTargets($type, $props) as $key => ['max' => $max]) {
             $fields[$key] = $max;
         }
+        // B18: rotating words of a text effect (`text_effect.words.<index>`).
+        if (isset(self::TEXT_EFFECT_ELEMENTS[$type]) && is_array($props['text_effect']['words'] ?? null)) {
+            foreach (array_keys($props['text_effect']['words']) as $index) {
+                $fields["text_effect.words.{$index}"] = self::TEXT_EFFECT_WORD_MAX;
+            }
+        }
 
         return $fields;
     }
@@ -941,6 +984,10 @@ final class ElementRegistry
         }
         // B8a.
         array_push($patterns, ...array_keys(self::NESTED_LIST_TRANSLATABLE[$type] ?? []));
+        // B18.
+        if (isset(self::TEXT_EFFECT_ELEMENTS[$type])) {
+            $patterns[] = 'text_effect.words.*';
+        }
 
         return $patterns;
     }
@@ -963,6 +1010,10 @@ final class ElementRegistry
             return [$field];
         }
         $list = $parts[0];
+        // B18: a rotating word of the text effect.
+        if (count($parts) === 3 && $list === 'text_effect' && $parts[1] === 'words' && isset(self::TEXT_EFFECT_ELEMENTS[$type])) {
+            return ctype_digit($parts[2]) && is_string($props['text_effect']['words'][(int) $parts[2]] ?? null) ? ['text_effect', 'words', (int) $parts[2]] : null;
+        }
         if (count($parts) === 3 && isset(self::LIST_TRANSLATABLE[$type][$list][$parts[2]]) && is_array($props[$list] ?? null)) {
             foreach ($props[$list] as $index => $item) {
                 if (is_array($item) && ($item['id'] ?? null) === $parts[1]) {
@@ -1370,6 +1421,15 @@ final class ElementRegistry
                 'recently_viewed_limit' => ['min' => self::RECENTLY_VIEWED_LIMIT[0], 'max' => self::RECENTLY_VIEWED_LIMIT[1]],
                 'motion_duration' => ['min' => StyleSchema::MOTION_DURATION[0], 'max' => StyleSchema::MOTION_DURATION[1]],
                 'motion_delay' => ['min' => StyleSchema::MOTION_DELAY[0], 'max' => StyleSchema::MOTION_DELAY[1]],
+                // B18.
+                'motion_stagger' => ['min' => StyleSchema::MOTION_STAGGER[0], 'max' => StyleSchema::MOTION_STAGGER[1]],
+                'hover_duration' => ['min' => StyleSchema::HOVER_DURATION[0], 'max' => StyleSchema::HOVER_DURATION[1]],
+                'text_effect' => [
+                    'words' => ['min' => self::TEXT_EFFECT_WORDS[0], 'max' => self::TEXT_EFFECT_WORDS[1]],
+                    'word_max' => self::TEXT_EFFECT_WORD_MAX,
+                    'reveal_letters_max' => self::TEXT_EFFECT_REVEAL_LETTERS_MAX,
+                    'cycles' => ['min' => self::TEXT_EFFECT_CYCLES[0], 'max' => self::TEXT_EFFECT_CYCLES[1]],
+                ],
                 'shape_height' => ['min' => BuilderDocumentSchema::SHAPE_HEIGHT[0], 'max' => BuilderDocumentSchema::SHAPE_HEIGHT[1]],
                 'sticky_sections' => 1,
                 // B8a.
@@ -1477,6 +1537,21 @@ final class ElementRegistry
                 'marquee_separators' => self::MARQUEE_SEPARATORS,
                 'motion_entrances' => StyleSchema::MOTION_ENTRANCES,
                 'section_shapes' => BuilderDocumentSchema::SHAPES,
+                // B18: motion studio.
+                'motion_easings' => StyleSchema::MOTION_EASINGS,
+                'motion_loops' => StyleSchema::MOTION_LOOPS,
+                'motion_repeats' => StyleSchema::MOTION_REPEATS,
+                'hover_effects' => StyleSchema::HOVER_EFFECTS,
+                'parallax' => StyleSchema::PARALLAX,
+                'shape_animations' => BuilderDocumentSchema::SHAPE_ANIMATIONS,
+                'text_effect_types' => self::TEXT_EFFECT_TYPES,
+                'text_effect_speeds' => self::TEXT_EFFECT_SPEEDS,
+                'text_effect_color_roles' => self::TEXT_EFFECT_COLOR_ROLES,
+                'text_effect_elements' => array_keys(self::TEXT_EFFECT_ELEMENTS),
+                'card_hover_effects' => self::CARD_HOVER_EFFECTS,
+                'card_hover_elements' => self::CARD_HOVER_ELEMENTS,
+                'card_hover_second_image_elements' => self::CARD_HOVER_SECOND_IMAGE,
+                'motion_themes' => BuilderDocumentSchema::MOTION_THEMES,
                 // B8a.
                 'chart_stacked_kinds' => self::CHART_STACKED_KINDS,
                 'chart_data_sources' => self::CHART_DATA_SOURCES,

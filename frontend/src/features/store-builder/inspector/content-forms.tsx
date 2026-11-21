@@ -17,6 +17,8 @@ import type { ButtonElement, Column, DividerElement, DocumentContext, HeadingEle
 import type { MediaRef } from '@/storefront/types'
 import type { PaletteColor } from '../controls'
 import { SectionShapeControl } from './b6-style'
+import { TextEffectForm } from './b18-text-effect-form'
+import { textEffectBanglaFields } from './b18-text-effect'
 import { FieldError, ImageChooser, LinkField, NodeBangla, ThemeColorField, type Errors } from './fields'
 import { COLUMN_PRESETS, currentPreset } from './tree-lookup'
 import { DIVIDER_THICKNESS, DIVIDER_WIDTH, TEXT_LIMITS } from './validate'
@@ -61,9 +63,10 @@ export function HeadingForm({ node, onChange, errors, bangla }: FormProps<Headin
         </Select>
       </FormField>
       <LinkField key={node.id} label="Link" value={p.link?.url ?? null} onChange={(url) => setProps(node, onChange, { link: url === null ? null : { url } }, 'link')} error={errors.link} hint="Optional: the heading becomes a link." />
+      <TextEffectForm node={node} onChange={onChange} errors={errors} />
       {bangla && (
         <NodeBangla
-          fields={[{ name: 'text', label: 'Heading text', base: p.text, max: TEXT_LIMITS.heading }]}
+          fields={[{ name: 'text', label: 'Heading text', base: p.text, max: TEXT_LIMITS.heading }, ...textEffectBanglaFields(p.text_effect)]}
           translations={node.translations}
           errors={errors}
           onChange={(translations) => onChange({ ...node, translations }, { coalesceKey: `${node.id}:bn` })}
@@ -82,9 +85,10 @@ export function TextForm({ node, onChange, errors, bangla }: FormProps<TextEleme
         <RichTextEditor key={node.id} id={id} label="Text" value={node.props.html} invalid={!!errors.html} onChange={(html) => setProps(node, onChange, { html }, 'html')} />
         <FieldError message={errors.html} />
       </div>
+      <TextEffectForm node={node} onChange={onChange} errors={errors} />
       {bangla && (
         <NodeBangla
-          fields={[{ name: 'html', label: 'Text', base: node.props.html, kind: 'rich' }]}
+          fields={[{ name: 'html', label: 'Text', base: node.props.html, kind: 'rich' }, ...textEffectBanglaFields(node.props.text_effect)]}
           translations={node.translations}
           errors={errors}
           onChange={(translations) => onChange({ ...node, translations }, { coalesceKey: `${node.id}:bn` })}

@@ -3,7 +3,8 @@ import { REDUCED_MOTION_QUERY, TABLET_UP_QUERY, useMediaQuery } from '../compone
 import { withFocal } from '../focal'
 import { colorCss, PARALLAX_FACTORS } from './compile-styles'
 import { usePage } from './render-context'
-import { parallaxOffset, SHAPE_PATHS } from './section-layer-utils'
+import { ambientMotionOn, useLongMotion, useMotionMode } from './motion-pause'
+import { LAYERED_WAVES, parallaxOffset, SHAPE_ANIMATION_MS, SHAPE_PATHS, TILEABLE_SHAPES } from './section-layer-utils'
 import type { BackgroundVideo, SectionShape } from './types'
 import { backgroundVideoEmbedUrl } from './validate'
 
@@ -15,16 +16,60 @@ import { backgroundVideoEmbedUrl } from './validate'
 
 /* -------------------------------------------------------------------------------------------- */
 
-/** A decorative divider (inline SVG, aria-hidden) at the section's top or bottom edge. */
+/** The divider's drawing in one 1200 × 120 box (B18 `layered_waves`: its three layers). */
+function ShapePaths({ shape, fill }: { shape: SectionShape; fill: string }) {
+  if (shape.shape === 'layered_waves') return LAYERED_WAVES.map((layer) => <path key={layer.d} d={layer.d} fill={fill} opacity={layer.opacity} />)
+  return <path d={SHAPE_PATHS[shape.shape]} fill={fill} />
+}
+
+/**
+ * A decorative divider (inline SVG, aria-hidden) at the section's top or bottom edge. B18
+ * `animate`: `flow` slides a strip of copies sideways (twice as wide; shapes whose ends don't meet
+ * alternate with mirrored copies), `drift` sways it gently, `pulse` breathes its height —
+ * transforms only, and only for visitors who allow motion (storefront.css). `layered_waves` moves
+ * its three layers at different speeds. The editor canvas keeps dividers still unless "Preview
+ * motion" is on.
+ */
 export function ShapeDivider({ shape, edge }: { shape: SectionShape; edge: 'top' | 'bottom' }) {
+  const mode = useMotionMode()
+  const reduced = useMediaQuery(REDUCED_MOTION_QUERY)
+  const animate = shape.animate && ambientMotionOn(mode) ? shape.animate : undefined
+  // Shoppers can pause it (it moves for longer than 5 s).
+  useLongMotion(animate !== undefined && mode === 'live' && !reduced)
   const fill = colorCss(shape.color) ?? 'currentColor'
   const scaleX = shape.flip ? -1 : 1
   const scaleY = edge === 'top' ? -1 : 1
+  if (!animate) {
+    return (
+      <div className="b-shape" data-edge={edge} data-shape={shape.shape} aria-hidden style={{ height: `${shape.height}px` }}>
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" focusable="false" style={{ transform: `scale(${scaleX}, ${scaleY})` }}>
+          <ShapePaths shape={shape} fill={fill} />
+        </svg>
+      </div>
+    )
+  }
+  const layers = shape.shape === 'layered_waves' ? LAYERED_WAVES.map((layer) => ({ ...layer, key: layer.d })) : [{ d: SHAPE_PATHS[shape.shape], opacity: 1, key: shape.shape }]
+  const copies = animate === 'flow' ? (TILEABLE_SHAPES.has(shape.shape) ? 2 : 4) : 1
   return (
-    <div className="b-shape" data-edge={edge} data-shape={shape.shape} aria-hidden style={{ height: `${shape.height}px` }}>
-      <svg viewBox="0 0 1200 120" preserveAspectRatio="none" focusable="false" style={{ transform: `scale(${scaleX}, ${scaleY})` }}>
-        <path d={SHAPE_PATHS[shape.shape]} fill={fill} />
-      </svg>
+    <div className="b-shape" data-edge={edge} data-shape={shape.shape} data-animate={animate} aria-hidden style={{ height: `${shape.height}px` }}>
+      <div className="b-shape-frame" style={{ transform: `scale(${scaleX}, ${scaleY})` }}>
+        {layers.map((layer, index) => (
+          // Back layers move slower than the front one.
+          <div key={layer.key} className="b-shape-move" style={{ '--b-shape-ms': `${Math.round(SHAPE_ANIMATION_MS[animate] * (1 + (layers.length - 1 - index) * 0.4))}ms` } as CSSProperties}>
+            <svg viewBox={`0 0 ${1200 * copies} 120`} preserveAspectRatio="none" focusable="false" style={{ width: animate === 'drift' ? '110%' : `${copies * 100}%` }}>
+              {Array.from({ length: copies }, (_, copy) => (
+                <path
+                  key={copy}
+                  d={layer.d}
+                  fill={fill}
+                  opacity={layer.opacity}
+                  transform={copy % 2 === 1 && !TILEABLE_SHAPES.has(shape.shape) ? `translate(${(copy + 1) * 1200},0) scale(-1,1)` : copy > 0 ? `translate(${copy * 1200},0)` : undefined}
+                />
+              ))}
+            </svg>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -219,8 +219,9 @@ describe('B6 shared metadata and validators', () => {
     )
     expect(normalizeSectionShape({ shape: 'wave', color: 'theme:surface', height: 64, flip: false })).toEqual({ shape: 'wave', color: 'theme:surface', height: 64, flip: false })
     expect(normalizeSectionShape({ shape: 'wave', color: 'red', height: 64 })).toBeNull()
-    expect(normalizeSectionShape({ shape: 'blob', color: '#ffffff', height: 64 })).toBeNull()
-    expect(Object.keys(SHAPE_PATHS)).toEqual(['wave', 'curve', 'tilt', 'triangle', 'zigzag'])
+    expect(normalizeSectionShape({ shape: 'hexagon', color: '#ffffff', height: 64 })).toBeNull()
+    // B18 adds layered_waves and blob.
+    expect(Object.keys(SHAPE_PATHS)).toEqual(['wave', 'curve', 'tilt', 'triangle', 'zigzag', 'layered_waves', 'blob'])
     expect(ICON_NAMES).toHaveLength(20)
   })
 

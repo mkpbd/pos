@@ -45,6 +45,11 @@ use Illuminate\Support\Facades\Validator;
  * pages, content pages and shop areas may carry `experiments` and their top-level sections an
  * `experiment` version (Experiments) — all kept only when set.
  *
+ * B18: motion studio — the document may carry `motion_theme` (MOTION_THEMES); heading, text and
+ * call-to-action elements a `text_effect`, product listing elements a `card_hover`, section shape
+ * dividers an `animate` (and two more shapes); StyleSchema knows the new entrances, easings, loops
+ * and hover effects. All kept only when set, so older documents normalize unchanged.
+ *
  * B14: store page templates — context `template:<key>` (contextOf(`template:<key>`)): what a
  * page may hold (globals, sticky, audiences, A/B tests; no `seo`) plus the template's main part
  * (ElementRegistry::TEMPLATE_CORE) at most once (TEMPLATE_CORE_DUPLICATE; publishing needs it
@@ -77,8 +82,17 @@ final class BuilderDocumentSchema
 
     public const DEVICES = ['desktop', 'tablet', 'mobile'];
 
-    /** B6: section shape dividers (`shape_top` / `shape_bottom`). */
-    public const SHAPES = ['wave', 'curve', 'tilt', 'triangle', 'zigzag'];
+    /** B6: section shape dividers (`shape_top` / `shape_bottom`); B18 adds layered waves and a blob. */
+    public const SHAPES = ['wave', 'curve', 'tilt', 'triangle', 'zigzag', 'layered_waves', 'blob'];
+
+    /** B18: how a shape divider moves (`animate`, kept only when not `none`). */
+    public const SHAPE_ANIMATIONS = ['none', 'flow', 'drift', 'pulse'];
+
+    /**
+     * B18: the motion theme last applied to the document (`motion_theme`, any context; a label
+     * only — the motion itself lives on the nodes). Kept only when set.
+     */
+    public const MOTION_THEMES = ['calm', 'lively', 'festive', 'premium', 'minimal'];
 
     /** B6: a shape divider's height, px. */
     public const SHAPE_HEIGHT = [16, 200];
@@ -371,6 +385,12 @@ final class BuilderDocumentSchema
         );
         // B13: A/B tests (pages, content pages and shop areas; kept only when there are any).
         $experiments = $this->experiments($document['experiments'] ?? null, $sections);
+        // B18: the motion theme last applied (any document; kept only when set).
+        $motionTheme = $document['motion_theme'] ?? null;
+        if ($motionTheme !== null && ! in_array($motionTheme, self::MOTION_THEMES, true)) {
+            $this->error('motion_theme', null, 'Choose one of: '.implode(', ', self::MOTION_THEMES).'.');
+            $motionTheme = null;
+        }
         // B14: a store page template holds its main part at most once (exactly once to publish).
         if ($this->template !== null) {
             foreach (array_slice(self::coreElements(['sections' => $sections], $this->template), 1) as $extra) {
@@ -393,6 +413,9 @@ final class BuilderDocumentSchema
         }
         if ($experiments !== []) {
             $result['experiments'] = $experiments;
+        }
+        if ($motionTheme !== null) {
+            $result['motion_theme'] = $motionTheme;
         }
 
         return $result;
@@ -630,8 +653,9 @@ final class BuilderDocumentSchema
 
     /**
      * B6: a section shape divider `{shape, color, height, flip}`, or null for none.
+     * B18: `animate` (flow | drift | pulse) kept only when not `none`.
      *
-     * @return array{shape: string, color: string, height: int, flip: bool}|null
+     * @return array{shape: string, color: string, height: int, flip: bool, animate?: string}|null
      */
     private function shape(mixed $value, string $path, ?string $id): ?array
     {
@@ -664,8 +688,20 @@ final class BuilderDocumentSchema
             $this->error("{$path}.flip", $id, 'Flip is true or false.');
             $valid = false;
         }
+        $animate = $value['animate'] ?? null;
+        if ($animate !== null && ! in_array($animate, self::SHAPE_ANIMATIONS, true)) {
+            $this->error("{$path}.animate", $id, 'Choose one of: '.implode(', ', self::SHAPE_ANIMATIONS).'.');
+            $valid = false;
+        }
+        if (! $valid) {
+            return null;
+        }
+        $result = ['shape' => $shape, 'color' => $color, 'height' => $height, 'flip' => $flip];
+        if ($animate !== null && $animate !== 'none') {
+            $result['animate'] = $animate;
+        }
 
-        return $valid ? ['shape' => $shape, 'color' => $color, 'height' => $height, 'flip' => $flip] : null;
+        return $result;
     }
 
     /**
@@ -790,7 +826,22 @@ final class BuilderDocumentSchema
             $props = [];
         }
 
+        $raw = $props;
         $props = $this->props($type, $props, "{$path}.props", $id);
+        // B18: a text effect (headings, texts, calls to action) and a card hover (product
+        // listings) — kept only when set.
+        if (isset(ElementRegistry::TEXT_EFFECT_ELEMENTS[$type])) {
+            $effect = $this->textEffect($raw['text_effect'] ?? null, "{$path}.props.text_effect", $id);
+            if ($effect !== null) {
+                $props['text_effect'] = $effect;
+            }
+        }
+        if (in_array($type, ElementRegistry::CARD_HOVER_ELEMENTS, true)) {
+            $cardHover = $this->cardHover($type, $raw['card_hover'] ?? null, "{$path}.props.card_hover", $id);
+            if ($cardHover !== null) {
+                $props['card_hover'] = $cardHover;
+            }
+        }
         $result = [
             'id' => $id,
             'type' => $type,
@@ -799,11 +850,138 @@ final class BuilderDocumentSchema
             // rows may have a background video like sections.
             ...$this->common($node, $path, $id, ElementRegistry::translationFields($type, $props), $type === 'inner_row'),
         ];
+        if (($props['text_effect']['type'] ?? null) === 'reveal_letters') {
+            $this->checkRevealLetters($type, $props, $result['translations'], $path, $id);
+        }
         if (ElementRegistry::children($type) === 'columns') {
             $result['columns'] = $this->columns($node['columns'] ?? null, "{$path}.columns", $id, true);
         }
 
         return $result;
+    }
+
+    /**
+     * B18: a text effect `{type, words?, speed?, color_role?, cycles?}` — null (none) when unset
+     * or `none`. `words` (1–6 texts of at most 40 characters) only for rotating words; `cycles`
+     * (1–5, or null = until paused) only for the typewriter and rotating words, kept when sent.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function textEffect(mixed $value, string $path, ?string $id): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (! is_array($value) || ($value !== [] && array_is_list($value))) {
+            $this->error($path, $id, 'A text effect is null or {type, words?, speed?, color_role?, cycles?}.');
+
+            return null;
+        }
+        $type = $value['type'] ?? null;
+        if (! in_array($type, ElementRegistry::TEXT_EFFECT_TYPES, true)) {
+            $this->error("{$path}.type", $id, 'Choose one of: '.implode(', ', ElementRegistry::TEXT_EFFECT_TYPES).'.');
+
+            return null;
+        }
+        if ($type === 'none') {
+            return null;
+        }
+        $valid = true;
+        $result = ['type' => $type];
+        if ($type === 'rotate_words') {
+            $words = $value['words'] ?? null;
+            [$min, $max] = ElementRegistry::TEXT_EFFECT_WORDS;
+            $limit = ElementRegistry::TEXT_EFFECT_WORD_MAX;
+            if (! is_array($words) || ! array_is_list($words) || count($words) < $min || count($words) > $max) {
+                $this->error("{$path}.words", $id, "Add {$min} to {$max} words to rotate.");
+                $valid = false;
+            } else {
+                foreach ($words as $i => $word) {
+                    if (! is_string($word) || trim($word) === '' || mb_strlen($word) > $limit) {
+                        $this->error("{$path}.words.{$i}", $id, "Enter 1 to {$limit} characters.");
+                        $valid = false;
+                    }
+                }
+                $result['words'] = $words;
+            }
+        }
+        foreach (['speed' => ElementRegistry::TEXT_EFFECT_SPEEDS, 'color_role' => ElementRegistry::TEXT_EFFECT_COLOR_ROLES] as $key => $allowed) {
+            $option = $value[$key] ?? null;
+            if ($option === null) {
+                continue;
+            }
+            if (! in_array($option, $allowed, true)) {
+                $this->error("{$path}.{$key}", $id, 'Choose one of: '.implode(', ', $allowed).'.');
+                $valid = false;
+
+                continue;
+            }
+            $result[$key] = $option;
+        }
+        if (in_array($type, ElementRegistry::TEXT_EFFECT_CYCLING, true) && array_key_exists('cycles', $value)) {
+            $cycles = $value['cycles'];
+            [$min, $max] = ElementRegistry::TEXT_EFFECT_CYCLES;
+            if ($cycles !== null && (! is_int($cycles) || $cycles < $min || $cycles > $max)) {
+                $this->error("{$path}.cycles", $id, "Enter a whole number from {$min} to {$max}, or null to repeat until paused.");
+                $valid = false;
+            } else {
+                $result['cycles'] = $cycles;
+            }
+        }
+
+        return $valid ? $result : null;
+    }
+
+    /**
+     * B18: a letter-by-letter reveal only for short texts — the base text and its translations.
+     *
+     * @param  array<string, mixed>  $props  normalized
+     * @param  array<string, array<string, string>>  $translations  normalized
+     */
+    private function checkRevealLetters(string $type, array $props, array $translations, string $path, ?string $id): void
+    {
+        $field = ElementRegistry::TEXT_EFFECT_ELEMENTS[$type];
+        $max = ElementRegistry::TEXT_EFFECT_REVEAL_LETTERS_MAX;
+        $message = "Letter by letter works for texts of at most {$max} characters. Shorten the text or choose another effect.";
+        if (self::plainLength($props[$field] ?? null) > $max) {
+            $this->error("{$path}.props.text_effect.type", $id, $message, ElementRegistry::TEXT_EFFECT_TOO_LONG);
+        }
+        foreach ($translations as $locale => $texts) {
+            if (self::plainLength($texts[$field] ?? null) > $max) {
+                $this->error("{$path}.translations.{$locale}.{$field}", $id, $message, ElementRegistry::TEXT_EFFECT_TOO_LONG);
+            }
+        }
+    }
+
+    /**
+     * B18: the length of a text as shoppers read it (tags removed, entities decoded, trimmed).
+     */
+    public static function plainLength(mixed $text): int
+    {
+        return is_string($text) ? mb_strlen(trim(html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8'))) : 0;
+    }
+
+    /**
+     * B18: a product listing's card hover effect — null when unset or `none`; the second image
+     * only where the cards are product cards.
+     */
+    private function cardHover(string $type, mixed $value, string $path, ?string $id): ?string
+    {
+        if ($value === null || $value === 'none') {
+            return null;
+        }
+        if (! in_array($value, ElementRegistry::CARD_HOVER_EFFECTS, true)) {
+            $this->error($path, $id, 'Choose one of: '.implode(', ', ElementRegistry::CARD_HOVER_EFFECTS).'.');
+
+            return null;
+        }
+        if ($value === 'second_image' && ! in_array($type, ElementRegistry::CARD_HOVER_SECOND_IMAGE, true)) {
+            $this->error($path, $id, 'Only product cards have a second picture to show.');
+
+            return null;
+        }
+
+        return $value;
     }
 
     /**

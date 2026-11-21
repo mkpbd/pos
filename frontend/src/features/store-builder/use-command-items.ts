@@ -29,6 +29,8 @@ export type CommandActions = {
   history: () => void
   styles: () => void
   shortcuts: () => void
+  /** B18: the Motion themes dialog (absent: not offered). */
+  motion?: (() => void) | null
 }
 
 const DEVICE_NAMES: Record<Device, string> = { desktop: 'Computer view', tablet: 'Tablet view', mobile: 'Phone view' }
@@ -67,6 +69,7 @@ export function useCommandItems(open: boolean, actions: CommandActions, inserter
     action('history', 'Version history', actions.history, { hint: 'Published versions and named copies' })
     action('save-copy', 'Save a named copy…', actions.history, { hint: 'Keep the draft as it is now, without publishing it', words: ACTION_WORDS['save-copy'] })
     action('styles', 'Site styles', actions.styles, { hint: 'Colours, fonts and buttons of the whole store' })
+    if (actions.motion) action('motion', 'Apply motion theme', actions.motion, { hint: 'Calm, Lively, Festive, Premium or Minimal animation for the whole page — or remove all motion' })
     for (const value of ['desktop', 'tablet', 'mobile'] as const) {
       if (value !== device) items.push({ id: `action:device-${value}`, group: 'action', label: `Switch to ${DEVICE_NAMES[value].toLowerCase()}`, words: ACTION_WORDS.device, run: () => store.getState().setDevice(value) })
     }

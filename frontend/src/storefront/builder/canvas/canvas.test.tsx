@@ -16,9 +16,16 @@ const ORIGIN = window.location.origin
 const motion = vi.hoisted(() => ({ played: [] as string[], targets: [] as unknown[] }))
 vi.mock('../motion', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../motion')>()),
-  playMotion: (el: HTMLElement, target?: unknown) => {
+  // B18: the canvas plays through playMotionScope (node scope = one node, as before).
+  playMotionScope: (root: ParentNode, targets: { id: string }[], id: string, scope = 'node') => {
+    if (scope !== 'node') {
+      motion.played.push(`${scope}:${id}`)
+      return
+    }
+    const el = root.querySelector<HTMLElement>(`[data-b="${id}"]`)
+    if (!el) return
     motion.played.push(el.dataset.b ?? '')
-    motion.targets.push(target)
+    motion.targets.push(targets.find((target) => target.id === id))
   },
 }))
 
@@ -193,6 +200,26 @@ describe('builder canvas app', () => {
     send({ type: 'play-motion', id: sections[0]!.id })
     expect(motion.played).toEqual([sections[0]!.id])
     expect(motion.targets[0]).toMatchObject({ id: sections[0]!.id, motion: { stagger_children: 120, loop: 'glow', loop_forever: false } })
+  })
+
+  it('B18: plays a section or the whole page, and animates dividers only while "Preview motion" is on', async () => {
+    const { send } = mount()
+    send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
+    const sections = structuredClone(page.sections)
+    ;(sections[0]!.props as Record<string, unknown>).shape_bottom = { shape: 'wave', color: '#ffffff', height: 40, flip: false, animate: 'flow' }
+    send(frame({ sections }))
+    expect(await screen.findByRole('heading', { name: 'Made fresh every morning' })).toBeInTheDocument()
+    motion.played.length = 0
+    send({ type: 'play-motion', id: 'e_heading', scope: 'section' })
+    send({ type: 'play-motion', id: '', scope: 'page' })
+    send({ type: 'play-motion', id: '"]*', scope: 'section' })
+    expect(motion.played).toEqual(['section:e_heading', 'page:'])
+    const divider = () => document.querySelector(`[data-b="${sections[0]!.id}"] .b-shape`)
+    expect(divider()).not.toHaveAttribute('data-animate')
+    send({ type: 'preview-motion', on: true })
+    await waitFor(() => expect(divider()).toHaveAttribute('data-animate', 'flow'))
+    send({ type: 'preview-motion', on: false })
+    await waitFor(() => expect(divider()).not.toHaveAttribute('data-animate'))
   })
 
   it('B9: a global section is one selectable block with a badge; an unavailable one shows where it sits', async () => {

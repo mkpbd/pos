@@ -168,7 +168,8 @@ class BuilderB6SchemaTest extends TestCase
         $this->assertSame(['images.*.alt', 'images.*.caption'], $byType['gallery']['translatable']);
         $this->assertSame(['min' => 2, 'max' => 24], $meta['limits']['lists']['logo_carousel.logos']);
         $this->assertSame(StyleSchema::MOTION_ENTRANCES, $meta['enums']['motion_entrances']);
-        $this->assertSame(['wave', 'curve', 'tilt', 'triangle', 'zigzag'], $meta['enums']['section_shapes']);
+        // B18 adds layered waves and a blob.
+        $this->assertSame(['wave', 'curve', 'tilt', 'triangle', 'zigzag', 'layered_waves', 'blob'], $meta['enums']['section_shapes']);
 
         // Defaults normalize unchanged; elements that need content are valid once given it.
         foreach (ElementRegistry::B6 as $type) {
@@ -362,7 +363,7 @@ class BuilderB6SchemaTest extends TestCase
     {
         $this->assertSame(
             ['base' => ['motion' => ['entrance' => 'slide-up', 'duration' => 2000, 'delay' => 0]]],
-            StyleSchema::normalize(['base' => ['motion' => ['entrance' => 'slide-up', 'duration' => 2000, 'delay' => 0, 'easing' => 'bounce']], 'mobile' => ['motion' => ['entrance' => 'fade']]]),
+            StyleSchema::normalize(['base' => ['motion' => ['entrance' => 'slide-up', 'duration' => 2000, 'delay' => 0, 'easing' => 'elastic']], 'mobile' => ['motion' => ['entrance' => 'fade']]]),
         );
         $this->assertSame(['base' => ['motion' => ['entrance' => 'zoom']]], StyleSchema::normalize(['base' => ['motion' => ['entrance' => 'zoom', 'duration' => 199, 'delay' => 2001]]]));
         $this->assertSame(['base' => ['motion' => ['entrance' => 'none', 'duration' => 200]]], StyleSchema::normalize(['base' => ['motion' => ['entrance' => 'none', 'duration' => 200, 'delay' => 1.5]]]));
@@ -442,7 +443,7 @@ class BuilderB6SchemaTest extends TestCase
         $this->assertSame(['sections.0.props.sticky'], array_keys($errors([$section('s_a', ['sticky' => 'yes'])])));
         $this->assertEqualsCanonicalizing(
             ['sections.0.props.shape_top.shape', 'sections.0.props.shape_top.color', 'sections.0.props.shape_top.height', 'sections.0.props.shape_top.flip', 'sections.0.props.shape_bottom'],
-            array_keys($errors([$section('s_a', ['shape_top' => ['shape' => 'blob', 'color' => 'red', 'height' => 201, 'flip' => 'no'], 'shape_bottom' => 'wave'])])),
+            array_keys($errors([$section('s_a', ['shape_top' => ['shape' => 'star', 'color' => 'red', 'height' => 201, 'flip' => 'no'], 'shape_bottom' => 'wave'])])),
         );
         $this->assertSame(['sections.0.props.shape_top.height'], array_keys($errors([$section('s_a', ['shape_top' => ['shape' => 'wave', 'color' => '#000000', 'height' => 15]])])));
         $this->assertSame(['sections.0.props.shape_top.color'], array_keys($errors([$section('s_a', ['shape_top' => $shape])])));

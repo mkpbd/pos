@@ -1,4 +1,5 @@
 import type { BuilderContent, BuilderNode, HeadingElement, ResponsiveStyle } from '@/storefront/builder/types'
+import { motionState, toMotion } from './inspector/b9-motion'
 import { writeStyleValue } from './inspector/style-model'
 import type { PageCheckFix } from './page-check'
 import { findNode, moveBy, setNode } from './tree'
@@ -31,5 +32,13 @@ export function applyPageCheckFix(content: BuilderContent, fix: PageCheckFix): B
     case 'move-down':
       // B15 "Move the video lower": a section below the next one (the last stays put).
       return moveBy(content, node.id, 1)
+    case 'remove-entrance': {
+      // B18 "Remove animation": no entrance (its duration, delay and easing go with it); loops stay.
+      if (!('style' in node)) return content
+      const style = (node.style ?? {}) as ResponsiveStyle
+      const motion = style.base?.motion
+      if (!motion || motion.entrance === 'none') return content
+      return setNode(content, { ...node, style: writeStyleValue(style, 'base', ['motion'], toMotion({ ...motionState(motion), entrance: 'none' })) } as BuilderNode)
+    }
   }
 }

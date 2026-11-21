@@ -26,9 +26,12 @@ import {
   LockIcon,
   MessageSquareIcon,
   DownloadIcon,
+  SparklesIcon,
+  PlayIcon,
+  WavesIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -201,6 +204,47 @@ type ToolbarProps = {
   comments?: { open: boolean; count: number; onToggle: () => void }
   /** B16: ⋯ "Download a copy (.json)"; absent = not offered. */
   onDownload?: () => void
+  /** B18: opens the Motion themes dialog; absent = no Motion button. */
+  onMotionThemes?: () => void
+  /** B18 (editor A): "▶ Play page" plays every entrance on the canvas, top to bottom; absent = no Preview motion / Play page. */
+  onPlayPage?: () => void
+}
+
+/**
+ * B18: one "Motion" menu keeps the toolbar narrow — Motion themes…, "Preview motion" (loops, text effects
+ * and moving dividers run on the canvas while ticked; not saved) and "Play page" (every entrance, top to bottom).
+ */
+function MotionMenu({ onThemes, onPlayPage }: { onThemes?: () => void; onPlayPage?: () => void }) {
+  const on = useEditor((s) => s.previewMotion)
+  const setOn = useEditor((s) => s.setPreviewMotion)
+  return (
+    <DropdownMenu>
+      <Hint label="Animate the page: motion themes, preview the moving parts, play every entrance">
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant={on ? 'secondary' : 'outline'} aria-label="Motion" data-testid="motion-menu-button">
+            <SparklesIcon /> <span className="max-[1599px]:sr-only">Motion</span>
+          </Button>
+        </DropdownMenuTrigger>
+      </Hint>
+      <DropdownMenuContent align="end">
+        {onThemes && (
+          <DropdownMenuItem onSelect={onThemes} data-testid="motion-themes-button">
+            <SparklesIcon /> Motion themes…
+          </DropdownMenuItem>
+        )}
+        {onPlayPage && (
+          <>
+            <DropdownMenuCheckboxItem checked={on} onCheckedChange={(checked) => setOn(checked === true)} data-testid="preview-motion-toggle">
+              <WavesIcon /> Preview motion
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuItem onSelect={onPlayPage} data-testid="play-page-button">
+              <PlayIcon /> Play page
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 }
 
 /** B10: "Edit in: English | বাংলা" — the language the canvas shows and edits. */
@@ -238,7 +282,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample, readOnly = false, people, comments, onDownload }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample, readOnly = false, people, comments, onDownload, onMotionThemes, onPlayPage }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -249,7 +293,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
   const isPopup = document.kind === 'popup'
 
   return (
-    <header aria-label="Editor toolbar" className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2">
+    <header aria-label="Editor toolbar" className="flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b bg-background px-2 [scrollbar-width:thin]">
       <Hint label="Back to your pages">
         <Button variant="ghost" size="icon" asChild>
           <Link to="/storefront/pages" aria-label="Back to pages">
@@ -260,7 +304,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       <div className="flex min-w-0 flex-col">
         <TitleField title={document.title} canEdit={!readOnly} onRename={onRename} />
       </div>
-      <span className="hidden truncate text-xs text-muted-foreground lg:inline">{document.path}</span>
+      <span className="hidden truncate text-xs text-muted-foreground min-[1600px]:inline">{document.path}</span>
 
       <div className="mx-auto flex items-center gap-1" role="group" aria-label="Canvas width">
         {DEVICES.map(({ device: value, label, icon: Icon }) => (
@@ -302,18 +346,18 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       <SaveStatus onShowProblem={onShowProblem} />
       {status}
 
+      {(onMotionThemes || onPlayPage) && <MotionMenu onThemes={onMotionThemes} onPlayPage={onPlayPage} />}
       {insights && (
         <Hint label="How many people saw this page, where they clicked and what they ordered">
           <Button type="button" variant={insights.open ? 'secondary' : 'outline'} aria-pressed={insights.open} onClick={insights.onToggle} data-testid="insights-button">
-            <ChartColumnIcon /> Insights
+            <ChartColumnIcon /> <span className="max-[1599px]:sr-only">Insights</span>
           </Button>
         </Hint>
       )}
       {comments && (
         <Hint label="Notes for your team on this page (C adds one on the selected part)">
           <Button type="button" variant={comments.open ? 'secondary' : 'outline'} aria-pressed={comments.open} onClick={comments.onToggle} data-testid="comments-button">
-            <MessageSquareIcon /> <span className="hidden xl:inline">Comments</span>
-            <span className="sr-only xl:hidden">Comments</span>
+            <MessageSquareIcon /> <span className="max-[1599px]:sr-only">Comments</span>
             {comments.count > 0 && (
               <span data-testid="comments-count" className="ml-0.5 rounded-full bg-blue-700 px-1.5 text-xs font-semibold text-white tabular-nums">
                 <span aria-hidden>{comments.count}</span>
@@ -326,7 +370,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       {abTests && (
         <Hint label="Try two versions of a section and see which one gets more orders">
           <Button type="button" variant={abTests.open ? 'secondary' : 'outline'} aria-pressed={abTests.open} onClick={abTests.onToggle} data-testid="ab-tests-button">
-            <FlaskConicalIcon /> A/B tests
+            <FlaskConicalIcon /> <span className="max-[1599px]:sr-only">A/B tests</span>
             {abTests.count > 0 && (
               <span data-testid="ab-tests-count" className="ml-0.5 rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground tabular-nums">
                 <span aria-hidden>{abTests.count}</span>
@@ -339,7 +383,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       {check && (
         <Hint label="Look for missing picture descriptions, hard-to-read text, broken links and more">
           <Button type="button" variant={check.open ? 'secondary' : 'outline'} aria-pressed={check.open} onClick={check.onToggle} data-testid="check-page-button">
-            <ListChecksIcon /> Check page
+            <ListChecksIcon /> <span className="max-[1599px]:sr-only">Check page</span>
             {check.errors + check.warnings > 0 && (
               <span
                 data-testid="check-badge"
@@ -358,7 +402,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
         {/* A span keeps the tooltip working on the disabled button. */}
         <span tabIndex={document.preview_url ? undefined : 0}>
           <Button type="button" variant="outline" disabled={!document.preview_url} onClick={onPreview} aria-label={isPopup ? 'Preview on store' : 'Preview draft'}>
-            <ExternalLinkIcon /> {isPopup ? 'Preview on store' : 'Preview'}
+            <ExternalLinkIcon /> <span className="max-[1599px]:sr-only">{isPopup ? 'Preview on store' : 'Preview'}</span>
           </Button>
         </span>
       </Hint>

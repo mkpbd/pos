@@ -34,7 +34,7 @@ import {
 import { HelpTip } from '../controls/control-label'
 import { BackgroundVideoControl } from './b6-style'
 import { MotionControl } from './b9-motion-control'
-import { canParallax } from './b9-motion'
+import { canParallax, canStagger } from './b9-motion'
 import { DeviceStatus } from './device-status'
 import { GROUP_TIPS, GROUP_TITLES, groupsFor, type GroupId } from './style-groups'
 import { BREAKPOINT, CASCADE, DEVICE_LABEL, effectiveGroup, getAt, resolveStyleValue, sameJson, styleIsValid, widthAt, writeStyleValue, type Resolved, type StylePath } from './style-model'
@@ -365,7 +365,8 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
         nodeType={node.type}
         value={style.base?.motion}
         onChange={(motion) => setBase(['motion'], motion)}
-        onPreview={() => onCommand({ type: 'preview-motion', nodeId: node.id })}
+        onPreview={() => onCommand({ type: 'preview-motion', nodeId: node.id, scope: canStagger(node.type) ? 'section' : 'node' })}
+        onTimeline={() => onCommand({ type: 'open-motion-timeline', sectionId: node.id })}
         hover={style.base?.hover}
         onHover={(hover: HoverStyle | undefined) => setBase(['hover'], hover)}
         parallax={canParallax(node.type) ? { value: baseParallax, available: style.base?.background?.type === 'image', onChange: setParallax } : undefined}

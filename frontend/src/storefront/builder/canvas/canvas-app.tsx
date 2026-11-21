@@ -15,7 +15,8 @@ import type { StorefrontBootstrap, StorefrontTheme } from '../../types'
 import { PageRenderer } from '../page-renderer'
 import { PopupFrame } from '../popups/popup-frame'
 import { motionTargets } from '../compile-styles'
-import { playMotion } from '../motion'
+import { playMotionScope } from '../motion'
+import { MotionModeCtx } from '../motion-pause'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, Device, RenderColumn, RenderElement, RenderPageSection, RenderSection } from '../types'
 import { normalizeStorePopupSettings } from '../validate'
@@ -443,6 +444,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   const [localeOverride, setLocaleOverride] = useState<Locale | null>(null)
   // B13: the toolbar's "Preview as" (null = show everything).
   const [previewAs, setPreviewAs] = useState<PreviewContext | null>(null)
+  // B18: the toolbar's "Preview motion" (off until the editor says otherwise).
+  const [previewMotion, setPreviewMotion] = useState(false)
   // B14: the toolbar's sample for a store page template (live text and the main parts draw it).
   const [storePage, setStorePage] = useState<StorePageRuntime>(NO_SAMPLE)
   const pendingRects = useRef(false)
@@ -528,11 +531,13 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
         if (r.top < 0 || r.bottom > window.innerHeight) el.scrollIntoView({ block: r.height > window.innerHeight ? 'start' : 'center' })
       } else if (message.type === 'scroll-by' && Number.isFinite(message.dy)) window.scrollBy(0, Math.max(-200, Math.min(200, message.dy)))
       else if (message.type === 'play-motion') {
-        if (!NODE_ID.test(message.id)) return
-        const el = document.querySelector<HTMLElement>(`[data-b="${message.id}"]`)
+        // B18: `page` ignores the id (every entrance top to bottom); `section` plays the id's section.
+        const scope = message.scope === 'section' || message.scope === 'page' ? message.scope : 'node'
+        if (scope !== 'page' && (typeof message.id !== 'string' || !NODE_ID.test(message.id))) return
         // B9: the node's whole motion (entrance, staggered children, loop) as the last frame describes it.
-        if (el) playMotion(el, motionTargets(sectionsRef.current).find((target) => target.id === message.id))
-      } else if (message.type === 'edit-text') {
+        playMotionScope(document, motionTargets(sectionsRef.current), typeof message.id === 'string' ? message.id : '', scope)
+      } else if (message.type === 'preview-motion') setPreviewMotion(message.on === true)
+      else if (message.type === 'edit-text') {
         if (typeof message.id === 'string' && NODE_ID.test(message.id)) editing.startEdit(message.id, typeof message.field === 'string' ? message.field : undefined)
       } else if (message.type === 'end-text-edit') editing.finish(message.commit === true ? 'commit' : 'cancel')
       else if (message.type === 'text-edit-link-result') editing.answerLink(typeof message.url === 'string' ? message.url : null)
@@ -725,6 +730,8 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
     <LocaleContext value={localeValue}>
       <BootstrapContext value={bootstrap}>
         <NoticeProvider>
+         {/* B18: calm while editing; loops, dividers and text effects run while "Preview motion" is on. */}
+         <MotionModeCtx value={previewMotion ? 'canvas-preview' : 'canvas'}>
          <StorePageCtx value={storePage}>
           <style data-testid="canvas-editor-css">{EDITOR_CSS}</style>
           <style data-testid="canvas-outlines">{outlineCss(frame, editor.dropTarget)}</style>
@@ -758,6 +765,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
           {editor.editing?.kind === 'html' &&
             createPortal(<FormatBar target={editor.editing.element} onCommand={editor.format} onLink={editor.requestLink} />, document.body)}
          </StorePageCtx>
+         </MotionModeCtx>
         </NoticeProvider>
       </BootstrapContext>
     </LocaleContext>

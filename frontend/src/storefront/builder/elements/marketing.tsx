@@ -16,6 +16,7 @@ import { Countdown } from '../../promotions/countdown-timer'
 import { useDeadline } from '../../promotions/countdown'
 import { usePage } from '../render-context'
 import { DraftPlaceholder, PreviewMark } from '../preview-mark'
+import { EffectText } from '../effect-text'
 import type { CountdownData, DiscountData, PromoCardData } from '../types'
 import { isCountdownData, isDiscountData, isPromoCardData } from './guards'
 import { B4_ENUMS, B4_LIMITS, oneOf, safeLink, safeUrl } from '../validate'
@@ -184,7 +185,11 @@ export function CtaElement({ element }: { element: El<'cta'> }) {
 
   return (
     <div data-b={element.id} className={cn('b-cta flex flex-col gap-4', ALIGN_ITEMS[align])} data-testid="builder-cta">
-      {title && <h2 className="sf-heading-case text-3xl font-extrabold lg:text-4xl">{title}</h2>}
+      {title && (
+        <h2 className="sf-heading-case text-3xl font-extrabold lg:text-4xl">
+          <EffectText value={p.text_effect} text={title} />
+        </h2>
+      )}
       {text && <p className="max-w-2xl text-lg whitespace-pre-line">{text}</p>}
       {(primary || secondary) && (
         <div className={cn('mt-2 flex flex-wrap gap-3', JUSTIFY[align])}>

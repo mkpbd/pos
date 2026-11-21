@@ -5,6 +5,7 @@ import { safeUrl } from '@/storefront/builder/validate'
 import { hasSeo, readSeo } from './inspector/seo-panel-model'
 import { Collector, focus, isObj, label, list, megabytes, pictures, str, visibleAnywhere, type Obj, type Place, type StyledNode } from './page-check-core'
 import { runSpeedCheck, type CheckFonts } from './page-check-speed'
+import { runMotionCheck } from './page-check-motion'
 import { resolveStyleValue } from './inspector/style-model'
 import { templateKeyOf } from '@/storefront/builder/templates/types'
 import { CORE_NAMES, coreElementOf, elementsOfTypeWithState } from './store-page-core'
@@ -39,6 +40,8 @@ export type PageCheckAction =
   | { type: 'set-heading-level'; level: 1 | 2 | 3 | 4 | 5 | 6 }
   /** B15: one step down among its siblings (a section below the next one). */
   | { type: 'move-down' }
+  /** B18: the node's entrance animation removed (its loop and the rest of its motion stay). */
+  | { type: 'remove-entrance' }
 
 export type PageCheckFix =
   /** Select `node_id` (null: the page settings, e.g. `seo.title`) and focus `field` (a form key; null: just select). */
@@ -674,7 +677,7 @@ export function runPageCheck(input: PageCheckInput): PageCheckIssue[] {
 
   checkHeadings(headings, context, out)
   checkStorePage(input, out)
-  return sortIssues([...out.issues, ...runSpeedCheck(input).issues], nodeOrder(input.content))
+  return sortIssues([...out.issues, ...runSpeedCheck(input).issues, ...runMotionCheck(input)], nodeOrder(input.content))
 }
 
 /**
@@ -784,6 +787,8 @@ export function serverFieldKey(field: string | null): string | null {
   if (field.startsWith('seo.')) return field.split('.').slice(0, 2).join('.')
   const prop = field.startsWith('props.') ? field.slice(6) : field
   if (prop === '') return null
+  // B18: the Text effect form is one field.
+  if (prop === 'text_effect' || prop.startsWith('text_effect.')) return 'text_effect'
   return prop.replace(/(^|\.)link\.url$/, '$1link').replace(/(^|\.)image\.media_id$/, '$1image')
 }
 
@@ -793,7 +798,10 @@ export function fromServerIssue(issue: ServerCheckIssue): PageCheckIssue {
   const details = isObj(issue.details) ? issue.details : {}
   const raw = typeof details.field === 'string' ? details.field : typeof details.path === 'string' && issue.node_id === null ? details.path : null
   const field = serverFieldKey(raw)
-  const fix: PageCheckFix | null = issue.node_id
+  const fix: PageCheckFix | null = issue.node_id && details.fix === 'remove_entrance'
+    ? // B18 MOTION_LCP: the entrance can be removed right away.
+      { kind: 'apply', label: 'Remove animation', node_id: issue.node_id, action: { type: 'remove-entrance' } }
+    : issue.node_id
     ? focus(field ? 'Fix it' : 'Select it', issue.node_id, field)
     : field?.startsWith('seo.')
       ? focus('Fix it', null, field)

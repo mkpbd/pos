@@ -89,7 +89,8 @@ describe('B4 shared metadata', () => {
     expect(isAllowedIn('copyright', 'footer')).toBe(true)
     expect(isAllowedIn('video', 'zone')).toBe(true)
     expect(isAllowedIn('hero_slider', 'header')).toBe(false)
-    expect(elementMeta('cta')?.translatable).toEqual(['title', 'text', 'primary.label', 'secondary.label'])
+    // B18: the rotating words of its title's text effect.
+    expect(elementMeta('cta')?.translatable).toEqual(['title', 'text', 'primary.label', 'secondary.label', 'text_effect.words.*'])
     expect(elementMeta('logo')?.group).toBe('site')
     expect(ELEMENT_REGISTRY.every((meta) => meta.allowed_in.length > 0)).toBe(true)
     expect(documentContext('cms:abc')).toBe('cms')

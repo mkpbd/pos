@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 import type { BackgroundVideo, SectionShape, SectionShapeKind } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
 import { SHAPE_PATHS } from '@/storefront/builder/section-layer-utils'
-import { B6_ENUMS, B6_LIMITS, parseVideoUrl } from '@/storefront/builder/validate'
+import { B18_ENUMS, B6_ENUMS, B6_LIMITS, parseVideoUrl } from '@/storefront/builder/validate'
+import { SHAPE_ANIMATE_LABELS } from './b18-motion'
 import { ColorControl, ControlLabel, HelpTip, Segmented, SliderControl, type PaletteColor } from '../controls'
 import { ImageChooser } from './fields'
 
@@ -20,7 +21,7 @@ import { ImageChooser } from './fields'
 const SHAPES = B6_ENUMS.shape
 type ShapeName = SectionShapeKind
 
-const SHAPE_LABELS: Record<ShapeName, string> = { wave: 'Wave', curve: 'Curve', tilt: 'Tilt', triangle: 'Triangle', zigzag: 'Zigzag' }
+const SHAPE_LABELS: Record<ShapeName, string> = { wave: 'Wave', curve: 'Curve', tilt: 'Tilt', triangle: 'Triangle', zigzag: 'Zigzag', layered_waves: 'Layered waves', blob: 'Blob' }
 
 /** A small drawing of the shape as the storefront draws it (SHAPE_PATHS, same flips). */
 function ShapePreview({ shape, flip, edge }: { shape: ShapeName | null; flip?: boolean; edge: 'top' | 'bottom' }) {
@@ -33,7 +34,7 @@ function ShapePreview({ shape, flip, edge }: { shape: ShapeName | null; flip?: b
       className="h-5 w-full"
       style={shape ? { transform: `scale(${flip ? -1 : 1}, ${edge === 'top' ? -1 : 1})` } : undefined}
     >
-      {shape ? <path d={SHAPE_PATHS[shape]} className="fill-current" /> : <line x1="0" y1="60" x2="1200" y2="60" className="stroke-current" strokeWidth={8} strokeDasharray="40 40" />}
+      {shape ? <path d={SHAPE_PATHS[shape] ?? SHAPE_PATHS.wave} className="fill-current" /> : <line x1="0" y1="60" x2="1200" y2="60" className="stroke-current" strokeWidth={8} strokeDasharray="40 40" />}
     </svg>
   )
 }
@@ -67,7 +68,7 @@ export function SectionShapeControl({ edge, value, onChange, themeColors, palett
               aria-checked={active}
               aria-label={name}
               title={name}
-              onClick={() => onChange(shape === null ? null : { shape, color: value?.color ?? 'theme:canvas', height: value?.height ?? 48, flip: value?.flip ?? false })}
+              onClick={() => onChange(shape === null ? null : { shape, color: value?.color ?? 'theme:canvas', height: value?.height ?? 48, flip: value?.flip ?? false, ...(value?.animate ? { animate: value.animate } : {}) })}
               className={cn(
                 'flex flex-col items-stretch gap-1 rounded-md border p-1.5 text-xs text-muted-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50',
                 active && 'border-primary bg-primary/10 text-primary',
@@ -106,6 +107,17 @@ export function SectionShapeControl({ edge, value, onChange, themeColors, palett
               { value: 'flip', label: 'Mirrored' },
             ]}
             onChange={(v) => onChange({ ...value, flip: v === 'flip' })}
+          />
+          <Segmented
+            label="Animate"
+            tooltip="Flow: sideways like water. Drift: slowly back and forth. Pulse: gently grows and shrinks. The shape moves gently. It only moves while shoppers can see it, never for shoppers who turned off animations, and the page’s “Pause animations” button stops it. In the editor it moves while Preview motion is on."
+            value={value.animate ?? 'none'}
+            options={B18_ENUMS.shapeAnimate.map((a) => ({ value: a, label: SHAPE_ANIMATE_LABELS[a] }))}
+            onChange={(a) => {
+              const { animate: _old, ...rest } = value
+              void _old
+              onChange(a === 'none' ? rest : { ...rest, animate: a })
+            }}
           />
         </>
       )}

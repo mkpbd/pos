@@ -19,7 +19,31 @@ export const SHAPE_PATHS: Record<SectionShape['shape'], string> = {
   tilt: 'M0,120 L1200,0 L1200,120 Z',
   triangle: 'M0,120 L600,0 L1200,120 Z',
   zigzag: ZIGZAG,
+  // B18: the front layer of the three (LAYERED_WAVES draws them all) and an organic blob.
+  layered_waves: periodicWave(78, 18),
+  blob: 'M0,120 L0,88 C140,40 300,104 480,62 C640,26 760,14 900,52 C1020,86 1110,66 1200,78 L1200,120 Z',
 }
+
+/**
+ * A wave whose start and end meet seamlessly (same height and slope at x 0 and 1200), so copies
+ * side by side flow without a seam: `y` its middle height, `d` how far it swings.
+ */
+function periodicWave(y: number, d: number): string {
+  return `M0,${y} C200,${y + d} 400,${y - d} 600,${y} C800,${y + d} 1000,${y - d} 1200,${y} L1200,120 L0,120 Z`
+}
+
+/** B18 `layered_waves`: three waves, back to front (lighter at the back); each flows at its own speed. */
+export const LAYERED_WAVES: readonly { d: string; opacity: number }[] = [
+  { d: periodicWave(36, 24), opacity: 0.3 },
+  { d: periodicWave(56, 22), opacity: 0.55 },
+  { d: periodicWave(78, 18), opacity: 1 },
+]
+
+/** B18: shapes whose ends meet (copies tile as they are); the others tile with every second copy mirrored. */
+export const TILEABLE_SHAPES: ReadonlySet<SectionShape['shape']> = new Set(['wave', 'zigzag', 'layered_waves'])
+
+/** B18: how long one flow / drift / pulse cycle of a divider takes (ms). */
+export const SHAPE_ANIMATION_MS = { flow: 24000, drift: 9000, pulse: 5000 } as const
 
 /** The node's background video (base breakpoint) with its overlay, or null. */
 export function backgroundVideoOf(style: unknown): { video: BackgroundVideo; overlay: string | undefined } | null {

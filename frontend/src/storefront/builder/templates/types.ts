@@ -1,4 +1,5 @@
 import type { BlogPostDetail, OrderView, ProductListing, SortKey } from '../../types'
+import type { CardHover } from '../types'
 
 /*
  * B14: store page templates — the shapes shared by the storefront routes, the five template
@@ -199,6 +200,8 @@ export type ProductListingProps = {
   columns: { desktop: 3 | 4 | 5; tablet: 2 | 3 | 4; mobile: 1 | 2 }
   show_count: boolean
   pagination: 'pages' | 'load_more'
+  /** B18 card hover of the listing's product cards (absent = none). */
+  card_hover?: CardHover
 }
 
 /** `data[id]` of a product_listing with scope categories / brands (only then): the live slugs, in order. */

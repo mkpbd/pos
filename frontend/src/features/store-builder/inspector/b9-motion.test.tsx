@@ -76,27 +76,27 @@ describe('B9 Animation group', () => {
   it('a button: new entrances, every time, an attention loop and Preview animation (desktop value on any device)', async () => {
     const { user, last, commands } = setup(button(), 'mobile')
     const group = await openAnimation(user)
-    const preview = within(group).getByRole('button', { name: 'Preview animation' })
+    const preview = within(group).getByRole('button', { name: 'Play animation' })
     expect(preview).toBeDisabled()
     // Elements have no "one after another"; sections have no loop.
     expect(within(group).queryByLabelText('Elements inside, one after another')).not.toBeInTheDocument()
 
-    await user.selectOptions(within(group).getByLabelText('Entrance'), 'bounce-in')
+    await user.click(within(within(group).getByTestId('entrance-tiles')).getByRole('radio', { name: 'Bounce in' }))
     expect(last().style).toEqual({ base: { motion: { entrance: 'bounce-in', duration: 600, delay: 0 } } })
     await user.click(within(group).getByRole('radio', { name: 'Every time' }))
     expect(last().style.base?.motion).toEqual({ entrance: 'bounce-in', duration: 600, delay: 0, repeat: 'every_time' })
 
-    await user.selectOptions(within(group).getByLabelText('Attention loop'), 'pulse')
+    await user.click(within(within(group).getByTestId('loop-tiles')).getByRole('radio', { name: 'Pulse' }))
     expect(last().style.base?.motion?.loop).toBe('pulse')
-    await user.click(within(group).getByRole('switch', { name: 'Keep repeating' }))
+    await user.click(within(group).getByRole('switch', { name: 'Keep looping' }))
     expect(last().style.base?.motion?.loop_forever).toBe(true)
 
-    await user.selectOptions(within(group).getByLabelText('Entrance'), 'none')
+    await user.click(within(within(group).getByTestId('entrance-tiles')).getByRole('radio', { name: 'None' }))
     expect(last().style.base?.motion).toEqual({ entrance: 'none', loop: 'pulse', loop_forever: true })
     await user.click(preview)
-    expect(commands).toContainEqual({ type: 'preview-motion', nodeId: 'e_btn001' })
+    expect(commands).toContainEqual({ type: 'preview-motion', nodeId: 'e_btn001', scope: 'node' })
 
-    await user.selectOptions(within(group).getByLabelText('Attention loop'), 'none')
+    await user.click(within(within(group).getByTestId('loop-tiles')).getByRole('radio', { name: 'None' }))
     expect(last().style).toEqual({})
   })
 
@@ -104,22 +104,22 @@ describe('B9 Animation group', () => {
     const { user, last } = setup(button())
     const group = await openAnimation(user)
     const hover = within(group).getByTestId('hover-effect-control')
-    await user.selectOptions(within(hover).getByLabelText('Hover effect'), 'tilt')
+    await user.click(within(hover).getByRole('radio', { name: 'Tilt' }))
     expect(last().style).toEqual({ base: { hover: { effect: 'tilt' } } })
     fireEvent.change(within(hover).getByLabelText('Hover speed'), { target: { value: '400' } })
     expect(last().style.base?.hover).toEqual({ effect: 'tilt', duration: 400 })
-    await user.selectOptions(within(hover).getByLabelText('Hover effect'), 'none')
+    await user.click(within(hover).getByRole('radio', { name: 'None' }))
     expect(last().style).toEqual({})
   })
 
   it('a section: elements inside one after another, no loop or hover; parallax needs a background picture', async () => {
     const { user, last } = setup(section())
     const group = await openAnimation(user)
-    expect(within(group).queryByLabelText('Attention loop')).not.toBeInTheDocument()
+    expect(within(group).queryByTestId('loop-tiles')).not.toBeInTheDocument()
     expect(within(group).queryByTestId('hover-effect-control')).not.toBeInTheDocument()
     fireEvent.change(within(group).getByLabelText('Elements inside, one after another'), { target: { value: '150' } })
     expect(last().style).toEqual({ base: { motion: { entrance: 'none', stagger_children: 150 } } })
-    expect(within(group).getByRole('button', { name: 'Preview animation' })).toBeEnabled()
+    expect(within(group).getByRole('button', { name: 'Play animation' })).toBeEnabled()
 
     const parallax = within(group).getByTestId('parallax-control')
     expect(within(parallax).getByRole('radio', { name: 'Slow' })).toBeDisabled()

@@ -13,7 +13,7 @@ import { useElementData, usePage } from '../render-context'
 import { fieldText, formatDynamicText, storeContext } from '../templates/context'
 import { useStorePage } from '../templates/runtime'
 import { readListingData, readSampleListing } from '../templates/sample'
-import { B14_ENUMS, B14_LIMITS, B14_TEXT_LIMITS, oneOf } from '../validate'
+import { B14_ENUMS, B14_LIMITS, B14_TEXT_LIMITS, normalizeCardHover, oneOf } from '../validate'
 import type { RenderElement } from '../types'
 import { isB14Type } from './b14-types'
 import { bool, isObject, PRIMARY_BUTTON, SECONDARY_BUTTON, str, type El } from './shared'
@@ -171,7 +171,7 @@ function LiveListing({ element, setup, scope, reportTotal }: { element: RenderEl
     reportTotal?.(total)
   }, [reportTotal, total])
   return (
-    <div data-b={element.id} className="b-product-listing" data-testid="builder-product-listing">
+    <div data-b={element.id} className="b-product-listing" data-testid="builder-product-listing" data-b-card-hover={normalizeCardHover(element.type, (element.props as { card_hover?: unknown } | undefined)?.card_hover)}>
       <ListingBody controller={controller} options={setup.options} />
     </div>
   )
@@ -208,7 +208,7 @@ function CanvasListing({ element, setup, scope }: { element: RenderElement; setu
     categoryHref: () => '#',
   }
   return (
-    <div data-b={element.id} className="b-product-listing" data-testid="builder-product-listing">
+    <div data-b={element.id} className="b-product-listing" data-testid="builder-product-listing" data-b-card-hover={normalizeCardHover(element.type, (element.props as { card_hover?: unknown } | undefined)?.card_hover)}>
       <ListingBody controller={controller} options={setup.options} />
     </div>
   )

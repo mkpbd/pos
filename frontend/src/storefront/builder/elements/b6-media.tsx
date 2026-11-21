@@ -5,6 +5,7 @@ import { MenuLink } from '../../components/menu-link'
 import { withFocal } from '../../focal'
 import { useLocale } from '../../i18n/locale'
 import { useReducedMotion } from '../motion'
+import { useLongMotion, useMotionMode } from '../motion-pause'
 import { DraftPlaceholder } from '../preview-mark'
 import { useImagePriority } from '../image-priority'
 import { usePage } from '../render-context'
@@ -317,6 +318,9 @@ function MovingStrip({
 }) {
   const [stopped, setStopped] = useState(false)
   const { paused: held, handlers } = useHoverPause()
+  // B18: a moving strip on the store offers the global "Pause animations" too.
+  const motionMode = useMotionMode()
+  useLongMotion(!stopped && motionMode === 'live')
   const repeats = repeatsFor(items.length, minimum)
   const duration = `${Math.max(12, Math.round(items.length * repeats * SPEEDS[speed]))}s`
   const copy = (key: string, hidden: boolean) => (

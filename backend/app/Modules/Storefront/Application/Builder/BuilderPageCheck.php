@@ -29,7 +29,11 @@ use Carbon\CarbonImmutable;
  * - links to the store (site paths, or absolute URLs on the store's own domains) whose product,
  *   category, brand, content page, landing page, blog post or blog category doesn't exist or isn't
  *   live, and site paths that are no storefront page;
- * - forms that notify nobody (no e-mail and no staff with forms.view) — a tip.
+ * - forms that notify nobody (no e-mail and no staff with forms.view) — a tip;
+ * - B18 motion (warnings): an entrance on the first section or its first picture / heading
+ *   (MOTION_LCP: the top of the page appears late), too many looping nodes (MOTION_TOO_MUCH: more
+ *   than 6 in one section, or more than 3 looping forever), text effects on long texts
+ *   (TEXT_EFFECT_LONG: rotating words over 24 characters, a typewriter over 160).
  *
  * Hidden nodes (and what they contain) are left out, except for records that are gone. Nothing is
  * saved. Errors don't block publishing: the owner decides.
@@ -37,6 +41,24 @@ use Carbon\CarbonImmutable;
 class BuilderPageCheck
 {
     public const SEVERITIES = ['error', 'warning', 'tip'];
+
+    /** B18: the contexts whose first section is the top of a page (its LCP candidate). */
+    public const MOTION_LCP_CONTEXTS = ['page', 'cms', 'zone', 'header', 'template'];
+
+    /** B18: the elements that are a section's main picture or heading for MOTION_LCP. */
+    public const MOTION_LCP_IMAGES = ['image', 'hero_slider', 'image_carousel'];
+
+    public const MOTION_LCP_HEADINGS = ['heading', 'cta'];
+
+    /** B18: at most this many looping nodes in one section, and looping forever on the page. */
+    public const MOTION_LOOPS_PER_SECTION = 6;
+
+    public const MOTION_LOOPS_FOREVER = 3;
+
+    /** B18: rotating words longer than this get cut on phones; a typewriter text longer than this takes too long. */
+    public const TEXT_EFFECT_WORD_WARN = 24;
+
+    public const TEXT_EFFECT_TYPEWRITER_WARN = 160;
 
     /** First path segments of storefront pages that need no lookup. */
     private const STATIC_ROUTES = ['shop', 'search', 'cart', 'wishlist', 'checkout', 'account', 'order', 'newsletter', 'demos', 'storage', 'sitemap.xml', 'robots.txt'];
@@ -153,6 +175,13 @@ class BuilderPageCheck
             }
         }
 
+        // B18: motion.
+        if (! $document->isGlobal() && in_array(BuilderDocumentSchema::baseContext($context), self::MOTION_LCP_CONTEXTS, true)) {
+            $this->checkMotionLcp($tree, $nodes, $issue);
+        }
+        $this->checkMotionAmount($tree, $nodes, $issue);
+        $this->checkTextEffects($nodes, $issue);
+
         $rank = array_flip(self::SEVERITIES);
         usort($issues, fn (array $a, array $b) => [$rank[$a['severity']], $a['_order']] <=> [$rank[$b['severity']], $b['_order']]);
         $counts = ['error' => 0, 'warning' => 0, 'tip' => 0];
@@ -162,6 +191,146 @@ class BuilderPageCheck
         }
 
         return ['issues' => array_values($issues), 'counts' => $counts, 'checked_at' => CarbonImmutable::now()->toIso8601String()];
+    }
+
+    /**
+     * B18: the first shown section, its first picture and its first heading should not enter with
+     * an animation — that is what shoppers see first (and what the speed score measures).
+     *
+     * @param  array<string, mixed>  $tree
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkMotionLcp(array $tree, array $nodes, callable $issue): void
+    {
+        $first = null;
+        foreach ($tree['sections'] ?? [] as $section) {
+            if (is_array($section) && ($section['hidden'] ?? false) !== true) {
+                $first = $section;
+                break;
+            }
+        }
+        if ($first === null || ($first['type'] ?? null) !== 'section' || ! isset($nodes[$first['id'] ?? ''])) {
+            return;
+        }
+        $sectionPath = $nodes[$first['id']]['path'];
+        $candidates = [$first['id'] => 'section'];
+        $found = ['image' => false, 'heading' => false];
+        foreach ($nodes as $id => $entry) {
+            if ($entry['hidden'] || ! str_starts_with($entry['path'], $sectionPath.'.')) {
+                continue;
+            }
+            $type = $entry['node']['type'] ?? null;
+            foreach (['image' => self::MOTION_LCP_IMAGES, 'heading' => self::MOTION_LCP_HEADINGS] as $kind => $types) {
+                if (! $found[$kind] && in_array($type, $types, true)) {
+                    $found[$kind] = true;
+                    $candidates[$id] = $kind;
+                }
+            }
+        }
+        $messages = [
+            'section' => 'Your top section appears late; remove its animation for a faster store.',
+            'image' => 'Your top picture appears late; remove its animation for a faster store.',
+            'heading' => 'Your top heading appears late; remove its animation for a faster store.',
+        ];
+        foreach ($candidates as $id => $kind) {
+            $entrance = $nodes[$id]['node']['style']['base']['motion']['entrance'] ?? 'none';
+            if ($entrance !== 'none') {
+                $issue('MOTION_LCP', 'warning', $id, $messages[$kind], $nodes[$id]['path'].'.style.base.motion.entrance', [
+                    'kind' => $kind,
+                    'entrance' => $entrance,
+                    'fix' => 'remove_entrance',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * B18: too much moving at once — more than 6 looping nodes in one section, or more than 3
+     * nodes looping forever on the page.
+     *
+     * @param  array<string, mixed>  $tree
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkMotionAmount(array $tree, array $nodes, callable $issue): void
+    {
+        $perSection = [];
+        $forever = [];
+        foreach ($nodes as $id => $entry) {
+            $motion = $entry['node']['style']['base']['motion'] ?? null;
+            if ($entry['hidden'] || ! is_array($motion) || ($motion['loop'] ?? 'none') === 'none') {
+                continue;
+            }
+            preg_match('/^sections\.(\d+)/', $entry['path'], $m);
+            $perSection[(int) $m[1]][] = $id;
+            if (($motion['loop_forever'] ?? false) === true) {
+                $forever[] = $id;
+            }
+        }
+        foreach ($perSection as $index => $ids) {
+            $sectionId = $tree['sections'][$index]['id'] ?? null;
+            if (count($ids) > self::MOTION_LOOPS_PER_SECTION && is_string($sectionId)) {
+                $issue('MOTION_TOO_MUCH', 'warning', $sectionId, 'Too much is moving in this section ('.count($ids).' looping animations). Keep at most '.self::MOTION_LOOPS_PER_SECTION.' so shoppers can read it.', "sections.{$index}", [
+                    'ids' => $ids,
+                    'count' => count($ids),
+                    'limit' => self::MOTION_LOOPS_PER_SECTION,
+                ]);
+            }
+        }
+        if (count($forever) > self::MOTION_LOOPS_FOREVER) {
+            $issue('MOTION_TOO_MUCH', 'warning', null, count($forever).' animations on this page keep looping. Keep at most '.self::MOTION_LOOPS_FOREVER.'; let the others stop after a few times.', 'sections', [
+                'ids' => $forever,
+                'count' => count($forever),
+                'limit' => self::MOTION_LOOPS_FOREVER,
+            ]);
+        }
+    }
+
+    /**
+     * B18: text effects on long texts — rotating words that get cut on phones, and a typewriter
+     * that takes too long to read (base text and translations).
+     *
+     * @param  array<string, array{path: string, node: array<string, mixed>, order: int, hidden: bool}>  $nodes
+     */
+    private function checkTextEffects(array $nodes, callable $issue): void
+    {
+        foreach ($nodes as $id => $entry) {
+            $type = $entry['node']['type'] ?? null;
+            $effect = $entry['node']['props']['text_effect'] ?? null;
+            if ($entry['hidden'] || ! is_array($effect) || ! is_string($type) || ! isset(ElementRegistry::TEXT_EFFECT_ELEMENTS[$type])) {
+                continue;
+            }
+            $translations = is_array($entry['node']['translations'] ?? null) ? $entry['node']['translations'] : [];
+            $path = $entry['path'].'.props.text_effect';
+            if (($effect['type'] ?? null) === 'rotate_words') {
+                $long = [];
+                foreach (is_array($effect['words'] ?? null) ? $effect['words'] : [] as $i => $word) {
+                    $texts = [$word, ...array_map(fn ($texts) => is_array($texts) ? ($texts["text_effect.words.{$i}"] ?? null) : null, array_values($translations))];
+                    foreach ($texts as $text) {
+                        if (is_string($text) && mb_strlen(trim($text)) > self::TEXT_EFFECT_WORD_WARN) {
+                            $long[] = $i;
+                            break;
+                        }
+                    }
+                }
+                if ($long !== []) {
+                    $issue('TEXT_EFFECT_LONG', 'warning', $id, 'Some rotating words are long and get cut on phones. Keep each word under '.self::TEXT_EFFECT_WORD_WARN.' characters.', "{$path}.words", [
+                        'words' => $long,
+                        'limit' => self::TEXT_EFFECT_WORD_WARN,
+                    ]);
+                }
+            } elseif (($effect['type'] ?? null) === 'typewriter') {
+                $field = ElementRegistry::TEXT_EFFECT_ELEMENTS[$type];
+                $lengths = [BuilderDocumentSchema::plainLength($entry['node']['props'][$field] ?? null)];
+                foreach ($translations as $texts) {
+                    $lengths[] = BuilderDocumentSchema::plainLength(is_array($texts) ? ($texts[$field] ?? null) : null);
+                }
+                if (max($lengths) > self::TEXT_EFFECT_TYPEWRITER_WARN) {
+                    $issue('TEXT_EFFECT_LONG', 'warning', $id, 'This text is long for typing out letter by letter; shoppers wait too long to read it. Use it on a short line, or choose another effect.', "{$path}.type", [
+                        'limit' => self::TEXT_EFFECT_TYPEWRITER_WARN,
+                    ]);
+                }
+            }
+        }
     }
 
     /**

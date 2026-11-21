@@ -22,7 +22,7 @@ import { useImagePriority } from '../image-priority'
 import { DraftPlaceholder } from '../preview-mark'
 import { usePage } from '../render-context'
 import type { CategoryCardData, Hotspot, ProductSpotlightData, ShopTheLookData } from '../types'
-import { B6_ENUMS, B6_LIMITS, B6_TEXT_LIMITS, boundedInt, hasTwoDecimals, isUuid, listItems, oneOf, safeUrl } from '../validate'
+import { B6_ENUMS, B6_LIMITS, B6_TEXT_LIMITS, boundedInt, hasTwoDecimals, isUuid, listItems, normalizeCardHover, oneOf, safeUrl } from '../validate'
 import { isCategoryCardData, isProductSpotlightData, isShopTheLookData } from './guards'
 import { str, type El } from './shared'
 import { WithData } from './with-data'
@@ -64,6 +64,8 @@ function CategoryCardBody({ element, data }: { element: El<'category_card'>; dat
       data-layout={overlay ? 'overlay' : 'below'}
       className="b-category-card group relative flex flex-col overflow-hidden rounded-sf-card border bg-sf-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sf-accent"
       data-testid="builder-category-card"
+      data-b-card-hover={normalizeCardHover(element.type, p.card_hover)}
+      data-b-card=""
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-sf-canvas">
         {image && <MediaImage media={image} alt="" sizes="(max-width: 639px) 100vw, 33vw" className="size-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100" />}
@@ -105,8 +107,15 @@ function SpotlightBody({ element, product: data }: { element: El<'product_spotli
   const headingId = useId()
 
   return (
-    <article data-b={element.id} aria-labelledby={headingId} className="b-spotlight grid gap-8 md:grid-cols-2" data-layout={imageRight ? 'image-right' : 'image-left'} data-testid="builder-spotlight">
-      <div className={cn('relative min-w-0', imageRight && 'md:order-2')}>
+    <article
+      data-b={element.id}
+      aria-labelledby={headingId}
+      className="b-spotlight grid gap-8 md:grid-cols-2"
+      data-layout={imageRight ? 'image-right' : 'image-left'}
+      data-testid="builder-spotlight"
+      data-b-card-hover={normalizeCardHover(element.type, p.card_hover)}
+    >
+      <div className={cn('relative min-w-0', imageRight && 'md:order-2')} data-b-card="">
         <ProductGallery images={product.images} name={product.name} index={imageIndex} onIndexChange={setImageIndex} video={galleryVideoOf(product)} />
         {badge && (
           <span aria-hidden className="pointer-events-none absolute top-3 left-3 rounded-full bg-sf-sale px-3 py-1 text-xs font-bold tracking-wide text-white uppercase">
@@ -163,6 +172,7 @@ function LookBody({ element, data }: { element: El<'shop_the_look'>; data: ShopT
   const spots = spotsOf(p.hotspots, Array.isArray(data.products) ? {} : (data.products ?? {}))
   const title = str(p.title).slice(0, B6_TEXT_LIMITS.shop_the_look.title).trim()
   const alt = str(p.alt).slice(0, B6_TEXT_LIMITS.shop_the_look.alt).trim()
+  const cardHover = normalizeCardHover(element.type, p.card_hover)
   const [open, setOpen] = useState<string | null>(null)
   const dots = useRef(new Map<string, HTMLButtonElement | null>())
   const base = useId()
@@ -187,7 +197,7 @@ function LookBody({ element, data }: { element: El<'shop_the_look'>; data: ShopT
   if (!image || spots.length === 0) return <DraftPlaceholder element={element} />
 
   return (
-    <div data-b={element.id} className="b-shop-look flex flex-col gap-4" data-testid="builder-shop-look">
+    <div data-b={element.id} className="b-shop-look flex flex-col gap-4" data-testid="builder-shop-look" data-b-card-hover={cardHover}>
       {title && <h2 className="font-heading text-2xl font-extrabold text-sf-heading lg:text-3xl">{title}</h2>}
       <div
         className="relative"
@@ -198,7 +208,14 @@ function LookBody({ element, data }: { element: El<'shop_the_look'>; data: ShopT
           }
         }}
       >
-        <MediaImage media={image} alt={alt || image.alt || ''} sizes="(max-width: 1023px) 100vw, 60vw" priority={priority} className="block h-auto w-full rounded-sf-card" />
+        {cardHover ? (
+          // B18 card hover: the picture moves inside its own frame (the hotspot cards stay outside it).
+          <div data-b-card="" className="overflow-hidden rounded-sf-card">
+            <MediaImage media={image} alt={alt || image.alt || ''} sizes="(max-width: 1023px) 100vw, 60vw" priority={priority} className="block h-auto w-full rounded-sf-card" />
+          </div>
+        ) : (
+          <MediaImage media={image} alt={alt || image.alt || ''} sizes="(max-width: 1023px) 100vw, 60vw" priority={priority} className="block h-auto w-full rounded-sf-card" />
+        )}
         {spots.map((spot) => {
           const expanded = open === spot.id
           const cardId = `${base}-${spot.id}`

@@ -13,7 +13,7 @@
  */
 
 import { NODE_ID } from './registry'
-import type { Background, Breakpoint, Gradient, HoverStyle, Motion, ResponsiveStyle, Shadow, Style } from './types'
+import type { Background, Breakpoint, Gradient, HoverStyle, Motion, MotionEasing, ResponsiveStyle, Shadow, Style } from './types'
 import { B9_DEFAULTS, B9_LIMITS, normalizeColor, normalizeGradient, normalizeStyle, normalizeWidth, oneOf } from './validate'
 
 export const TABLET_QUERY = '(max-width: 1023px)'
@@ -314,10 +314,47 @@ function compileNodeStyle(
 
 export const MOTION_DEFAULTS = { duration: 600, delay: 0 } as const
 
-/** B9 attention loops: one cycle's length (ms); the keyframes are `b-loop-<loop>` in storefront.css. */
-export const LOOP_DURATIONS = { pulse: 1600, float: 3000, shake: 900, glow: 2000 } as const
+/**
+ * B9 attention loops: one cycle's length (ms); the keyframes are `b-loop-<loop>` in storefront.css.
+ * B18 adds wiggle, heartbeat, breathe, shine (a sheen sweeping over the node, drawn by its
+ * `::after`) and spin-slow.
+ */
+export const LOOP_DURATIONS = {
+  pulse: 1600,
+  float: 3000,
+  shake: 900,
+  glow: 2000,
+  wiggle: 1200,
+  heartbeat: 1400,
+  breathe: 4000,
+  shine: 2600,
+  'spin-slow': 8000,
+} as const
+
+/** B18: loops that keep one speed all the way round (the others ease in and out). */
+const LINEAR_LOOPS: ReadonlySet<string> = new Set(['spin-slow', 'shine'])
 
 const EASE = 'cubic-bezier(0.2,0.7,0.2,1)'
+
+/**
+ * B18 entrance easing curves. `spring` and `bounce` are CSS `linear()` curves; browsers without
+ * `linear()` drop that declaration and keep the cubic-bezier written before it (`fallback`).
+ */
+export const EASINGS: Record<MotionEasing, { curve: string; fallback?: string }> = {
+  smooth: { curve: EASE },
+  snappy: { curve: 'cubic-bezier(0.16,1,0.3,1)' },
+  gentle: { curve: 'cubic-bezier(0.45,0,0.25,1)' },
+  linear: { curve: 'linear' },
+  spring: {
+    curve:
+      'linear(0,0.009,0.035 2.1%,0.141,0.281 6.7%,0.723 12.9%,0.938 16.7%,1.017,1.077,1.121,1.149 24.3%,1.159,1.163,1.161,1.154 29.9%,1.129 32.8%,1.051 39.6%,1.017 43.1%,0.991,0.977 51%,0.974 53.8%,0.975 57.1%,0.997 69.8%,1.003 76.9%,1)',
+    fallback: 'cubic-bezier(0.34,1.56,0.64,1)',
+  },
+  bounce: {
+    curve: 'linear(0,0.063,0.25,0.563,1 36.4%,0.812,0.75,0.813,1 72.7%,0.953,0.938,0.953,1 90.9%,0.984,1)',
+    fallback: 'cubic-bezier(0.34,1.4,0.64,1)',
+  },
+}
 
 /**
  * A node's motion with every default filled in; null when it has neither an entrance, a loop nor a
@@ -334,27 +371,63 @@ export function motionOf(style: unknown): Required<Motion> | null {
     stagger_children: motion.stagger_children ?? B9_DEFAULTS.staggerChildren,
     loop: motion.loop ?? B9_DEFAULTS.motionLoop,
     loop_forever: motion.loop_forever ?? B9_DEFAULTS.loopForever,
+    easing: motion.easing ?? 'smooth',
   }
   return value.entrance === 'none' && value.loop === 'none' && value.stagger_children === 0 ? null : value
 }
+
+/** `animation:` declarations for a value built around an easing: the fallback curve first, then `linear()` (dropped where unsupported). */
+function animationDeclarations(easing: MotionEasing, build: (curve: string) => string): string[] {
+  const { curve, fallback } = EASINGS[easing] ?? EASINGS.smooth
+  return fallback ? [`animation:${build(fallback)}`, `animation:${build(curve)}`] : [`animation:${build(curve)}`]
+}
+
+/** B18: the sheen layer the `shine` loop sweeps over a node (its `::after`; the node clips it). */
+const SHEEN = 'linear-gradient(115deg,transparent 35%,rgb(255 255 255 / 0.45) 50%,transparent 65%)'
+
+/** The node becomes the sheen's containing box; sticky and layered sections keep their own position. */
+function overlayHost(selector: string): Rule[] {
+  return [
+    { selector, declarations: ['overflow:hidden', 'isolation:isolate'] },
+    { selector: `${selector}:not(.b-sticky):not(.b-layered)`, declarations: ['position:relative'] },
+  ]
+}
+
+/** B18: the shopper paused animations (./motion-pause.ts). */
+const PAUSED = ':root[data-b-paused]'
 
 function motionRules(selector: string, motion: Required<Motion>, staggered: boolean): Rule[] {
   const rules: Rule[] = []
   // A staggered element waits its turn: the runtime sets `--b-stagger` (its index × the parent's stagger).
   const at = (ms: number) => (staggered ? `calc(${num(ms)}ms + var(--b-stagger, 0ms))` : `${num(ms)}ms`)
-  const entrance = motion.entrance === 'none' ? null : `b-motion-${motion.entrance} ${num(motion.duration)}ms ${EASE} ${at(motion.delay)} backwards`
+  const entrance = motion.entrance === 'none' ? null : (curve: string) => `b-motion-${motion.entrance} ${num(motion.duration)}ms ${curve} ${at(motion.delay)} backwards`
   if (entrance) {
     rules.push({ selector: `${selector}[data-b-motion="start"]`, declarations: ['opacity:0'] })
-    rules.push({ selector: `${selector}[data-b-motion="run"]`, declarations: [`animation:${entrance}`] })
+    rules.push({ selector: `${selector}[data-b-motion="run"]`, declarations: animationDeclarations(motion.easing, entrance) })
   }
   if (motion.loop !== 'none') {
-    const loop = `b-loop-${motion.loop} ${num(LOOP_DURATIONS[motion.loop])}ms ease-in-out`
+    const timing = LINEAR_LOOPS.has(motion.loop) ? 'linear' : 'ease-in-out'
+    const loop = `b-loop-${motion.loop} ${num(LOOP_DURATIONS[motion.loop])}ms ${timing}`
     const count = motion.loop_forever ? 'infinite' : String(B9_LIMITS.loopCycles)
+    const start = entrance ? at(motion.delay + motion.duration) : '0ms'
+    if (motion.loop === 'shine') {
+      // B18: the sheen is the node's ::after layer; the node itself keeps its entrance.
+      rules.push(...overlayHost(selector))
+      rules.push({ selector: `${selector}::after`, declarations: ['content:""', 'position:absolute', 'inset:0', 'z-index:1', 'pointer-events:none', `background:${SHEEN}`, 'transform:translateX(-110%)'] })
+      rules.push({ selector: `${selector}[data-b-loop="run"]::after`, declarations: [`animation:${loop} ${start} ${count}`] })
+      rules.push({ selector: `${selector}[data-b-loop="run"]:hover::after,${selector}[data-b-loop="run"]:focus-within::after`, declarations: ['animation-play-state:paused'] })
+      // B18 "Pause animations" (WCAG 2.2.2).
+      rules.push({ selector: `${PAUSED} ${selector}[data-b-loop="run"]::after`, declarations: ['animation-play-state:paused'] })
+      return rules
+    }
     if (entrance) {
       // The loop starts once the entrance has finished.
-      rules.push({ selector: `${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: [`animation:${entrance},${loop} ${at(motion.delay + motion.duration)} ${count}`] })
+      rules.push({ selector: `${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: animationDeclarations(motion.easing, (curve) => `${entrance(curve)},${loop} ${start} ${count}`) })
+      // B18 "Pause animations": the loop stops; an entrance still playing finishes (never frozen half-hidden).
+      rules.push({ selector: `${PAUSED} ${selector}[data-b-motion="run"][data-b-loop="run"]`, declarations: ['animation-play-state:running,paused'] })
     } else {
       rules.push({ selector: `${selector}[data-b-loop="run"]`, declarations: [`animation:${loop} 0ms ${count}`] })
+      rules.push({ selector: `${PAUSED} ${selector}[data-b-loop="run"]`, declarations: ['animation-play-state:paused'] })
     }
     // Attention loops pause while the visitor points at or focuses the node.
     rules.push({ selector: `${selector}[data-b-loop="run"]:hover,${selector}[data-b-loop="run"]:focus-within`, declarations: ['animation-play-state:paused'] })
@@ -363,26 +436,92 @@ function motionRules(selector: string, motion: Required<Motion>, staggered: bool
 }
 
 /** B9 hover effects (`style.base.hover`): what the node does on hover (desktop pointers) and on keyboard focus. */
-const HOVER_EFFECTS: Record<Exclude<HoverStyle['effect'], 'none'>, string[]> = {
+const HOVER_EFFECTS: Record<'lift' | 'grow' | 'shrink' | 'tilt' | 'glow' | 'underline' | 'lift-shadow', string[]> = {
   lift: ['transform:translateY(-4px)'],
   grow: ['transform:scale(1.04)'],
   shrink: ['transform:scale(0.97)'],
   tilt: ['transform:perspective(800px) rotateX(2deg) rotateY(-3deg)'],
   glow: ['box-shadow:0 0 0 3px color-mix(in srgb, var(--sf-primary) 35%, transparent),0 10px 28px color-mix(in srgb, var(--sf-primary) 30%, transparent)'],
   underline: ['text-decoration-line:underline', 'text-decoration-thickness:2px', 'text-underline-offset:4px'],
+  // B18: lift with a soft shadow.
+  'lift-shadow': ['transform:translateY(-6px)', 'box-shadow:0 18px 36px -14px rgb(0 0 0 / 0.35)'],
 }
+
+/** B18: the pointer-follow tilt (the runtime sets the angles, at most 8°) and its calm keyboard version. */
+const TILT_3D = 'transform:perspective(800px) rotateX(var(--b-tilt-x, 0deg)) rotateY(var(--b-tilt-y, 0deg))'
+const TILT_3D_FOCUS = 'transform:perspective(800px) rotateX(2deg) rotateY(-2deg)'
+const GLARE = 'radial-gradient(circle at center,rgb(255 255 255 / 0.4),transparent 40%)'
 
 function hoverRules(out: Output, selector: string, hover: HoverStyle) {
   if (hover.effect === 'none') return
   const ms = `${num(hover.duration ?? B9_DEFAULTS.hoverDuration)}ms`
-  const effect = HOVER_EFFECTS[hover.effect]
-  out.motion.push(
-    { selector, declarations: [`transition:transform ${ms} ease,box-shadow ${ms} ease,color ${ms} ease,background-color ${ms} ease,text-decoration-color ${ms} ease`] },
-    // Keyboard users get the same: on the node itself, or while something inside it shows focus.
-    { selector: `${selector}:focus-visible`, declarations: effect },
-    { selector: `${selector}:has(:focus-visible)`, declarations: effect },
-  )
-  out.pointer.push({ selector: `${selector}:hover`, declarations: effect })
+  const transition = `transition:transform ${ms} ease,box-shadow ${ms} ease,color ${ms} ease,background-color ${ms} ease,text-decoration-color ${ms} ease`
+  // Keyboard users get the same as a pointer: on the node itself, or while something inside it shows focus.
+  const focus = `${selector}:focus-visible,${selector}:has(:focus-visible)`
+  switch (hover.effect) {
+    case 'tilt-3d':
+      out.motion.push({ selector, declarations: [`transition:transform ${ms} ease-out`] }, { selector: focus, declarations: [TILT_3D_FOCUS] })
+      out.pointer.push({ selector: `${selector}:hover`, declarations: [TILT_3D] })
+      return
+    case 'zoom-image': {
+      // The node's own picture grows inside its box (its frame clips it).
+      const image = `${selector} img`
+      out.motion.push(
+        { selector: `${selector}:has(> img),${selector} :has(> img)`, declarations: ['overflow:hidden'] },
+        { selector: image, declarations: [`transition:transform ${ms} ease`] },
+        { selector: `${selector}:focus-visible img,${selector}:has(:focus-visible) img`, declarations: ['transform:scale(1.08)'] },
+      )
+      out.pointer.push({ selector: `${selector}:hover img`, declarations: ['transform:scale(1.08)'] })
+      return
+    }
+    case 'pop':
+      out.motion.push({ selector: focus, declarations: ['transform:scale(1.04)'] })
+      out.pointer.push({ selector: `${selector}:hover`, declarations: [`animation:b-hover-pop ${ms} ease-out both`] })
+      return
+    case 'glare':
+    case 'shine': {
+      // A light layer (::before) over the node: a glare that follows the pointer, or a sheen sweeping across once.
+      const glare = hover.effect === 'glare'
+      out.motion.push(
+        ...overlayHost(selector),
+        {
+          selector: `${selector}::before`,
+          declarations: glare
+            ? ['content:""', 'position:absolute', 'inset:-50%', 'z-index:1', 'pointer-events:none', `background:${GLARE}`, 'opacity:0', 'transform:translate(var(--b-glare-x, 0%),var(--b-glare-y, 0%))', `transition:opacity ${ms} ease`]
+            : ['content:""', 'position:absolute', 'inset:0', 'z-index:1', 'pointer-events:none', `background:${SHEEN}`, 'transform:translateX(-110%)'],
+        },
+        { selector: `${selector}:focus-visible::before,${selector}:has(:focus-visible)::before`, declarations: glare ? ['opacity:0.6'] : ['transform:translateX(110%)', 'transition:transform 700ms ease'] },
+      )
+      out.pointer.push({ selector: `${selector}:hover::before`, declarations: glare ? ['opacity:1'] : ['transform:translateX(110%)', 'transition:transform 700ms ease'] })
+      return
+    }
+    default: {
+      const effect = HOVER_EFFECTS[hover.effect]
+      out.motion.push({ selector, declarations: [transition] }, { selector: `${selector}:focus-visible`, declarations: effect }, { selector: `${selector}:has(:focus-visible)`, declarations: effect })
+      out.pointer.push({ selector: `${selector}:hover`, declarations: effect })
+    }
+  }
+}
+
+/** B18: what the pointer runtime (./motion.ts) drives on a node: a 3D tilt or a glare that follows the pointer. */
+export type PointerEffect = 'tilt' | 'glare'
+
+/** B18: the nodes whose hover effect follows the pointer (`tilt-3d`, `glare`), by id. */
+export function pointerEffects(sections: readonly unknown[]): Record<string, PointerEffect> {
+  const out: Record<string, PointerEffect> = {}
+  const visit = (node: unknown) => {
+    if (typeof node !== 'object' || node === null) return
+    const n = node as NodeLike & { elements?: unknown }
+    if (validId(n.id)) {
+      const effect = normalizeStyle(n.style).base?.hover?.effect
+      if (effect === 'tilt-3d') out[n.id] = 'tilt'
+      else if (effect === 'glare') out[n.id] = 'glare'
+    }
+    if (Array.isArray(n.columns)) n.columns.forEach(visit)
+    if (Array.isArray(n.elements)) n.elements.forEach(visit)
+  }
+  sections.forEach(visit)
+  return out
 }
 
 /** B9 parallax: how fast the background layer moves against the scroll. */

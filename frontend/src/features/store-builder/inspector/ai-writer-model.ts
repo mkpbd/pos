@@ -42,6 +42,8 @@ type Json = Record<string, unknown>
 const isObj = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 const FIELD_LABELS: Record<string, string> = {
+  // B18: a text effect's rotating words.
+  'text_effect.words.*': 'Word',
   html: 'Text',
   body_html: 'Text',
   text: 'Text',
@@ -60,6 +62,7 @@ const FIELD_LABELS: Record<string, string> = {
 }
 
 const ITEM_NOUNS: Record<string, string> = {
+  words: 'Rotating word',
   items: 'Item',
   plans: 'Plan',
   features: 'line',

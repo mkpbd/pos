@@ -535,6 +535,27 @@ Original questions:
   *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
   the editor sends the canvas only the shown arm (the canvas never filters).
 
+### As built — B18 Motion studio (2026-11-21)
+
+- **Schema:** `StyleSchema` (easings, new entrances / loops / hover effects; silent drop), `ElementRegistry` (`TEXT_EFFECT_*`,
+  `CARD_HOVER_*`, `text_effect.words.*` translations), `BuilderDocumentSchema` (`textEffect()`, `cardHover()`, divider `animate`,
+  `motion_theme`), `BuilderPageCheck` (`MOTION_LCP`, `MOTION_TOO_MUCH`, `TEXT_EFFECT_LONG`). Mirrored in the storefront
+  `types.ts` / `validate.ts` (`B18_ENUMS`, `B18_LIMITS`, `b18PropProblems`).
+- **Storefront:** `compile-styles.ts` writes easing curves (`spring` / `bounce` as `linear()` after a cubic-bezier fallback) and the new
+  keyframes (transform, opacity, clip-path, filter, background-position only — tested); one rAF-throttled pointer listener drives
+  `tilt-3d` / `glare` (fine pointers, ≤ 8°). Text effects: the real text stays as the accessible text and sizes the box, the moving copy
+  is an `aria-hidden` `inert` overlay removed when done, rotating words sit in an inline grid cell as wide as the longest word, Bangla
+  splits by grapheme cluster merged across viramas and joiners (`text-effects.ts`, lazy, 2 kB gzip). Dividers: `flow` translates a
+  doubled strip; `layered_waves` three layers; `blob` transform only. `motion-pause.ts` / `pause-toggle.tsx`: the Pause animations pill
+  appears only with motion longer than 5 s (and never under reduced motion); paused loops keep entrances finishing.
+- **Editor:** Motion group rebuilt (`b18-motion-tiles.tsx`: roving-focus tile groups, previews via the Web Animations API on hover /
+  focus; `EasingChips` with a curve drawing), Text effect form, Card hover picker, divider Animate; one toolbar *Motion* menu (themes, *Preview motion*
+  checkbox, *Play page*); below 1600 px the secondary toolbar buttons are icon-only and the toolbar scrolls rather than clips;
+  page check `remove-entrance` fix. `motion-themes.ts` (pure, idempotent; *Keep my own animations* compares against
+  what the current theme would produce; never animates the first section's pictures or headings; ≤ 6 loops per section, no
+  endless loops). `timeline/` docked panel: rows in reading order with delay + duration sliders (`role="slider"`), drag snaps to
+  50 ms, keyboard ←/→ (delay) and Shift+←/→ (duration), one undo step per drag.
+
 ### As built — B16 teamwork & safety (2026-11-20)
 
 - **Presence & lock:** `Collaboration\BuilderPresence` (cache; viewers 60 s, lease 90 s) and `BuilderEditLock::assertCanWrite`

@@ -21,6 +21,29 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B18 — Store builder: Motion studio
+
+#### Added
+- **Motion themes:** *Motion → Motion themes…* animates the whole page in one style — Calm, Lively, Festive, Premium, Minimal — or *Remove all motion*. One undo step; plays the page afterwards; *Keep my own animations* (on by default) leaves motion you set yourself. Themes never animate the first section's pictures or headings (fast first paint), never loop forever and stay under the page-check limits. The document remembers the theme (`motion_theme`).
+- **Motion timeline:** for a section (mini toolbar *Motion timeline*, or *Open timeline* in the Motion group): each part's start and length as bars on a ruler — drag (snaps to 50 ms) or use the keyboard (←/→ start, Shift+←/→ length), easing per row, ▶ *Play section*; screen-reader text per row.
+- **Motion group rebuilt:** entrance tiles that preview on hover / focus (new: wipe up, wipe left, drop in, swing, scale down), easing chips with a curve (smooth, snappy, gentle, spring, bounce, linear), duration / delay / repeat / stagger, attention loops (new: wiggle, heartbeat, breathe, shine, slow spin), ▶ *Play*; new hover effects: 3D tilt, picture zoom, glare, pop, lift with shadow, shine.
+- **Text effects** on headings, texts and call-to-action titles: typewriter, rotating words ("Fresh mango / lychee / dates", Bangla words translatable), word-by-word and letter-by-letter reveal (Bangla conjuncts never split), gradient shimmer, highlight and underline that draw themselves. No layout shift; the full text stays the accessible text.
+- **Card hover** on product grids, carousels, tabs, listings, category cards, spotlight and shop the look: lift, picture zoom, 3D tilt, glare, second picture.
+- **Moving dividers:** section dividers can flow, drift or pulse; new shapes *layered waves* and *blob*.
+- **Editor:** *Motion* menu in the toolbar (themes, *Preview motion* — loops and effects run in the editor only while ticked —, *Play page*). Page check: `MOTION_LCP` (animated top picture or heading, one-click *Remove animation*), `MOTION_TOO_MUCH`, `TEXT_EFFECT_LONG`.
+- **Shoppers:** everything respects *reduce motion*; pages with motion longer than 5 seconds show an accessible **Pause animations** button (WCAG 2.2.2), remembered per browser. Motion uses transform, opacity, clip-path, light blur and background position only; text effects are a 2 kB lazy chunk. No new dependencies.
+
+#### Fixed
+- **Editor toolbar overflow:** on screens narrower than about 1700 px the last toolbar buttons (including *More page actions* → Version history) were pushed out of reach. Below 1600 px the secondary buttons (Motion, Insights, Comments, A/B tests, Check page, Preview) now show icons only (names kept for screen readers and tooltips), and the toolbar scrolls instead of clipping. Checked at 1280, 1366 and 1600 px.
+- Endless loops (`loop_forever`, from B9) had no way to pause them; the new Pause animations button covers them.
+
+#### Tests
+- Backend 1520 (PostgreSQL: 1519 pass, 1 opt-in skip; new `BuilderB18SchemaTest`, `StoreBuilderB18Test`); Pint clean. vitest 2538; mocked Playwright 444 + 1 mobile layout test that timed out under load (passes 3 / 3 alone) (new `storefront-motion-b18`, `store-builder-b18-motion`, `store-builder-b18-themes`).
+- Full-stack (PostgreSQL, desktop) 51 — new **B18**: a Green Basket campaign page with rotating words in English and Bangla saves with its motion theme, letter-by-letter on a long heading is refused, the page check flags the animated top heading, the shopper pauses the motion (remembered after a reload), and with *reduce motion* nothing runs and there is no pause button. Builder acceptance 5.
+
+#### Upgrade
+- No migration, no new setting. Published pages keep their motion unchanged until edited.
+
 ### AI2b — Shop assistant on the online store
 
 Optional and **off by default**: each store switches it on in *Online store → Assistant*. Same AI switch, key and monthly budget as AI1/AI2a. Details: [AI_INTEGRATION.md](docs/AI_INTEGRATION.md#ai2b--shopper-support-assistant-as-built-2026-11-20).

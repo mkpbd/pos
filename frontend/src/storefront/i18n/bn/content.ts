@@ -159,6 +159,8 @@ export const content: Translations<typeof en> = {
   'content.builder.template.listing': 'পণ্যের তালিকা',
   'content.builder.template.post': 'ব্লগ পোস্ট',
   'content.builder.template.order': 'অর্ডারের সারাংশ',
+  'content.motion.pause': 'অ্যানিমেশন থামান',
+  'content.motion.play': 'অ্যানিমেশন চালান',
 
   'content.section.openOffer': 'অফারটি দেখুন',
   'content.section.fromBlog': 'ব্লগ থেকে',

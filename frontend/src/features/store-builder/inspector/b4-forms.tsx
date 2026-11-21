@@ -41,6 +41,8 @@ import { parseVideoUrl } from '@/storefront/builder/validate'
 import { ColorControl } from '../controls'
 import type { FormProps } from './content-forms'
 import { FieldError, LinkField, NodeBangla } from './fields'
+import { TextEffectForm } from './b18-text-effect-form'
+import { textEffectBanglaFields } from './b18-text-effect'
 import { counter } from './format-text'
 import { ChoiceField, CouponPreview, IconPicker, ManageLink, MenuPicker, PixelField, PromotionPicker, SingleProductPicker, TextField, ToggleField, ZonedDateTimeField } from './pickers'
 import { B4_BOUNDS, B4_TEXT_LIMITS } from './validate'
@@ -258,6 +260,7 @@ export function CtaForm(props: B4FormProps<CtaElement>) {
         </fieldset>
       )}
       <ChoiceField label="Alignment" value={p.align} error={errors.align} options={ALIGN_OPTIONS} onChange={(align) => patch(node, onChange, { align })} />
+      <TextEffectForm node={node} onChange={onChange} errors={errors} />
       <Bangla
         {...props}
         fields={[
@@ -265,6 +268,7 @@ export function CtaForm(props: B4FormProps<CtaElement>) {
           { name: 'text', label: 'Text', base: p.text, kind: 'textarea' },
           { name: 'primary.label', label: 'Button text', base: p.primary.label },
           ...(p.secondary ? [{ name: 'secondary.label', label: 'Second button text', base: p.secondary.label }] : []),
+          ...textEffectBanglaFields(p.text_effect),
         ]}
       />
     </div>

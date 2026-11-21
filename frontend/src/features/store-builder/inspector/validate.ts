@@ -13,6 +13,9 @@ import { ICON_NAMES } from '@/storefront/builder/icons'
 import { B8A_TYPES as B8A_TYPE_LIST } from '@/storefront/builder/elements/b8a-types'
 import {
   B14_TEXT_LIMITS,
+  B18_ENUMS,
+  B18_LIMITS,
+  b18PropProblems,
   B4_ENUMS,
   B17_TEXT_LIMITS,
   b17PropProblems,
@@ -34,6 +37,7 @@ import {
   normalizeSectionShape,
   normalizeWidthValue,
   parseVideoUrl,
+  plainTextOf,
   safeUrl,
   type PropProblem,
 } from '@/storefront/builder/validate'
@@ -110,6 +114,12 @@ const B6_TEXTS = { ...B6_TEXT_LIMITS, ...B8A_TEXT_LIMITS, form: B8B_TEXT_LIMITS.
  * B6 list fields are patterns (`items.*.title`, `labels.*`); see `translationLimit`.
  */
 export function translatableFields(type: string): Record<string, number> {
+  const fields = ownTranslatableFields(type)
+  // B18: the rotating words of a text effect.
+  return (B18_ENUMS.textEffectElements as readonly string[]).includes(type) ? { ...fields, 'text_effect.words.*': B18_LIMITS.textEffectWordLength } : fields
+}
+
+function ownTranslatableFields(type: string): Record<string, number> {
   const b6 = B6_TEXTS[type]
   if (b6) return Object.fromEntries(Object.entries(b6).filter(([field]) => !(B6_NOT_TRANSLATED[type] ?? []).includes(field)))
   const b4 = B4_TEXT_LIMITS[type]
@@ -346,6 +356,34 @@ function validateB4(node: Element, add: (path: string, message: string) => void,
   }
 }
 
+/* ----------------------------------------------------------------------------------------------
+ * B18: text effects and card hover (b18PropProblems) with messages
+ * -------------------------------------------------------------------------------------------- */
+
+function b18Message(problem: PropProblem): string {
+  if (problem.path === 'card_hover') return 'This card hover isn’t available for this element.'
+  if (problem.path === 'text_effect.type') return problem.code === 'too_long' ? `Letter by letter is for short texts (at most ${B18_LIMITS.revealLettersMax} characters). Choose another effect or shorten the text.` : 'Choose an effect.'
+  if (problem.path === 'text_effect.words') return problem.code === 'too_many' ? `At most ${B18_LIMITS.textEffectWords.max} words.` : 'Add at least one word.'
+  if (problem.path.startsWith('text_effect.words.')) return problem.code === 'too_long' ? `At most ${B18_LIMITS.textEffectWordLength} characters.` : 'Enter a word or remove it.'
+  if (problem.path === 'text_effect.cycles') return `Choose 1 to ${B18_LIMITS.textEffectCycles.max} times, or until paused.`
+  return 'Choose one of the options.'
+}
+
+function validateB18(node: Element, add: (path: string, message: string) => void) {
+  for (const problem of b18PropProblems(node.type, node.props)) add(`props.${problem.path}`, b18Message(problem))
+  // Letter by letter: each translation of the text is short too (the server checks them as well).
+  const effect = (node.props as { text_effect?: { type?: unknown } }).text_effect
+  if (effect?.type !== 'reveal_letters') return
+  const field = node.type === 'heading' ? 'text' : node.type === 'text' ? 'html' : node.type === 'cta' ? 'title' : null
+  if (!field) return
+  for (const [locale, texts] of Object.entries(node.translations ?? {})) {
+    const text = texts?.[field]
+    if (typeof text !== 'string' || text === '') continue
+    const plain = node.type === 'text' ? plainTextOf(text) : text
+    if (plain.length > B18_LIMITS.revealLettersMax) add(`translations.${locale}.${field}`, `Letter by letter is for short texts: at most ${B18_LIMITS.revealLettersMax} characters.`)
+  }
+}
+
 /** The maximum length of a stored translation key (`items.i_ab12cd.title` → the `items.*.title` limit); undefined = not translatable. */
 export function translationLimit(type: string, key: string): number | undefined {
   for (const [pattern, max] of Object.entries(translatableFields(type))) if (matchesTranslatable(pattern, key)) return max
@@ -552,6 +590,8 @@ export function orderFormMessage(problem: PropProblem): string {
 }
 
 function validateElement(node: Element, add: (path: string, message: string) => void, icons: readonly string[], context?: DocumentContext, template: StoreTemplateKey | null = null) {
+  // B18: the text effect (heading, text, cta) and the card hover (product listings), whatever the type's own rules.
+  validateB18(node, add)
   if (B14_TYPES.has(node.type)) {
     // B14: live text and the store page main parts (the field and the listing scope depend on the page).
     for (const problem of b14Problems(node.type, node.props, template, context === 'template')) add(problem.path, problem.message)

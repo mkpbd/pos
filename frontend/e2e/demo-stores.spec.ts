@@ -1593,6 +1593,104 @@ test('B16: Green Basket — one editor at a time, a comment with a mention, the 
   await ownerContext.close()
 })
 
+test('B18: Green Basket animates a campaign page — rotating words in two languages, a motion theme marker, the page check, and shoppers can pause or switch motion off', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+  const ownerContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const owner = await ownerContext.newPage()
+  await signIn(owner, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await ownerContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return owner.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  type Node = { id: string; type?: string; props?: Record<string, unknown>; style?: Record<string, any>; translations?: Record<string, any>; columns?: { elements: Node[] }[] }
+  const firstHeading = (node: Node): Node | null => {
+    for (const column of node.columns ?? []) for (const element of column.elements) {
+      if (element.type === 'heading') return element
+      const inner = firstHeading(element)
+      if (inner) return inner
+    }
+    return null
+  }
+  const section = async (text: string) => {
+    const made = (await call('POST', '/api/v1/storefront/builder/templates/neutral-how-it-works/instantiate', { context: 'page' })).body.data.nodes[0] as Node
+    const heading = firstHeading(made)!
+    heading.props = { ...heading.props, text }
+    heading.translations = {}
+    return { section: made, heading }
+  }
+
+  // Section 1 (top): a heading with an entrance → the page check warns (slower first paint).
+  const top = await section('Green Basket fresh week')
+  top.heading.style = { ...(top.heading.style ?? {}), base: { ...(top.heading.style?.base ?? {}), motion: { entrance: 'slide-up', easing: 'spring' } } }
+  // Section 2: rotating words (English + Bangla) and an endless "breathe" loop → shoppers get a pause button.
+  const words = await section('Fresh')
+  words.heading.props = { ...words.heading.props, text_effect: { type: 'rotate_words', words: ['mango', 'lychee', 'dates'] } }
+  words.heading.translations = { bn: { text: 'তাজা', 'text_effect.words.0': 'আম', 'text_effect.words.1': 'লিচু', 'text_effect.words.2': 'খেজুর' } }
+  words.heading.style = { ...(words.heading.style ?? {}), base: { ...(words.heading.style?.base ?? {}), motion: { entrance: 'none', loop: 'breathe', loop_forever: true } } }
+
+  let doc = await call('POST', '/api/v1/storefront/builder/documents', { kind: 'page', key: 'landing:b18-motion', title: 'B18 motion', from: 'blank' })
+  if (doc.status === 409) {
+    const existing = ((await call('GET', '/api/v1/storefront/builder/documents')).body.data as { id: string; key: string }[]).find((d) => d.key === 'landing:b18-motion')!
+    doc = await call('GET', `/api/v1/storefront/builder/documents/${existing.id}`)
+  }
+  const docId = doc.body.data.id as string
+  const content = { schema_version: 1, seo: { title: null, description: null, image: null, noindex: false, translations: {} }, sections: [top.section, words.section], motion_theme: 'lively' }
+  const saved = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: doc.body.data.draft_revision, content })
+  expect(saved.status).toBe(200)
+  expect(saved.body.data.content.motion_theme).toBe('lively')
+  // Letter-by-letter on a long heading is refused with a plain reason.
+  const tooLong = structuredClone(content)
+  firstHeading(tooLong.sections[1] as Node)!.props!.text_effect = { type: 'reveal_letters' }
+  firstHeading(tooLong.sections[1] as Node)!.props!.text = 'A heading that is far too long for letters to appear one by one without boring the shopper'
+  const refused = await call('PUT', `/api/v1/storefront/builder/documents/${docId}/draft`, { revision: saved.body.data.draft_revision, content: tooLong })
+  expect(refused.status).toBe(422)
+  expect(JSON.stringify(refused.body.error)).toContain('TEXT_EFFECT_TOO_LONG')
+
+  // The page check flags the animated top heading (a warning — publishing still works).
+  const check = await call('POST', `/api/v1/storefront/builder/documents/${docId}/check`, {})
+  expect(JSON.stringify(check.body.data)).toContain('MOTION_LCP')
+  expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B18' })).status).toBe(200)
+
+  // A shopper sees the rotating words (the full text is the heading's accessible name) and can pause the motion.
+  await page.setViewportSize({ width: 1366, height: 900 })
+  await page.goto(`${base}/p/b18-motion`)
+  await expect(page.getByRole('heading', { name: 'Fresh mango, lychee, dates' })).toBeVisible({ timeout: 30_000 })
+  const pause = page.getByRole('button', { name: 'Pause animations' })
+  await expect(pause).toBeVisible()
+  await pause.click()
+  await expect(page.locator('html')).toHaveAttribute('data-b-paused', '')
+  await expect(page.getByRole('button', { name: 'Play animations' })).toHaveAttribute('aria-pressed', 'true')
+  // The choice is remembered on the next visit.
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-b-paused', '')
+  await page.getByRole('button', { name: 'Play animations' }).click()
+  await expect(page.locator('html')).not.toHaveAttribute('data-b-paused', /.*/)
+
+  // In Bangla the rotating words are translated.
+  await page.goto(`${base}/p/b18-motion?lang=bn`)
+  await expect(page.getByRole('heading', { name: 'তাজা আম, লিচু, খেজুর' })).toBeVisible({ timeout: 30_000 })
+
+  // With "reduce motion" switched on, nothing moves: no pause button, the first word stands still.
+  const calm = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' })
+  const calmPage = await calm.newPage()
+  await calmPage.goto(`${base}/p/b18-motion`)
+  await expect(calmPage.getByRole('heading', { name: 'Fresh mango, lychee, dates' })).toBeVisible({ timeout: 30_000 })
+  await expect(calmPage.getByRole('button', { name: /Pause animations|Play animations/ })).toHaveCount(0)
+  expect(await calmPage.evaluate<number>('document.getAnimations().filter((a) => a.playState === "running").length')).toBe(0)
+  expect(await calmPage.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+  await calm.close()
+  await ownerContext.close()
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

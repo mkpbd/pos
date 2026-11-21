@@ -118,6 +118,9 @@ import { CommentsPanel } from './collab/comments-panel'
 import { PresenceBanner } from './collab/presence-ui'
 import { useComments } from './collab/use-comments'
 import { noteBlocked, usePresence } from './collab/use-presence'
+import { MotionThemesDialog } from './timeline/motion-themes-dialog'
+import { MotionTimelinePanel } from './timeline/motion-timeline'
+import { MotionUiContext, useMotionStudio } from './timeline/motion-ui'
 
 /*
  * The full-screen store builder editor (B2): toolbar, Add / Layers panel, canvas, inspector;
@@ -410,6 +413,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   // B12: the command box (Ctrl/Cmd+K) and the keyboard shortcut sheet (?).
   const [commandOpen, setCommandOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  // B18: the Motion themes dialog and the section's Motion timeline panel.
+  const { ui: motionUi, themesOpen: motionThemesOpen, setThemesOpen: setMotionThemesOpen, openThemes: openMotionThemes, timelineId, closeTimeline } = useMotionStudio()
+  const openTimeline = motionUi.openTimeline
   // Escape that reaches the editor from the canvas (focus not yet moved into the dialog) closes them too.
   const overlaysOpen = useRef(false)
   useEffect(() => {
@@ -494,6 +500,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   // B13: "Preview as" (null = show everything) and the "Who sees this" badges on the canvas.
   const previewContext = usePreviewContext()
   const audience = useAudienceBadges(expanded.content, previewContext)
+  // B18 (editor A): "Preview motion" runs loops and text effects on the canvas; "▶ Play page" plays every entrance in order.
+  const previewMotion = useEditor((s) => s.previewMotion)
+  const playPage = () => onCanvas(canvas, (handle) => handle.playMotion(store.getState().content.sections[0]?.id ?? '', 'page'))
   // B13: one version of each A/B test on the canvas, with its "Showing version A | B" switch.
   const canvasArms = useCanvasArms(sections)
   // B12: the phone / tablet order the canvas draws with (globals' column orders merged in).
@@ -1322,8 +1331,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       history: () => setHistoryOpen(true),
       styles: () => setStylesOpen(true),
       shortcuts: () => setShortcutsOpen(true),
+      motion: openMotionThemes,
     }),
-    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck, readOnly],
+    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck, readOnly, openMotionThemes],
   )
   const insightsShown = insights.open && !checkOpen
   const abShown = abAvailable && ab.open && !checkOpen && !insightsShown
@@ -1453,6 +1463,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
 
   return (
     <TemplateSampleContext value={templateSample}>
+    <MotionUiContext value={motionUi}>
     <DndContext sensors={readOnly ? NO_SENSORS : sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={(e) => onDragMove(e as unknown as DragMoveEvent)} onDragEnd={onDragEnd} onDragCancel={resetDrag} autoScroll={{ layoutShiftCompensation: false }}>
       <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground" data-testid="store-builder-editor">
         <Toolbar
@@ -1522,6 +1533,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           people={people}
           comments={{ open: commentsShown, count: comments.openCount, onToggle: toggleComments }}
           onDownload={canManage && documentInfo.kind !== 'theme' ? () => void downloadCopy() : undefined}
+          onMotionThemes={openMotionThemes}
+          onPlayPage={playPage}
         />
         <PresenceBanner ui={presenceUi} />
         <div className="flex min-h-0 flex-1">
@@ -1662,6 +1675,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               uploads={uploads}
               heat={checkOpen ? null : insights.heat}
               previewAs={previewContext}
+              previewMotion={previewMotion}
               audienceBadges={audience.badges}
               arms={canvasArms.layer}
               pageContext={livesText ? templateSample.context : undefined}
@@ -1669,6 +1683,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               pins={pinLayer}
               onCommentAt={comments.mode && commentsShown ? dropComment : null}
             />
+            <MotionTimelinePanel nodeId={timelineId} onClose={closeTimeline} />
           </main>
           <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
             {/* B9: a global section reference has its own panel; so does a global's document with nothing selected. */}
@@ -1710,9 +1725,11 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                     }
                     case 'open-site-styles':
                       return setStylesOpen(true)
+                    case 'open-motion-timeline':
+                      return openTimeline(command.sectionId)
                     case 'preview-motion':
                       canvas.current?.scrollTo(command.nodeId)
-                      return canvas.current?.playMotion(command.nodeId)
+                      return canvas.current?.playMotion(command.nodeId, command.scope)
                     case 'set-popup': {
                       const settings = command.settings
                       return void state.apply((c) => ({ ...c, popup: settings }), { coalesceKey: command.coalesceKey })
@@ -1752,6 +1769,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
 
       <SiteStylesDrawer open={stylesOpen} onOpenChange={setStylesOpen} styles={siteStyles} canPublish={canPublish} />
       <CommandBox open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} />
+      <MotionThemesDialog open={motionThemesOpen} onOpenChange={setMotionThemesOpen} />
       <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <PublishDialog
         open={publishOpen}
@@ -1849,6 +1867,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         }}
       />
     </DndContext>
+    </MotionUiContext>
     </TemplateSampleContext>
   )
 }

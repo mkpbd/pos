@@ -1,3 +1,4 @@
+import { stripTextEffects } from '../text-effect'
 import { elementMeta, isWrappedSectionType, NODE_ID } from '../registry'
 import type { RenderColumn, RenderElement, RenderPageSection } from '../types'
 import type { ImageDropTarget, TextFieldKind } from './protocol'
@@ -52,7 +53,8 @@ export function textFields(node: { type: string; props?: unknown }): FieldValue[
   for (const pattern of meta.translatable) {
     const parts = pattern.split('.')
     const last = parts[parts.length - 1]!
-    if (HIDDEN.has(last)) continue
+    // B18: rotating words are edited in the inspector, never in place on the canvas.
+    if (HIDDEN.has(last) || parts[0] === 'text_effect') continue
     expand(node.props, parts, [], out, last === 'html')
   }
   return out
@@ -73,6 +75,15 @@ function keepsLines(element: HTMLElement): boolean {
   const view = element.ownerDocument.defaultView
   const ws = view ? view.getComputedStyle(element).whiteSpace : ''
   return ws === 'pre-line' || ws === 'pre-wrap' || ws === 'pre' || ws === 'break-spaces'
+}
+
+/** B18: an element's markup without the text effect decorations (rotating slot, highlight marks, the animated copy). */
+function effectFreeMarkup(element: HTMLElement): string {
+  if (!element.querySelector('[data-b-te-slot],[data-b-te-wrap],.b-te-fx')) return element.innerHTML
+  const copy = element.cloneNode(true) as HTMLElement
+  copy.querySelectorAll('.b-te-fx').forEach((overlay) => overlay.remove())
+  stripTextEffects(copy)
+  return copy.innerHTML
 }
 
 /** Elements under (and including) the root, outside nested nodes (their own `data-b`) and global sections. */
@@ -96,7 +107,7 @@ export function fieldTargets(root: HTMLElement, node: { type: string; props?: un
     let found: HTMLElement | null = null
     if (field.html) {
       const markup = htmlMarkup(field.value)
-      found = elements.find((el) => !claimed.has(el) && (el === root || el.classList.contains('sf-rich-text')) && el.innerHTML === markup) ?? null
+      found = elements.find((el) => !claimed.has(el) && (el === root || el.classList.contains('sf-rich-text')) && effectFreeMarkup(el) === markup) ?? null
     } else {
       const text = normalize(field.value)
       const matches = elements.filter((el) => !claimed.has(el) && normalize(el.textContent ?? '') === text)

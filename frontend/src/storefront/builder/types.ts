@@ -63,10 +63,18 @@ export type MotionEntrance =
   | 'bounce-in'
   | 'blur-in'
   | 'rotate-in'
+  /** B18: clip-path wipes, drop-in, swing and scale-down. */
+  | 'mask-up'
+  | 'mask-left'
+  | 'drop-in'
+  | 'swing'
+  | 'scale-down'
 /** B9: `once` (default) or `every_time` the node re-enters the viewport. */
 export type MotionRepeat = 'once' | 'every_time'
 /** B9 attention loops (buttons, badges, icons): pause on hover / focus; 3 cycles then stop unless `loop_forever`. */
-export type MotionLoop = 'none' | 'pulse' | 'float' | 'shake' | 'glow'
+export type MotionLoop = 'none' | 'pulse' | 'float' | 'shake' | 'glow' | 'wiggle' | 'heartbeat' | 'breathe' | 'shine' | 'spin-slow'
+/** B18: the entrance's easing curve (absent = smooth). `spring` / `bounce` use CSS `linear()` with a cubic-bezier fallback. */
+export type MotionEasing = 'smooth' | 'snappy' | 'gentle' | 'spring' | 'bounce' | 'linear'
 /**
  * `duration` 200–2000 ms (default 600), `delay` 0–2000 ms (default 0). B9 (all optional, sparse;
  * absent = the default): `repeat` (default once), `stagger_children` 0–500 ms (sections and inner
@@ -81,10 +89,12 @@ export type Motion = {
   stagger_children?: number
   loop?: MotionLoop
   loop_forever?: boolean
+  /** B18: kept whenever valid (also with `entrance: 'none'`); absent = smooth. */
+  easing?: MotionEasing
 }
 
 /** B9 style group `hover` (any node, `base` only): desktop pointers on hover, everyone on `:focus-visible`. */
-export type HoverEffect = 'none' | 'lift' | 'grow' | 'shrink' | 'tilt' | 'glow' | 'underline'
+export type HoverEffect = 'none' | 'lift' | 'grow' | 'shrink' | 'tilt' | 'glow' | 'underline' | 'tilt-3d' | 'zoom-image' | 'glare' | 'pop' | 'lift-shadow' | 'shine'
 /** `duration` 100–600 ms (default 250). */
 export type HoverStyle = { effect: HoverEffect; duration?: number }
 
@@ -174,12 +184,38 @@ export type WrappedSectionProps = {
   subtitle: string | null
   config: Record<string, unknown>
   items: { item_type: string; item_id: string }[]
+  /** B18: product_grid / product_carousel / product_tabs (absent = none). */
+  card_hover?: CardHover
 }
 
 type ElementOf<T extends string, P> = NodeCommon & { type: T; props: P }
 
-export type HeadingElement = ElementOf<'heading', { text: string; level: 1 | 2 | 3 | 4 | 5 | 6; link: Link }>
-export type TextElement = ElementOf<'text', { html: string }>
+/* B18 text effects (heading, text, cta → its title) and card hover (product listing elements). */
+export type TextEffectType = 'none' | 'typewriter' | 'rotate_words' | 'reveal_words' | 'reveal_letters' | 'gradient_shimmer' | 'highlight_draw' | 'underline_draw'
+export type TextEffectSpeed = 'slow' | 'normal' | 'fast'
+export type TextEffectColorRole = 'primary' | 'accent' | 'secondary'
+/**
+ * B18 `props.text_effect` (absent = none; the server drops `{type: 'none'}`). `words`: rotate_words
+ * only (1–6, each 1–40 chars; translatable as `text_effect.words.<index>`). `cycles`: typewriter and
+ * rotate_words only — 1–5, explicit null = until paused, absent = the default (typewriter 1 run,
+ * rotate_words until paused). reveal_letters only for texts ≤ 80 characters.
+ */
+export type TextEffect = {
+  type: Exclude<TextEffectType, 'none'>
+  words?: string[]
+  speed?: TextEffectSpeed
+  color_role?: TextEffectColorRole
+  cycles?: number | null
+}
+/** B18 `props.card_hover` (absent = none); `second_image` on product_grid / product_carousel / product_tabs / product_listing only. */
+export type CardHover = 'none' | 'lift' | 'zoom_image' | 'tilt_3d' | 'glare' | 'second_image'
+/** B18 animated section dividers (absent = still). */
+export type ShapeAnimate = 'none' | 'flow' | 'drift' | 'pulse'
+/** B18 document top-level `motion_theme`: a label of the last applied motion theme (the motion lives on the nodes). */
+export type MotionTheme = 'calm' | 'lively' | 'festive' | 'premium' | 'minimal'
+
+export type HeadingElement = ElementOf<'heading', { text: string; level: 1 | 2 | 3 | 4 | 5 | 6; link: Link; text_effect?: TextEffect }>
+export type TextElement = ElementOf<'text', { html: string; text_effect?: TextEffect }>
 export type ImageElement = ElementOf<
   'image',
   { media_id: string | null; alt: string; link: Link; aspect: 'auto' | '1:1' | '4:3' | '3:2' | '16:9' | '3:4'; fit: 'cover' | 'contain' }
@@ -229,7 +265,7 @@ export type CountdownElement = ElementOf<
 >
 export type DiscountElement = ElementOf<'discount', { promotion_id: string | null; title: string; text: string; show_code: boolean; button_label: string; link: Link }>
 export type CtaButton = { label: string; link: { url: string } }
-export type CtaElement = ElementOf<'cta', { title: string; text: string; primary: CtaButton; secondary: CtaButton | null; align: 'left' | 'center' | 'right' }>
+export type CtaElement = ElementOf<'cta', { title: string; text: string; primary: CtaButton; secondary: CtaButton | null; align: 'left' | 'center' | 'right'; text_effect?: TextEffect }>
 export type SearchBoxElement = ElementOf<'search_box', { placeholder: string; button_label: string }>
 /** `title` null = the product's name. */
 export type PromoCardElement = ElementOf<'promo_card', { product_id: string | null; badge: string; title: string | null; text: string; button_label: string }>
@@ -367,13 +403,13 @@ export type MapElement = ElementOf<'map', { query: string; title: string; height
 /** `title` null = the category's name; `media_id` overrides the category image. */
 export type CategoryCardElement = ElementOf<
   'category_card',
-  { category_id: string | null; media_id: string | null; title: string | null; button_label: string; layout: 'overlay' | 'below' }
+  { category_id: string | null; media_id: string | null; title: string | null; button_label: string; layout: 'overlay' | 'below'; card_hover?: CardHover }
 >
-export type ProductSpotlightElement = ElementOf<'product_spotlight', { product_id: string | null; layout: 'image-left' | 'image-right'; show_description: boolean; badge: string }>
+export type ProductSpotlightElement = ElementOf<'product_spotlight', { product_id: string | null; layout: 'image-left' | 'image-right'; show_description: boolean; badge: string; card_hover?: CardHover }>
 
 /** `x` / `y` in percent of the image (0–100, ≤ 2 decimals). */
 export type Hotspot = { id: string; x: number; y: number; product_id: string }
-export type ShopTheLookElement = ElementOf<'shop_the_look', { media_id: string | null; alt: string; title: string; hotspots: Hotspot[] }>
+export type ShopTheLookElement = ElementOf<'shop_the_look', { media_id: string | null; alt: string; title: string; hotspots: Hotspot[]; card_hover?: CardHover }>
 
 /** B17: an optional `link` (the key is absent when unset); 1–8 items. */
 export type TrustBadgeItem = { id: string; icon: string; title: string; text: string; link?: Link }
@@ -730,8 +766,9 @@ export type Element =
 export type ElementType = Element['type']
 
 /** B6 section shape divider (inline SVG, decorative). `height` px 16–200. */
-export type SectionShapeKind = 'wave' | 'curve' | 'tilt' | 'triangle' | 'zigzag'
-export type SectionShape = { shape: SectionShapeKind; color: Color; height: number; flip: boolean }
+export type SectionShapeKind = 'wave' | 'curve' | 'tilt' | 'triangle' | 'zigzag' | 'layered_waves' | 'blob'
+/** B18 `animate`: kept only when not none (absent = still). */
+export type SectionShape = { shape: SectionShapeKind; color: Color; height: number; flip: boolean; animate?: Exclude<ShapeAnimate, 'none'> }
 
 export type SectionProps = {
   layout: 'boxed' | 'full' | 'full-bleed'
@@ -848,7 +885,7 @@ export type PageSeo = {
  * GlobalSectionNode entries (see DocumentSection) — typed `Section[]` for older code, check with
  * `isGlobalSectionNode`.
  */
-export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo; device_order?: DeviceOrder; experiments?: Experiment[] }
+export type BuilderDocument = { schema_version: 1; sections: Section[]; popup?: PopupSettings; seo?: PageSeo; device_order?: DeviceOrder; experiments?: Experiment[]; motion_theme?: MotionTheme }
 
 /**
  * B12: per-device order of a container's children, by container id → the children's ids in the

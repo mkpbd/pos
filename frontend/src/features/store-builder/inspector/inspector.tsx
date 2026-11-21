@@ -43,6 +43,8 @@ import { readPopupSettings } from '../popup-model'
 import { ElementSetupHost } from './setup-dialog'
 import { SeoPanel } from './seo-panel'
 import { hasSeo } from './seo-panel-model'
+import { CardHoverPicker } from './b18-card-hover'
+import { CARD_HOVER_ELEMENTS } from './b18-text-effect'
 import { StyleTab } from './style-tab'
 import { MultiInspector } from './common-style-form'
 import { findParent, otherAnchors } from './tree-lookup'
@@ -398,6 +400,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
             documentId={document.id}
             b4={{ context, theme, icons, canCustomHtml, enums: registry.enums, template }}
           />
+          {CARD_HOVER_ELEMENTS.has(node.type) && <CardHoverPicker node={node} onChange={onChange} error={errors.card_hover} />}
           </ReadOnlyFields>
         </TabsContent>
         <TabsContent value="style" className="pt-4">

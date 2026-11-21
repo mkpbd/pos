@@ -39,8 +39,13 @@ export type InspectorCommand =
   | { type: 'set-column-width'; columnId: string; device: Device; width: number | null }
   /** B3: open the Site styles drawer (theme draft). */
   | { type: 'open-site-styles' }
-  /** B6: replay the node's entrance animation on the canvas ("Preview animation"). */
-  | { type: 'preview-motion'; nodeId: string }
+  /**
+   * B6: replay the node's entrance animation on the canvas (B18 "▶ Play"). B18 `scope`: `section`
+   * plays a section with its elements in order (default: the canvas decides by the node).
+   */
+  | { type: 'preview-motion'; nodeId: string; scope?: 'node' | 'section' | 'page' }
+  /** B18: open the Motion timeline of a section (an inner row id: its section). Editor B's panel. */
+  | { type: 'open-motion-timeline'; sectionId: string }
   /**
    * A banner of the page was edited from the inspector: in place (`replaced` null) or copied by
    * the server (swap `old_id` for `new_id` in the draft, one undo step). Either way the canvas

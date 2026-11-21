@@ -31,7 +31,8 @@ export type CanvasHandle = {
   scrollTo: (id: string) => void
   scrollBy: (dy: number) => void
   /** B6: replays the node's entrance animation once. */
-  playMotion: (id: string) => void
+  /** B18: `scope` page plays every entrance top to bottom (the id is ignored); section: the id's section in order. */
+  playMotion: (id: string, scope?: 'node' | 'section' | 'page') => void
   /** A client (parent window) point in canvas viewport pixels; null outside the canvas. */
   toCanvasPoint: (clientX: number, clientY: number) => { x: number; y: number } | null
   rects: () => Record<string, Rect>
@@ -137,10 +138,12 @@ export type CanvasFrameProps = {
    * of selecting; the wheel still scrolls the page. Null: off.
    */
   onCommentAt?: ((point: { x: number; y: number }) => void) | null
+  /** B18: the toolbar's "Preview motion" — loops, text effects and animated dividers run on the canvas while on (default off). */
+  previewMotion?: boolean
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null, previewMotion = false } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -263,6 +266,17 @@ export function CanvasFrame(props: CanvasFrameProps) {
     sentPreview.current = { ready, context: previewAs }
   }, [ready, previewAs, send])
 
+  // B18: "Preview motion" on change and after every `ready` — a new canvas page starts with it off.
+  const sentMotion = useRef<{ ready: number; on: boolean }>({ ready: 0, on: false })
+  useEffect(() => {
+    if (ready === 0) return
+    const last = sentMotion.current
+    if (last.ready === ready && last.on === previewMotion) return
+    sentMotion.current = { ready, on: previewMotion }
+    if (last.ready !== ready && !previewMotion) return
+    send({ type: 'preview-motion', on: previewMotion })
+  }, [ready, previewMotion, send])
+
   // B14: the page context after every `ready` and on change (before the render that uses it).
   useEffect(() => {
     if (ready === 0 || pageContext === undefined) return
@@ -317,7 +331,7 @@ export function CanvasFrame(props: CanvasFrameProps) {
     () => ({
       scrollTo: (id) => send({ type: 'scroll-to', id }),
       scrollBy: (dy) => send({ type: 'scroll-by', dy }),
-      playMotion: (id) => send({ type: 'play-motion', id }),
+      playMotion: (id, scope) => send(scope ? { type: 'play-motion', id, scope } : { type: 'play-motion', id }),
       toCanvasPoint: (clientX, clientY) => {
         const frame = frameRef.current
         if (!frame) return null

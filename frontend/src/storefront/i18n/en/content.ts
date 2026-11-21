@@ -159,6 +159,8 @@ export const content = {
   'content.builder.template.listing': 'Product listing',
   'content.builder.template.post': 'Blog post',
   'content.builder.template.order': 'Order summary',
+  'content.motion.pause': 'Pause animations',
+  'content.motion.play': 'Play animations',
 
   'content.section.openOffer': 'Open offer',
   'content.section.fromBlog': 'From the blog',

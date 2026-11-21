@@ -95,4 +95,5 @@ export const ACTION_WORDS: Record<string, string> = {
   redo: 'আবার again',
   'save-copy': 'কপি সংরক্ষণ named version checkpoint',
   shortcuts: 'শর্টকাট কিবোর্ড keyboard keys help',
+  motion: 'অ্যানিমেশন মোশন নড়াচড়া animation animate motion theme effects calm lively festive premium minimal remove',
 }

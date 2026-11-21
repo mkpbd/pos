@@ -1,3 +1,4 @@
+import { stripTextEffects } from '../text-effect'
 import type { TextFieldKind } from './protocol'
 import { sanitizeHtml, sanitizeRichText } from './sanitize'
 import type { FieldTarget } from './text-fields'
@@ -84,6 +85,9 @@ export class TextEditSession {
   /** Makes the element editable and focuses it: the caret at `point` (a double-click) or everything selected. */
   start(point?: { x: number; y: number }) {
     const el = this.element
+    // B18: the text effect's decorations are not part of the text being edited.
+    el.querySelectorAll('.b-te-fx').forEach((overlay) => overlay.remove())
+    stripTextEffects(el)
     el.dataset.bEditing = this.kind
     if (this.kind === 'html') el.setAttribute('contenteditable', 'true')
     else {

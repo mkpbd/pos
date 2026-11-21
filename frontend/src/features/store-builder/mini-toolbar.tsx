@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, BookmarkPlusIcon, ClipboardCopyIcon, CopyIcon, EllipsisIcon, EyeIcon, EyeOffIcon, GlobeIcon, GripVerticalIcon, ImageUpIcon, PaintbrushIcon, PaintBucketIcon, PencilIcon, RowsIcon, SquareDashedIcon, TypeIcon, Trash2Icon, XIcon } from 'lucide-react'
+import { ArrowDownIcon, ArrowUpIcon, ArrowUpLeftIcon, BookmarkPlusIcon, ChartGanttIcon, ClipboardCopyIcon, CopyIcon, EllipsisIcon, EyeIcon, EyeOffIcon, GlobeIcon, GripVerticalIcon, ImageUpIcon, PaintbrushIcon, PaintBucketIcon, PencilIcon, RowsIcon, SquareDashedIcon, TypeIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -19,6 +19,7 @@ import { NOT_SIBLINGS_REASON, siblingGroup } from './selection'
 import { useEditor, useEditorStoreApi, useSelectedIds } from './store'
 import { findNode } from './tree'
 import { dropTargetOf } from './media-upload'
+import { useMotionUi } from './timeline/motion-ui'
 
 /** `reason`: why it can't be used now — the button stays focusable, says why and shows the reason when pressed. */
 function ToolButton({ label, onClick, disabled, reason, children }: { label: string; onClick: () => void; disabled?: boolean; reason?: string | null; children: ReactNode }) {
@@ -50,6 +51,7 @@ function SingleToolbar({ theme, onEditText, onReplacePicture }: { theme?: QuickT
   const device = useEditor((s) => s.device)
   const { registry, globals } = useEditorUi()
   const commands = useCommands()
+  const motionUi = useMotionUi()
   const info = findNode(content, selection)
   const dragged: Dragged | null = info && info.kind !== 'column' ? { kind: 'node', id: info.node.id, type: info.node.type } : null
   const { attributes, listeners, setNodeRef } = useDraggable({ id: `canvas-drag:${selection ?? ''}`, data: { dragged }, disabled: dragged === null })
@@ -110,6 +112,12 @@ function SingleToolbar({ theme, onEditText, onReplacePicture }: { theme?: QuickT
           <ToolButton label="Copy (paste it on any page)" onClick={() => commands.copy(id)}>
             <ClipboardCopyIcon aria-hidden />
           </ToolButton>
+          {/* B18: the section's motion timeline. */}
+          {info.kind === 'section' && !ref && motionUi && (
+            <ToolButton label="Motion timeline" onClick={() => motionUi.openTimeline(id)}>
+              <ChartGanttIcon aria-hidden />
+            </ToolButton>
+          )}
           {info.kind === 'section' && commands.requestSaveTemplate && (
             <ToolButton label="Save as template" onClick={() => commands.requestSaveTemplate?.(id)}>
               <BookmarkPlusIcon aria-hidden />

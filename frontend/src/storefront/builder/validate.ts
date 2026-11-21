@@ -15,8 +15,11 @@ import type {
   GlobalContext,
   GlobalSectionNode,
   Gradient,
+  CardHover,
   HoverStyle,
   GradientStop,
+  MotionTheme,
+  TextEffect,
   Length,
   Motion,
   PageSeo,
@@ -202,6 +205,9 @@ export function normalizeMotion(value: unknown): Motion | undefined {
   const loop = oneOf(value.loop, B9_ENUMS.motionLoop)
   if (loop) motion.loop = loop
   if (typeof value.loop_forever === 'boolean') motion.loop_forever = value.loop_forever
+  // B18: kept whenever valid, also with `entrance: 'none'`.
+  const easing = oneOf(value.easing, B18_ENUMS.motionEasing)
+  if (easing) motion.easing = easing
   return motion
 }
 
@@ -527,9 +533,10 @@ export function normalizeListingColumns(value: unknown): ListingColumns {
  * -------------------------------------------------------------------------------------------- */
 
 export const B6_ENUMS = {
-  /** B9 adds flip-up, flip-left, bounce-in, blur-in and rotate-in. */
-  motionEntrance: ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'flip-up', 'flip-left', 'bounce-in', 'blur-in', 'rotate-in'],
-  shape: ['wave', 'curve', 'tilt', 'triangle', 'zigzag'],
+  /** B9 adds flip-up, flip-left, bounce-in, blur-in and rotate-in; B18 mask-up, mask-left, drop-in, swing and scale-down. */
+  motionEntrance: ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'flip-up', 'flip-left', 'bounce-in', 'blur-in', 'rotate-in', 'mask-up', 'mask-left', 'drop-in', 'swing', 'scale-down'],
+  /** B18 adds layered_waves and blob. */
+  shape: ['wave', 'curve', 'tilt', 'triangle', 'zigzag', 'layered_waves', 'blob'],
   accordionStyle: ['plain', 'boxed'],
   tabsLayout: ['horizontal', 'vertical'],
   iconBoxLayout: ['top', 'left'],
@@ -622,7 +629,11 @@ export function normalizeSectionShape(value: unknown): SectionShape | null {
   const shape = oneOf(value.shape, B6_ENUMS.shape)
   const color = normalizeColor(value.color)
   if (!shape || !color || !isInt(value.height, B6_LIMITS.shapeHeight.min, B6_LIMITS.shapeHeight.max)) return null
-  return { shape, color, height: value.height, flip: value.flip === true }
+  const out: SectionShape = { shape, color, height: value.height, flip: value.flip === true }
+  // B18: kept only when it moves.
+  const animate = oneOf(value.animate, B18_ENUMS.shapeAnimate)
+  if (animate && animate !== 'none') out.animate = animate
+  return out
 }
 
 /** Gallery `columns`: base 2–6 (default 3); tablet / mobile only when valid. */
@@ -1282,6 +1293,7 @@ export function b8aPropProblems(type: string, props: unknown): PropProblem[] {
 /** Every problem with an element's props, B6, B8a and B8b rules (empty = valid; unknown types []). */
 export function elementPropProblems(type: string, props: unknown): PropProblem[] {
   return [
+    ...b18PropProblems(type, props),
     ...b6PropProblems(type, props),
     ...b8bPropProblems(type, props),
     ...(type === 'order_form' ? orderFormPropProblems(props) : []),
@@ -1659,8 +1671,10 @@ export function orderFormPropProblems(props: unknown): PropProblem[] {
 
 export const B9_ENUMS = {
   motionRepeat: ['once', 'every_time'],
-  motionLoop: ['none', 'pulse', 'float', 'shake', 'glow'],
-  hoverEffect: ['none', 'lift', 'grow', 'shrink', 'tilt', 'glow', 'underline'],
+  /** B18 adds wiggle, heartbeat, breathe, shine and spin-slow. */
+  motionLoop: ['none', 'pulse', 'float', 'shake', 'glow', 'wiggle', 'heartbeat', 'breathe', 'shine', 'spin-slow'],
+  /** B18 adds tilt-3d, zoom-image, glare, pop, lift-shadow and shine. */
+  hoverEffect: ['none', 'lift', 'grow', 'shrink', 'tilt', 'glow', 'underline', 'tilt-3d', 'zoom-image', 'glare', 'pop', 'lift-shadow', 'shine'],
   parallax: ['none', 'slow', 'medium'],
   globalContext: ['page', 'header', 'footer'],
 } as const
@@ -1978,4 +1992,138 @@ export function b14PropProblems(type: string, props: unknown): PropProblem[] {
 /** B14: whether a dynamic_text field may be used in a document of this template (null = a normal page: store fields only). */
 export function dynamicFieldAllowed(field: unknown, template: StoreTemplateKey | null): boolean {
   return typeof field === 'string' && (fieldsFor(template) as readonly string[]).includes(field)
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * B18: Motion studio — easing, text effects, card hover, animated dividers, motion theme marker
+ * (contract §1, the backend's B18 contract). All keys optional, kept only when set.
+ * -------------------------------------------------------------------------------------------- */
+
+export const B18_ENUMS = {
+  motionEasing: ['smooth', 'snappy', 'gentle', 'spring', 'bounce', 'linear'],
+  textEffect: ['none', 'typewriter', 'rotate_words', 'reveal_words', 'reveal_letters', 'gradient_shimmer', 'highlight_draw', 'underline_draw'],
+  textEffectSpeed: ['slow', 'normal', 'fast'],
+  textEffectColorRole: ['primary', 'accent', 'secondary'],
+  cardHover: ['none', 'lift', 'zoom_image', 'tilt_3d', 'glare', 'second_image'],
+  shapeAnimate: ['none', 'flow', 'drift', 'pulse'],
+  motionTheme: ['calm', 'lively', 'festive', 'premium', 'minimal'],
+  /** Elements that take `props.text_effect` (cta: on its title). */
+  textEffectElements: ['heading', 'text', 'cta'],
+  /** Elements that take `props.card_hover` (wrapped sections: at props top level). */
+  cardHoverElements: ['product_grid', 'product_carousel', 'product_tabs', 'product_listing', 'category_card', 'product_spotlight', 'shop_the_look'],
+  /** Elements whose cards have a second image (`card_hover: second_image`). */
+  cardHoverSecondImageElements: ['product_grid', 'product_carousel', 'product_tabs', 'product_listing'],
+} as const
+
+/** Bounds of B18 (min / max inclusive). */
+export const B18_LIMITS = {
+  textEffectWords: { min: 1, max: 6 },
+  /** Characters per rotating word (trimmed). */
+  textEffectWordLength: 40,
+  textEffectCycles: { min: 1, max: 5 },
+  /** reveal_letters only for texts up to this many characters. */
+  revealLettersMax: 80,
+} as const
+
+/** Effects that take `cycles`. */
+const CYCLE_EFFECTS: readonly string[] = ['typewriter', 'rotate_words']
+
+/**
+ * B18 `props.text_effect` with every key valid, or undefined (absent, `type: none` or not an
+ * object). Words only for rotate_words (trimmed, 1–40 chars, at most 6; none left = no effect);
+ * cycles only for typewriter / rotate_words (1–5, or explicit null = until paused; absent = default).
+ */
+export function normalizeTextEffect(value: unknown): TextEffect | undefined {
+  if (!isObject(value)) return undefined
+  const type = oneOf(value.type, B18_ENUMS.textEffect)
+  if (!type || type === 'none') return undefined
+  const effect: TextEffect = { type }
+  if (type === 'rotate_words') {
+    const words = Array.isArray(value.words)
+      ? value.words
+          .filter((word): word is string => typeof word === 'string')
+          .map((word) => word.trim())
+          .filter((word) => word.length > 0 && word.length <= B18_LIMITS.textEffectWordLength)
+          .slice(0, B18_LIMITS.textEffectWords.max)
+      : []
+    if (words.length === 0) return undefined
+    effect.words = words
+  }
+  const speed = oneOf(value.speed, B18_ENUMS.textEffectSpeed)
+  if (speed) effect.speed = speed
+  const role = oneOf(value.color_role, B18_ENUMS.textEffectColorRole)
+  if (role) effect.color_role = role
+  if (CYCLE_EFFECTS.includes(type) && Object.hasOwn(value, 'cycles')) {
+    if (value.cycles === null) effect.cycles = null
+    else if (isInt(value.cycles, B18_LIMITS.textEffectCycles.min, B18_LIMITS.textEffectCycles.max)) effect.cycles = value.cycles
+  }
+  return effect
+}
+
+/** B18 `props.card_hover` of an element type, or undefined (none, invalid, or second_image where cards have none). */
+export function normalizeCardHover(type: unknown, value: unknown): CardHover | undefined {
+  if (!(B18_ENUMS.cardHoverElements as readonly unknown[]).includes(type)) return undefined
+  const hover = oneOf(value, B18_ENUMS.cardHover)
+  if (!hover || hover === 'none') return undefined
+  if (hover === 'second_image' && !(B18_ENUMS.cardHoverSecondImageElements as readonly unknown[]).includes(type)) return undefined
+  return hover
+}
+
+/** B18 document top-level `motion_theme`, or undefined. */
+export function normalizeMotionTheme(value: unknown): MotionTheme | undefined {
+  return oneOf(value, B18_ENUMS.motionTheme)
+}
+
+const ENTITIES: Record<string, string> = { '&nbsp;': ' ', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'", '&amp;': '&' }
+
+/** Plain text of a rich text html (tags dropped, common entities decoded) — for counting characters. */
+export function plainTextOf(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/&(?:nbsp|lt|gt|quot|#39|apos|amp);/g, (entity) => ENTITIES[entity] ?? entity)
+}
+
+/** The text a text effect animates: heading `text`, text `html` (as plain text), cta `title`. */
+export function textEffectSource(type: string, props: unknown): string {
+  const p: Obj = isObject(props) ? props : {}
+  if (type === 'heading') return typeof p.text === 'string' ? p.text : ''
+  if (type === 'text') return typeof p.html === 'string' ? plainTextOf(p.html) : ''
+  if (type === 'cta') return typeof p.title === 'string' ? p.title : ''
+  return ''
+}
+
+/** Problems with an element's B18 props (`text_effect`, `card_hover`); the server answers 422 for each. */
+export function b18PropProblems(type: string, props: unknown): PropProblem[] {
+  const p: Obj = isObject(props) ? props : {}
+  const problems: Problems = []
+  if (Object.hasOwn(p, 'text_effect') && p.text_effect !== null) {
+    const value = p.text_effect
+    if (!(B18_ENUMS.textEffectElements as readonly string[]).includes(type) || !isObject(value)) problems.push({ path: 'text_effect', code: 'invalid' })
+    else {
+      const effectType = oneOf(value.type, B18_ENUMS.textEffect)
+      if (!effectType) problems.push({ path: 'text_effect.type', code: 'invalid' })
+      if (effectType === 'rotate_words') {
+        if (!Array.isArray(value.words)) problems.push({ path: 'text_effect.words', code: value.words === undefined ? 'required' : 'invalid' })
+        else {
+          if (value.words.length < B18_LIMITS.textEffectWords.min) problems.push({ path: 'text_effect.words', code: 'too_few' })
+          if (value.words.length > B18_LIMITS.textEffectWords.max) problems.push({ path: 'text_effect.words', code: 'too_many' })
+          value.words.forEach((word: unknown, index) => {
+            const at = `text_effect.words.${index}`
+            if (typeof word !== 'string') problems.push({ path: at, code: 'invalid' })
+            else if (word.trim() === '') problems.push({ path: at, code: 'required' })
+            else if (word.trim().length > B18_LIMITS.textEffectWordLength) problems.push({ path: at, code: 'too_long' })
+          })
+        }
+      } else if (value.words !== undefined) problems.push({ path: 'text_effect.words', code: 'invalid' })
+      if (value.speed !== undefined) enumOf(problems, 'text_effect.speed', value.speed, B18_ENUMS.textEffectSpeed)
+      if (value.color_role !== undefined) enumOf(problems, 'text_effect.color_role', value.color_role, B18_ENUMS.textEffectColorRole)
+      if (value.cycles !== undefined) {
+        if (!effectType || !CYCLE_EFFECTS.includes(effectType)) problems.push({ path: 'text_effect.cycles', code: 'invalid' })
+        else if (value.cycles !== null) int(problems, 'text_effect.cycles', value.cycles, B18_LIMITS.textEffectCycles)
+      }
+      if (effectType === 'reveal_letters' && textEffectSource(type, p).length > B18_LIMITS.revealLettersMax) problems.push({ path: 'text_effect.type', code: 'too_long' })
+    }
+  }
+  if (Object.hasOwn(p, 'card_hover') && p.card_hover !== null && p.card_hover !== 'none' && !normalizeCardHover(type, p.card_hover)) {
+    problems.push({ path: 'card_hover', code: 'invalid' })
+  }
+  return problems
 }

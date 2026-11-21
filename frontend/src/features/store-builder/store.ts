@@ -74,6 +74,8 @@ export type EditorState = {
   editLocale: 'en' | 'bn'
   /** B13: "Preview as" — the shopper the canvas pretends to be (null = "Show everything"). Not saved. */
   previewAs: PreviewSettings | null
+  /** B18: the toolbar's "Preview motion" — loops, text effects and moving dividers run on the canvas (default off). Not saved. */
+  previewMotion: boolean
   history: { past: Snapshot[]; future: Snapshot[] }
   saveState: SaveState
   /** Server problems per node id (`''` = the page). */
@@ -117,6 +119,8 @@ export type EditorActions = {
   setEditLocale: (locale: 'en' | 'bn') => void
   /** B13: "Preview as" a shopper, or null for "Show everything". */
   setPreviewAs: (previewAs: PreviewSettings | null) => void
+  /** B18: "Preview motion" on or off. */
+  setPreviewMotion: (on: boolean) => void
   undo: () => void
   redo: () => void
   /** Replaces everything with a document from the server (open, discard, restore, "load their version"): history is cleared. */
@@ -181,6 +185,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       device: 'desktop',
       editLocale: 'en',
       previewAs: null,
+      previewMotion: false,
       history: { past: [], future: [] },
       saveState: { status: 'saved', savedAt: detail.draft_updated_at ? Date.parse(detail.draft_updated_at) : null },
       errors: {},
@@ -228,6 +233,7 @@ export function createEditorStore(detail: DocumentDetail, now: () => number = Da
       setDevice: (device) => set({ device }),
       setEditLocale: (editLocale) => set({ editLocale }),
       setPreviewAs: (previewAs) => set({ previewAs }),
+      setPreviewMotion: (previewMotion) => set({ previewMotion }),
 
       undo: () => {
         const state = get()

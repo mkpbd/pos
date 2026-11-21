@@ -366,7 +366,7 @@ describe('B9 motion runtime', () => {
     child.dataset.b = 'e_two'
     section.append(child)
     document.body.append(section)
-    playMotion(section, { id: 's_row0', motion: { entrance: 'fade', duration: 600, delay: 0, repeat: 'once', stagger_children: 100, loop: 'glow', loop_forever: false }, children: ['e_missing', 'e_two'] })
+    playMotion(section, { id: 's_row0', motion: { entrance: 'fade', duration: 600, delay: 0, repeat: 'once', stagger_children: 100, loop: 'glow', loop_forever: false, easing: 'smooth' }, children: ['e_missing', 'e_two'] })
     expect(section).toHaveAttribute('data-b-motion', 'run')
     expect(section).toHaveAttribute('data-b-loop', 'run')
     expect(child).toHaveAttribute('data-b-motion', 'run')

@@ -46,8 +46,17 @@ final class StyleSchema
 
     public const HOVER_TRANSFORMS = ['none', 'lift', 'grow'];
 
-    /** B6: entrance animations of the `motion` group (base only); B9 adds the flip, bounce, blur and rotate kinds. */
-    public const MOTION_ENTRANCES = ['none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'flip-up', 'flip-left', 'bounce-in', 'blur-in', 'rotate-in'];
+    /**
+     * B6: entrance animations of the `motion` group (base only); B9 adds the flip, bounce, blur and
+     * rotate kinds; B18 the clip-path wipes (mask-up, mask-left), drop-in, swing and scale-down.
+     */
+    public const MOTION_ENTRANCES = [
+        'none', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'zoom', 'flip-up', 'flip-left', 'bounce-in', 'blur-in', 'rotate-in',
+        'mask-up', 'mask-left', 'drop-in', 'swing', 'scale-down',
+    ];
+
+    /** B18: the entrance's easing curve (absent = smooth). */
+    public const MOTION_EASINGS = ['smooth', 'snappy', 'gentle', 'spring', 'bounce', 'linear'];
 
     /** B6: entrance duration and delay, milliseconds. */
     public const MOTION_DURATION = [200, 2000];
@@ -60,11 +69,14 @@ final class StyleSchema
     /** B9: children of a section / inner row enter one after another, this many ms apart. */
     public const MOTION_STAGGER = [0, 500];
 
-    /** B9: attention loops (3 cycles unless `loop_forever`). */
-    public const MOTION_LOOPS = ['none', 'pulse', 'float', 'shake', 'glow'];
+    /** B9: attention loops (3 cycles unless `loop_forever`); B18 adds wiggle, heartbeat, breathe, shine and spin-slow. */
+    public const MOTION_LOOPS = ['none', 'pulse', 'float', 'shake', 'glow', 'wiggle', 'heartbeat', 'breathe', 'shine', 'spin-slow'];
 
-    /** B9: the `hover` group's effects (desktop pointer and focus-visible). */
-    public const HOVER_EFFECTS = ['none', 'lift', 'grow', 'shrink', 'tilt', 'glow', 'underline'];
+    /**
+     * B9: the `hover` group's effects (desktop pointer and focus-visible); B18 adds tilt-3d,
+     * zoom-image, glare, pop, lift-shadow and shine.
+     */
+    public const HOVER_EFFECTS = ['none', 'lift', 'grow', 'shrink', 'tilt', 'glow', 'underline', 'tilt-3d', 'zoom-image', 'glare', 'pop', 'lift-shadow', 'shine'];
 
     /** B9: hover transition, milliseconds. */
     public const HOVER_DURATION = [100, 600];
@@ -161,6 +173,8 @@ final class StyleSchema
      * B9: `repeat?` (once | every_time), `stagger_children?` (0–500 ms, containers only),
      * `loop?` (none | pulse | float | shake | glow) and `loop_forever?` (bool).
      *
+     * B18: `easing?` (MOTION_EASINGS), more entrances and loops — kept only when set.
+     *
      * @return array<string, mixed>|null
      */
     private static function motion(mixed $value, bool $container = false): ?array
@@ -174,6 +188,7 @@ final class StyleSchema
             'entrance' => $entrance,
             'duration' => $int($value['duration'] ?? null, self::MOTION_DURATION),
             'delay' => $int($value['delay'] ?? null, self::MOTION_DELAY),
+            'easing' => self::enum($value['easing'] ?? null, self::MOTION_EASINGS),
             'repeat' => self::enum($value['repeat'] ?? null, self::MOTION_REPEATS),
             'stagger_children' => $container ? $int($value['stagger_children'] ?? null, self::MOTION_STAGGER) : null,
             'loop' => self::enum($value['loop'] ?? null, self::MOTION_LOOPS),

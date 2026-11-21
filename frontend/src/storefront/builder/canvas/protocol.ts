@@ -3,6 +3,7 @@ import type { PreviewContext } from '../audience/types'
 import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderPageSection } from '../types'
 import type { FontSource } from '../../fonts'
 import type { CanvasThemeSettings } from './theme-override'
+import type { PlayScope } from '../motion'
 import type { StorePageContext, StorePageSample } from '../templates/types'
 
 /*
@@ -102,8 +103,18 @@ export type ParentMessage =
     }
   /** Drag autoscroll near the canvas edges. */
   | { type: 'scroll-by'; dy: number }
-  /** B6 (additive, v stays 1): replay a node's entrance animation once (the inspector's "Preview animation"). */
-  | { type: 'play-motion'; id: string }
+  /**
+   * B6 (additive, v stays 1): replay a node's entrance animation once (the inspector's "Preview animation").
+   * B18 (additive): `scope` `node` (absent: as before), `section` (every motion of the id's
+   * top-level section) or `page` (every entrance top to bottom; the id is ignored). Text effects
+   * in that scope replay too.
+   */
+  | { type: 'play-motion'; id: string; scope?: PlayScope }
+  /**
+   * B18 (additive, v stays 1): the toolbar's "Preview motion". While on, loops, animated dividers
+   * and text effects run in the canvas; off (the default, also after each `ready`) keeps editing calm.
+   */
+  | { type: 'preview-motion'; on: boolean }
   /**
    * B10 (additive, v stays 1): start editing a text field in place (the inspector's "Edit on the
    * page", Enter on the selected node). `field` absent = the node's first field shown on the canvas.
@@ -194,7 +205,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
   return { ...message, source: BUILDER_SOURCE, v: PROTOCOL_VERSION }
 }
 
-const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as', 'page-context'])
+const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'preview-motion', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as', 'page-context'])
 const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {
