@@ -64,7 +64,7 @@ export type ParallaxSetting = {
  * `value` undefined = nothing moves; a change that leaves nothing moving removes the group.
  * `onPreview` plays the entrance, the sequence and the loop on the canvas (▶ Play).
  */
-export function MotionControl({ nodeType = 'heading', value, onChange, onPreview, onTimeline, hover, onHover, parallax }: {
+export function MotionControl({ nodeType = 'heading', value, onChange, onPreview, onTimeline, hover, onHover, parallax, simple = false }: {
   nodeType?: string
   value: Motion | undefined
   onChange: (value: Motion | undefined) => void
@@ -74,6 +74,8 @@ export function MotionControl({ nodeType = 'heading', value, onChange, onPreview
   hover?: HoverStyle
   onHover?: (value: HoverStyle | undefined) => void
   parallax?: ParallaxSetting
+  /** B21 Easy mode: only the entrance and attention loop tiles and ▶ Play (no movement style, timing or "Keep looping"). */
+  simple?: boolean
 }) {
   const current = motionState(value)
   const on = current.entrance !== 'none'
@@ -92,8 +94,8 @@ export function MotionControl({ nodeType = 'heading', value, onChange, onPreview
         testId="entrance-tiles"
         renderTile={(option, state) => <EntrancePreview entrance={option.value} easing={current.easing} duration={on ? current.duration : 600} active={state.active} checked={state.checked} />}
       />
-      {(on || staggering) && <EasingChips value={current.easing} options={B18_ENUMS.motionEasing} onChange={(easing) => update({ easing })} />}
-      {on && (
+      {!simple && (on || staggering) && <EasingChips value={current.easing} options={B18_ENUMS.motionEasing} onChange={(easing) => update({ easing })} />}
+      {!simple && on && (
         <>
           <SliderControl
             label="Duration"
@@ -116,7 +118,7 @@ export function MotionControl({ nodeType = 'heading', value, onChange, onPreview
           />
         </>
       )}
-      {canStagger(nodeType) && (
+      {!simple && canStagger(nodeType) && (
         <SliderControl
           label="Elements inside, one after another"
           tooltip="Elements inside that have an entrance animation appear one after another, this far apart. Off: they all start together."
@@ -128,7 +130,7 @@ export function MotionControl({ nodeType = 'heading', value, onChange, onPreview
           onChange={(stagger_children) => update({ stagger_children })}
         />
       )}
-      {(on || current.stagger_children > 0) && (
+      {!simple && (on || current.stagger_children > 0) && (
         <Segmented
           label="Play it"
           tooltip="Every time: it plays again each time the shopper scrolls back to it."
@@ -149,7 +151,7 @@ export function MotionControl({ nodeType = 'heading', value, onChange, onPreview
             testId="loop-tiles"
             renderTile={(option, state) => <LoopPreview loop={option.value} active={state.active} />}
           />
-          {current.loop !== 'none' && (
+          {!simple && current.loop !== 'none' && (
             <ToggleRow
               label="Keep looping"
               checked={current.loop_forever}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { envelope, readCanvasMessage, type CanvasMessage, type CanvasProduct, type CanvasSurroundings, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
+import { envelope, readCanvasMessage, type CanvasMessage, type CanvasProduct, type CanvasSurroundings, type FileDropHover, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
 import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderSection, ScrollProgress } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
@@ -9,6 +9,7 @@ import { CANVAS_URL, DEVICE_WIDTHS } from './canvas-config'
 import { ColumnHandles, type ResizePhase, type ResizeRow } from './column-handles'
 import { toolbarPosition } from './toolbar-position'
 import type { DropIndicator } from './drop-targets'
+import { dropLabel } from './file-drop'
 import { SpacingHandles, type SpacingPhase, type SpacingValues } from './spacing-handles'
 import type { SpacingGuide } from './snapping'
 import type { SpacingBox, SpacingSide } from './spacing-drag'
@@ -53,9 +54,9 @@ export type CanvasHandle = {
 }
 
 /** B10: canvas messages of editing on the page (text edits, dropped pictures, "Replace picture"). */
-export type CanvasEditMessage = Extract<CanvasMessage, { type: 'text-edit-start' | 'text-edit-commit' | 'text-edit-cancel' | 'text-edit-link' | 'image-drop' | 'image-replace' }>
+export type CanvasEditMessage = Extract<CanvasMessage, { type: 'text-edit-start' | 'text-edit-commit' | 'text-edit-cancel' | 'text-edit-link' | 'image-drop' | 'image-replace' | 'drop-files' }>
 
-const EDIT_TYPES: ReadonlySet<string> = new Set(['text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
+const EDIT_TYPES: ReadonlySet<string> = new Set(['text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace', 'drop-files'])
 
 /** B10: the selected section / inner row / column's spacing handles (values in px at this device; null = can't be dragged). */
 export type SpacingTarget = {
@@ -145,10 +146,15 @@ export type CanvasFrameProps = {
   onCommentAt?: ((point: { x: number; y: number }) => void) | null
   /** B18: the toolbar's "Preview motion" — loops, text effects and animated dividers run on the canvas while on (default off). */
   previewMotion?: boolean
+  /**
+   * B21 "What next?": drawn in the overlay under the last section (`rect`, canvas px; null = empty
+   * page), editor only. `height`: the overlay's height (px). Null / absent: none.
+   */
+  nextStrip?: ((place: { rect: Rect | null; scale: number; width: number; height: number }) => ReactNode) | null
 }
 
 export function CanvasFrame(props: CanvasFrameProps) {
-  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, scrollProgress = null, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null, previewMotion = false } = props
+  const { bootstrap, locale, sections, data, media, pending, selection, selectedIds, deviceOrder, hover, errorIds, device, dragging, indicator, onSelect, onHover, onKey, toolbar, hoverLabel, handleRef, theme, resizeRow, onResize, surroundings = 'page', emptyText, popup, product, scrollProgress = null, onEdit, spacing, uploads, fonts, heat, previewAs = null, audienceBadges, arms, pageContext, pageSample = null, pins = null, onCommentAt = null, previewMotion = false, nextStrip = null } = props
   const areaRef = useRef<HTMLDivElement>(null)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const [area, setArea] = useState({ w: 0, h: 0 })
@@ -157,6 +163,9 @@ export function CanvasFrame(props: CanvasFrameProps) {
   const [renderTick, setRenderTick] = useState(0)
   // B10: a file dragged in from the desktop: the overlay lets every pointer through to the canvas.
   const [fileDrag, setFileDrag] = useState(false)
+  // B21: where the dragged picture files would land (the canvas's `drag-files`), and how many there are.
+  const [fileOver, setFileOver] = useState<{ over: FileDropHover; count?: number } | null>(null)
+  const fileDragTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [rects, setRects] = useState<Record<string, Rect>>({})
   const rectsRef = useRef<Record<string, Rect>>({})
   const viewportRef = useRef({ w: DEVICE_WIDTHS.desktop, h: 0 })
@@ -203,7 +212,11 @@ export function CanvasFrame(props: CanvasFrameProps) {
       if (!message) return
       if (EDIT_TYPES.has(message.type)) {
         const edit = message as CanvasEditMessage
-        if (edit.type === 'image-drop') setFileDrag(false)
+        if (edit.type === 'image-drop' || edit.type === 'drop-files') {
+          clearTimeout(fileDragTimer.current)
+          setFileDrag(false)
+          setFileOver(null)
+        }
         if (edit.type === 'text-edit-start') editingRef.current = edit.id
         else if (edit.type === 'text-edit-commit' || edit.type === 'text-edit-cancel') editingRef.current = null
         setEditing(editingRef.current)
@@ -236,6 +249,10 @@ export function CanvasFrame(props: CanvasFrameProps) {
           break
         case 'key':
           callbacks.current.onKey(message)
+          break
+        case 'drag-files':
+          // B21: the canvas tells where the files would land (null: nowhere, or they left it).
+          setFileOver(message.over ? { over: message.over, ...(message.count !== undefined ? { count: message.count } : {}) } : null)
           break
       }
     }
@@ -309,24 +326,25 @@ export function CanvasFrame(props: CanvasFrameProps) {
 
   useEffect(() => {
     const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
-    let timer: ReturnType<typeof setTimeout> | undefined
+    const timer = fileDragTimer
     const over = (event: DragEvent) => {
       if (!hasFiles(event)) return
       setFileDrag(true)
       // dragover repeats while the file is over this window; when it stops (dropped in the canvas, left), the overlay comes back.
-      clearTimeout(timer)
-      timer = setTimeout(() => setFileDrag(false), 1500)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setFileDrag(false), 1500)
     }
     const end = () => {
-      clearTimeout(timer)
+      clearTimeout(timer.current)
       setFileDrag(false)
+      setFileOver(null)
     }
     window.addEventListener('dragenter', over)
     window.addEventListener('dragover', over)
     window.addEventListener('drop', end)
     window.addEventListener('dragend', end)
     return () => {
-      clearTimeout(timer)
+      clearTimeout(timer.current)
       window.removeEventListener('dragenter', over)
       window.removeEventListener('dragover', over)
       window.removeEventListener('drop', end)
@@ -374,6 +392,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
   const hovered = hover && hover !== selection && !others.includes(hover) ? rects[hover] : undefined
   const editingNow = editing !== null
   const spacingRect = spacing ? rects[spacing.nodeId] : undefined
+  // B21: the lowest drawn section (on a tablet or phone the order may differ from the list).
+  const lastSection = nextStrip ? lowestRect(sections.map((s) => rects[s.id])) : undefined
 
   return (
     <div ref={areaRef} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted/60" data-testid="canvas-area" data-device={device}>
@@ -437,6 +457,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
             )
           })}
           {!dragging && pins && pins.pins.length > 0 && <CommentPins layer={pins} rects={rects} scale={scale} />}
+          {!dragging && fileOver && <FileDropMark over={fileOver.over} count={fileOver.count} scale={scale} />}
+          {!dragging && !editingNow && !fileOver && nextStrip && (sections.length === 0 || lastSection) && nextStrip({ rect: sections.length === 0 ? null : lastSection!, scale, width: width * scale, height: frameHeight * scale })}
           {dragging && indicator && (
             <div
               data-testid="drop-indicator"
@@ -460,6 +482,35 @@ export function CanvasFrame(props: CanvasFrameProps) {
       </div>
     </div>
   )
+}
+
+/** B21: where dragged picture files would land — the node's box or the insertion line, with what happens ("Replace picture"). */
+function FileDropMark({ over, count, scale }: { over: FileDropHover; count?: number; scale: number }) {
+  const label = dropLabel(over, count)
+  const r = over.rect
+  const line = over.line === true
+  return (
+    <div data-testid="file-drop-mark" data-kind={over.kind} data-node={over.node_id}>
+      <div
+        className={line ? 'absolute h-1 -translate-y-1/2 rounded-full bg-emerald-600 shadow' : 'absolute rounded border-2 border-dashed border-emerald-600 bg-emerald-600/10'}
+        style={{ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: line ? 4 : r.h * scale }}
+      />
+      <span
+        className="absolute max-w-[90%] truncate rounded-sm bg-emerald-700 px-2 py-0.5 text-xs font-medium text-white shadow"
+        style={{ left: Math.max(0, r.x * scale) + 4, top: Math.max(0, r.y * scale + (line ? 6 : 4)) }}
+      >
+        {label}
+      </span>
+      <span role="status" className="sr-only">{label}</span>
+    </div>
+  )
+}
+
+/** B21: the drawn rect that ends lowest; undefined when none is drawn. */
+function lowestRect(list: (Rect | undefined)[]): Rect | undefined {
+  let lowest: Rect | undefined
+  for (const r of list) if (r && r.h > 0 && (!lowest || r.y + r.h > lowest.y + lowest.h)) lowest = r
+  return lowest
 }
 
 /** The box around several rects (the ones drawn); undefined when none is. */

@@ -9,7 +9,7 @@ import type { BuilderContent } from '@/storefront/builder/types'
 import { bootstrapFixture } from '@/storefront/test-fixtures'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
-import { detail } from './test-helpers'
+import { detail, seedFullMode } from './test-helpers'
 
 /* B13 in the editor (editor A): "Who sees this" badges on the canvas and in Layers, and "Preview as". */
 
@@ -65,6 +65,9 @@ async function openEditor() {
   const previews = () => posted.filter((m): m is Extract<ParentMessage, { type: 'preview-as' }> => m.type === 'preview-as')
   return { fromCanvas, posted, previews }
 }
+
+// B21: these tests use full mode (Preview as, the Advanced tab).
+beforeEach(() => seedFullMode())
 
 describe('store builder editor (B13, editor A)', () => {
   it('draws "Who sees this" badges on the canvas and in Layers', async () => {

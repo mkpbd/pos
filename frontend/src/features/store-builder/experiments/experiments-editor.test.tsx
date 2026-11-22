@@ -8,7 +8,7 @@ import type { BuilderContent, Experiment } from '@/storefront/builder/types'
 import { bootstrapFixture } from '@/storefront/test-fixtures'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
-import { detail } from '../test-helpers'
+import { detail, seedFullMode } from '../test-helpers'
 import { createTest, experimentsOf, removeTest } from './experiments-model'
 
 /* B13 editor B: "Test a different version", the A/B tests panel, the canvas switch, Layers grouping. */
@@ -100,6 +100,9 @@ async function openEditor() {
 }
 
 const toolbar = () => screen.getByRole('banner', { name: 'Editor toolbar' })
+
+// B21: the A/B tests button is a full-mode control.
+beforeEach(() => seedFullMode())
 
 describe('A/B tests in the editor (B13, editor B)', () => {
   it('"Test a different version" adds version B and a draft test; the canvas shows one version; Layers groups them; one undo takes it back', async () => {

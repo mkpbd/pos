@@ -29,6 +29,9 @@ import {
   SparklesIcon,
   PlayIcon,
   WavesIcon,
+  CompassIcon,
+  LightbulbIcon,
+  WandSparklesIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -208,6 +211,8 @@ type ToolbarProps = {
   onMotionThemes?: () => void
   /** B18 (editor A): "▶ Play page" plays every entrance on the canvas, top to bottom; absent = no Preview motion / Play page. */
   onPlayPage?: () => void
+  /** B21: ⋯ "Easy mode — fewer controls", "Take the tour" and "Reset tips"; absent = not offered. */
+  ease?: { easy: boolean; onEasy: (on: boolean) => void; onTour: () => void; onResetTips: () => void }
 }
 
 /**
@@ -221,7 +226,7 @@ function MotionMenu({ onThemes, onPlayPage }: { onThemes?: () => void; onPlayPag
     <DropdownMenu>
       <Hint label="Animate the page: motion themes, preview the moving parts, play every entrance">
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant={on ? 'secondary' : 'outline'} aria-label="Motion" data-testid="motion-menu-button">
+          <Button type="button" variant={on ? 'secondary' : 'outline'} aria-label="Motion" data-testid="motion-menu-button" data-tour="motion">
             <SparklesIcon /> <span className="max-[1599px]:sr-only">Motion</span>
           </Button>
         </DropdownMenuTrigger>
@@ -282,7 +287,7 @@ function LocaleToggle() {
   )
 }
 
-export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample, readOnly = false, people, comments, onDownload, onMotionThemes, onPlayPage }: ToolbarProps) {
+export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status, onRename, onPreview, onPublish, onDiscard, onHistory, onShowProblem, bangla = false, check, onCommandBox, onShortcuts, insights, abTests, previewAs = true, sample, readOnly = false, people, comments, onDownload, onMotionThemes, onPlayPage, ease }: ToolbarProps) {
   const document = useEditor((s) => s.document)
   const device = useEditor((s) => s.device)
   const setDevice = useEditor((s) => s.setDevice)
@@ -309,7 +314,7 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       <div className="mx-auto flex items-center gap-1" role="group" aria-label="Canvas width">
         {DEVICES.map(({ device: value, label, icon: Icon }) => (
           <Hint key={value} label={`${label} (${DEVICE_WIDTHS[value]} px)`}>
-            <Button type="button" variant={device === value ? 'secondary' : 'ghost'} size="icon" aria-pressed={device === value} aria-label={`${label} view`} onClick={() => setDevice(value)}>
+            <Button type="button" variant={device === value ? 'secondary' : 'ghost'} size="icon" aria-pressed={device === value} aria-label={`${label} view`} onClick={() => setDevice(value)} data-tour={value === 'mobile' ? 'phone' : undefined}>
               <Icon />
             </Button>
           </Hint>
@@ -408,14 +413,14 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
       </Hint>
       {!canPublish && canSubmit ? (
         <Hint label={readOnly ? 'Someone else is editing this page' : 'Send this draft to someone who can publish it'}>
-          <Button type="button" onClick={onSubmitReview} disabled={readOnly}>
+          <Button type="button" onClick={onSubmitReview} disabled={readOnly} data-tour="publish">
             <SendIcon /> Submit for review
           </Button>
         </Hint>
       ) : (
         <Hint label={readOnly ? 'Someone else is editing this page' : canPublish ? 'Make this draft live on your store, now or later' : 'You don’t have permission to publish'}>
           <span tabIndex={canPublish && !readOnly ? undefined : 0}>
-            <Button type="button" disabled={!canPublish || readOnly} onClick={onPublish}>
+            <Button type="button" disabled={!canPublish || readOnly} onClick={onPublish} data-tour="publish">
               <RocketIcon /> Publish
             </Button>
           </span>
@@ -438,6 +443,20 @@ export function Toolbar({ canPublish, canSubmit = false, onSubmitReview, status,
             <DropdownMenuItem onSelect={onDownload}>
               <DownloadIcon /> Download a copy (.json)
             </DropdownMenuItem>
+          )}
+          {ease && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem checked={ease.easy} onCheckedChange={(checked) => ease.onEasy(checked === true)} data-testid="easy-mode-toggle">
+                <WandSparklesIcon /> Easy mode — fewer controls
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuItem onSelect={ease.onTour} data-testid="take-tour">
+                <CompassIcon /> Take the tour
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={ease.onResetTips} data-testid="reset-tips">
+                <LightbulbIcon /> Reset tips
+              </DropdownMenuItem>
+            </>
           )}
           {onShortcuts && (
             <>

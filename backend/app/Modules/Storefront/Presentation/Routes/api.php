@@ -11,6 +11,7 @@ use App\Modules\Storefront\Presentation\Http\Controllers\BuilderPortabilityContr
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderPublishingController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderReviewController;
 use App\Modules\Storefront\Presentation\Http\Controllers\BuilderTemplateController;
+use App\Modules\Storefront\Presentation\Http\Controllers\BuilderWizardController;
 use App\Modules\Storefront\Presentation\Http\Controllers\CustomFontController;
 use App\Modules\Storefront\Presentation\Http\Controllers\DemoGalleryController;
 use App\Modules\Storefront\Presentation\Http\Controllers\FestivalController;
@@ -211,6 +212,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront/builder')->gro
         Route::post('start-from-demo/{preset}', [BuilderTemplateController::class, 'startFromDemo'])
             ->whereIn('preset', ['default', 'vegan', 'handmade', 'classic', 'kids', 'fashion', 'electronics', 'grocery', 'beauty', 'furniture'])->middleware('throttle:builder-templates');
         Route::post('publish-all', [BuilderTemplateController::class, 'publishAll'])->middleware('can:storefront.publish');
+        // B21: "Build my page in 1 minute" — a draft from the built-in templates (never published).
+        Route::post('wizard', BuilderWizardController::class)->middleware('throttle:builder-templates');
         // B9: the AI writer (through the AI module's gate and budget; nothing is saved).
         Route::post('ai/write', BuilderAiController::class)->middleware('throttle:builder-ai');
     });

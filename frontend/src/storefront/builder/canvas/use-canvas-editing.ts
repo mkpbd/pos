@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { NODE_ID } from '../registry'
 import type { BuilderPage, RenderPageSection } from '../types'
-import type { CanvasMessage, ImageDropTarget, TextFieldKind } from './protocol'
+import { MAX_DROP_FILES, type CanvasMessage, type FileDropHover, type TextFieldKind } from './protocol'
+import { dropTargetOf, fileTargetAt } from './file-targets'
 import { sanitizeRichText } from './sanitize'
 import { TextEditSession, type FormatCommand } from './text-edit'
-import { fieldTargets, imageTargetOf, indexNodes, type FieldTarget, type TreeNode } from './text-fields'
+import { fieldTargets, imageTargetOf, indexNodes, type FieldTarget } from './text-fields'
 
 /*
  * B10: editing on the canvas — texts in place (double-click, Enter on the selected node, or the
  * editor's `edit-text`), the format bar's link round trip, and pictures dropped from the desktop
- * onto an image or a background-image node (handed to the editor, which uploads them).
+ * (B21: onto an image, a background, between elements or into a gallery — handed to the editor, which uploads them).
  *
  * While a text is edited the drawn page is frozen (the editor's render frames still update the
  * outlines), so React never touches the element being typed in. A commit keeps the typed text on
@@ -207,37 +208,50 @@ export function useCanvasEditing({ post, sections, page, locale, selection }: Op
     }
   }, [finish])
 
-  // Pictures dragged in from the desktop: the image or background-image node under the pointer.
+  // B21: pictures dragged in from the computer — the place under the pointer (replace a picture, a
+  // background, new pictures between elements or in a gallery), told to the editor as it changes.
   useEffect(() => {
-    const dropNodeAt = (target: EventTarget | null): { id: string; kind: ImageDropTarget } | null => {
-      if (!(target instanceof Element) || target.closest('[data-b-global]')) return null
-      let el = target.closest<HTMLElement>('[data-b]')
-      while (el) {
-        const node: TreeNode | undefined = el.dataset.b ? latest.current.nodes.get(el.dataset.b) : undefined
-        const kind = imageTargetOf(node)
-        if (node && kind) return { id: node.id, kind }
-        el = el.parentElement?.closest<HTMLElement>('[data-b]') ?? null
-      }
-      return null
+    let last = ''
+    const tell = (over: FileDropHover | null, count?: number) => {
+      const key = over ? `${over.kind}:${over.node_id}:${over.index ?? ''}:${count ?? ''}` : ''
+      if (key === last) return
+      last = key
+      latest.current.post(over ? { type: 'drag-files', over, ...(count !== undefined ? { count } : {}) } : { type: 'drag-files', over: null })
     }
+    const targetOf = (event: DragEvent): FileDropHover | null =>
+      isEditUi(event.target) ? null : fileTargetAt(event.target, { x: event.clientX, y: event.clientY }, latest.current.nodes, { background: event.shiftKey })
     const onOver = (event: DragEvent) => {
       if (!hasFiles(event)) return
       // Never let the browser open the file in the canvas.
       event.preventDefault()
-      const hit = isEditUi(event.target) ? null : dropNodeAt(event.target)
+      const hit = targetOf(event)
       if (event.dataTransfer) event.dataTransfer.dropEffect = hit ? 'copy' : 'none'
-      setDropTarget(hit?.id ?? null)
+      setDropTarget(hit && hit.into !== 'column' ? hit.node_id : null)
+      const items = event.dataTransfer?.items
+      tell(hit, items ? Array.from(items).filter((item) => item.kind === 'file').length || undefined : undefined)
     }
     const onLeave = (event: DragEvent) => {
-      if (event.relatedTarget === null) setDropTarget(null)
+      // Still inside the canvas (relatedTarget is the element entered); leaving it has none.
+      if (event.relatedTarget) return
+      setDropTarget(null)
+      tell(null)
     }
     const onDrop = (event: DragEvent) => {
       if (!hasFiles(event)) return
       event.preventDefault()
       setDropTarget(null)
-      const hit = isEditUi(event.target) ? null : dropNodeAt(event.target)
-      const file = event.dataTransfer?.files?.[0]
-      if (hit && file) latest.current.post({ type: 'image-drop', id: hit.id, target: hit.kind, file })
+      const hit = targetOf(event)
+      tell(null)
+      const files = Array.from(event.dataTransfer?.files ?? []).slice(0, MAX_DROP_FILES)
+      if (!hit || files.length === 0) return
+      // One picture on an image, or on a node that already has a background picture: the B10
+      // message, handled exactly as before (same result, same undo step).
+      const node = latest.current.nodes.get(hit.node_id)
+      if (files.length === 1 && (hit.kind === 'replace' || (hit.kind === 'background' && imageTargetOf(node) === 'background'))) {
+        latest.current.post({ type: 'image-drop', id: hit.node_id, target: hit.kind === 'replace' ? 'image' : 'background', file: files[0]! })
+        return
+      }
+      latest.current.post({ type: 'drop-files', target: dropTargetOf(hit), files })
     }
     document.addEventListener('dragover', onOver, { capture: true })
     document.addEventListener('dragenter', onOver, { capture: true })

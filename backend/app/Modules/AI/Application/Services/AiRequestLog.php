@@ -17,9 +17,10 @@ final class AiRequestLog
      * (the store builder's AI writer, Storefront module, same contract). AI2a (OnlineCatalog, through
      * Shared's AiJsonWriter): `catalog_writer` (Write with AI), `catalog_drafts` (AI drafts),
      * `category_suggestions`, `bundle_ideas`. AI2b: `store_assistant` (the online store's shopper
-     * assistant, one row per shopper turn, no user).
+     * assistant, one row per shopper turn, no user). B21: `builder_wizard` (the store builder's
+     * page wizard rewriting its texts, Storefront module, through Shared's AiJsonWriter).
      */
-    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions', 'builder_writer', 'catalog_writer', 'catalog_drafts', 'category_suggestions', 'bundle_ideas', 'store_assistant'];
+    public const FEATURES = ['ask', 'explain_reorder', 'insights', 'daily_insights', 'customer_insights', 'social_captions', 'builder_writer', 'catalog_writer', 'catalog_drafts', 'category_suggestions', 'bundle_ideas', 'store_assistant', 'builder_wizard'];
 
     /**
      * @param  list<array{name: string, params: array<string, mixed>, ok: bool}>  $tools

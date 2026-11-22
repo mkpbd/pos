@@ -7,7 +7,7 @@ import type { BuilderContent } from '@/storefront/builder/types'
 import { bootstrapFixture } from '@/storefront/test-fixtures'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
-import { detail } from './test-helpers'
+import { detail, seedFullMode } from './test-helpers'
 
 /* B12 in the Layers panel: several selected, and the tablet / phone order ("Order on phones"). */
 
@@ -44,6 +44,9 @@ const tree = () => screen.getByRole('tree')
 const row = (id: string) => screen.getByTestId(`layer-${id}`)
 const rowButton = (id: string) => row(id).querySelector<HTMLButtonElement>('[data-layer-id]')!
 const sectionOrder = () => within(tree()).getAllByRole('treeitem').filter((r) => r.getAttribute('aria-level') === '1').map((r) => r.dataset.testid!.replace('layer-', ''))
+
+// B21: no first-visit tour over the editor.
+beforeEach(() => seedFullMode())
 
 describe('Layers panel (B12)', () => {
   it('Ctrl+click adds rows, Shift+click picks the siblings in between, Esc clears', async () => {

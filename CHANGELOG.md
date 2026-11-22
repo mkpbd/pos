@@ -21,6 +21,28 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B21 — Store builder: Easy building
+
+#### Added
+- **Build my page in a minute** (*Build it for me* on the Pages list and on empty pages): 4 steps — page type, what you sell (categories, products or best sellers), what the page should do, look + language (+ AI texts when AI is on, + optional colours from the logo) — assemble a complete **draft** from the shipped sections with the store's own facts: its products, the running sale or coupon, festival texts, its contact details, and **real 4★+ customer reviews only when the store has them** (never sample testimonials). Every result passes the page check; nothing is published.
+- **What next?** — three suggested next sections under the last section (and *Suggested next* in Ctrl+K), one click to insert.
+- **Try another layout** — the same content in another arrangement (picture left / right / above / behind, 2 / 3 / 4 per row or a list, grid or slider…), with mini previews and Shuffle; nothing is ever lost (tested on 12 section shapes), one undo step each.
+- **Drag pictures from the computer** onto the page: replace a picture, add to a gallery, add a picture between parts, or (Shift) use as background — up to 10 at once, uploaded with progress, description suggested from the file name, one undo step.
+- **Easy mode** (on the first visit; More options / ⋯ menu to switch), a 6-step **guided tour** (English / Bangla; never pops up over someone already working) and one-line **tips**.
+- **Colours from your logo** (Theme page, and an optional wizard step): 2–3 palettes taken from the logo and adjusted for readable text (WCAG AA), saved to the theme draft.
+
+#### Fixed
+- The new "What next?" and "Try another layout" code no longer crashes the editor on pages that contain a global section (found by the existing B9 tests; guarded and covered by regression tests).
+- The first-visit tour no longer opens over someone who has already started clicking or typing, or over an open dialog.
+- Test setup: every browser test starts as a returning builder user on the app and on each demo store's own address (Playwright `storageState`), so first-visit Easy mode and the tour only appear in the specs written for them.
+
+#### Tests
+- Backend 1572 (PostgreSQL: 1571 pass, 1 opt-in skip; new `StoreBuilderB21WizardTest` — all 30 page type × goal combinations, `BuilderWizardRecipesTest`); Pint clean. vitest 2786; mocked Playwright 494 (new `store-builder-b21-wizard`, `-easy`, `-drop`).
+- Full-stack (PostgreSQL, desktop) 54 — new **B21**: Green Basket goes through the real wizard (sale page, best sellers, Lively look), lands in the editor on a draft with at least three sections and the Lively theme that passes the page check, shoppers still see "Page not found", and the same address is refused the second time. Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- No migration. Existing editor users keep the full editor (Easy mode is only the default for people who have never used the builder in that browser).
+
 ### B20 — Store builder: Animated graphics
 
 #### Added

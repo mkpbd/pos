@@ -10,7 +10,7 @@ import { mockApi, ok, renderRoutes } from '@/test/utils'
 import type { DocumentDetail } from './api'
 import { clearClipboardMemory } from './clipboard'
 import { makeGlobal } from './global-sections'
-import { detail } from './test-helpers'
+import { detail, seedFullMode } from './test-helpers'
 
 /*
  * B9 in the editor: copy & paste with the keyboard, a global section reference (its panel, detach),
@@ -55,6 +55,8 @@ const rowNames = () => within(tree()).getAllByRole('treeitem').map((row) => row.
 
 beforeEach(() => {
   window.localStorage.clear()
+  // A returning user: no first-visit tour or tips over these flows (B21).
+  seedFullMode()
   clearClipboardMemory()
 })
 

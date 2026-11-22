@@ -3,10 +3,12 @@
  * without the dialog.
  */
 
-export type CommandGroup = 'recent' | 'action' | 'add' | 'template' | 'goto' | 'page'
+export type CommandGroup = 'recent' | 'suggest' | 'action' | 'add' | 'template' | 'goto' | 'page'
 
 export const GROUP_TITLES: Record<CommandGroup, string> = {
   recent: 'Recent',
+  // B21: "What next?" — sections that usually follow the selected one.
+  suggest: 'Suggested next',
   action: 'Actions',
   add: 'Add an element',
   template: 'Insert a template',
@@ -14,7 +16,7 @@ export const GROUP_TITLES: Record<CommandGroup, string> = {
   page: 'Open another page',
 }
 
-const GROUP_ORDER: CommandGroup[] = ['action', 'add', 'template', 'goto', 'page']
+const GROUP_ORDER: CommandGroup[] = ['suggest', 'action', 'add', 'template', 'goto', 'page']
 
 export type CommandItem = {
   /** Unique across groups (`add:heading`, `goto:e_abc`, …); recent items are kept by it. */

@@ -3,6 +3,7 @@
 namespace App\Modules\Storefront\Domain\Builder;
 
 use App\Modules\Shared\Domain\VideoUrl;
+use App\Modules\Storefront\Domain\Builder\Wizard\WizardOptions;
 use App\Modules\Storefront\Domain\SectionType;
 use App\Modules\Storefront\Domain\ThemeSchema;
 
@@ -1690,6 +1691,8 @@ final class ElementRegistry
                 'background_fx_colors' => ['min' => StyleSchema::BACKGROUND_FX_COLORS[0], 'max' => StyleSchema::BACKGROUND_FX_COLORS[1]],
                 'background_fx_warn' => StyleSchema::BACKGROUND_FX_WARN,
                 'icon_loop_warn' => self::ICON_LOOP_WARN,
+                // B21: the page wizard.
+                'wizard' => WizardOptions::limits(),
             ],
             // B8a: elements whose data depends on their props (a chart has data only with a store source).
             // B14: a product listing only for chosen categories or brands.
@@ -1873,6 +1876,12 @@ final class ElementRegistry
                 'background_fx_default_colors' => StyleSchema::BACKGROUND_FX_DEFAULT_COLORS,
                 'theme_add_to_cart_effects' => ThemeSchema::ADD_TO_CART_EFFECTS,
                 'theme_effects_defaults' => ThemeSchema::EFFECTS_DEFAULTS,
+                // B21: the page wizard's choices (its recipes are server-side only).
+                'wizard_page_types' => WizardOptions::PAGE_TYPES,
+                'wizard_goals' => WizardOptions::GOALS,
+                'wizard_looks' => WizardOptions::LOOKS,
+                'wizard_languages' => WizardOptions::LANGUAGES,
+                'wizard_default_goals' => WizardOptions::DEFAULT_GOALS,
             ],
             // B8b: the settings a new popup starts with.
             'popup_defaults' => PopupSettings::present(PopupSettings::defaults()),

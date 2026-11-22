@@ -34,6 +34,7 @@ import { rememberScreenLang, ScreenLangContext, storedScreenLang, useScreenText 
 import { LanguageToggle, ScreenConfirm } from './screen-ui'
 import { StartGuide } from './start-guide'
 import { StorePagesCard } from './store-pages-card'
+import { BuildForMeButton } from '../wizard/wizard-dialog'
 
 /*
  * Online store → Page builder (/admin/storefront/pages), in three groups (B4):
@@ -120,6 +121,8 @@ function HomeCard({ home, canManage }: { home: DocumentSummary | undefined; canM
                 {create.isPending && create.variables?.from === 'blank' ? <Loader2Icon className="animate-spin" aria-hidden /> : <PlusIcon aria-hidden />}
                 {t('home.blank')}
               </Button>
+              {/* B21: the wizard builds the home page draft. */}
+              <BuildForMeButton initialType="home" />
             </div>
           </div>
         ) : (
@@ -281,6 +284,7 @@ function PagesScreen() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     {landings.length > 1 && <SortSelect id="landing-sort" value={landingSort} onChange={setLandingSort} />}
+                    {canManage && <BuildForMeButton initialType="sale" />}
                     {canManage && (
                       <Button onClick={() => setCreating(true)}>
                         <PlusIcon aria-hidden /> {t('landing.new')}

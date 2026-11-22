@@ -42,6 +42,9 @@ import { DeviceStatus } from './device-status'
 import { GROUP_TIPS, GROUP_TITLES, groupsFor, type GroupId } from './style-groups'
 import { BREAKPOINT, CASCADE, DEVICE_LABEL, effectiveGroup, getAt, resolveStyleValue, sameJson, styleIsValid, widthAt, writeStyleValue, type Resolved, type StylePath } from './style-model'
 import type { BuilderNode, InspectorChangeOptions, InspectorCommand } from './types'
+import { useEaseUi } from '../easy/ease-context'
+import { EasyDeviceNote, SpacingPresets } from '../easy/easy-controls'
+import { easyGroups } from '../easy/ease-store'
 
 export type StyleTheme = { colors?: Record<string, string>; palette?: readonly PaletteColor[] }
 
@@ -139,7 +142,9 @@ const GROUP_PATHS: Record<GroupId, StylePath[]> = {
 }
 
 export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabProps) {
-  const bp = BREAKPOINT[device]
+  // B21: Easy mode styles every device at once (no per-device values) with fewer, simpler controls.
+  const { easy } = useEaseUi()
+  const bp: Breakpoint = easy ? 'base' : BREAKPOINT[device]
   const style: ResponsiveStyle = node.style ?? {}
   const [refused, setRefused] = useState<string | null>(null)
   const themeColors = theme?.colors
@@ -215,6 +220,7 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
 
   /** The indicator + reset for a path. */
   const status = (path: StylePath, label: string) => {
+    if (easy) return null
     const resolved = get(path)
     // The breakpoint whose value shows through after a reset (the nearest wider one that sets it).
     const after = CASCADE[bp].slice(1).find((b) => getAt(style[b], path) !== undefined) ?? null
@@ -246,7 +252,7 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
           tooltip="A colour, gradient or picture behind this part of the page."
         />
         {/* B20: sections and inner rows can have a moving background (desktop style = every device). */}
-        {(node.type === 'section' || node.type === 'inner_row') && (
+        {(node.type === 'section' || node.type === 'inner_row') && (!easy || style.base?.background_fx !== undefined) && (
           <MovingBackgroundControl value={style.base?.background_fx} onChange={(fx: BackgroundFx | undefined) => setBase(['background_fx'], fx)} themeColors={themeColors} />
         )}
       </>
@@ -281,14 +287,14 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
             contrastWith={bg?.type === 'color' ? bg.color : undefined}
             status={status(['color'], 'Text colour')}
           />
-          <HoverControl
+          {!easy && <HoverControl
             value={hover}
             parts={['background_color', 'color']}
             onChange={(key, v) => set(['effects', 'hover', key], v)}
             statusFor={(key) => status(['effects', 'hover', key], key === 'color' ? 'Text colour on hover' : 'Background on hover')}
             themeColors={themeColors}
             palette={palette}
-          />
+          />}
         </>
       )
     },
@@ -311,9 +317,16 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
         value={group<Typography>(['typography'])}
         onChange={(key: TypographyKey, v: unknown) => set(['typography', key], v)}
         statusFor={(key) => status(['typography', key], TYPOGRAPHY_LABELS[key])}
+        fields={easy ? EASY_TYPOGRAPHY : undefined}
       />
     ),
-    spacing: () => (
+    spacing: () => easy ? (
+      <SpacingPresets
+        nodeType={node.type}
+        value={{ margin: group<Sides>(['spacing', 'margin']), padding: group<Sides>(['spacing', 'padding']) }}
+        onChange={(box, sides) => setDiff(['spacing', box], sides, group<Sides>(['spacing', box]))}
+      />
+    ) : (
       <SpacingBox
         value={{ margin: group<Sides>(['spacing', 'margin']), padding: group<Sides>(['spacing', 'padding']) }}
         onChange={(box: SpacingBoxName, sides) => setDiff(['spacing', box], sides, group<Sides>(['spacing', box]))}
@@ -321,8 +334,8 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
         placeholder="0"
       />
     ),
-    size: () => <SizeGroup node={node} bp={bp} device={device} get={get} set={set} status={status} onCommand={onCommand} />,
-    layout: () => <LayoutGroup node={node} get={get} set={set} status={status} />,
+    size: () => <SizeGroup node={node} bp={bp} device={device} get={get} set={set} status={status} onCommand={onCommand} easy={easy} />,
+    layout: () => <LayoutGroup node={node} get={get} set={set} status={status} easy={easy} />,
     border: () => {
       const border = group<Border>(['border'])
       return (
@@ -384,10 +397,11 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
         value={style.base?.motion}
         onChange={(motion) => setBase(['motion'], motion)}
         onPreview={() => onCommand({ type: 'preview-motion', nodeId: node.id, scope: canStagger(node.type) ? 'section' : 'node' })}
-        onTimeline={() => onCommand({ type: 'open-motion-timeline', sectionId: node.id })}
+        onTimeline={easy ? undefined : () => onCommand({ type: 'open-motion-timeline', sectionId: node.id })}
+        simple={easy}
         hover={style.base?.hover}
-        onHover={(hover: HoverStyle | undefined) => setBase(['hover'], hover)}
-        parallax={canParallax(node.type) ? { value: baseParallax, available: style.base?.background?.type === 'image', onChange: setParallax, replacedBy: (node as Section).props.background_scroll ? 'Background moves while scrolling (in Scroll) is on; choosing one here turns it off.' : undefined } : undefined}
+        onHover={easy ? undefined : (hover: HoverStyle | undefined) => setBase(['hover'], hover)}
+        parallax={!easy && canParallax(node.type) ? { value: baseParallax, available: style.base?.background?.type === 'image', onChange: setParallax, replacedBy: (node as Section).props.background_scroll ? 'Background moves while scrolling (in Scroll) is on; choosing one here turns it off.' : undefined } : undefined}
       />
     ),
     scroll: () => (
@@ -415,10 +429,10 @@ export function StyleTab({ node, device, onChange, onCommand, theme }: StyleTabP
     ),
   }
 
-  const groups = groupsFor(node)
+  const groups = easy ? easyGroups(groupsFor(node), node.type) : groupsFor(node)
   return (
-    <div className="flex flex-col gap-3" data-testid="style-tab">
-      <DeviceBanner device={device} onDevice={(d) => onCommand({ type: 'set-device', device: d })} />
+    <div className="flex flex-col gap-3" data-testid="style-tab" data-easy={easy || undefined}>
+      {easy ? <EasyDeviceNote style={style} device={device} /> : <DeviceBanner device={device} onDevice={(d) => onCommand({ type: 'set-device', device: d })} />}
       {refused && <p role="alert" className="text-sm text-destructive">{refused}</p>}
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">This element has no style settings.</p>
@@ -455,6 +469,9 @@ const TYPOGRAPHY_LABELS: Record<TypographyKey, string> = {
   transform: 'Capitals',
 }
 
+/** B21: Easy mode's text controls (no line height, letter spacing or capitals). */
+const EASY_TYPOGRAPHY: readonly TypographyKey[] = ['font', 'size', 'weight', 'align']
+
 const BORDER_LABELS: Record<BorderKey, string> = { width: 'Line width', style: 'Line', color: 'Line colour', radius: 'Rounded corners' }
 
 export function OpacityControl({ value, onChange, status }: { value: number | undefined; onChange: (v: number) => void; status: ReactNode }) {
@@ -487,14 +504,15 @@ const SIZE_FIELDS = [
   { key: 'min_height', label: 'Minimum height', units: ['px', 'vh', 'rem'], tooltip: 'At least this tall; taller when the content needs it. vh = % of the screen height.' },
 ] as const
 
-function SizeGroup({ node, bp, device, get, set, status, onCommand }: { node: BuilderNode; bp: Breakpoint; device: Device; get: Getter; set: Setter; status: StatusFn; onCommand: (cmd: InspectorCommand) => void }) {
-  const fields = node.type === 'spacer' ? SIZE_FIELDS.filter((f) => f.key === 'height') : node.type === 'divider' ? SIZE_FIELDS.filter((f) => f.key === 'width' || f.key === 'max_width') : SIZE_FIELDS
+function SizeGroup({ node, bp, device, get, set, status, onCommand, easy = false }: { node: BuilderNode; bp: Breakpoint; device: Device; get: Getter; set: Setter; status: StatusFn; onCommand: (cmd: InspectorCommand) => void; easy?: boolean }) {
+  // B21: Easy mode keeps only a button's "Fill the column width" (no size numbers).
+  const fields = easy ? [] : node.type === 'spacer' ? SIZE_FIELDS.filter((f) => f.key === 'height') : node.type === 'divider' ? SIZE_FIELDS.filter((f) => f.key === 'width' || f.key === 'max_width') : SIZE_FIELDS
   const widthValue = get<string>(['size', 'width'])
   // Full width inherited from a wider device can only be changed there (width has no "auto").
   const inheritedFull = widthValue.value === '100%' && widthValue.origin.kind === 'inherited'
   return (
     <>
-      {node.type === 'column' && <ColumnWidthField column={node as Column} bp={bp} device={device} onCommand={onCommand} />}
+      {!easy && node.type === 'column' && <ColumnWidthField column={node as Column} bp={bp} device={device} onCommand={onCommand} />}
       {node.type === 'button' && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -591,11 +609,12 @@ function ColumnWidthField({ column, bp, device, onCommand }: { column: Column; b
   )
 }
 
-function LayoutGroup({ node, get, set, status }: { node: BuilderNode; get: Getter; set: Setter; status: StatusFn }) {
+function LayoutGroup({ node, get, set, status, easy = false }: { node: BuilderNode; get: Getter; set: Setter; status: StatusFn; easy?: boolean }) {
   const isColumn = node.type === 'column'
   return (
     <>
-      <LengthControl
+      {/* B21: Easy mode keeps the line-up choices, not the gap numbers. */}
+      {!easy && <LengthControl
         label={isColumn ? 'Space between elements' : 'Space between columns'}
         value={get<string>(['layout', 'gap']).value}
         units={['px', 'rem']}
@@ -603,8 +622,8 @@ function LayoutGroup({ node, get, set, status }: { node: BuilderNode; get: Gette
         slider={{ min: 0, max: 96, step: 4 }}
         onChange={(v) => set(['layout', 'gap'], v)}
         status={status(['layout', 'gap'], isColumn ? 'Space between elements' : 'Space between columns')}
-      />
-      {!isColumn && (
+      />}
+      {!easy && !isColumn && (
         <LengthControl
           label="Space between lines"
           tooltip="When columns wrap onto a new line (on smaller screens), the space between the lines."
@@ -641,7 +660,7 @@ function LayoutGroup({ node, get, set, status }: { node: BuilderNode; get: Gette
         onChange={(v) => set(['layout', 'justify'], v)}
         status={status(['layout', 'justify'], isColumn ? 'Spread vertically' : 'Spread across')}
       />
-      {!isColumn && (
+      {!easy && !isColumn && (
         <div className="flex items-center gap-2">
           <Switch id={`wrap-${node.id}`} checked={get<boolean>(['layout', 'wrap']).value ?? true} onCheckedChange={(wrap) => set(['layout', 'wrap'], wrap)} />
           <label htmlFor={`wrap-${node.id}`} className="text-sm">Let columns wrap onto a new line</label>

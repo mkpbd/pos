@@ -49,7 +49,8 @@ import { GlobalStylesPanel } from '@/features/storefront/theme/global-styles'
 import { ProductLayoutFields } from '@/features/storefront/theme/product-layout-card'
 import { CartEffectsCard } from '@/features/storefront/theme/cart-effects-card'
 import { ThemeConflictDialog, ThemePublishDialog, ThemeVersionsDialog } from '@/features/storefront/theme/theme-dialogs'
-import { FONT_FAMILIES, FONT_LABELS } from '@/features/storefront/theme/theme-options'
+import { applyPalette, BUTTON_RADII, FONT_FAMILIES, FONT_LABELS, type PaletteColors } from '@/features/storefront/theme/theme-options'
+import { LogoColours } from '@/features/storefront/theme/logo-colours'
 import { ANNOUNCEMENT_TEXT_MAX, THEME_FIELDS, themeSchema, toDocument, toFormValues, type ThemeFormValues } from '@/features/storefront/theme-form'
 import { BanglaTranslations } from '@/features/translations/components/bangla-translations'
 import { rhfBnErrors, type TranslationsMap } from '@/features/translations/translations'
@@ -309,6 +310,36 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
     name: ['colors', 'palette', 'typography', 'shape', 'announcement.enabled', 'announcement.text', 'announcement.foreground', 'announcement.background', 'layout.product'],
   })
   const panelSettings: ThemeSettings = { ...draft.settings, colors, palette, typography, shape }
+  const logoMediaId = useWatch({ control, name: 'logo_media_id' })
+
+  /**
+   * B21 "Get colours from my logo": the chosen palette goes into the form and the draft is saved
+   * (never published). The toast's Undo puts the previous colours back and saves again.
+   */
+  const onUseLogoColours = async (picked: PaletteColors): Promise<boolean> => {
+    const previous = form.getValues('colors')
+    form.setValue('colors', applyPalette(previous, { key: 'logo', name: 'Logo', description: '', colors: picked }), { shouldDirty: true, shouldValidate: form.formState.isSubmitted })
+    let values: ThemeFormValues | null = null
+    await form.handleSubmit(
+      (v) => {
+        values = v
+      },
+      () => toast.error('Please correct the highlighted fields.'),
+    )()
+    if (!values || !(await saveValues(values))) return false
+    toast.success('Your logo’s colours are in your theme draft. Publish to show them on your store.', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          // The latest draft (the save above moved its revision on).
+          const latest = queryClient.getQueryData<ThemeDraft>(storefrontKeys.themeDraft) ?? draft
+          form.setValue('colors', previous, { shouldDirty: true })
+          void saveValues(form.getValues(), latest.draft_revision, latest.settings).then((ok) => ok && toast.success('The colours are back as they were.'))
+        },
+      },
+    })
+    return true
+  }
   const panelErrors = Object.assign({}, ...GLOBAL_STYLE_KEYS.map((key) => flattenErrors(errors[key] as FieldErrors | undefined, key)), errors.palette?.message ? { palette: errors.palette.message } : {}) as Record<string, string>
 
   const onPanelChange = (next: ThemeSettings) => {
@@ -354,6 +385,23 @@ function ThemeEditor({ draft, canManage, canPublish }: Props) {
                 <Label>Favicon</Label>
                 <Controller control={control} name="favicon_media_id" render={({ field }) => <MediaField value={field.value} onChange={field.onChange} title="Choose the favicon" disabled={!canManage} />} />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-2" data-testid="logo-colours-card">
+            <CardHeader>
+              <CardTitle>Colours from your logo</CardTitle>
+              <CardDescription>Get store colours that match your logo, already easy to read. They go into your draft; publish to show them.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LogoColours
+                logoMediaId={logoMediaId}
+                onUse={onUseLogoColours}
+                disabled={!canManage || busy}
+                headingFont={FONT_FAMILIES[typography.heading_font]}
+                bodyFont={FONT_FAMILIES[typography.body_font]}
+                buttonRadius={BUTTON_RADII[shape.button_style]}
+              />
             </CardContent>
           </Card>
 

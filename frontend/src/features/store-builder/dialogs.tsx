@@ -22,6 +22,7 @@ import { ServerCheckNote } from './check-panel'
 import type { PageCheck } from './use-page-check'
 import { countsText } from './page-check'
 import { safeLinkUrl } from './inline-edit'
+import { FirstPublishTip } from './easy/tips'
 
 /**
  * B10: the URL prompt of the canvas format bar's Link button. Answers a checked URL, '' (remove
@@ -174,6 +175,8 @@ export function PublishDialog({ open, onOpenChange, pending, error, onPublish, p
             onPublish(note.trim() || null, when.nowOptions)
           }}
         >
+          {/* B21: the first time, a one-line tip: Check page looks for problems first. */}
+          <FirstPublishTip onShowCheck={onShowCheck} />
           <PublishWhenFields when={when} noun={noun} />
           {check && <PublishCheck check={check} onShowAll={onShowCheck} />}
           <Label htmlFor="publish-note">Note (optional)</Label>

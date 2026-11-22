@@ -9,7 +9,7 @@ import { bootstrapFixture } from '@/storefront/test-fixtures'
 import { makeCurrentUser } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 import type { DocumentDetail } from './api'
-import { detail } from './test-helpers'
+import { detail, seedFullMode } from './test-helpers'
 
 /*
  * B16 in the editor: presence avatars, the "someone else is editing" banner with a real read-only
@@ -26,6 +26,7 @@ vi.mock('sonner', async (importOriginal) => {
 beforeEach(() => {
   Object.values(toasts).forEach((fn) => fn.mockReset())
   window.localStorage.clear()
+  seedFullMode()
 })
 
 const RIMA = { id: 'u-2', name: 'Rima Akter' }

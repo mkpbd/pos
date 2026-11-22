@@ -57,6 +57,9 @@ import { findParent, otherAnchors } from './tree-lookup'
 import type { BuilderNode, InspectorChangeOptions, InspectorProps } from './types'
 import { B4_TYPES, B6_TYPES, B8A_TYPES, B8B_TYPES, P2A_TYPES, validateNode } from './validate'
 import { WrappedSectionForm } from './wrapped-form'
+import { TryLayoutButton } from '../building/try-layout-button'
+import { useEaseUi } from '../easy/ease-context'
+import { EasyModeSwitch, MoreOptionsLink } from '../easy/easy-controls'
 
 const ICONS: Record<string, typeof HeadingIcon> = {
   section: PanelTopIcon,
@@ -158,7 +161,10 @@ function PageSettings({ document, content, locales, onCommand, errors, theme }: 
   return (
     <div className="flex flex-col gap-5 p-4">
       <div>
-        <h2 className="text-base font-semibold">{heading}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="min-w-0 flex-1 text-base font-semibold">{heading}</h2>
+          <EasyModeSwitch />
+        </div>
         <p className="text-sm text-muted-foreground">Select a section or element on the {info.noun} or in Layers to edit it. Add new ones from the Add panel.</p>
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
@@ -308,6 +314,8 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
   const [tab, setTab] = useState<Tab>('content')
   const panel = useRef<HTMLElement | null>(null)
   const nodeId = node?.id ?? null
+  // B21: Easy mode hides the Advanced tab and the hover / scroll pickers.
+  const { easy } = useEaseUi()
 
   // B10: page check "Fix it": the tab (switched while rendering, once per request), then the field once it has rendered.
   const focusToken = focus?.token ?? null
@@ -346,9 +354,10 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
   const template = documentTemplate({ kind: document.kind ?? 'page', key: document.key })
   const problems = validateNode(node, { icons, context, template })
   const errors = errorMap(node, problems, serverProblems)
-  const hasAdvanced = node.type !== 'column'
-  const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
   const advancedErrors = Object.keys(errors).some(isAdvancedKey)
+  // B21: in Easy mode the Advanced tab shows only while it has problems to fix.
+  const hasAdvanced = node.type !== 'column' && (!easy || advancedErrors)
+  const activeTab: Tab = hasAdvanced || tab !== 'advanced' ? tab : 'content'
   const contentErrors = Object.keys(errors).some((k) => !isAdvancedKey(k))
   const label = nodeLabel(node, registry)
   // Columns show their own "Select the section" button in the Content tab.
@@ -360,6 +369,8 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <NodeIcon type={node.type} />
         <h2 className="min-w-0 flex-1 truncate text-base font-semibold">{label}</h2>
+        <TryLayoutButton node={node} />
+        <EasyModeSwitch />
         {parent && (
           <Button
             type="button"
@@ -416,8 +427,8 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
             documentId={document.id}
             b4={{ context, theme, icons, canCustomHtml, enums: registry.enums, limits: registry.limits, template }}
           />
-          {CARD_HOVER_ELEMENTS.has(node.type) && <CardHoverPicker node={node} onChange={onChange} error={errors.card_hover} />}
-          {KEN_BURNS_TYPES.has(node.type) && <KenBurnsPicker node={node} onChange={onChange} error={errors.ken_burns ?? errors.ken_burns_direction} />}
+          {(!easy || errors.card_hover) && CARD_HOVER_ELEMENTS.has(node.type) && <CardHoverPicker node={node} onChange={onChange} error={errors.card_hover} />}
+          {(!easy || errors.ken_burns || errors.ken_burns_direction) && KEN_BURNS_TYPES.has(node.type) && <KenBurnsPicker node={node} onChange={onChange} error={errors.ken_burns ?? errors.ken_burns_direction} />}
           </ReadOnlyFields>
         </TabsContent>
         <TabsContent value="style" className="pt-4">
@@ -439,6 +450,7 @@ function SingleInspector({ content, node, document, registry, locales, errors: s
           </TabsContent>
         )}
       </Tabs>
+      <MoreOptionsLink className="mx-4 mb-4 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" />
     </aside>
   )
 }

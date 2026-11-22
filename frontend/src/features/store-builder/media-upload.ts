@@ -27,7 +27,8 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null
 }
 
-export type UploadOptions = { onProgress?: (fraction: number) => void; signal?: AbortSignal }
+/** B21: `alt` is stored with the picture in the media library. */
+export type UploadOptions = { onProgress?: (fraction: number) => void; signal?: AbortSignal; alt?: string }
 
 /** Uploads one picture to the media library; `onProgress` gets 0–1 while the bytes go up. */
 export function uploadPicture(file: File, options: UploadOptions = {}): Promise<MediaItem> {
@@ -61,6 +62,7 @@ export function uploadPicture(file: File, options: UploadOptions = {}): Promise<
     options.signal?.addEventListener('abort', () => xhr.abort(), { once: true })
     const body = new FormData()
     body.append('file', file)
+    if (options.alt) body.append('alt', options.alt)
     xhr.send(body)
   })
 }

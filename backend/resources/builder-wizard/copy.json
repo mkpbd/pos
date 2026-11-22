@@ -1,0 +1,164 @@
+{
+    "version": 1,
+    "about": "B21: the built-in texts of the page wizard (original plain text, English and Bangla). slots.<slot> holds the texts of a recipe slot; pages.<page type>.<slot> replaces them for one page type; '<slot>:<product source>' is used for product sections (chosen, category, best_sellers, new_arrivals). Each language holds a list of variants with the same fields; one is picked from the page title. Placeholders: {store} (the store's name), {title} (the page title), {category} (the first chosen category). Fields: heading, text, button (+ button_link), title, subtitle, element_text, cta_title, cta_text, cta_button (+ cta_link). No prices, discounts, stock or delivery promises.",
+    "slots": {
+        "hero": {
+            "en": [
+                {"heading": "{title}", "text": "Take a look at what is new at {store} and find something you will love.", "button": "Shop now", "button_link": "/shop"},
+                {"heading": "{title}", "text": "Hand-picked for you by the {store} team. Order online in a few taps.", "button": "See the products", "button_link": "/shop"}
+            ],
+            "bn": [
+                {"heading": "{title}", "text": "{store}-এ নতুন কী এসেছে দেখে নিন, পছন্দের জিনিসটি খুঁজে নিন।", "button": "এখনই কিনুন", "button_link": "/shop"},
+                {"heading": "{title}", "text": "{store}-এর টিম আপনার জন্য বেছে রেখেছে। কয়েকটি ট্যাপেই অনলাইনে অর্ডার করুন।", "button": "পণ্যগুলো দেখুন", "button_link": "/shop"}
+            ]
+        },
+        "hero_sale": {
+            "en": [
+                {"cta_title": "{title}", "cta_text": "Our sale is on at {store}. Have a look before your favourites are gone.", "cta_button": "See the offers", "cta_link": "/shop"},
+                {"cta_title": "{title}", "cta_text": "Special prices for a short time only. Pick your favourites today.", "cta_button": "Shop the sale", "cta_link": "/shop"}
+            ],
+            "bn": [
+                {"cta_title": "{title}", "cta_text": "{store}-এ সেল চলছে। পছন্দের জিনিস শেষ হওয়ার আগেই দেখে নিন।", "cta_button": "অফারগুলো দেখুন", "cta_link": "/shop"},
+                {"cta_title": "{title}", "cta_text": "অল্প সময়ের জন্য বিশেষ দাম। আজই পছন্দের জিনিসটি বেছে নিন।", "cta_button": "সেলে কেনাকাটা", "cta_link": "/shop"}
+            ]
+        },
+        "hero_plain": {
+            "en": [
+                {"heading": "{title}", "text": "Welcome to {store}. We are glad you are here."}
+            ],
+            "bn": [
+                {"heading": "{title}", "text": "{store}-এ আপনাকে স্বাগতম। আপনি এসেছেন বলে আমরা খুশি।"}
+            ]
+        },
+        "flash_sale": {
+            "en": [{"title": "Flash sale — hurry"}],
+            "bn": [{"title": "ফ্ল্যাশ সেল — তাড়াতাড়ি করুন"}]
+        },
+        "coupon": {
+            "en": [{"title": "An extra treat for you", "element_text": "Use this code when you check out."}],
+            "bn": [{"title": "আপনার জন্য বাড়তি উপহার", "element_text": "চেকআউটের সময় এই কোডটি ব্যবহার করুন।"}]
+        },
+        "categories": {
+            "en": [{"title": "Shop by category"}],
+            "bn": [{"title": "ক্যাটাগরি অনুযায়ী কিনুন"}]
+        },
+        "products:chosen": {
+            "en": [{"title": "Our picks for you", "subtitle": "Chosen by the {store} team"}],
+            "bn": [{"title": "আপনার জন্য আমাদের বাছাই", "subtitle": "{store}-এর টিমের বাছাই করা"}]
+        },
+        "products:category": {
+            "en": [{"title": "{category}", "subtitle": "Popular picks from this category"}],
+            "bn": [{"title": "{category}", "subtitle": "এই ক্যাটাগরির জনপ্রিয় পণ্য"}]
+        },
+        "products:best_sellers": {
+            "en": [{"title": "Best sellers", "subtitle": "What our customers buy most"}],
+            "bn": [{"title": "সবচেয়ে বেশি বিক্রি", "subtitle": "ক্রেতারা যা সবচেয়ে বেশি কেনেন"}]
+        },
+        "products:new_arrivals": {
+            "en": [{"title": "New arrivals", "subtitle": "Fresh in at {store}"}],
+            "bn": [{"title": "নতুন এসেছে", "subtitle": "{store}-এ একদম নতুন"}]
+        },
+        "products_carousel:chosen": {
+            "en": [{"title": "More to discover"}],
+            "bn": [{"title": "আরও দেখুন"}]
+        },
+        "products_carousel:category": {
+            "en": [{"title": "More from {category}"}],
+            "bn": [{"title": "{category} থেকে আরও"}]
+        },
+        "products_carousel:best_sellers": {
+            "en": [{"title": "Customer favourites"}],
+            "bn": [{"title": "ক্রেতাদের প্রিয়"}]
+        },
+        "products_carousel:new_arrivals": {
+            "en": [{"title": "Just in"}],
+            "bn": [{"title": "সবে এসেছে"}]
+        },
+        "order_form": {
+            "en": [{"title": "Order now", "element_text": "Fill in your details and we will call you to confirm. Pay when it arrives."}],
+            "bn": [{"title": "এখনই অর্ডার করুন", "element_text": "আপনার তথ্য দিন, নিশ্চিত করতে আমরা ফোন করব। পণ্য হাতে পেয়ে মূল্য পরিশোধ করুন।"}]
+        },
+        "phone_form": {
+            "en": [{"title": "Leave your number — we will call you"}],
+            "bn": [{"title": "আপনার নম্বর দিন — আমরা ফোন করব"}]
+        },
+        "story": {
+            "en": [{"heading": "The {store} story", "text": "Scroll down to see how we work, step by step."}],
+            "bn": [{"heading": "{store}-এর গল্প", "text": "নিচে স্ক্রল করে ধাপে ধাপে দেখুন আমরা কীভাবে কাজ করি।"}]
+        },
+        "about_story": {
+            "en": [{"heading": "How {store} started", "text": "It began with a simple wish: good things, honest service and happy customers. That is still what we work for every day."}],
+            "bn": [{"heading": "{store} যেভাবে শুরু", "text": "শুরুটা একটি সহজ ইচ্ছা থেকে: ভালো জিনিস, সৎ সেবা আর খুশি ক্রেতা। আজও প্রতিদিন আমরা সেটার জন্যই কাজ করি।"}]
+        },
+        "why_us": {
+            "en": [{"heading": "Why shop with {store}", "text": "Small promises we keep on every order."}],
+            "bn": [{"heading": "কেন {store} থেকে কিনবেন", "text": "প্রতিটি অর্ডারে যে ছোট ছোট কথা আমরা রাখি।"}]
+        },
+        "reviews": {
+            "en": [{"title": "What customers say"}],
+            "bn": [{"title": "ক্রেতারা যা বলেন"}]
+        },
+        "faq": {
+            "en": [{"heading": "Questions and answers", "text": "Here are the questions we hear most. Ask us if yours is not here."}],
+            "bn": [{"heading": "প্রশ্ন ও উত্তর", "text": "যে প্রশ্নগুলো সবচেয়ে বেশি পাই। আপনার প্রশ্নটি না থাকলে আমাদের জিজ্ঞেস করুন।"}]
+        },
+        "contact_form": {
+            "en": [{"heading": "Send us a message", "text": "Ask about an order, a product or anything else. We read every message."}],
+            "bn": [{"heading": "আমাদের বার্তা পাঠান", "text": "অর্ডার, পণ্য বা অন্য যেকোনো বিষয়ে জিজ্ঞেস করুন। প্রতিটি বার্তা আমরা পড়ি।"}]
+        },
+        "visit": {
+            "en": [{"heading": "How to reach {store}"}],
+            "bn": [{"heading": "{store}-এর সাথে যোগাযোগ"}]
+        },
+        "cta": {
+            "en": [{"cta_title": "Ready to shop?", "cta_text": "See everything {store} has for you.", "cta_button": "Start shopping", "cta_link": "/shop"}],
+            "bn": [{"cta_title": "কেনাকাটা শুরু করবেন?", "cta_text": "{store}-এ আপনার জন্য যা আছে সব দেখুন।", "cta_button": "কেনাকাটা শুরু করুন", "cta_link": "/shop"}]
+        }
+    },
+    "pages": {
+        "home": {
+            "hero": {
+                "en": [
+                    {"heading": "Welcome to {store}", "text": "Good things, fair service and quick delivery. Find your favourites and order online in a few taps.", "button": "Shop now", "button_link": "/shop"},
+                    {"heading": "{store} — shop online", "text": "Everything you love from {store}, now just a few taps away.", "button": "Start shopping", "button_link": "/shop"}
+                ],
+                "bn": [
+                    {"heading": "{store}-এ স্বাগতম", "text": "ভালো জিনিস, আন্তরিক সেবা আর দ্রুত ডেলিভারি। পছন্দের জিনিস খুঁজে কয়েকটি ট্যাপেই অর্ডার করুন।", "button": "এখনই কিনুন", "button_link": "/shop"},
+                    {"heading": "{store} — অনলাইনে কেনাকাটা", "text": "{store}-এর পছন্দের সবকিছু এখন মাত্র কয়েকটি ট্যাপ দূরে।", "button": "কেনাকাটা শুরু করুন", "button_link": "/shop"}
+                ]
+            }
+        },
+        "product_launch": {
+            "hero": {
+                "en": [
+                    {"heading": "{title}", "text": "Something new has arrived at {store}. Be among the first to get it.", "button": "Order now", "button_link": "@product"},
+                    {"heading": "{title}", "text": "Meet the newest addition to {store}. Here is everything you need to know.", "button": "See it now", "button_link": "@product"}
+                ],
+                "bn": [
+                    {"heading": "{title}", "text": "{store}-এ নতুন কিছু এসেছে। প্রথম দিকের ক্রেতাদের একজন হয়ে যান।", "button": "এখনই অর্ডার করুন", "button_link": "@product"},
+                    {"heading": "{title}", "text": "{store}-এর নতুন সংযোজনের সাথে পরিচিত হোন। যা জানা দরকার সব এখানে।", "button": "এখনই দেখুন", "button_link": "@product"}
+                ]
+            }
+        },
+        "about": {
+            "hero_plain": {
+                "en": [
+                    {"heading": "{title}", "text": "Get to know the people behind {store} and what we care about."}
+                ],
+                "bn": [
+                    {"heading": "{title}", "text": "{store}-এর পেছনের মানুষ আর আমাদের মূল্যবোধের সাথে পরিচিত হোন।"}
+                ]
+            }
+        },
+        "contact": {
+            "hero_plain": {
+                "en": [
+                    {"heading": "{title}", "text": "Questions about an order or a product? We are happy to help."}
+                ],
+                "bn": [
+                    {"heading": "{title}", "text": "অর্ডার বা পণ্য নিয়ে প্রশ্ন আছে? সাহায্য করতে পেরে আমরা খুশি।"}
+                ]
+            }
+        }
+    }
+}

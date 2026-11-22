@@ -66,6 +66,7 @@ import { useCanvasArms } from './experiments/use-canvas-arms'
 import { usePageCheck } from './use-page-check'
 import { applyTextEdit, firstInlineField } from './inline-edit'
 import { dropTargetOf, pictureFileProblem, setNodePicture, uploadErrorMessage, uploadPicture } from './media-upload'
+import { useFileDrop } from './use-file-drop'
 import type { PageCheckIssue, PageCheckTab } from './page-check'
 import { applyPageCheckFix } from './page-check-fix'
 import { hasSpacingHandles, setSpacing, spacingAt } from './spacing-drag'
@@ -122,6 +123,15 @@ import { noteBlocked, usePresence } from './collab/use-presence'
 import { MotionThemesDialog } from './timeline/motion-themes-dialog'
 import { MotionTimelinePanel } from './timeline/motion-timeline'
 import { MotionUiContext, useMotionStudio } from './timeline/motion-ui'
+import { LayoutVariantsPanel } from './building/layout-panel'
+import { LayoutUiContext, useLayoutStudio } from './building/layout-ui'
+import { NextStripHost } from './building/next-strip-host'
+import type { NextStripPlace } from './building/next-strip'
+import { useNextSections } from './building/use-next-sections'
+import { EaseContext, useEase } from './easy/ease-context'
+import { easyHidesFix } from './easy/ease-store'
+import { GuidedTour } from './easy/guided-tour'
+import { CanvasTips } from './easy/tips'
 
 /*
  * The full-screen store builder editor (B2): toolbar, Add / Layers panel, canvas, inspector;
@@ -417,6 +427,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   // B18: the Motion themes dialog and the section's Motion timeline panel.
   const { ui: motionUi, themesOpen: motionThemesOpen, setThemesOpen: setMotionThemesOpen, openThemes: openMotionThemes, timelineId, closeTimeline } = useMotionStudio()
   const openTimeline = motionUi.openTimeline
+  // B21: "Try another layout" for a section (mini toolbar, inspector header; the strip under the canvas).
+  const { ui: layoutUi, sectionId: layoutSectionId, close: closeLayouts } = useLayoutStudio()
   // Escape that reaches the editor from the canvas (focus not yet moved into the dialog) closes them too.
   const overlaysOpen = useRef(false)
   useEffect(() => {
@@ -448,6 +460,14 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   const comments = useComments({ documentId: documentInfo.id, stamp: presence?.comments?.updated_at, presenceOpen: presence?.comments?.open })
   const setCommentsOpen = comments.setOpen
   const [addressOpen, setAddressOpen] = useState(false)
+
+  /* ---------------------------------------------------------------- B21 easy building ------- */
+  // Easy mode (fewer controls), the guided tour and the one-line tips — remembered per person.
+  const ease = useEase({ userId: meId, editLocale, bangla })
+  const easy = ease.easy
+  const setEasy = ease.setEasy
+  const startTour = ease.startTour
+  const resetTips = ease.resetTips
 
   /* ---------------------------------------------------------------- site styles (B3) ------- */
   const siteStyles = useSiteStyles()
@@ -520,6 +540,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
 
   /* ---------------------------------------------------------------- B10 edit on the page -- */
   const [uploads, setUploads] = useState<Record<string, NodeUpload>>({})
+  // B21: picture files dropped from the computer (replace, background, new pictures, gallery items).
+  const dropFiles = useFileDrop({ store, registry, context, setUploads })
   const [replaceId, setReplaceId] = useState<string | null>(null)
   const [linkRequest, setLinkRequest] = useState<{ url: string | null } | null>(null)
   const fontsQuery = useStoreFonts()
@@ -604,6 +626,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           return
         case 'image-drop':
           return void dropPicture(message.id, message.file)
+        case 'drop-files':
+          if (insideGlobal(message.target.node_id)) return void toast.info(GLOBAL_NOTE)
+          return void dropFiles(message.target, message.files)
         case 'image-replace':
           if (insideGlobal(message.id)) return void toast.info(GLOBAL_NOTE)
           if (state.selection !== message.id) state.select(message.id)
@@ -611,7 +636,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
           return
       }
     },
-    [store, insideGlobal, canvas, context, bangla, dropPicture, setLinkRequest, setReplaceId],
+    [store, insideGlobal, canvas, context, bangla, dropPicture, dropFiles, setLinkRequest, setReplaceId],
   )
 
   // An edit in progress ends when another node is chosen (committed), on a device switch (committed) or an undo / redo (cancelled).
@@ -744,11 +769,16 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         state.select(owner)
         return void toast.info(GLOBAL_NOTE)
       }
+      // B21: a fix that needs a control Easy mode hides switches to full mode first.
+      if (easy && easyHidesFix(fix.tab, fix.field)) {
+        setEasy(false)
+        toast.info('Showing every option so you can fix this. Turn Easy mode back on in the inspector or the ⋯ menu.')
+      }
       state.select(owner)
       if (owner) commands.reveal(owner)
       setFocus((f) => ({ nodeId: owner, tab: fix.tab, field: fix.field, token: (f?.token ?? 0) + 1 }))
     },
-    [store, commands, ownerOf, insideGlobal],
+    [store, commands, ownerOf, insideGlobal, easy, setEasy],
   )
 
   /* ---------------------------------------------------------------- shortcuts -------------- */
@@ -1333,13 +1363,24 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       styles: () => setStylesOpen(true),
       shortcuts: () => setShortcutsOpen(true),
       motion: openMotionThemes,
+      tour: startTour,
+      easy: { on: easy, set: setEasy },
+      resetTips,
     }),
-    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck, readOnly, openMotionThemes],
+    [canPublish, canSubmit, runServerCheck, store, documentInfo.preview_url, openCheck, readOnly, openMotionThemes, startTour, easy, setEasy, resetTips],
   )
   const insightsShown = insights.open && !checkOpen
   const abShown = abAvailable && ab.open && !checkOpen && !insightsShown
   const commentsShown = comments.open && !checkOpen && !insightsShown && !abShown
-  const commandItems = useCommandItems(commandOpen, commandActions, single ? null : templates)
+  const baseCommandItems = useCommandItems(commandOpen, commandActions, single ? null : templates)
+  // B21 "What next?": the canvas strip under the last section and Ctrl+K "Suggested next" (pages only).
+  const next = useNextSections(single ? null : templates, !readOnly)
+  const nextCommands = next.commandItems
+  const commandItems = useMemo(() => (commandOpen && nextCommands.length > 0 ? [...nextCommands, ...baseCommandItems] : baseCommandItems), [commandOpen, nextCommands, baseCommandItems])
+  const nextStrip = useCallback(
+    (place: NextStripPlace) => <NextStripHost place={place} next={next} onMore={() => setTab('templates')} />,
+    [next, setTab],
+  )
 
   const labelOf = useCallback((id: string) => {
     const info = findNode(store.getState().content, ownerOf(id))
@@ -1465,6 +1506,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
   return (
     <TemplateSampleContext value={templateSample}>
     <MotionUiContext value={motionUi}>
+    <EaseContext value={ease.ui}>
+    <LayoutUiContext value={layoutUi}>
     <DndContext sensors={readOnly ? NO_SENSORS : sensors} collisionDetection={collision} onDragStart={onDragStart} onDragMove={onDragMove} onDragOver={(e) => onDragMove(e as unknown as DragMoveEvent)} onDragEnd={onDragEnd} onDragCancel={resetDrag} autoScroll={{ layoutShiftCompensation: false }}>
       <div className="fixed inset-0 z-40 flex flex-col bg-background text-foreground" data-testid="store-builder-editor">
         <Toolbar
@@ -1528,7 +1571,9 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
                 }
               : undefined
           }
-          abTests={abAvailable ? { open: abShown, count: abCount, onToggle: () => ab.setOpen(!abShown) } : undefined}
+          abTests={abAvailable && (!easy || abCount > 0) ? { open: abShown, count: abCount, onToggle: () => ab.setOpen(!abShown) } : undefined}
+          previewAs={!easy || previewContext !== null}
+          ease={{ easy, onEasy: setEasy, onTour: startTour, onResetTips: resetTips }}
           sample={showSample}
           readOnly={readOnly}
           people={people}
@@ -1539,7 +1584,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         />
         <PresenceBanner ui={presenceUi} />
         <div className="flex min-h-0 flex-1">
-          <nav aria-label="Add elements, page layers and templates" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown || abShown || commentsShown ? 'w-96' : 'w-72')}>
+          <nav aria-label="Add elements, page layers and templates" data-tour="add" className={cn('flex shrink-0 flex-col border-r bg-background', insightsShown || abShown || commentsShown ? 'w-96' : 'w-72')}>
             {checkOpen && (
               <CheckPanel
                 check={check}
@@ -1614,7 +1659,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               </TabsContent>
             </Tabs>
           </nav>
-          <main aria-label="Page canvas" className="flex min-w-0 flex-1 flex-col" data-canvas-keys>
+          <main aria-label="Page canvas" className="flex min-w-0 flex-1 flex-col" data-canvas-keys data-tour="canvas">
             {documentInfo.kind === 'global' ? <GlobalDocBar /> : info.placement && (
               <div className="flex shrink-0 items-center gap-2 border-b bg-muted/40 px-4 py-2">
                 <p role="note" data-testid="document-placement" className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
@@ -1684,10 +1729,13 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
               pageSample={templateSample.sample}
               pins={pinLayer}
               onCommentAt={comments.mode && commentsShown ? dropComment : null}
+              nextStrip={readOnly || single || isPopup ? null : nextStrip}
             />
             <MotionTimelinePanel nodeId={timelineId} onClose={closeTimeline} />
+            <LayoutVariantsPanel sectionId={layoutSectionId} onClose={closeLayouts} />
+            <CanvasTips />
           </main>
-          <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel">
+          <div className="flex w-80 shrink-0 flex-col border-l bg-background" data-testid="inspector-panel" data-tour="picture">
             {/* B9: a global section reference has its own panel; so does a global's document with nothing selected. */}
             {selectedRef ? <GlobalRefPanel node={selectedRef} /> : globalSettings && <GlobalDocPanel onOpenSiteStyles={() => setStylesOpen(true)} />}
             {/* The inspector stays mounted (it hosts the new-element setup dialog). */}
@@ -1780,6 +1828,7 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
       <CommandBox open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} />
       <MotionThemesDialog open={motionThemesOpen} onOpenChange={setMotionThemesOpen} />
       <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <GuidedTour open={ease.tourOpen} onClose={ease.closeTour} />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}
@@ -1876,6 +1925,8 @@ function EditorLayout({ autosave, canPublish, canSubmit, canCustomHtml, canvasCo
         }}
       />
     </DndContext>
+    </LayoutUiContext>
+    </EaseContext>
     </MotionUiContext>
     </TemplateSampleContext>
   )

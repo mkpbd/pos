@@ -202,6 +202,20 @@ export type CanvasMessage =
   | { type: 'image-drop'; id: string; target: ImageDropTarget; file: File }
   /** B10: double-click on an image (or a background-image node): the editor opens the media chooser for it. */
   | { type: 'image-replace'; id: string; target?: ImageDropTarget }
+  /**
+   * B21 (additive, v stays 1): picture files dragged from the computer over the canvas — where they
+   * would land (null: nowhere / left the canvas). Sent when the place changes. `rect` (canvas
+   * viewport px) is what to highlight: the node's box, or with `line` the insertion line.
+   * `count`: the files being dragged (when the browser tells; absent = unknown).
+   */
+  | { type: 'drag-files'; over: FileDropHover | null; count?: number }
+  /**
+   * B21 (additive, v stays 1): picture files dropped on the canvas (the Files are structured-cloned;
+   * the canvas posts at most MAX_DROP_FILES). The editor checks them, uploads them to the media
+   * library and changes the page in one undo step. One file on an image, or on a node that
+   * already has a background picture, still goes as `image-drop` (B10, unchanged).
+   */
+  | { type: 'drop-files'; target: FileDropTarget; files: File[] }
 
 /** B10: how a text field is edited in place. */
 export type TextFieldKind = 'line' | 'multiline' | 'html'
@@ -215,6 +229,20 @@ export type TextFieldKey = string
 
 export type ImageDropTarget = 'image' | 'background'
 
+/**
+ * B21: where dropped pictures go. `replace`: the image element's picture (`node_id` an image);
+ * `background`: the background picture of a section, inner row (or a column that has one);
+ * `insert`: new pictures — `into: 'column'` as image elements in the column `node_id` at `index`
+ * (the drawn order) before the element `before` (null = at the end), `into: 'items'` as new items of
+ * the gallery-like element `node_id` (gallery, carousels, photo grid, horizontal gallery).
+ */
+export type FileDropKind = 'replace' | 'background' | 'insert'
+export type FileDropTarget = { node_id: string; kind: FileDropKind; into?: 'column' | 'items'; index?: number; before?: string | null }
+export type FileDropHover = FileDropTarget & { rect: Rect; line?: boolean }
+
+/** B21: the most picture files one drop adds. */
+export const MAX_DROP_FILES = 10
+
 type Envelope = { source: typeof BUILDER_SOURCE; v: typeof PROTOCOL_VERSION }
 
 export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M & Envelope {
@@ -222,7 +250,7 @@ export function envelope<M extends ParentMessage | CanvasMessage>(message: M): M
 }
 
 const PARENT_TYPES = new Set(['init', 'render', 'scroll-to', 'scroll-by', 'theme', 'play-motion', 'preview-motion', 'preview-scroll', 'edit-text', 'end-text-edit', 'set-locale', 'text-edit-link-result', 'preview-as', 'page-context'])
-const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace'])
+const CANVAS_TYPES = new Set(['ready', 'rects', 'click', 'hover', 'key', 'text-edit-start', 'text-edit-commit', 'text-edit-cancel', 'text-edit-link', 'image-drop', 'image-replace', 'drag-files', 'drop-files'])
 
 function accepted(event: MessageEvent, origin: string, from: MessageEventSource | null | undefined, types: Set<string>): boolean {
   if (event.origin !== origin) return false

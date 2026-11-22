@@ -31,6 +31,10 @@ export type CommandActions = {
   shortcuts: () => void
   /** B18: the Motion themes dialog (absent: not offered). */
   motion?: (() => void) | null
+  /** B21: the guided tour, Easy mode on / off and "Reset tips" (absent: not offered). */
+  tour?: (() => void) | null
+  easy?: { on: boolean; set: (on: boolean) => void } | null
+  resetTips?: (() => void) | null
 }
 
 const DEVICE_NAMES: Record<Device, string> = { desktop: 'Computer view', tablet: 'Tablet view', mobile: 'Phone view' }
@@ -76,6 +80,15 @@ export function useCommandItems(open: boolean, actions: CommandActions, inserter
     action('undo', 'Undo', () => store.getState().undo(), { disabled: canUndo ? null : 'Nothing to undo yet.' })
     action('redo', 'Redo', () => store.getState().redo(), { disabled: canRedo ? null : 'Nothing to redo.' })
     action('shortcuts', 'Keyboard shortcuts', actions.shortcuts)
+    if (actions.tour) action('tour', 'Take the tour', actions.tour, { hint: 'Six short steps around the editor', words: 'guide help start tutorial walkthrough how' })
+    const easy = actions.easy
+    if (easy) {
+      action('easy', easy.on ? 'Turn off Easy mode' : 'Turn on Easy mode', () => easy.set(!easy.on), {
+        hint: easy.on ? 'Show every control (per-device styles, hover, scroll, A/B tests …)' : 'Fewer controls: just the main ones',
+        words: 'simple beginner basic advanced full more options fewer controls',
+      })
+    }
+    if (actions.resetTips) action('reset-tips', 'Reset tips', actions.resetTips, { hint: 'Show the one-line tips again', words: 'hints help' })
 
     for (const meta of registry.types) {
       if (!allowedIn(meta, context, template)) continue

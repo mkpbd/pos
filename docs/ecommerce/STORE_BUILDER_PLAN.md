@@ -535,6 +535,29 @@ Original questions:
   *Test a different version* (B = copy next to A), A/B tests panel with honest plain-word results, a per-day rate chart, Keep A / B;
   the editor sends the canvas only the shown arm (the canvas never filters).
 
+### As built — B21 easy building (2026-11-22)
+
+- **Wizard (backend):** `Wizard/WizardOptions`, `WizardRecipes` (22 sections lifted from shipped templates; recipes per page type +
+  goal), `WizardMotion` (server copy of the Calm / Lively / Festive themes), `BuildPageWizard` (target, products fallback chain,
+  store-dependent sections, broken-link pruning, real-review wall via `ReviewShowcase::approved` only when 4★+ reviews exist),
+  `WizardCopy` + `WizardAiWriter` (AI outside the transaction, clamped).
+- **Wizard UI** (`features/store-builder/wizard/`): 4 radio-card steps (page, what you sell, goal, look + language + optional AI and
+  *Colours from my logo*), from the Pages list (*Build it for me*) and empty pages; errors send you to the right step.
+- **What next?** (`building/next-sections.ts`, pure): page type from key / title words (en + bn), section roles from
+  `props.source_template` else element types; 3 suggestions after the last section (canvas strip) or the selected one (Ctrl+K
+  *Suggested next*); global section references are skipped.
+- **Try another layout** (`building/layout-variants.ts`, pure): media + text (left / right / above / behind), cards per row or list,
+  product grid ↔ carousel, gallery / team / review wall / icon list / steps arrangements, text alignment; every element id and content
+  value survives every variant round trip (tested on 12 shapes); *behind* only when the section has no background of its own.
+- **Drag pictures** (`storefront/builder/canvas/file-targets.ts`, `features/store-builder/use-file-drop.ts`, `file-drop.ts`): targets
+  replace / gallery / insert at an edge or empty column / background (Shift forces background); uploads one by one, one undo step.
+- **Easy mode, tour, tips** (`features/store-builder/easy/`): per-user `pos.builder.ease.<userId>` (first visit → Easy mode + tour;
+  any existing `pos.builder.*` key → returning user, full mode); Easy mode writes all-device values and hides advanced controls, a
+  page-check fix that needs a hidden control switches to full mode; the tour auto-starts only if the person hasn't started
+  clicking / typing and no dialog is open; one-line tips once each, *Reset tips*.
+- **Colours from the logo** (`features/storefront/theme/logo-palette.ts`, `logo-colours.tsx`): median-cut on an offscreen canvas, 2–3
+  palettes adjusted to WCAG AA with the theme contrast helpers, saved to the theme draft only.
+
 ### As built — B20 animated graphics (2026-11-21)
 
 - **Schema:** `B20ElementProps` (animated icon, illustration), `StyleSchema` `background_fx` (sections / inner rows, base only),

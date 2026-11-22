@@ -206,7 +206,8 @@ test.describe('B14 store page designs in the editor', () => {
   })
 
   test('preview with a category: the canvas and the live text follow the sample; the main part goes in once', async ({ page }) => {
-    await page.addInitScript('window.localStorage.clear()')
+    // B21: storage cleared, then the returning-builder-user key again (full mode, no first-visit tour; see playwright.config.ts).
+    await page.addInitScript("window.localStorage.clear(); window.localStorage.setItem('pos.builder.commands.recent', '[]')")
     const b = await openEditor(page, {
       id: CAT_ID,
       template: 'category',

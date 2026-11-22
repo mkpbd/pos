@@ -1857,6 +1857,66 @@ test('B20: Green Basket adds animated icons, an animated delivery scene and a mo
   }
 })
 
+test('B21: Green Basket builds a sale page in a minute with the wizard — a lively draft from its best sellers that stays private until published', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The builder is a desktop tool')
+  test.setTimeout(240_000)
+  const base = origin('vegan.shop.localhost')
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await signIn(page, base, 'owner@greenbasket.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await page.context().cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const slug = `b21-sale-${Date.now().toString(36)}`
+
+  // The wizard: what page → what you sell (best sellers) → what it should do → the look.
+  await page.goto(`${base}/admin/storefront/pages`)
+  await page.getByTestId('build-for-me').last().click()
+  const dialog = page.getByTestId('wizard-dialog')
+  await expect(dialog.getByRole('heading', { name: 'What page do you want?' })).toBeFocused()
+  await dialog.getByTestId('wizard-type-sale').click()
+  await dialog.getByLabel('Page name').fill('Green week sale')
+  await dialog.getByLabel('Address (optional)').fill(slug)
+  await dialog.getByRole('button', { name: 'Next' }).click()
+  await dialog.getByRole('button', { name: 'Next' }).click()
+  await dialog.getByTestId('wizard-goal-orders').click()
+  await dialog.getByRole('button', { name: 'Next' }).click()
+  await dialog.getByTestId('wizard-look-lively').click()
+  await dialog.getByRole('button', { name: /Build my page/ }).click()
+  await expect(page.getByText('Your page is ready to edit — nothing is live until you publish.')).toBeVisible({ timeout: 30_000 })
+  await expect(page).toHaveURL(/\/admin\/storefront\/builder\//, { timeout: 30_000 })
+
+  // A real draft: several sections, the Lively motion theme, products from the store — and nothing published.
+  const docs = (await call('GET', '/api/v1/storefront/builder/documents')).body.data as { id: string; key: string; published?: unknown }[]
+  const made = docs.find((d) => d.key === `landing:${slug}`)!
+  expect(made).toBeTruthy()
+  const detail = (await call('GET', `/api/v1/storefront/builder/documents/${made.id}`)).body.data
+  expect((detail.content.sections as unknown[]).length).toBeGreaterThanOrEqual(3)
+  expect(detail.content.motion_theme).toBe('lively')
+  expect(detail.published ?? null).toBeNull()
+  // The page check passes without errors (warnings are fine).
+  const check = await call('POST', `/api/v1/storefront/builder/documents/${made.id}/check`, {})
+  expect(JSON.stringify(check.body.data)).not.toContain('"severity":"error"')
+
+  // Shoppers can't see it yet.
+  const shopper = await browser.newContext({ viewport: { width: 1366, height: 900 } })
+  const shopperPage = await shopper.newPage()
+  await shopperPage.goto(`${base}/p/${slug}`)
+  await expect(shopperPage.getByRole('heading', { name: 'Page not found' })).toBeVisible({ timeout: 30_000 })
+  await shopper.close()
+
+  // The same address again is refused with a plain reason.
+  const again = await call('POST', '/api/v1/storefront/builder/wizard', { page_type: 'sale', title: 'Again', slug, goal: 'orders', look: 'current', language: 'en' })
+  expect(again.status).toBe(409)
+  expect(again.body.error.code).toBe('DOCUMENT_EXISTS')
+})
+
 const B11_LOOKS = [
   { preset: 'fashion', name: 'Loom & Lane' },
   { preset: 'electronics', name: 'Circuit Bazar' },

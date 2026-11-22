@@ -563,6 +563,8 @@ export const FEATURE_LABELS: Record<string, string> = {
   bundle_ideas: 'Bundle ideas',
   // AI2b (online store, shoppers).
   store_assistant: 'Shop assistant (online store)',
+  // B21 (store builder).
+  builder_wizard: 'Page wizard (store builder)',
 }
 
 export function useAiSettingsQuery(enabled = true) {
