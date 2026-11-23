@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Tests\Feature;
 
 use App\Modules\Organizations\Infrastructure\Models\Organization;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +15,7 @@ use Tests\TestCase;
 
 class StorefrontPublicTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     /**
      * An organization with a domain, a theme, menus and (optionally) an open store.
@@ -92,7 +93,7 @@ class StorefrontPublicTest extends TestCase
         ['admin' => $admin] = $this->store('Berry Kids', 'berry.test');
         $this->actingAsUser($admin);
         $logo = $this->post('/api/v1/media', ['file' => UploadedFile::fake()->image('logo.png', 400, 120), 'alt' => 'Berry Kids'], $this->spaHeaders())->json('data');
-        $this->putJson('/api/v1/storefront/theme', [
+        $this->publishTheme([
             'logo_media_id' => $logo['id'],
             'announcement' => ['enabled' => true, 'text' => 'Eid sale', 'starts_at' => '2026-11-01T00:00:00+06:00', 'ends_at' => '2026-11-05T00:00:00+06:00'],
             'footer' => ['social' => ['facebook' => 'https://facebook.com/berrykids'], 'payment_logo_media_ids' => [$logo['id']]],

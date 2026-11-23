@@ -11,6 +11,7 @@ use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Shapes promotions, coupon codes and redemptions for the staff API.
@@ -26,6 +27,17 @@ class PromotionPresenter
     ) {}
 
     /**
+     * Q1: uses that still count — a cancelled order's redemptions are released.
+     *
+     * @param  Builder<PromotionRedemption>  $query
+     * @return Builder<PromotionRedemption>
+     */
+    public static function active(Builder $query): Builder
+    {
+        return $query->whereNull('released_at');
+    }
+
+    /**
      * A list row. Expects `coupons_count`, `redemptions_count` and `redemptions_sum_amount`
      * (loaded by the caller; computed when missing).
      *
@@ -34,8 +46,8 @@ class PromotionPresenter
     public static function row(Promotion $p): array
     {
         $couponCount = $p->getAttribute('coupons_count') ?? $p->coupons()->count();
-        $redemptionCount = $p->getAttribute('redemptions_count') ?? $p->redemptions()->count();
-        $sum = array_key_exists('redemptions_sum_amount', $p->getAttributes()) ? $p->getAttribute('redemptions_sum_amount') : $p->redemptions()->sum('amount');
+        $redemptionCount = $p->getAttribute('redemptions_count') ?? self::active($p->redemptions()->getQuery())->count();
+        $sum = array_key_exists('redemptions_sum_amount', $p->getAttributes()) ? $p->getAttribute('redemptions_sum_amount') : self::active($p->redemptions()->getQuery())->sum('amount');
 
         return [
             'id' => $p->id,
@@ -63,7 +75,7 @@ class PromotionPresenter
      */
     public function detail(Promotion $p): array
     {
-        $p->loadCount(['coupons', 'redemptions'])->loadSum('redemptions', 'amount');
+        $p->loadCount(['coupons', 'redemptions' => self::active(...)])->loadSum(['redemptions' => self::active(...)], 'amount');
         $ids = $p->targets()->pluck('target_id')->all();
         $org = $p->organization_id;
         $names = match ($p->scope) {
@@ -129,6 +141,7 @@ class PromotionPresenter
             'amount' => (string) $r->amount,
             'coupon_code' => $r->coupon_id === null ? null : ($codes[$r->coupon_id] ?? null),
             'created_at' => $r->created_at->toIso8601String(),
+            'released_at' => $r->released_at?->toIso8601String(),
         ], $rows);
     }
 }

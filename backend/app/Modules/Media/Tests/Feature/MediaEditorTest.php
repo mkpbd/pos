@@ -7,6 +7,7 @@ use App\Modules\Media\Domain\RenditionPlan;
 use App\Modules\Media\Infrastructure\Imaging\GdImageProcessor;
 use App\Modules\Media\Infrastructure\Models\Media;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use GdImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,7 @@ use Tests\TestCase;
  */
 class MediaEditorTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -143,7 +144,7 @@ class MediaEditorTest extends TestCase
         $this->assertDatabaseCount('media', 1);
 
         // In use by the theme and a menu: refused with the places, done when confirmed.
-        $this->putJson('/api/v1/storefront/theme', ['logo_media_id' => $id])->assertOk();
+        $this->publishTheme(['logo_media_id' => $id])->assertOk();
         $menu = $this->postJson('/api/v1/storefront/menus', ['name' => 'Main', 'location' => 'main'])->json('data.id');
         $this->putJson("/api/v1/storefront/menus/{$menu}/items", ['items' => [
             ['label' => 'Baby', 'url' => '/baby', 'is_mega' => true, 'image_media_id' => $id],

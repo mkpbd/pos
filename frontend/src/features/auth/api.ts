@@ -6,6 +6,19 @@ export const authKeys = {
   me: ['auth', 'me'] as const,
   tokens: ['auth', 'tokens'] as const,
   loginActivity: (page: number) => ['auth', 'login-activity', page] as const,
+  options: ['auth', 'options'] as const,
+}
+
+export type AuthOptions = { registration_enabled: boolean }
+
+/** GET /auth/options (no sign-in needed): whether public sign-up is switched on (Q1 §5, off by default). */
+export function useAuthOptionsQuery() {
+  return useQuery({
+    queryKey: authKeys.options,
+    queryFn: ({ signal }) => api.get<AuthOptions>('/auth/options', { signal }).then((r) => r.data),
+    staleTime: 5 * 60_000,
+    retry: 1,
+  })
 }
 
 /**

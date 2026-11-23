@@ -16,6 +16,7 @@ use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
 use App\Modules\Orders\Infrastructure\Models\Shipment;
 use App\Modules\Payments\Domain\PaymentSource;
+use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
@@ -33,7 +34,12 @@ use Illuminate\Support\Facades\DB;
  * Unpaid orders are cancelled with __invoke / cancelLocked (paid ones: ORDER_PAID). Paid
  * orders (E11) are cancelled by staff with cancelWithRefund(): everything paid and not yet
  * refunded goes back through the E10b refund path (RefundPayout) in the same transaction,
- * and the order becomes cancelled and `refunded`. Promotion redemptions are not reversed.
+ * and the order becomes cancelled and `refunded`.
+ *
+ * Q1: every cancel path (staff, customer, expiry, paid with refund, returned to sender) releases
+ * the order's promotion redemptions in the same transaction — usage limits and once-per-customer
+ * coupons are given back (idempotent: released ones are skipped) — and the audit record of the
+ * cancel lists them (`released_promotions`).
  */
 class CancelOrder
 {
@@ -41,6 +47,7 @@ class CancelOrder
         private readonly StockLedger $stock,
         private readonly AuditTrail $audit,
         private readonly RefundPayout $payout,
+        private readonly PromotionRedemptions $redemptions,
     ) {}
 
     public function __invoke(Order $order, ?string $reason, ?string $actorId): Order
@@ -67,13 +74,13 @@ class CancelOrder
             throw new BusinessRuleViolation('ORDER_PAID', "{$locked->number} is paid; cancel it with a refund instead.");
         }
 
-        $this->restockAndClose($locked, $from, $reason, $actorId, $actorType, []);
+        $released = $this->restockAndClose($locked, $from, $reason, $actorId, $actorType, []);
         $this->audit->record('web_order.cancelled', $locked, ['status' => $from->value], [
             'status' => OrderStatus::Cancelled->value,
             'number' => $locked->number,
             'reason' => $reason,
             'by' => $actorType,
-        ]);
+        ] + $released);
 
         return $locked;
     }
@@ -106,7 +113,7 @@ class CancelOrder
                 new PaymentSource(PaymentSource::ONLINE_ORDER_REFUND, $locked->id, $locked->number),
                 "Refund of cancelled web order {$locked->number}");
 
-            $this->restockAndClose($locked, $from, $reason, $actorId, 'staff', [
+            $released = $this->restockAndClose($locked, $from, $reason, $actorId, 'staff', [
                 'payment_status' => PaymentStatus::Refunded,
                 'refunded_total' => $paid->amount(),
             ]);
@@ -117,7 +124,7 @@ class CancelOrder
                 'reason' => $reason,
                 'by' => 'staff',
                 'refund' => ['amount' => $amount->amount(), 'method' => $method->value, 'reference' => $reference],
-            ]);
+            ] + $released);
             $this->audit->record('web_order.refunded', $locked, ['payment_status' => $paymentFrom->value, 'refunded_total' => $paid->minus($amount)->amount()], [
                 'payment_status' => PaymentStatus::Refunded->value, 'refunded_total' => $paid->amount(), 'cancellation' => true, 'amount' => $amount->amount(), 'method' => $method->value,
             ]);
@@ -167,11 +174,13 @@ class CancelOrder
     }
 
     /**
-     * Stock back to the exact batches, order cancelled, status history appended.
+     * Stock back to the exact batches, promotions given back, order cancelled, status history
+     * appended. Returns the audit fragment of the released promotions (empty when none).
      *
      * @param  array<string, mixed>  $extra  further order attributes
+     * @return array{released_promotions?: list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>}
      */
-    private function restockAndClose(Order $locked, OrderStatus $from, ?string $reason, ?string $actorId, string $actorType, array $extra): void
+    private function restockAndClose(Order $locked, OrderStatus $from, ?string $reason, ?string $actorId, string $actorType, array $extra): array
     {
         $changes = [];
         foreach ($locked->lines()->with('stock')->get() as $line) {
@@ -180,6 +189,7 @@ class CancelOrder
             }
         }
         $this->stock->post($changes, new StockReference('online_order_cancellation', $locked->id, $locked->number));
+        $released = $this->redemptions->release($locked->id);
 
         $now = now();
         $locked->update([
@@ -199,5 +209,7 @@ class CancelOrder
             'actor_type' => $actorType,
             'created_at' => $now,
         ]);
+
+        return $released === [] ? [] : ['released_promotions' => $released];
     }
 }

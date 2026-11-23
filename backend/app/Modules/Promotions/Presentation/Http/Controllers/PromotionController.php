@@ -51,7 +51,7 @@ class PromotionController
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
         $now = now();
-        $query = Promotion::query()->withCount(['coupons', 'redemptions'])->withSum('redemptions', 'amount')
+        $query = Promotion::query()->withCount(['coupons', 'redemptions' => PromotionPresenter::active(...)])->withSum(['redemptions' => PromotionPresenter::active(...)], 'amount')
             ->when($request->query('trigger'), fn (Builder $q, string $v) => $q->where('trigger', $v))
             ->when($request->query('status'), fn (Builder $q, string $status) => match (PromotionState::from($status)) {
                 PromotionState::Inactive => $q->where('is_active', false),
@@ -154,7 +154,8 @@ class PromotionController
      * Redemptions of a promotion
      *
      * Newest first: `{id, order_id, order_number, customer: {id, name}|null, email, kind
-     * (product|order|shipping), amount, coupon_code, created_at}`.
+     * (product|order|shipping), amount, coupon_code, created_at, released_at}` — Q1: `released_at`
+     * is set when the order was cancelled and the use given back.
      */
     public function redemptions(Request $request, Promotion $promotion): JsonResponse
     {

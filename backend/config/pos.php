@@ -9,9 +9,10 @@ return [
     'default_timezone' => env('POS_DEFAULT_TIMEZONE', 'Asia/Dhaka'),
 
     /*
-    | Public self-service sign-up (creates a new organization with its first admin).
+    | Public self-service sign-up (creates a new organization with its first admin). Off unless
+    | POS_REGISTRATION_ENABLED=true (Q1): anyone could otherwise create organizations on a public install.
     */
-    'registration_enabled' => (bool) env('POS_REGISTRATION_ENABLED', true),
+    'registration_enabled' => (bool) env('POS_REGISTRATION_ENABLED', false),
 
     /*
     | Lifetime of personal access tokens issued to devices/integrations.

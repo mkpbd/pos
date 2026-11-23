@@ -472,16 +472,6 @@ export function useThemeQuery() {
   })
 }
 
-/** Legacy (before B3): saves and publishes in one step. The Theme page uses the draft endpoints. */
-export function useSaveThemeMutation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (settings: ThemeDocument) => api.put<ThemeResponse>('/storefront/theme', settings).then((r) => r.data),
-    onSuccess: (data) => queryClient.setQueryData(storefrontKeys.theme, data),
-  })
-}
-
 export function useThemePresetsQuery() {
   return useQuery({
     queryKey: storefrontKeys.themePresets,

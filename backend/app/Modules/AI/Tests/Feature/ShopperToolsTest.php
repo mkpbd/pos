@@ -19,6 +19,7 @@ use App\Modules\Organizations\Infrastructure\Models\Organization;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -30,7 +31,7 @@ use Tests\TestCase;
  */
 class ShopperToolsTest extends TestCase
 {
-    use ActsAsShopper, BuildsCheckout, BuildsCustomerOrders, BuildsOnlineCatalog, InteractsWithAi, InteractsWithTenancy, RefreshDatabase;
+    use ActsAsShopper, BuildsCheckout, BuildsCustomerOrders, BuildsOnlineCatalog, InteractsWithAi, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const OTHER_HOST = 'other.example.test';
 
@@ -223,7 +224,7 @@ class ShopperToolsTest extends TestCase
 
     public function test_store_policies_give_delivery_payment_returns_and_contact_without_private_settings(): void
     {
-        $this->putJson('/api/v1/storefront/theme', ['footer' => ['contact' => ['phone' => '+8801712345678', 'email' => 'hello@berry.test']]])->assertOk();
+        $this->publishTheme(['footer' => ['contact' => ['phone' => '+8801712345678', 'email' => 'hello@berry.test']]])->assertOk();
 
         $data = $this->runTool('store_policies', ['topic' => 'all']);
 

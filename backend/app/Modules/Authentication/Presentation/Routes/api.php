@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Authentication\Presentation\Http\Controllers\AuthOptionsController;
 use App\Modules\Authentication\Presentation\Http\Controllers\LoginActivityController;
 use App\Modules\Authentication\Presentation\Http\Controllers\PasswordController;
 use App\Modules\Authentication\Presentation\Http\Controllers\RegistrationController;
@@ -8,6 +9,9 @@ use App\Modules\Authentication\Presentation\Http\Controllers\TokenController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
+    // Q1: public — the login page offers "Create an account" only when sign-up is open.
+    Route::get('options', AuthOptionsController::class)->name('auth.options');
+
     Route::middleware('throttle:auth')->group(function () {
         Route::post('login', [SessionController::class, 'login'])->name('auth.login');
         Route::post('register', RegistrationController::class)->name('auth.register');

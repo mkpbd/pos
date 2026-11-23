@@ -1823,9 +1823,14 @@ test('B20: Green Basket adds animated icons, an animated delivery scene and a mo
   expect((await call('POST', `/api/v1/storefront/builder/documents/${docId}/publish`, { note: 'B20' })).status).toBe(200)
 
   // Store-wide: fly to cart with button feedback (the rest of the theme unchanged).
-  const theme = (await call('GET', '/api/v1/storefront/theme')).body.data
-  const put = await call('PUT', '/api/v1/storefront/theme', { ...theme.settings, effects: { add_to_cart: 'fly', button_feedback: true } })
-  expect(put.status).toBe(200)
+  // Themes are saved as a draft and published (Q1 removed the one-call PUT).
+  const setEffects = async (effects: unknown) => {
+    const draft = (await call('GET', '/api/v1/storefront/theme/draft')).body.data
+    const saved = await call('PUT', '/api/v1/storefront/theme/draft', { revision: draft.draft_revision, settings: { ...draft.settings, effects } })
+    expect(saved.status).toBe(200)
+    expect((await call('POST', '/api/v1/storefront/theme/publish', {})).status).toBe(200)
+  }
+  await setEffects({ add_to_cart: 'fly', button_feedback: true })
 
   try {
     // The page: the described icon is an image with its name, the decorative ones are hidden from screen readers.
@@ -1852,7 +1857,7 @@ test('B20: Green Basket adds animated icons, an animated delivery scene and a mo
     await expect(page.getByTestId('mini-cart').getByTestId('cart-line').first()).toBeVisible()
   } finally {
     // Back to the store's own setting (unset → bump), so other tests see the default.
-    await call('PUT', '/api/v1/storefront/theme', { ...theme.settings, effects: null })
+    await setEffects(null)
     await ownerContext.close()
   }
 })

@@ -1050,3 +1050,79 @@ test('with AI switched off the insights still show their figures and the assista
   await page.goto('/admin/reports/sales_daily')
   await expect(page.getByTestId('report-totals')).toBeVisible()
 })
+
+test('Q1: public sign-up is closed by default, a stock count sets the counted number, a cashier adds a customer at the till, and owners see every sign-in', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  const signIn = async (email: string) => {
+    const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage()
+    await page.goto('/admin/login')
+    // Sign-up is off unless the server is configured for it: no "Create an account".
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Create an account' })).toHaveCount(0)
+    await page.getByLabel('E-mail').fill(email)
+    await page.getByLabel('Password').fill('password')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page).not.toHaveURL(/\/admin\/login/)
+    return page
+  }
+  const call = async (page: import('@playwright/test').Page, method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await page.context().cookies()).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // A signed-out visitor who opens the sign-up address learns it is closed.
+  const visitor = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage()
+  await visitor.goto('/admin/register')
+  await expect(visitor.getByRole('heading', { name: 'Sign-up is closed' })).toBeVisible()
+  await visitor.context().close()
+
+  const owner = await signIn('owner@demo.test')
+  expect((await call(owner, 'GET', '/api/v1/auth/options')).body.data.registration_enabled).toBe(false)
+
+  // Stock count: the counted number becomes the stock; counted and system numbers are both kept.
+  type StockRow = { store: { id: string } | null; variant: { id: string } | null; quantity: string }
+  const rows = (await call(owner, 'GET', '/api/v1/inventory/stock?search=Pran%20Mango%20Juice')).body.data as StockRow[]
+  const row = rows.find((r) => r.store && r.variant)!
+  const storeId = row.store!.id
+  const variantId = row.variant!.id
+  const onHand = row.quantity
+  const counted = String(Math.trunc(Number(onHand)) + 3)
+  const posted = await call(owner, 'POST', '/api/v1/inventory/adjustments', { store_id: storeId, reason: 'count', note: 'Q1 shelf count', lines: [{ variant_id: variantId, counted_quantity: counted }] })
+  expect(posted.status).toBe(201)
+  const line = posted.body.data.lines[0] as { counted_quantity: string; system_quantity: string; quantity: string }
+  expect(Number(line.counted_quantity)).toBe(Number(counted))
+  expect(Number(line.system_quantity)).toBe(Number(onHand))
+  expect(Number(line.quantity)).toBe(3)
+  const after = (await call(owner, 'GET', `/api/v1/inventory/stock?variant_id=${variantId}&store_id=${storeId}`)).body.data as StockRow[]
+  expect(Number(after[0]!.quantity)).toBe(Number(counted))
+  // Counting the same number again changes nothing.
+  const same = await call(owner, 'POST', '/api/v1/inventory/adjustments', { store_id: storeId, reason: 'count', lines: [{ variant_id: variantId, counted_quantity: counted }] })
+  expect(same.status).toBe(422)
+  expect(same.body.error.code).toBe('NOTHING_TO_ADJUST')
+  await owner.goto(`/admin/inventory/adjustments/${posted.body.data.id}`)
+  await expect(owner.getByRole('table', { name: 'Adjustment lines' })).toContainText('+3')
+
+  // A cashier adds a new customer from the till and the sale is for them.
+  const cashier = await signIn('cashier@demo.test')
+  await expect(cashier.getByRole('heading', { name: 'POS terminal' })).toBeAttached()
+  await cashier.getByRole('button', { name: 'Customer' }).click()
+  await cashier.getByRole('button', { name: 'New customer' }).click()
+  const dialog = cashier.getByRole('dialog', { name: 'New customer' })
+  await dialog.getByLabel('Name').fill('Q1 Walk-in Rahim')
+  await dialog.getByLabel('Phone').fill(`0181${String(Date.now()).slice(-7)}`)
+  await dialog.getByRole('button', { name: 'Add customer' }).click()
+  await expect(cashier.getByRole('button', { name: 'Customer' })).toContainText('Q1 Walk-in Rahim')
+
+  // Owners see everyone's sign-ins.
+  await owner.goto('/admin/audit-log')
+  await owner.getByRole('link', { name: 'Sign-ins' }).click()
+  const signIns = owner.getByRole('table', { name: 'Sign-ins' })
+  await expect(signIns).toContainText('cashier@demo.test')
+  await expect(signIns).toContainText('owner@demo.test')
+})

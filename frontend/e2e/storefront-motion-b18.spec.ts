@@ -92,6 +92,10 @@ async function serve(page: Page) {
     // A web font arriving late reflows every text; only shifts after the fonts are in count.
     window.__fontsAt = Infinity
     document.fonts.ready.then(() => { window.__fontsAt = performance.now() })
+    // A face loaded later (e.g. the Bangla subset when that text scrolls in) reflows too: the frames
+    // right after each later font load are the font's doing, not the effect's.
+    window.__fontLoads = []
+    document.fonts.addEventListener('loadingdone', () => { window.__fontLoads.push(performance.now()) })
     try {
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
@@ -119,7 +123,7 @@ const css = (page: Page, selector: string, property: string, pseudo: string | nu
   page.evaluate<string>(`getComputedStyle(document.querySelector(${JSON.stringify(selector)}), ${JSON.stringify(pseudo)}).getPropertyValue(${JSON.stringify(property)})`)
 const noHorizontalScroll = (page: Page) => page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')
 const currentWord = (page: Page) => page.evaluate<string | null>(`document.querySelector('[data-b="e_rot"] [data-te-current]')?.textContent ?? null`)
-const effectShifts = (page: Page) => page.evaluate<number>(`(window.__shifts ?? []).filter((s) => s.inEffect && s.at > window.__fontsAt).reduce((sum, s) => sum + s.value, 0)`)
+const effectShifts = (page: Page) => page.evaluate<number>(`(window.__shifts ?? []).filter((s) => s.inEffect && s.at > window.__fontsAt && !(window.__fontLoads ?? []).some((t) => s.at >= t - 50 && s.at <= t + 300)).reduce((sum, s) => sum + s.value, 0)`)
 const box = (page: Page, selector: string) => page.evaluate<{ w: number; h: number }>(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) } })()`)
 
 async function scrollTo(page: Page, selector: string) {

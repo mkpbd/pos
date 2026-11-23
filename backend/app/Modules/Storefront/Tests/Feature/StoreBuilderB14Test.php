@@ -5,6 +5,7 @@ namespace App\Modules\Storefront\Tests\Feature;
 use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use App\Modules\Storefront\Domain\Builder\ElementRegistry;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Infrastructure\Models\Role;
 use App\Modules\Users\Infrastructure\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +23,7 @@ use Tests\TestCase;
  */
 class StoreBuilderB14Test extends TestCase
 {
-    use BuildsOnlineCatalog, InteractsWithTenancy, RefreshDatabase;
+    use BuildsOnlineCatalog, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const DOCS = '/api/v1/storefront/builder/documents';
 
@@ -297,7 +298,7 @@ class StoreBuilderB14Test extends TestCase
     public function test_the_sample_context_follows_the_storefront_page_context(): void
     {
         $this->catalog();
-        $this->putJson('/api/v1/storefront/theme', ['footer' => ['contact' => ['phone' => '+8801712345678', 'email' => 'hello@berry.test']]])->assertOk();
+        $this->publishTheme(['footer' => ['contact' => ['phone' => '+8801712345678', 'email' => 'hello@berry.test']]])->assertOk();
 
         $shop = $this->getJson(self::SAMPLE.'?template=shop')->assertOk()->assertHeader('Cache-Control', 'no-store, private')->json('data');
         $this->assertSame('shop', $shop['context']['template']);

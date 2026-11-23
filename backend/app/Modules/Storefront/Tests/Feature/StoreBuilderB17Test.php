@@ -426,17 +426,12 @@ class StoreBuilderB17Test extends TestCase
 
     public function test_the_shipped_festival_templates_set_up_for_every_occasion(): void
     {
+        // Q1: the templates ship (B17b) — a missing one fails here instead of skipping the test.
         $library = app(BuilderTemplateLibrary::class);
-        $missing = [];
         foreach (array_keys(FestivalCalendar::OCCASIONS) as $key) {
             foreach (['landing', 'hero', 'bar'] as $part) {
-                if ($library->find("festival-{$key}-{$part}") === null) {
-                    $missing[] = "festival-{$key}-{$part}";
-                }
+                $this->assertNotNull($library->find("festival-{$key}-{$part}"), "festival-{$key}-{$part} is missing.");
             }
-        }
-        if ($missing !== []) {
-            $this->markTestSkipped('The festival templates are not shipped yet: '.implode(', ', $missing));
         }
         $this->makeProduct($this->t['unit']->id, 'Panjabi', [['PJ', '1500.00']]);
 

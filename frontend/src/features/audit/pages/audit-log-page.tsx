@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuditLogQuery, type AuditEntry } from '@/features/audit/api'
+import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
+import { AUDIT_TABS } from '@/features/inventory/sections'
 
 const ACTION_FILTERS = [
   { value: 'all', label: 'All actions' },
@@ -76,6 +78,7 @@ export function AuditLogPage() {
         description="Append-only record of sensitive changes in your organization."
         actions={<ExportMenu list="auditLog" query={filters} disabled={!data?.items.length} />}
       />
+      <SectionTabs tabs={AUDIT_TABS} label="Audit log sections" />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">

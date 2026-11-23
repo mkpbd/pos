@@ -154,19 +154,45 @@ class SaveRfq
         });
     }
 
+    /**
+     * Takes a supplier off the RFQ: while it is a draft, or (Q1) once sent, to drop a supplier who
+     * will not reply — as long as no answer (quote or decline) of theirs is recorded, and never the
+     * last supplier of a sent RFQ (cancel it instead). Locked with the RFQ row, like recording a
+     * quote, so a quote cannot arrive in between. Audited.
+     *
+     * @throws BusinessRuleViolation RFQ_LOCKED, RFQ_SUPPLIER_QUOTED, RFQ_LAST_SUPPLIER
+     */
     public function removeSupplier(Rfq $rfq, string $supplierId): Rfq
     {
         return DB::transaction(function () use ($rfq, $supplierId) {
             $locked = Rfq::query()->whereKey($rfq->id)->lockForUpdate()->firstOrFail();
-            $this->expectDraft($locked);
-            $deleted = $locked->suppliers()->where('supplier_id', $supplierId)->delete();
-            if ($deleted === 0) {
+            if (! self::suppliersRemovable($locked)) {
+                throw new BusinessRuleViolation('RFQ_LOCKED', "RFQ {$locked->number} is {$locked->status->value}; its suppliers can no longer change.");
+            }
+            /** @var RfqSupplier|null $invite */
+            $invite = $locked->suppliers()->where('supplier_id', $supplierId)->with('quote')->first();
+            if ($invite === null) {
                 throw ValidationException::withMessages(['supplier_id' => ['This supplier is not invited.']]);
             }
-            $this->audit->record('rfq.supplier_removed', $locked, old: ['supplier_id' => $supplierId]);
+            if ($invite->quote !== null) {
+                throw new BusinessRuleViolation('RFQ_SUPPLIER_QUOTED', "This supplier has already answered RFQ {$locked->number}, so they stay on it.", ['supplier_id' => $supplierId]);
+            }
+            if ($locked->status === RfqStatus::Sent && $locked->suppliers()->count() === 1) {
+                throw new BusinessRuleViolation('RFQ_LAST_SUPPLIER', "This is the only supplier left on RFQ {$locked->number}; cancel the RFQ instead.", ['supplier_id' => $supplierId]);
+            }
+            $invite->delete();
+            $this->audit->record('rfq.supplier_removed', $locked, old: ['supplier_id' => $supplierId, 'sent_at' => $invite->sent_at?->toIso8601String()], context: ['status' => $locked->status->value]);
 
             return $locked;
         });
+    }
+
+    /**
+     * Whether the RFQ's status still lets suppliers be taken off (each one also needs no recorded answer).
+     */
+    public static function suppliersRemovable(Rfq $rfq): bool
+    {
+        return in_array($rfq->status, [RfqStatus::Draft, RfqStatus::Sent], true);
     }
 
     /**

@@ -26,6 +26,9 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
   const branch = sale.receipt.branch
   const discount = addDecimal(sale.item_discount_total, sale.invoice_discount_total, 2)
   const payments = sale.payments.filter((p) => p.kind === 'payment')
+  const bin = sale.receipt.tax_number?.trim() || null
+  // Only a seller with a BIN issues a tax invoice; without one the document is a plain receipt.
+  const taxInvoice = (sale.receipt.is_tax_invoice ?? true) && !!bin
 
   return (
     <div
@@ -39,6 +42,7 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
     >
       <div className={cn('text-center', !thermal && 'mb-4')}>
         <div className={cn('font-bold', thermal ? 'text-[13px]' : 'text-xl')}>{sale.receipt.organization_name}</div>
+        {bin && <div>BIN: {bin}</div>}
         {branch && <div>{branch.name}</div>}
         {branch?.address && <div className="whitespace-pre-line">{branch.address}</div>}
         {branch?.phone && <div>Tel: {branch.phone}</div>}
@@ -47,7 +51,7 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
 
       <Rule thermal={thermal} />
       <div className={cn(!thermal && 'mb-3 grid grid-cols-2 gap-1')}>
-        <div>{sale.tax_mode === 'inclusive' ? 'Invoice' : 'Tax invoice'}: <b>{sale.number}</b></div>
+        <div>{taxInvoice ? 'Tax invoice' : 'Receipt'}: <b>{sale.number}</b></div>
         <div>{formatDate(sale.sold_at, sale.receipt.timezone)}</div>
         {sale.cashier?.name && <div>Cashier: {sale.cashier.name}</div>}
         <div>Customer: {sale.customer ? `${sale.customer.name}${sale.customer.phone ? ` (${sale.customer.phone})` : ''}` : 'Walk-in'}</div>

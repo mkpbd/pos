@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useLoginMutation } from '@/features/auth/api'
+import { useAuthOptionsQuery, useLoginMutation } from '@/features/auth/api'
 import { AuthLayout } from '@/features/auth/components/auth-layout'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { ApiError } from '@/lib/api/client'
@@ -22,6 +22,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const login = useLoginMutation()
+  // "Create an account" only when public sign-up is on (never while unknown or on error).
+  const signUpOpen = useAuthOptionsQuery().data?.registration_enabled === true
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '', remember: false },
@@ -47,9 +49,11 @@ export function LoginPage() {
       title="Sign in"
       description="Use your work e-mail and password."
       footer={
-        <span>
-          New business? <Link to="/register" className="font-medium text-primary underline-offset-4 hover:underline">Create an account</Link>
-        </span>
+        signUpOpen ? (
+          <span>
+            New business? <Link to="/register" className="font-medium text-primary underline-offset-4 hover:underline">Create an account</Link>
+          </span>
+        ) : undefined
       }
     >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">

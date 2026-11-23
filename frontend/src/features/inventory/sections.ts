@@ -34,3 +34,8 @@ export const PAYMENTS_TABS: SectionTab[] = [
   { to: '/payments', label: 'Payments ledger' },
   { to: '/payments/customers', label: 'Customer payments' },
 ]
+
+export const AUDIT_TABS: SectionTab[] = [
+  { to: '/audit-log', label: 'Changes' },
+  { to: '/audit-log/sign-ins', label: 'Sign-ins' },
+]

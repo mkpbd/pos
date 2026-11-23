@@ -205,15 +205,6 @@ export function useCanvasContextQuery() {
   })
 }
 
-export function useVersionsQuery(id: string, enabled: boolean) {
-  return useQuery({
-    queryKey: builderAdminKeys.versions(id),
-    queryFn: ({ signal }) => api.get<VersionSummary[]>(`${doc(id)}/versions`, { signal }).then((r) => r.data),
-    enabled,
-    staleTime: 0,
-  })
-}
-
 /**
  * POST /storefront/builder/documents. B4: `from: cms` imports a CMS page (`cms:<uuid>` keys),
  * `from: current` starts the header / footer from today's default layout.

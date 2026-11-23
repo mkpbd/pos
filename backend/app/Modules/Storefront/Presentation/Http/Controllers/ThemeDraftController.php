@@ -47,7 +47,7 @@ class ThemeDraftController
     /**
      * Save the theme draft
      *
-     * `{revision, settings}`: the whole theme document, validated like `PUT /storefront/theme`
+     * `{revision, settings}`: the whole theme document, validated by the theme rules (SaveThemeRequest::themeRules)
      * (omitted keys take their defaults; media must exist, `MEDIA_NOT_FOUND`). A stale revision
      * is 409 DRAFT_CONFLICT with `details.revision`. Not live until published.
      */

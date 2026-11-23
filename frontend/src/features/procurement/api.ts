@@ -187,6 +187,8 @@ export type RfqSupplier = {
   /** Sent, but the supplier has no e-mail: staff send the PDF themselves. */
   send_manually?: boolean
   quote: SupplierQuote | null
+  /** Q1 §7: the supplier can be taken off the RFQ (purchases.manage, no quote yet, RFQ draft or sent). */
+  can_remove?: boolean
 }
 
 export type Rfq = {
@@ -516,6 +518,21 @@ export function useInviteSuppliersMutation() {
       api.post<Rfq>(`/purchasing/rfqs/${id}/suppliers`, { supplier_ids: supplierIds }, { idempotencyKey }).then((r) => r.data),
     onSuccess: invalidate,
   })
+}
+
+/** DELETE /purchasing/rfqs/{rfq}/suppliers/{supplierId} — answers with the updated RFQ. */
+export function useRemoveRfqSupplierMutation() {
+  const invalidate = useInvalidateProcurement()
+  return useMutation({
+    mutationFn: ({ rfqId, supplierId }: { rfqId: string; supplierId: string }) =>
+      api.delete<Rfq>(`/purchasing/rfqs/${rfqId}/suppliers/${supplierId}`).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}
+
+/** Whether "Remove" is offered for an invited supplier (older payloads without `can_remove`: drafts only). */
+export function canRemoveInvite(rfq: Pick<Rfq, 'status'>, invite: RfqSupplier, manage: boolean): boolean {
+  return invite.can_remove ?? (manage && rfq.status === 'draft' && invite.quote === null)
 }
 
 export type RfqAction = 'send' | 'close' | 'cancel'

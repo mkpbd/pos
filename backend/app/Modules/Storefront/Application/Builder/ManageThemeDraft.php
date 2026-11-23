@@ -181,22 +181,6 @@ class ManageThemeDraft
     }
 
     /**
-     * Legacy `PUT /storefront/theme`: saves the draft and publishes it in one step (no revision check).
-     *
-     * @param  array<string, mixed>  $settings  validated
-     */
-    public function saveAndPublish(array $settings): BuilderDocument
-    {
-        $settings = $this->save->prepare($settings);
-
-        return DB::transaction(function () use ($settings) {
-            $this->writeDraft($this->document(), $settings);
-
-            return $this->publish(null);
-        });
-    }
-
-    /**
      * The draft goes back to the live theme.
      */
     public function discard(): BuilderDocument

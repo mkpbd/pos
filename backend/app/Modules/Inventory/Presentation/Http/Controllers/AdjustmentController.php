@@ -79,6 +79,15 @@ class AdjustmentController
         return ApiResponse::success($this->present($adjustment, $user->can('products.view_cost')));
     }
 
+    /**
+     * Post a stock adjustment
+     *
+     * Lines carry a signed `quantity`. Q1: with reason `count` a line may give `counted_quantity`
+     * (≥ 0) instead — the server locks the stock level, posts `counted − on hand` and keeps both
+     * (`counted_quantity`, `system_quantity` on the line); batch-tracked products are counted per
+     * batch (`batch_id`, or `batch_number` for a batch not recorded yet). Lines matching the stock
+     * are skipped; all matching → 422 NOTHING_TO_ADJUST.
+     */
     public function store(PostAdjustmentRequest $request, PostStockAdjustment $post): JsonResponse
     {
         /** @var TenantUser $user */
@@ -109,6 +118,9 @@ class AdjustmentController
                 'batch' => $l->batch_id ? ($lookups['batches'][$l->batch_id] ?? null) : null,
                 'quantity' => $l->quantity,
                 'unit_cost' => $withCost ? $l->unit_cost : null,
+                // Q1: stock count lines — what was counted and what the system held (null otherwise).
+                'counted_quantity' => $l->counted_quantity,
+                'system_quantity' => $l->system_quantity,
             ])->values(),
         ];
     }

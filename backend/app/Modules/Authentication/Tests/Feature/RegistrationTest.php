@@ -10,6 +10,14 @@ class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Q1: sign-up is off by default; these tests open it (the switch is tested at the end).
+        config(['pos.registration_enabled' => true]);
+    }
+
     /**
      * @return array<string, string>
      */
@@ -86,5 +94,21 @@ class RegistrationTest extends TestCase
 
         $this->spa()->postJson('/api/v1/auth/register', $this->payload())->assertNotFound();
         $this->assertDatabaseCount('organizations', 0);
+    }
+
+    public function test_the_sign_in_options_tell_signed_out_visitors_whether_sign_up_is_open(): void
+    {
+        $this->assertSame(['registration_enabled' => true], $this->getJson('/api/v1/auth/options')->assertOk()->json('data'));
+
+        config(['pos.registration_enabled' => false]);
+        $this->assertSame(['registration_enabled' => false], $this->getJson('/api/v1/auth/options')->assertOk()->json('data'));
+        $this->spa()->getJson('/api/v1/auth/options')->assertOk()->assertJsonPath('data.registration_enabled', false);
+    }
+
+    public function test_sign_up_is_off_unless_the_environment_turns_it_on(): void
+    {
+        // The shipped default (config/pos.php and .env.example) keeps public sign-up closed.
+        $this->assertMatchesRegularExpression("/'registration_enabled' => \\(bool\\) env\\('POS_REGISTRATION_ENABLED', false\\)/", (string) file_get_contents(config_path('pos.php')));
+        $this->assertMatchesRegularExpression('/^POS_REGISTRATION_ENABLED=false$/m', (string) file_get_contents(base_path('.env.example')));
     }
 }

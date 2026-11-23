@@ -6,6 +6,7 @@ use App\Modules\OnlineCatalog\Application\Contracts\ProductPageZones;
 use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -21,7 +22,7 @@ use Tests\TestCase;
  */
 class ProductZonesTest extends TestCase
 {
-    use BuildsOnlineCatalog, InteractsWithTenancy, RefreshDatabase;
+    use BuildsOnlineCatalog, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const DOCS = '/api/v1/storefront/builder/documents';
 
@@ -261,7 +262,7 @@ class ProductZonesTest extends TestCase
 
         // The legacy theme save accepts the layout too.
         $this->actingAsUser($this->t['admin']);
-        $this->putJson('/api/v1/storefront/theme', ['layout' => ['product' => ['details' => 'stacked']]])->assertOk()
+        $this->publishTheme(['layout' => ['product' => ['details' => 'stacked']]])->assertOk()
             ->assertJsonPath('data.settings.layout.product', ['gallery' => 'left', 'thumbnails' => 'bottom', 'sticky_summary' => false, 'details' => 'stacked']);
     }
 }

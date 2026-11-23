@@ -61,10 +61,6 @@ export function useRemoveCartItemMutation() {
   return useCartMutation((id: string) => storeApi.delete<Cart>(`/store/cart/items/${encodeURIComponent(id)}`).then((r) => r.data))
 }
 
-export function useClearCartMutation() {
-  return useCartMutation(() => storeApi.delete<Cart>('/store/cart').then((r) => r.data))
-}
-
 /** POST /store/cart/coupon — the repriced cart, or 422 COUPON_INVALID with details.reason (see coupon-messages.ts). */
 export function useApplyCouponMutation() {
   return useCartMutation((code: string) => storeApi.post<Cart>('/store/cart/coupon', { code }).then((r) => r.data))

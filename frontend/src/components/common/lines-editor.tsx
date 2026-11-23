@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { emptyLine, type LinesForm } from '@/components/common/line-values'
 import { VariantPicker } from '@/components/common/variant-picker'
-import { useBatchesQuery } from '@/features/inventory/api'
+import { useBatchesQuery, useStockOnHandQuery } from '@/features/inventory/api'
+import { isZeroDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
 
 type Config = {
   /** Show a unit cost column. */
@@ -22,6 +23,8 @@ type Config = {
   fixedProducts?: boolean
   stockedOnly?: boolean
   currency?: string
+  /** Stock count: the quantity is what was counted; shows "In stock now" and the resulting difference per line. */
+  count?: boolean
 }
 
 type Props<T extends LinesForm> = {
@@ -56,6 +59,40 @@ function BatchPicker({ variantId, storeId, value, onChange, invalid }: { variant
   )
 }
 
+type CountLine = { variantId: string | undefined; storeId: string | null | undefined; batchId: string | null | undefined; trackBatches: boolean }
+
+/** "In stock now" of a stock count line (read-only). */
+function StockNowCell({ line }: { line: CountLine }) {
+  const stock = useStockOnHandQuery(line.variantId, line.storeId, line.batchId, line.trackBatches)
+  const hint = !line.storeId ? 'Choose store' : line.trackBatches && !line.batchId ? 'Choose batch' : null
+
+  return (
+    <td className="pr-2">
+      <output className="block py-1.5 font-mono tabular-nums" aria-label="In stock now">
+        {hint ? <span className="font-sans text-xs text-muted-foreground">{hint}</span> : stock.quantity === null ? (stock.isPending && line.variantId ? '…' : '—') : trimDecimal(stock.quantity)}
+      </output>
+    </td>
+  )
+}
+
+/** Counted − in stock now: what the count will add (+) or remove (−). */
+function DifferenceCell({ line, counted }: { line: CountLine; counted: string }) {
+  const stock = useStockOnHandQuery(line.variantId, line.storeId, line.batchId, line.trackBatches)
+  const valid = /^\d{1,15}(\.\d{1,3})?$/.test(counted)
+  const diff = valid && stock.quantity !== null ? subtractDecimal(counted, stock.quantity) : null
+  const sign = diff === null || isZeroDecimal(diff) ? 0 : diff.startsWith('-') ? -1 : 1
+
+  return (
+    <td className="pr-2">
+      <output className="block py-1.5 font-mono tabular-nums" aria-label="Difference" aria-live="polite">
+        {diff === null ? '—' : sign === 0 ? <span className="font-sans text-xs text-muted-foreground">No change</span> : (
+          <span className={sign > 0 ? 'text-success-soft-foreground' : 'text-destructive-soft-foreground'}>{sign > 0 ? '+' : '−'}{trimDecimal(diff.replace('-', ''))}</span>
+        )}
+      </output>
+    </td>
+  )
+}
+
 /**
  * Editable product lines of a stock or purchase document. Shows only an estimate of line
  * amounts for orientation; the server computes the binding totals.
@@ -76,7 +113,9 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
           <thead className="text-left text-xs text-muted-foreground">
             <tr>
               <th className="w-[34%] font-medium">Product</th>
-              <th className="w-28 font-medium">Quantity</th>
+              {config.count && <th className="w-24 font-medium">In stock now</th>}
+              <th className="w-28 font-medium">{config.count ? 'Counted quantity' : 'Quantity'}</th>
+              {config.count && <th className="w-24 font-medium">Difference</th>}
               {config.cost && <th className="w-32 font-medium">Unit cost{config.cost === 'optional' && ' (opt.)'}</th>}
               {config.tax && <th className="w-24 font-medium">Tax %</th>}
               {config.batch && <th className="font-medium">Batch</th>}
@@ -88,7 +127,9 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
               const line = lines?.[i]
               const variant = line?.variant
               const negative = (line?.quantity ?? '').trim().startsWith('-')
-              const batchMode = config.batch === 'signed' ? (negative ? 'out' : 'in') : config.batch
+              // A count names the batch on the shelf; signed lines decide by the sign.
+              const batchMode = config.count ? 'out' : config.batch === 'signed' ? (negative ? 'out' : 'in') : config.batch
+              const countLine: CountLine = { variantId: variant?.id, storeId: config.storeId, batchId: line?.batch_id, trackBatches: !!variant?.track_batches }
               const err = (f: string) => lineError(errs, i, f)
 
               return (
@@ -120,11 +161,12 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                     )}
                     {(err('variant') || err('variant_id')) && <p className="mt-1 text-xs text-destructive">{err('variant') ?? err('variant_id')}</p>}
                   </td>
+                  {config.count && <StockNowCell line={countLine} />}
                   <td className="pr-2">
                     <Input
-                      aria-label={`Quantity of line ${i + 1}`}
+                      aria-label={`${config.count ? 'Counted quantity' : 'Quantity'} of line ${i + 1}`}
                       inputMode="decimal"
-                      placeholder={config.signed ? '+/−' : '0'}
+                      placeholder={config.signed && !config.count ? '+/−' : '0'}
                       aria-invalid={!!err('quantity') || undefined}
                       {...reg(`lines.${i}.quantity`)}
                     />
@@ -133,9 +175,10 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                     </p>
                     {err('quantity') && <p className="text-xs text-destructive">{err('quantity')}</p>}
                   </td>
+                  {config.count && <DifferenceCell line={countLine} counted={(line?.quantity ?? '').trim()} />}
                   {config.cost && (
                     <td className="pr-2">
-                      <Input aria-label={`Unit cost of line ${i + 1}`} inputMode="decimal" placeholder="0.00" aria-invalid={!!err('unit_cost') || undefined} disabled={config.signed && negative} {...reg(`lines.${i}.unit_cost`)} />
+                      <Input aria-label={`Unit cost of line ${i + 1}`} inputMode="decimal" placeholder="0.00" aria-invalid={!!err('unit_cost') || undefined} disabled={config.signed && !config.count && negative} {...reg(`lines.${i}.unit_cost`)} />
                       {err('unit_cost') && <p className="mt-1 text-xs text-destructive">{err('unit_cost')}</p>}
                     </td>
                   )}

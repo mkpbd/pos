@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Tests\Feature;
 
 use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +20,7 @@ use Tests\TestCase;
  */
 class StoreBuilderB20Test extends TestCase
 {
-    use BuildsOnlineCatalog, InteractsWithTenancy, RefreshDatabase;
+    use BuildsOnlineCatalog, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const DOCS = '/api/v1/storefront/builder/documents';
 
@@ -261,17 +262,17 @@ class StoreBuilderB20Test extends TestCase
     {
         // A store that never set them: no key in the theme, the defaults in the bootstrap.
         $this->assertArrayNotHasKey('effects', $this->getJson('/api/v1/storefront/theme')->assertOk()->json('data.settings'));
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#123456']])->assertOk();
+        $this->publishTheme(['colors' => ['primary' => '#123456']])->assertOk();
         $this->assertArrayNotHasKey('effects', $this->getJson('/api/v1/storefront/theme')->assertOk()->json('data.settings'));
         $this->app['auth']->forgetGuards();
         $this->getJson(self::STORE.'/bootstrap')->assertOk()->assertJsonPath('data.theme.effects', ['add_to_cart' => 'bump', 'button_feedback' => true]);
 
         $this->actingAsUser($this->t['admin']);
-        $this->putJson('/api/v1/storefront/theme', ['effects' => ['add_to_cart' => 'fly', 'button_feedback' => false]])->assertOk()
+        $this->publishTheme(['effects' => ['add_to_cart' => 'fly', 'button_feedback' => false]])->assertOk()
             ->assertJsonPath('data.settings.effects', ['add_to_cart' => 'fly', 'button_feedback' => false]);
         $this->assertDatabaseHas('audit_logs', ['action' => 'storefront.theme_updated']);
         // Missing keys take their defaults.
-        $this->putJson('/api/v1/storefront/theme', ['effects' => ['add_to_cart' => 'none']])->assertOk()
+        $this->publishTheme(['effects' => ['add_to_cart' => 'none']])->assertOk()
             ->assertJsonPath('data.settings.effects', ['add_to_cart' => 'none', 'button_feedback' => true]);
         // The theme draft takes them too.
         $revision = $this->getJson('/api/v1/storefront/theme/draft')->assertOk()->json('data.draft_revision');
@@ -280,10 +281,10 @@ class StoreBuilderB20Test extends TestCase
         $this->postJson('/api/v1/storefront/theme/publish')->assertOk();
 
         // Invalid values are refused with their keys.
-        $this->putJson('/api/v1/storefront/theme', ['effects' => ['add_to_cart' => 'explode', 'button_feedback' => 'maybe']])->assertStatus(422)
-            ->assertJsonValidationErrorFor('effects.add_to_cart', 'error.details')
-            ->assertJsonValidationErrorFor('effects.button_feedback', 'error.details');
-        $this->putJson('/api/v1/storefront/theme', ['effects' => 'fly'])->assertStatus(422)->assertJsonValidationErrorFor('effects', 'error.details');
+        $this->publishTheme(['effects' => ['add_to_cart' => 'explode', 'button_feedback' => 'maybe']])->assertStatus(422)
+            ->assertJsonValidationErrorFor('settings.effects.add_to_cart', 'error.details')
+            ->assertJsonValidationErrorFor('settings.effects.button_feedback', 'error.details');
+        $this->publishTheme(['effects' => 'fly'])->assertStatus(422)->assertJsonValidationErrorFor('settings.effects', 'error.details');
 
         // A preset keeps them; the shopper store gets them.
         $this->postJson('/api/v1/storefront/theme/presets/vegan/apply')->assertOk()
@@ -300,7 +301,7 @@ class StoreBuilderB20Test extends TestCase
 
         // Unset again with null.
         $this->actingAsUser($this->t['admin']);
-        $this->putJson('/api/v1/storefront/theme', ['effects' => null])->assertOk();
+        $this->publishTheme(['effects' => null])->assertOk();
         $this->assertArrayNotHasKey('effects', $this->getJson('/api/v1/storefront/theme')->assertOk()->json('data.settings'));
     }
 }

@@ -27,6 +27,13 @@ describe('money', () => {
     expect(compareDecimal('9.99', '10')).toBeLessThan(0)
     expect(compareDecimal('100', '99.999')).toBeGreaterThan(0)
     expect(compareDecimal('0.10', '0.09')).toBeGreaterThan(0)
+    // Negative values (a due or balance below zero) compare by value, not by string length.
+    expect(compareDecimal('-5.00', '0')).toBeLessThan(0)
+    expect(compareDecimal('0', '-0.01')).toBeGreaterThan(0)
+    expect(compareDecimal('-10', '-2')).toBeLessThan(0)
+    expect(compareDecimal('-2.5', '-2.50')).toBe(0)
+    expect(compareDecimal('-0', '0')).toBe(0)
+    expect(compareDecimal('007.5', '7.50')).toBe(0)
   })
 
   it('formats price ranges', () => {

@@ -81,8 +81,6 @@ Route::middleware(['auth:sanctum', 'tenant'])->prefix('storefront')->group(funct
         Route::post('domains', [StorefrontAdminController::class, 'storeDomain']);
         Route::patch('domains/{domain}', [StorefrontAdminController::class, 'updateDomain'])->whereUuid('domain');
         Route::delete('domains/{domain}', [StorefrontAdminController::class, 'destroyDomain'])->whereUuid('domain');
-        // Legacy: saves the draft and publishes it in one step (B3).
-        Route::put('theme', [StorefrontAdminController::class, 'updateTheme'])->middleware('can:storefront.publish');
         Route::put('theme/draft', [ThemeDraftController::class, 'save']);
         Route::post('theme/publish', [ThemeDraftController::class, 'publish'])->middleware('can:storefront.publish');
         // B11: publish the theme draft later.

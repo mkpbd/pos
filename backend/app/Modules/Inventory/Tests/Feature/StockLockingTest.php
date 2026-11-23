@@ -62,6 +62,35 @@ class StockLockingTest extends TestCase
         });
     }
 
+    public function test_a_stock_count_reads_the_level_only_under_its_row_lock(): void
+    {
+        ['admin' => $admin, 'organization' => $org] = $this->provisionTenant();
+        $variant = $this->stockedVariant($org);
+        $store = $this->mainStoreId($org);
+        $this->actingAsUser($admin)->adjust($store, 'opening', ['variant_id' => $variant->id, 'quantity' => '5', 'unit_cost' => '1']);
+
+        // Another request (a sale) holds the level: the count must wait for it, not read a stale quantity.
+        $second = DB::connection('pgsql_second');
+        $second->beginTransaction();
+        $second->table('stock_levels')->where('variant_id', $variant->id)->lockForUpdate()->get();
+        DB::statement("SET lock_timeout = '300ms'");
+        try {
+            $this->withoutExceptionHandling()->postJson('/api/v1/inventory/adjustments', [
+                'store_id' => $store, 'reason' => 'count', 'lines' => [['variant_id' => $variant->id, 'counted_quantity' => '8']],
+            ]);
+            $this->fail('The count should have waited for the stock row lock.');
+        } catch (QueryException $e) {
+            $this->assertSame('55P03', $e->getCode()); // lock_not_available
+        } finally {
+            $second->rollBack();
+            DB::statement('SET lock_timeout = 0');
+        }
+
+        $this->withExceptionHandling()->postJson('/api/v1/inventory/adjustments', [
+            'store_id' => $store, 'reason' => 'count', 'lines' => [['variant_id' => $variant->id, 'counted_quantity' => '8']],
+        ])->assertCreated()->assertJsonPath('data.lines.0.quantity', '3.000');
+    }
+
     public function test_the_last_unit_cannot_be_issued_twice(): void
     {
         ['admin' => $admin, 'organization' => $org] = $this->provisionTenant();

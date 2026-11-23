@@ -6,6 +6,7 @@ use App\Modules\OnlineCatalog\Application\Contracts\ProductRatings;
 use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -19,7 +20,7 @@ use Tests\TestCase;
  */
 class StorefrontSeoTest extends TestCase
 {
-    use BuildsOnlineCatalog, InteractsWithTenancy, RefreshDatabase;
+    use BuildsOnlineCatalog, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private string $shell;
 
@@ -197,7 +198,7 @@ class StorefrontSeoTest extends TestCase
     public function test_homepage_organization_and_website_and_no_rich_data_on_noindex_pages(): void
     {
         ['admin' => $admin] = $this->openStore('Berry Kids', 'berry.test');
-        $this->putJson('/api/v1/storefront/theme', ['footer' => ['contact' => ['phone' => '+8801712345678', 'email' => 'hello@berry.test']]])->assertOk();
+        $this->publishTheme(['footer' => ['contact' => ['phone' => '+8801712345678', 'email' => 'hello@berry.test']]])->assertOk();
         $this->asVisitor();
 
         $ld = $this->jsonLd($this->get('http://berry.test/')->assertOk()->getContent());
@@ -454,7 +455,7 @@ class StorefrontSeoTest extends TestCase
         $other = $this->openStore('Tiny Toes', 'tiny.test')['organization']->id;
         $otherVersion = $version->current($other);
         $this->actingAsUser($t['admin']);
-        $this->putJson('/api/v1/storefront/theme', ['footer' => ['about' => 'Hello']])->assertOk();
+        $this->publishTheme(['footer' => ['about' => 'Hello']])->assertOk();
         $this->assertSame($otherVersion, $version->current($other));
         $this->assertGreaterThan($afterStock, $version->current($org));
 

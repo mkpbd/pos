@@ -5,6 +5,7 @@ namespace App\Modules\Purchasing\Presentation\Http\Support;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Purchasing\Application\Actions\ChangePurchaseOrderStatus;
+use App\Modules\Purchasing\Application\Actions\SaveRfq;
 use App\Modules\Purchasing\Application\Services\ApprovalRules;
 use App\Modules\Purchasing\Application\Services\PurchasingContext;
 use App\Modules\Purchasing\Domain\Procurement\ApprovalPolicy;
@@ -222,10 +223,13 @@ class ProcurementPresenter
         $header['quote_count'] = $invited->filter(fn (RfqSupplier $s) => $s->quote !== null)->count();
         $manage = $this->rules->has($user, 'purchases.manage');
         $sent = $rfq->status === RfqStatus::Sent;
+        // Q1: an invited supplier without a recorded answer may be taken off a draft or sent RFQ
+        // (never the last one of a sent RFQ).
+        $removable = $manage && SaveRfq::suppliersRemovable($rfq) && ! ($sent && $invited->count() === 1);
 
         return $header + [
             'lines' => $lines->map(fn (RfqLine $l) => $this->rfqLine($l, $variants))->values()->all(),
-            'suppliers' => $invited->map(function (RfqSupplier $s) use ($contacts) {
+            'suppliers' => $invited->map(function (RfqSupplier $s) use ($contacts, $removable) {
                 $contact = $contacts[$s->supplier_id] ?? null;
                 $quote = $s->quote;
 
@@ -238,6 +242,7 @@ class ProcurementPresenter
                     'emailed_at' => $s->emailed_at?->toIso8601String(),
                     'emailed_to' => $s->email,
                     'send_manually' => $s->sent_at !== null && $s->emailed_at === null,
+                    'can_remove' => $removable && $quote === null,
                     'quote' => $quote === null ? null : [
                         'id' => $quote->id,
                         'status' => $quote->status->value,

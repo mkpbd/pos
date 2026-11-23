@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyLine, type LineValue } from '@/components/common/line-values'
 import type { VariantOption } from '@/components/common/variant-options'
-import { linesSchema, toApiLine } from '@/features/inventory/lines'
+import { linesSchema, toApiLine, toCountApiLine } from '@/features/inventory/lines'
 
 const variant = (overrides: Partial<VariantOption> = {}): VariantOption => ({
   id: 'v-1', label: 'Mango Juice 1L', sku: 'JUICE-1L', unit_code: 'pcs', allow_decimal: false, track_stock: true, track_batches: false, tax_rate: null, ...overrides,
@@ -71,5 +71,26 @@ describe('toApiLine', () => {
     expect(toApiLine(line({ unit_cost: '18.00', tax_rate: '', source_line_id: 'pol-1' }), options)).toEqual({
       variant_id: 'v-1', quantity: '5', unit_cost: '18.00', tax_rate: null, purchase_order_line_id: 'pol-1',
     })
+  })
+})
+
+describe('stock count lines (Q1 §1)', () => {
+  const schema = linesSchema({ count: true, cost: 'optional', batch: 'out' })
+
+  it('accepts a count of zero and refuses negative or fractional counts of whole units', () => {
+    expect(issues(schema, [line({ quantity: '0' })])).toEqual({})
+    expect(issues(schema, [line({ quantity: '-2' })])).toEqual({ '0.quantity': 'The counted quantity: 0 or more (up to 3 decimals).' })
+    expect(issues(schema, [line({ quantity: '1.5' })])).toEqual({ '0.quantity': 'Whole pcs only.' })
+  })
+
+  it('asks for the counted batch of a batch-tracked product', () => {
+    expect(issues(schema, [line({ variant: variant({ track_batches: true }) })])).toEqual({ '0.batch_id': 'Choose the batch you counted.' })
+    expect(issues(schema, [line({ variant: variant({ track_batches: true }), batch_id: 'bt-1' })])).toEqual({})
+  })
+
+  it('sends counted_quantity instead of a signed quantity', () => {
+    expect(toCountApiLine(line({ quantity: ' 12 ' }), { cost: 'optional' })).toEqual({ variant_id: 'v-1', counted_quantity: '12', unit_cost: null })
+    expect(toCountApiLine(line({ quantity: '3', unit_cost: '9.5', variant: variant({ track_batches: true }), batch_id: 'bt-1' }), { cost: 'optional' }))
+      .toEqual({ variant_id: 'v-1', counted_quantity: '3', unit_cost: '9.5', batch_id: 'bt-1' })
   })
 })

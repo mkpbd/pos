@@ -3,7 +3,7 @@ import { useLocation } from 'react-router'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '@/lib/api/client'
 import type { Section } from '@/storefront/builder/types'
-import { builderAdminKeys, fetchDocument, type DocumentDetail, type DocumentSummary, type GlobalUsage } from './api'
+import { fetchDocument, type DocumentDetail, type DocumentSummary, type GlobalUsage } from './api'
 import { sectionNodes, isGlobalRef, type GlobalContext, type GlobalEntry } from './global-sections'
 
 /*
@@ -39,17 +39,6 @@ export type CreateGlobalInput = { title: string; context: GlobalContext; section
 export function createGlobal(input: CreateGlobalInput) {
   const body = input.section ? { kind: 'global', title: input.title, context: input.context, from: 'section', section: input.section } : { kind: 'global', title: input.title, context: input.context, from: 'blank' }
   return api.post<DocumentDetail>('/storefront/builder/documents', body).then((r) => r.data)
-}
-
-export function useCreateGlobalMutation() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: createGlobal,
-    onSuccess: (created) => {
-      queryClient.setQueryData(builderAdminKeys.document(created.id), created)
-      void queryClient.invalidateQueries({ queryKey: globalKeys.list })
-    },
-  })
 }
 
 /** The pages listed by a 409 GLOBAL_IN_USE (empty for other errors). */

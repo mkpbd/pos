@@ -6,6 +6,7 @@ use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Domain\ThemeSchema;
 use App\Modules\Storefront\Infrastructure\Models\ThemeSettings;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use App\Modules\Users\Infrastructure\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class ThemePresetsTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const LAYOUT_DEFAULTS = [
         'container_width' => 1170,
@@ -66,7 +67,7 @@ class ThemePresetsTest extends TestCase
         ['admin' => $admin] = $this->provisionTenant();
         $this->actingAsUser($admin);
 
-        $this->putJson('/api/v1/storefront/theme', [
+        $this->publishTheme([
             'preset' => 'handmade',
             'typography' => ['heading_font' => 'playfair', 'body_font' => 'jost'],
             'layout' => ['header_style' => 'commerce', 'footer_style' => 'widgets', 'card_style' => 'minimal', 'hero_style' => 'tiles', 'heading_case' => 'uppercase', 'top_bar' => 'ticker'],
@@ -81,7 +82,7 @@ class ThemePresetsTest extends TestCase
                 'product' => ['gallery' => 'left', 'thumbnails' => 'bottom', 'sticky_summary' => false, 'details' => 'tabs'],
             ]);
 
-        $this->putJson('/api/v1/storefront/theme', ['typography' => ['heading_font' => 'jost', 'body_font' => 'jost']])->assertOk();
+        $this->publishTheme(['typography' => ['heading_font' => 'jost', 'body_font' => 'jost']])->assertOk();
 
         $invalid = [
             'preset' => ['preset' => 'neon'],
@@ -97,8 +98,8 @@ class ThemePresetsTest extends TestCase
             'layout.product.details' => ['layout' => ['product' => ['details' => 'popup']]],
         ];
         foreach ($invalid as $field => $body) {
-            $this->putJson('/api/v1/storefront/theme', $body)
-                ->assertStatus(422)->assertJsonValidationErrorFor($field, 'error.details');
+            $this->publishTheme($body)
+                ->assertStatus(422)->assertJsonValidationErrorFor('settings.'.$field, 'error.details');
         }
     }
 
@@ -152,7 +153,7 @@ class ThemePresetsTest extends TestCase
                 'payment_logo_media_ids' => [$logo['id']],
             ],
         ];
-        $this->putJson('/api/v1/storefront/theme', $content + ['colors' => ['primary' => '#123456'], 'layout' => ['container_width' => 1400]])->assertOk();
+        $this->publishTheme($content + ['colors' => ['primary' => '#123456'], 'layout' => ['container_width' => 1400]])->assertOk();
         $this->putJson('/api/v1/storefront/theme/custom-css', ['custom_css' => '.x{color:red}'])->assertOk();
         $before = $this->getJson('/api/v1/storefront/theme')->json('data.settings');
 
@@ -232,7 +233,7 @@ class ThemePresetsTest extends TestCase
         ['admin' => $b] = $this->provisionTenant('Shop B');
 
         $this->actingAsUser($b);
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#abcdef']])->assertOk();
+        $this->publishTheme(['colors' => ['primary' => '#abcdef']])->assertOk();
 
         $this->actingAsUser($a);
         $this->postJson('/api/v1/storefront/theme/presets/handmade/apply')->assertOk()->assertJsonPath('data.settings.preset', 'handmade');

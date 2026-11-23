@@ -57,18 +57,12 @@ export function formatRange(amounts: string[], currency?: string): string {
 
 /** Exact comparison of non-negative decimal strings. */
 export function compareDecimal(a: string, b: string): number {
-  const [ai = '0', af = ''] = a.split('.')
-  const [bi = '0', bf = ''] = b.split('.')
-  const intA = ai.replace(/^0+(?=\d)/, '')
-  const intB = bi.replace(/^0+(?=\d)/, '')
-  if (intA.length !== intB.length) return intA.length - intB.length
-  if (intA !== intB) return intA < intB ? -1 : 1
-
-  const width = Math.max(af.length, bf.length)
-  const fa = af.padEnd(width, '0')
-  const fb = bf.padEnd(width, '0')
-
-  return fa === fb ? 0 : fa < fb ? -1 : 1
+  // Sign-aware (Q1): exact integer comparison at a common scale, so "-5.00" < "0" and "-10" < "-2".
+  const fraction = (value: string) => value.trim().split('.')[1]?.length ?? 0
+  const scale = Math.max(fraction(a), fraction(b))
+  const x = toScaled(a, scale)
+  const y = toScaled(b, scale)
+  return x === y ? 0 : x < y ? -1 : 1
 }
 
 function toScaled(value: string, scale: number): bigint {

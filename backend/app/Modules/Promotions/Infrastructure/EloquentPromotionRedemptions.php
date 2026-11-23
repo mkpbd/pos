@@ -6,8 +6,13 @@ use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Promotions\Infrastructure\Models\Coupon;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
+use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
+/**
+ * Q1: release() marks a cancelled order's redemptions released and uncounts its coupons.
+ */
 class EloquentPromotionRedemptions implements PromotionRedemptions
 {
     public function lock(array $promotionIds, ?string $couponId): bool
@@ -53,5 +58,35 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
         foreach (array_keys($coupons) as $couponId) {
             Coupon::query()->whereKey($couponId)->increment('used_count');
         }
+    }
+
+    public function release(string $orderId): array
+    {
+        /** @var Collection<int, PromotionRedemption> $rows */
+        $rows = PromotionRedemption::query()->where('order_id', $orderId)->whereNull('released_at')
+            ->orderBy('id')->lockForUpdate()->get();
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        // Query-builder updates: the model guard (AppendOnly) refuses every update; the trigger
+        // allows exactly this one (released_at NULL → a time).
+        PromotionRedemption::query()->whereKey($rows->pluck('id')->all())->whereNull('released_at')->update(['released_at' => now()]);
+
+        // record() counted each coupon once per order.
+        $couponIds = $rows->pluck('coupon_id')->filter()->unique()->sort()->values()->all();
+        foreach ($couponIds as $couponId) {
+            Coupon::query()->whereKey($couponId)->where('used_count', '>', 0)->decrement('used_count');
+        }
+
+        // A used-up offer may be available again on the storefront.
+        app(StorefrontContentVersion::class)->bump((string) $rows->first()->getAttribute('organization_id'));
+
+        return $rows->map(fn (PromotionRedemption $r) => [
+            'promotion_id' => $r->promotion_id,
+            'coupon_id' => $r->coupon_id,
+            'kind' => $r->kind,
+            'amount' => (string) $r->amount,
+        ])->values()->all();
     }
 }

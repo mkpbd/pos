@@ -155,7 +155,7 @@ class PromotionOffers
     }
 
     /**
-     * Redemptions per promotion.
+     * Redemptions per promotion (released ones — cancelled orders, Q1 — no longer count).
      *
      * @param  list<string>  $promotionIds
      * @return array<string, int>
@@ -166,7 +166,7 @@ class PromotionOffers
             return [];
         }
 
-        return PromotionRedemption::query()->whereIn('promotion_id', $promotionIds)
+        return PromotionRedemption::query()->whereIn('promotion_id', $promotionIds)->whereNull('released_at')
             ->groupBy('promotion_id')->select('promotion_id', DB::raw('count(*) as uses'))
             ->pluck('uses', 'promotion_id')->map(fn ($n) => (int) $n)->all();
     }
@@ -183,7 +183,7 @@ class PromotionOffers
             return [];
         }
 
-        return PromotionRedemption::query()->whereIn('promotion_id', $promotionIds)
+        return PromotionRedemption::query()->whereIn('promotion_id', $promotionIds)->whereNull('released_at')
             ->when($customerId !== null,
                 fn (Builder $q) => $q->where('customer_id', $customerId),
                 fn (Builder $q) => $q->where('email', mb_strtolower(trim((string) $email))))

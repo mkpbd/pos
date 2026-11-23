@@ -57,6 +57,101 @@ describe('NewAdjustmentPage', () => {
     expect(posted).toEqual({ store_id: 's-1', reason: 'damage', note: null, lines: [{ variant_id: 'v-1', quantity: '-3', batch_id: 'bt-1' }] })
   })
 
+  it('counts stock: shows in stock now and the difference, posts the counted quantity, then shows counted vs system', async () => {
+    const user = userEvent.setup()
+    const soap = { ...juice, id: 'p-2', name: 'Soap', track_batches: false, variants: [{ ...juice.variants[0], id: 'v-2', sku: 'SOAP-1' }] }
+    const soapRef = { id: 'v-2', product_id: 'p-2', product_name: 'Soap', variant_name: null, sku: 'SOAP-1', unit_code: 'pcs', track_batches: false, allow_decimal: false }
+    let posted: Record<string, unknown> | undefined
+    let stockQuery: string | undefined
+    mockApi({
+      'GET /auth/me': ok(stockManager()),
+      'GET /branches': paged(branchesWithStores()),
+      'GET /products': ok([soap]),
+      'GET /inventory/stock': (_init, url) => {
+        stockQuery = url.search
+        return paged([{ store: store('s-1', 'Shop floor'), variant: soapRef, quantity: '45.000', reorder_level: '0', is_low: false, value: null, updated_at: null }])
+      },
+      'POST /inventory/adjustments': (init) => {
+        posted = JSON.parse(String(init.body))
+        return ok({ id: 'a-9', number: 'ADJ-000009', reason: 'count', note: null, store: store('s-1', 'Shop floor'), created_at: '2026-10-31T09:00:00Z', lines: [] })
+      },
+      'GET /inventory/adjustments/a-9': ok({
+        id: 'a-9', number: 'ADJ-000009', reason: 'count', note: null, store: store('s-1', 'Shop floor'), created_at: '2026-10-31T09:00:00Z',
+        lines: [{ id: 'l-1', variant: soapRef, batch: null, quantity: '5.000', unit_cost: null, counted_quantity: '50.000', system_quantity: '45.000' }],
+      }),
+    })
+    const { router } = renderRoutes(routes, '/inventory/adjustments/new')
+
+    await user.click(await screen.findByRole('combobox', { name: 'Store' }))
+    await user.click(await screen.findByRole('option', { name: 'Shop floor (FLOOR)' }))
+    await user.click(screen.getByRole('combobox', { name: 'Reason' }))
+    await user.click(await screen.findByRole('option', { name: 'Stock count' }))
+    expect(screen.getByText(/Enter what you counted on the shelf/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('combobox', { name: 'Product of line 1' }))
+    await user.type(screen.getByPlaceholderText('Name, SKU or barcode'), 'soap')
+    await user.click(await screen.findByRole('option', { name: /Soap/ }))
+    expect(await screen.findByRole('status', { name: 'In stock now' })).toHaveTextContent('45')
+    expect(stockQuery).toContain('variant_id=v-2')
+    expect(stockQuery).toContain('store_id=s-1')
+
+    await user.type(screen.getByLabelText('Counted quantity of line 1'), '50')
+    expect(screen.getByRole('status', { name: 'Difference' })).toHaveTextContent('+5')
+    await user.clear(screen.getByLabelText('Counted quantity of line 1'))
+    await user.type(screen.getByLabelText('Counted quantity of line 1'), '41')
+    expect(screen.getByRole('status', { name: 'Difference' })).toHaveTextContent('−4')
+    await user.clear(screen.getByLabelText('Counted quantity of line 1'))
+    await user.type(screen.getByLabelText('Counted quantity of line 1'), '50')
+
+    await user.click(screen.getByRole('button', { name: 'Post adjustment' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/inventory/adjustments/a-9'))
+    expect(posted).toEqual({ store_id: 's-1', reason: 'count', note: null, lines: [{ variant_id: 'v-2', counted_quantity: '50', unit_cost: '18.5000' }] })
+    const row = within(await screen.findByRole('table', { name: 'Adjustment lines' })).getAllByRole('row')[1]!
+    expect(row).toHaveTextContent('Soap')
+    expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(expect.arrayContaining(['50', '45', '+5 pcs']))
+  })
+
+  it('counts a batch-tracked product per batch', async () => {
+    const user = userEvent.setup()
+    let posted: Record<string, unknown> | undefined
+    mockApi({
+      'GET /auth/me': ok(stockManager()),
+      'GET /branches': paged(branchesWithStores()),
+      'GET /products': ok([juice]),
+      'GET /inventory/batches': ok([
+        { store: store('s-1', 'Shop floor'), variant: null, batch: { id: 'bt-1', batch_number: 'L-7', expires_on: '2027-01-31' }, quantity: '40.000', is_expired: false },
+      ]),
+      'POST /inventory/adjustments': (init) => {
+        posted = JSON.parse(String(init.body))
+        return ok({ id: 'a-1', number: 'ADJ-000001', reason: 'count', store: store('s-1', 'Shop floor'), created_at: '2026-10-31T09:00:00Z', lines: [] })
+      },
+      'GET /inventory/adjustments/a-1': ok({ id: 'a-1', number: 'ADJ-000001', reason: 'count', note: null, store: store('s-1', 'Shop floor'), created_at: '2026-10-31T09:00:00Z', lines: [] }),
+    })
+    renderRoutes(routes, '/inventory/adjustments/new')
+
+    await user.click(await screen.findByRole('combobox', { name: 'Store' }))
+    await user.click(await screen.findByRole('option', { name: 'Shop floor (FLOOR)' }))
+    await user.click(screen.getByRole('combobox', { name: 'Reason' }))
+    await user.click(await screen.findByRole('option', { name: 'Stock count' }))
+    await user.click(screen.getByRole('combobox', { name: 'Product of line 1' }))
+    await user.type(screen.getByPlaceholderText('Name, SKU or barcode'), 'juice')
+    await user.click(await screen.findByRole('option', { name: /Mango Juice 1L/ }))
+    await user.type(screen.getByLabelText('Counted quantity of line 1'), '38')
+
+    await user.click(screen.getByRole('button', { name: 'Post adjustment' }))
+    expect(await screen.findByText('Choose the batch you counted.')).toBeInTheDocument()
+    expect(posted).toBeUndefined()
+
+    await user.click(screen.getByRole('combobox', { name: 'Batch' }))
+    await user.click(await screen.findByRole('option', { name: /L-7 · 40.000/ }))
+    expect(await screen.findByRole('status', { name: 'In stock now' })).toHaveTextContent('40')
+    expect(screen.getByRole('status', { name: 'Difference' })).toHaveTextContent('−2')
+    await user.click(screen.getByRole('button', { name: 'Post adjustment' }))
+
+    await waitFor(() => expect(posted).toEqual({ store_id: 's-1', reason: 'count', note: null, lines: [{ variant_id: 'v-1', counted_quantity: '38', unit_cost: '18.5000', batch_id: 'bt-1' }] }))
+  })
+
   it('shows line errors before anything is posted', async () => {
     const user = userEvent.setup()
     mockApi({ 'GET /auth/me': ok(stockManager()), 'GET /branches': paged(branchesWithStores()) })

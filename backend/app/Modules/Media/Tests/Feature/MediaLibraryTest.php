@@ -3,6 +3,7 @@
 namespace App\Modules\Media\Tests\Feature;
 
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -11,7 +12,7 @@ use Tests\TestCase;
 
 class MediaLibraryTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -84,7 +85,7 @@ class MediaLibraryTest extends TestCase
         $logo = $this->post('/api/v1/media', ['file' => UploadedFile::fake()->image('logo.png', 400, 120)], $this->spaHeaders())->json('data.id');
         $promo = $this->post('/api/v1/media', ['file' => UploadedFile::fake()->image('promo.png', 600, 600)], $this->spaHeaders())->json('data.id');
 
-        $this->putJson('/api/v1/storefront/theme', ['logo_media_id' => $logo])->assertOk();
+        $this->publishTheme(['logo_media_id' => $logo])->assertOk();
         $this->deleteJson("/api/v1/media/{$logo}")->assertStatus(422)->assertJsonPath('error.code', 'IN_USE');
 
         $menu = $this->postJson('/api/v1/storefront/menus', ['name' => 'Main', 'location' => 'main'])->json('data.id');

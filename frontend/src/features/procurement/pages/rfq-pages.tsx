@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
-import { ArrowLeftIcon, AwardIcon, BanIcon, FileDownIcon, Loader2Icon, LockIcon, NotebookPenIcon, PlusIcon, UserPlusIcon, XCircleIcon } from 'lucide-react'
+import { ArrowLeftIcon, AwardIcon, BanIcon, FileDownIcon, Loader2Icon, LockIcon, NotebookPenIcon, PlusIcon, UserMinusIcon, UserPlusIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { ExportMenu } from '@/components/common/export-menu'
@@ -22,11 +22,13 @@ import { PO_STATUS } from '@/features/purchasing/api'
 import { useIdempotencyKey } from '@/features/returns/api'
 import { variantDisplayName } from '@/features/supply-chain/api'
 import {
+  canRemoveInvite,
   PROCUREMENT_PERMISSIONS,
   rfqListQuery,
   rfqPdfPath,
   useInviteSuppliersMutation,
   useRecordQuoteMutation,
+  useRemoveRfqSupplierMutation,
   useRfqActionMutation,
   useRfqComparisonQuery,
   useRfqQuery,
@@ -196,7 +198,15 @@ function quoteBadge(invite: RfqSupplier): { label: string; variant: 'success' | 
   return { label: 'Awaiting quote', variant: 'outline' }
 }
 
-function SuppliersCard({ rfq, manage, onRecord, onDecline, onInvite }: { rfq: Rfq; manage: boolean; onRecord: (invite: RfqSupplier) => void; onDecline: (invite: RfqSupplier) => void; onInvite?: () => void }) {
+function SuppliersCard({ rfq, manage, canRemove, onRecord, onDecline, onRemove, onInvite }: {
+  rfq: Rfq
+  manage: boolean
+  canRemove: (invite: RfqSupplier) => boolean
+  onRecord: (invite: RfqSupplier) => void
+  onDecline: (invite: RfqSupplier) => void
+  onRemove: (invite: RfqSupplier) => void
+  onInvite?: () => void
+}) {
   const me = useAuth()
   const timeZone = me.organization?.timezone
   const sent = rfq.status !== 'draft' && rfq.status !== 'cancelled'
@@ -236,6 +246,11 @@ function SuppliersCard({ rfq, manage, onRecord, onDecline, onInvite }: { rfq: Rf
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {sent && <PdfButton rfq={rfq} invite={invite} />}
+                  {canRemove(invite) && (
+                    <Button variant="ghost" size="sm" aria-label={`Remove ${invite.supplier.name} from the RFQ`} onClick={() => onRemove(invite)}>
+                      <UserMinusIcon data-icon="inline-start" /> Remove
+                    </Button>
+                  )}
                   {manage && open && (
                     <>
                       <Button variant="outline" size="sm" aria-label={`Record quote from ${invite.supplier.name}`} onClick={() => onRecord(invite)}>
@@ -269,6 +284,8 @@ function RfqView({ rfq }: { rfq: Rfq }) {
   const comparison = useRfqComparisonQuery(rfq, showComparison)
   const action = useRfqActionMutation()
   const record = useRecordQuoteMutation()
+  const removeSupplier = useRemoveRfqSupplierMutation()
+  const [removing, setRemoving] = useState<RfqSupplier | null>(null)
   const keys = { close: useIdempotencyKey(), cancel: useIdempotencyKey(), decline: useIdempotencyKey() }
   const [confirm, setConfirm] = useState<'close' | 'cancel' | null>(null)
   const [quoting, setQuoting] = useState<RfqSupplier | null>(null)
@@ -294,6 +311,14 @@ function RfqView({ rfq }: { rfq: Rfq }) {
       onSuccess: () => { keys.decline.settle(); toast.success(`${invite.supplier.name} marked as declined.`) },
       onError: (e) => { keys.decline.settle(e); toast.error(e.message) },
       onSettled: () => setDeclining(null),
+    })
+  }
+
+  const remove = (invite: RfqSupplier) => {
+    removeSupplier.mutate({ rfqId: rfq.id, supplierId: invite.supplier.id }, {
+      onSuccess: () => toast.success(`${invite.supplier.name} removed from ${rfq.number}.`),
+      onError: (e) => toast.error(e.message),
+      onSettled: () => setRemoving(null),
     })
   }
 
@@ -385,8 +410,10 @@ function RfqView({ rfq }: { rfq: Rfq }) {
           <SuppliersCard
             rfq={rfq}
             manage={rfq.can_record_quotes ?? manage}
+            canRemove={(invite) => canRemoveInvite(rfq, invite, manage)}
             onRecord={setQuoting}
             onDecline={setDeclining}
+            onRemove={setRemoving}
             onInvite={rfq.status === 'sent' && (rfq.can_invite ?? manage) ? () => setInviting(true) : undefined}
           />
           <Card>
@@ -420,6 +447,16 @@ function RfqView({ rfq }: { rfq: Rfq }) {
         confirmLabel="Mark declined"
         pending={record.isPending}
         onConfirm={() => declining && decline(declining)}
+      />
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        title={`Remove ${removing?.supplier.name ?? 'supplier'} from ${rfq.number}?`}
+        description={rfq.status === 'draft' ? 'The supplier will not get this request.' : 'The supplier is no longer asked to quote and is left out of the comparison. Let them know if they already have the request.'}
+        confirmLabel="Remove supplier"
+        destructive
+        pending={removeSupplier.isPending}
+        onConfirm={() => removing && remove(removing)}
       />
       <ConfirmDialog
         open={confirm !== null}

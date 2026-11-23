@@ -9,11 +9,9 @@ use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontSettings;
 use App\Modules\Storefront\Application\Actions\SaveTheme;
-use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
 use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
-use App\Modules\Storefront\Presentation\Http\Requests\SaveThemeRequest;
 use App\Modules\Storefront\Presentation\Http\Support\StorefrontPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -156,20 +154,6 @@ class StorefrontAdminController
      */
     public function showTheme(Request $request, StorefrontConfig $config): JsonResponse
     {
-        return ApiResponse::success(StorefrontPresenter::theme($config->theme(), $request->user()->can('storefront.custom_css')));
-    }
-
-    /**
-     * Replace theme settings (legacy)
-     *
-     * Send the whole document; omitted keys take their defaults. Media ids must exist in the media library (`MEDIA_NOT_FOUND`).
-     * B3: kept for API compatibility — saves the theme draft and publishes it in one step (a new
-     * version; needs `storefront.publish`). Editors use `PUT /storefront/theme/draft` + `POST /storefront/theme/publish`.
-     */
-    public function updateTheme(SaveThemeRequest $request, ManageThemeDraft $theme, StorefrontConfig $config): JsonResponse
-    {
-        $theme->saveAndPublish($request->validated());
-
         return ApiResponse::success(StorefrontPresenter::theme($config->theme(), $request->user()->can('storefront.custom_css')));
     }
 

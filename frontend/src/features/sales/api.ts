@@ -91,6 +91,10 @@ export type Sale = SaleHeader & {
   returns: SaleReturnSummary[]
   receipt: {
     organization_name: string | null
+    /** Seller BIN (organization tax number); printed under the shop name when set (Q1 §3). */
+    tax_number?: string | null
+    /** True only when a BIN is set: the document may then be titled "Tax invoice". */
+    is_tax_invoice?: boolean
     header: string | null
     footer: string | null
     branch: { id: string; code: string; name: string; address: string | null; phone: string | null; email: string | null } | null

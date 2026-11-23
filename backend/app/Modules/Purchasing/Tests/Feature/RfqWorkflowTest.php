@@ -108,7 +108,8 @@ class RfqWorkflowTest extends TestCase
         $this->transition("rfqs/{$rfq['id']}/send")->assertStatus(422)->assertJsonPath('error.code', 'INVALID_STATUS_CHANGE');
         $this->transition("rfqs/{$rfq['id']}/suppliers", ['supplier_ids' => [$late->id]])->assertOk()->assertJsonCount(3, 'data.suppliers');
         Notification::assertSentOnDemandTimes(RfqRequestMail::class, 2);
-        $this->deleteJson("/api/v1/purchasing/rfqs/{$rfq['id']}/suppliers/{$late->id}")->assertStatus(422)->assertJsonPath('error.code', 'RFQ_LOCKED');
+        // Q1: a supplier who has not answered can still be taken off a sent RFQ.
+        $this->deleteJson("/api/v1/purchasing/rfqs/{$rfq['id']}/suppliers/{$late->id}")->assertOk()->assertJsonCount(2, 'data.suppliers');
     }
 
     public function test_quotes_comparison_and_split_award_with_catalog_update(): void

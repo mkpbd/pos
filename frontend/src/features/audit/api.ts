@@ -25,3 +25,32 @@ export function useAuditLogQuery(params: AuditListParams) {
     placeholderData: (previous) => previous,
   })
 }
+
+/** GET /login-activities (audit.view): every sign-in attempt in the organization. */
+export type OrganizationLoginActivity = {
+  id: string
+  user_id: string | null
+  email: string | null
+  channel: 'session' | 'token'
+  succeeded: boolean
+  failure_reason: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export type LoginActivityParams = { page: number; succeeded?: boolean; search?: string }
+
+export function useLoginActivitiesQuery(params: LoginActivityParams) {
+  return useQuery({
+    queryKey: ['login-activities', params],
+    queryFn: ({ signal }) =>
+      api
+        .get<OrganizationLoginActivity[]>('/login-activities', {
+          signal,
+          query: { page: params.page, search: params.search, succeeded: params.succeeded === undefined ? undefined : params.succeeded ? 1 : 0 },
+        })
+        .then(toPaginated),
+    placeholderData: (previous) => previous,
+  })
+}

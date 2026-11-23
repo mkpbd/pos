@@ -21,6 +21,34 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### Q1 — Quick fixes from the feature gap audit
+
+From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §1 and §7: places where the manual and the software disagreed, plus small loose ends.
+
+#### Fixed
+- **Stock count:** the manual told staff to enter the *counted* number in a stock adjustment, but the system added it as a change (a count of 50 on 45 in stock made 95). New **Stock count** reason: enter the counted quantity, see "In stock now" and the difference, and the server posts `counted − on hand` under a row lock, keeping both numbers on the line (batch-tracked items per batch; unchanged lines skipped; nothing to change → a plain message). New adjustment detail page with counted / system / difference. The manual now explains both ways.
+- **Add a customer at the till:** the POS customer picker (F4) has **New customer** (name, phone, optional e-mail and address; credit limit only for those who manage customers); a phone that already exists offers "Use this customer".
+- **Receipts:** the shop's BIN prints under its name; the title says "Tax invoice" only when a BIN is set, otherwise "Receipt".
+- **Coupons on cancelled orders:** cancelling a web order in any way now gives its coupons and offer uses back (once-per-customer coupons can be used again); promotion counts no longer include cancelled orders.
+- **Public sign-up is off by default**; the login page shows "Create an account" only when the server allows it, and `/register` explains that sign-up is closed.
+- **Offers:** the manual now says automatic offers apply in the online store (offers at the till come with POS1).
+- **Money comparisons:** the shared `compareDecimal` helper treated negative amounts by string length (e.g. a due of "-5.00" counted as more than 0); it now compares values exactly (unchanged for positive amounts; tests for negatives).
+
+#### Added
+- **Sign-ins** tab on the Audit log page: everyone's sign-ins (who, when, result, device, IP), filters and paging.
+- **Remove a supplier from an RFQ** — also after sending, while that supplier hasn't answered (not the last supplier on a sent RFQ).
+- The page builder shows "Open the page builder on a bigger screen" on phones instead of a cramped editor.
+
+#### Removed
+- Legacy `PUT /storefront/theme` (themes are saved as a draft and published) and unused frontend hooks; the unused `refunds.*` role pattern; a stale test skip.
+
+#### Tests
+- Backend 1592 (PostgreSQL: 1591 pass, 1 opt-in PDF skip; new `StockCountTest`, `CancelReleasesPromotionsTest`, `RfqSupplierRemovalTest`, `ReceiptTaxNumberTest`, registration options, a two-connection count lock test, a role-pattern test); Pint clean. vitest 2817; mocked Playwright 508 (new `q1-quick-fixes`; the B18 layout-shift check now ignores the frames right after a late web-font load, which flaked under full-suite load).
+- Full-stack (PostgreSQL, desktop) 55 — new **Q1**: sign-up closed by default, a stock count sets the counted number (and a repeat count changes nothing), a cashier adds a customer at the till, the owner sees everyone's sign-ins. Builder acceptance 5 (fresh database). The B20 full-stack test now saves its effects through the theme draft + publish.
+
+#### Upgrade
+- `php artisan migrate`. Set `POS_REGISTRATION_ENABLED=true` only if public sign-up is wanted. Clients of `PUT /api/v1/storefront/theme` must use the theme draft + publish.
+
 ### B21 — Store builder: Easy building
 
 #### Added

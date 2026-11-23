@@ -127,6 +127,13 @@ class RfqController
         return ApiResponse::success($this->presenter->rfq($save->invite($rfq, $data['supplier_ids']), $user));
     }
 
+    /**
+     * Remove an invited supplier
+     *
+     * On a draft, or (Q1) on a sent RFQ while that supplier has no recorded answer and is not the
+     * last one; each invite carries `can_remove`. Refused with RFQ_LOCKED (closed / awarded /
+     * cancelled), RFQ_SUPPLIER_QUOTED or RFQ_LAST_SUPPLIER. Audited (`rfq.supplier_removed`).
+     */
     public function removeSupplier(Request $request, Rfq $rfq, string $supplierId, SaveRfq $save): JsonResponse
     {
         $user = $this->visible($request, $rfq);

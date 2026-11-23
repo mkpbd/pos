@@ -6,6 +6,7 @@ use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Tests\Concerns\BuildsPromotions;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Date;
@@ -20,7 +21,7 @@ use Tests\TestCase;
  */
 class StoreBuilderPartsTest extends TestCase
 {
-    use BuildsOnlineCatalog, BuildsPromotions, InteractsWithTenancy, RefreshDatabase;
+    use BuildsOnlineCatalog, BuildsPromotions, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const DOCS = '/api/v1/storefront/builder/documents';
 
@@ -149,7 +150,7 @@ class StoreBuilderPartsTest extends TestCase
     {
         $main = $this->menu('main', 'Main', [['label' => 'Shop', 'url' => '/shop', 'children' => [['label' => 'Tea', 'url' => '/tea']]]]);
         $help = $this->menu('footer_1', 'Help', [['label' => 'Delivery', 'url' => '/delivery']]);
-        $this->putJson('/api/v1/storefront/theme', ['footer' => ['about' => "Fresh food\nsince <2010>"]])->assertOk();
+        $this->publishTheme(['footer' => ['about' => "Fresh food\nsince <2010>"]])->assertOk();
 
         $this->asVisitorNow();
         $this->getJson(self::STORE.'/bootstrap')->assertOk()->assertJsonPath('data.builder.header', null)->assertJsonPath('data.builder.footer', null);
@@ -551,9 +552,9 @@ class StoreBuilderPartsTest extends TestCase
         foreach ([
             ['desktop' => 6], ['desktop' => 2], ['tablet' => 1], ['tablet' => 5], ['mobile' => 3], ['mobile' => 0], ['desktop' => 4.5], ['desktop' => 'four'],
         ] as $columns) {
-            $this->putJson('/api/v1/storefront/theme', ['layout' => ['listing_columns' => $columns]])->assertUnprocessable();
+            $this->publishTheme(['layout' => ['listing_columns' => $columns]])->assertUnprocessable();
         }
-        $this->putJson('/api/v1/storefront/theme', ['layout' => ['listing_columns' => ['desktop' => 5, 'mobile' => 1]]])->assertOk()
+        $this->publishTheme(['layout' => ['listing_columns' => ['desktop' => 5, 'mobile' => 1]]])->assertOk()
             ->assertJsonPath('data.settings.layout.listing_columns', ['desktop' => 5, 'tablet' => 3, 'mobile' => 1]);
         $this->asVisitorNow();
         $this->getJson(self::STORE.'/bootstrap')->assertOk()->assertJsonPath('data.theme.layout.listing_columns', ['desktop' => 5, 'tablet' => 3, 'mobile' => 1]);

@@ -9,6 +9,7 @@ use App\Modules\Storefront\Domain\ThemePresets;
 use App\Modules\Storefront\Domain\ThemeSchema;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
 use App\Modules\Storefront\Infrastructure\Models\ThemeSettings;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use App\Modules\Users\Infrastructure\Models\Role;
 use App\Modules\Users\Infrastructure\Models\User;
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class ThemeDraftTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private const DRAFT = '/api/v1/storefront/theme/draft';
 
@@ -162,9 +163,8 @@ class ThemeDraftTest extends TestCase
         foreach ($invalid as $field => $body) {
             $this->putJson(self::DRAFT, $body)->assertStatus(422)->assertJsonValidationErrorFor($field, 'error.details');
         }
-        // The same rules on the legacy endpoint.
-        $this->putJson('/api/v1/storefront/theme', ['typography' => ['body_size' => 12]])->assertStatus(422)->assertJsonValidationErrorFor('typography.body_size', 'error.details');
-        $this->putJson('/api/v1/storefront/theme', ['palette' => [['name' => 'X', 'hex' => '#00']]])->assertStatus(422)->assertJsonValidationErrorFor('palette.0.hex', 'error.details');
+        // Q1: the legacy one-step save + publish is gone (the theme reads stay).
+        $this->putJson('/api/v1/storefront/theme', ['typography' => ['body_size' => 12]])->assertStatus(405);
 
         // Media must exist.
         $this->putJson(self::DRAFT, ['revision' => 1, 'settings' => ['logo_media_id' => '01900000-0000-7000-8000-000000000001']])
@@ -284,13 +284,13 @@ class ThemeDraftTest extends TestCase
         $this->actingAsUser($admin);
     }
 
-    public function test_the_legacy_put_saves_and_publishes(): void
+    public function test_saving_and_publishing_the_whole_theme_through_the_draft(): void
     {
         ['admin' => $admin, 'organization' => $org] = $this->store('Berry Kids', 'berry.test');
         $this->saveDraft(['colors' => ['primary' => '#000000']]);
 
-        // The legacy save replaces the draft (no revision) and publishes it.
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#abcdef'], 'palette' => [['name' => 'Sky', 'hex' => '#abcdef']]])->assertOk()
+        // Q1: what the legacy PUT did in one step: the whole document to the draft, then publish.
+        $this->publishTheme(['colors' => ['primary' => '#abcdef'], 'palette' => [['name' => 'Sky', 'hex' => '#abcdef']]])->assertOk()
             ->assertJsonPath('data.settings.colors.primary', '#abcdef')
             ->assertJsonPath('data.settings.colors.button', '#abcdef')
             ->assertJsonPath('data.settings.palette.0.name', 'Sky');
@@ -302,10 +302,10 @@ class ThemeDraftTest extends TestCase
         $this->asVisitor();
         $this->getJson('http://berry.test/api/v1/store/bootstrap')->assertJsonPath('data.theme.colors.primary', '#abcdef');
 
-        // It publishes, so it needs storefront.publish; the draft endpoints need storefront.manage.
+        // Publishing needs storefront.publish; the draft endpoints need storefront.manage.
         $editor = $this->role($org, 'Editor', ['storefront.view', 'storefront.manage']);
         $this->actingAsUser($editor);
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#111111']])->assertForbidden();
+        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#111111']])->assertStatus(405);
         $this->saveDraft(['colors' => ['primary' => '#111111']]);
         $this->postJson('/api/v1/storefront/theme/presets/classic/apply')->assertOk()->assertJsonPath('data.settings.preset', 'classic');
         $this->postJson('/api/v1/storefront/theme/discard')->assertOk();

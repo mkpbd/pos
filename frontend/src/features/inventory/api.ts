@@ -49,7 +49,17 @@ export type Movement = {
 
 export type AdjustmentReason = 'opening' | 'count' | 'damage' | 'expiry' | 'theft' | 'correction' | 'other'
 
-export type DocumentLine = { id: string; variant: VariantRef | null; batch: BatchRef | null; quantity: string; unit_cost: string | null }
+export type DocumentLine = {
+  id: string
+  variant: VariantRef | null
+  batch: BatchRef | null
+  /** Signed change that was posted. */
+  quantity: string
+  unit_cost: string | null
+  /** Stock count lines (Q1): what was counted and what the system held then; null on signed lines. */
+  counted_quantity?: string | null
+  system_quantity?: string | null
+}
 
 export type Adjustment = {
   id: string
@@ -83,7 +93,8 @@ export type AdjustmentInput = {
   store_id: string
   reason: AdjustmentReason
   note: string | null
-  lines: { variant_id: string; quantity: string; unit_cost?: string | null; batch_id?: string | null; batch_number?: string | null; expires_on?: string | null }[]
+  /** Each line sends either a signed `quantity` or, for reason `count`, the `counted_quantity`. */
+  lines: { variant_id: string; quantity?: string; counted_quantity?: string; unit_cost?: string | null; batch_id?: string | null; batch_number?: string | null; expires_on?: string | null }[]
 }
 
 export type TransferInput = {
@@ -112,6 +123,34 @@ export const useStockQuery = (params: Query) => usePagedList<StockRow>('/invento
 export const useMovementsQuery = (params: Query) => usePagedList<Movement>('/inventory/movements', params)
 export const useAdjustmentsQuery = (params: Query) => usePagedList<Adjustment>('/inventory/adjustments', params)
 export const useTransfersQuery = (params: Query) => usePagedList<Transfer>('/inventory/transfers', params)
+
+export function useAdjustmentQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: [...inventoryKeys.all, 'adjustment', id],
+    queryFn: ({ signal }) => api.get<Adjustment>(`/inventory/adjustments/${id}`, { signal }).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+/**
+ * Stock on hand of one product in one store (or of one batch there) — "In stock now" on a stock
+ * count line. Only a guide: the server re-reads the stock under a lock when the count is posted.
+ */
+export function useStockOnHandQuery(variantId: string | undefined, storeId: string | null | undefined, batchId: string | null | undefined, trackBatches: boolean) {
+  const enabled = !!variantId && !!storeId && (!trackBatches || !!batchId)
+  const stock = useQuery({
+    queryKey: [...inventoryKeys.all, '/inventory/stock', { variant_id: variantId, store_id: storeId }],
+    queryFn: ({ signal }) =>
+      api.get<StockRow[]>('/inventory/stock', { signal, query: { variant_id: variantId, store_id: storeId ?? undefined } }).then((r) => r.data[0]?.quantity ?? '0'),
+    enabled: enabled && !trackBatches,
+  })
+  const batches = useBatchesQuery({ variant_id: variantId, store_id: storeId ?? undefined }, enabled && trackBatches)
+  if (!enabled) return { quantity: null, isPending: false }
+  if (trackBatches) {
+    return { quantity: batches.data ? (batches.data.find((b) => b.batch.id === batchId)?.quantity ?? '0') : null, isPending: batches.isPending }
+  }
+  return { quantity: stock.data ?? null, isPending: stock.isPending }
+}
 
 export function useBatchesQuery(params: Query, enabled = true) {
   return useQuery({

@@ -6,14 +6,50 @@ import { toast } from 'sonner'
 import { FormField } from '@/components/common/form-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useRegisterMutation } from '@/features/auth/api'
+import { useAuthOptionsQuery, useRegisterMutation } from '@/features/auth/api'
 import { AuthLayout } from '@/features/auth/components/auth-layout'
 import { registerSchema, type RegisterValues } from '@/features/auth/schemas'
+import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { handleFormError } from '@/lib/forms'
 
 const FIELDS = ['organization_name', 'branch_name', 'name', 'email', 'password', 'password_confirmation'] as const
 
+const signInFooter = (
+  <span>
+    Already registered? <Link to="/login" className="font-medium text-primary underline-offset-4 hover:underline">Sign in</Link>
+  </span>
+)
+
+/** /register — public sign-up, only when the server switches it on (POS_REGISTRATION_ENABLED, off by default). */
 export function RegisterPage() {
+  const options = useAuthOptionsQuery()
+
+  if (options.isPending) {
+    return (
+      <AuthLayout title="Create your business account">
+        <LoadingState rows={3} label="Checking sign-up" />
+      </AuthLayout>
+    )
+  }
+  if (options.error) {
+    return (
+      <AuthLayout title="Create your business account" footer={signInFooter}>
+        <ErrorState error={options.error} onRetry={() => options.refetch()} />
+      </AuthLayout>
+    )
+  }
+  if (!options.data.registration_enabled) {
+    return (
+      <AuthLayout title="Sign-up is closed" footer={signInFooter}>
+        <p className="text-sm">New accounts can't be created here. Ask your administrator to add you as a user.</p>
+      </AuthLayout>
+    )
+  }
+
+  return <RegisterForm />
+}
+
+function RegisterForm() {
   const navigate = useNavigate()
   const register = useRegisterMutation()
   const form = useForm<RegisterValues>({
@@ -39,11 +75,7 @@ export function RegisterPage() {
     <AuthLayout
       title="Create your business account"
       description="Sets up your organization, a main branch and your administrator login."
-      footer={
-        <span>
-          Already registered? <Link to="/login" className="font-medium text-primary underline-offset-4 hover:underline">Sign in</Link>
-        </span>
-      }
+      footer={signInFooter}
     >
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         <FormField label="Business name" error={errors.organization_name?.message}>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon, Loader2Icon, PlusIcon, SendIcon, Trash2Icon, XCircleIcon } from 'lucide-react'
+import { ArrowLeftIcon, Loader2Icon, PlusIcon, SendIcon, Trash2Icon, UserMinusIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -15,8 +15,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useIdempotencyKey } from '@/features/returns/api'
-import { useRfqActionMutation, useSaveRfqMutation, type Rfq } from '@/features/procurement/api'
-import { SupplierChecklist } from '@/features/procurement/components/supplier-pickers'
+import { canRemoveInvite, useRemoveRfqSupplierMutation, useRfqActionMutation, useSaveRfqMutation, type Rfq, type RfqSupplier } from '@/features/procurement/api'
+import { EmailBadge, SupplierChecklist } from '@/features/procurement/components/supplier-pickers'
 import { handleFormError } from '@/lib/forms'
 import { trimDecimal } from '@/lib/money'
 
@@ -101,6 +101,8 @@ export function RfqForm({ rfq }: { rfq?: Rfq }) {
   const cancelKey = useIdempotencyKey()
   const [confirm, setConfirm] = useState<'send' | 'cancel' | null>(null)
   const [pendingValues, setPendingValues] = useState<Values | null>(null)
+  const removeSupplier = useRemoveRfqSupplierMutation()
+  const [removing, setRemoving] = useState<RfqSupplier | null>(null)
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults(rfq) })
   const { errors } = form.formState
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
@@ -163,6 +165,20 @@ export function RfqForm({ rfq }: { rfq?: Rfq }) {
     setPendingValues(values)
     setConfirm('send')
   })
+
+  // Q1 §7: a supplier already saved on the draft can be taken off at once (unticking waits for Save).
+  const invited = (rfq?.suppliers ?? []).filter((invite) => canRemoveInvite(rfq ?? { status: 'draft' }, invite, true))
+  const removeInvite = (invite: RfqSupplier) => {
+    if (!rfq) return
+    removeSupplier.mutate({ rfqId: rfq.id, supplierId: invite.supplier.id }, {
+      onSuccess: () => {
+        form.setValue('suppliers', form.getValues('suppliers').filter((s) => s.id !== invite.supplier.id))
+        toast.success(`${invite.supplier.name} removed from ${rfq.number}.`)
+      },
+      onError: (e) => toast.error(e.message),
+      onSettled: () => setRemoving(null),
+    })
+  }
 
   const busy = save.isPending || action.isPending
 
@@ -238,7 +254,26 @@ export function RfqForm({ rfq }: { rfq?: Rfq }) {
           <CardTitle>Suppliers</CardTitle>
           <CardDescription>Suppliers with an e-mail address get the RFQ PDF by e-mail when you send; send it to the others yourself.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          {invited.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">On this RFQ now</p>
+              <ul className="flex flex-col divide-y rounded-md border" aria-label="Suppliers on this RFQ">
+                {invited.map((invite) => (
+                  <li key={invite.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="font-medium">{invite.supplier.name}</span>
+                      <EmailBadge email={invite.supplier.email} />
+                    </span>
+                    <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${invite.supplier.name} from the RFQ`} onClick={() => setRemoving(invite)}>
+                      <UserMinusIcon data-icon="inline-start" /> Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">Remove takes a supplier off at once. Ticks below change when you save.</p>
+            </div>
+          )}
           <Controller control={form.control} name="suppliers" render={({ field }) => <SupplierChecklist selected={field.value} onChange={(v) => { field.onChange(v); form.clearErrors('suppliers') }} />} />
           {errors.suppliers?.message && <p role="alert" className="mt-2 text-sm text-destructive">{errors.suppliers.message}</p>}
         </CardContent>
@@ -260,6 +295,17 @@ export function RfqForm({ rfq }: { rfq?: Rfq }) {
         pending={busy}
         onConfirm={() => pendingValues && persist(pendingValues, true)}
       />
+      {rfq && (
+        <ConfirmDialog
+          open={removing !== null}
+          onOpenChange={(open) => !open && setRemoving(null)}
+          title={`Remove ${removing?.supplier.name ?? 'supplier'} from ${rfq.number}?`}
+          description="The supplier will not get this request."
+          confirmLabel="Remove supplier"
+          pending={removeSupplier.isPending}
+          onConfirm={() => removing && removeInvite(removing)}
+        />
+      )}
       {rfq && (
         <ConfirmDialog
           open={confirm === 'cancel'}

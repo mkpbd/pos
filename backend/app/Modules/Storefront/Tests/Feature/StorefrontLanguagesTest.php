@@ -4,6 +4,7 @@ namespace App\Modules\Storefront\Tests\Feature;
 
 use App\Modules\OnlineCatalog\Tests\Concerns\BuildsOnlineCatalog;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,7 +18,7 @@ use Tests\TestCase;
  */
 class StorefrontLanguagesTest extends TestCase
 {
-    use BuildsOnlineCatalog, InteractsWithTenancy, RefreshDatabase;
+    use BuildsOnlineCatalog, InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     private string $shell;
 
@@ -55,7 +56,7 @@ class StorefrontLanguagesTest extends TestCase
             ['label' => 'Home', 'url' => '/', 'translations' => ['bn' => ['label' => 'হোম']]],
             ['label' => 'Shop', 'url' => '/shop', 'children' => [['label' => 'Sale', 'url' => '/sale', 'translations' => ['bn' => ['label' => 'ছাড়']]]]],
         ]])->assertOk();
-        $this->putJson('/api/v1/storefront/theme', ['announcement' => [
+        $this->publishTheme(['announcement' => [
             'enabled' => true, 'text' => 'Free delivery today', 'translations' => ['bn' => ['text' => 'আজ ফ্রি ডেলিভারি']],
         ]])->assertOk();
 
@@ -134,8 +135,8 @@ class StorefrontLanguagesTest extends TestCase
 
         $theme = $this->getJson('/api/v1/storefront/theme')->assertOk()->json('data.settings.announcement');
         $this->assertSame(['bn' => ['text' => 'আজ ফ্রি ডেলিভারি']], $theme['translations']);
-        $this->putJson('/api/v1/storefront/theme', ['announcement' => ['enabled' => true, 'text' => 'Hi', 'translations' => ['bn' => ['text' => str_repeat('ক', 201)]]]])
-            ->assertUnprocessable()->assertJsonValidationErrors(['announcement.translations.bn.text'], 'error.details');
+        $this->publishTheme(['announcement' => ['enabled' => true, 'text' => 'Hi', 'translations' => ['bn' => ['text' => str_repeat('ক', 201)]]]])
+            ->assertUnprocessable()->assertJsonValidationErrors(['settings.announcement.translations.bn.text'], 'error.details');
     }
 
     public function test_homepage_reads_in_bangla_with_per_field_fallback(): void

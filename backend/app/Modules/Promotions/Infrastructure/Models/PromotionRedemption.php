@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A promotion used by a placed order. Append-only.
+ * A promotion used by a placed order. Append-only, except `released_at` (Q1: set once when the
+ * order is cancelled).
  *
  * @property string $id
  * @property string $promotion_id
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $kind
  * @property string $amount
  * @property CarbonImmutable $created_at
+ * @property ?CarbonImmutable $released_at Q1: the order was cancelled; the use no longer counts
  */
 #[Table(timestamps: false)]
 #[Fillable(['organization_id', 'promotion_id', 'coupon_id', 'order_id', 'order_number', 'customer_id', 'customer_account_id', 'email', 'kind', 'amount', 'created_at'])]
@@ -37,6 +39,7 @@ class PromotionRedemption extends Model
         return [
             'amount' => 'decimal:2',
             'created_at' => 'immutable_datetime',
+            'released_at' => 'immutable_datetime',
         ];
     }
 }

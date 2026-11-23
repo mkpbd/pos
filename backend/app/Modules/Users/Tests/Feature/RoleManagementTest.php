@@ -2,6 +2,7 @@
 
 namespace App\Modules\Users\Tests\Feature;
 
+use App\Modules\Shared\Application\Authorization\PermissionRegistry;
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use App\Modules\Users\Infrastructure\Models\Role;
@@ -22,6 +23,18 @@ class RoleManagementTest extends TestCase
         foreach (['Audit', 'Branches', 'Organizations', 'Users', 'Products', 'Customers'] as $module) {
             $this->assertContains($module, $modules);
         }
+    }
+
+    public function test_every_built_in_role_pattern_grants_a_real_permission(): void
+    {
+        // Q1: a leftover pattern (Branch Manager's `refunds.*`) matched nothing; keep the roles honest.
+        $registry = app(PermissionRegistry::class);
+        foreach (SystemRole::cases() as $role) {
+            foreach ($role->permissionPatterns() as $pattern) {
+                $this->assertNotSame([], $registry->matching([$pattern]), "{$role->value}: `{$pattern}` matches no permission.");
+            }
+        }
+        $this->assertSame([], $registry->matching(['refunds.*']));
     }
 
     public function test_built_in_roles_have_expected_permissions(): void

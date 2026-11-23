@@ -98,6 +98,8 @@ class SalePresenter
         $batches = $this->batches->summaries($org, $lines->flatMap(fn (SaleLine $l) => $l->stock->pluck('batch_id'))->filter()->values()->all());
         $users = $this->users->names($org, array_values(array_filter([$sale->created_by, $sale->cancelled_by, ...$payments->pluck('created_by')->all()])));
         $organization = $this->context->organization();
+        $taxNumber = trim((string) ($organization['tax_number'] ?? ''));
+        $taxNumber = $taxNumber === '' ? null : $taxNumber;
         $branch = $this->branches->profile($sale->branch_id, $org);
         $returns = SaleReturn::query()->where('sale_id', $sale->id)->orderBy('requested_at')->get();
         $returned = SaleReturnLine::query()
@@ -169,6 +171,9 @@ class SalePresenter
             ])->all(),
             'receipt' => [
                 'organization_name' => $organization['name'] ?? null,
+                // Q1: the seller's BIN; the receipt is a tax invoice only when one is set.
+                'tax_number' => $taxNumber,
+                'is_tax_invoice' => $taxNumber !== null,
                 'header' => $organization['receipt_header'] ?? null,
                 'footer' => $organization['receipt_footer'] ?? null,
                 'branch' => $branch,

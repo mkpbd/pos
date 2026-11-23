@@ -3,13 +3,14 @@
 namespace App\Modules\Storefront\Tests\Feature;
 
 use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
+use App\Modules\Storefront\Tests\Concerns\PublishesTheme;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class StorefrontAdminTest extends TestCase
 {
-    use InteractsWithTenancy, RefreshDatabase;
+    use InteractsWithTenancy, PublishesTheme, RefreshDatabase;
 
     public function test_settings_default_to_a_closed_store_named_after_the_organization(): void
     {
@@ -77,7 +78,7 @@ class StorefrontAdminTest extends TestCase
             ->assertJsonPath('data.settings.layout.container_width', 1170)
             ->assertJsonPath('data.settings.footer.payment_logo_media_ids', []);
 
-        $this->putJson('/api/v1/storefront/theme', [
+        $this->publishTheme([
             'colors' => ['primary' => '#FF8800', 'unknown' => '#000000'],
             'layout' => ['sticky_header' => false],
             'announcement' => ['enabled' => true, 'text' => 'Free delivery in Dhaka over ৳2000', 'link' => '/shipping'],
@@ -92,12 +93,12 @@ class StorefrontAdminTest extends TestCase
             ->assertJsonMissingPath('data.settings.not_a_key');
         $this->assertDatabaseHas('audit_logs', ['action' => 'storefront.theme_updated']);
 
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => 'red']])->assertStatus(422);
-        $this->putJson('/api/v1/storefront/theme', ['typography' => ['heading_font' => 'Comic Sans']])->assertStatus(422);
-        $this->putJson('/api/v1/storefront/theme', ['announcement' => ['enabled' => true]])->assertStatus(422);
-        $this->putJson('/api/v1/storefront/theme', ['announcement' => ['link' => 'javascript:alert(1)']])->assertStatus(422);
-        $this->putJson('/api/v1/storefront/theme', ['footer' => ['social' => ['facebook' => 'http://facebook.com/x']]])->assertStatus(422);
-        $this->putJson('/api/v1/storefront/theme', ['logo_media_id' => '0192f0c8-0000-7000-8000-000000000000'])
+        $this->publishTheme(['colors' => ['primary' => 'red']])->assertStatus(422);
+        $this->publishTheme(['typography' => ['heading_font' => 'Comic Sans']])->assertStatus(422);
+        $this->publishTheme(['announcement' => ['enabled' => true]])->assertStatus(422);
+        $this->publishTheme(['announcement' => ['link' => 'javascript:alert(1)']])->assertStatus(422);
+        $this->publishTheme(['footer' => ['social' => ['facebook' => 'http://facebook.com/x']]])->assertStatus(422);
+        $this->publishTheme(['logo_media_id' => '0192f0c8-0000-7000-8000-000000000000'])
             ->assertStatus(422)->assertJsonPath('error.code', 'MEDIA_NOT_FOUND');
     }
 
@@ -107,7 +108,7 @@ class StorefrontAdminTest extends TestCase
         $manager = $this->createUserWithRole($org, SystemRole::OnlineStoreManager);
 
         $this->actingAsUser($manager);
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#123456']])->assertOk()->assertJsonPath('data.custom_css', null);
+        $this->publishTheme(['colors' => ['primary' => '#123456']])->assertOk()->assertJsonPath('data.custom_css', null);
         $this->putJson('/api/v1/storefront/theme/custom-css', ['custom_css' => '.x{}'])->assertForbidden();
 
         $this->actingAsUser($admin);
@@ -122,7 +123,7 @@ class StorefrontAdminTest extends TestCase
 
         // The theme save of the manager does not wipe the CSS they cannot see.
         $this->actingAsUser($manager);
-        $this->putJson('/api/v1/storefront/theme', ['colors' => ['primary' => '#654321']])->assertOk()->assertJsonPath('data.has_custom_css', true);
+        $this->publishTheme(['colors' => ['primary' => '#654321']])->assertOk()->assertJsonPath('data.has_custom_css', true);
     }
 
     public function test_menus_one_per_location_with_a_validated_item_tree(): void

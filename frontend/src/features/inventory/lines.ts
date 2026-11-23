@@ -11,6 +11,8 @@ type Options = {
   cost?: 'required' | 'optional'
   tax?: boolean
   batch?: 'in' | 'out' | 'signed'
+  /** Stock count (Q1 §1): the quantity is what was counted (0 or more); batch-tracked lines name the counted batch. */
+  count?: boolean
 }
 
 const variantShape = z.object({
@@ -52,6 +54,14 @@ export function linesSchema(options: Options) {
         const negative = quantity.startsWith('-')
 
         if (!line.variant) issue('variant', 'Choose a product.')
+        if (options.count) {
+          if (!QUANTITY.test(quantity)) issue('quantity', 'The counted quantity: 0 or more (up to 3 decimals).')
+          else if (line.variant && !line.variant.allow_decimal && quantity.includes('.') && !/\.0+$/.test(quantity)) issue('quantity', `Whole ${line.variant.unit_code ?? 'units'} only.`)
+          const cost = line.unit_cost.trim()
+          if (options.cost && cost !== '' && !COST.test(cost)) issue('unit_cost', 'Cost with up to 4 decimals.')
+          if (line.variant?.track_batches && !line.batch_id) issue('batch_id', 'Choose the batch you counted.')
+          return
+        }
         if (!(options.signed ? SIGNED_QUANTITY : QUANTITY).test(quantity)) {
           issue('quantity', options.signed ? 'A quantity like 5 or -2 (up to 3 decimals).' : 'A positive quantity (up to 3 decimals).')
         } else if (/^-?0+(\.0+)?$/.test(quantity)) {
@@ -91,5 +101,15 @@ export function toApiLine(line: LineValue, options: Options & { sourceField?: st
     ...(tracksBatches && mode === 'in' ? { batch_number: line.batch_number.trim(), expires_on: line.expires_on || null } : {}),
     ...(tracksBatches && mode === 'out' ? { batch_id: line.batch_id } : {}),
     ...(options.sourceField && line.source_line_id ? { [options.sourceField]: line.source_line_id } : {}),
+  }
+}
+
+/** Stock count line (Q1 §1): the counted quantity; the server works out the change (counted − in stock) under a row lock. */
+export function toCountApiLine(line: LineValue, options: Pick<Options, 'cost'>) {
+  return {
+    variant_id: line.variant?.id ?? '',
+    counted_quantity: line.quantity.trim(),
+    ...(options.cost ? { unit_cost: line.unit_cost.trim() || null } : {}),
+    ...(line.variant?.track_batches ? { batch_id: line.batch_id } : {}),
   }
 }

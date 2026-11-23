@@ -5,7 +5,7 @@ namespace App\Modules\Storefront\Presentation\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * B3: the theme draft — the whole theme document (validated like `PUT /storefront/theme`) with
+ * B3: the theme draft — the whole theme document (SaveThemeRequest::themeRules under `settings.`) with
  * the draft revision it was edited from.
  */
 class SaveThemeDraftRequest extends FormRequest

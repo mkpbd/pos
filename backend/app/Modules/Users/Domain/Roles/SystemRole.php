@@ -54,7 +54,7 @@ enum SystemRole: string
                 // SC2: approves requisitions / orders up to the manager limit; above it and the
                 // approval limits themselves stay with the Organization Admin.
                 'inventory.*', 'purchases.view', 'purchases.manage', 'purchases.receive', 'purchases.return', 'purchases.pay',
-                'purchases.request', 'purchases.approve', 'purchases.landed_cost', 'pos.*', 'sales.*', 'returns.*', 'refunds.*',
+                'purchases.request', 'purchases.approve', 'purchases.landed_cost', 'pos.*', 'sales.*', 'returns.*',
                 'payments.*', 'cash_registers.*', 'expenses.*', 'loyalty.view', 'reports.*',
                 // Phase 7: reports.* = reports.view + reports.financial.
                 'dashboard.view',
