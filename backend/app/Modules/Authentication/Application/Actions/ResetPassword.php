@@ -2,6 +2,7 @@
 
 namespace App\Modules\Authentication\Application\Actions;
 
+use App\Modules\Authentication\Application\Services\AccountLockout;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Users\Infrastructure\Models\User;
@@ -12,11 +13,14 @@ use Illuminate\Support\Str;
 
 /**
  * Password-reset flow (forgot → e-mailed link → reset). A successful reset
- * revokes every session and token of the user.
+ * revokes every session and token of the user and (G1a) clears an account lockout.
  */
 class ResetPassword
 {
-    public function __construct(private readonly AuditTrail $audit) {}
+    public function __construct(
+        private readonly AuditTrail $audit,
+        private readonly AccountLockout $lockout,
+    ) {}
 
     /**
      * Always reports success to the caller so it cannot be used to discover accounts.
@@ -34,9 +38,10 @@ class ResetPassword
                 $user->forceFill(['password' => $password, 'remember_token' => Str::random(60)])->save();
                 $user->tokens()->delete();
                 DB::table('sessions')->where('user_id', $user->id)->delete();
+                $wasLocked = $this->lockout->clear($user);
 
                 event(new PasswordReset($user));
-                $this->audit->record('auth.password_reset', $user);
+                $this->audit->record('auth.password_reset', $user, context: $wasLocked ? ['unlocked' => true] : []);
             },
         );
 

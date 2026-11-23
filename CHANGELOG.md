@@ -21,6 +21,27 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### G1a — Sign-in security: two-factor sign-in, account lockout, security headers
+
+First part of G1 (go-live essentials) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2. No new packages: the codes are computed in-house (RFC 6238) and the setup QR code uses the existing in-house encoder.
+
+#### Added
+- **Two-factor sign-in** with an authenticator app: set up under *Profile → Two-factor sign-in* (password → scan the QR code or type the key → confirm a code → 10 recovery codes to copy or download, shown once), new recovery codes, turn off. At sign-in a second step asks for the 6-digit code or a recovery code; each app code and each recovery code works once. Device tokens take the code in the same request.
+- **Organization policy** (*Organization → Security*): two-factor *Optional*, *Required for admins* (people who can manage users, roles or the organization) or *Required for everyone*, with how many have it on and how many still need it. Covered users who have not set it up can only reach the setup screen.
+- **Account lockout:** 10 wrong passwords or codes in a row lock the account for 15 minutes (settings `POS_LOCKOUT_MAX_ATTEMPTS`, `POS_LOCKOUT_MINUTES`), even with the right password; the user gets an e-mail. A successful sign-in resets the count; a password reset by e-mail or **Unlock** on the Users page ends the lock.
+- **Users page:** "2FA" and "Locked until …" badges; **Unlock** and **Reset two-factor** (lost phone; not on yourself or a more powerful user). Turning two-factor on, off or resetting it e-mails the user; everything is in the audit log, and sign-ins show "Wrong two-factor code" / "Account locked".
+- **Security headers** on every Laravel response (nosniff, referrer and permissions policy, HSTS on HTTPS with `POS_HSTS`, API never framed, storefront framed only by the back office) and a checked Content-Security-Policy for the admin app in the deployment guide.
+
+#### Changed
+- The `auth` rate limit counts the two-factor step and signed-in password / two-factor changes per account and IP instead of per IP only (staff behind one shop connection no longer share one bucket).
+
+#### Tests
+- Backend 1649 (PostgreSQL: 1648 pass, 1 opt-in PDF skip; RFC 6238 test vectors, `TwoFactorSignInTest`, `TwoFactorManagementTest`, `TwoFactorPolicyTest`, `AccountLockoutTest`, `SecurityHeadersTest`); Pint clean. vitest 2850 (incl. a check that the admin CSP hash in the deployment guide matches `index.html`); mocked Playwright 521 (new `g1a-two-factor`; the storefront hot-deals countdown test timed out once under full-suite load and passes 10/10 alone).
+- Full-stack (PostgreSQL, desktop) 56 — new **G1a** (in its own newly provisioned organization): the owner turns on two-factor with a real authenticator code computed from the returned secret, signs in with a code and with a recovery code (used once), a replayed code is refused; the policy sends a cashier to setup; ten wrong passwords lock the cashier and the owner unlocks them. Builder acceptance 5 (fresh database). The long "banner and homepage section" flow now has 120 s (one save per section came close to 60 s with the demo stores running alongside).
+
+#### Upgrade
+- `php artisan migrate`. Add the admin header block to Nginx (DEPLOYMENT_GUIDE → Security checklist). Rotating `APP_KEY` now turns off everyone's two-factor sign-in.
+
 ### Q1 — Quick fixes from the feature gap audit
 
 From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §1 and §7: places where the manual and the software disagreed, plus small loose ends.

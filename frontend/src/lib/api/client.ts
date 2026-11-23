@@ -85,6 +85,20 @@ type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 let contextHeaders: () => Record<string, string> = () => ({})
 
+type ApiErrorListener = (error: ApiError) => void
+const errorListeners = new Set<ApiErrorListener>()
+
+/**
+ * Observe every error the server answers with (e.g. 403 TWO_FACTOR_SETUP_REQUIRED, which sends the
+ * user to the two-factor setup screen). Returns the unsubscribe function.
+ */
+export function onApiError(listener: ApiErrorListener): () => void {
+  errorListeners.add(listener)
+  return () => {
+    errorListeners.delete(listener)
+  }
+}
+
 /**
  * Register a provider for headers that depend on app state (e.g. X-Branch-Id).
  * Kept as an injection point so the client has no dependency on stores.
@@ -174,7 +188,9 @@ export async function request<T>(method: Method, path: string, options: RequestO
 
   if (isEnvelope(payload)) {
     if (payload.success) return payload as ApiSuccess<T>
-    throw new ApiError(response.status, payload.error.code, payload.error.message, payload.error.details ?? {}, payload.meta?.request_id ?? requestId)
+    const error = new ApiError(response.status, payload.error.code, payload.error.message, payload.error.details ?? {}, payload.meta?.request_id ?? requestId)
+    for (const listener of errorListeners) listener(error)
+    throw error
   }
 
   throw new ApiError(response.status, 'INVALID_RESPONSE', 'The server returned an unexpected response.', {}, requestId)

@@ -270,6 +270,8 @@ test('theme colour and menu changes made in the admin reach the storefront', asy
 
 test('a banner edited and a section added in the admin show on the storefront in order', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile-chromium', 'The admin sidebar flow runs on desktop')
+  // One move per homepage section (each a save + reload): close to 60 s while the demo stores run alongside.
+  test.setTimeout(120_000)
 
   await page.goto('/admin/login')
   await page.getByLabel('E-mail').fill('owner@demo.test')
@@ -1125,4 +1127,151 @@ test('Q1: public sign-up is closed by default, a stock count sets the counted nu
   const signIns = owner.getByRole('table', { name: 'Sign-ins' })
   await expect(signIns).toContainText('cashier@demo.test')
   await expect(signIns).toContainText('owner@demo.test')
+})
+
+test('G1a: two-factor sign-in with a real authenticator code and a recovery code, the policy sends staff to setup, and ten wrong passwords lock an account', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const { createHmac } = await import('node:crypto')
+  // RFC 6238 (SHA-1, 6 digits, 30 s) — what an authenticator app computes from the secret.
+  const totp = (secret: string, at = Date.now()) => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+    let bits = ''
+    for (const char of secret.replace(/=+$/, '').toUpperCase()) bits += alphabet.indexOf(char).toString(2).padStart(5, '0')
+    const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((byte) => parseInt(byte, 2)))
+    const counter = Buffer.alloc(8)
+    counter.writeBigUInt64BE(BigInt(Math.floor(at / 1000 / 30)))
+    const hmac = createHmac('sha1', key).update(counter).digest()
+    const offset = hmac[hmac.length - 1]! & 0x0f
+    return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0')
+  }
+  type Page = import('@playwright/test').Page
+  type Call = { status: number; body: { data: any; error?: any } }
+  const call = async (page: Page, method: string, url: string, body?: unknown): Promise<Call> => {
+    const token = decodeURIComponent((await page.context().cookies()).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const freshPage = async () => {
+    const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage()
+    await page.goto('/admin/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    return page
+  }
+  const password = 'G1a-Strong-Pass-2026!'
+  const submitPassword = async (page: Page, email: string) => {
+    await page.getByLabel('E-mail').fill(email)
+    await page.getByLabel('Password').fill(password)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+  }
+  /** Password step through the API (a fresh XSRF cookie first). */
+  const apiLogin = async (page: Page, email: string, secretWord = password) => {
+    await page.evaluate(`fetch('/sanctum/csrf-cookie', { credentials: 'include' })`)
+    return call(page, 'POST', '/api/v1/auth/login', { email, password: secretWord })
+  }
+
+  // Its own organization, so the policy and the accounts never touch the demo stores tested in parallel.
+  const stamp = Date.now()
+  const ownerEmail = `g1a-owner-${stamp}@security.test`
+  const staffEmail = `g1a-staff-${stamp}@security.test`
+  const owner = await freshPage()
+  await test.step('a platform admin provisions an organization; its owner adds a cashier', async () => {
+    const platform = await freshPage()
+    expect((await apiLogin(platform, 'admin@pos.test', 'password')).status).toBe(200)
+    const provisioned = await call(platform, 'POST', '/api/v1/platform/organizations', { organization_name: `G1a Security ${stamp}`, name: 'G1a Owner', email: ownerEmail, password, password_confirmation: password })
+    expect(provisioned.status).toBe(201)
+    await platform.context().close()
+    expect((await apiLogin(owner, ownerEmail)).status).toBe(200)
+    const roles = (await call(owner, 'GET', '/api/v1/roles')).body.data as { id: string; system_key: string | null }[]
+    const branches = (await call(owner, 'GET', '/api/v1/branches')).body.data as { id: string }[]
+    const cashierRole = roles.find((r) => r.system_key === 'cashier')!
+    const staff = await call(owner, 'POST', '/api/v1/users', { name: 'G1a Cashier', email: staffEmail, password, role_ids: [cashierRole.id], branch_ids: [branches[0]!.id] })
+    expect(staff.status).toBe(201)
+  })
+
+  let secret = ''
+  let recoveryCodes: string[] = []
+  let code = ''
+  await test.step('the owner turns two-factor on with a real code and gets ten recovery codes', async () => {
+    const setup = await call(owner, 'POST', '/api/v1/auth/two-factor/setup', { password })
+    expect(setup.status).toBe(200)
+    secret = setup.body.data.secret as string
+    expect(setup.body.data.otpauth_uri).toContain(`secret=${secret}`)
+    const confirmed = await call(owner, 'POST', '/api/v1/auth/two-factor/confirm', { code: totp(secret) })
+    expect(confirmed.status).toBe(200)
+    recoveryCodes = confirmed.body.data.recovery_codes as string[]
+    expect(recoveryCodes).toHaveLength(10)
+  })
+
+  await test.step("signing in asks for the code; the next step's code is accepted, a replay is refused", async () => {
+    const second = await freshPage()
+    await submitPassword(second, ownerEmail)
+    code = totp(secret, Date.now() + 30_000)
+    // Six digits send the code on their own (no button press needed).
+    await second.getByLabel('Authentication code').fill(code)
+    await expect(second).not.toHaveURL(/\/admin\/login/)
+    await second.context().close()
+    const replay = await freshPage()
+    expect((await apiLogin(replay, ownerEmail)).body.data.two_factor_required).toBe(true)
+    const replayed = await call(replay, 'POST', '/api/v1/auth/two-factor-challenge', { code })
+    expect(replayed.status).toBe(422)
+    expect(replayed.body.error.code).toBe('INVALID_TWO_FACTOR_CODE')
+    await replay.context().close()
+  })
+
+  await test.step('a recovery code signs in once', async () => {
+    const recovery = await freshPage()
+    await submitPassword(recovery, ownerEmail)
+    await recovery.getByRole('button', { name: 'Use a recovery code instead' }).click()
+    await recovery.getByLabel('Recovery code').fill(recoveryCodes[0]!)
+    await recovery.getByRole('button', { name: 'Verify' }).click()
+    await expect(recovery).not.toHaveURL(/\/admin\/login/)
+    await recovery.context().close()
+    const reuse = await freshPage()
+    await apiLogin(reuse, ownerEmail)
+    const reused = await call(reuse, 'POST', '/api/v1/auth/two-factor-challenge', { recovery_code: recoveryCodes[0] })
+    expect(reused.body.error.code).toBe('INVALID_TWO_FACTOR_CODE')
+    await reuse.context().close()
+    expect((await call(owner, 'GET', '/api/v1/auth/two-factor')).body.data.recovery_codes_left).toBe(9)
+  })
+
+  await test.step('required for everyone: the cashier lands on setup and the API holds back', async () => {
+    const policy = await call(owner, 'PATCH', '/api/v1/organization', { settings: { two_factor_policy: 'everyone' } })
+    expect(policy.status).toBe(200)
+    expect(policy.body.data.two_factor_summary.required_missing).toBe(1)
+    const cashier = await freshPage()
+    await submitPassword(cashier, staffEmail)
+    await expect(cashier).toHaveURL(/\/two-factor\/setup/)
+    await expect(cashier.getByText('Set up two-factor sign-in').first()).toBeVisible()
+    const held = await call(cashier, 'GET', '/api/v1/products')
+    expect(held.status).toBe(403)
+    expect(held.body.error.code).toBe('TWO_FACTOR_SETUP_REQUIRED')
+    await cashier.context().close()
+    expect((await call(owner, 'PATCH', '/api/v1/organization', { settings: { two_factor_policy: 'optional' } })).status).toBe(200)
+  })
+
+  await test.step('ten wrong passwords lock the cashier even for the right one; the owner unlocks them', async () => {
+    const guesser = await freshPage()
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await apiLogin(guesser, staffEmail, 'wrong-password')).status).toBe(422)
+    }
+    const locked = await apiLogin(guesser, staffEmail)
+    expect(locked.body.error.code).toBe('ACCOUNT_LOCKED')
+    const users = (await call(owner, 'GET', `/api/v1/users?search=${encodeURIComponent(staffEmail)}`)).body.data as { id: string; email: string; is_locked: boolean }[]
+    const staffUser = users.find((u) => u.email === staffEmail)!
+    expect(staffUser.is_locked).toBe(true)
+    expect((await call(owner, 'POST', `/api/v1/users/${staffUser.id}/unlock`)).status).toBe(200)
+    const unlocked = await apiLogin(guesser, staffEmail)
+    expect(unlocked.status).toBe(200)
+    expect(unlocked.body.data.user.email).toBe(staffEmail)
+    await guesser.context().close()
+    await owner.goto('/admin/audit-log')
+    await owner.getByRole('link', { name: 'Sign-ins' }).click()
+    await expect(owner.getByRole('table', { name: 'Sign-ins' })).toContainText('Account locked')
+  })
 })

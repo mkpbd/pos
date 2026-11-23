@@ -1,9 +1,13 @@
 import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2Icon, ShieldXIcon } from 'lucide-react'
 import { ErrorState } from '@/components/common/state-views'
-import { useCurrentUserQuery } from '@/features/auth/api'
+import { authKeys, useCurrentUserQuery } from '@/features/auth/api'
+import type { CurrentUser } from '@/features/auth/types'
+import { TWO_FACTOR_SETUP_PATH } from '@/features/auth/redirect'
 import { useCan } from '@/features/auth/use-auth'
+import { onApiError } from '@/lib/api/client'
 import { useSessionStore } from '@/stores/session-store'
 
 function FullScreenLoader() {
@@ -16,13 +20,28 @@ function FullScreenLoader() {
 
 /**
  * Renders child routes only for an authenticated session; otherwise redirects to /login
- * and comes back afterwards. Also keeps the active branch valid for this user.
+ * and comes back afterwards. Also keeps the active branch valid for this user, and sends
+ * users whose organization requires two-factor sign-in to the setup screen until it is on.
  */
 export function RequireAuth() {
   const location = useLocation()
+  const queryClient = useQueryClient()
   const { data, isPending, error, refetch } = useCurrentUserQuery()
   const activeBranchId = useSessionStore((s) => s.activeBranchId)
   const setActiveBranch = useSessionStore((s) => s.setActiveBranch)
+
+  // Any API call refused with 403 TWO_FACTOR_SETUP_REQUIRED (policy tightened mid-session) flips the
+  // session summary, which redirects below.
+  useEffect(
+    () =>
+      onApiError((apiError) => {
+        if (apiError.status !== 403 || apiError.code !== 'TWO_FACTOR_SETUP_REQUIRED') return
+        queryClient.setQueryData<CurrentUser | null>(authKeys.me, (me) =>
+          me && !me.two_factor?.setup_required ? { ...me, two_factor: { enabled: false, required: true, setup_required: true } } : me,
+        )
+      }),
+    [queryClient],
+  )
 
   const usableBranches = data?.branches.filter((b) => b.is_active) ?? []
   const fallbackBranchId = usableBranches[0]?.id ?? null
@@ -46,6 +65,10 @@ export function RequireAuth() {
   if (!data) {
     const redirect = location.pathname + location.search
     return <Navigate to={`/login${redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`} replace />
+  }
+  if (data.two_factor?.setup_required && location.pathname !== TWO_FACTOR_SETUP_PATH) {
+    const redirect = location.pathname + location.search
+    return <Navigate to={`${TWO_FACTOR_SETUP_PATH}${redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`} replace />
   }
 
   return <Outlet />

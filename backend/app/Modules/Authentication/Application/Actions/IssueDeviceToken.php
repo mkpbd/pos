@@ -14,7 +14,10 @@ class IssueDeviceToken
 {
     public function __construct(private readonly AuditTrail $audit) {}
 
-    public function __invoke(User $user, string $deviceName): NewAccessToken
+    /**
+     * @param  'totp'|'recovery_code'|null  $twoFactor  the second factor used (G1a), if any
+     */
+    public function __invoke(User $user, string $deviceName, ?string $twoFactor = null): NewAccessToken
     {
         $token = $user->createToken($deviceName, ['*'], now()->addDays(config('pos.device_token_ttl_days')));
 
@@ -22,7 +25,7 @@ class IssueDeviceToken
             'channel' => 'token',
             'token_id' => $token->accessToken->getKey(),
             'device_name' => $deviceName,
-        ]);
+        ] + ($twoFactor !== null ? ['two_factor' => $twoFactor] : []));
 
         return $token;
     }

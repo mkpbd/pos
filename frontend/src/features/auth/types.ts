@@ -17,6 +17,13 @@ export type OrganizationSummary = {
   ai_enabled?: boolean
 }
 
+/** G1a: the signed-in user's two-factor state. `setup_required`: the organization requires it and it is not on yet. */
+export type CurrentUserTwoFactor = {
+  enabled: boolean
+  required: boolean
+  setup_required: boolean
+}
+
 export type CurrentUser = {
   user: {
     id: string
@@ -32,4 +39,6 @@ export type CurrentUser = {
   branches: BranchSummary[]
   /** Phase 8: AI features switched on for the organization (app and organization settings). */
   ai_enabled?: boolean
+  /** G1a: two-factor sign-in state (absent from servers before G1a). */
+  two_factor?: CurrentUserTwoFactor
 }

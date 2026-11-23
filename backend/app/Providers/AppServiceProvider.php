@@ -62,9 +62,23 @@ class AppServiceProvider extends ServiceProvider
             ->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
 
         // Credential endpoints: per account+IP and per IP, to slow down guessing and enumeration.
+        // G1a: requests without an e-mail (two-factor challenge, signed-in two-factor/password changes)
+        // count per account — the pending challenge's user or the signed-in user — not per shared IP.
         RateLimiter::for('auth', fn (Request $request) => [
-            Limit::perMinute((int) config('pos.auth_rate_limit'))->by(mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute((int) config('pos.auth_rate_limit'))->by(self::authLimitAccount($request).'|'.$request->ip()),
             Limit::perMinute(4 * (int) config('pos.auth_rate_limit'))->by($request->ip()),
         ]);
+    }
+
+    private static function authLimitAccount(Request $request): string
+    {
+        $email = mb_strtolower(trim((string) $request->input('email')));
+        if ($email !== '') {
+            return $email;
+        }
+
+        $pending = $request->hasSession() ? $request->session()->get('auth.two_factor.user_id') : null;
+
+        return (string) ($request->user()?->getAuthIdentifier() ?? $pending ?? '');
     }
 }

@@ -51,6 +51,8 @@ const pages = {
   signIns: page(() => import('@/features/audit/pages/sign-ins-page'), 'SignInsPage'),
   platformOrganizations: page(() => import('@/features/platform/pages/platform-organizations-page'), 'PlatformOrganizationsPage'),
   profile: page(() => import('@/features/profile/pages/profile-page'), 'ProfilePage'),
+  // G1a: two-factor setup when the organization requires it (full screen, outside the shell).
+  twoFactorSetup: page(() => import('@/features/auth/pages/two-factor-setup-page'), 'TwoFactorSetupPage'),
   systemStatus: page(() => import('@/features/system/pages/system-status-page'), 'SystemStatusPage'),
   stock: page(() => import('@/features/inventory/pages/stock-page'), 'StockPage'),
   batches: page(() => import('@/features/inventory/pages/stock-page'), 'BatchesPage'),
@@ -175,6 +177,7 @@ export const routes: RouteObject[] = [
       {
         element: <RequireAuth />,
         children: [
+          { path: 'two-factor/setup', ...pages.twoFactorSetup },
           // Print sheets: own minimal layout, no admin chrome (E10a).
           guarded('web_orders.view', 'web-orders/print', pages.webOrdersPrint),
           // Store builder editor (B2): full screen, outside the admin shell.

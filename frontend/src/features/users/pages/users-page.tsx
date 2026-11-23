@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { PencilIcon, PlusIcon, SearchIcon } from 'lucide-react'
+import { EllipsisIcon, LockOpenIcon, PencilIcon, PlusIcon, SearchIcon, ShieldOffIcon } from 'lucide-react'
+import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useRolesQuery } from '@/features/roles/api'
-import { useUsersQuery, type ManagedUser, type UserStatus } from '@/features/users/api'
+import { useResetUserTwoFactorMutation, useUnlockUserMutation, useUsersQuery, type ManagedUser, type UserStatus } from '@/features/users/api'
 import { UserFormDialog } from '@/features/users/components/user-form-dialog'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -20,6 +23,16 @@ const ALL = 'all'
 function formatDateTime(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString() : 'Never'
 }
+
+/** "Locked until 14:35" today, with the date otherwise. */
+function lockedUntilLabel(iso: string | null | undefined): string {
+  if (!iso) return 'Locked'
+  const until = new Date(iso)
+  const sameDay = until.toDateString() === new Date().toDateString()
+  return `Locked until ${sameDay ? until.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : until.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+}
+
+type PendingAction = { kind: 'unlock' | 'reset'; user: ManagedUser }
 
 export function UsersPage() {
   const me = useAuth()
@@ -30,6 +43,9 @@ export function UsersPage() {
   const [status, setStatus] = useState<UserStatus | typeof ALL>(ALL)
   const [roleId, setRoleId] = useState<string>(ALL)
   const [editing, setEditing] = useState<ManagedUser | null | undefined>(undefined)
+  const [pending, setPending] = useState<PendingAction | null>(null)
+  const unlock = useUnlockUserMutation()
+  const resetTwoFactor = useResetUserTwoFactorMutation()
   const debouncedSearch = useDebouncedValue(search)
 
   const roles = useRolesQuery(can('roles.view'))
@@ -40,6 +56,27 @@ export function UsersPage() {
   }
   const { data, error, isPending, refetch } = useUsersQuery({ page, ...filters })
   const branchNames = new Map(me.branches.map((b) => [b.id, b.name]))
+
+  const canUnlock = (user: ManagedUser) => canManage && user.is_locked === true
+  // Not on yourself (use your profile), and an organization admin cannot touch a platform admin.
+  const canResetTwoFactor = (user: ManagedUser) =>
+    canManage && user.two_factor_enabled === true && user.id !== me.user.id && (!user.is_platform_admin || me.user.is_platform_admin)
+
+  const runPending = () => {
+    if (!pending) return
+    const { kind, user } = pending
+    const mutation = kind === 'unlock' ? unlock : resetTwoFactor
+    mutation.mutate(user.id, {
+      onSuccess: () => {
+        toast.success(kind === 'unlock' ? `${user.name} can sign in again.` : `Two-factor sign-in reset for ${user.name}.`)
+        setPending(null)
+      },
+      onError: (error) => {
+        toast.error(error.message)
+        setPending(null)
+      },
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -114,7 +151,7 @@ export function UsersPage() {
                   <TableHead className="hidden lg:table-cell">Branches</TableHead>
                   <TableHead className="hidden md:table-cell">Last sign-in</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
+                  <TableHead className="w-12 text-right"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -134,14 +171,41 @@ export function UsersPage() {
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{formatDateTime(user.last_login_at)}</TableCell>
                     <TableCell>
-                      <Badge variant={user.status === 'active' ? 'success' : 'outline'}>{user.status === 'active' ? 'Active' : 'Inactive'}</Badge>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant={user.status === 'active' ? 'success' : 'outline'}>{user.status === 'active' ? 'Active' : 'Inactive'}</Badge>
+                        {user.two_factor_enabled && <Badge variant="info" title="Two-factor sign-in is on">2FA</Badge>}
+                        {user.is_locked && <Badge variant="destructive">{lockedUntilLabel(user.locked_until)}</Badge>}
+                      </div>
                     </TableCell>
                     <TableCell>
-                      {canManage && roles.data && (
-                        <Button variant="ghost" size="icon-sm" aria-label={`Edit ${user.name}`} onClick={() => setEditing(user)}>
-                          <PencilIcon />
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-0.5">
+                        {canManage && roles.data && (
+                          <Button variant="ghost" size="icon-sm" aria-label={`Edit ${user.name}`} onClick={() => setEditing(user)}>
+                            <PencilIcon />
+                          </Button>
+                        )}
+                        {(canUnlock(user) || canResetTwoFactor(user)) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${user.name}`}>
+                                <EllipsisIcon />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canUnlock(user) && (
+                                <DropdownMenuItem onSelect={() => setPending({ kind: 'unlock', user })}>
+                                  <LockOpenIcon /> Unlock
+                                </DropdownMenuItem>
+                              )}
+                              {canResetTwoFactor(user) && (
+                                <DropdownMenuItem variant="destructive" onSelect={() => setPending({ kind: 'reset', user })}>
+                                  <ShieldOffIcon /> Reset two-factor
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -151,6 +215,21 @@ export function UsersPage() {
           <PaginationBar pagination={data.pagination} onPageChange={setPage} />
         </>
       )}
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={pending?.kind === 'unlock' ? `Unlock ${pending.user.name}?` : `Reset two-factor sign-in for ${pending?.user.name ?? ''}?`}
+        description={
+          pending?.kind === 'unlock'
+            ? 'They can sign in again straight away and their failed sign-in count starts from zero.'
+            : 'For a lost or replaced phone. Their authenticator and recovery codes stop working; they sign in with their password and, if your organization requires it, set two-factor up again. They are told by e-mail.'
+        }
+        confirmLabel={pending?.kind === 'unlock' ? 'Unlock' : 'Reset two-factor'}
+        destructive={pending?.kind === 'reset'}
+        pending={unlock.isPending || resetTwoFactor.isPending}
+        onConfirm={runPending}
+      />
 
       {canManage && roles.data && (
         <UserFormDialog

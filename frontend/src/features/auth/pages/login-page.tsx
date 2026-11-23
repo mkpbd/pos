@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,21 +8,20 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuthOptionsQuery, useLoginMutation } from '@/features/auth/api'
+import { isTwoFactorChallenge, useAuthOptionsQuery, useLoginMutation } from '@/features/auth/api'
 import { AuthLayout } from '@/features/auth/components/auth-layout'
+import { TwoFactorChallengeForm } from '@/features/auth/components/two-factor-challenge-form'
+import { safeRedirect } from '@/features/auth/redirect'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { ApiError } from '@/lib/api/client'
 import { handleFormError } from '@/lib/forms'
-
-/** Only same-app relative paths are accepted as post-login targets (no open redirects). */
-function safeRedirect(target: string | null): string {
-  return target && target.startsWith('/') && !target.startsWith('//') ? target : '/'
-}
 
 export function LoginPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const login = useLoginMutation()
+  // G1a: the password was accepted and the account has two-factor sign-in on.
+  const [step, setStep] = useState<'password' | 'two_factor'>('password')
   // "Create an account" only when public sign-up is on (never while unknown or on error).
   const signUpOpen = useAuthOptionsQuery().data?.registration_enabled === true
   const form = useForm<LoginValues>({
@@ -31,9 +31,24 @@ export function LoginPage() {
   const { errors } = form.formState
   const watchedRemember = useWatch({ control: form.control, name: 'remember' })
 
+  const goToApp = () => navigate(safeRedirect(params.get('redirect')), { replace: true })
+
+  const backToPassword = (message?: string) => {
+    form.setValue('password', '')
+    setStep('password')
+    if (message) form.setError('root', { message })
+  }
+
   const onSubmit = form.handleSubmit((values) =>
     login.mutate(values, {
-      onSuccess: () => navigate(safeRedirect(params.get('redirect')), { replace: true }),
+      onSuccess: (result) => {
+        if (isTwoFactorChallenge(result)) {
+          form.clearErrors()
+          setStep('two_factor')
+          return
+        }
+        goToApp()
+      },
       onError: (error) => {
         if (error instanceof ApiError && error.status === 422 && error.code !== 'VALIDATION_FAILED') {
           form.setError('root', { message: error.message })
@@ -43,6 +58,14 @@ export function LoginPage() {
       },
     }),
   )
+
+  if (step === 'two_factor') {
+    return (
+      <AuthLayout title="Two-factor sign-in" description="Enter the 6-digit code from your authenticator app.">
+        <TwoFactorChallengeForm onSignedIn={goToApp} onExpired={backToPassword} onBack={() => backToPassword()} />
+      </AuthLayout>
+    )
+  }
 
   return (
     <AuthLayout

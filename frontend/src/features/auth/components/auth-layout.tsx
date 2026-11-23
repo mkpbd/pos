@@ -3,7 +3,20 @@ import { StoreIcon } from 'lucide-react'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function AuthLayout({ title, description, children, footer }: { title: string; description?: string; children: ReactNode; footer?: ReactNode }) {
+export function AuthLayout({
+  title,
+  description,
+  children,
+  footer,
+  actions,
+}: {
+  title: string
+  description?: ReactNode
+  children: ReactNode
+  footer?: ReactNode
+  /** Extra header controls next to the theme toggle (e.g. Sign out on the two-factor setup screen). */
+  actions?: ReactNode
+}) {
   return (
     <div className="flex min-h-svh flex-col bg-canvas">
       <header className="flex items-center justify-between bg-topbar p-4 text-topbar-foreground [&_[data-slot=button]:hover]:bg-topbar-accent [&_[data-slot=button]:hover]:text-white [&_[data-slot=button][aria-expanded=true]]:bg-topbar-accent">
@@ -11,7 +24,10 @@ export function AuthLayout({ title, description, children, footer }: { title: st
           <StoreIcon className="size-5" aria-hidden />
           Enterprise POS
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          {actions}
+          <ThemeToggle />
+        </div>
       </header>
       <main className="flex flex-1 items-start justify-center px-4 pt-8 pb-16 sm:pt-16">
         <Card className="w-full max-w-md">

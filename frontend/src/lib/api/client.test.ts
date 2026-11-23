@@ -1,8 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
-import { api, ApiError } from '@/lib/api/client'
+import { api, ApiError, onApiError } from '@/lib/api/client'
 import { mockFetchJson } from '@/test/utils'
 
 describe('api client', () => {
+  it('tells error listeners about every failed envelope until they unsubscribe (G1a)', async () => {
+    const listener = vi.fn()
+    const unsubscribe = onApiError(listener)
+    mockFetchJson({ success: false, error: { code: 'TWO_FACTOR_SETUP_REQUIRED', message: 'Set it up.', details: {} }, meta: { request_id: null } }, { status: 403 })
+
+    await expect(api.get('/users')).rejects.toBeInstanceOf(ApiError)
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener.mock.calls[0]?.[0]).toMatchObject({ status: 403, code: 'TWO_FACTOR_SETUP_REQUIRED' })
+
+    unsubscribe()
+    await expect(api.get('/users')).rejects.toBeInstanceOf(ApiError)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
   it('returns the success envelope and builds the versioned URL with query params', async () => {
     const fetchMock = mockFetchJson({ success: true, data: { id: 1 }, meta: { request_id: 'r-1' } })
 

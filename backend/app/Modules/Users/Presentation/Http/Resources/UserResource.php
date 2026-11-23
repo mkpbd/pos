@@ -21,6 +21,10 @@ class UserResource extends JsonResource
             'status' => $this->status->value,
             'is_platform_admin' => $this->is_platform_admin,
             'last_login_at' => $this->last_login_at?->toIso8601String(),
+            // G1a: sign-in security (locked_until is null unless the account is locked now).
+            'two_factor_enabled' => $this->hasTwoFactorEnabled(),
+            'is_locked' => $this->isLocked(),
+            'locked_until' => $this->isLocked() ? $this->locked_until->toIso8601String() : null,
             'roles' => $this->whenLoaded('roles', fn () => $this->roles->map(fn ($role) => [
                 'id' => $role->id,
                 'name' => $role->name,

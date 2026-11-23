@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
 import { deviceSummary } from '@/features/audit/device'
+import { failureReasonLabel } from '@/features/audit/failure-reasons'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
 
@@ -26,7 +27,31 @@ describe('deviceSummary', () => {
   })
 })
 
+describe('failureReasonLabel', () => {
+  it('words the G1a reasons and falls back to the code in words', () => {
+    expect(failureReasonLabel('invalid_two_factor')).toBe('Wrong two-factor code')
+    expect(failureReasonLabel('account_locked')).toBe('Account locked')
+    expect(failureReasonLabel('invalid_credentials')).toBe('Invalid credentials')
+    expect(failureReasonLabel(null)).toBe('Failed')
+  })
+})
+
 describe('SignInsPage (Q1 §6)', () => {
+  it('labels two-factor and lockout failures (G1a)', async () => {
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser()),
+      'GET /login-activities': paged([
+        activity({ id: 'la-3', succeeded: false, failure_reason: 'invalid_two_factor' }),
+        activity({ id: 'la-4', succeeded: false, failure_reason: 'account_locked' }),
+      ]),
+    })
+    renderRoutes(routes, '/audit-log/sign-ins')
+
+    const rows = within(await screen.findByRole('table', { name: 'Sign-ins' })).getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('Wrong two-factor code')
+    expect(rows[2]).toHaveTextContent('Account locked')
+  })
+
   it('lists the organization’s sign-ins with filters', async () => {
     const user = userEvent.setup()
     const queries: URLSearchParams[] = []

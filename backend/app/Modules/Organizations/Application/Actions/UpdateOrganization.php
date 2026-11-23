@@ -50,6 +50,8 @@ class UpdateOrganization
         $values = $organization->only(self::AUDITED);
         $values['tax_mode'] = $organization->tax_mode->value;
         $values['status'] = $organization->status->value;
+        // G1a: the two-factor policy as its own audited value (absent = optional), old → new.
+        $values['two_factor_policy'] = $organization->settings['two_factor_policy'] ?? Organization::TWO_FACTOR_OPTIONAL;
 
         return $values;
     }

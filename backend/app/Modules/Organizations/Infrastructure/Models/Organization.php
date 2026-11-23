@@ -33,6 +33,11 @@ class Organization extends Model
     /** @use HasFactory<OrganizationFactory> */
     use ChangesStorefrontContent, HasFactory, HasUuids, TracksAuthor;
 
+    /** G1a: `settings.two_factor_policy` — who must use two-factor sign-in. */
+    public const TWO_FACTOR_OPTIONAL = 'optional';
+
+    public const TWO_FACTOR_POLICIES = [self::TWO_FACTOR_OPTIONAL, 'admins', 'everyone'];
+
     protected $attributes = [
         'settings' => '{}',
         'status' => 'active',

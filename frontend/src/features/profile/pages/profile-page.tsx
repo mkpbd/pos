@@ -12,8 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { failureReasonLabel } from '@/features/audit/failure-reasons'
 import { changePasswordSchema, type ChangePasswordValues } from '@/features/auth/schemas'
 import { useAuth } from '@/features/auth/use-auth'
+import { TwoFactorCard } from '@/features/profile/components/two-factor-card'
 import { useChangePasswordMutation, useDeviceTokensQuery, useMyLoginActivityQuery, useRevokeTokenMutation } from '@/features/profile/api'
 import { handleFormError } from '@/lib/forms'
 
@@ -144,7 +146,7 @@ function LoginActivityCard() {
                     <TableRow key={a.id}>
                       <TableCell className="whitespace-nowrap text-sm">{new Date(a.created_at).toLocaleString()}</TableCell>
                       <TableCell>
-                        {a.succeeded ? <Badge variant="success">Success</Badge> : <Badge variant="destructive">{a.failure_reason?.replaceAll('_', ' ') ?? 'Failed'}</Badge>}
+                        {a.succeeded ? <Badge variant="success">Success</Badge> : <Badge variant="destructive">{failureReasonLabel(a.failure_reason)}</Badge>}
                       </TableCell>
                       <TableCell className="text-sm">{a.channel === 'session' ? 'Web' : 'Device'}</TableCell>
                       <TableCell className="hidden font-mono text-xs md:table-cell">{a.ip_address ?? '—'}</TableCell>
@@ -169,6 +171,7 @@ export function ProfilePage() {
       <PageHeader title="Profile & security" description={`${me.user.name} · ${me.user.email}`} />
       <div className="grid gap-6 lg:grid-cols-2">
         <ChangePasswordCard />
+        <TwoFactorCard />
         <DevicesCard />
         <LoginActivityCard />
       </div>

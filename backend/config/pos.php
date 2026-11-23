@@ -45,4 +45,23 @@ return [
     // Shopper questions about products per hour per visitor IP (P1b).
     'question_rate_limit' => (int) env('POS_QUESTION_RATE_LIMIT', 5),
 
+    /*
+    | G1a: staff account lockout. After `max_attempts` failed sign-ins in a row (wrong password or
+    | wrong two-factor code) the account is locked for `minutes`; the user is e-mailed. A successful
+    | sign-in, an e-mailed password reset or an administrator's unlock clears it.
+    */
+    'lockout' => [
+        'max_attempts' => (int) env('POS_LOCKOUT_MAX_ATTEMPTS', 10),
+        'minutes' => (int) env('POS_LOCKOUT_MINUTES', 15),
+    ],
+
+    /*
+    | G1a: security headers. HSTS (`Strict-Transport-Security: max-age=31536000; includeSubDomains`)
+    | is sent on HTTPS requests only. Turn it off (POS_HSTS=false) when a subdomain of the host must
+    | still be reachable over plain HTTP — browsers would refuse it for a year.
+    */
+    'security' => [
+        'hsts' => (bool) env('POS_HSTS', true),
+    ],
+
 ];

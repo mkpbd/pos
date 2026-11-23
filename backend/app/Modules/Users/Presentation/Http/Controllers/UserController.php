@@ -2,6 +2,7 @@
 
 namespace App\Modules\Users\Presentation\Http\Controllers;
 
+use App\Modules\Authentication\Application\Actions\AdministerSignIn;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
@@ -72,5 +73,33 @@ class UserController
         $user = $updateUser($user, $request->validated(), $actor);
 
         return ApiResponse::success(new UserResource($user->load(['roles', 'branchMemberships'])));
+    }
+
+    /**
+     * Unlock a user
+     *
+     * G1a: clears a sign-in lockout (after many failed sign-ins) and the failure count.
+     */
+    public function unlock(Request $request, User $user, AdministerSignIn $administer): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return ApiResponse::success(new UserResource($administer->unlock($user, $actor)->load(['roles', 'branchMemberships'])));
+    }
+
+    /**
+     * Reset a user's two-factor sign-in
+     *
+     * G1a: for a lost phone — removes the user's authenticator and recovery codes (they are
+     * e-mailed). Not on yourself (`CANNOT_RESET_OWN_TWO_FACTOR`), not on more powerful users
+     * (`PRIVILEGE_ESCALATION`).
+     */
+    public function resetTwoFactor(Request $request, User $user, AdministerSignIn $administer): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return ApiResponse::success(new UserResource($administer->resetTwoFactor($user, $actor)->load(['roles', 'branchMemberships'])));
     }
 }

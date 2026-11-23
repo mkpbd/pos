@@ -2,15 +2,23 @@
 
 namespace App\Modules\Authentication;
 
+use App\Modules\Authentication\Application\Services\TwoFactorPolicy;
+use App\Modules\Shared\Application\Contracts\TwoFactorOverview;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Validation\Rules\Password;
 
 /**
- * Login/logout (SPA sessions and device tokens), registration, password flows, login activity.
+ * Login/logout (SPA sessions and device tokens), registration, password flows, login activity,
+ * two-factor sign-in and account lockout (G1a).
  */
 class AuthenticationServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(TwoFactorOverview::class, TwoFactorPolicy::class);
+    }
+
     public function boot(): void
     {
         parent::boot();

@@ -24,4 +24,9 @@ interface OrganizationDirectory
      * @return array{id: string, name: string, slug: string, base_currency: string, timezone: string, tax_mode: string, status: string, invoice_prefix: ?string, receipt_header: ?string, receipt_footer: ?string, legal_name: ?string, tax_number: ?string, email: ?string, phone: ?string, address: ?string}|null
      */
     public function summary(string $organizationId): ?array;
+
+    /**
+     * G1a: who must use two-factor sign-in — `optional` (default), `admins` or `everyone`.
+     */
+    public function twoFactorPolicy(string $organizationId): string;
 }

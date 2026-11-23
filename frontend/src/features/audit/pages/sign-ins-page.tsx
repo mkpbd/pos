@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useLoginActivitiesQuery } from '@/features/audit/api'
 import { deviceSummary } from '@/features/audit/device'
+import { failureReasonLabel } from '@/features/audit/failure-reasons'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { AUDIT_TABS } from '@/features/inventory/sections'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -21,12 +22,6 @@ const RESULTS: { value: Result; label: string }[] = [
   { value: 'succeeded', label: 'Successful' },
   { value: 'failed', label: 'Failed' },
 ]
-
-function failureLabel(reason: string | null): string {
-  if (!reason) return 'Failed'
-  const text = reason.replaceAll('_', ' ')
-  return text.charAt(0).toUpperCase() + text.slice(1)
-}
 
 /** /audit-log/sign-ins — every sign-in attempt in the organization (GET /login-activities, audit.view). */
 export function SignInsPage() {
@@ -89,7 +84,7 @@ export function SignInsPage() {
                     <TableCell className="whitespace-nowrap text-sm">{new Date(a.created_at).toLocaleString()}</TableCell>
                     <TableCell className="text-sm break-all">{a.email ?? '—'}</TableCell>
                     <TableCell>
-                      {a.succeeded ? <Badge variant="success">Signed in</Badge> : <Badge variant="destructive">{failureLabel(a.failure_reason)}</Badge>}
+                      {a.succeeded ? <Badge variant="success">Signed in</Badge> : <Badge variant="destructive">{failureReasonLabel(a.failure_reason)}</Badge>}
                     </TableCell>
                     <TableCell className="hidden text-sm md:table-cell" title={a.user_agent ?? undefined}>
                       {deviceSummary(a.user_agent)}

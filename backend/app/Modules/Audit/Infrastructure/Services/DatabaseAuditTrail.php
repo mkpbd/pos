@@ -13,7 +13,11 @@ use Illuminate\Support\Facades\Context;
 class DatabaseAuditTrail implements AuditTrail
 {
     /** Attribute names that must never be written to the audit log. */
-    private const REDACTED = ['password', 'remember_token', 'token', 'current_password', 'password_confirmation'];
+    private const REDACTED = [
+        'password', 'remember_token', 'token', 'current_password', 'password_confirmation',
+        // G1a: two-factor secrets never reach the audit log.
+        'two_factor_secret', 'two_factor_recovery_codes', 'recovery_codes', 'recovery_code',
+    ];
 
     public function __construct(
         private readonly TenantContext $tenant,

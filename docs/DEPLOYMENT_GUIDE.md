@@ -47,6 +47,8 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Store builder upgrade (B15):** `php artisan migrate` (page insight tables, `carts.builder_attribution`). The scheduler runs `marketing:prune-page-insights` daily (90-day retention, 2-day visitor hashes). `POST /api/v1/store/insights/events` receives anonymous beacons from shoppers' browsers (60/min per IP, 64 KB): keep it reachable on every store host and out of any cache; if a CDN/WAF sits in front, allow `text/plain` and `application/json` POST bodies there. No cookies are set and nothing personal is stored, so no consent banner change is needed for it; the storefront honours Do-Not-Track and Global Privacy Control.
 
+**Sign-in security (G1a):** `php artisan migrate` (two-factor and lockout columns on `users`). New settings: `POS_LOCKOUT_MAX_ATTEMPTS` (10), `POS_LOCKOUT_MINUTES` (15), `POS_HSTS` (true — set false only if a subdomain must stay on plain HTTP, because the header covers subdomains). The lock and two-factor e-mails are queued: a mailer and a queue worker are needed. **`APP_KEY` now also protects two-factor secrets and recovery codes — rotating it turns off everyone's two-factor sign-in** (each user sets it up again; with a required policy they are sent to setup at the next sign-in). Laravel now sends the security headers itself; add the admin block under *Security checklist* to Nginx.
+
 **Quick fixes (Q1):** `php artisan migrate` (stock count quantities on adjustment lines; `promotion_redemptions.released_at` with an updated append-only trigger). **Public sign-up is now off by default** — set `POS_REGISTRATION_ENABLED=true` only on an install where anyone may create an organization (and put a CAPTCHA / rate limit in front of it). The legacy `PUT /api/v1/storefront/theme` is removed (405); anything that called it must save the theme draft and publish. `php artisan pos:permissions:sync` is harmless (only an unused role pattern was removed).
 
 **Store builder upgrade (B16):** `php artisan migrate` (`builder_comments`, `builder_edit_sessions`, `storefront_redirects`). Who is on a page and the one-editor-at-a-time lease are kept in the cache: production needs a cache store shared by every app server that supports atomic locks — Redis (recommended) or `database`; `file` only works on a single server, and `array` loses everything between requests. Redirects are answered by the Laravel storefront shell (no Nginx rule needed); `GET /api/v1/store/redirects/resolve` is public and cacheable for 60 s. Imports accept files up to 30 MB: keep PHP `upload_max_filesize` / `post_max_size` and Nginx `client_max_body_size` at least that large for the admin host.
@@ -329,9 +331,21 @@ npm run build                   # publish frontend/dist
 ## Security checklist
 
 - `APP_DEBUG=false`; Scramble docs disabled or gated (`viewApiDocs`).
-- HTTPS only, HSTS, secure + HttpOnly + SameSite=Lax cookies.
+- HTTPS only, HSTS, secure + HttpOnly + SameSite=Lax cookies. Laravel sends HSTS on HTTPS responses (`POS_HSTS`), plus nosniff, referrer and permissions policy, and framing rules (API: `DENY`; storefront HTML: framed only by the back office).
+- **Admin app headers (G1a)** — the back office (`frontend/dist`) is served by Nginx, so add these to the `location = /admin/builder-canvas` and `location /admin/` blocks (an `add_header` inside a location replaces the server-level ones, so repeat any you rely on):
+
+  ```nginx
+  add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-aATtmmR3yaaFhUvWJ3fsT2ob01Z1erl5iZgfzz5pVoY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" always;
+  add_header X-Frame-Options "SAMEORIGIN" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+  ```
+
+  Why: the `sha256-…` allows the one inline script in `index.html` (applies the light/dark theme before the first paint; a test keeps this hash in step with the file — change both together). Inline `<style>` is needed (dialogs, print pages, the builder canvas, uploaded fonts). `font-src data:` for small inlined fonts; `img-src https:` for pictures from the media disk or CDN and external images in rich text. `frame-src`: the builder canvas plus YouTube / Vimeo / Google Maps embeds. If `MEDIA_DISK` is an S3/CDN bucket, add its origin to `font-src` (uploaded store fonts). Try it first as `Content-Security-Policy-Report-Only` and open the dashboard, POS, the page builder and a report.
+- **Two-factor sign-in (G1a):** ask owners to set *Organization → Security → Two-factor sign-in* to *Required for admins* (or everyone); keep a second admin who can reset a colleague's two-factor if a phone is lost.
 - Upload storage outside the web root; images served through signed/authorized routes.
-- Rate limiters enabled; fail2ban or WAF on login endpoints.
+- Rate limiters enabled; account lockout (G1a, `POS_LOCKOUT_*`); fail2ban or WAF on login endpoints (`/api/v1/auth/login`, `/auth/two-factor-challenge`, `/auth/tokens`).
 - Behind a load balancer or reverse proxy: `TRUSTED_PROXIES` lists exactly its addresses (or `*` only when PHP cannot be reached around it), so client IPs and HTTPS are taken from trusted headers only. `SESSION_DOMAIN` unset (or a parent covering every host).
 - Log shipping with `request_id` correlation; alerts on 5xx rate and queue backlog.
 - AI (Phase 8): `AI_API_KEY` only in the secret store; outbound HTTPS limited to `api.anthropic.com`; a monthly token budget set (`AI_MONTHLY_TOKEN_BUDGET` or per organization); alert on `ai_requests` rows with `status = failed` (`provider_auth` = a bad or revoked key).

@@ -9,20 +9,26 @@ use App\Modules\Organizations\Presentation\Http\Resources\OrganizationResource;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * The organization of the current tenant context.
+ *
+ * G1a: for users who may edit it (organization.update), the response carries
+ * `two_factor_summary` {users, enabled, required_missing} next to `settings.two_factor_policy`.
  */
 class CurrentOrganizationController
 {
-    public function show(TenantContext $tenant): JsonResponse
+    public function show(Request $request, TenantContext $tenant): JsonResponse
     {
-        return ApiResponse::success(new OrganizationResource($this->current($tenant)));
+        return ApiResponse::success((new OrganizationResource($this->current($tenant)))
+            ->withSecuritySummary($request->user()->can('organization.update')));
     }
 
     public function update(UpdateOrganizationRequest $request, TenantContext $tenant, UpdateOrganization $update): JsonResponse
     {
-        return ApiResponse::success(new OrganizationResource($update($this->current($tenant), $request->validated())));
+        return ApiResponse::success((new OrganizationResource($update($this->current($tenant), $request->validated())))
+            ->withSecuritySummary());
     }
 
     private function current(TenantContext $tenant): Organization

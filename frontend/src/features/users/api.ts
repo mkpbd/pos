@@ -14,6 +14,11 @@ export type ManagedUser = {
   roles: { id: string; name: string; system_key: string | null }[]
   branch_ids: string[]
   created_at: string
+  /** G1a: two-factor sign-in is on for this user. */
+  two_factor_enabled?: boolean
+  /** G1a: sign-in blocked after too many failed attempts, until this time. */
+  locked_until?: string | null
+  is_locked?: boolean
 }
 
 export type UserListParams = { page: number; search?: string; status?: UserStatus; role_id?: string; branch_id?: string }
@@ -51,5 +56,25 @@ export function useSaveUserMutation() {
       void queryClient.invalidateQueries({ queryKey: userKeys.all })
       void queryClient.invalidateQueries({ queryKey: ['roles'] })
     },
+  })
+}
+
+/** POST /users/{id}/unlock (G1a, users.manage): lifts a sign-in lockout and resets the failed count. */
+export function useUnlockUserMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.post<unknown>(`/users/${id}/unlock`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+  })
+}
+
+/** POST /users/{id}/two-factor/reset (G1a, users.manage): for a lost phone — the user sets it up again. */
+export function useResetUserTwoFactorMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.post<unknown>(`/users/${id}/two-factor/reset`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
   })
 }

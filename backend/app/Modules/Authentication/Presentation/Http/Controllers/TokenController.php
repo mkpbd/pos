@@ -2,8 +2,7 @@
 
 namespace App\Modules\Authentication\Presentation\Http\Controllers;
 
-use App\Modules\Authentication\Application\Actions\IssueDeviceToken;
-use App\Modules\Authentication\Application\Actions\VerifyCredentials;
+use App\Modules\Authentication\Application\Actions\DeviceSignIn;
 use App\Modules\Authentication\Presentation\Http\Requests\IssueTokenRequest;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
@@ -22,13 +21,21 @@ class TokenController
      * Issue a device token
      *
      * The plain-text token is returned once; send it as `Authorization: Bearer <token>`.
+     * G1a: accounts with two-factor sign-in add `code` or `recovery_code` (missing: 422
+     * `TWO_FACTOR_REQUIRED`; wrong: 422 `INVALID_TWO_FACTOR_CODE`); accounts the organization
+     * requires it from who have not set it up get 403 `TWO_FACTOR_SETUP_REQUIRED`.
      *
      * @unauthenticated
      */
-    public function store(IssueTokenRequest $request, VerifyCredentials $verify, IssueDeviceToken $issue): JsonResponse
+    public function store(IssueTokenRequest $request, DeviceSignIn $signIn): JsonResponse
     {
-        $user = $verify($request->validated('email'), $request->validated('password'), 'token');
-        $token = $issue($user, $request->validated('device_name'));
+        $token = $signIn(
+            $request->validated('email'),
+            $request->validated('password'),
+            $request->validated('device_name'),
+            $request->validated('code'),
+            $request->validated('recovery_code'),
+        );
 
         return ApiResponse::created([
             'token' => $token->plainTextToken,

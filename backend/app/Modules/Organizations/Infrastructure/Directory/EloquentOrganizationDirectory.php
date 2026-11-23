@@ -18,6 +18,13 @@ class EloquentOrganizationDirectory implements OrganizationDirectory
         return Organization::query()->where('status', OrganizationStatus::Active->value)->orderBy('created_at')->orderBy('id')->pluck('id')->all();
     }
 
+    public function twoFactorPolicy(string $organizationId): string
+    {
+        $policy = Organization::query()->find($organizationId)?->settings['two_factor_policy'] ?? null;
+
+        return in_array($policy, Organization::TWO_FACTOR_POLICIES, true) ? $policy : Organization::TWO_FACTOR_OPTIONAL;
+    }
+
     public function summary(string $organizationId): ?array
     {
         $organization = Organization::query()->find($organizationId);

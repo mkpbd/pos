@@ -2,6 +2,7 @@
 
 namespace App\Modules\Authentication\Presentation\Http\Resources;
 
+use App\Modules\Authentication\Application\Services\TwoFactorPolicy;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Authorization\PermissionRegistry;
@@ -27,6 +28,8 @@ class CurrentUserResource extends JsonResource
             : array_keys($this->permissionNames());
         sort($permissions);
 
+        $twoFactorRequired = app(TwoFactorPolicy::class)->requiredFor($this->resource);
+
         return [
             'user' => [
                 'id' => $this->id,
@@ -43,6 +46,13 @@ class CurrentUserResource extends JsonResource
                 'system_key' => $role->system_key?->value,
             ])->values(),
             'permissions' => $permissions,
+            // G1a: `setup_required` — the organization requires two-factor sign-in and it is not set up:
+            // every other staff route answers 403 TWO_FACTOR_SETUP_REQUIRED until it is.
+            'two_factor' => [
+                'enabled' => $this->hasTwoFactorEnabled(),
+                'required' => $twoFactorRequired,
+                'setup_required' => $twoFactorRequired && ! $this->hasTwoFactorEnabled(),
+            ],
             // Phase 8: whether AI summaries / the assistant are on for the organization (app + organization switch).
             'ai_enabled' => app(AiFeatures::class)->enabledFor($this->organization_id),
             'branches' => $organization

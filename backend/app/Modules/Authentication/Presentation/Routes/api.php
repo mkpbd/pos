@@ -6,6 +6,7 @@ use App\Modules\Authentication\Presentation\Http\Controllers\PasswordController;
 use App\Modules\Authentication\Presentation\Http\Controllers\RegistrationController;
 use App\Modules\Authentication\Presentation\Http\Controllers\SessionController;
 use App\Modules\Authentication\Presentation\Http\Controllers\TokenController;
+use App\Modules\Authentication\Presentation\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -14,6 +15,8 @@ Route::prefix('auth')->group(function () {
 
     Route::middleware('throttle:auth')->group(function () {
         Route::post('login', [SessionController::class, 'login'])->name('auth.login');
+        // G1a: second step of a web sign-in with two-factor (pending challenge in the session).
+        Route::post('two-factor-challenge', [SessionController::class, 'challenge'])->name('auth.two-factor-challenge');
         Route::post('register', RegistrationController::class)->name('auth.register');
         Route::post('tokens', [TokenController::class, 'store'])->name('auth.tokens.store');
         Route::post('forgot-password', [PasswordController::class, 'forgot'])->name('auth.password.forgot');
@@ -27,6 +30,15 @@ Route::prefix('auth')->group(function () {
         Route::get('tokens', [TokenController::class, 'index'])->name('auth.tokens.index');
         Route::delete('tokens/{tokenId}', [TokenController::class, 'destroy'])->whereNumber('tokenId')->name('auth.tokens.destroy');
         Route::get('login-activity', [LoginActivityController::class, 'mine'])->name('auth.login-activity');
+
+        // G1a: own two-factor sign-in. `auth.two-factor.*` stays reachable while setup is required.
+        Route::get('two-factor', [TwoFactorController::class, 'show'])->name('auth.two-factor.show');
+        Route::middleware('throttle:auth')->group(function () {
+            Route::post('two-factor/setup', [TwoFactorController::class, 'setup'])->name('auth.two-factor.setup');
+            Route::post('two-factor/confirm', [TwoFactorController::class, 'confirm'])->name('auth.two-factor.confirm');
+            Route::post('two-factor/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes'])->name('auth.two-factor.recovery-codes');
+            Route::delete('two-factor', [TwoFactorController::class, 'destroy'])->name('auth.two-factor.destroy');
+        });
     });
 });
 

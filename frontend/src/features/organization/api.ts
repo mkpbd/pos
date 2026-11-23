@@ -15,8 +15,21 @@ export type Organization = {
   timezone: string
   tax_mode: 'exclusive' | 'inclusive'
   status: 'active' | 'suspended'
-  settings: { receipt_header?: string | null; receipt_footer?: string | null; invoice_prefix?: string | null }
+  settings: {
+    receipt_header?: string | null
+    receipt_footer?: string | null
+    invoice_prefix?: string | null
+    /** G1a: who must use two-factor sign-in. Absent = optional. */
+    two_factor_policy?: TwoFactorPolicy
+  }
+  /** G1a: two-factor adoption, for users who can change the policy (organization.update). */
+  two_factor_summary?: TwoFactorSummary
 }
+
+export type TwoFactorPolicy = 'optional' | 'admins' | 'everyone'
+
+/** `required_missing`: users the current policy covers who have not set two-factor up yet. */
+export type TwoFactorSummary = { users: number; enabled: number; required_missing: number }
 
 export type OrganizationInput = Partial<Pick<Organization, 'name' | 'legal_name' | 'tax_number' | 'email' | 'phone' | 'address' | 'timezone' | 'tax_mode' | 'settings'>>
 

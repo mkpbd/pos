@@ -3,6 +3,7 @@
 namespace App\Modules\Organizations\Presentation\Http\Requests;
 
 use App\Modules\Organizations\Domain\Enums\TaxMode;
+use App\Modules\Organizations\Infrastructure\Models\Organization;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,10 +22,12 @@ class UpdateOrganizationRequest extends FormRequest
             'tax_mode' => ['sometimes', Rule::enum(TaxMode::class)],
             // Base currency is fixed at creation: changing it would corrupt historical amounts.
             'base_currency' => ['prohibited'],
-            'settings' => ['sometimes', 'array:receipt_header,receipt_footer,invoice_prefix'],
+            'settings' => ['sometimes', 'array:receipt_header,receipt_footer,invoice_prefix,two_factor_policy'],
             'settings.receipt_header' => ['nullable', 'string', 'max:500'],
             'settings.receipt_footer' => ['nullable', 'string', 'max:500'],
             'settings.invoice_prefix' => ['nullable', 'string', 'max:10', 'regex:/^[A-Z0-9\-]*$/'],
+            // G1a: who must use two-factor sign-in.
+            'settings.two_factor_policy' => ['sometimes', 'string', Rule::in(Organization::TWO_FACTOR_POLICIES)],
         ];
     }
 }

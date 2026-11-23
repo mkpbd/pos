@@ -10,6 +10,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('users', [UserController::class, 'store'])->middleware('can:users.manage');
     Route::get('users/{user}', [UserController::class, 'show'])->middleware('can:users.view');
     Route::patch('users/{user}', [UserController::class, 'update'])->middleware('can:users.manage');
+    // G1a: help with another user's sign-in.
+    Route::post('users/{user}/unlock', [UserController::class, 'unlock'])->middleware('can:users.manage');
+    Route::post('users/{user}/two-factor/reset', [UserController::class, 'resetTwoFactor'])->middleware('can:users.manage');
 
     Route::get('roles', [RoleController::class, 'index'])->middleware('can:roles.view');
     Route::post('roles', [RoleController::class, 'store'])->middleware('can:roles.manage');

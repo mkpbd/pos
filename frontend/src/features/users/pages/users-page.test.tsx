@@ -83,4 +83,83 @@ describe('UsersPage', () => {
     expect(within(dialog).getByRole('checkbox', { name: /Cashier/ })).toBeDisabled()
     expect(within(dialog).getByText('You cannot change your own status.')).toBeInTheDocument()
   })
+
+  describe('two-factor and lockout (G1a)', () => {
+    const lockedUntil = new Date(Date.now() + 15 * 60_000).toISOString()
+    const karim: ManagedUser = {
+      ...self, id: 'u-2', name: 'Karim Cashier', email: 'karim@corner.test', roles: [{ id: 'r-3', name: 'Cashier', system_key: 'cashier' }],
+      two_factor_enabled: true, is_locked: true, locked_until: lockedUntil,
+    }
+    const meWithTwoFactor: ManagedUser = { ...self, two_factor_enabled: true, is_locked: false, locked_until: null }
+
+    it('shows 2FA and lock badges, and unlocks after confirming', async () => {
+      const user = userEvent.setup()
+      document.cookie = 'XSRF-TOKEN=t'
+      let unlocked = false
+      const fetchMock = mockApi({
+        'GET /auth/me': ok(makeCurrentUser()),
+        'GET /users': () => page([meWithTwoFactor, unlocked ? { ...karim, is_locked: false, locked_until: null } : karim]),
+        'GET /roles': ok(roles),
+        'POST /users/u-2/unlock': () => {
+          unlocked = true
+          return { status: 204 }
+        },
+      })
+      renderRoutes(routes, '/users')
+
+      const row = (await screen.findByText('Karim Cashier')).closest('tr') as HTMLElement
+      expect(within(row).getByText('2FA')).toBeInTheDocument()
+      expect(within(row).getByText(/^Locked until /)).toBeInTheDocument()
+
+      await user.click(within(row).getByRole('button', { name: 'More actions for Karim Cashier' }))
+      await user.click(await screen.findByRole('menuitem', { name: 'Unlock' }))
+      const confirm = await screen.findByRole('alertdialog', { name: 'Unlock Karim Cashier?' })
+      await user.click(within(confirm).getByRole('button', { name: 'Unlock' }))
+
+      await waitFor(() => expect(within(row).queryByText(/^Locked until /)).not.toBeInTheDocument())
+      expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/users/u-2/unlock') && (init as RequestInit).method === 'POST')).toBe(true)
+    })
+
+    it('resets another user’s two-factor, never your own', async () => {
+      const user = userEvent.setup()
+      document.cookie = 'XSRF-TOKEN=t'
+      let reset = false
+      mockApi({
+        'GET /auth/me': ok(makeCurrentUser()),
+        'GET /users': () => page([meWithTwoFactor, { ...karim, is_locked: false, locked_until: null, two_factor_enabled: !reset }]),
+        'GET /roles': ok(roles),
+        'POST /users/u-2/two-factor/reset': () => {
+          reset = true
+          return { status: 204 }
+        },
+      })
+      renderRoutes(routes, '/users')
+
+      const selfRow = (await screen.findByText('(you)')).closest('tr') as HTMLElement
+      expect(within(selfRow).getByText('2FA')).toBeInTheDocument()
+      expect(within(selfRow).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument()
+
+      const row = screen.getByText('Karim Cashier').closest('tr') as HTMLElement
+      await user.click(within(row).getByRole('button', { name: 'More actions for Karim Cashier' }))
+      expect(screen.queryByRole('menuitem', { name: 'Unlock' })).not.toBeInTheDocument()
+      await user.click(await screen.findByRole('menuitem', { name: 'Reset two-factor' }))
+      const confirm = await screen.findByRole('alertdialog', { name: 'Reset two-factor sign-in for Karim Cashier?' })
+      await user.click(within(confirm).getByRole('button', { name: 'Reset two-factor' }))
+
+      await waitFor(() => expect(within(row).queryByText('2FA')).not.toBeInTheDocument())
+      expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument()
+    })
+
+    it('offers no actions without users.manage', async () => {
+      mockApi({
+        'GET /auth/me': ok(makeCurrentUser({ permissions: ['users.view', 'branches.view'] })),
+        'GET /users': page([karim]),
+      })
+      renderRoutes(routes, '/users')
+
+      const row = (await screen.findByText('Karim Cashier')).closest('tr') as HTMLElement
+      expect(within(row).getByText('2FA')).toBeInTheDocument()
+      expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument()
+    })
+  })
 })

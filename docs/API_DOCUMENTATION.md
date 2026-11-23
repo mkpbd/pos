@@ -50,12 +50,14 @@ Clients should branch on `error.code`, not on `message`. Money values are serial
 |------|--------------|---------|
 | 401 | `UNAUTHENTICATED` | No valid session/token. |
 | 403 | `FORBIDDEN` | Authenticated but lacking permission or branch access. |
+| 403 | `TWO_FACTOR_SETUP_REQUIRED` | G1a: the organization requires two-factor sign-in and the user has not set it up — every staff route except `auth/me`, `auth/logout`, `auth/options`, `PUT auth/password` and `auth/two-factor*` (sessions and device tokens). |
 | 404 | `NOT_FOUND` | Unknown route or resource (also returned for resources of other tenants). |
 | 405 | `METHOD_NOT_ALLOWED` | |
 | 409 | `CONFLICT` / `IDEMPOTENCY_KEY_REUSED` / `IDEMPOTENCY_REQUEST_IN_PROGRESS` | State conflict / same key with a different payload / the first request with this key is still running (`Retry-After`). |
 | 428 | `IDEMPOTENCY_KEY_REQUIRED` | Checkout sent without an `Idempotency-Key` header. |
 | 419 | `CSRF_TOKEN_MISMATCH` | SPA must refresh `/sanctum/csrf-cookie`. |
 | 422 | `VALIDATION_FAILED` | Field-level errors in `details`. |
+| 422 | `ACCOUNT_LOCKED` | G1a: too many failed sign-ins; `details.retry_after_seconds`. |
 | 422 | *domain code* | Business rule violation, e.g. `INSUFFICIENT_STOCK`, `CREDIT_LIMIT_EXCEEDED`, `DISCOUNT_NOT_ALLOWED`. Context in `details`. |
 | 400 | `ORGANIZATION_CONTEXT_REQUIRED` | Platform admin called a tenant endpoint without `X-Organization-Id`. |
 | 403 | `ACCOUNT_INACTIVE` / `ORGANIZATION_SUSPENDED` | Credential still valid but the account or tenant is blocked. |
@@ -253,8 +255,9 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET | `/health` | public | — | Dependency status. `200` `status: "ok"` or `503` `status: "degraded"`; no internal details. |
 | POST | `/auth/register` | public | — | Sign-up: provisions organization + main branch/store + built-in roles + admin; starts a session. **Off by default** (Q1): only when `POS_REGISTRATION_ENABLED=true`, else 404. |
 | GET | `/auth/options` | public | — | Q1: `{registration_enabled: bool}` — the SPA shows "Create an account" and the sign-up form only when true. |
-| POST | `/auth/login` | public (SPA) | — | Cookie-session login. Call `GET /sanctum/csrf-cookie` first. Returns the current-user profile. |
-| POST | `/auth/tokens` | public | — | Device token: `{email, password, device_name}` → `{token, token_type, expires_at}` (plain token shown once). |
+| POST | `/auth/login` | public (SPA) | — | Cookie-session login. Call `GET /sanctum/csrf-cookie` first. Returns the current-user profile — or, when the user has two-factor sign-in on (G1a), `{two_factor_required: true}` and no session yet. Locked → 422 `ACCOUNT_LOCKED`. |
+| POST | `/auth/two-factor-challenge` | public (SPA) | — | G1a: `{code}` (6 digits) **or** `{recovery_code}` after a `two_factor_required` login → current-user profile. `TWO_FACTOR_CHALLENGE_EXPIRED` (5 min, or after 5 wrong codes), `INVALID_TWO_FACTOR_CODE`. |
+| POST | `/auth/tokens` | public | — | Device token: `{email, password, device_name}` (+ `code` or `recovery_code` when two-factor is on — G1a) → `{token, token_type, expires_at}` (plain token shown once). |
 | POST | `/auth/forgot-password` | public | — | Always 200; e-mails a link to `{FRONTEND_URL}/reset-password?token=…&email=…`. |
 | POST | `/auth/reset-password` | public | — | `{token, email, password, password_confirmation}`; revokes all sessions/tokens. |
 | GET | `/auth/me` | auth | — | User, organization, roles, effective permissions, accessible branches, `ai_enabled` (Phase 8: AI usable for the organization). |
@@ -263,14 +266,21 @@ Auth column: **public**; **auth** = session or token; **tenant** = auth + organi
 | GET | `/auth/tokens` | auth | — | Own device tokens (`is_current` marks the presented one). |
 | DELETE | `/auth/tokens/{id}` | auth | — | Revoke one of your tokens. |
 | GET | `/auth/login-activity` | auth | — | Own sign-in attempts (paginated). |
+| GET | `/auth/two-factor` | auth | — | G1a: `{enabled, confirmed_at, required, recovery_codes_left, pending_setup}`. |
+| POST | `/auth/two-factor/setup` | auth | — | G1a: `{password}` → `{secret, otpauth_uri}` (unconfirmed until confirm). |
+| POST | `/auth/two-factor/confirm` | auth | — | G1a: `{code}` → `{recovery_codes: [10]}` (shown only here). |
+| POST | `/auth/two-factor/recovery-codes` | auth | — | G1a: `{password}` → 10 new recovery codes; the old ones stop working. |
+| DELETE | `/auth/two-factor` | auth | — | G1a: `{password, code}` (app code or recovery code) → 204. `TWO_FACTOR_REQUIRED_BY_POLICY` when the organization requires it. |
 | GET | `/login-activities` | tenant | `audit.view` | Organization sign-in attempts; `user_id`, `succeeded`, `search`. |
-| GET / PATCH | `/organization` | tenant | `organization.view` / `organization.update` | Profile, `tax_mode`, `timezone`, `settings.{receipt_header, receipt_footer, invoice_prefix}`. `base_currency` is immutable. |
+| GET / PATCH | `/organization` | tenant | `organization.view` / `organization.update` | Profile, `tax_mode`, `timezone`, `settings.{receipt_header, receipt_footer, invoice_prefix, two_factor_policy}`. `base_currency` is immutable. G1a: `two_factor_summary {users, enabled, required_missing}` for `organization.update`. |
 | GET / POST | `/branches` | tenant | `branches.view` / `branches.manage` | Lists only accessible branches; create also creates store `MAIN`. Filters: `is_active`, `search`. |
 | GET / PATCH | `/branches/{id}` | tenant | `branches.view` / `branches.manage` | Deactivating the last active branch → `LAST_ACTIVE_BRANCH`. |
 | GET / POST | `/branches/{id}/stores` | tenant | `branches.view` / `branches.manage` | Stock locations (`type`: `store` \| `warehouse`). |
 | PATCH | `/branches/{id}/stores/{storeId}` | tenant | `branches.manage` | Store must belong to the branch in the URL. |
 | GET / POST | `/users` | tenant | `users.view` / `users.manage` | Filters `status`, `role_id`, `branch_id`, `search`; sort `name`, `email`, `created_at`, `last_login_at`. |
-| GET / PATCH | `/users/{id}` | tenant | `users.view` / `users.manage` | Partial update incl. `password`, `status`, `role_ids`, `branch_ids`. |
+| GET / PATCH | `/users/{id}` | tenant | `users.view` / `users.manage` | Partial update incl. `password`, `status`, `role_ids`, `branch_ids`. G1a: the user adds `two_factor_enabled`, `is_locked`, `locked_until`. |
+| POST | `/users/{id}/unlock` | tenant | `users.manage` | G1a: ends a sign-in lock → the user. |
+| POST | `/users/{id}/two-factor/reset` | tenant | `users.manage` | G1a: turns off a user's two-factor sign-in (lost phone) → the user. Not yourself (`CANNOT_RESET_OWN_TWO_FACTOR`), not a more powerful user (`PRIVILEGE_ESCALATION`). |
 | GET / POST | `/roles` | tenant | `roles.view` / `roles.manage` | Built-in roles first, with `users_count` and `permissions`. |
 | GET / PUT / DELETE | `/roles/{id}` | tenant | `roles.view` / `roles.manage` | Built-in roles are read-only; assigned roles cannot be deleted. |
 | GET | `/permissions` | tenant | `roles.view` | Catalog grouped by module. |
@@ -2484,6 +2494,16 @@ Admin endpoints are under `/storefront/builder` and tenant-scoped; another organ
   - Drafts add `state: unavailable`.
 - **`POST /builder/resolve`** also covers `category_card`, `product_spotlight` and `shop_the_look`. A spotlight product with no online listing → `PRODUCT_UNAVAILABLE`.
 - **Templates:** the `requires` value `products` (shop-the-look templates pick products by source).
+
+**Sign-in security (G1a).**
+- **Two-factor sign-in (TOTP):** authenticator-app codes (RFC 6238: SHA-1, 6 digits, 30 s, ±1 step; a code's time step can be used once) and 10 single-use recovery codes (`xxxxx-xxxxx`; case, spaces and the dash are ignored). The secret is stored encrypted with `APP_KEY`, recovery codes as HMAC-SHA256 keyed with `APP_KEY` — **rotating `APP_KEY` turns off everyone's two-factor sign-in** (users must set it up again; an admin resets it). Secrets and codes never appear in other responses, logs or the audit log.
+- **Login:** `POST /auth/login` → `{two_factor_required: true}` for users with two-factor on; the session holds a 5-minute challenge; `POST /auth/two-factor-challenge` finishes the sign-in. Five wrong codes end the challenge. Audit `auth.login` adds `two_factor: totp | recovery_code`; a used recovery code writes `auth.recovery_code_used {remaining}`. Device tokens take `code` / `recovery_code` in the same request (`TWO_FACTOR_REQUIRED` when missing).
+- **Policy:** `organizations.settings.two_factor_policy` = `optional` (default) | `admins` (users holding `users.manage`, `roles.manage` or `organization.update`) | `everyone`. Platform admins are never forced. A user the policy covers who has not set it up can sign in but gets **403 `TWO_FACTOR_SETUP_REQUIRED`** on every staff route except `auth/me`, `auth/logout`, `auth/options`, `PUT auth/password` and `auth/two-factor*` (device tokens too). `GET /auth/me` adds `two_factor: {enabled, required, setup_required}`.
+- **Lockout:** each wrong password for an existing account and each wrong two-factor code counts; at `POS_LOCKOUT_MAX_ATTEMPTS` (10) the account is locked for `POS_LOCKOUT_MINUTES` (15): 422 `ACCOUNT_LOCKED` (`details.retry_after_seconds`) even with the right password, audit `auth.account_locked`, and an e-mail to the user. A successful sign-in resets the count; a password reset by e-mail and `POST /users/{id}/unlock` end the lock. Sign-in history adds the reasons `invalid_two_factor` and `account_locked`.
+- **Audit actions:** `auth.two_factor_enabled`, `auth.two_factor_disabled`, `auth.recovery_codes_regenerated`, `auth.recovery_code_used`, `auth.account_locked`, `user.unlocked`, `user.two_factor_reset`; turning on/off/reset also e-mails the user.
+- **Security headers** (every Laravel response, never overwriting a route's own): `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`, HSTS on HTTPS (`POS_HSTS`). API: `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. Storefront and other HTML: `Content-Security-Policy: frame-ancestors 'self' <FRONTEND_URL origin>`.
+- **Rate limit `auth`:** requests without an e-mail (the challenge, signed-in two-factor and password changes) now count per account (the pending or signed-in user) + IP instead of one bucket per IP.
+- **Upgrade:** `php artisan migrate` (two-factor and lockout columns on `users`).
 
 **Quick fixes from the feature gap audit (Q1).**
 - **Stock count:** `POST /inventory/adjustments` with `reason: "count"` — each line sends either `quantity` (signed, as before) or **`counted_quantity`** (≥ 0, ≤ 3 decimals; whole units for non-decimal products; only with reason count, else 422). The server locks the stock rows, posts `counted − on hand`, and stores `counted_quantity` / `system_quantity` on the line (null on signed lines; CHECK: both set together, `quantity = counted − system`). Batch-tracked products are counted per batch (`batch_id`, or `batch_number` [+ `expires_on`] for a batch found on the shelf — created); for count the same product may appear once per batch. Lines equal to stock are skipped; all equal → 422 `NOTHING_TO_ADJUST`. Audit adds `counted_lines`, `unchanged_lines`.

@@ -29,10 +29,16 @@ use Laravel\Sanctum\HasApiTokens;
  * @property bool $is_platform_admin
  * @property UserStatus $status
  * @property ?Carbon $last_login_at
+ * @property ?string $two_factor_secret
+ * @property ?Carbon $two_factor_confirmed_at
+ * @property ?list<string> $two_factor_recovery_codes
+ * @property ?int $two_factor_last_step
+ * @property int $failed_login_count
+ * @property ?Carbon $locked_until
  */
 #[UseFactory(UserFactory::class)]
 #[Fillable(['organization_id', 'name', 'email', 'phone', 'password', 'status'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_last_step'])]
 class User extends Authenticatable implements TenantUser
 {
     /** @use HasFactory<UserFactory> */
@@ -57,7 +63,25 @@ class User extends Authenticatable implements TenantUser
             'password' => 'hashed',
             'is_platform_admin' => 'boolean',
             'status' => UserStatus::class,
+            // G1a: two-factor sign-in and lockout.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_last_step' => 'integer',
+            'failed_login_count' => 'integer',
+            'locked_until' => 'datetime',
         ];
+    }
+
+    /** Two-factor sign-in is on once the first authenticator code was confirmed. */
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && ($this->getAttributes()['two_factor_secret'] ?? null) !== null;
+    }
+
+    public function isLocked(): bool
+    {
+        return $this->locked_until !== null && $this->locked_until->isFuture();
     }
 
     /**

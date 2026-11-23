@@ -7,6 +7,7 @@ export const authKeys = {
   tokens: ['auth', 'tokens'] as const,
   loginActivity: (page: number) => ['auth', 'login-activity', page] as const,
   options: ['auth', 'options'] as const,
+  twoFactor: ['auth', 'two-factor'] as const,
 }
 
 export type AuthOptions = { registration_enabled: boolean }
@@ -42,13 +43,41 @@ export function useCurrentUserQuery() {
 
 export type LoginInput = { email: string; password: string; remember: boolean }
 
+/** G1a: the password was right but the account has two-factor sign-in on — a code is needed next. */
+export type TwoFactorChallenge = { two_factor_required: true }
+
+export function isTwoFactorChallenge(value: CurrentUser | TwoFactorChallenge): value is TwoFactorChallenge {
+  return 'two_factor_required' in value && value.two_factor_required === true
+}
+
 export function useLoginMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (input: LoginInput) => {
       await ensureCsrfCookie()
-      return (await api.post<CurrentUser>('/auth/login', input)).data
+      return (await api.post<CurrentUser | TwoFactorChallenge>('/auth/login', input)).data
+    },
+    onSuccess: (result) => {
+      // A pending two-factor challenge is not a session yet.
+      if (isTwoFactorChallenge(result)) return
+      queryClient.clear()
+      queryClient.setQueryData(authKeys.me, result)
+    },
+  })
+}
+
+/** Exactly one of the two: a 6-digit authenticator code or an unused recovery code. */
+export type TwoFactorChallengeInput = { code: string } | { recovery_code: string }
+
+/** POST /auth/two-factor-challenge: second sign-in step after `two_factor_required`. */
+export function useTwoFactorChallengeMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: TwoFactorChallengeInput) => {
+      await ensureCsrfCookie()
+      return (await api.post<CurrentUser>('/auth/two-factor-challenge', input)).data
     },
     onSuccess: (me) => {
       queryClient.clear()
