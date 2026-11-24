@@ -9,7 +9,9 @@ use App\Modules\Reports\Domain\ReportDefinition;
 use App\Modules\Reports\Domain\ReportGroup;
 use App\Modules\Reports\Domain\ReportParam;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,6 +22,9 @@ use Illuminate\Support\Facades\DB;
  */
 class SalesByCustomerReport extends SalesReport
 {
+    /** Customer lists up to this size are queried with IN (…); longer ones are filtered in PHP. */
+    private const IN_LIST_LIMIT = 500;
+
     public const FIGURES = ['orders', 'returns', 'net_sales', 'average_ticket', 'gross_profit'];
 
     public function definition(): ReportDefinition
@@ -50,7 +55,7 @@ class SalesByCustomerReport extends SalesReport
         ));
         $ids = array_column($aggregates, 'customer');
         $customers = [];
-        foreach (array_chunk($ids, 500) as $chunk) {
+        foreach (array_chunk($ids, WhereInChunks::SIZE) as $chunk) {
             foreach (DB::table('customers')->where('organization_id', $context->organizationId)->whereIn('id', $chunk)->get(['id', 'code', 'name']) as $c) {
                 $customers[$c->id] = $c;
             }
@@ -93,22 +98,29 @@ class SalesByCustomerReport extends SalesReport
     private function lastPurchases(ReportContext $context, array $customerIds): array
     {
         $latest = [];
-        $keep = function (iterable $rows) use (&$latest) {
+        // G1c: a long customer list (a year of a busy shop) is not sent as IN (…) chunks — one
+        // grouped query per channel over the period, keeping only the listed customers, is the
+        // same answer in two statements instead of two per 500 customers.
+        $wanted = count($customerIds) > self::IN_LIST_LIMIT ? array_flip($customerIds) : null;
+        $keep = function (iterable $rows) use (&$latest, $wanted) {
             foreach ($rows as $row) {
+                if ($wanted !== null && ! isset($wanted[$row->customer_id])) {
+                    continue;
+                }
                 $at = CarbonImmutable::parse((string) $row->at, 'UTC');
                 if (! isset($latest[$row->customer_id]) || $at->greaterThan($latest[$row->customer_id])) {
                     $latest[$row->customer_id] = $at;
                 }
             }
         };
-        foreach (array_chunk($customerIds, 500) as $chunk) {
+        foreach ($wanted === null ? array_chunk($customerIds, self::IN_LIST_LIMIT) : [null] as $chunk) {
             if ($context->includesPos()) {
                 $query = DB::table('sales as s')
                     ->where('s.organization_id', $context->organizationId)
                     ->where('s.status', 'completed')
                     ->where('s.sold_at', '>=', $context->fromInstant())
                     ->where('s.sold_at', '<', $context->toInstant())
-                    ->whereIn('s.customer_id', $chunk);
+                    ->when($chunk !== null, fn (Builder $q) => $q->whereIn('s.customer_id', $chunk), fn (Builder $q) => $q->whereNotNull('s.customer_id'));
                 $context->scopeBranches($query, 's.branch_id');
                 $keep($query->groupBy('s.customer_id')->selectRaw('s.customer_id as customer_id, MAX(s.sold_at) as at')->get());
             }
@@ -118,7 +130,7 @@ class SalesByCustomerReport extends SalesReport
                     ->where('o.status', 'delivered')
                     ->where('o.delivered_at', '>=', $context->fromInstant())
                     ->where('o.delivered_at', '<', $context->toInstant())
-                    ->whereIn('o.customer_id', $chunk);
+                    ->when($chunk !== null, fn (Builder $q) => $q->whereIn('o.customer_id', $chunk), fn (Builder $q) => $q->whereNotNull('o.customer_id'));
                 $context->scopeBranches($query, 'o.branch_id');
                 $keep($query->groupBy('o.customer_id')->selectRaw('o.customer_id as customer_id, MAX(o.delivered_at) as at')->get());
             }

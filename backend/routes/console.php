@@ -66,7 +66,7 @@ Schedule::command('pos:prune-records')->daily()->withoutOverlapping();
 // 90 minutes later — only when POS_BACKUP_ENABLED.
 if (config('pos.backup.enabled')) {
     $backupAt = preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', (string) config('pos.backup.time')) ? (string) config('pos.backup.time') : '02:00';
-    Schedule::command('pos:backup')->dailyAt($backupAt)->withoutOverlapping()->onOneServer();
+    Schedule::command('pos:backup')->dailyAt($backupAt)->withoutOverlapping()->onOneServer()->runInBackground();
     Schedule::command('pos:backup:verify')->dailyAt(Carbon::createFromFormat('H:i', $backupAt)->addMinutes(90)->format('H:i'))
-        ->withoutOverlapping()->onOneServer();
+        ->withoutOverlapping()->onOneServer()->runInBackground();
 }

@@ -26,7 +26,12 @@ final class LowStock
             ->join('product_variants as pv', 'pv.id', '=', 'sl.variant_id')
             ->join('products as p', 'p.id', '=', 'pv.product_id')
             ->leftJoin('stock_reorder_rules as r', fn (JoinClause $j) => $j->on('r.store_id', '=', 'sl.store_id')->on('r.variant_id', '=', 'sl.variant_id')->where('r.is_active', true))
-            ->where('sl.organization_id', $context->organizationId);
+            ->where('sl.organization_id', $context->organizationId)
+            // G1c: only levels that can have a reorder point (an active rule above zero, or no
+            // rule and a variant reorder level) — the HAVING below drops every other group anyway
+            // (rule and variant are the same on every row of a group), so the aggregate only
+            // sees those rows.
+            ->where(fn (Builder $q) => $q->where('r.min_qty', '>', 0)->orWhere(fn (Builder $q) => $q->whereNull('r.id')->where('pv.reorder_level', '>', 0)));
         $this->filters($levels, $context, 'sl');
         $point = 'COALESCE(MAX(r.min_qty), MAX(pv.reorder_level))';
         $levels->groupBy('sl.store_id', 'sl.branch_id', 'sl.variant_id')

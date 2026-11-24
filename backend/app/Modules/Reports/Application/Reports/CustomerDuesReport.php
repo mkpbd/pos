@@ -13,6 +13,7 @@ use App\Modules\Reports\Domain\ReportDefinition;
 use App\Modules\Reports\Domain\ReportGroup;
 use App\Modules\Reports\Domain\ReportParam;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +98,7 @@ class CustomerDuesReport implements Report
         }
 
         $results = array_filter($aging->results(), fn (array $r) => ! Decimal::isZero($r['outstanding']));
-        $info = DB::table('customers')->where('organization_id', $org)->whereIn('id', array_keys($results))->get(['id', 'name', 'code', 'phone', 'credit_limit'])->keyBy('id');
+        $info = WhereInChunks::get(DB::table('customers')->where('organization_id', $org), 'id', array_keys($results), ['id', 'name', 'code', 'phone', 'credit_limit'])->keyBy('id');
 
         $rows = [];
         $totals = array_fill_keys(['outstanding', ...Aging::BUCKETS], '0.00');

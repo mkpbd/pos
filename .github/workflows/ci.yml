@@ -1,0 +1,180 @@
+# Enterprise POS — continuous integration (G1c; docs/TESTING_GUIDE.md, deploy/README.md).
+# backend: Pint + the PHPUnit suite on PostgreSQL 18. frontend: typecheck, lint, Vitest, build (artifact
+# "frontend-dist", usable by deploy/scripts/release.sh --frontend-dist). e2e-mocked: the Playwright suite with
+# mocked APIs (the full-stack specs skip themselves without E2E_BACKEND).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (PHP 8.4, PostgreSQL 18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          # Throwaway database container that lives only for this job and is reachable only from it:
+          # these are CI-only values, not secrets.
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # phpunit.xml selects DB_CONNECTION=pgsql and DB_DATABASE=pos_test; host, user and password come from
+      # here (real environment variables win over backend/.env). CI-only password of the throwaway role.
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: pos_app
+      DB_PASSWORD: pos_app_ci_only
+      # BackupTest runs the real pg_dump / pg_restore: they must match the server's major version.
+      POS_PG_BIN: /usr/lib/postgresql/18/bin
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, gd, intl, zip, bcmath, mbstring, fileinfo, pcntl
+          ini-values: memory_limit=1G
+          coverage: none
+          tools: composer:v2
+
+      - name: PostgreSQL 18 client tools (pg_dump, pg_restore, psql)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-18
+          "$POS_PG_BIN/pg_dump" --version
+
+      - name: Create the pos_app role and the pos_test database
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          "$POS_PG_BIN/psql" -v ON_ERROR_STOP=1 -d postgres \
+            -c "CREATE ROLE pos_app LOGIN PASSWORD '${DB_PASSWORD}'" \
+            -c "CREATE DATABASE pos_test OWNER pos_app"
+
+      - name: Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Composer install
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Environment file
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Pint
+        run: vendor/bin/pint --test
+
+      # Sequential: brianium/paratest is not installed, and parallel runs would need CREATEDB for
+      # pos_test_<n> databases, which the application role does not have.
+      - name: Tests
+        run: php artisan test
+
+  frontend:
+    name: Frontend (typecheck, lint, unit tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e-mocked:
+    name: E2E (Playwright, mocked API)
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    env:
+      # Keep the HTML report from trying to open a browser on failure.
+      PLAYWRIGHT_HTML_OPEN: never
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts starts the Vite dev server itself (port 5173, never reused on CI) and, with
+      # CI set, retries twice and forbids test.only. E2E_BACKEND is unset, so full-stack specs skip.
+      - name: Playwright (mocked)
+        run: npx playwright test --reporter=github,html
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 14

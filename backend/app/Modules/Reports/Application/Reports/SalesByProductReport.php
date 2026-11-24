@@ -9,6 +9,7 @@ use App\Modules\Reports\Domain\ReportColumn;
 use App\Modules\Reports\Domain\ReportDefinition;
 use App\Modules\Reports\Domain\ReportGroup;
 use App\Modules\Reports\Domain\ReportParam;
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -45,9 +46,8 @@ class SalesByProductReport extends SalesReport
     public function run(ReportContext $context): ReportResult
     {
         $aggregates = $this->facts->aggregate($context, ['product']);
-        $products = DB::table('products')->where('organization_id', $context->organizationId)
-            ->whereIn('id', array_column($aggregates, 'product'))
-            ->get(['id', 'name', 'category_id', 'brand_id'])->keyBy('id');
+        $products = WhereInChunks::get(DB::table('products')->where('organization_id', $context->organizationId),
+            'id', array_column($aggregates, 'product'), ['id', 'name', 'category_id', 'brand_id'])->keyBy('id');
         $categories = Names::of('category', $context->organizationId, $products->pluck('category_id'));
         $brands = Names::of('brand', $context->organizationId, $products->pluck('brand_id'));
 

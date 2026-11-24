@@ -29,12 +29,12 @@ contradictions below were then re-checked by hand in the code (marked ✔). "Mis
 
 | Gap | Status | Evidence | Pri |
 |---|---|---|---|
-| Phase 9 (security review, performance) and Phase 10 (production deployment) | Open | README roadmap ☐; CHANGELOG "Phase 9 part 1" was UI fixes + `npm audit` only | **P0** |
+| Phase 9 (security review, performance) and Phase 10 (production deployment) | **Mostly done (G1a–G1c)** | sign-in security, headers, operations, deployment files, CI, EXPLAIN; a full security review and the over-target reports in PERFORMANCE.md §5 remain | **P0** |
 | Backups + restore drill, error monitoring (Sentry-like), queue dashboard | **Done (G1b)** | `pos:backup` + nightly check, built-in error log + alert e-mails, failed jobs on *System status* | **P0** |
 | Health check covers database + cache only — not the queue worker, scheduler or mail | **Done (G1b)** | heartbeats + mail / backup / disk checks on the platform *System status*; public `/health` deliberately unchanged | P1 |
-| Security headers (CSP, X-Frame-Options, HSTS); no nginx / Docker / CI files in the repo | Headers **done (G1a)**; deployment files → G1c | Laravel middleware + admin CSP in DEPLOYMENT_GUIDE; storefront `script-src` CSP still open | P1 |
+| Security headers (CSP, X-Frame-Options, HSTS); no nginx / Docker / CI files in the repo | **Done (G1a, G1c)** | headers, `deploy/`, `.github/workflows/ci.yml`; storefront `script-src` CSP and Docker still open | P1 |
 | Two-factor login for owners / accountants; account lockout after many failed logins | **Done (G1a)** | TOTP + recovery codes, organization policy, lockout with unlock | P1 |
-| `EXPLAIN` on production-sized data (sales, P&L, tax, dashboard, storefront, insights) | Pending | README, DEPLOYMENT_GUIDE | P1 |
+| `EXPLAIN` on production-sized data (sales, P&L, tax, dashboard, storefront, insights) | **Done (G1c)** | `pos:perf:*`, 12 indexes, 500s fixed; long-range reports / dashboard / big storefronts still over target — PERFORMANCE.md §5 | P1 |
 | Live AI call never made (AI1, AI2a, AI2b) | Unverified | AI_INTEGRATION | P1 before switching AI on |
 | E-mail actually sending: default mailer is `log`, e-mails are queued | Config | `.env.example` | P0 at deploy (configure SMTP + worker) |
 | Data retention (audit logs, login history, notifications, failed jobs, AI logs grow forever) | **Done (G1b)** | `pos:prune-records` daily; audit kept unless configured | P2 |

@@ -14,7 +14,7 @@ class ErrorTextTest extends TestCase
         $this->assertSame('Login failed: password=[redacted] for [email]', ErrorText::sanitise('Login failed: password=hunter2 for jane.doe@example.com'));
         $this->assertSame('api_key: [redacted], other', ErrorText::sanitise('api_key: "abc def", other'));
         $this->assertSame('GET /x?token=[redacted]&page=2', ErrorText::sanitise('GET /x?token=abc123&page=2'));
-        $this->assertSame('DB_PASSWORD=[redacted] client_secret=[redacted]', ErrorText::sanitise('DB_PASSWORD=MK6683 client_secret=s3cr3t'));
+        $this->assertSame('DB_PASSWORD=[redacted] client_secret=[redacted]', ErrorText::sanitise('DB_PASSWORD=example-only client_secret=s3cr3t'));
         $this->assertSame('connect postgresql://[redacted]@db:5432/pos', ErrorText::sanitise('connect postgresql://pos_app:p4ss@db:5432/pos'));
         $this->assertSame('Card [number] declined, order 12345', ErrorText::sanitise('Card 4111111111111111 declined, order 12345'));
     }

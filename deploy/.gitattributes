@@ -1,0 +1,2 @@
+# Server files: always LF, also in Windows checkouts (a CRLF shell script or unit file breaks on Linux).
+* text eol=lf

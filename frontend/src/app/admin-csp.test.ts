@@ -18,8 +18,13 @@ describe('admin CSP', () => {
     const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? '')
     expect(inline).toHaveLength(1)
     const hash = createHash('sha256').update(inline[0]!, 'utf8').digest('base64')
-    const documented = [...read('../../../docs/DEPLOYMENT_GUIDE.md').matchAll(/script-src 'self' 'sha256-([A-Za-z0-9+/=]+)'/g)].map((match) => match[1])
-    expect(documented.length).toBeGreaterThan(0)
+    // G1c: the shipped Nginx snippet carries the same header.
+    const sources = ['../../../docs/DEPLOYMENT_GUIDE.md', '../../../deploy/nginx/snippets/pos-admin-headers.conf']
+    const documented = sources.flatMap((source) => {
+      const found = [...read(source).matchAll(/script-src 'self' 'sha256-([A-Za-z0-9+/=]+)'/g)].map((match) => match[1])
+      expect(found.length, source).toBeGreaterThan(0)
+      return found
+    })
     for (const value of documented) expect(value).toBe(hash)
   })
 })

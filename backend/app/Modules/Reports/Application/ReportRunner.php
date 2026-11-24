@@ -204,22 +204,21 @@ final class ReportRunner
     public function sortRows(ReportDefinition $definition, array $rows, string $key, bool $descending): array
     {
         $type = $definition->column($key)?->type ?? ColumnType::Text;
+        $numeric = $type->isNumeric();
+        // G1c: each row's sort value is prepared once (a year of products is ~50 000 rows, about
+        // 800 000 comparisons), not on every comparison; the order is the same.
         $indexed = [];
         foreach (array_values($rows) as $i => $row) {
-            $indexed[] = [$i, $row];
+            $value = $row[$key] ?? null;
+            $indexed[] = [$i, $row, $value === null || $value === '' ? null : ($numeric ? Decimal::sortKey(Sql::plain($value)) : mb_strtolower((string) $value))];
         }
-        usort($indexed, function (array $a, array $b) use ($key, $type, $descending) {
-            $x = $a[1][$key] ?? null;
-            $y = $b[1][$key] ?? null;
-            if ($x === null || $x === '' || $y === null || $y === '') {
-                $nullX = $x === null || $x === '';
-                $nullY = $y === null || $y === '';
-
-                return $nullX === $nullY ? $a[0] <=> $b[0] : ($nullX ? 1 : -1);
+        usort($indexed, function (array $a, array $b) use ($numeric, $descending) {
+            $x = $a[2];
+            $y = $b[2];
+            if ($x === null || $y === null) {
+                return $x === $y ? $a[0] <=> $b[0] : ($x === null ? 1 : -1);
             }
-            $cmp = $type->isNumeric()
-                ? Decimal::compare(Sql::plain($x), Sql::plain($y))
-                : strcmp(mb_strtolower((string) $x), mb_strtolower((string) $y));
+            $cmp = $numeric ? $x->compare($y) : strcmp($x, $y);
             if ($descending) {
                 $cmp = -$cmp;
             }

@@ -298,7 +298,7 @@ OnlineCatalog module (`2026_11_01_150100_add_storefront_performance_indexes`, fr
 | `product_listings_unpublish_index` | `(organization_id, unpublished_at) WHERE is_published AND unpublished_at IS NOT NULL` | `(organization_id, unpublished_at)` | `MIN(unpublished_at) > now` (cache expiry) |
 | `product_variants_live_product_index` | `(product_id, sort_order) WHERE deleted_at IS NULL AND is_active` | `(product_id, is_active, sort_order)` | "has an active variant" (`EXISTS`) and the variant load of the candidate set |
 
-Created with `CREATE INDEX IF NOT EXISTS`; `StorefrontIndexesTest` (PostgreSQL only) asserts they exist. Reviewed and left as is: images `(product_id, sort_order)`, stock `(store_id, variant_id)`, reviews `(organization_id, product_id, status, created_at)`, promotions `(organization_id, trigger, is_active)`, blog `(organization_id, status, published_at)`, search on the `lower(name)` trigram index (SKU match is a scan; search results are not cached). Assumed scale: a few thousand products per organization. `StorefrontIndexesTest` passed on PostgreSQL 18 (2026-11-11); **`EXPLAIN` on production-sized data is still pending**.
+Created with `CREATE INDEX IF NOT EXISTS`; `StorefrontIndexesTest` (PostgreSQL only) asserts they exist. Reviewed and left as is: images `(product_id, sort_order)`, stock `(store_id, variant_id)`, reviews `(organization_id, product_id, status, created_at)`, promotions `(organization_id, trigger, is_active)`, blog `(organization_id, status, published_at)`, search on the `lower(name)` trigram index (SKU match is a scan; search results are not cached). Assumed scale: a few thousand products per organization. `StorefrontIndexesTest` passed on PostgreSQL 18 (2026-11-11). `EXPLAIN` on production-sized data (G1c): [PERFORMANCE.md](PERFORMANCE.md) — the live-window and variant indexes are used; the cost of large categories is the in-PHP filtering, not SQL.
 
 No table for the server cache: entries and the per-organization content version live in the configured cache store (`cache` table with the `database` store).
 
@@ -416,7 +416,7 @@ Stock movements, expiry, expenses and dues use existing indexes:
 - `batches (organization_id, expires_on)`;
 - `expenses (organization_id, type, occurred_on)`.
 
-Daily summary tables or materialized views (the original plan) are deferred until PostgreSQL `EXPLAIN` on production-sized data shows the aggregates need them. The indexes and the report SQL ran with the full suite on PostgreSQL 18 (2026-11-11); `EXPLAIN` on production-sized data is still pending.
+Daily summary tables or materialized views (the original plan) are still not built. G1c ran `EXPLAIN (ANALYZE, BUFFERS)` on production-sized data ([PERFORMANCE.md](PERFORMANCE.md)): covering indexes on `sale_lines` / `order_lines` made short ranges (today, 30 days) fast; twelve-month aggregates stay above the 300 ms target because they sum ~1 000 000 lines, and PERFORMANCE.md proposes a daily summary table for them.
 
 ### Phase 8 — AI (AI1)
 
@@ -474,10 +474,10 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 ## 3. Indexing strategy
 
 - Every tenant table: composite index starting with `(organization_id, …)`; branch tables `(organization_id, branch_id, …)`.
-- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6). Storefront live listings: partial indexes on published `product_listings` windows and live `product_variants` (E12a). The Bangla-name search on `translations` jsonb (E12b) has no index (a GIN / trigram expression index can follow if `EXPLAIN` asks for it).
+- Hot POS lookups: `product_barcodes (organization_id, barcode)` unique; `product_variants (organization_id, lower(sku)) WHERE deleted_at IS NULL` unique. Storefront search: trigram GIN index on `lower(products.name)` (`pg_trgm`, PostgreSQL only, E6). Storefront live listings: partial indexes on published `product_listings` windows and live `product_variants` (E12a). The Bangla-name search on `translations` jsonb (E12b) has no index (a GIN / trigram expression index can follow if `EXPLAIN` asks for it). G1c: trigram GIN indexes for the staff searches — `orders` (number, contact name / phone / e-mail), `customers` (code, name, phone, e-mail), `sales.number`; `sales (organization_id, sold_at, id)` for the newest sales ([PERFORMANCE.md](PERFORMANCE.md)).
 - Case-insensitive uniqueness uses expression indexes, e.g. `brands (organization_id, lower(name))`, and partial indexes such as `customers (organization_id, phone) WHERE deleted_at IS NULL AND phone IS NOT NULL` — valid on PostgreSQL and SQLite alike.
 - Ledgers: `stock_movements (store_id, variant_id, created_at)` for stock history; `(reference_type, reference_id)` for drill-down to the source document.
-- Reports (Phase 7): `(organization_id, status, <event time>)` on `sales` (`sold_at`), `sale_returns` (`decided_at`), `orders` (`delivered_at`) and `order_returns` (`refunded_at`); `(organization_id, created_at)` on `payments` and `purchase_returns`; `(organization_id, invoice_date)` on `goods_receipts` (see § Phase 7). BRIN on large append-only `created_at` columns, or summary tables, once volumes and `EXPLAIN` justify it.
+- Reports (Phase 7): `(organization_id, status, <event time>)` on `sales` (`sold_at`), `sale_returns` (`decided_at`), `orders` (`delivered_at`) and `order_returns` (`refunded_at`); `(organization_id, created_at)` on `payments` and `purchase_returns`; `(organization_id, invoice_date)` on `goods_receipts` (see § Phase 7). G1c covering indexes `sale_lines (sale_id) INCLUDE (…measures)` and `order_lines (order_id) INCLUDE (…measures)` for the sales facts, built `CONCURRENTLY` ([PERFORMANCE.md](PERFORMANCE.md)). BRIN on large append-only `created_at` columns, or summary tables, are proposals there.
 
 ## 4. Concurrency model
 

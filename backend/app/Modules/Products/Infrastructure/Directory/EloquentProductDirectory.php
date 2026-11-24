@@ -8,8 +8,10 @@ use App\Modules\Products\Domain\ProductType;
 use App\Modules\Products\Infrastructure\Models\Product;
 use App\Modules\Products\Infrastructure\Models\ProductImage;
 use App\Modules\Products\Infrastructure\Models\ProductVariant;
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class EloquentProductDirectory implements ProductDirectory
 {
@@ -21,13 +23,36 @@ class EloquentProductDirectory implements ProductDirectory
             return [];
         }
 
-        $variants = ProductVariant::query()->withoutGlobalScope('organization')->withTrashed()
+        // G1c: chunked — a store can stock more variants than PostgreSQL allows bound parameters.
+        $variants = WhereInChunks::get(ProductVariant::query()->withoutGlobalScope('organization')->withTrashed()
             ->where('organization_id', $organizationId)
-            ->whereKey(array_values(array_unique($variantIds)))
-            ->with(['product' => fn ($q) => $q->withoutGlobalScope('organization')->withTrashed()])
-            ->get();
+            ->with(['product' => fn ($q) => $q->withoutGlobalScope('organization')->withTrashed()]), 'product_variants.id', $variantIds);
 
         return $this->describe($organizationId, $variants)->all();
+    }
+
+    public function stockFlags(string $organizationId, array $variantIds): array
+    {
+        if ($variantIds === []) {
+            return [];
+        }
+
+        // Plain rows instead of models: the same rules as describe(), at a fraction of the cost.
+        $rows = WhereInChunks::get(DB::table('product_variants as v')->join('products as p', 'p.id', '=', 'v.product_id')
+            ->where('v.organization_id', $organizationId), 'v.id', $variantIds,
+            ['v.id', 'v.is_active as variant_active', 'v.deleted_at as variant_deleted_at', 'p.is_active', 'p.deleted_at', 'p.type', 'p.track_stock', 'p.unit_id']);
+        $units = $this->catalog->describe($organizationId, ['units' => $rows->pluck('unit_id')->filter()->unique()->values()->all()])['units'];
+
+        $flags = [];
+        foreach ($rows as $row) {
+            $flags[$row->id] = [
+                'track_stock' => $row->type === ProductType::Standard->value && (bool) $row->track_stock,
+                'sellable' => $row->variant_deleted_at === null && $row->deleted_at === null && (bool) $row->variant_active && (bool) $row->is_active,
+                'allow_decimal' => (bool) ($units[$row->unit_id]['allow_decimal'] ?? false),
+            ];
+        }
+
+        return $flags;
     }
 
     public function products(string $organizationId, array $productIds): array

@@ -5,6 +5,8 @@ namespace App\Modules\System;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use App\Modules\System\Infrastructure\Console\BackupCommand;
 use App\Modules\System\Infrastructure\Console\HeartbeatCommand;
+use App\Modules\System\Infrastructure\Console\PerfExplainCommand;
+use App\Modules\System\Infrastructure\Console\PerfSeedCommand;
 use App\Modules\System\Infrastructure\Console\PruneRecordsCommand;
 use App\Modules\System\Infrastructure\Console\VerifyBackupCommand;
 use App\Modules\System\Infrastructure\ErrorLog\ErrorRecorder;
@@ -32,7 +34,8 @@ class SystemServiceProvider extends ModuleServiceProvider
         parent::boot();
 
         if ($this->app->runningInConsole()) {
-            $this->commands([HeartbeatCommand::class, BackupCommand::class, VerifyBackupCommand::class, PruneRecordsCommand::class]);
+            $this->commands([HeartbeatCommand::class, BackupCommand::class, VerifyBackupCommand::class, PruneRecordsCommand::class,
+                PerfSeedCommand::class, PerfExplainCommand::class]);
         }
     }
 }

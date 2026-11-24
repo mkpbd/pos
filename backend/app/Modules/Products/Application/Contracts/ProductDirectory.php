@@ -24,6 +24,16 @@ interface ProductDirectory
     public function variants(string $organizationId, array $variantIds): array;
 
     /**
+     * G1c: only the stock flags of {@see self::variants()} (same values), without loading the
+     * full descriptions — for screens that first decide over every variant of a store which
+     * few to show (reorder suggestions).
+     *
+     * @param  list<string>  $variantIds
+     * @return array<string, array{track_stock: bool, sellable: bool, allow_decimal: bool}>
+     */
+    public function stockFlags(string $organizationId, array $variantIds): array;
+
+    /**
      * Products of the organization that are not archived, keyed by id (unknown ids left out).
      *
      * @param  list<string>  $productIds

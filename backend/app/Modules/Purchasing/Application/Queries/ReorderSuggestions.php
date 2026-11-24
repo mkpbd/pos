@@ -10,6 +10,7 @@ use App\Modules\Purchasing\Domain\Reorder\ReorderCalculator;
 use App\Modules\Purchasing\Domain\Reorder\ReorderInput;
 use App\Modules\Purchasing\Infrastructure\Models\SupplierProduct;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use App\Modules\Suppliers\Application\Contracts\SupplierDirectory;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -40,15 +41,18 @@ class ReorderSuggestions
         $since = CarbonImmutable::now()->subDays($settings['velocity_days']);
         $inputs = $this->replenishment->storeInputs($organizationId, $storeId, $since);
 
-        $variants = array_filter(
-            $this->products->variants($organizationId, array_keys($inputs)),
+        // G1c: the decision over every variant of the store needs only the stock flags; the full
+        // descriptions are loaded for the variants that get a row (EXPLAIN on production-sized
+        // data: describing ~40 000 variants as models took seconds).
+        $flags = array_filter(
+            $this->products->stockFlags($organizationId, array_keys($inputs)),
             fn (array $v) => $v['track_stock'] && $v['sellable'],
         );
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
-            $variants = array_intersect_key($variants, array_flip($this->products->searchVariantIds($organizationId, $search, 2000)));
+            $flags = array_intersect_key($flags, array_flip($this->products->searchVariantIds($organizationId, $search, 2000)));
         }
-        $ids = array_keys($variants);
+        $ids = array_keys($flags);
 
         $preferred = $this->preferredCatalog($organizationId, $ids);
         $onOrder = $this->openOrderQuantities($organizationId, $storeId, $ids, [PurchaseOrderStatus::Ordered, PurchaseOrderStatus::PartiallyReceived]);
@@ -57,7 +61,7 @@ class ReorderSuggestions
         $source = $this->sourceStore($organizationId, $settings['source_store_id'], $storeId);
 
         // First pass without a source, to find what needs reordering at all.
-        $calculate = function (string $variantId, ?string $surplus) use ($inputs, $variants, $preferred, $onOrder, $settings) {
+        $calculate = function (string $variantId, ?string $surplus) use ($inputs, $flags, $preferred, $onOrder, $settings) {
             $in = $inputs[$variantId];
             $catalog = $preferred[$variantId] ?? null;
 
@@ -74,7 +78,7 @@ class ReorderSuggestions
                 coverageDays: $settings['coverage_days'],
                 packSize: $catalog['pack_size'] ?? '1',
                 minOrderQty: $catalog['min_order_qty'] ?? null,
-                wholeUnits: ! $variants[$variantId]['allow_decimal'],
+                wholeUnits: ! $flags[$variantId]['allow_decimal'],
                 sourceSurplus: $surplus,
             ));
         };
@@ -95,7 +99,7 @@ class ReorderSuggestions
                 }
                 $point = ReorderCalculator::reorderPoint($s['sold'], $settings['velocity_days'], $s['min_qty'],
                     $preferred[$variantId]['lead_time_days'] ?? SupplierProduct::DEFAULT_LEAD_TIME_DAYS, $settings['safety_days']);
-                $surplus = ReorderCalculator::surplus($s['on_hand'], $point, ! $variants[$variantId]['allow_decimal']);
+                $surplus = ReorderCalculator::surplus($s['on_hand'], $point, ! $flags[$variantId]['allow_decimal']);
                 if (Decimal::compare($surplus, '0') > 0) {
                     $results[$variantId] = $calculate($variantId, $surplus);
                 }
@@ -104,6 +108,7 @@ class ReorderSuggestions
 
         $lastCosts = $this->lastPurchaseCosts($organizationId, array_values(array_diff(array_keys($results), array_keys($preferred))));
         $supplierNames = $this->suppliers->summaries($organizationId, array_values(array_unique(array_column($preferred, 'supplier_id'))));
+        $variants = $this->products->variants($organizationId, array_keys($results));
 
         $rows = [];
         foreach ($results as $variantId => $r) {
@@ -164,12 +169,10 @@ class ReorderSuggestions
         if ($variantIds === []) {
             return [];
         }
-        $rows = SupplierProduct::query()->withoutGlobalScope('organization')
+        $rows = WhereInChunks::get(SupplierProduct::query()->withoutGlobalScope('organization')
             ->where('organization_id', $organizationId)
-            ->whereIn('variant_id', $variantIds)
             ->where('is_preferred', true)
-            ->where('is_active', true)
-            ->get();
+            ->where('is_active', true), 'variant_id', $variantIds);
 
         $usable = [];
         $suppliers = [];
@@ -221,14 +224,13 @@ class ReorderSuggestions
             return [];
         }
 
-        return DB::table('purchase_order_lines as l')
+        return WhereInChunks::get(DB::table('purchase_order_lines as l')
             ->join('purchase_orders as o', 'o.id', '=', 'l.purchase_order_id')
             ->where('o.organization_id', $organizationId)
             ->where('o.store_id', $storeId)
             ->whereIn('o.status', array_map(fn (PurchaseOrderStatus $s) => $s->value, $statuses))
-            ->whereIn('l.variant_id', $variantIds)
             ->groupBy('l.variant_id')
-            ->selectRaw('l.variant_id as variant_id, SUM(l.quantity - l.received_quantity) as total')
+            ->selectRaw('l.variant_id as variant_id, SUM(l.quantity - l.received_quantity) as total'), 'l.variant_id', $variantIds)
             ->pluck('total', 'variant_id')
             ->map(fn ($q) => Decimal::max(Decimal::round(self::plain($q), 3), '0.000'))
             ->all();
@@ -247,12 +249,11 @@ class ReorderSuggestions
         }
 
         $costs = [];
-        DB::table('goods_receipt_lines as l')
+        // Chunks split by variant, so each variant's receipts stay in one ordered result.
+        WhereInChunks::get(DB::table('goods_receipt_lines as l')
             ->join('goods_receipts as r', 'r.id', '=', 'l.goods_receipt_id')
             ->where('r.organization_id', $organizationId)
-            ->whereIn('l.variant_id', $variantIds)
-            ->orderByDesc('r.invoice_date')->orderByDesc('r.created_at')
-            ->get(['l.variant_id', 'l.unit_cost'])
+            ->orderByDesc('r.invoice_date')->orderByDesc('r.created_at'), 'l.variant_id', $variantIds, ['l.variant_id', 'l.unit_cost'])
             ->each(function ($line) use (&$costs) {
                 $costs[$line->variant_id] ??= Decimal::round(self::plain($line->unit_cost), 4);
             });

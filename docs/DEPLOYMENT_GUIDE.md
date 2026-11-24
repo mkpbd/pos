@@ -25,6 +25,11 @@ Browser ──▶ │ Nginx                                                │
 
 The PHP-FPM hosts also need Node.js ≥ 22.12 and a Chromium for PDF exports (X1, below).
 
+**Deployment files (G1c):** ready-made templates are in [`deploy/`](../deploy/README.md): the Nginx site (`deploy/nginx/pos.conf` with `snippets/pos-common.conf` and `snippets/pos-admin-headers.conf`, which already carries the admin security headers from the *Security checklist*), the PHP-FPM pool and OPcache settings (`deploy/php/`), queue workers for Supervisor or systemd, the scheduler as a cron file or systemd timer, and `deploy/scripts/release.sh`. Placeholders are written `{{NAME}}`; `deploy/README.md` shows how to fill them in and install each file. This guide stays the reference for settings and upgrade notes; the files implement it.
+- The Nginx site has a back-office server block (admin SPA, builder canvas, API; `client_max_body_size 32m`) and a catch-all storefront block (`default_server`, no `/admin`, `2m`). Every store domain needs DNS pointing at the server and a certificate covering it: a SAN / wildcard certificate, one server block per domain, or TLS ending at a proxy in front. For a single-domain install, list that host in the back-office block.
+- Use `TRUSTED_PROXIES` (Laravel) **or** Nginx `real_ip`, never both.
+- **CI:** `.github/workflows/ci.yml` runs on every push and pull request — backend (Pint + the full PHPUnit suite on a PostgreSQL 18 service, with `postgresql-client-18` so the backup tests run the real `pg_dump`), frontend (typecheck, oxlint, Vitest, build; `frontend/dist` uploaded as the artifact `frontend-dist`) and the mocked Playwright suite. The runner is Linux / UTC.
+
 Serving the SPA and API from the **same origin** is required for Sanctum cookie authentication without third-party cookies.
 
 **Store builder upgrade (B1–B4):** run `php artisan migrate` (B1 adds `builder_documents`, `builder_versions` and `builder_templates`) and `php artisan pos:permissions:sync`. The sync adds `storefront.publish` (builder and theme publishing; Organization Admin and Online Store Manager) and `storefront.custom_html` (custom HTML elements; Organization Admin only) to the built-in roles. Without the sync, nobody can publish on an existing database.
@@ -46,6 +51,8 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 **Store builder upgrade (B13):** `php artisan migrate` (A/B test stats). No new job: `marketing:prune-page-insights` also clears the A/B tables (90 days). Audience rules and A/B versions are evaluated in shoppers' browsers, so builder pages stay cacheable — don't vary caches by cookie for them.
 
 **Store builder upgrade (B15):** `php artisan migrate` (page insight tables, `carts.builder_attribution`). The scheduler runs `marketing:prune-page-insights` daily (90-day retention, 2-day visitor hashes). `POST /api/v1/store/insights/events` receives anonymous beacons from shoppers' browsers (60/min per IP, 64 KB): keep it reachable on every store host and out of any cache; if a CDN/WAF sits in front, allow `text/plain` and `application/json` POST bodies there. No cookies are set and nothing personal is stored, so no consent banner change is needed for it; the storefront honours Do-Not-Track and Global Privacy Control.
+
+**Deployment and performance (G1c):** templates in [`deploy/`](../deploy/README.md) (see *Deployment files* above) and CI in `.github/workflows/ci.yml`. `php artisan migrate --force` builds 12 new indexes **concurrently** (the migrations run outside a transaction — do not wrap `migrate` in one): about a minute per 20–50 M sale lines on a busy server and ~190 MB of disk per 2 M sale lines; a build that fails leaves an INVALID index that the next `migrate` drops and rebuilds. PostgreSQL settings for this workload are in [PERFORMANCE.md](PERFORMANCE.md) §7 (`shared_buffers` ≈ 25 % of RAM, `random_page_cost` 1.1 on SSD, `work_mem` 16–32 MB, autovacuum on). `config/database.php` no longer ships a default database password — set `DB_PASSWORD` in `.env`.
 
 **Operations (G1b):** `php artisan migrate` (`system_backups`, `error_events`). The scheduler now also runs `pos:heartbeat` every minute and `pos:prune-records` daily; turn on nightly backups with `POS_BACKUP_ENABLED=true` (see *Backups and restore* below) and set `POS_OPS_ALERT_EMAILS`. Platform admins see backups, failed jobs, the error log and warnings under *System status*. The error log writes through a second connection to the same database (one extra connection per PHP worker while it records an error).
 
@@ -301,6 +308,10 @@ Shop assistant on the online store (AI2b, optional — same switch, key and budg
 
 ## Release steps
 
+**Scripted (G1c):** `POS_FPM_SERVICE=php8.4-fpm deploy/scripts/release.sh --ref <tag> --health-url https://pos.example.com/api/v1/health` builds each release in `/srv/pos/releases/<stamp>-<sha>` (shared `.env` and `storage`), runs the steps below, switches the `current` symlink atomically, reloads PHP-FPM and restarts the workers. `--frontend-dist <dir>` uses the CI artifact `frontend-dist` instead of building on the server; `--maintenance` puts the site in maintenance mode while migrating; `--rollback` goes back one release (migrations are not undone). In this layout `storage:link` runs for every release (the link lives inside the release). Recent `/assets` files (under 7 days old) are carried into the new build so open tabs keep working. Re-running for the commit that is already live does nothing unless `--force`.
+
+**By hand** (what the script runs):
+
 ```bash
 # backend
 composer install --no-dev --optimize-autoloader
@@ -326,6 +337,11 @@ npm run build                   # publish frontend/dist
 | Heartbeat (G1b) | `pos:heartbeat` every minute from the scheduler; it queues a small job, so *System status* shows when the scheduler and the worker last ran | (scheduler) |
 | Backups (G1b) | `pos:backup` at `POS_BACKUP_TIME` and `pos:backup:verify` 90 minutes later, only when `POS_BACKUP_ENABLED=true` | (scheduler) |
 | Retention (G1b) | `pos:prune-records` daily (`--dry-run` to preview) | (scheduler) |
+
+- Pick one set (G1c files): Supervisor workers (`deploy/supervisor/pos-worker.conf`) with cron (`deploy/cron/pos`), or the systemd workers `pos-worker@1` / `@2` with `pos-scheduler.timer`. Never run cron and the timer together. The nightly backup and its check run in the background of `schedule:run`, so neither holds up the every-minute tasks.
+- **Set the queue's retry time above the longest job:** `DB_QUEUE_RETRY_AFTER` (database queue) or `REDIS_QUEUE_RETRY_AFTER` (Redis), e.g. `4000`. A backup runs up to `POS_BACKUP_TIMEOUT` + 300 s and an AI drafts batch up to 3600 s; with Laravel's default 90 s the queue hands a still-running job to a second worker, which fails it. The worker stop timeout in the templates (3960 s) lets a running job finish.
+- **PHP-FPM** (`deploy/php/pos-fpm.conf`): `memory_limit` 512M, `upload_max_filesize` 32M / `post_max_size` 34M, `request_terminate_timeout` 300 s (below Nginx `fastcgi_read_timeout` 310 s; a load balancer in front needs an idle timeout above 310 s for `/api/v1/ai/*`). The pool keeps `clear_env = yes`, so put `POS_PG_BIN` and the PDF renderer paths in `.env`.
+- **OPcache** (`deploy/php/opcache.ini`) runs with `validate_timestamps=0`: reload PHP-FPM after every release (the release script does it when `POS_FPM_SERVICE` is set and the deploy user may `sudo -n systemctl reload` it) and after editing `.env` + `php artisan optimize`.
 
 ## Database
 
@@ -381,7 +397,7 @@ The password is passed to `pg_dump` / `pg_restore` through `PGPASSWORD` in the p
   add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
   ```
 
-  Why: the `sha256-…` allows the one inline script in `index.html` (applies the light/dark theme before the first paint; a test keeps this hash in step with the file — change both together). Inline `<style>` is needed (dialogs, print pages, the builder canvas, uploaded fonts). `font-src data:` for small inlined fonts; `img-src https:` for pictures from the media disk or CDN and external images in rich text. `frame-src`: the builder canvas plus YouTube / Vimeo / Google Maps embeds. If `MEDIA_DISK` is an S3/CDN bucket, add its origin to `font-src` (uploaded store fonts). Try it first as `Content-Security-Policy-Report-Only` and open the dashboard, POS, the page builder and a report.
+  Why: the `sha256-…` allows the one inline script in `index.html` (applies the light/dark theme before the first paint; `frontend/src/app/admin-csp.test.ts` keeps this hash, and the copy in `deploy/nginx/snippets/pos-admin-headers.conf`, in step with the file — change them together). Inline `<style>` is needed (dialogs, print pages, the builder canvas, uploaded fonts). `font-src data:` for small inlined fonts; `img-src https:` for pictures from the media disk or CDN and external images in rich text. `frame-src`: the builder canvas plus YouTube / Vimeo / Google Maps embeds. If `MEDIA_DISK` is an S3/CDN bucket, add its origin to `font-src` (uploaded store fonts). Try it first as `Content-Security-Policy-Report-Only` and open the dashboard, POS, the page builder and a report.
 - **Two-factor sign-in (G1a):** ask owners to set *Organization → Security → Two-factor sign-in* to *Required for admins* (or everyone); keep a second admin who can reset a colleague's two-factor if a phone is lost.
 - Upload storage outside the web root; images served through signed/authorized routes.
 - Rate limiters enabled; account lockout (G1a, `POS_LOCKOUT_*`); fail2ban or WAF on login endpoints (`/api/v1/auth/login`, `/auth/two-factor-challenge`, `/auth/tokens`).

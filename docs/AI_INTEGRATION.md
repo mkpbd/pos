@@ -249,7 +249,7 @@ Tests never reach the network: `phpunit.xml` forces `AI_ENABLED=false`, `AI_API_
 - Narratives are English; Ask answers follow the question's language (English or Bangla).
 - One request may overshoot the monthly budget.
 - A cached business insight is shared by every user of its scope; its narrative was written from facts that include shortage risk, which the response hides from users without `purchases.view` (all built-in roles with `ai.insights` have it).
-- The AI tables, CHECKs and queries ran with the full suite on PostgreSQL 18 (2026-11-11); `EXPLAIN` of the insight queries on production-sized data is still pending.
+- The AI tables, CHECKs and queries ran with the full suite on PostgreSQL 18 (2026-11-11); `EXPLAIN` of the insight queries on production-sized data: [PERFORMANCE.md](PERFORMANCE.md) (G1c; the shortage-risk part runs the reorder suggestions of every store and dominates).
 
 ## AI2a — online store texts for staff (as built, 2026-11-20)
 

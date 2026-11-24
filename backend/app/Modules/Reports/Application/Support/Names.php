@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reports\Application\Support;
 
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -33,7 +34,7 @@ final class Names
         }
         [$table, $column] = self::TABLES[$kind];
         $names = [];
-        foreach (array_chunk($ids, 500) as $chunk) {
+        foreach (array_chunk($ids, WhereInChunks::SIZE) as $chunk) {
             $names += DB::table($table)->where('organization_id', $organizationId)->whereIn('id', $chunk)->pluck($column, 'id')->all();
         }
 

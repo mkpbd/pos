@@ -212,9 +212,24 @@ final class Dashboard
      */
     private function topProducts(ReportContext $context): array
     {
-        $rows = $this->facts->aggregate($context, ['product']);
-        usort($rows, fn (array $a, array $b) => Decimal::compare($b['net_sales'], $a['net_sales']) ?: Decimal::compare($b['quantity'], $a['quantity']));
-        $rows = array_slice(array_values(array_filter($rows, fn (array $r) => Decimal::compare($r['net_sales'], '0') > 0 || Decimal::compare($r['quantity'], '0') > 0)), 0, 10);
+        // G1c: the ten best in one pass instead of sorting every product sold in the range
+        // (tens of thousands): the same rows as a stable sort by net sales, then quantity, desc.
+        $before = fn (array $a, array $b) => (Decimal::compare($b['net_sales'], $a['net_sales']) ?: Decimal::compare($b['quantity'], $a['quantity'])) < 0;
+        $rows = [];
+        foreach ($this->facts->aggregate($context, ['product']) as $r) {
+            if (Decimal::compare($r['net_sales'], '0') <= 0 && Decimal::compare($r['quantity'], '0') <= 0) {
+                continue;
+            }
+            if (count($rows) === 10 && ! $before($r, $rows[9])) {
+                continue;
+            }
+            $at = count($rows);
+            while ($at > 0 && $before($r, $rows[$at - 1])) {
+                $at--;
+            }
+            array_splice($rows, $at, 0, [$r]);
+            $rows = array_slice($rows, 0, 10);
+        }
         $names = Names::of('product', $context->organizationId, array_column($rows, 'product'));
 
         return array_map(fn (array $r) => [

@@ -21,6 +21,29 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### G1c — Deployment files, CI, performance on production-sized data
+
+Third part of G1 (go-live essentials) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2. No new runtime packages.
+
+#### Added
+- **Deployment files** in [`deploy/`](deploy/README.md): Nginx site (back office + catch-all storefront hosts, admin security headers), PHP-FPM pool and OPcache settings, queue workers for Supervisor or systemd, the scheduler as cron or a systemd timer, and `deploy/scripts/release.sh` (release folders, atomic switch, PHP-FPM reload, worker restart, health check, `--rollback`, `--frontend-dist` for the CI build). Checked with `nginx -t` and every route by curl on a local Nginx; the release script was run end to end with stand-in tools (two bugs found and fixed).
+- **CI** (`.github/workflows/ci.yml`): Pint + the full backend suite on PostgreSQL 18 (real `pg_dump` for the backup tests), frontend typecheck / lint / Vitest / build (artifact `frontend-dist`), and the mocked Playwright suite, on every push and pull request.
+- **Performance tools:** `php artisan pos:perf:seed` (fills a non-production database with ~2 years of data: 600 000 sales / 2 M lines, 150 000 web orders, 200 000 customers, 80 000 variants, 3 M stock movements; ~7 min) and `pos:perf:explain` (times and plans the heavy read paths). Results and remaining work in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+- **12 indexes** (built `CONCURRENTLY`): covering indexes for sale and order lines, trigram search indexes for web orders, customers and sale numbers, newest-sales order. Web-order search 419 → 18 ms, sales list search 172 → 30 ms, POS day lines 130 → 2 ms, 30-day P&L 450 → ~220 ms.
+
+#### Fixed
+- **HTTP 500 on big stores:** reorder suggestions, the low-stock report, AI insights and the daily reorder alerts bound more than PostgreSQL's 65 535 parameters at ~80 000 variants; long `IN` lists are now chunked (`WhereInChunks`, tested with 70 001 values). The sales-by-customer report runs 28 queries instead of ~550.
+- **Security:** `config/database.php` no longer has a literal default database password (it is empty; the password comes from `.env`), and a test no longer contains a fragment of it.
+
+#### Known limits (proposals in PERFORMANCE.md §5, not built)
+- 12-month sales / P&L / tax reports 1–2 s, the dashboard ~2 s, reorder / low-stock / AI shortage risk several seconds on 80 000 variants, and storefront listings of very large catalogs (filtering in PHP) remain over target; summary tables and SQL-side filtering are proposed.
+
+#### Tests
+- Backend PostgreSQL (new `PerformanceToolsTest`, `PerformanceIndexesTest`, `WhereInChunksTest`; counted with ST1 below). The admin CSP hash test also checks the Nginx snippet.
+
+#### Upgrade
+- `php artisan migrate --force` builds the new indexes concurrently (not inside an outer transaction; roughly a minute per 20–50 M sale lines on a busy server; ~190 MB per 2 M sale lines; a failed build is dropped and rebuilt on the next migrate). Set `DB_QUEUE_RETRY_AFTER` / `REDIS_QUEUE_RETRY_AFTER` to 4000. **Change the database password** if the old literal default was ever used.
+
 ### G1b — Operations: backups, restore check, system status, error log, data retention
 
 Second part of G1 (go-live essentials) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2. No new packages.

@@ -1,0 +1,9 @@
+# Enterprise POS — Laravel scheduler, every minute (docs/DEPLOYMENT_GUIDE.md "Processes").
+# Use this OR deploy/systemd/pos-scheduler.timer, not both (tasks would run twice).
+# Install: render the placeholders, then `install -m 0644 -o root -g root pos /etc/cron.d/pos` (file name without a dot).
+# /etc/cron.d format: minute hour day month weekday USER command. Task errors go to the Laravel log; a stopped
+# scheduler shows on System status (pos:heartbeat, G1b). To debug, send the output to a file instead of /dev/null.
+SHELL=/bin/sh
+PATH=/usr/local/bin:/usr/bin:/bin
+
+* * * * * {{APP_USER}} cd {{APP_ROOT}}/current/backend && {{PHP_BIN}} artisan schedule:run --no-interaction >> /dev/null 2>&1

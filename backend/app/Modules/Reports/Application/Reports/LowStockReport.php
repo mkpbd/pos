@@ -13,6 +13,7 @@ use App\Modules\Reports\Domain\ReportDefinition;
 use App\Modules\Reports\Domain\ReportGroup;
 use App\Modules\Reports\Domain\ReportParam;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use App\Modules\Shared\Infrastructure\Persistence\WhereInChunks;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -59,10 +60,9 @@ class LowStockReport implements Report
     public function run(ReportContext $context): ReportResult
     {
         $low = $this->lowStock->rows($context);
-        $variants = DB::table('product_variants as pv')->join('products as p', 'p.id', '=', 'pv.product_id')
-            ->where('pv.organization_id', $context->organizationId)
-            ->whereIn('pv.id', array_values(array_unique(array_column($low, 'variant_id'))))
-            ->get(['pv.id', 'pv.sku', 'pv.name as variant_name', 'p.id as product_id', 'p.name as product_name'])->keyBy('id');
+        $variants = WhereInChunks::get(DB::table('product_variants as pv')->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->where('pv.organization_id', $context->organizationId), 'pv.id', array_column($low, 'variant_id'),
+            ['pv.id', 'pv.sku', 'pv.name as variant_name', 'p.id as product_id', 'p.name as product_name'])->keyBy('id');
         $stores = Names::of('store', $context->organizationId, array_column($low, 'store_id'));
 
         $suggestions = [];

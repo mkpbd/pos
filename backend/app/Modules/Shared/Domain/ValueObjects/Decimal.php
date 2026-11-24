@@ -103,6 +103,15 @@ final class Decimal
         return self::fix(self::n($a), $scale);
     }
 
+    /**
+     * G1c: the validated number behind a decimal string, for sorting many values: build it once
+     * per value and compare with `$a->compare($b)` (the same order as compare()).
+     */
+    public static function sortKey(string $value): Number
+    {
+        return self::n($value);
+    }
+
     private static function n(string $value): Number
     {
         if (! preg_match('/^-?\d+(\.\d+)?$/', $value)) {

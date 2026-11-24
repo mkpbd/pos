@@ -1,0 +1,25 @@
+# Enterprise POS — Laravel scheduler, one run (started every minute by pos-scheduler.timer).
+# Use the timer OR the cron line in deploy/cron/pos, not both (tasks would run twice).
+# Install: render the placeholders, copy both files to /etc/systemd/system/, then
+#   systemctl daemon-reload && systemctl enable --now pos-scheduler.timer
+#   systemctl list-timers pos-scheduler.timer ; journalctl -u pos-scheduler.service
+#
+# Caveat: a timer does not start the service again while a run is still active. `pos:backup` and
+# `pos:backup:verify` run in the foreground of schedule:run (POS_BACKUP_ENABLED=true; up to POS_BACKUP_TIMEOUT),
+# so with this timer the every-minute tasks (orders:expire-pending, storefront:publish-scheduled,
+# social:publish-due, pos:heartbeat) pause until the backup is done. Cron starts a new run every minute
+# regardless, so prefer deploy/cron/pos when backups are on.
+
+[Unit]
+Description=Enterprise POS scheduler (php artisan schedule:run)
+After=network-online.target redis-server.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{APP_USER}}
+Group={{APP_GROUP}}
+WorkingDirectory={{APP_ROOT}}/current/backend
+ExecStart={{PHP_BIN}} {{APP_ROOT}}/current/backend/artisan schedule:run --no-interaction
+NoNewPrivileges=true
+SyslogIdentifier=pos-scheduler

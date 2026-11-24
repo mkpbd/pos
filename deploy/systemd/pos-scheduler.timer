@@ -1,0 +1,13 @@
+# Enterprise POS — runs pos-scheduler.service at the start of every minute (alternative to deploy/cron/pos).
+
+[Unit]
+Description=Enterprise POS scheduler, every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Persistent=false
+Unit=pos-scheduler.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,31 @@
+# Enterprise POS — one queue worker per instance (docs/DEPLOYMENT_GUIDE.md "Processes", deploy/README.md).
+# Use this OR deploy/supervisor/pos-worker.conf, not both.
+# Install: render the placeholders, copy to /etc/systemd/system/, then
+#   systemctl daemon-reload && systemctl enable --now pos-worker@1 pos-worker@2
+# Releases: deploy/scripts/release.sh runs `php artisan queue:restart`; each worker finishes its job, exits,
+# and systemd starts it again (Restart=always) from the new {{APP_ROOT}}/current.
+# Long jobs (backup up to POS_BACKUP_TIMEOUT + 300 s, AI drafts up to 3600 s): set REDIS_QUEUE_RETRY_AFTER in
+# backend/.env above the longest job (e.g. 4000); TimeoutStopSec lets a running job finish on stop.
+
+[Unit]
+Description=Enterprise POS queue worker %i
+After=network-online.target redis-server.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{APP_USER}}
+Group={{APP_GROUP}}
+WorkingDirectory={{APP_ROOT}}/current/backend
+ExecStart={{PHP_BIN}} {{APP_ROOT}}/current/backend/artisan queue:work redis --tries=3 --max-time=3600 --sleep=3
+Restart=always
+RestartSec=5
+# SIGTERM: Laravel finishes the job in hand, then exits.
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=3960
+NoNewPrivileges=true
+SyslogIdentifier=pos-worker-%i
+
+[Install]
+WantedBy=multi-user.target
