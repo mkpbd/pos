@@ -5,11 +5,14 @@ namespace App\Modules\Orders\Presentation\Http\Controllers;
 use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\Orders\Application\Actions\PlaceDirectOrder;
 use App\Modules\Orders\Application\Services\CheckoutPhoneCheck;
+use App\Modules\Orders\Application\Services\CodAdvancePolicy;
 use App\Modules\Orders\Application\Services\CodRiskPolicy;
+use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Presentation\Http\Support\CheckoutVerifiedPhones;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\BangladeshMobile;
+use App\Modules\Shared\Domain\ClickIds;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,8 +38,9 @@ class StoreDirectCheckoutController
      * Errors: `ORDER_FORM_UNAVAILABLE`, `CHECKOUT_UNAVAILABLE`, field errors on `lines`.
      * BD1b: optional `contact: {phone}` → `cod_available` false for a blocked number (cash on
      * delivery then unusable: `payment_method` null, no COD fee); true otherwise.
+     * BD1c: `cod_advance` (`{amount, methods}` or null) as in the checkout preview.
      */
-    public function preview(Request $request, PlaceDirectOrder $direct, CodRiskPolicy $codRisk): JsonResponse
+    public function preview(Request $request, PlaceDirectOrder $direct, CodRiskPolicy $codRisk, CodAdvancePolicy $codAdvance): JsonResponse
     {
         $data = $request->validate([
             ...$this->formRules(),
@@ -46,10 +50,12 @@ class StoreDirectCheckoutController
             'address' => ['sometimes', 'nullable', 'array'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
-            'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(['cod', 'bank_transfer'])],
+            'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(OrderPaymentMethod::values())],
         ]);
+        $phones = [$data['contact']['phone'] ?? null];
 
-        return ApiResponse::success($codRisk->preview($direct->preview($data, $this->account()?->customer_id), [$data['contact']['phone'] ?? null]));
+        // BD1c: `cod_advance` as in the checkout preview.
+        return ApiResponse::success($codAdvance->preview($codRisk->preview($direct->preview($data, $this->account()?->customer_id), $phones), $phones));
     }
 
     /**
@@ -87,7 +93,7 @@ class StoreDirectCheckoutController
             'address.address_line' => ['required', 'string', 'max:255'],
             'address.postcode' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}$/'],
             'shipping_method_id' => ['required', 'uuid'],
-            'payment_method' => ['required', 'string', Rule::in(['cod', 'bank_transfer'])],
+            'payment_method' => ['required', 'string', Rule::in(OrderPaymentMethod::values())],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
             'expected_total' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
             // Sanitized by the action (invalid parts dropped, never an error).
@@ -103,7 +109,9 @@ class StoreDirectCheckoutController
         $result = $direct->place(
             $data,
             $account === null ? null : ['customer_id' => $account->customer_id, 'account_id' => $account->id],
-            ['ip' => $request->ip(), 'user_agent' => $request->userAgent(), 'site_url' => $request->getSchemeAndHttpHost()],
+            // BD1c: the ad click ids (pixel cookies, click ids of the attribution).
+            ['ip' => $request->ip(), 'user_agent' => $request->userAgent(), 'site_url' => $request->getSchemeAndHttpHost(),
+                'tracking_ids' => ClickIds::collect($request->cookies->all(), $request->input('attribution'), (int) now()->getTimestampMs())],
         );
         $number = $result['order']->number;
 

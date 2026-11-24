@@ -13,6 +13,8 @@ import { OrderActionDialog } from '@/features/web-orders/components/order-action
 import { OrderEditsCard } from '@/features/web-orders/components/order-edits-card'
 import { staffSourceLabel } from '@/features/web-orders/order-entry'
 import { ShipmentCard } from '@/features/web-orders/components/shipment-card'
+import { PaymentClaimsCard } from '@/features/web-orders/components/payment-claims-card'
+import { hasSendMoneyPayment, remainingAfterAdvance } from '@/features/web-orders/payment-claims'
 import { OrderReturnsCard } from '@/features/web-returns/components/order-returns-card'
 import {
   ACTION_LABELS,
@@ -276,6 +278,8 @@ export function WebOrderPage() {
         <PaymentCard order={order} timeZone={timeZone} />
       </div>
 
+      {hasSendMoneyPayment(order) && <PaymentClaimsCard order={order} timeZone={timeZone} canManage={can('web_orders.manage')} />}
+
       <OriginCard order={order} />
 
       {order.phone_report && <DeliveryHistoryCard report={order.phone_report} timeZone={timeZone} />}
@@ -344,6 +348,8 @@ export function WebOrderPage() {
               </dd>
               {!isZeroDecimal(order.cod_fee) && <><dt className="text-muted-foreground">Cash on delivery fee</dt><dd className="text-right font-mono">{formatMoney(order.cod_fee)}</dd></>}
               <dt className="font-semibold">Total</dt><dd className="text-right font-mono font-semibold" data-testid="order-total">{formatMoney(order.total, c)}</dd>
+              {!isZeroDecimal(order.advance_amount) && <><dt className="text-muted-foreground">Advance delivery charge</dt><dd className="text-right font-mono" data-testid="order-advance">{formatMoney(order.advance_amount)}</dd></>}
+              {remainingAfterAdvance(order) && <><dt className="text-muted-foreground">To collect on delivery</dt><dd className="text-right font-mono" data-testid="order-cod-rest">{formatMoney(remainingAfterAdvance(order), c)}</dd></>}
             </dl>
             {order.coupon_code && (
               <p className="mt-4 text-sm" data-testid="order-coupon"><span className="text-muted-foreground">Coupon code:</span> <span className="font-mono font-medium">{order.coupon_code}</span></p>

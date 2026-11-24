@@ -6,6 +6,7 @@ use App\Modules\Marketing\Presentation\Http\Controllers\PageInsightsController;
 use App\Modules\Marketing\Presentation\Http\Controllers\ShortLinkController;
 use App\Modules\Marketing\Presentation\Http\Controllers\StoreInsightEventsController;
 use App\Modules\Marketing\Presentation\Http\Controllers\StoreVisitController;
+use App\Modules\Marketing\Presentation\Http\Controllers\TrackingSettingsController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
@@ -39,6 +40,8 @@ Route::prefix('marketing')->middleware(['auth:sanctum', 'tenant'])->group(functi
         Route::get('short-links', [ShortLinkController::class, 'index']);
         Route::get('short-links/{shortLink}', [ShortLinkController::class, 'show'])->whereUuid('shortLink');
         Route::get('stats', MarketingStatsController::class);
+        // BD1c: ad pixels, Conversions API and pasted tracking code.
+        Route::get('tracking', [TrackingSettingsController::class, 'show']);
     });
 
     Route::middleware('can:marketing.manage')->group(function () {
@@ -47,5 +50,7 @@ Route::prefix('marketing')->middleware(['auth:sanctum', 'tenant'])->group(functi
         Route::post('short-links', [ShortLinkController::class, 'store']);
         Route::patch('short-links/{shortLink}', [ShortLinkController::class, 'update'])->whereUuid('shortLink');
         Route::delete('short-links/{shortLink}', [ShortLinkController::class, 'destroy'])->whereUuid('shortLink');
+        Route::patch('tracking', [TrackingSettingsController::class, 'update']);
+        Route::post('tracking/test', [TrackingSettingsController::class, 'test'])->middleware('throttle:tracking-test');
     });
 });

@@ -3,11 +3,14 @@ import { api, toPaginated, type Paginated } from '@/lib/api/client'
 import type { OrderReturnSummary } from '@/features/web-returns/api'
 import type { OrderRisk, PhoneReport } from '@/features/web-orders/risk'
 import type { OrderEdit } from '@/features/web-orders/order-entry-api'
+import type { PaymentClaim, PaymentDue } from '@/features/web-orders/payment-claims-api'
 
 /** BD1b: `pending_confirmation` = a cash-on-delivery order held until staff call the customer. */
 export type WebOrderStatus = 'pending_confirmation' | 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed'
-export type WebPaymentStatus = 'unpaid' | 'paid' | 'partially_refunded' | 'refunded'
-export type WebPaymentMethod = 'cod' | 'bank_transfer'
+/** BD1c: `partially_paid` = an advance (e.g. the delivery charge) is paid, the rest is due on delivery. */
+export type WebPaymentStatus = 'unpaid' | 'partially_paid' | 'paid' | 'partially_refunded' | 'refunded'
+/** BD1c: `*_manual` = bKash / Nagad / Rocket "Send Money" checked by staff from the shopper's transaction ID. */
+export type WebPaymentMethod = 'cod' | 'bank_transfer' | 'bkash_manual' | 'nagad_manual' | 'rocket_manual'
 
 /** Staff actions, in the order they are offered; the server decides which apply (`allowed_actions`). BD1b: `confirm` after a call. */
 export const WEB_ORDER_ACTIONS = ['confirm', 'confirm_payment', 'process', 'ship', 'deliver', 'record_cod_payment', 'cancel'] as const
@@ -59,6 +62,8 @@ export type WebOrderRow = OrderOrigin & {
   risk?: OrderRisk | null
   /** BD1b: where a staff-entered order was taken (phone, facebook…); null for shop orders. */
   channel?: string | null
+  /** BD1c: `submitted` while a Send Money transaction ID waits for staff to check it. */
+  payment_claim_status?: 'submitted' | null
 }
 
 export type WebOrderLine = {
@@ -165,8 +170,14 @@ export type WebOrder = OrderOrigin & {
   notes: string | null
   cancel_reason: string | null
   payments: WebOrderPayment[]
-  /** Status actions plus `create_return` (E10b) when a return can be created; BD1b `edit` when it can still be changed. */
-  allowed_actions: (WebOrderAction | 'create_return' | 'edit')[]
+  /** Status actions plus `create_return` (E10b) when a return can be created; BD1b `edit` when it can still be changed; BD1c `confirm_payment_claim` while a transaction ID waits. */
+  allowed_actions: (WebOrderAction | 'create_return' | 'edit' | 'confirm_payment_claim')[]
+  /** BD1c: Send Money transaction IDs the customer sent (newest first). */
+  payment_claims?: PaymentClaim[]
+  /** BD1c: the advance delivery charge asked on a cash-on-delivery order ("0.00" when none). */
+  advance_amount?: string
+  /** BD1c: what the customer still has to send by Send Money; null when nothing is due. */
+  payment_due?: PaymentDue | null
   /** BD1b: staff-entered orders and order changes. */
   customer_id?: string | null
   channel?: string | null
@@ -236,13 +247,15 @@ export type WebOrdersListParams = {
   cod_unremitted?: 1
   /** P2a: only orders from the cart checkout or from campaign-page order forms. */
   source?: WebOrderSource
+  /** BD1c: orders with a Send Money transaction ID waiting to be checked. */
+  payment_check?: 1
   search?: string
   date_from?: string
   date_to?: string
 }
 
 /** Orders per status for the list's other filters (E10a `meta.status_counts`). */
-export type StatusCounts = Partial<Record<WebOrderStatus | 'all' | 'cod_unremitted', number>>
+export type StatusCounts = Partial<Record<WebOrderStatus | 'all' | 'cod_unremitted' | 'payment_check', number>>
 
 export type WebOrdersPage = Paginated<WebOrderRow> & { statusCounts: StatusCounts | null }
 

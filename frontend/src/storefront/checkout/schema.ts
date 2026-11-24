@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { BD_MOBILE, bdPhoneFrom, normalizeBdPhone } from '../account/schemas'
 import type { MessageKey } from '../i18n/en'
+import { isPlaceableMethod } from '../payments/manual-methods'
 import type { CheckoutEmailMode, CheckoutPreviewInput, Customer, CustomerAddress, GeoId, PaymentMethodCode, PhoneVerificationMode, PlaceOrderInput } from '../types'
 
 /** The "New address" choice of the address radio list (the other choices are address ids). */
@@ -47,7 +48,7 @@ export const checkoutSchemaFor = (emailMode: CheckoutEmailMode) => z
     postcode: z.string(),
     save_address: z.boolean(),
     shipping_method_id: z.string().min(1, m('checkout.validation.shippingMethod')),
-    payment_method: z.string().refine((v) => v === 'cod' || v === 'bank_transfer', m('checkout.validation.paymentMethod')),
+    payment_method: z.string().refine((v) => isPlaceableMethod(v), m('checkout.validation.paymentMethod')),
     notes: z.string().max(500, m('checkout.validation.max500')),
   })
   .superRefine((values, ctx) => {

@@ -37,12 +37,17 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $cod_review cash-on-delivery orders held for a confirmation call: off | risky | all (BD1b)
  * @property int $cod_review_min_success_rate `risky`: numbers below this delivery success rate (%) are held (BD1b)
  * @property bool $cod_review_new_numbers `risky`: also hold numbers without a delivered order (BD1b)
+ * @property string $cod_advance COD orders that pay the delivery charge in advance by Send Money: off | risky | all (BD1c)
+ * @property string $cod_advance_amount delivery (delivery charge + COD fee) | fixed (BD1c)
+ * @property ?string $cod_advance_fixed the fixed advance (> 0) when `cod_advance_amount` is fixed (BD1c)
+ * @property int $cod_advance_hold_hours hours the shopper has to pay the advance (1–168, BD1c)
  */
 #[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing', 'bangla_enabled', 'default_locale', 'bangla_digits',
     'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button',
     'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff',
     'checkout_email', 'checkout_phone_verification',
-    'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers'])]
+    'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers',
+    'cod_advance', 'cod_advance_amount', 'cod_advance_fixed', 'cod_advance_hold_hours'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -55,6 +60,12 @@ class StorefrontSettings extends Model
 
     /** BD1b: which cash-on-delivery orders wait for a confirmation call. */
     public const COD_REVIEW_MODES = ['off', 'risky', 'all'];
+
+    /** BD1c: which cash-on-delivery orders pay the delivery charge in advance. */
+    public const COD_ADVANCE_MODES = ['off', 'risky', 'all'];
+
+    /** BD1c: how the advance is worked out. */
+    public const COD_ADVANCE_AMOUNTS = ['delivery', 'fixed'];
 
     protected $table = 'storefront_settings';
 
@@ -76,6 +87,9 @@ class StorefrontSettings extends Model
         'cod_review' => 'off',
         'cod_review_min_success_rate' => 70,
         'cod_review_new_numbers' => false,
+        'cod_advance' => 'off',
+        'cod_advance_amount' => 'delivery',
+        'cod_advance_hold_hours' => 24,
     ];
 
     protected function casts(): array
@@ -83,7 +97,8 @@ class StorefrontSettings extends Model
         return ['is_enabled' => 'boolean', 'guest_checkout_enabled' => 'boolean', 'return_window_days' => 'integer', 'allow_indexing' => 'boolean', 'bangla_enabled' => 'boolean', 'bangla_digits' => 'boolean',
             'share_buttons' => 'boolean', 'whatsapp_order_button' => 'boolean', 'whatsapp_chat_button' => 'boolean',
             'assistant_enabled' => 'boolean', 'assistant_translations' => 'array', 'assistant_daily_limit' => 'integer',
-            'cod_review_min_success_rate' => 'integer', 'cod_review_new_numbers' => 'boolean'];
+            'cod_review_min_success_rate' => 'integer', 'cod_review_new_numbers' => 'boolean',
+            'cod_advance_fixed' => 'decimal:2', 'cod_advance_hold_hours' => 'integer'];
     }
 
     /**

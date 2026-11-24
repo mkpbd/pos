@@ -2,9 +2,11 @@
 
 namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
+use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Sms\Application\Contracts\SmsSender;
 use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
@@ -36,13 +38,15 @@ class StorefrontAdminController
      * BD1a: whether SMS is set up (`sms_ready`) and can send sign-in / checkout codes
      * (`otp_ready`) — read-only, beside the checkout phone-check setting.
      *
-     * @return array{sms_ready: bool, otp_ready: bool}
+     * @return array{sms_ready: bool, otp_ready: bool, cod_advance_ready: bool}
      */
     private function smsState(SmsSender $sms, TenantContext $tenant): array
     {
         $organizationId = $tenant->requireOrganization();
 
-        return ['sms_ready' => $sms->ready($organizationId), 'otp_ready' => $sms->otpReady($organizationId)];
+        return ['sms_ready' => $sms->ready($organizationId), 'otp_ready' => $sms->otpReady($organizationId),
+            // BD1c: the advance delivery charge needs a Send Money method to pay it with (else it acts as off).
+            'cod_advance_ready' => app(CheckoutPaymentMethods::class)->sendMoneyMethods() !== []];
     }
 
     /**
@@ -72,6 +76,11 @@ class StorefrontAdminController
      * orders start `pending_confirmation` (all of them, or with `risky` those whose mobile
      * number has a delivery success rate below `cod_review_min_success_rate` (0–100, default
      * 70) and, with `cod_review_new_numbers` (default false), numbers without a delivered order).
+     * BD1c: `cod_advance` off (default) | risky (the rule above) | all — shop and landing-page COD
+     * orders pay an advance by Send Money first (`pending_payment`): `cod_advance_amount`
+     * delivery (default: delivery charge + COD fee) | fixed (`cod_advance_fixed` > 0, capped at
+     * the total); `cod_advance_hold_hours` 1–168 (24). Read-only `cod_advance_ready`: a Send
+     * Money method is on (otherwise the advance acts as off).
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save, SmsSender $sms, TenantContext $tenant): JsonResponse
     {
@@ -102,7 +111,14 @@ class StorefrontAdminController
             'cod_review' => ['sometimes', 'string', Rule::in(StorefrontSettings::COD_REVIEW_MODES)],
             'cod_review_min_success_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'cod_review_new_numbers' => ['sometimes', 'boolean'],
+            'cod_advance' => ['sometimes', 'string', Rule::in(StorefrontSettings::COD_ADVANCE_MODES)],
+            'cod_advance_amount' => ['sometimes', 'string', Rule::in(StorefrontSettings::COD_ADVANCE_AMOUNTS)],
+            'cod_advance_fixed' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'max:9999999', 'decimal:0,2'],
+            'cod_advance_hold_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
         ]);
+        if (isset($data['cod_advance_fixed'])) {
+            $data['cod_advance_fixed'] = Decimal::round((string) $data['cod_advance_fixed'], 2);
+        }
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)) + $this->smsState($sms, $tenant));
     }

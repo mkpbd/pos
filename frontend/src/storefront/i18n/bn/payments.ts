@@ -1,0 +1,51 @@
+import type { Translations } from '../types'
+import type { payments as en } from '../en/payments'
+
+export const payments: Translations<typeof en> = {
+  'payments.method.bkashManual': 'বিকাশ (সেন্ড মানি)',
+  'payments.method.nagadManual': 'নগদ (সেন্ড মানি)',
+  'payments.method.rocketManual': 'রকেট (সেন্ড মানি)',
+  'payments.accountType.personal': 'পার্সোনাল',
+  'payments.accountType.agent': 'এজেন্ট',
+  'payments.accountType.merchant': 'মার্চেন্ট',
+  'payments.state.partiallyPaid': 'আংশিক পরিশোধিত',
+
+  'payments.checkout.sendAfter': 'অর্ডার করার পর {number} ({type}) নম্বরে টাকা পাঠান।',
+  'payments.checkout.payAfter': 'অর্ডার করার পর মোবাইল থেকে টাকা পাঠান।',
+  'payments.codAdvance.notice': 'অর্ডার করার পর {methods} দিয়ে {amount} ডেলিভারি চার্জ অগ্রিম পরিশোধ করুন। বাকি টাকা পণ্য হাতে পেয়ে নগদে দেবেন।',
+
+  'payments.due.title': 'আপনার অর্ডারের টাকা পরিশোধ করুন',
+  'payments.due.titleAdvance': 'ডেলিভারি চার্জ অগ্রিম পরিশোধ করুন',
+  'payments.due.amountLabel': 'পরিশোধের পরিমাণ',
+  'payments.due.advanceNote': 'বাকি টাকা অর্ডার হাতে পেয়ে নগদে পরিশোধ করবেন।',
+  'payments.due.chooseMethod': 'যেভাবে পরিশোধ করবেন',
+  'payments.due.sendTo.personal': '{number} (পার্সোনাল) নম্বরে সেন্ড মানি করুন',
+  'payments.due.sendTo.agent': '{number} (এজেন্ট) নম্বরে ক্যাশ আউট করুন',
+  'payments.due.sendTo.merchant': '{number} (মার্চেন্ট) নম্বরে পেমেন্ট করুন',
+  'payments.due.copy': 'নম্বর কপি করুন',
+  'payments.due.copied': 'কপি হয়েছে',
+  'payments.due.deadline': '{date}-এর আগে পরিশোধ করুন। এর মধ্যে পরিশোধ না হলে অর্ডারটি বাতিল হয়ে যাবে।',
+  'payments.due.steps': 'টাকা পাঠানোর পর যে নম্বর থেকে পাঠিয়েছেন সেটি এবং নিশ্চিতকরণ এসএমএস-এর ট্রানজেকশন আইডি (TrxID) লিখুন।',
+
+  'payments.claim.formLabel': 'পেমেন্টের তথ্য',
+  'payments.claim.sender': 'যে নম্বর থেকে টাকা পাঠিয়েছেন',
+  'payments.claim.trxid': 'ট্রানজেকশন আইডি (TrxID)',
+  'payments.claim.trxidHint': 'টাকা পাঠানোর পর পাওয়া এসএমএস-এ এটি আছে, যেমন 9A8B7C6D5E।',
+  'payments.claim.submit': 'পেমেন্টের তথ্য পাঠান',
+  'payments.claim.pending': 'পাঠানো হচ্ছে…',
+  'payments.claim.sent': 'ধন্যবাদ! আপনার পেমেন্টের তথ্য পেয়েছি।',
+  'payments.claim.checking': 'আমরা আপনার পেমেন্ট যাচাই করছি — TrxID {trxid}। পেমেন্ট পাওয়া গেলেই অর্ডারটি নিশ্চিত করা হবে।',
+  'payments.claim.rejected': 'TrxID {trxid} দিয়ে আপনার পেমেন্ট খুঁজে পাওয়া যায়নি।',
+  'payments.claim.rejectedReason': 'কারণ: {reason}',
+  'payments.claim.tryAgain': 'অনুগ্রহ করে তথ্য যাচাই করে আবার পাঠান।',
+
+  'payments.claim.error.senderRequired': 'যে নম্বর থেকে টাকা পাঠিয়েছেন সেটি লিখুন।',
+  'payments.claim.error.trxRequired': 'ট্রানজেকশন আইডি লিখুন।',
+  'payments.claim.error.trxInvalid': 'ট্রানজেকশন আইডিতে ৬ থেকে ৪০টি অক্ষর ও সংখ্যা থাকে, যেমন 9A8B7C6D5E।',
+  'payments.claim.error.methodRequired': 'কীভাবে টাকা পাঠিয়েছেন তা বেছে নিন।',
+  'payments.claim.error.method': 'এই অর্ডারে এই পেমেন্ট পদ্ধতি ব্যবহার করা যাবে না। অন্য একটি বেছে নিন।',
+  'payments.claim.error.used': 'এই ট্রানজেকশন আইডি আগেই ব্যবহার করা হয়েছে। যাচাই করে আবার চেষ্টা করুন।',
+  'payments.claim.error.pending': 'এই অর্ডারের একটি পেমেন্ট আমরা ইতিমধ্যে যাচাই করছি। অনুগ্রহ করে নিশ্চিতকরণের অপেক্ষা করুন।',
+  'payments.claim.error.notDue': 'এই অর্ডারে এখন পরিশোধের কিছু নেই।',
+  'payments.claim.error.notFound': 'অর্ডারটি খুঁজে পাওয়া যায়নি। পেজটি আবার লোড করে চেষ্টা করুন।',
+}

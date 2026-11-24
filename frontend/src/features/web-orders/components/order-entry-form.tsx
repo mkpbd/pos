@@ -16,6 +16,7 @@ import { useCan } from '@/features/auth/use-auth'
 import { isRetryable, useIdempotencyKey } from '@/features/returns/api'
 import { useDistrictsQuery, useDivisionsQuery } from '@/features/shipping/api'
 import type { WebOrder, WebPaymentMethod } from '@/features/web-orders/api'
+import { isSendMoneyCode } from '@/features/online-payments/gateway-form'
 import { CustomerSearch } from '@/features/web-orders/components/customer-search'
 import { PhoneHistoryStrip } from '@/features/web-orders/components/phone-history-strip'
 import {
@@ -49,7 +50,7 @@ import {
   type StaffQuote,
   type StaffQuoteInput,
 } from '@/features/web-orders/order-entry-api'
-import { etaLabel, promotionKindLabel } from '@/features/web-orders/orders'
+import { etaLabel, paymentMethodLabel, promotionKindLabel } from '@/features/web-orders/orders'
 import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap } from '@/lib/forms'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
@@ -387,9 +388,12 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
                     quote.payment_methods.map((m) => (
                       <label key={m.code} className="flex cursor-pointer items-center gap-2 text-sm">
                         <input type="radio" name="payment-method" className="size-4 accent-primary" checked={paymentMethod === m.code} onChange={() => set({ payment_method: m.code })} />
-                        {m.name}
+                        {m.name || paymentMethodLabel(m.code)}
                       </label>
                     ))
+                  )}
+                  {isSendMoneyCode(paymentMethod) && (
+                    <p className="text-sm text-muted-foreground" data-testid="send-money-note">The order waits as Awaiting payment until you confirm the customer's transaction ID on the order page.</p>
                   )}
                   {errors.payment_method && <ErrorText>{errors.payment_method}</ErrorText>}
                 </fieldset>

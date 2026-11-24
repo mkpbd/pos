@@ -7,7 +7,7 @@ import { elementMeta, isAllowedIn, isTranslatableKey } from './builder/registry'
 import { documentOf, elementNode, payloadOf } from './builder/test-payload'
 import type { BuilderPage, OrderFormData } from './builder/types'
 import { elementPropProblems, orderFormPropProblems } from './builder/validate'
-import { ATTRIBUTION_KEY, captureTouch, readAttribution, touchFromUrl } from './landing/attribution'
+import { ATTRIBUTION_KEY, CLICK_IDS_KEY, captureTouch, orderAttribution, readAttribution, readClickIds, touchFromUrl } from './landing/attribution'
 import { entryPathOf, landingSlugOf } from './landing/entry-path'
 import {
   EMPTY_VALUES,
@@ -483,6 +483,22 @@ describe('campaign attribution', () => {
     })
     expect(() => captureTouch(at('?utm_source=fb'), '')).not.toThrow()
     spy.mockRestore()
+  })
+
+  it('keeps ad click ids apart from the campaign and sends them with the order (BD1c)', () => {
+    // A click alone is no campaign: no touch, no visit, but its ids are kept for the order.
+    expect(captureTouch(at('?fbclid=IwAR0abc&gclid=Cj0K-x_y.1&ttclid=bad id!'), '', new Date('2026-11-05T10:00:00Z'))).toBeNull()
+    expect(readAttribution(new Date('2026-11-05T10:00:00Z'))).toBeNull()
+    expect(orderAttribution(new Date('2026-11-05T11:00:00Z'))).toEqual({ fbclid: 'IwAR0abc', gclid: 'Cj0K-x_y.1', first_seen_at: '2026-11-05T11:00:00.000Z' })
+    // With a campaign touch the ids ride along with it; the last click replaces the earlier one.
+    captureTouch(at('?utm_source=facebook&fbclid=IwAR9xyz', '/p/eid-sale'), '', new Date('2026-11-06T10:00:00Z'))
+    const sent = orderAttribution(new Date('2026-11-06T10:00:00Z'))
+    expect(sent).toMatchObject({ utm_source: 'facebook', fbclid: 'IwAR9xyz', landing_path: '/p/eid-sale' })
+    expect(sent?.gclid).toBeUndefined()
+    // 30 days later they are gone too.
+    expect(readClickIds(new Date('2026-12-07T10:00:00Z'))).toEqual({})
+    localStorage.setItem(CLICK_IDS_KEY, '{nope')
+    expect(readClickIds()).toEqual({})
   })
 
   it('counts a campaign or landing page visit once per session', () => {

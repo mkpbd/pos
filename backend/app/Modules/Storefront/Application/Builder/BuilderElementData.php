@@ -712,7 +712,8 @@ class BuilderElementData
         $settings = $this->storefront->settings();
         $storeId = $settings->fulfilment_store_id;
         $store = $storeId === null ? null : $this->branches->store($storeId, $this->tenant->requireOrganization());
-        $methods = array_map(fn (array $m) => ['code' => $m['code'], 'display_name' => $m['display_name']], $this->payments->enabled());
+        // BD1c: Send Money methods add {instructions, account_number, account_type}.
+        $methods = array_map(fn (array $m) => $this->payments->shopperView($m), $this->payments->enabled());
         $shipping = $this->shipping->districtMethods();
 
         return [

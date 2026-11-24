@@ -5,6 +5,7 @@ namespace App\Modules\Orders\Infrastructure\Console;
 use App\Modules\Orders\Application\Actions\CancelOrder;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
+use App\Modules\Orders\Infrastructure\Models\OrderPaymentClaim;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Console\Command;
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\DB;
  * actor) and puts their stock back. Each order is taken with FOR UPDATE SKIP LOCKED on
  * PostgreSQL, so parallel runs (or a staff action on the same order) never cancel or
  * restock twice; the status is re-checked under the lock. Scheduled every minute.
+ *
+ * BD1c: an order with a Send Money payment claim waiting for staff is not expired — staff
+ * confirm or reject the claim first (a rejected claim lets the next run cancel it).
  */
 class ExpirePendingOrdersCommand extends Command
 {
@@ -29,6 +33,7 @@ class ExpirePendingOrdersCommand extends Command
         $due = Order::query()->withoutGlobalScope('organization')
             ->where('status', OrderStatus::PendingPayment->value)
             ->where('expires_at', '<=', now())
+            ->whereDoesntHave('paymentClaims', fn ($q) => $q->withoutGlobalScopes()->where('status', OrderPaymentClaim::SUBMITTED))
             ->orderBy('expires_at')
             ->limit(500)
             ->get(['id', 'organization_id']);
@@ -40,7 +45,8 @@ class ExpirePendingOrdersCommand extends Command
                     $query = Order::query()
                         ->whereKey($candidate->id)
                         ->where('status', OrderStatus::PendingPayment->value)
-                        ->where('expires_at', '<=', now());
+                        ->where('expires_at', '<=', now())
+                        ->whereDoesntHave('paymentClaims', fn ($q) => $q->where('status', OrderPaymentClaim::SUBMITTED));
                     /** @var Order|null $order */
                     $order = (DB::getDriverName() === 'pgsql' ? $query->lock('for update skip locked') : $query->lockForUpdate())->first();
                     if ($order === null) {

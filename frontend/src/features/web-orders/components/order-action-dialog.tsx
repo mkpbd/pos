@@ -15,9 +15,11 @@ import { isRetryable, useIdempotencyKey } from '@/features/returns/api'
 import { useCouriersQuery } from '@/features/shipping/api'
 import { sortCouriers } from '@/features/shipping/shipping'
 import { useWebOrderActionMutation, type WebOrder, type WebOrderAction } from '@/features/web-orders/api'
-import { actionErrorMessage, cancelRefundDue, isStaleOrderError, refundBlocker } from '@/features/web-orders/orders'
+import { actionErrorMessage, cancelRefundDue, isStaleOrderError, paymentMethodLabel, refundBlocker } from '@/features/web-orders/orders'
 import { WEB_REFUND_METHODS, type WebRefundMethod } from '@/features/web-returns/api'
 import { REFUND_METHOD_LABELS } from '@/features/web-returns/returns'
+import { isSendMoneyCode } from '@/features/online-payments/gateway-form'
+import { remainingAfterAdvance } from '@/features/web-orders/payment-claims'
 import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap } from '@/lib/forms'
 import { formatMoney } from '@/lib/money'
@@ -26,6 +28,9 @@ type Copy = { title: string; description: string; submit: string; success: strin
 
 function copyFor(action: WebOrderAction, order: WebOrder, refundDue: string | null): Copy {
   const total = formatMoney(order.total, order.currency)
+  // BD1c: after an advance, only the rest is collected on delivery.
+  const rest = remainingAfterAdvance(order)
+  const onDelivery = rest ? formatMoney(rest, order.currency) : total
   switch (action) {
     case 'confirm':
       return {
@@ -37,7 +42,9 @@ function copyFor(action: WebOrderAction, order: WebOrder, refundDue: string | nu
     case 'confirm_payment':
       return {
         title: `Confirm payment for ${order.number}`,
-        description: `Record the bank transfer of ${total} once it has reached your account. The order moves to Confirmed.`,
+        description: isSendMoneyCode(order.payment_method)
+          ? `Record the ${paymentMethodLabel(order.payment_method)} payment of ${total} once you see it in your app. The order moves to Confirmed.`
+          : `Record the bank transfer of ${total} once it has reached your account. The order moves to Confirmed.`,
         submit: 'Confirm payment',
         success: `Payment for ${order.number} confirmed.`,
       }
@@ -52,8 +59,8 @@ function copyFor(action: WebOrderAction, order: WebOrder, refundDue: string | nu
       return {
         title: `Ship ${order.number}`,
         description:
-          order.payment_method === 'cod' && order.payment_status === 'unpaid'
-            ? `Record the courier who carries the parcel. The courier collects ${total} on delivery. The tracking number is shown to the customer.`
+          order.payment_method === 'cod' && (order.payment_status === 'unpaid' || rest !== null)
+            ? `Record the courier who carries the parcel. The courier collects ${onDelivery} on delivery. The tracking number is shown to the customer.`
             : 'Record the courier who carries the parcel. The tracking number is shown to the customer.',
         submit: 'Mark as shipped',
         success: `${order.number} marked as shipped.`,
@@ -68,7 +75,7 @@ function copyFor(action: WebOrderAction, order: WebOrder, refundDue: string | nu
     case 'record_cod_payment':
       return {
         title: `Record cash on delivery for ${order.number}`,
-        description: `Record ${total} collected on delivery. The order is marked paid. For cash a courier pays over, use a COD remittance instead.`,
+        description: `Record ${onDelivery} collected on delivery. The order is marked paid. For cash a courier pays over, use a COD remittance instead.`,
         submit: 'Record payment',
         success: `Payment for ${order.number} recorded.`,
       }
@@ -214,7 +221,7 @@ export function OrderActionDialog({ order, action, onClose }: Props) {
             <FormField
               label={action === 'confirm_payment' ? 'Transaction reference' : 'Reference (optional)'}
               error={errors.reference}
-              hint={action === 'confirm_payment' ? 'As shown on the bank statement.' : 'e.g. the rider\'s receipt number'}
+              hint={action === 'confirm_payment' ? (isSendMoneyCode(order.payment_method) ? 'The transaction ID (TrxID) shown in your app.' : 'As shown on the bank statement.') : 'e.g. the rider\'s receipt number'}
             >
               <Input autoFocus maxLength={80} value={fields.reference} onChange={(e) => set({ reference: e.target.value })} />
             </FormField>

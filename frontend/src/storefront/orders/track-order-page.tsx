@@ -8,16 +8,15 @@ import { useCustomer } from '../account/api'
 import { BD_MOBILE, bdPhoneFrom } from '../account/schemas'
 import { formatDateTime } from '../checkout/delivery'
 import { storeFormError } from '../form-errors'
-import type { MessageKey } from '../i18n/en'
 import { useLocale } from '../i18n/locale'
 import { rich } from '../i18n/rich'
 import { usePriceFormat } from '../money'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
+import { paymentMethodLabel, paymentStateKey } from '../payments/manual-methods'
+import { PaymentDueCard } from '../payments/payment-due-card'
 import { AwaitingConfirmationNote, OrderStatusBadge, OrderTimeline } from './order-view'
 import { orderStatusLabel } from './returns-api'
 import { trackOrder, type TrackedOrder } from './track-api'
-
-const METHOD_LABELS: Record<string, MessageKey> = { cod: 'orders.trackOrder.method.cod', bank_transfer: 'orders.trackOrder.method.bankTransfer' }
 
 const linkClass = 'font-semibold text-sf-link underline-offset-4 hover:underline'
 
@@ -109,6 +108,8 @@ export function TrackOrderPage() {
       {track.data && !track.isPending && (
         <div ref={resultRef} tabIndex={-1} className="mt-6 flex flex-col gap-4 focus:outline-none" aria-live="polite">
           <TrackedOrderCard order={track.data} />
+          {/* BD1c: what is still owed by Send Money; the TrxID goes with the mobile number this order was found by. */}
+          <PaymentDueCard number={track.data.number} due={track.data.payment_due} access={{ kind: 'track', phone: track.variables?.phone ?? '' }} className="mt-0" />
         </div>
       )}
     </section>
@@ -119,8 +120,8 @@ function TrackedOrderCard({ order }: { order: TrackedOrder }) {
   const { t, formatNumber } = useLocale()
   const format = usePriceFormat()
   const status = orderStatusLabel(t, order.status, order.status)
-  const method = METHOD_LABELS[order.payment_method] ? t(METHOD_LABELS[order.payment_method]!) : order.payment_method
-  const paymentState = t(order.payment_status === 'paid' ? 'orders.paymentState.paid' : order.payment_method === 'cod' ? 'orders.paymentState.cod' : 'orders.paymentState.awaiting')
+  const method = paymentMethodLabel(t, order.payment_method)
+  const paymentState = t(paymentStateKey(order.payment_status, order.payment_method))
   const count = Number(order.item_count)
   const shipment = order.shipment
   const history = (Array.isArray(order.history) ? order.history : []).map((entry) => ({ ...entry, label: orderStatusLabel(t, entry.status, entry.status) }))

@@ -34,7 +34,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         $middleware->throttleApi();
         // E12b: the storefront's language switcher writes `lang` in the browser (plain text).
-        $middleware->encryptCookies(except: ['lang']);
+        // BD1c: the Meta / TikTok pixels' first-party cookies (read at checkout for the click ids).
+        $middleware->encryptCookies(except: ['lang', '_fbp', '_fbc', '_ttp']);
 
         $middleware->alias([
             'tenant' => ResolveTenant::class,

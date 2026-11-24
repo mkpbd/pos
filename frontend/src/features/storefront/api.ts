@@ -48,10 +48,21 @@ export type StorefrontSettings = {
   cod_review_min_success_rate?: number
   /** BD1b: with `risky`, also hold orders from numbers that have no delivered order yet (default off). */
   cod_review_new_numbers?: boolean
+  /** BD1c: ask an advance delivery charge by Send Money on cash-on-delivery orders — none, only risky ones (the COD check rules) or all (default off). */
+  cod_advance?: CodReviewMode
+  /** BD1c: the advance is the order's delivery charge (+ COD fee) or a fixed amount (default `delivery`). */
+  cod_advance_amount?: CodAdvanceAmount
+  /** BD1c: the fixed advance (decimal string > 0) with `fixed`; null otherwise. */
+  cod_advance_fixed?: string | null
+  /** BD1c: hours the shopper has to pay the advance before the order is cancelled (1–168, default 24). */
+  cod_advance_hold_hours?: number
+  /** BD1c (read-only): at least one bKash / Nagad / Rocket Send Money method is on; otherwise no advance is asked. */
+  cod_advance_ready?: boolean
   updated_at: string | null
 }
 
 export type CodReviewMode = 'off' | 'risky' | 'all'
+export type CodAdvanceAmount = 'delivery' | 'fixed'
 
 export type StoreLocale = 'en' | 'bn'
 export type CheckoutEmailMode = 'required' | 'optional' | 'hidden'
@@ -436,6 +447,10 @@ export function useSaveStorefrontSettingsMutation() {
           | 'cod_review'
           | 'cod_review_min_success_rate'
           | 'cod_review_new_numbers'
+          | 'cod_advance'
+          | 'cod_advance_amount'
+          | 'cod_advance_fixed'
+          | 'cod_advance_hold_hours'
         >
       > & { assistant?: AssistantSettingsInput },
     ) =>

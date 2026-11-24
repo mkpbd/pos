@@ -6,7 +6,7 @@
 
 import type { Audience, AudienceCampaigns, Experiment, SectionExperiment } from './audience/types'
 import type { BlogPostBodyProps, BootstrapTemplates, DynamicTextProps, NotFoundMessageProps, OrderSummaryProps, ProductListingData, ProductListingProps } from './templates/types'
-import type { CatalogImage, FaqGroup, MediaRef, ProductCard, ProductDetail, ShippingMethod, StoreSection, StorefrontMenu, ThemeColors } from '../types'
+import type { CatalogImage, FaqGroup, MediaRef, PaymentMethodCode, ProductCard, ProductDetail, ShippingMethod, StoreSection, StorefrontMenu, ThemeColors } from '../types'
 
 export type Breakpoint = 'base' | 'tablet' | 'mobile'
 export type Device = 'desktop' | 'tablet' | 'mobile'
@@ -1196,7 +1196,8 @@ export type ChartStoreData = { labels: string[]; series: ChartSeries[]; state?: 
 export type OrderFormData = {
   product: ProductDetail
   upsell: ProductDetail | null
-  payment_methods: { code: 'cod' | 'bank_transfer'; display_name: string }[]
+  /** BD1c: Send Money methods (`store_methods` forms) also carry the shop's number and its kind. */
+  payment_methods: { code: PaymentMethodCode; display_name: string; instructions?: string | null; account_number?: string | null; account_type?: string | null }[]
   cod_enabled: boolean
   guest_checkout: boolean
   checkout_available: boolean

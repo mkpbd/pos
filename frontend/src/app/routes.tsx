@@ -154,6 +154,8 @@ const pages = {
   shortLinks: page(() => import('@/features/marketing/pages/short-links-page'), 'ShortLinksPage'),
   socialPosts: page(() => import('@/features/marketing/pages/social-page'), 'SocialPage'),
   productFeeds: page(() => import('@/features/marketing/pages/feeds-page'), 'ProductFeedsPage'),
+  // BD1c: ad pixels, Conversions API and pasted tracking code.
+  trackingPixels: page(() => import('@/features/marketing/pages/tracking-page'), 'TrackingPage'),
   // ST1: bulk import wizard and label printing.
   imports: page(() => import('@/features/imports/pages/import-pages'), 'ImportsPage'),
   newImport: page(() => import('@/features/imports/pages/import-pages'), 'NewImportPage'),
@@ -245,6 +247,8 @@ export const routes: RouteObject[] = [
               // P2b: Facebook & Instagram posting and product feeds; changes need social.manage (page and API).
               guarded('social.view', 'marketing/social', pages.socialPosts),
               guarded('social.view', 'marketing/feeds', pages.productFeeds),
+              // BD1c: changes need marketing.manage; the pasted code also storefront.custom_html (page and API).
+              guarded('marketing.view', 'marketing/tracking', pages.trackingPixels),
               guarded('reviews.view', 'reviews', pages.reviews),
               // P1b: shoppers' questions; answering, rejecting and deleting need reviews.moderate (bell link ?status=pending).
               guarded('reviews.view', 'reviews/questions', pages.productQuestions),

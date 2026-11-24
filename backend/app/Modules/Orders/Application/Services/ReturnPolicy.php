@@ -3,6 +3,7 @@
 namespace App\Modules\Orders\Application\Services;
 
 use App\Modules\Orders\Domain\OrderStatus;
+use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\ReturnStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderReturn;
@@ -59,7 +60,8 @@ class ReturnPolicy
         if ($order->status !== OrderStatus::Delivered) {
             return self::NOT_DELIVERED;
         }
-        if (! $order->payment_status->isPaid()) {
+        // BD1c: a partly paid order (only its advance received) is not paid yet.
+        if (! $order->payment_status->isPaid() || $order->payment_status === PaymentStatus::PartiallyPaid) {
             return self::NOT_PAID;
         }
         if ($ignoreWindow) {

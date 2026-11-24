@@ -7,11 +7,16 @@ use App\Modules\OnlinePayments\Infrastructure\Models\PaymentGatewaySetting;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\TranslationInput;
+use App\Modules\Shared\Domain\BangladeshMobile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Saves an organization's configuration of a payment method, creating the row from the
  * defaults on first use. Settings are merged over the stored ones.
+ *
+ * BD1c: a Send Money method can only be on with the shop's receiving number set (a valid
+ * Bangladeshi mobile number) — else 422 on `settings.account_number`.
  */
 class ConfigurePaymentMethod
 {
@@ -48,7 +53,11 @@ class ConfigurePaymentMethod
             if (array_key_exists('translations', $data)) {
                 $data['translations'] = TranslationInput::apply($row->translations, $data['translations'], array_keys(self::TRANSLATABLE));
             }
-            $row->fill(array_intersect_key($data, array_flip(self::AUDITED)))->save();
+            $row->fill(array_intersect_key($data, array_flip(self::AUDITED)));
+            if ($code->isSendMoney() && $row->is_enabled && BangladeshMobile::normalize((string) ($row->settings['account_number'] ?? '')) === null) {
+                throw ValidationException::withMessages(['settings.account_number' => ['Enter the mobile number that receives the money (e.g. 01712345678) before turning this method on.']]);
+            }
+            $row->save();
 
             [$old, $new] = Changes::between($before, $row->only(self::AUDITED));
             if ($new !== []) {

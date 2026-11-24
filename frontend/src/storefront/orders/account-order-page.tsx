@@ -18,6 +18,7 @@ import { ReviewDialog, type ReviewTarget } from '../reviews/review-dialog'
 import { Stars } from '../reviews/stars'
 import type { AccountOrder, AccountOrderLine, OrderReturnSummary } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
+import { PaymentDueCard } from '../payments/payment-due-card'
 import { reorderNotice, useAccountOrderQuery, useCancelOrderMutation, useReorderMutation } from './account-api'
 import { ReturnRequestDialog } from './return-request-dialog'
 import { canRequestReturn, orderStatusLabel } from './returns-api'
@@ -179,7 +180,8 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
         )}
       </header>
 
-      <PaymentInstructionsCard order={order} />
+      {/* BD1c: a Send Money order (or a cash-on-delivery advance) shows the number to pay and the TrxID form instead. */}
+      {order.payment_due ? <PaymentDueCard number={order.number} due={order.payment_due} access={{ kind: 'account' }} /> : <PaymentInstructionsCard order={order} />}
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_20rem]">
         <div className="flex min-w-0 flex-col gap-6">

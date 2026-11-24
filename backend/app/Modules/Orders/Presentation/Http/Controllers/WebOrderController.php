@@ -15,6 +15,7 @@ use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\RefundMethod;
 use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
+use App\Modules\Orders\Infrastructure\Models\OrderPaymentClaim;
 use App\Modules\Orders\Presentation\Http\Exports\WebOrdersExport;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
@@ -65,6 +66,9 @@ class WebOrderController
      * source, campaign: {id, name}|null}` (P2a: filter `source` storefront | landing_page; BD1b: staff).
      * `meta.status_counts`: `{all, <every status>: n, cod_unremitted}` for the current
      * filters except `status` (and except `cod_unremitted` for its own count).
+     * BD1c: `payment_check=1` — orders with a Send Money payment claim waiting for staff
+     * (`meta.status_counts.payment_check`, counted like `cod_unremitted`); rows add
+     * `payment_claim_status` (`submitted` | null); `cod_unremitted` includes partly paid orders.
      * BD1b: rows add `risk: {success_rate: int|null, blocked: bool}` (the contact phone's
      * delivery success rate and whether it is blocked; not in exports).
      */
@@ -84,6 +88,8 @@ class WebOrderController
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             // P2a: cart checkout or a landing page's order form.
             'source' => ['sometimes', Rule::in(Order::SOURCES)],
+            // BD1c: orders with a Send Money payment claim waiting for staff.
+            'payment_check' => ['sometimes', 'boolean'],
         ]);
         $timezone = $organizations->summary($tenant->requireOrganization())['timezone'] ?? config('app.timezone');
         $day = fn (string $date) => Carbon::parse($date, $timezone)->startOfDay()->setTimezone(config('app.timezone'));
@@ -92,7 +98,9 @@ class WebOrderController
         $search = trim((string) $request->query('search', ''));
         $codUnremitted = fn (Builder $q) => $q->where('payment_method', OrderPaymentMethod::CashOnDelivery->value)
             ->where('status', OrderStatus::Delivered->value)
-            ->where('payment_status', PaymentStatus::Unpaid->value);
+            // BD1c: or only its advance delivery charge paid.
+            ->whereIn('payment_status', [PaymentStatus::Unpaid->value, PaymentStatus::PartiallyPaid->value]);
+        $paymentCheck = fn (Builder $q) => $q->whereHas('paymentClaims', fn (Builder $c) => $c->where('status', OrderPaymentClaim::SUBMITTED));
 
         $filtered = fn (bool $withCodUnremitted) => Order::query()
             ->when($request->query('payment_status'), fn (Builder $q, string $v) => $q->where('payment_status', $v))
@@ -101,6 +109,7 @@ class WebOrderController
             ->when($request->query('courier_id'), fn (Builder $q, string $v) => $q->whereHas('shipment', fn (Builder $s) => $s->where('courier_id', $v)))
             ->when($request->query('district_id'), fn (Builder $q, $v) => $q->whereHas('shippingAddress', fn (Builder $a) => $a->where('district_id', (int) $v)))
             ->when($withCodUnremitted && $request->boolean('cod_unremitted'), $codUnremitted)
+            ->when($withCodUnremitted && $request->boolean('payment_check'), $paymentCheck)
             ->when(is_string($from), fn (Builder $q) => $q->where('placed_at', '>=', $day($from)))
             ->when(is_string($to), fn (Builder $q) => $q->where('placed_at', '<', $day($to)->addDay()))
             ->when($search !== '', fn (Builder $q) => $q->where(function (Builder $w) use ($search) {
@@ -115,9 +124,11 @@ class WebOrderController
             $statusCounts[$status->value] = (int) ($counts[$status->value] ?? 0);
         }
         $statusCounts['cod_unremitted'] = $codUnremitted($filtered(false))->count();
+        $statusCounts['payment_check'] = $paymentCheck($filtered(false))->count();
 
         $query = $filtered(true)
             ->with(['shippingAddress', 'shipment'])
+            ->withExists(['paymentClaims as has_submitted_claim' => fn (Builder $c) => $c->where('status', OrderPaymentClaim::SUBMITTED)])
             ->withSum('lines', 'quantity')
             ->when($request->query('status'), fn (Builder $q, string $v) => $q->where('status', $v));
         ListQuery::apply($query, $request, sortable: ['placed_at', 'number', 'total'], defaultSort: '-placed_at');
@@ -203,6 +214,8 @@ class WebOrderController
      * `payments` (direction `out`) and `create_return` in `allowed_actions` (with
      * `web_orders.refund`, delivered and paid orders with something left to return â€”
      * after the window only with `override_window`).
+     * BD1c: `advance_amount`, `payment_due` (as on the shopper's order page), `payment_claims`
+     * (newest first) and `confirm_payment_claim` in `allowed_actions` while a claim is `submitted`.
      */
     public function show(Request $request, Order $webOrder): JsonResponse
     {
@@ -214,6 +227,7 @@ class WebOrderController
      *
      * `pending_payment` → `confirmed`, paid; records the order total as `bank_transfer` in the
      * payments ledger with the staff-entered `reference`. `ORDER_ALREADY_PAID` when repeated.
+     * BD1c: Send Money orders too (recorded as `mobile_banking`).
      */
     public function confirmPayment(Request $request, Order $webOrder, OrderWorkflow $workflow): JsonResponse
     {

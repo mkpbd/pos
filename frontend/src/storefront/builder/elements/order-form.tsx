@@ -26,7 +26,7 @@ import { useDebouncedValue } from '../../checkout/use-debounced-value'
 import { storeApi } from '../../http'
 import type { MessageKey } from '../../i18n/en'
 import { useLocale } from '../../i18n/locale'
-import { readAttribution } from '../../landing/attribution'
+import { orderAttribution } from '../../landing/attribution'
 import { directKeys, fetchDirectPreview, useDirectOrderMutation, useDirectPreviewQuery } from '../../landing/direct-api'
 import { ORDER_PLACED_EVENT, orderFormAnchor } from '../../landing/order-now-shared'
 import {
@@ -52,8 +52,13 @@ import {
   type OrderProblem,
 } from '../../landing/order-form-logic'
 import { formatPrice } from '../../money'
+import { CodAdvanceNotice, ManualMethodNote } from '../../payments/checkout-notes'
+import { codAdvanceOf, isManualMethod, isPlaceableMethod } from '../../payments/manual-methods'
+import { PaymentDueCard } from '../../payments/payment-due-card'
+import { productData, trackPurchase } from '../../tracking/payloads'
+import { track } from '../../tracking/track'
 import { customerKeys, localized } from '../../store-keys'
-import type { CheckoutPreview, Customer, GeoDistrict, GeoDivision, ProductDetail, ShippingMethod } from '../../types'
+import type { CheckoutPreview, CodAdvance, Customer, GeoDistrict, GeoDivision, ProductDetail, ShippingMethod } from '../../types'
 import { DraftPlaceholder, PreviewMark } from '../preview-mark'
 import { NODE_ID } from '../registry'
 import { DeviceOrderCtx, useOwnerDocumentId, usePage } from '../render-context'
@@ -182,7 +187,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   const [withUpsell, setWithUpsell] = useState(false)
 
   // Payment methods offered (cod_only: cash on delivery only).
-  const paymentMethods = (Array.isArray(data.payment_methods) ? data.payment_methods : []).filter((m) => isObject(m) && (m.code === 'cod' || m.code === 'bank_transfer') && (!codOnly || m.code === 'cod'))
+  const paymentMethods = (Array.isArray(data.payment_methods) ? data.payment_methods : []).filter((m) => isObject(m) && isPlaceableMethod(m.code) && (!codOnly || m.code === 'cod'))
   const [values, setValues] = useState<OrderFormValues>(() => ({ ...EMPTY_VALUES, payment_method: paymentMethods.length === 1 ? paymentMethods[0]!.code : '' }))
   const set = (field: keyof OrderFormValues, value: string) => setValues((v) => ({ ...v, [field]: value }))
 
@@ -194,7 +199,15 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   const servedDistricts = isObject(data.shipping) && isObject(data.shipping.districts) ? (data.shipping.districts as Record<string, string[]>) : null
 
   // BD1a: the store may want the mobile number confirmed with an SMS code (all orders, or cash on delivery ones).
-  const verifyMode = useContext(BootstrapContext)?.checkout?.phone_verification ?? 'off'
+  const bootstrap = useContext(BootstrapContext)
+  const verifyMode = bootstrap?.checkout?.phone_verification ?? 'off'
+  // BD1c: the ad pixels' InitiateCheckout on the shopper's first touch of the form (never in a draft or the canvas).
+  const begun = useRef(false)
+  const beginCheckout = () => {
+    if (begun.current || inactive) return
+    begun.current = true
+    track('begin_checkout', productData(product, variant, bootstrap?.store.currency ?? null, qty))
+  }
   // The live summary.
   const unavailable = data.checkout_available === false || paymentMethods.length === 0
   // Only a store that requires an account (or checks the number: a verified account number needs no code) asks who is signed in (never from the editor canvas).
@@ -284,7 +297,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     if (values.payment_method === 'cod' && codUnavailable(priced)) return fail({ payment_method: 'checkout.problem.codNotAvailable' }, { code: 'COD_NOT_AVAILABLE', message: t('checkout.problem.codNotAvailable') })
     setErrors({})
     setProblem(null)
-    const touch = readAttribution()
+    const touch = orderAttribution()
     const input = toDirectOrderInput(base, values, rules, priced.total, geoId, builder ? { ...(touch ?? {}), builder } : touch)
     const idempotencyKey = attempts.keyFor(input)
     place.mutate(
@@ -293,6 +306,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
         onSuccess: (order) => {
           attempts.reset()
           setPlaced({ order, name: input.contact.name })
+          // BD1c: the ad pixels' Purchase (once per order; the order page will not send it again).
+          trackPurchase(order.order)
           window.dispatchEvent(new CustomEvent(ORDER_PLACED_EVENT, { detail: element.id }))
         },
         onError: (error) => {
@@ -352,6 +367,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     return (
       <div data-b={element.id} id={orderFormAnchor(element.id)} tabIndex={-1} className="b-order-form @container scroll-mt-24 focus:outline-none" data-testid="order-form">
         <ThankYou placed={placed.order} name={placed.name} message={successMessage} />
+        {/* BD1c: a Send Money order (or a cash-on-delivery advance) is paid right here: number, then the TrxID. */}
+        <PaymentDueCard number={placed.order.order.number} due={placed.order.order.payment_due} access={{ kind: 'order' }} className="text-left" />
       </div>
     )
   }
@@ -483,7 +500,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
             {text && <p className="whitespace-pre-line">{text}</p>}
           </div>
         )}
-        <form noValidate onSubmit={(event) => void submit(event)} aria-label={title || t('landing.orderForm.label')} className={cn('grid items-start gap-5', twoColumns && '@3xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]')}>
+        <form noValidate onSubmit={(event) => void submit(event)} onFocusCapture={beginCheckout} aria-label={title || t('landing.orderForm.label')} className={cn('grid items-start gap-5', twoColumns && '@3xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]')}>
           <div className={cn('flex min-w-0 flex-col gap-5', twoColumns && '@3xl:col-start-2 @3xl:row-start-1')}>
             {productPanel}
             {twoColumns && <div className="hidden @3xl:block">{summaryPanel}</div>}
@@ -593,6 +610,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
               selectedMethod={selectedMethod}
               currency={currency}
               codBlockedForNumber={codBlockedForNumber}
+              codAdvance={codAdvanceOf(shown)}
             />
 
             {rules.note !== 'hidden' && (
@@ -765,6 +783,7 @@ function PaymentChoice({
   selectedMethod,
   currency,
   codBlockedForNumber = false,
+  codAdvance = null,
 }: {
   groupId: string
   errorId: string
@@ -776,6 +795,8 @@ function PaymentChoice({
   currency: string | null
   /** BD1b: the store does not allow cash on delivery for the typed number. */
   codBlockedForNumber?: boolean
+  /** BD1c: the advance a cash-on-delivery order needs (paid by Send Money after placing it). */
+  codAdvance?: CodAdvance | null
 }) {
   const { t } = useLocale()
   if (methods.length === 0) return null
@@ -801,13 +822,18 @@ function PaymentChoice({
               />
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-sf-heading">{method.code === 'cod' ? t('landing.orderForm.cod') : method.display_name}</span>
-                <span className="block text-sm">{method.code === 'cod' ? t('landing.orderForm.codText') : t('checkout.payment.bankTransfer')}</span>
+                {isManualMethod(method.code) ? (
+                  <ManualMethodNote method={method} />
+                ) : (
+                  <span className="block text-sm">{method.code === 'cod' ? t('landing.orderForm.codText') : t('checkout.payment.bankTransfer')}</span>
+                )}
                 {codForbidden ? (
                   <span className="block text-sm font-medium text-sf-sale" data-testid="cod-unavailable">{t('checkout.payment.codUnavailable')}</span>
                 ) : (
                   codBlocked && selectedMethod && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>
                 )}
                 {codFee && <span className="block text-xs">{t('checkout.payment.codFee', { amount: formatPrice(codFee, currency) })}</span>}
+                {method.code === 'cod' && !codBlocked && codAdvance && <CodAdvanceNotice advance={codAdvance} currency={currency} />}
               </span>
             </label>
           )

@@ -9,6 +9,7 @@ use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Sms\Application\Contracts\SmsSender;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\WhatsAppNumber;
@@ -27,7 +28,9 @@ class SaveStorefrontSettings
         // BD1a.
         'checkout_email', 'checkout_phone_verification',
         // BD1b.
-        'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers'];
+        'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers',
+        // BD1c.
+        'cod_advance', 'cod_advance_amount', 'cod_advance_fixed', 'cod_advance_hold_hours'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
@@ -48,7 +51,11 @@ class SaveStorefrontSettings
      * BD1b: `cod_review` (off | risky | all), `cod_review_min_success_rate` (0–100) and
      * `cod_review_new_numbers` — which cash-on-delivery orders wait for a confirmation call.
      *
-     * @param  array{cod_review?: string, cod_review_min_success_rate?: int, cod_review_new_numbers?: bool, checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
+     * BD1c: `cod_advance` (off | risky | all), `cod_advance_amount` (delivery | fixed),
+     * `cod_advance_fixed` (> 0, required once the amount is `fixed`, else 422) and
+     * `cod_advance_hold_hours` (1–168) — the advance delivery charge of cash-on-delivery orders.
+     *
+     * @param  array{cod_advance?: string, cod_advance_amount?: string, cod_advance_fixed?: ?string, cod_advance_hold_hours?: int, cod_review?: string, cod_review_min_success_rate?: int, cod_review_new_numbers?: bool, checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {
@@ -90,6 +97,10 @@ class SaveStorefrontSettings
             // E12b: the default language must be one shoppers can use.
             if (! $settings->bangla_enabled && $settings->default_locale !== LocaleContext::BASE) {
                 throw ValidationException::withMessages(['default_locale' => ['Switch Bangla on before making it the default language.']]);
+            }
+            // BD1c: a fixed advance needs its amount.
+            if (($settings->cod_advance_amount ?? 'delivery') === 'fixed' && ($settings->cod_advance_fixed === null || Decimal::compare((string) $settings->cod_advance_fixed, '0') <= 0)) {
+                throw ValidationException::withMessages(['cod_advance_fixed' => ['Enter the fixed advance amount (more than 0).']]);
             }
             if ($settings->is_enabled && ! StorefrontDomain::query()->exists()) {
                 throw new BusinessRuleViolation('STOREFRONT_DOMAIN_REQUIRED', 'Add a domain before opening the storefront.');

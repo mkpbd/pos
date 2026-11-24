@@ -32,6 +32,7 @@ import {
   ORDER_SOURCE_LABELS,
   PAYMENT_METHOD_LABELS,
   paymentBadge,
+  paymentMethodLabel,
   printPath,
   statusBadge,
   toListParams,
@@ -327,12 +328,15 @@ export function WebOrdersPage() {
                         <RiskIndicator risk={o.risk} orderNumber={o.number} />
                       </TableCell>
                       <TableCell className="hidden text-sm lg:table-cell">
-                        {PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}
+                        {paymentMethodLabel(o.payment_method)}
                         <div><Badge variant={payment.variant}>{payment.label}</Badge></div>
                       </TableCell>
                       <TableCell className="text-right font-mono whitespace-nowrap">{formatMoney(o.total, o.currency)}</TableCell>
                       <TableCell>
                         <Badge variant={status.variant}>{status.label}</Badge>
+                        {o.payment_claim_status === 'submitted' && (
+                          <div className="mt-0.5"><Badge variant="warning" data-testid={`trxid-sent-${o.id}`} title="The customer sent a Send Money transaction ID; check it on the order.">TrxID sent</Badge></div>
+                        )}
                         {o.courier_name && <div className="mt-0.5 text-xs text-muted-foreground">{o.courier_name}</div>}
                       </TableCell>
                     </TableRow>

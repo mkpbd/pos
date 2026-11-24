@@ -68,6 +68,8 @@ use LogicException;
  * @property ?string $cancel_reason
  * @property ?string $ip
  * @property ?string $user_agent
+ * @property string $advance_amount BD1c: what a COD order pays in advance by Send Money (0 = nothing)
+ * @property ?array<string, string> $tracking_ids BD1c: {fbp?, fbc?, ttp?, ttclid?, gclid?} (ClickIds), null when none
  * @property-read ?Shipment $shipment
  */
 #[Fillable([
@@ -79,6 +81,10 @@ use LogicException;
     'cancel_reason', 'ip', 'user_agent', 'locale', 'source', 'attribution',
     // BD1b.
     'channel', 'created_by', 'revision',
+    // BD1c: the advance delivery charge of a cash-on-delivery order.
+    'advance_amount',
+    // BD1c: ad click ids for the Conversions API.
+    'tracking_ids',
 ])]
 class Order extends Model
 {
@@ -124,6 +130,7 @@ class Order extends Model
             'eta_min_days' => 'integer',
             'eta_max_days' => 'integer',
             'revision' => 'integer',
+            'advance_amount' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'discount_total' => 'decimal:2',
             'tax_total' => 'decimal:2',
@@ -135,6 +142,7 @@ class Order extends Model
             'refunded_total' => 'decimal:2',
             'cost_total' => 'decimal:2',
             'attribution' => 'array',
+            'tracking_ids' => 'array',
             'placed_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime',
             'confirmed_at' => 'immutable_datetime',
@@ -220,6 +228,16 @@ class Order extends Model
     public function returns(): HasMany
     {
         return $this->hasMany(OrderReturn::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /**
+     * BD1c: the shopper's Send Money payment claims (no order: query sorts as needed).
+     *
+     * @return HasMany<OrderPaymentClaim, $this>
+     */
+    public function paymentClaims(): HasMany
+    {
+        return $this->hasMany(OrderPaymentClaim::class);
     }
 
     /**

@@ -9,7 +9,9 @@ use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutPhoneController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreDirectCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreOrderController;
+use App\Modules\Orders\Presentation\Http\Controllers\StorePaymentClaimController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderController;
+use App\Modules\Orders\Presentation\Http\Controllers\WebOrderPaymentClaimController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderReturnController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +29,9 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'c
     // BD1a: track an order with its number and mobile number (before orders/{number}).
     Route::get('orders/track', [StoreOrderController::class, 'track'])->middleware('throttle:order-track')->name('store.orders.track');
     Route::get('orders/{number}', [StoreOrderController::class, 'show'])->where('number', '[A-Za-z0-9-]{1,40}')->name('store.orders.show');
+    // BD1c: the shopper reports a Send Money payment (guests keep no cart after checkout: visitor-scoped idempotency).
+    Route::post('orders/{number}/payment-claims', [StorePaymentClaimController::class, 'store'])->where('number', '[A-Za-z0-9-]{1,40}')
+        ->middleware(['throttle:storefront-write', 'idempotent:visitor'])->name('store.orders.payment-claims');
 });
 
 // The signed-in customer's own orders (E9).
@@ -79,6 +84,9 @@ Route::prefix('web-orders')->middleware(['auth:sanctum', 'tenant'])->group(funct
         Route::post('{webOrder}/shipment/events', [WebOrderController::class, 'shipmentEvent'])->whereUuid('webOrder');
         Route::post('{webOrder}/deliver', [WebOrderController::class, 'deliver'])->whereUuid('webOrder');
         Route::post('{webOrder}/record-cod-payment', [WebOrderController::class, 'recordCodPayment'])->whereUuid('webOrder');
+        // BD1c: the shopper's Send Money payment claims.
+        Route::post('{webOrder}/payment-claims/{claim}/confirm', [WebOrderPaymentClaimController::class, 'confirm'])->whereUuid(['webOrder', 'claim']);
+        Route::post('{webOrder}/payment-claims/{claim}/reject', [WebOrderPaymentClaimController::class, 'reject'])->whereUuid(['webOrder', 'claim']);
     });
 
     // Unpaid orders: web_orders.manage; paid orders with a refund (E11): web_orders.refund (checked by the controller).

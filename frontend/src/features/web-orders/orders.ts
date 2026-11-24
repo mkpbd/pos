@@ -31,6 +31,7 @@ export const FILTER_STATUSES: WebOrderStatus[] = ['pending_confirmation', 'pendi
 
 export const PAYMENT_STATUS: Record<WebPaymentStatus, { label: string; variant: BadgeVariant }> = {
   unpaid: { label: 'Unpaid', variant: 'outline' },
+  partially_paid: { label: 'Partly paid', variant: 'info' },
   paid: { label: 'Paid', variant: 'success' },
   partially_refunded: { label: 'Partially refunded', variant: 'warning' },
   refunded: { label: 'Refunded', variant: 'soft' },
@@ -39,6 +40,14 @@ export const PAYMENT_STATUS: Record<WebPaymentStatus, { label: string; variant: 
 export const PAYMENT_METHOD_LABELS: Record<WebPaymentMethod, string> = {
   cod: 'Cash on delivery',
   bank_transfer: 'Bank transfer',
+  bkash_manual: 'bKash (Send Money)',
+  nagad_manual: 'Nagad (Send Money)',
+  rocket_manual: 'Rocket (Send Money)',
+}
+
+/** "bKash (Send Money)"; unknown codes from a newer server read as words. */
+export function paymentMethodLabel(method: string): string {
+  return PAYMENT_METHOD_LABELS[method as WebPaymentMethod] ?? method.replaceAll('_', ' ')
 }
 
 /** Unknown values from a newer server still render, just unstyled. */
@@ -50,19 +59,29 @@ export function paymentBadge(status: string): { label: string; variant: BadgeVar
   return PAYMENT_STATUS[status as WebPaymentStatus] ?? { label: status, variant: 'outline' }
 }
 
-/** Board tabs: every order, one per status, and delivered COD orders whose cash the courier still owes. */
-export type BoardTab = 'all' | WebOrderStatus | 'cod_unremitted'
+/**
+ * Board tabs: every order, one per status, delivered COD orders whose cash the courier still owes,
+ * and (BD1c) orders whose Send Money transaction ID waits to be checked.
+ */
+export type BoardTab = 'all' | WebOrderStatus | 'cod_unremitted' | 'payment_check'
 
-export const BOARD_TABS: BoardTab[] = ['all', 'pending_confirmation', 'pending_payment', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'cod_unremitted']
+export const BOARD_TABS: BoardTab[] = ['all', 'pending_confirmation', 'pending_payment', 'payment_check', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'cod_unremitted']
 
-/** BD1b: "Awaiting confirmation" only shows while orders wait for a call (or it is the open tab); stores that hold no orders never see it. */
+/** Tabs that are not a status but a cross-status filter; "All" does not add them up. */
+const FILTER_TABS: readonly string[] = ['cod_unremitted', 'payment_check']
+
+/**
+ * BD1b: "Awaiting confirmation" only shows while orders wait for a call (or it is the open tab); stores that hold no orders never see it.
+ * BD1c: "Payment to check" likewise only while transaction IDs wait.
+ */
 export function visibleBoardTabs(current: BoardTab, counts: StatusCounts | null): BoardTab[] {
-  return BOARD_TABS.filter((t) => t !== 'pending_confirmation' || current === t || (counts?.pending_confirmation ?? 0) > 0)
+  return BOARD_TABS.filter((t) => (t !== 'pending_confirmation' && t !== 'payment_check') || current === t || (counts?.[t] ?? 0) > 0)
 }
 
 export function boardTabLabel(tab: BoardTab): string {
   if (tab === 'all') return 'All'
   if (tab === 'cod_unremitted') return 'COD to collect'
+  if (tab === 'payment_check') return 'Payment to check'
   if (tab === 'pending_payment') return 'Pending payment'
   return ORDER_STATUS[tab].label
 }
@@ -72,10 +91,10 @@ export function boardTabCount(tab: BoardTab, counts: StatusCounts | null): numbe
   if (!counts) return null
   if (tab === 'all') {
     if (typeof counts.all === 'number') return counts.all
-    const values = Object.entries(counts).filter(([k]) => k !== 'cod_unremitted').map(([, v]) => v ?? 0)
+    const values = Object.entries(counts).filter(([k]) => !FILTER_TABS.includes(k)).map(([, v]) => v ?? 0)
     return values.length > 0 ? values.reduce((a, b) => a + b, 0) : null
   }
-  if (tab === 'cod_unremitted') return counts.cod_unremitted ?? null
+  if (tab === 'cod_unremitted' || tab === 'payment_check') return counts[tab] ?? null
   return counts[tab] ?? 0
 }
 
@@ -125,7 +144,14 @@ export function filtersFromSearchParams(params: URLSearchParams): WebOrderFilter
   const from = params.get('from') ?? ''
   const to = params.get('to') ?? ''
   const source = params.get('source')
-  const tab: BoardTab = params.get('cod_unremitted') === '1' ? 'cod_unremitted' : status && (FILTER_STATUSES as string[]).includes(status) ? (status as WebOrderStatus) : 'all'
+  const tab: BoardTab =
+    params.get('cod_unremitted') === '1'
+      ? 'cod_unremitted'
+      : params.get('payment_check') === '1'
+        ? 'payment_check'
+        : status && (FILTER_STATUSES as string[]).includes(status)
+          ? (status as WebOrderStatus)
+          : 'all'
   return {
     page: Number.isInteger(page) && page > 0 ? page : 1,
     tab,
@@ -142,6 +168,7 @@ export function filtersFromSearchParams(params: URLSearchParams): WebOrderFilter
 export function filtersToSearchParams(filters: WebOrderFilters): URLSearchParams {
   const params = new URLSearchParams()
   if (filters.tab === 'cod_unremitted') params.set('cod_unremitted', '1')
+  else if (filters.tab === 'payment_check') params.set('payment_check', '1')
   else if (filters.tab !== 'all') params.set('status', filters.tab)
   if (filters.courierId) params.set('courier_id', filters.courierId)
   if (filters.paymentMethod) params.set('payment_method', filters.paymentMethod)
@@ -163,6 +190,7 @@ export function hasFilters(filters: WebOrderFilters, search: string): boolean {
 export function toListParams(filters: WebOrderFilters, search: string): WebOrdersListParams {
   const params: WebOrdersListParams = { page: filters.page, per_page: PAGE_SIZE }
   if (filters.tab === 'cod_unremitted') params.cod_unremitted = 1
+  else if (filters.tab === 'payment_check') params.payment_check = 1
   else if (filters.tab !== 'all') params.status = filters.tab
   if (filters.courierId) params.courier_id = filters.courierId
   if (filters.paymentMethod) params.payment_method = filters.paymentMethod
@@ -343,7 +371,7 @@ export function cancelRefundDue(order: Pick<WebOrder, 'payment_status' | 'total'
   const positive = (amount: string) => (amount.startsWith('-') || compareDecimal(amount, '0') === 0 ? null : amount)
   // The server's figure wins; older payloads fall back to paid − refunded.
   if (order.cancel_refund_amount !== undefined) return order.cancel_refund_amount === null ? null : positive(order.cancel_refund_amount)
-  if (order.payment_status !== 'paid' && order.payment_status !== 'partially_refunded') return null
+  if (order.payment_status !== 'paid' && order.payment_status !== 'partially_refunded' && order.payment_status !== 'partially_paid') return null
   return positive(subtractDecimal(order.paid_total ?? order.total, order.refunded_total ?? '0', 2))
 }
 

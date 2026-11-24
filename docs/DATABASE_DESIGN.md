@@ -471,6 +471,14 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Send Money payments, advance delivery charge and ad tracking BD1c (implemented)
+
+- `payment_gateways` rows for `bkash_manual`, `nagad_manual`, `rocket_manual` (settings `account_number`, `account_type`, `hold_hours`; no column change).
+- `order_payment_claims` (organization, order, method CHECK, purpose `full|advance` CHECK, amount numeric(12,2), sender phone, transaction id CHECK `[A-Z0-9]{6,40}`, status `submitted|confirmed|rejected` CHECK, reject reason, submitted / reviewed at, reviewed by, IP; partial unique `(organization_id, method, transaction_id) WHERE status <> 'rejected'`; index `(organization_id, status)`).
+- `orders.advance_amount` numeric(18,2) default 0 (CHECK ≥ 0); `orders.tracking_ids` jsonb (`fbp`, `fbc`, `ttp`, `ttclid`, `gclid`); payment status `partially_paid` (not CHECK-constrained).
+- `storefront_settings`: `cod_advance` `off|risky|all`, `cod_advance_amount` `delivery|fixed`, `cod_advance_fixed`, `cod_advance_hold_hours` (CHECKs).
+- `tracking_settings` (one row per organization: Meta pixel id, Conversions API on/off, `meta_capi_token` encrypted with APP_KEY, test event code, GA4 measurement id, TikTok pixel id, `head_code`, `body_code`, last Conversions API status / error / time, updated by).
+
 ### Staff orders, order edits and cash-on-delivery checks BD1b (implemented)
 
 - `orders`: `source` CHECK adds `staff`; `channel` (`phone|facebook|whatsapp|instagram|walk_in|other` CHECK, staff orders only), `created_by` → users (null on delete), `revision` smallint default 1 (CHECK ≥ 1); status `pending_confirmation` (status is not CHECK-constrained). Index `(organization_id, contact_phone)`.

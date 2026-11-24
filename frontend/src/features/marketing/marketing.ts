@@ -9,6 +9,8 @@ export const MARKETING_TABS: SectionTab[] = [
   { to: '/marketing/short-links', label: 'Short links', permission: 'marketing.view' },
   { to: '/marketing/social', label: 'Social posts', permission: 'social.view' },
   { to: '/marketing/feeds', label: 'Product feeds', permission: 'social.view' },
+  // BD1c: Meta / GA4 / TikTok pixels, the Conversions API and pasted tracking code.
+  { to: '/marketing/tracking', label: 'Tracking & pixels', permission: 'marketing.view' },
 ]
 
 export const CAMPAIGN_STATUS: Record<CampaignStatus, { label: string; variant: 'success' | 'outline' }> = {

@@ -67,7 +67,7 @@ class PlaceDirectOrder
     /**
      * @param  array<string, mixed>  $data  validated place body
      * @param  array{customer_id: string, account_id: string}|null  $customer
-     * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
+     * @param  array{ip: ?string, user_agent: ?string, site_url: string, tracking_ids?: ?array<string, string>}  $client
      * @return array{order: Order, access_token: ?string}
      *
      * @throws BusinessRuleViolation|ValidationException

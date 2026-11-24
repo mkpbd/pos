@@ -1,5 +1,5 @@
 import { storeApi } from '../http'
-import type { OrderStatus, PaymentMethodCode } from '../types'
+import type { OrderStatus, PaymentDue, PaymentMethodCode } from '../types'
 
 /**
  * BD1a §6: GET /store/orders/track?number=&phone= — an order found by its number and the mobile
@@ -16,6 +16,8 @@ export type TrackedOrder = {
   item_count: number | string
   history: { status: OrderStatus; at: string }[]
   shipment: { courier_name: string | null; tracking_number: string | null; tracking_url: string | null; status: string | null } | null
+  /** BD1c: what is still owed by Send Money (the TrxID form then sends `phone`); null / absent = nothing. */
+  payment_due?: PaymentDue | null
 }
 
 export function trackOrder(number: string, phone: string): Promise<TrackedOrder> {

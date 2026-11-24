@@ -8,6 +8,7 @@ use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
 use App\Modules\Orders\Domain\ShipmentStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
+use App\Modules\Orders\Infrastructure\Models\OrderPaymentClaim;
 use App\Modules\Orders\Infrastructure\Models\OrderStatusChange;
 use App\Modules\Orders\Infrastructure\Models\Shipment;
 use App\Modules\Orders\Infrastructure\Models\ShipmentEvent;
@@ -18,6 +19,7 @@ use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Shared\Domain\ValueObjects\Money;
 use App\Modules\Shipping\Application\Contracts\CourierDirectory;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -38,6 +40,11 @@ use Illuminate\Validation\ValidationException;
  * (shipmentEvent) append shipment events, `delivered` delivers the order.
  *
  * BD1a: every status change dispatches OrderStatusChanged after commit.
+ *
+ * BD1c: confirming the payment with a reference also takes Send Money orders (recorded as
+ * `mobile_banking`); an advance already paid on a cash-on-delivery order (`partially_paid`)
+ * leaves the rest to the courier: the shipment's `cod_amount` and the COD payment / remittance
+ * are `total − paid_total`, after which the order is `paid`.
  */
 class OrderWorkflow
 {
@@ -48,19 +55,24 @@ class OrderWorkflow
     ) {}
 
     /**
-     * Bank transfer received: pending_payment → confirmed, paid.
+     * Bank transfer (BD1c: or Send Money) received: pending_payment → confirmed, paid.
      */
     public function confirmPayment(Order $order, string $reference, string $actorId): Order
     {
         return $this->locked($order, function (Order $o) use ($reference, $actorId) {
             $this->assertUnpaid($o);
-            if ($o->payment_method !== OrderPaymentMethod::BankTransfer) {
-                throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "{$o->number} is not paid by bank transfer.", ['payment_method' => $o->payment_method->value]);
+            if ($o->payment_method !== OrderPaymentMethod::BankTransfer && ! $o->payment_method->isSendMoney()) {
+                throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "{$o->number} is not paid by bank transfer or Send Money.", ['payment_method' => $o->payment_method->value]);
+            }
+            // BD1c: a TrxID the customer sent is confirmed or rejected on its own, never left behind.
+            if (OrderPaymentClaim::query()->where('order_id', $o->id)->where('status', OrderPaymentClaim::SUBMITTED)->exists()) {
+                throw new BusinessRuleViolation('PAYMENT_CLAIM_PENDING', "The customer sent a transaction ID for {$o->number}; confirm or reject it instead.", [], 409);
             }
             $from = $o->status;
             $from->assertCanBecome(OrderStatus::Confirmed, $o->number);
 
-            $this->recordPayment($o, LedgerMethod::BankTransfer, $reference, $actorId);
+            $method = $o->payment_method === OrderPaymentMethod::BankTransfer ? LedgerMethod::BankTransfer : LedgerMethod::MobileBanking;
+            $this->recordPayment($o, $method, $this->balance($o), $reference, $actorId);
             $o->update([
                 'status' => OrderStatus::Confirmed,
                 'payment_status' => PaymentStatus::Paid,
@@ -119,7 +131,8 @@ class OrderWorkflow
                 'shipped_at' => $now,
             ], trim($courier['name'].' '.($trackingNumber ?? '')), $actorId, 'web_order.shipped');
 
-            $cod = $o->payment_method === OrderPaymentMethod::CashOnDelivery && $o->payment_status === PaymentStatus::Unpaid;
+            // BD1c: an advance paid already is not collected again.
+            $cod = $o->payment_method === OrderPaymentMethod::CashOnDelivery && $o->payment_status->owesMoney();
             $shipment = Shipment::query()->create([
                 'organization_id' => $o->organization_id,
                 'order_id' => $o->id,
@@ -127,7 +140,7 @@ class OrderWorkflow
                 'courier_name' => $courier['name'],
                 'tracking_number' => $trackingNumber,
                 'status' => ShipmentStatus::HandedOver,
-                'cod_amount' => $cod ? (string) $o->total : '0.00',
+                'cod_amount' => $cod ? $this->balance($o) : '0.00',
                 'shipped_at' => $now,
                 'created_by' => $actorId,
             ]);
@@ -193,11 +206,14 @@ class OrderWorkflow
     /**
      * The cash-on-delivery payment of an order the caller already locked inside its
      * transaction: the single path shared by "Record COD payment" and courier COD
-     * remittances (E10a) — `cash_on_delivery` in the ledger for the order total, order paid.
+     * remittances (E10a) — `cash_on_delivery` in the ledger for what is left to pay (the order
+     * total, BD1c: less an advance already paid), order paid.
      */
     public function recordCodPaymentLocked(Order $o, ?string $reference, string $actorId): void
     {
-        $this->assertUnpaid($o);
+        if (! $o->payment_status->owesMoney()) {
+            throw new BusinessRuleViolation('ORDER_ALREADY_PAID', "{$o->number} is already paid.");
+        }
         if ($o->payment_method !== OrderPaymentMethod::CashOnDelivery || ! in_array($o->status, [OrderStatus::Shipped, OrderStatus::Delivered], true)) {
             throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "A cash-on-delivery payment can only be recorded for a shipped or delivered cash-on-delivery order; {$o->number} is {$o->status->label()}.", [
                 'status' => $o->status->value,
@@ -212,10 +228,12 @@ class OrderWorkflow
             ]);
         }
 
-        $this->recordPayment($o, LedgerMethod::CashOnDelivery, $reference, $actorId);
+        $amount = $this->balance($o);
+        $paymentFrom = $o->payment_status;
+        $this->recordPayment($o, LedgerMethod::CashOnDelivery, $amount, $reference, $actorId);
         $o->update(['payment_status' => PaymentStatus::Paid, 'paid_total' => $o->total]);
-        $this->audit->record('web_order.cod_payment_recorded', $o, ['payment_status' => PaymentStatus::Unpaid->value], [
-            'payment_status' => PaymentStatus::Paid->value, 'amount' => $o->total, 'reference' => $reference,
+        $this->audit->record('web_order.cod_payment_recorded', $o, ['payment_status' => $paymentFrom->value], [
+            'payment_status' => PaymentStatus::Paid->value, 'amount' => $amount, 'reference' => $reference,
         ]);
     }
 
@@ -291,11 +309,19 @@ class OrderWorkflow
         }
     }
 
-    private function recordPayment(Order $o, LedgerMethod $method, ?string $reference, string $actorId): void
+    private function recordPayment(Order $o, LedgerMethod $method, string $amount, ?string $reference, string $actorId): void
     {
         $this->payments->recordSystem($o->branch_id, [
-            new LedgerEntry(PaymentDirection::In, $method, (string) $o->total, $o->customer_id, $reference, "Web order {$o->number}"),
+            new LedgerEntry(PaymentDirection::In, $method, $amount, $o->customer_id, $reference, "Web order {$o->number}"),
         ], new PaymentSource(PaymentSource::ONLINE_ORDER, $o->id, $o->number), $actorId);
+    }
+
+    /**
+     * BD1c: what is left to pay — the total less what was paid already (an advance).
+     */
+    private function balance(Order $o): string
+    {
+        return Money::of((string) $o->total, $o->currency)->minus(Money::of((string) $o->paid_total, $o->currency))->amount();
     }
 
     private function history(Order $o, OrderStatus $from, OrderStatus $to, ?string $note, string $actorId): void

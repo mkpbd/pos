@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
+import { request as httpRequest } from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { expect as baseExpect, test, type Page } from '@playwright/test'
 
@@ -55,6 +56,21 @@ async function getJson<T>(page: Page, url: string): Promise<{ status: number; bo
     return { status: res.status, body: (await res.json()) as unknown }
   }, url)
   return result as { status: number; body: T }
+}
+
+/** BD1c: the storefront page as the backend serves it in production (the shell with injected code). */
+function backendHtml(host: string, path: string): Promise<string> {
+  const target = new URL(process.env.VITE_BACKEND_ORIGIN ?? 'http://127.0.0.1:8071')
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ hostname: target.hostname, port: target.port, path, headers: { Host: host, Accept: 'text/html' } }, (res) => {
+      let body = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk: string) => (body += chunk))
+      res.on('end', () => resolve(body))
+    })
+    req.on('error', reject)
+    req.end()
+  })
 }
 
 async function signIn(page: Page, base: string, email: string) {
@@ -2364,6 +2380,128 @@ test('BD1b: Bazar Fresh holds cash-on-delivery orders for a call, staff confirm 
     await call('PATCH', '/api/v1/storefront/settings', { cod_review: 'off' })
     const blocks = ((await call('GET', `/api/v1/web-orders/blocked-phones?search=${phone}`)).body?.data ?? []) as { id: string }[]
     for (const b of blocks) await call('DELETE', `/api/v1/web-orders/blocked-phones/${b.id}`)
+    await adminContext.close()
+  }
+})
+
+test('BD1c: Bazar Fresh takes bKash Send Money with a TrxID, asks an advance delivery charge on cash on delivery, and fires the Meta pixel and pasted code', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const shopper = async () => {
+    const context = await browser.newContext({ viewport: { width: 1400, height: 1000 } })
+    // The ad platforms are not reached from the test machine: their stubs keep the calls queued.
+    await context.route(/connect\.facebook\.net|googletagmanager\.com|analytics\.tiktok\.com/, (route) => route.abort())
+    const page = await context.newPage()
+    await page.goto(`${base}/`)
+    const list = (await getJson<{ data: { slug: string }[] }>(page, '/api/v1/store/products?in_stock=1&per_page=12')).body.data
+    let variantId = ''
+    for (const item of list) {
+      const product = (await getJson<{ data: { variants: { id: string; in_stock: boolean }[] } }>(page, `/api/v1/store/products/${item.slug}`)).body.data
+      variantId = product.variants.find((v) => v.in_stock)?.id ?? ''
+      if (variantId) break
+    }
+    expect(variantId).not.toBe('')
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    const added = await page.evaluate(async ({ id, token }) => {
+      const res = await fetch('/api/v1/store/cart/items', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: JSON.stringify({ variant_id: id, quantity: 1 }) })
+      return res.status
+    }, { id: variantId, token })
+    expect(added).toBeLessThan(300)
+    await page.goto(`${base}/checkout`)
+    const checkout = page.getByRole('form', { name: 'Checkout' })
+    const phone = `016${String(Date.now()).slice(-8)}`
+    await checkout.getByLabel('Full name').fill('Nasrin Akter')
+    await checkout.getByLabel('Mobile number', { exact: true }).fill(phone)
+    await checkout.getByLabel('Recipient name').fill('Nasrin Akter')
+    await checkout.getByLabel('Recipient mobile number').fill(phone)
+    await checkout.getByLabel('Division').selectOption({ label: 'Dhaka (ঢাকা)' })
+    await checkout.getByLabel('District').selectOption({ label: 'Dhaka (ঢাকা)' })
+    await checkout.getByLabel('Area / thana').fill('Mohammadpur')
+    await checkout.getByLabel('Street address').fill('Block C, Road 4')
+    await checkout.getByRole('radio', { name: /Home delivery/ }).check()
+    return { context, page, checkout, phone }
+  }
+  const payWithTrxId = async (page: Page, trxId: string) => {
+    const card = page.getByTestId('payment-due')
+    await expect(card).toBeVisible({ timeout: 20_000 })
+    await expect(card.getByTestId('payment-due-account')).toContainText('01712345678')
+    await card.getByLabel('The number you paid from').fill('01911 223344')
+    await card.getByLabel('Transaction ID (TrxID)').fill(trxId)
+    await card.getByRole('button', { name: 'Send payment details' }).click()
+    await expect(card.getByTestId('payment-claim-submitted')).toContainText(`TrxID ${trxId.toUpperCase()}`)
+    return (await page.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
+  }
+  const confirmClaim = async (number: string, trxId: string) => {
+    const found = (await call('GET', `/api/v1/web-orders?search=${number}`)).body.data as { id: string; payment_claim_status: string | null }[]
+    expect(found[0]).toMatchObject({ payment_claim_status: 'submitted' })
+    await admin.goto(`${base}/admin/web-orders/${found[0].id}`)
+    const card = admin.getByTestId('payment-claims-card')
+    await card.getByRole('group', { name: `Check transaction ID ${trxId.toUpperCase()}` }).getByRole('button', { name: 'Confirm payment' }).click()
+    await admin.getByRole('dialog', { name: /^Confirm .* by bKash \(Send Money\)\?$/ }).getByRole('button', { name: 'Confirm payment' }).click()
+    await expect(card.getByTestId('payment-due')).toHaveCount(0)
+    return (await call('GET', `/api/v1/web-orders/${found[0].id}`)).body.data
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  try {
+    // The owner turns on bKash Send Money, the Meta pixel and a pasted snippet.
+    const bkash = await call('PUT', '/api/v1/payment-gateways/bkash_manual', { is_enabled: true, settings: { account_number: '01712345678', account_type: 'personal', hold_hours: 24 } })
+    expect(bkash.status).toBe(200)
+    const tracking = await call('PATCH', '/api/v1/marketing/tracking', { meta_pixel_id: '123456789012345', head_code: '<meta name="bd1c-pasted" content="yes">' })
+    expect(tracking.status).toBe(200)
+    expect(tracking.body.data).toMatchObject({ meta_pixel_id: '123456789012345', can_edit_code: true })
+    // The pasted code is part of the page the server sends (in development Vite serves the page, so ask the backend).
+    const shell = await backendHtml('grocery.shop.localhost', '/')
+    expect(shell).toContain('<meta name="bd1c-pasted" content="yes">')
+    expect(shell).toContain('"meta_pixel_id":"123456789012345"')
+    expect(await backendHtml('grocery.shop.localhost', '/?preview=draft')).not.toContain('bd1c-pasted')
+
+    // A shopper pays by bKash: the order waits, the TrxID is sent from the thank-you page, staff confirm it.
+    const first = await shopper()
+    await first.checkout.getByTestId('payment-option').filter({ hasText: 'bKash (Send Money)' }).getByRole('radio').check()
+    await first.checkout.getByRole('button', { name: 'Place order' }).click()
+    const number = await payWithTrxId(first.page, `BK${stamp}`)
+    // The pixel got one Purchase with the order number as the event id (the Conversions API uses the same id).
+    const purchases = await first.page.evaluate(() => ((globalThis as unknown as { fbq?: { queue?: unknown[][] } }).fbq?.queue ?? []).filter((c) => c[0] === 'track' && c[1] === 'Purchase'))
+    expect(purchases).toHaveLength(1)
+    expect(purchases[0]![3]).toEqual({ eventID: number })
+    await first.context.close()
+    const paid = await confirmClaim(number, `BK${stamp}`)
+    expect(paid).toMatchObject({ status: 'confirmed', payment_status: 'paid', payment_method: 'bkash_manual' })
+
+    // Cash on delivery with the delivery charge in advance: the advance is paid by bKash, the rest on delivery.
+    const settings = await call('PATCH', '/api/v1/storefront/settings', { cod_advance: 'all', cod_advance_amount: 'delivery' })
+    expect(settings.body.data).toMatchObject({ cod_advance: 'all', cod_advance_ready: true })
+    const second = await shopper()
+    const cod = second.checkout.getByTestId('payment-option').filter({ hasText: 'Cash on delivery' })
+    // The advance is priced once cash on delivery is chosen.
+    await cod.getByRole('radio').check()
+    await expect(cod.getByTestId('cod-advance-notice')).toBeVisible()
+    await second.checkout.getByRole('button', { name: 'Place order' }).click()
+    const advanceNumber = await payWithTrxId(second.page, `AD${stamp}`)
+    await second.context.close()
+    const partly = await confirmClaim(advanceNumber, `AD${stamp}`)
+    expect(partly).toMatchObject({ status: 'confirmed', payment_status: 'partially_paid', payment_method: 'cod' })
+    expect(Number(partly.paid_total)).toBe(Number(partly.advance_amount))
+    expect(Number(partly.advance_amount)).toBeGreaterThan(0)
+  } finally {
+    await call('PATCH', '/api/v1/storefront/settings', { cod_advance: 'off' })
+    await call('PATCH', '/api/v1/marketing/tracking', { meta_pixel_id: null, head_code: null })
+    await call('PUT', '/api/v1/payment-gateways/bkash_manual', { is_enabled: false })
     await adminContext.close()
   }
 })

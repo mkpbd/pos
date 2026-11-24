@@ -12,6 +12,7 @@ import { MotionPauseToggle } from '../builder/pause-toggle'
 import { CampaignTracker } from '../landing/campaign-tracker'
 import { PopupBanner } from '../popup/popup-banner'
 import { WhatsAppChatButton } from '../social/whatsapp'
+import { TrackingHost } from '../tracking/tracking-host'
 import { useThemeFonts } from '../font-loader'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../theme'
 import type { StorefrontBootstrap } from '../types'
@@ -44,6 +45,8 @@ export function StorefrontLayout() {
               <WhatsAppChatButton />
               {/* AI2b: the shop assistant's chat button, when the store's assistant is on (its panel is a lazy chunk). */}
               <AssistantLauncher />
+              {/* BD1c: the store's ad pixels and their page views (never in a preview); after the page, so its title is set. */}
+              <TrackingHost />
             </CartDrawerProvider>
           </NoticeProvider>
         </BootstrapContext>

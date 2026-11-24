@@ -21,6 +21,28 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### BD1c — bKash / Nagad / Rocket Send Money, advance delivery charge, ad pixels and tracking code
+
+Third and last part of BD1 (Bangladesh commerce pack) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P0). No new packages; no payment-gateway or ad-platform SDK.
+
+#### Added
+- **bKash, Nagad and Rocket (Send Money)** as payment methods (*Online payments*): the shop's receiving number, account type (Personal / Agent / Merchant — the shop tells the shopper to Send Money, Cash Out or Make a Payment accordingly) and hours to pay.
+- **Transaction ID (TrxID):** after placing the order the shopper sends the money and enters the sender number and TrxID on the thank-you page, the order page, the account order page or the *Track order* page. Staff see *Payment to check* on *Web orders* and confirm or reject each TrxID; a rejected one can be sent again; a TrxID cannot be used twice.
+- **Advance delivery charge** for cash on delivery (*Online store settings*): off, only risky numbers or all orders; the delivery charge or a fixed amount, paid by Send Money; the courier then collects only the rest (*Partly paid*).
+- **Ad tracking** (*Marketing → Tracking & pixels*): Meta pixel with the **Conversions API** (server-side Purchase, deduplicated with the pixel by the order number; write-only access token; test event), **GA4**, **TikTok** pixel, and pasted code for `<head>` / before `</body>` (Organization Admin only). The shop sends page views, product views, add to cart, checkout started and one purchase per order; nothing in previews.
+- Ad click ids (`fbclid`, `gclid`, `ttclid`) are kept for 30 days and sent with the order.
+
+#### Changed
+- Staff confirm a Send Money order through its TrxID while one waits (the plain *Confirm payment* is hidden then).
+- `_fbp`, `_fbc` and `_ttp` cookies are no longer encrypted by the app.
+
+#### Tests
+- Backend 1877 (PostgreSQL: 1876 pass, 1 opt-in PDF skip) (PostgreSQL); Pint clean. vitest 3078; mocked Playwright 583 (new `bd1c-admin`, `bd1c-storefront`).
+- Full-stack (PostgreSQL, desktop) 61 — new **BD1c** on Bazar Fresh: bKash Send Money switched on with the Meta pixel and pasted code (checked in the page the backend serves; not in a draft preview); a guest pays by bKash and sends the TrxID from the thank-you page; the pixel queued one Purchase with the order number as event id; staff confirm the TrxID (paid); with the advance delivery charge on, a cash-on-delivery order waits for the advance, the TrxID is confirmed and the order is partly paid.
+
+#### Upgrade
+- `php artisan migrate`; a queue worker for the Conversions API; outbound HTTPS to `graph.facebook.com`.
+
 ### BD1b — Staff-entered and editable web orders, cash-on-delivery checks
 
 Second part of BD1 (Bangladesh commerce pack) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P0). No new packages.

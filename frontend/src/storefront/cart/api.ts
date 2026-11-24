@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
 import { readBuilderAttribution } from '../insights/builder-attribution'
+import { trackAddToCart } from '../tracking/payloads'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
 import type { Cart } from '../types'
@@ -47,7 +48,11 @@ function useCartMutation<V>(request: (variables: V) => Promise<Cart>) {
 export function useAddToCartMutation() {
   return useCartMutation((input: { variant_id: string; quantity: string }) => {
     const builder = readBuilderAttribution()
-    return storeApi.post<Cart>('/store/cart/items', builder ? { ...input, attribution: { builder } } : input).then((r) => r.data)
+    return storeApi.post<Cart>('/store/cart/items', builder ? { ...input, attribution: { builder } } : input).then((r) => {
+      // BD1c: the ad pixels' AddToCart (product page, quick-buy bar, cards, bundles).
+      trackAddToCart(r.data, input)
+      return r.data
+    })
   })
 }
 

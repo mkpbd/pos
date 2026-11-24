@@ -50,6 +50,8 @@ class OrderPresenter
         private readonly PhoneDeliveryReport $phoneReport,
         // BD1b: staff-entered orders and order edits on the staff detail.
         private readonly OrderEditsPresenter $edits,
+        // BD1c: Send Money payments due and payment claims.
+        private readonly PaymentClaimPresenter $claims,
     ) {}
 
     /**
@@ -70,6 +72,8 @@ class OrderPresenter
             'payment_method' => $order->payment_method->value,
             'payment_method_label' => $this->methodLabel($order->payment_method),
             'payment_instructions' => $this->instructions($order),
+            // BD1c: what is still to be paid by Send Money (with the latest claim), or null.
+            'payment_due' => $this->claims->due($order),
             // E12b: the language the order was placed in (en | bn).
             'locale' => $order->locale ?? 'en',
             'placed_at' => $order->placed_at->toIso8601String(),
@@ -155,6 +159,8 @@ class OrderPresenter
             'total' => (string) $order->total,
             'currency' => $order->currency,
             'item_count' => (int) $items,
+            // BD1c: what is still to be paid by Send Money (with the latest claim), or null.
+            'payment_due' => $this->claims->due($order),
             'history' => $order->history->reject(fn (OrderStatusChange $h) => $h->from_status === $h->to_status)->map(fn (OrderStatusChange $h) => [
                 'status' => $h->to_status->value,
                 'at' => $h->created_at->toIso8601String(),
@@ -354,6 +360,9 @@ class OrderPresenter
                 ])->values()->all(),
             ],
             'cod_remittance' => $this->remittanceOf($order),
+            // BD1c: the advance delivery charge of a COD order and the Send Money payment claims (newest first).
+            'advance_amount' => (string) $order->advance_amount,
+            'payment_claims' => $this->claims->staff($order),
             // BD1b: the contact phone's delivery history (PhoneDeliveryReport).
             'phone_report' => $this->phoneReport->forPhone($order->contact_phone),
             // E11: what cancelling would refund (paid orders that can still be cancelled), else null.
@@ -361,13 +370,16 @@ class OrderPresenter
                 ? Money::of((string) $order->paid_total, $order->currency)->minus(Money::of((string) $order->refunded_total, $order->currency))->amount()
                 : null,
             'allowed_actions' => [
-                ...($canManage ? self::allowedActions($order, $canRefund) : []),
+                // BD1c: while a TrxID the customer sent waits, staff confirm or reject it instead of confirming by reference.
+                ...($canManage ? array_values(array_diff(self::allowedActions($order, $canRefund), $this->claims->hasSubmitted($order) ? ['confirm_payment'] : [])) : []),
                 // E11: cancelling a paid order with a refund needs web_orders.refund only.
                 ...(! $canManage && $canRefund && CancelOrder::cancellableWithRefund($order) ? ['cancel'] : []),
                 // E10b: a return can be created (after the window only with override_window).
                 ...($canRefund && $this->returnPolicy->blocker($order, ignoreWindow: true) === null && $this->returnPolicy->anythingLeft($order) ? ['create_return'] : []),
                 // BD1b: change the order before it ships (web_orders.edit).
                 ...($canEdit && OrderEditability::blocker($order) === null ? ['edit'] : []),
+                // BD1c: a Send Money payment claim waits for staff (confirm or reject it).
+                ...($canManage && $this->claims->hasSubmitted($order) ? ['confirm_payment_claim'] : []),
             ],
         ];
     }
@@ -497,6 +509,8 @@ class OrderPresenter
             'source' => $order->source,
             // BD1b: where a staff order was taken (null for shoppers' orders).
             'channel' => $order->channel,
+            // BD1c: `submitted` while a Send Money payment claim waits for staff (needs `has_submitted_claim` from the query).
+            'payment_claim_status' => $order->getAttribute('has_submitted_claim') ? 'submitted' : null,
         ];
     }
 
@@ -521,7 +535,8 @@ class OrderPresenter
             'deliver' => $shipped && ! $returned,
             // E10a: courier updates (in transit, delivered, returned) on the order's shipment.
             'add_shipment_event' => $shipped && $shipment !== null && ! $shipment->status->isFinal(),
-            'record_cod_payment' => $unpaid && $cod && ! $returned && in_array($order->status, [OrderStatus::Shipped, OrderStatus::Delivered], true),
+            // BD1c: also the rest of a COD order whose advance was paid.
+            'record_cod_payment' => $order->payment_status->owesMoney() && $cod && ! $returned && in_array($order->status, [OrderStatus::Shipped, OrderStatus::Delivered], true),
             // E10a: a parcel returned to the sender lets the unpaid shipped order be cancelled.
             'cancel' => ($unpaid && ($order->status->canBecome(OrderStatus::Cancelled) || $returned))
                 // E11: paid orders that are not delivered are cancelled with a refund (web_orders.refund).

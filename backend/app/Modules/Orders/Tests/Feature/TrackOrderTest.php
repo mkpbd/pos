@@ -56,7 +56,7 @@ class TrackOrderTest extends TestCase
         $number = $this->placeGuestOrder('01712345678', '01812345678');
 
         $data = $this->track(strtolower($number), '+880 1712-345678')->assertOk()->assertHeader('Cache-Control', 'no-store, private')->json('data');
-        $this->assertSame(['number', 'status', 'payment_method', 'payment_status', 'placed_at', 'total', 'currency', 'item_count', 'history', 'shipment'], array_keys($data));
+        $this->assertSame(['number', 'status', 'payment_method', 'payment_status', 'placed_at', 'total', 'currency', 'item_count', 'payment_due', 'history', 'shipment'], array_keys($data));
         $this->assertSame([$number, 'confirmed', 'cod', 'unpaid', '960.00', 2, null], [
             $data['number'], $data['status'], $data['payment_method'], $data['payment_status'], $data['total'], $data['item_count'], $data['shipment'],
         ]);

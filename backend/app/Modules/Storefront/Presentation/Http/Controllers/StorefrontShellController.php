@@ -10,6 +10,7 @@ use App\Modules\Shared\Application\Localization\FixedText;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Builder\ManageThemeDraft;
+use App\Modules\Storefront\Application\Contracts\StoreTracking;
 use App\Modules\Storefront\Application\Queries\StorefrontBootstrap;
 use App\Modules\Storefront\Application\Redirects\StorefrontRedirects;
 use App\Modules\Storefront\Infrastructure\Models\BuilderDocument;
@@ -56,6 +57,10 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  *
  * B16: a path that would be a 404 and has a storefront redirect answers with that 301 / 302
  * (the request's query string kept), counted at most once a minute; live pages always win.
+ *
+ * BD1c: the store's pasted tracking code (Marketing → Tracking & pixels) goes raw at the end of
+ * `<head>` and right before `</body>` — on public pages only (never a staff preview or any
+ * `?preview` address, where the bootstrap's `tracking` is null too).
  */
 class StorefrontShellController
 {
@@ -77,7 +82,7 @@ class StorefrontShellController
 
     public const ROBOTS_NOINDEX = 'noindex, follow';
 
-    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder, ManageThemeDraft $themeDraft, StorefrontRedirects $redirects): SymfonyResponse
+    public function __invoke(Request $request, StorefrontBootstrap $bootstrap, PageDirectory $pages, StorefrontCatalog $catalog, BlogDirectory $blog, LocaleContext $locale, BuilderPages $builder, ManageThemeDraft $themeDraft, StorefrontRedirects $redirects, StoreTracking $tracking): SymfonyResponse
     {
         $shell = config('storefront.shell_path');
         if (! is_string($shell) || ! is_file($shell)) {
@@ -88,6 +93,13 @@ class StorefrontShellController
         $draftPreview = StaffPreview::draft($request);
         $data = ($draftPreview ? $bootstrap->buildWithTheme($themeDraft->settings()) + ['theme_source' => 'draft'] : $bootstrap->build())
             + ['preview' => $request->attributes->get(ResolveStorefront::ATTRIBUTE)['preview']];
+        // BD1c: pixels and pasted tracking code only on public pages — never in a staff preview
+        // (closed store, `?preview=draft`, blog `?preview`) or any `?preview` address.
+        $publicPage = ! $data['preview'] && ! $draftPreview && ! $request->query->has('preview');
+        if (! $publicPage) {
+            $data['tracking'] = null;
+        }
+        $trackingCode = $publicPage ? $tracking->current() : null;
         $store = $data['store']['name'];
         $path = '/'.ltrim($request->path(), '/');
         $meta = ['title' => $store, 'description' => $data['store']['description']];
@@ -272,7 +284,7 @@ class StorefrontShellController
         $canonical = $this->inLanguage($canonical, $lang, $locale->defaultLocale());
         $languages = ['current' => $lang, 'others' => array_values(array_diff($locale->enabled(), [$lang])), 'alternates' => $alternates];
 
-        $html = $this->inject((string) file_get_contents($shell), $data, $meta, $canonical, $noindex, $documents, $languages);
+        $html = $this->inject((string) file_get_contents($shell), $data, $meta, $canonical, $noindex, $documents, $languages, $trackingCode);
 
         return response($html, $status, ['Content-Type' => 'text/html; charset=UTF-8', 'Vary' => 'Cookie'])
             // Previews of a closed store must never be cached or indexed.
@@ -315,8 +327,9 @@ class StorefrontShellController
      * @param  array{title: string, description: ?string, image?: ?string, image_alt?: ?string, type?: string}  $meta
      * @param  list<array<string, mixed>>  $documents  JSON-LD
      * @param  array{current: string, others: list<string>, alternates: array<string, string>}  $languages
+     * @param  array{head_code?: ?string, body_code?: ?string}|null  $code  BD1c: pasted tracking code (public pages only)
      */
-    private function inject(string $html, array $data, array $meta, string $url, bool $noindex, array $documents, array $languages): string
+    private function inject(string $html, array $data, array $meta, string $url, bool $noindex, array $documents, array $languages, ?array $code = null): string
     {
         $e = fn (?string $v) => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $name = $data['store']['name'];
@@ -388,6 +401,15 @@ class StorefrontShellController
             $html = preg_replace('#<link rel="icon"[^>]*>#', '', $html, 1) ?? $html;
         }
 
-        return str_replace('</head>', implode("\n    ", $head)."\n  </head>", $html);
+        // BD1c: the store's pasted tracking code, raw by design (only holders of
+        // storefront.custom_html can save it): at the end of <head> and right before </body>.
+        $headCode = is_string($code['head_code'] ?? null) && $code['head_code'] !== '' ? "\n    ".$code['head_code'] : '';
+        $html = str_replace('</head>', implode("\n    ", $head).$headCode."\n  </head>", $html);
+        $bodyCode = $code['body_code'] ?? null;
+        if (is_string($bodyCode) && $bodyCode !== '' && ($at = strrpos($html, '</body>')) !== false) {
+            $html = substr($html, 0, $at).$bodyCode."\n  ".substr($html, $at);
+        }
+
+        return $html;
     }
 }

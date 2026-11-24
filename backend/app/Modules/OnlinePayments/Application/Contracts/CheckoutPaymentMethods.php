@@ -42,4 +42,28 @@ interface CheckoutPaymentMethods
      * @param  array{id: string, number: string, total: string, currency: string}  $order
      */
     public function initiate(string $code, array $order): GatewayInitiation;
+
+    /**
+     * What a shopper sees of a method in payment method lists: `{code, display_name}`, plus for
+     * the Send Money methods (BD1c) `{instructions, account_number, account_type}` — the
+     * shop's receiving number is public by design.
+     *
+     * @param  MethodConfig  $method
+     * @return array<string, mixed>
+     */
+    public function shopperView(array $method): array;
+
+    /**
+     * BD1c: the enabled Send Money methods as `{code, display_name, account_number, account_type, instructions}`, by sort order.
+     *
+     * @return list<array{code: string, display_name: string, account_number: ?string, account_type: string, instructions: ?string}>
+     */
+    public function sendMoneyMethods(): array;
+
+    /**
+     * BD1c: one Send Money method (enabled or not) in the same shape; null for other codes.
+     *
+     * @return array{code: string, display_name: string, account_number: ?string, account_type: string, instructions: ?string}|null
+     */
+    public function sendMoneyMethod(string $code): ?array;
 }

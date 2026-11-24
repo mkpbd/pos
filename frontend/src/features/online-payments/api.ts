@@ -2,9 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TranslationsInput, TranslationsMap } from '@/features/translations/translations'
 import { api } from '@/lib/api/client'
 
-export type OfflineGatewayCode = 'cod' | 'bank_transfer'
+export type OfflineGatewayCode = 'cod' | 'bank_transfer' | 'bkash_manual' | 'nagad_manual' | 'rocket_manual'
 
-/** An online-store payment method. `settings`: `hold_hours` (bank transfer), `max_order_total` (COD). */
+/**
+ * An online-store payment method. `settings`: `hold_hours` (bank transfer, Send Money), `max_order_total` (COD);
+ * BD1c Send Money methods also `account_number` (the shop's receiving number) and `account_type` (personal / agent / merchant).
+ */
 export type PaymentGateway = {
   code: OfflineGatewayCode | string
   display_name: string

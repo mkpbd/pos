@@ -10,13 +10,16 @@ use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Actions\PlaceOrder;
 use App\Modules\Orders\Application\Services\CheckoutPhoneCheck;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
+use App\Modules\Orders\Application\Services\CodAdvancePolicy;
 use App\Modules\Orders\Application\Services\CodRiskPolicy;
+use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Presentation\Http\Support\CheckoutVerifiedPhones;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Domain\CampaignAttribution;
+use App\Modules\Shared\Domain\ClickIds;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Storefront\Application\Queries\CheckoutContact;
@@ -66,9 +69,8 @@ class StoreCheckoutController
             'available' => $reason === null,
             'reason' => $reason,
             'guest_checkout' => $settings->guest_checkout_enabled,
-            'payment_methods' => array_map(fn (array $m) => [
-                'code' => $m['code'],
-                'display_name' => $m['display_name'],
+            // BD1c: Send Money methods add {instructions, account_number, account_type}.
+            'payment_methods' => array_map(fn (array $m) => $payments->shopperView($m) + [
                 'instructions_preview' => null,
             ], $payments->enabled()),
             'signed_in' => $this->account() !== null,
@@ -91,8 +93,11 @@ class StoreCheckoutController
      * BD1b: `cod_available` (bool) — false when `contact.phone`, `address.phone` or the saved
      * address's phone is a blocked number; cash on delivery is then unusable (`payment_method`
      * null, no COD fee) and placing the order with it → 422 `COD_NOT_AVAILABLE`.
+     * BD1c: `cod_advance` `{amount, methods: [{code, display_name, account_number, account_type,
+     * instructions}]}` when cash on delivery is priced and the store asks for the delivery
+     * charge in advance (`cod_advance`; `risky` judged on the first phone given), else null.
      */
-    public function preview(Request $request, BranchDirectory $branches, TenantContext $tenant, CodRiskPolicy $codRisk): JsonResponse
+    public function preview(Request $request, BranchDirectory $branches, TenantContext $tenant, CodRiskPolicy $codRisk, CodAdvancePolicy $codAdvance): JsonResponse
     {
         $data = $request->validate([
             'contact' => ['sometimes', 'nullable', 'array'],
@@ -123,7 +128,10 @@ class StoreCheckoutController
         $quote = $this->quoter->quote($cart, $data, $this->account()?->customer_id, autoPickMethod: true);
 
         // BD1b: `cod_available` false when the contact, delivery or saved-address phone is blocked.
-        return ApiResponse::success($codRisk->preview($quote['preview'], [$data['contact']['phone'] ?? null, $data['address']['phone'] ?? null, $quote['saved_address']['phone'] ?? null]));
+        $phones = [$data['contact']['phone'] ?? null, $data['address']['phone'] ?? null, $quote['saved_address']['phone'] ?? null];
+
+        // BD1c: `cod_advance` — the advance delivery charge cash on delivery would owe.
+        return ApiResponse::success($codAdvance->preview($codRisk->preview($quote['preview'], $phones), $phones));
     }
 
     /**
@@ -186,7 +194,7 @@ class StoreCheckoutController
             'address.postcode' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}$/'],
             'save_address' => ['sometimes', 'boolean'],
             'shipping_method_id' => ['required', 'uuid'],
-            'payment_method' => ['required', 'string', Rule::in(['cod', 'bank_transfer'])],
+            'payment_method' => ['required', 'string', Rule::in(OrderPaymentMethod::values())],
             'notes' => ['sometimes', 'nullable', 'string', 'max:500'],
             'expected_total' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
             // P2a: campaign attribution (sanitized; invalid parts dropped, never an error).
@@ -217,7 +225,9 @@ class StoreCheckoutController
             CartCookie::owner($request),
             $account === null ? null : ['customer_id' => $account->customer_id, 'account_id' => $account->id],
             $data,
-            ['ip' => $request->ip(), 'user_agent' => $request->userAgent(), 'site_url' => $request->getSchemeAndHttpHost()],
+            // BD1c: the ad click ids (pixel cookies, click ids of the attribution).
+            ['ip' => $request->ip(), 'user_agent' => $request->userAgent(), 'site_url' => $request->getSchemeAndHttpHost(),
+                'tracking_ids' => ClickIds::collect($request->cookies->all(), $request->input('attribution'), (int) now()->getTimestampMs())],
         );
 
         $response = ApiResponse::created([

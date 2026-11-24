@@ -237,6 +237,8 @@ export type StorefrontBootstrap = {
   checkout?: { email: CheckoutEmailMode; phone_verification: PhoneVerificationMode }
   /** BD1a: `phone_login` = shoppers can sign in with a code sent to their mobile (SMS gateway ready). */
   account?: { phone_login: boolean }
+  /** BD1c: the store's ad pixels (public ids only); null / absent = none. Never loaded in a preview. */
+  tracking?: { meta_pixel_id: string | null; ga4_measurement_id: string | null; tiktok_pixel_id: string | null } | null
 }
 
 /** AI2b: who a shopper is handed to when the assistant cannot help. */
@@ -734,14 +736,56 @@ export type Wishlist = { items: WishlistItem[] }
  * Checkout and orders (E8a) — /api/v1/store/checkout*, /store/shipping-methods, /store/orders/{number}
  * ------------------------------------------------------------------------------------- */
 
-export type PaymentMethodCode = 'cod' | 'bank_transfer'
+export type PaymentMethodCode = 'cod' | 'bank_transfer' | ManualPaymentMethodCode
+
+/** BD1c: "Send Money" by bKash / Nagad / Rocket — the shopper pays from their phone, then sends the transaction ID. */
+export type ManualPaymentMethodCode = 'bkash_manual' | 'nagad_manual' | 'rocket_manual'
+
+/** The kind of the shop's receiving number (decides Send Money / Cash Out / Payment in the shopper's app). */
+export type MobileAccountType = 'personal' | 'agent' | 'merchant'
+
+/** A Send Money method with the shop's receiving number (public by design). */
+export type ManualPaymentOption = {
+  code: ManualPaymentMethodCode | (string & {})
+  display_name: string
+  account_number: string | null
+  account_type: MobileAccountType | (string & {}) | null
+  instructions: string | null
+}
+
+/** BD1c: the advance a cash-on-delivery order would need (delivery charge or a fixed amount), paid by Send Money. */
+export type CodAdvance = { amount: string; methods: ManualPaymentOption[] }
+
+/** The shopper's latest transaction ID for an order. */
+export type PaymentClaim = {
+  method: string
+  transaction_id: string
+  sender_phone: string
+  status: 'submitted' | 'confirmed' | 'rejected' | (string & {})
+  reject_reason: string | null
+  submitted_at: string
+}
+
+/** What an order still owes by Send Money (`full` = the order, `advance` = a COD order's advance); null when nothing is due. */
+export type PaymentDue = {
+  amount: string
+  currency: string | null
+  purpose: 'full' | 'advance'
+  expires_at: string | null
+  methods: ManualPaymentOption[]
+  claim: PaymentClaim | null
+}
+
+/** POST /store/orders/{number}/payment-claims — `token` (guest) or `phone` (track page); the signed-in owner sends neither. */
+export type PaymentClaimInput = { method: string; sender_phone: string; transaction_id: string; token?: string; phone?: string }
 
 /** GET /store/checkout/options */
 export type CheckoutOptions = {
   available: boolean
   reason: null | 'no_fulfilment_store' | 'cart_empty' | (string & {})
   guest_checkout: boolean
-  payment_methods: { code: PaymentMethodCode; display_name: string; instructions_preview?: string | null }[]
+  /** BD1c: Send Money methods also carry `instructions`, `account_number` and `account_type`. */
+  payment_methods: { code: PaymentMethodCode; display_name: string; instructions_preview?: string | null; instructions?: string | null; account_number?: string | null; account_type?: MobileAccountType | (string & {}) | null }[]
   signed_in: boolean
   /** BD1a: the e-mail field; absent (older payloads) = required. */
   email_field?: CheckoutEmailMode
@@ -791,6 +835,8 @@ export type CheckoutPreview = {
   issues: CartIssue[]
   /** BD1b: false when the given mobile number may not order with cash on delivery (it is then unusable here). Absent = available. */
   cod_available?: boolean
+  /** BD1c: the advance a cash-on-delivery order needs (for the numbers given); null / absent = none. */
+  cod_advance?: CodAdvance | null
 }
 
 export type CheckoutAddressInput = {
@@ -836,7 +882,8 @@ export type OrderView = {
   number: string
   status: OrderStatus
   status_label: string
-  payment_status: 'unpaid' | 'paid' | (string & {})
+  /** BD1c: `partially_paid` = the advance of a cash-on-delivery order is paid. */
+  payment_status: 'unpaid' | 'paid' | 'partially_paid' | (string & {})
   payment_method: PaymentMethodCode
   payment_method_label: string
   /** Bank transfer details while the order waits for the money; null otherwise. */
@@ -874,6 +921,8 @@ export type OrderView = {
   courier_name: string | null
   tracking_number: string | null
   history: { status: OrderStatus; label: string; at: string }[]
+  /** BD1c: what is still owed by Send Money (with the latest transaction ID); null / absent = nothing. */
+  payment_due?: PaymentDue | null
 }
 
 /** 201 of POST /store/checkout; the access token is only for guests (null for customers). */

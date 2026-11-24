@@ -80,7 +80,7 @@ class WebOrderWorkflowTest extends TestCase
         $this->staff();
 
         $list = $this->getJson('/api/v1/web-orders')->assertOk();
-        $this->assertSame(['id', 'number', 'placed_at', 'status', 'status_label', 'payment_status', 'payment_method', 'contact_name', 'contact_phone', 'total', 'currency', 'item_count', 'district', 'courier_name', 'tracking_number', 'shipment_status', 'delivered_at', 'source', 'channel', 'campaign', 'risk'], array_keys($list->json('data.0')));
+        $this->assertSame(['id', 'number', 'placed_at', 'status', 'status_label', 'payment_status', 'payment_method', 'contact_name', 'contact_phone', 'total', 'currency', 'item_count', 'district', 'courier_name', 'tracking_number', 'shipment_status', 'delivered_at', 'source', 'channel', 'payment_claim_status', 'campaign', 'risk'], array_keys($list->json('data.0')));
         $this->assertSame(['WEB-000001', '510.00', '1'], [$list->json('data.0.number'), $list->json('data.0.total'), $list->json('data.0.item_count')]);
         $this->getJson('/api/v1/web-orders?status=pending_payment')->assertJsonPath('meta.pagination.total', 0);
         $this->getJson('/api/v1/web-orders?search=01712345678')->assertJsonPath('meta.pagination.total', 1);
@@ -314,7 +314,7 @@ class WebOrderWorkflowTest extends TestCase
     {
         $this->staff();
         $methods = $this->getJson('/api/v1/payment-gateways')->assertOk()->json('data');
-        $this->assertSame(['cod', 'bank_transfer'], array_column($methods, 'code'));
+        $this->assertSame(['cod', 'bank_transfer', 'bkash_manual', 'nagad_manual', 'rocket_manual'], array_column($methods, 'code'));
         $this->assertSame(['code', 'display_name', 'is_enabled', 'instructions', 'settings', 'sort_order', 'translations'], array_keys($methods[0]));
         $this->assertSame(['max_order_total' => null], $methods[0]['settings']);
         $this->assertSame(['hold_hours' => 48], $methods[1]['settings']);

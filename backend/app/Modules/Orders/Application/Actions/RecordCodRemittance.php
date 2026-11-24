@@ -31,6 +31,9 @@ use Illuminate\Validation\ValidationException;
  * remittance and its lines, and per order the shared COD payment path
  * (OrderWorkflow::recordCodPaymentLocked: `cash_on_delivery` for the order total, order paid,
  * reference = the REM number). Remittances are append-only.
+ *
+ * BD1c: an order whose advance delivery charge was paid (`partially_paid`) is remitted for
+ * the rest (total − paid_total).
  */
 class RecordCodRemittance
 {
@@ -74,7 +77,7 @@ class RecordCodRemittance
                 $reason = match (true) {
                     $order === null => 'not_found',
                     $order->payment_method !== OrderPaymentMethod::CashOnDelivery => 'not_cod',
-                    $order->payment_status->isPaid() => 'already_paid',
+                    ! $order->payment_status->owesMoney() => 'already_paid',
                     $order->status !== OrderStatus::Delivered => 'not_delivered',
                     $shipments->get($id)?->courier_id !== $courier['id'] => 'other_courier',
                     default => null,
@@ -92,7 +95,7 @@ class RecordCodRemittance
             }
 
             $sorted = $orders->values();
-            $gross = $sorted->reduce(fn (Money $sum, Order $o) => $sum->plus(Money::of((string) $o->total, $currency)), Money::zero($currency));
+            $gross = $sorted->reduce(fn (Money $sum, Order $o) => $sum->plus(self::collected($o, $currency)), Money::zero($currency));
             if ($fee->greaterThan($gross)) {
                 throw ValidationException::withMessages(['fee_amount' => ["The courier fee cannot be more than the collected amount ({$gross->amount()})."]]);
             }
@@ -138,7 +141,7 @@ class RecordCodRemittance
                     'organization_id' => $organizationId,
                     'remittance_id' => $remittance->id,
                     'order_id' => $order->id,
-                    'amount' => (string) $order->total,
+                    'amount' => self::collected($order, $currency)->amount(),
                 ]);
                 $this->workflow->recordCodPaymentLocked($order, $number, $actorId);
             }
@@ -156,5 +159,13 @@ class RecordCodRemittance
 
             return $remittance;
         });
+    }
+
+    /**
+     * What the courier collected for the order: the total less an advance paid already (BD1c).
+     */
+    private static function collected(Order $order, string $currency): Money
+    {
+        return Money::of((string) $order->total, $currency)->minus(Money::of((string) $order->paid_total, $currency));
     }
 }

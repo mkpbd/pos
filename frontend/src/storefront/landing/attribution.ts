@@ -14,8 +14,13 @@ export const ATTRIBUTION_DAYS = 30
 export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'] as const
 export type UtmKey = (typeof UTM_KEYS)[number]
 
+/** BD1c: ad click ids, kept so the server can pass them on to the ad platforms (Conversions API). */
+export const CLICK_KEYS = ['fbclid', 'gclid', 'ttclid'] as const
+export type ClickKey = (typeof CLICK_KEYS)[number]
+const CLICK_ID = /^[A-Za-z0-9._-]{1,200}$/
+
 /** What the order receives (POST /store/checkout and /store/checkout/direct `attribution`). */
-export type Attribution = Partial<Record<UtmKey, string>> & {
+export type Attribution = Partial<Record<UtmKey, string>> & Partial<Record<ClickKey, string>> & {
   /** The short link's code. */
   short_link?: string
   /** The store path the visitor first landed on (no query string). */
@@ -52,9 +57,20 @@ function hostOf(url: string): string | null {
   }
 }
 
+/** BD1c: the ad click ids of a URL's query (`fbclid`, `gclid`, `ttclid`). */
+export function clickIdsFrom(params: URLSearchParams): Partial<Record<ClickKey, string>> {
+  const ids: Partial<Record<ClickKey, string>> = {}
+  for (const key of CLICK_KEYS) {
+    const value = (params.get(key) ?? '').trim()
+    if (CLICK_ID.test(value)) ids[key] = value
+  }
+  return ids
+}
+
 /**
  * The touch of an arrival: its UTM parameters, short link code, landing path and the other site
- * that sent the visitor; null when the URL has neither UTM parameters nor a short link.
+ * that sent the visitor (plus its ad click ids, BD1c); null when the URL has neither UTM parameters
+ * nor a short link.
  */
 export function touchFromUrl(location: { pathname: string; search: string; host: string }, referrer: string, now: Date = new Date()): Attribution | null {
   const params = new URLSearchParams(location.search)
@@ -73,6 +89,7 @@ export function touchFromUrl(location: { pathname: string; search: string; host:
     found = true
   }
   if (!found) return null
+  Object.assign(touch, clickIdsFrom(params))
   const path = clean(location.pathname, MAX.path)
   if (path && path.startsWith('/')) touch.landing_path = path
   const referrerHost = referrer ? hostOf(referrer) : null
@@ -117,6 +134,10 @@ function parseStored(raw: unknown): Attribution | null {
     found = true
   }
   if (!found) return null
+  for (const key of CLICK_KEYS) {
+    const id = value[key]
+    if (typeof id === 'string' && CLICK_ID.test(id)) out[key] = id
+  }
   if (typeof value.landing_path === 'string' && value.landing_path.startsWith('/')) out.landing_path = clean(value.landing_path, MAX.path)
   if (typeof value.referrer_host === 'string') out.referrer_host = clean(value.referrer_host, MAX.host)
   return out
@@ -150,9 +171,48 @@ export function readAttribution(now: Date = new Date()): Attribution | null {
   return parsed
 }
 
-/** Records the touch of this URL, when it is one; returns it. */
+/** Records the touch of this URL, when it is one; returns it. BD1c: ad click ids are kept apart. */
 export function captureTouch(location: { pathname: string; search: string; host: string }, referrer: string, now: Date = new Date()): Attribution | null {
   const touch = touchFromUrl(location, referrer, now)
   if (touch) rememberTouch(touch)
+  rememberClickIds(clickIdsFrom(new URLSearchParams(location.search)), now)
   return touch
+}
+
+/** BD1c: where an ad click's ids are kept (apart from the campaign touch: a click alone is no campaign). */
+export const CLICK_IDS_KEY = 'sf.click-ids'
+
+function rememberClickIds(ids: Partial<Record<ClickKey, string>>, now: Date): void {
+  if (Object.keys(ids).length === 0) return
+  try {
+    storage()?.setItem(CLICK_IDS_KEY, JSON.stringify({ ...ids, at: now.toISOString() }))
+  } catch {
+    // Blocked or full storage: the ids are simply not passed on.
+  }
+}
+
+/** The ad click ids of the past 30 days (the last click wins). */
+export function readClickIds(now: Date = new Date()): Partial<Record<ClickKey, string>> {
+  try {
+    const raw = JSON.parse(storage()?.getItem(CLICK_IDS_KEY) ?? 'null') as Record<string, unknown> | null
+    const at = typeof raw?.at === 'string' ? Date.parse(raw.at) : NaN
+    if (!raw || !Number.isFinite(at) || now.getTime() - at > ATTRIBUTION_DAYS * DAY_MS) return {}
+    const ids: Partial<Record<ClickKey, string>> = {}
+    for (const key of CLICK_KEYS) if (typeof raw[key] === 'string' && CLICK_ID.test(raw[key] as string)) ids[key] = raw[key] as string
+    return ids
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * What an order sends as `attribution`: the campaign touch (readAttribution) with the ad click ids of
+ * the past 30 days added (BD1c — the server passes them to the Conversions API); click ids alone are
+ * sent without a campaign (the server keeps no campaign for them).
+ */
+export function orderAttribution(now: Date = new Date()): Attribution | null {
+  const touch = readAttribution(now)
+  const ids = readClickIds(now)
+  if (touch) return { ...ids, ...touch }
+  return Object.keys(ids).length > 0 ? { ...ids, first_seen_at: now.toISOString() } : null
 }

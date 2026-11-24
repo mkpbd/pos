@@ -1,0 +1,51 @@
+import type { Messages } from '../types'
+
+/** BD1c: "Send Money" payments (bKash / Nagad / Rocket), the transaction ID form and the advance delivery charge. */
+export const payments = {
+  'payments.method.bkashManual': 'bKash (Send Money)',
+  'payments.method.nagadManual': 'Nagad (Send Money)',
+  'payments.method.rocketManual': 'Rocket (Send Money)',
+  'payments.accountType.personal': 'Personal',
+  'payments.accountType.agent': 'Agent',
+  'payments.accountType.merchant': 'Merchant',
+  'payments.state.partiallyPaid': 'Partly paid',
+
+  'payments.checkout.sendAfter': 'Send the money to {number} ({type}) after placing the order.',
+  'payments.checkout.payAfter': 'Pay from your phone after placing the order.',
+  'payments.codAdvance.notice': 'Pay the delivery charge of {amount} in advance by {methods} after placing your order. The rest is paid in cash on delivery.',
+
+  'payments.due.title': 'Pay for your order',
+  'payments.due.titleAdvance': 'Pay the delivery charge in advance',
+  'payments.due.amountLabel': 'Amount to pay',
+  'payments.due.advanceNote': 'The rest is paid in cash when your order is delivered.',
+  'payments.due.chooseMethod': 'Pay with',
+  'payments.due.sendTo.personal': 'Send Money to {number} (Personal)',
+  'payments.due.sendTo.agent': 'Cash Out to {number} (Agent)',
+  'payments.due.sendTo.merchant': 'Make a Payment to {number} (Merchant)',
+  'payments.due.copy': 'Copy number',
+  'payments.due.copied': 'Copied',
+  'payments.due.deadline': 'Pay before {date}. An unpaid order is cancelled after that.',
+  'payments.due.steps': 'After paying, enter the number you paid from and the transaction ID (TrxID) from the confirmation SMS.',
+
+  'payments.claim.formLabel': 'Payment details',
+  'payments.claim.sender': 'The number you paid from',
+  'payments.claim.trxid': 'Transaction ID (TrxID)',
+  'payments.claim.trxidHint': 'It is in the SMS you got after paying, e.g. 9A8B7C6D5E.',
+  'payments.claim.submit': 'Send payment details',
+  'payments.claim.pending': 'Sending…',
+  'payments.claim.sent': 'Thank you! We received your payment details.',
+  'payments.claim.checking': 'We are checking your payment — TrxID {trxid}. Your order is confirmed once we find it.',
+  'payments.claim.rejected': 'We could not find your payment with TrxID {trxid}.',
+  'payments.claim.rejectedReason': 'Reason: {reason}',
+  'payments.claim.tryAgain': 'Please check the details and send them again.',
+
+  'payments.claim.error.senderRequired': 'Please enter the number you paid from.',
+  'payments.claim.error.trxRequired': 'Please enter the transaction ID.',
+  'payments.claim.error.trxInvalid': 'A transaction ID has 6 to 40 letters and digits, e.g. 9A8B7C6D5E.',
+  'payments.claim.error.methodRequired': 'Please choose how you paid.',
+  'payments.claim.error.method': 'This payment method cannot be used for this order. Please choose another one.',
+  'payments.claim.error.used': 'This transaction ID has already been used. Please check it and try again.',
+  'payments.claim.error.pending': 'We are already checking a payment for this order. Please wait for our confirmation.',
+  'payments.claim.error.notDue': 'This order has nothing to pay right now.',
+  'payments.claim.error.notFound': 'We could not find this order. Please reload the page and try again.',
+} as const satisfies Messages

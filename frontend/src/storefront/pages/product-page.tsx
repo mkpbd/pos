@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -30,6 +30,10 @@ import type { ProductCard as Card, ProductDetail, ProductVariant } from '../type
 import { WishlistButton } from '../wishlist/wishlist-button'
 import { useDocumentMeta } from '../use-document-meta'
 import { useLocale } from '../i18n/locale'
+import { BootstrapContext } from '../api'
+import { productData } from '../tracking/payloads'
+import { track } from '../tracking/track'
+import { useTrackOnce } from '../tracking/use-track-once'
 import { NotFoundPage } from './not-found-page'
 
 const PREVIEW_STATES = {
@@ -69,6 +73,12 @@ function ProductPageContent({ slug }: { slug: string }) {
   useEffect(() => {
     if (data && !data.preview_state) recordRecentlyViewed(data.slug)
   }, [data])
+
+  // BD1c: the ad pixels' ViewContent, once per product shown (never for a staff preview of an unpublished one).
+  const currency = useContext(BootstrapContext)?.store.currency ?? null
+  useTrackOnce(data && !data.preview_state ? data.id : null, () => {
+    if (data) track('view_content', productData(data, data.variants.find((v) => v.id === params.get('variant')) ?? null, currency))
+  })
 
   if (isNotFound(product.error)) return <NotFoundPage />
   if (product.error) {

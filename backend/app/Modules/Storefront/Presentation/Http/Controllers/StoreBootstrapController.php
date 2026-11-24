@@ -33,6 +33,10 @@ class StoreBootstrapController
      *
      * P2a: `entry_path` — the page the requested host opens on (its domain's entry page, e.g.
      * `/p/eid-sale`), null for the home page.
+     *
+     * BD1c: `tracking` — `{meta_pixel_id, ga4_measurement_id, tiktok_pixel_id}` (public ids for
+     * the storefront's pixels) or null when none is set; always null in a staff preview (closed
+     * store or `?preview=draft`).
      */
     public function __invoke(Request $request, StorefrontBootstrap $bootstrap, ManageThemeDraft $theme, ResolveStorefront $resolver): Response
     {
@@ -45,6 +49,7 @@ class StoreBootstrapController
                 ->header('Cache-Control', 'no-store, private');
         }
 
-        return ApiResponse::success($bootstrap->build() + $extra);
+        // BD1c: no ad pixels while staff preview a closed store.
+        return ApiResponse::success(array_replace($bootstrap->build(), $preview ? ['tracking' => null] : []) + $extra);
     }
 }

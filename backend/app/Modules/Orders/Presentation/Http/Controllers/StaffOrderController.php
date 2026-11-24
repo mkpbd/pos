@@ -5,6 +5,7 @@ namespace App\Modules\Orders\Presentation\Http\Controllers;
 use App\Modules\Orders\Application\Actions\EditOrder;
 use App\Modules\Orders\Application\Actions\PlaceStaffOrder;
 use App\Modules\Orders\Application\Services\StaffOrderPricing;
+use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Shared\Domain\BangladeshMobile;
@@ -57,7 +58,7 @@ class StaffOrderController
             'address.division_id' => ['sometimes', 'nullable', 'integer'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
-            'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(['cod', 'bank_transfer'])],
+            'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(OrderPaymentMethod::values())],
             'coupon_code' => ['sometimes', 'nullable', 'string', 'max:40'],
         ]);
         $order = null;
@@ -89,7 +90,7 @@ class StaffOrderController
         $data = $request->validate([
             'customer_id' => ['sometimes', 'nullable', 'uuid'],
             ...self::contentRules(),
-            'payment_method' => ['required', 'string', Rule::in(['cod', 'bank_transfer'])],
+            'payment_method' => ['required', 'string', Rule::in(OrderPaymentMethod::values())],
             'channel' => ['required', 'string', Rule::in(array_keys(Order::CHANNELS))],
             'locale' => ['sometimes', 'nullable', Rule::in(['en', 'bn'])],
         ], self::messages());

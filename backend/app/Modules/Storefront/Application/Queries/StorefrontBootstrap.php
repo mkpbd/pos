@@ -11,6 +11,7 @@ use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Translations;
 use App\Modules\Storefront\Application\Builder\BuilderPages;
 use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
+use App\Modules\Storefront\Application\Contracts\StoreTracking;
 use App\Modules\Storefront\Domain\BannerPlacement;
 use App\Modules\Storefront\Domain\MenuLocation;
 use App\Modules\Storefront\Domain\ThemeSchema;
@@ -38,6 +39,8 @@ use Carbon\CarbonImmutable;
  * BD1a: `checkout` {email: required|optional|hidden, phone_verification: off|cod|all} and
  * `account` {phone_login} (CheckoutContact; outside the content cache — they follow the SMS
  * set-up too).
+ * BD1c: `tracking` {meta_pixel_id, ga4_measurement_id, tiktok_pixel_id} | null (StoreTracking,
+ * public ids only; outside the content cache; null in draft previews and the builder canvas).
  */
 class StorefrontBootstrap
 {
@@ -55,6 +58,7 @@ class StorefrontBootstrap
         private readonly StoreAssistantSettings $assistant,
         private readonly AiFeatures $ai,
         private readonly CheckoutContact $contact,
+        private readonly StoreTracking $tracking,
     ) {}
 
     /**
@@ -84,7 +88,26 @@ class StorefrontBootstrap
             'assistant' => $this->assistant(),
             'checkout' => ['email' => $this->contact->emailMode(), 'phone_verification' => $this->contact->phoneVerification()],
             'account' => ['phone_login' => $this->contact->phoneLogin()],
+            // BD1c: the ad pixels (public ids only).
+            'tracking' => $this->tracking(),
         ];
+    }
+
+    /**
+     * BD1c: `{meta_pixel_id, ga4_measurement_id, tiktok_pixel_id}`, or null when none is set.
+     *
+     * @return array{meta_pixel_id: ?string, ga4_measurement_id: ?string, tiktok_pixel_id: ?string}|null
+     */
+    public function tracking(): ?array
+    {
+        $tracking = $this->tracking->current();
+        $ids = [
+            'meta_pixel_id' => $tracking['meta_pixel_id'],
+            'ga4_measurement_id' => $tracking['ga4_measurement_id'],
+            'tiktok_pixel_id' => $tracking['tiktok_pixel_id'],
+        ];
+
+        return array_filter($ids) === [] ? null : $ids;
     }
 
     /**
@@ -115,7 +138,8 @@ class StorefrontBootstrap
      */
     public function buildWithTheme(array $theme): array
     {
-        return $this->compute($theme, true) + $this->live();
+        // BD1c: never the ad pixels in a draft preview or the builder canvas.
+        return array_replace($this->compute($theme, true) + $this->live(), ['tracking' => null]);
     }
 
     /**

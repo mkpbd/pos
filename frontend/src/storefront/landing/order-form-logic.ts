@@ -5,6 +5,7 @@ import type { OrderFormEmailField, OrderFormNoteField } from '../builder/types'
 import { isEmailAddress } from '../builder/validate'
 import type { MessageKey } from '../i18n/en'
 import type { Translate } from '../i18n/translate'
+import { isPlaceableMethod } from '../payments/manual-methods'
 import type { CheckoutPreview, GeoId, OrderView, PaymentMethodCode, ProductDetail, ProductVariant } from '../types'
 import type { OrderAttribution } from './attribution'
 
@@ -129,7 +130,7 @@ export function orderFormErrors(values: OrderFormValues, rules: OrderFormRules, 
   else if (line.length > 255) errors.address_line = 'checkout.validation.max255'
   // Delivery methods appear once the district is chosen (its own error says so first).
   if (values.district_id !== '' && values.shipping_method_id === '') errors.shipping_method_id = 'checkout.validation.shippingMethod'
-  if (values.payment_method !== 'cod' && values.payment_method !== 'bank_transfer') errors.payment_method = 'checkout.validation.paymentMethod'
+  if (!isPlaceableMethod(values.payment_method)) errors.payment_method = 'checkout.validation.paymentMethod'
   if (rules.note !== 'hidden' && values.note.trim().length > 500) errors.note = 'checkout.validation.max500'
   return errors
 }
@@ -175,7 +176,7 @@ export function toDirectPreviewInput(
   const input: DirectPreviewInput = { document_id: base.documentId, element_id: base.elementId, lines: base.lines }
   if (values.district_id) input.address = { district_id: geoId('district', values.district_id) }
   if (values.shipping_method_id) input.shipping_method_id = values.shipping_method_id
-  if (values.payment_method === 'cod' || values.payment_method === 'bank_transfer') input.payment_method = values.payment_method
+  if (isPlaceableMethod(values.payment_method)) input.payment_method = values.payment_method
   return input
 }
 

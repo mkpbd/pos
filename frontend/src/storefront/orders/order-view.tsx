@@ -12,6 +12,7 @@ import { orderStatusLabel } from './returns-api'
 import { rich } from '../i18n/rich'
 import type { Translate } from '../i18n/translate'
 import { formatDiscount, formatPrice } from '../money'
+import { paymentStateKey } from '../payments/manual-methods'
 import type { OrderView } from '../types'
 
 /**
@@ -173,7 +174,8 @@ export function TrackParcelLink({ url }: { url: string | null | undefined }) {
 }
 
 function paymentStateLabel(order: Pick<OrderView, 'payment_status' | 'payment_method'>, t: Translate): string {
-  return t(order.payment_status === 'paid' ? 'orders.paymentState.paid' : order.payment_method === 'cod' ? 'orders.paymentState.cod' : 'orders.paymentState.awaiting')
+  // BD1c: `partially_paid` (a cash-on-delivery order's advance is paid) reads "Partly paid".
+  return t(paymentStateKey(order.payment_status, order.payment_method))
 }
 
 /** `showCourier: false` when the timeline shows the courier and tracking number instead. */

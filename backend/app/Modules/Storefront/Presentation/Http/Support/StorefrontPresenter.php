@@ -55,6 +55,11 @@ final class StorefrontPresenter
             'cod_review' => $s->cod_review ?? 'off',
             'cod_review_min_success_rate' => (int) ($s->cod_review_min_success_rate ?? 70),
             'cod_review_new_numbers' => (bool) ($s->cod_review_new_numbers ?? false),
+            // BD1c: the advance delivery charge of cash-on-delivery orders.
+            'cod_advance' => $s->cod_advance ?? 'off',
+            'cod_advance_amount' => $s->cod_advance_amount ?? 'delivery',
+            'cod_advance_fixed' => $s->cod_advance_fixed === null ? null : (string) $s->cod_advance_fixed,
+            'cod_advance_hold_hours' => (int) ($s->cod_advance_hold_hours ?? 24),
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

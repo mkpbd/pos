@@ -18,6 +18,9 @@ import { orderStatusLabel } from './returns-api'
 import { rich } from '../i18n/rich'
 import type { OrderView } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
+import { PaymentDueCard } from '../payments/payment-due-card'
+import { trackPurchase } from '../tracking/payloads'
+import { useTrackOnce } from '../tracking/use-track-once'
 import { AwaitingConfirmationNote, OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
 
 /**
@@ -54,6 +57,10 @@ export function OrderPage() {
 
   const notFound = order.error instanceof ApiError && order.error.status === 404
   useDocumentMeta(privatePage(order.data ? (thankYou ? t('orders.page.thankYouTitle') : t('orders.title', { number: order.data.number })) : notFound ? t('orders.notFoundTitle') : null))
+  // BD1c: the ad pixels' Purchase on the thank-you view (once per order in this tab).
+  useTrackOnce(thankYou && order.data ? order.data.number : null, () => {
+    if (order.data) trackPurchase(order.data)
+  })
 
   // A signed-in customer's own order (opened without a guest token) is also in the account area.
   if (order.data) {
@@ -177,7 +184,8 @@ export function OrderDetails({
         )}
       </header>
 
-      <PaymentInstructionsCard order={order} />
+      {/* BD1c: a Send Money order (or a cash-on-delivery advance) shows the number to pay and the TrxID form instead. */}
+      {order.payment_due ? <PaymentDueCard number={order.number} due={order.payment_due} access={{ kind: 'order' }} /> : <PaymentInstructionsCard order={order} />}
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="flex min-w-0 flex-col gap-6">

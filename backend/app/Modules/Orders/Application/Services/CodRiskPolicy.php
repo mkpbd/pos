@@ -81,6 +81,19 @@ class CodRiskPolicy
         if ($mode !== 'risky') {
             return false;
         }
+
+        return $this->isRisky($phone);
+    }
+
+    /**
+     * The store's "risky number" rule (its `cod_review_*` settings), whatever `cod_review` is:
+     * the number's delivery success rate is known and below `cod_review_min_success_rate`, or
+     * `cod_review_new_numbers` and no order to it was ever delivered. BD1c: the advance
+     * delivery charge's `risky` mode uses the same rule.
+     */
+    public function isRisky(string $phone): bool
+    {
+        $settings = $this->storefront->settings();
         $phone = BangladeshMobile::normalize($phone) ?? $phone;
         $history = $this->report->forPhone($phone);
         $minimum = (int) ($settings->cod_review_min_success_rate ?? 70);

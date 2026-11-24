@@ -20,7 +20,7 @@ import { formatPrice } from '../money'
 import type { MessageKey } from '../i18n/en'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
-import type { Cart, CartCoupon, CheckoutEmailMode, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
+import type { Cart, CartCoupon, CheckoutEmailMode, CodAdvance, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { checkoutPhoneCode, useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
 import { etaLabel, goodsTotal, methodFee } from './delivery'
@@ -43,8 +43,13 @@ import {
 import { SummaryLines, SummaryTotals } from './summary-totals'
 import { useDebouncedValue } from './use-debounced-value'
 import { withBuilderAttribution } from '../insights/builder-attribution'
+import { CodAdvanceNotice, ManualMethodNote } from '../payments/checkout-notes'
+import { codAdvanceOf, isManualMethod } from '../payments/manual-methods'
+import { cartData } from '../tracking/payloads'
+import { track } from '../tracking/track'
+import { useTrackOnce } from '../tracking/use-track-once'
 import { rememberDistrict } from '../builder/audience/context'
-import { readAttribution } from '../landing/attribution'
+import { orderAttribution } from '../landing/attribution'
 
 /** How long the form must be still before the summary is recomputed. */
 export const PREVIEW_DEBOUNCE_MS = 250
@@ -163,6 +168,10 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   const verifyMode = options.phone_verification ?? bootstrap.checkout?.phone_verification ?? 'off'
   const schema = useMemo(() => checkoutSchemaFor(emailMode), [emailMode])
   const [verifiedPhones, setVerifiedPhones] = useState<string[]>([])
+  // BD1c: the ad pixels' InitiateCheckout, once per visit of the checkout.
+  useTrackOnce(cart ? 'checkout' : null, () => {
+    if (cart) track('begin_checkout', cartData(cart))
+  })
 
   const form = useForm<CheckoutValues>({
     resolver: zodResolver(schema),
@@ -248,7 +257,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       const signedIn = customer !== null
       const input = toPlaceInput(values, current.total, { signedIn, geoId, emailMode })
       // P2a: the campaign that brought the shopper (last touch of the past 30 days); B15: the builder page and section.
-      const attribution = withBuilderAttribution(readAttribution())
+      const attribution = withBuilderAttribution(orderAttribution())
       if (attribution) input.attribution = attribution
       const idempotencyKey = attempts.keyFor(input)
       place.mutate(
@@ -408,7 +417,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
             currency={shown?.currency ?? null}
             freeShipping={Boolean(cart?.free_shipping) || (shown?.promotions ?? []).some((p) => p.kind === 'shipping')}
           />
-          <PaymentSection form={form} options={options} selectedMethod={selectedMethod} currency={shown?.currency ?? null} codBlockedForNumber={codBlockedForNumber} />
+          <PaymentSection form={form} options={options} selectedMethod={selectedMethod} currency={shown?.currency ?? null} codBlockedForNumber={codBlockedForNumber} codAdvance={codAdvanceOf(shown)} />
           <NotesSection form={form} />
 
           <div className="flex flex-col gap-3 rounded-sf-card bg-sf-surface p-5 md:p-6">
@@ -748,6 +757,7 @@ function PaymentSection({
   selectedMethod,
   currency,
   codBlockedForNumber = false,
+  codAdvance = null,
 }: {
   form: Form
   options: CheckoutOptions
@@ -755,6 +765,8 @@ function PaymentSection({
   currency: string | null
   /** BD1b: the store does not allow cash on delivery for the typed number. */
   codBlockedForNumber?: boolean
+  /** BD1c: the advance a cash-on-delivery order needs (paid by Send Money after placing it). */
+  codAdvance?: CodAdvance | null
 }) {
   const errors = form.formState.errors
   const errorId = useId()
@@ -778,13 +790,18 @@ function PaymentSection({
             return (
               <RadioCard key={method.code} value={method.code} registered={form.register('payment_method')} invalid={invalid} disabled={codBlocked || codForbidden} testId="payment-option">
                 <span className="block font-semibold text-sf-heading">{method.display_name}</span>
-                <span className="block text-sm">{method.code in PAYMENT_DESCRIPTIONS ? t(PAYMENT_DESCRIPTIONS[method.code]!) : ''}</span>
+                {isManualMethod(method.code) ? (
+                  <ManualMethodNote method={method} />
+                ) : (
+                  <span className="block text-sm">{method.code in PAYMENT_DESCRIPTIONS ? t(PAYMENT_DESCRIPTIONS[method.code]!) : ''}</span>
+                )}
                 {codForbidden ? (
                   <span className="block text-sm font-medium text-sf-sale" data-testid="cod-unavailable">{t('checkout.payment.codUnavailable')}</span>
                 ) : (
                   codBlocked && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>
                 )}
                 {codFee && <span className="block text-xs">{t('checkout.payment.codFee', { amount: formatPrice(codFee, currency) })}</span>}
+                {method.code === 'cod' && !codBlocked && !codForbidden && codAdvance && <CodAdvanceNotice advance={codAdvance} currency={currency} />}
               </RadioCard>
             )
           })}

@@ -16,6 +16,7 @@ use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Orders\Application\Events\OrderPlaced;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
+use App\Modules\Orders\Application\Services\CodAdvancePolicy;
 use App\Modules\Orders\Application\Services\CodRiskPolicy;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
@@ -57,6 +58,9 @@ use Throwable;
  * BD1b (CodRiskPolicy, shoppers' orders only): cash on delivery to a blocked contact or
  * delivery phone → 422 COD_NOT_AVAILABLE; the store's `cod_review` may hold a COD order as
  * `pending_confirmation` (no confirmed_at) until staff confirm it after a call.
+ * BD1c: Send Money orders start `pending_payment` (the method's hold hours); the store's
+ * `cod_advance` (CodAdvancePolicy) may make a shopper's COD order owe its delivery charge in
+ * advance — `advance_amount`, `pending_payment` for `cod_advance_hold_hours` (no call hold).
  *
  * Promotions (E8b): after the first repricing, the promotions with usage limits and the
  * coupon the order would use are locked (FOR UPDATE, sorted) and the cart is priced again,
@@ -89,12 +93,14 @@ class PlaceOrder
         private readonly OrderPageAttribution $pages,
         // BD1b: blocked numbers and the COD confirmation-call hold.
         private readonly CodRiskPolicy $codRisk,
+        // BD1c: the advance delivery charge of shoppers' COD orders.
+        private readonly CodAdvancePolicy $codAdvance,
     ) {}
 
     /**
      * @param  array{customer_id: string, account_id: string}|null  $customer  the signed-in shopper, null for guests
      * @param  array<string, mixed>  $data  validated checkout body
-     * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
+     * @param  array{ip: ?string, user_agent: ?string, site_url: string, tracking_ids?: ?array<string, string>}  $client  BD1c: `tracking_ids` (ClickIds)
      * @return array{order: Order, access_token: ?string}
      *
      * @throws BusinessRuleViolation|ValidationException
@@ -115,7 +121,7 @@ class PlaceOrder
      * @param  list<array{variant_id: string, quantity: string}>  $lines
      * @param  array{customer_id: string, account_id: string}|null  $customer
      * @param  array<string, mixed>  $data  validated body (address inline; `source`, `attribution`)
-     * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
+     * @param  array{ip: ?string, user_agent: ?string, site_url: string, tracking_ids?: ?array<string, string>}  $client
      * @return array{order: Order, access_token: ?string}
      */
     public function direct(array $lines, ?array $customer, array $data, array $client): array
@@ -149,7 +155,7 @@ class PlaceOrder
      * @param  list<array{variant_id: string, quantity: string}>|null  $lines  direct lines (no cart) or null
      * @param  array{customer_id: string, account_id: string}|null  $customer
      * @param  array<string, mixed>  $data
-     * @param  array{ip: ?string, user_agent: ?string, site_url: string}  $client
+     * @param  array{ip: ?string, user_agent: ?string, site_url: string, tracking_ids?: ?array<string, string>}  $client
      * @return array{order: Order, access_token: ?string}
      */
     private function place(?CartOwner $owner, ?array $lines, ?array $customer, array $data, array $client, string $locale): array
@@ -240,12 +246,20 @@ class PlaceOrder
 
             $initiation = $this->payments->initiate($paymentMethod->value, ['id' => $orderId, 'number' => $number, 'total' => $total->amount(), 'currency' => $currency]);
             $status = $initiation->awaitsPayment ? OrderStatus::PendingPayment : OrderStatus::Confirmed;
+            $holdHours = (int) ($payment['settings']['hold_hours'] ?? 48);
+            // BD1c: a shopper's COD order may owe the delivery charge in advance (Send Money) — instead of the call.
+            $advance = $shopperOrder && $paymentMethod === OrderPaymentMethod::CashOnDelivery
+                ? $this->codAdvance->advanceFor((string) $data['contact']['phone'], $preview['shipping_total'], $codFee->amount(), $total->amount(), $currency)
+                : null;
+            if ($advance !== null) {
+                $status = OrderStatus::PendingPayment;
+                $holdHours = $this->codAdvance->holdHours();
+            }
             // BD1b: the store may hold shoppers' cash-on-delivery orders for a confirmation call.
             if ($status === OrderStatus::Confirmed && $shopperOrder && $paymentMethod === OrderPaymentMethod::CashOnDelivery
                 && $this->codRisk->holdsForReview((string) $data['contact']['phone'])) {
                 $status = OrderStatus::PendingConfirmation;
             }
-            $holdHours = (int) ($payment['settings']['hold_hours'] ?? 48);
             $token = $customer === null && $staffId === null ? rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=') : null;
 
             $order = Order::query()->create([
@@ -272,6 +286,8 @@ class PlaceOrder
                 'shipping_discount' => $quote['shipping_discount'],
                 'coupon_code' => $quote['coupon_code'],
                 'cod_fee' => $codFee->amount(),
+                // BD1c: the advance delivery charge (0 = none).
+                'advance_amount' => $advance ?? '0.00',
                 'total' => $total->amount(),
                 'paid_total' => '0.00',
                 'cost_total' => array_reduce($costs, fn (Money $sum, array $c) => $sum->plus($c['cost_total']), Money::zero($currency))->amount(),
@@ -292,6 +308,8 @@ class PlaceOrder
                 // BD1b: staff-entered orders.
                 'channel' => $staffId === null ? null : $data['channel'],
                 'created_by' => $staffId,
+                // BD1c: the shopper's ad click ids (ClickIds; never on staff orders).
+                'tracking_ids' => $staffId === null ? ($client['tracking_ids'] ?? null) : null,
             ]);
 
             foreach ($quote['lines'] as $i => $line) {
@@ -363,6 +381,7 @@ class PlaceOrder
                     // BD1b: "Order entered by staff (Phone)".
                     $staffId !== null => 'Order entered by staff ('.(Order::CHANNELS[$data['channel']] ?? 'Other').')',
                     $status === OrderStatus::PendingConfirmation => 'Order placed — awaiting confirmation',
+                    $advance !== null => 'Order placed — waiting for the advance delivery charge',
                     default => 'Order placed',
                 },
                 'actor_user_id' => $staffId,
