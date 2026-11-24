@@ -21,6 +21,26 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### ST1 — Stock operations: bulk import, barcodes & labels, stocktakes, supplier money in the drawer
+
+From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P0). No new packages (Excel/CSV through the existing OpenSpout; barcodes drawn in-house).
+
+#### Added
+- **Bulk import** from Excel or CSV: products (with variants, categories and brands), price updates, opening stock, customers and suppliers (with opening balances). Download a template, upload, see a check first (what will be created, updated, skipped and every error with its row number — downloadable to fix in Excel), then import; it runs in the background, keeps going past a bad row, and keeps a history.
+- **Barcodes and labels:** shop barcodes (EAN-13 starting with 20) for products without one; a *Print labels* page for product labels (A4 sheets of 24 / 40 / 65, thermal rolls 38×25 / 50×25 / 50×30 mm) and shelf labels with a big price, at true size, from a selection, a goods receipt, a purchase order or a category; EAN-13 / EAN-8 / UPC-A / Code 128 drawn in the browser.
+- **Stocktakes:** count a whole store, some categories or some products — several people at once, by scanner or by typing, optionally *blind*; items found on the shelf can be added; progress and the difference in quantity and value before posting. Posting corrects stock by the difference at the time each item was counted, so sales during the count stay right. New permission `inventory.stocktake`.
+- **Supplier refunds** and **voiding** supplier payments and refunds; statements, balances and the supplier dues report follow.
+
+#### Changed
+- **Cash paid to a supplier now comes out of the open cash drawer** (like expenses), so the drawer's expected cash is right; a refund in cash goes into it. Recording supplier money needs an open register session for cash, and an `Idempotency-Key`; the method "Other" is no longer offered.
+
+#### Tests
+- Backend 1745 with G1c (PostgreSQL: 1744 pass, 1 opt-in PDF skip; new `ImportFlowTest`, `CellValueTest`, `ProductImportTest`, `BarcodeLabelsTest`, `OpeningStockImportTest`, `CustomerImportTest`, `SupplierImportTest`, `StocktakeTest`, `StocktakeConcurrencyTest`, `SupplierMoneyTest`); Pint clean. vitest 2928; mocked Playwright 543 (new `st1-import`, `st1-labels`, `st1-stocktake`; the B21 tour test timed out once under load and passes 21/21 alone).
+- Full-stack (PostgreSQL, desktop) 58 — new **ST1**: two products imported from a CSV file, given shop barcodes and printed as labels, counted by two scans in a stocktake and posted (stock 2), a supplier refund recorded and voided on the statement. Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- `php artisan migrate`, `php artisan pos:permissions:sync`. Cash supplier payments need an open cash register session.
+
 ### G1c — Deployment files, CI, performance on production-sized data
 
 Third part of G1 (go-live essentials) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2. No new runtime packages.

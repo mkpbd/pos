@@ -2,12 +2,14 @@
 
 namespace App\Modules\Purchasing\Application\Queries;
 
+use App\Modules\Organizations\Application\Support\OrganizationDate;
 use App\Modules\Purchasing\Domain\LandedCost\LandedCostVoucherStatus;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceiptCharge;
 use App\Modules\Purchasing\Infrastructure\Models\LandedCostVoucher;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseReturn;
 use App\Modules\Purchasing\Infrastructure\Models\SupplierPayment;
+use App\Modules\Purchasing\Infrastructure\Models\SupplierRefund;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Suppliers\Application\Contracts\SupplierDirectory;
@@ -17,7 +19,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /**
  * What the organization owes each supplier:
  *   opening balance + goods receipts (payable total) + receipt charges it billed
- *   + posted landed cost vouchers it billed − purchase returns − payments.
+ *   + posted landed cost vouchers it billed − purchase returns − payments + refunds it gave back.
+ * ST1: a voided payment or refund keeps its line and gets a second, opposite line (`payment_void`,
+ * `refund_void`) dated the day it was voided, so the balance nets to zero from that day on.
  * Payments are on account (not matched to documents), so a charge document is settled like
  * any invoice: by paying the supplier.
  * Positive = we owe the supplier. Computed from the posted documents (no stored balance
@@ -28,6 +32,7 @@ class SupplierAccount
     public function __construct(
         private readonly TenantContext $tenant,
         private readonly SupplierDirectory $suppliers,
+        private readonly OrganizationDate $dates,
     ) {}
 
     /**
@@ -121,8 +126,25 @@ class SupplierAccount
             'date' => $p->paid_on->toDateString(), 'type' => 'payment', 'id' => $p->id, 'number' => $p->number,
             'reference' => $p->reference, 'amount' => Decimal::negate($p->amount, 2), 'created_at' => $p->created_at,
         ]);
+        // ST1: money the supplier gave back raises what we owe (it reverses an earlier payment).
+        $refunds = SupplierRefund::query()->where('supplier_id', $supplierId)->get()->map(fn (SupplierRefund $r) => [
+            'date' => $r->received_on->toDateString(), 'type' => 'refund', 'id' => $r->id, 'number' => $r->number,
+            'reference' => $r->reference, 'amount' => Decimal::round($r->amount, 2), 'created_at' => $r->created_at,
+        ]);
+        // ST1: voids are their own lines, on the (organization-local) day of the void.
+        $timezone = $this->dates->timezone();
+        $voidDate = fn ($at) => $at->copy()->setTimezone($timezone)->toDateString();
+        $paymentVoids = SupplierPayment::query()->where('supplier_id', $supplierId)->whereNotNull('voided_at')->get()->map(fn (SupplierPayment $p) => [
+            'date' => $voidDate($p->voided_at), 'type' => 'payment_void', 'id' => $p->id, 'number' => $p->number,
+            'reference' => 'Void: '.$p->void_reason, 'amount' => Decimal::round($p->amount, 2), 'created_at' => $p->voided_at,
+        ]);
+        $refundVoids = SupplierRefund::query()->where('supplier_id', $supplierId)->whereNotNull('voided_at')->get()->map(fn (SupplierRefund $r) => [
+            'date' => $voidDate($r->voided_at), 'type' => 'refund_void', 'id' => $r->id, 'number' => $r->number,
+            'reference' => 'Void: '.$r->void_reason, 'amount' => Decimal::negate($r->amount, 2), 'created_at' => $r->voided_at,
+        ]);
 
         return $receipts->concat($charges)->concat($vouchers)->concat($returns)->concat($payments)
+            ->concat($refunds)->concat($paymentVoids)->concat($refundVoids)
             ->sortBy([['date', 'asc'], ['created_at', 'asc']])
             ->map(fn (array $e) => array_diff_key($e, ['created_at' => true]))
             ->values();

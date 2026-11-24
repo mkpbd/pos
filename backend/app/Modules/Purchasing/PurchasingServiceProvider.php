@@ -2,6 +2,8 @@
 
 namespace App\Modules\Purchasing;
 
+use App\Modules\Products\Application\Contracts\LabelSources;
+use App\Modules\Purchasing\Application\Queries\PurchaseLabelSources;
 use App\Modules\Purchasing\Infrastructure\Console\SendReorderNotificationsCommand;
 use App\Modules\Purchasing\Infrastructure\Console\SendRfqRemindersCommand;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
@@ -9,6 +11,8 @@ use App\Modules\Purchasing\Infrastructure\Models\LandedCostVoucher;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrder;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseRequisition;
 use App\Modules\Purchasing\Infrastructure\Models\Rfq;
+use App\Modules\Purchasing\Infrastructure\Models\SupplierPayment;
+use App\Modules\Purchasing\Infrastructure\Models\SupplierRefund;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Support\Facades\Route;
 
@@ -18,10 +22,17 @@ use Illuminate\Support\Facades\Route;
  * notification (`purchasing:reorder-notifications`, SC1); purchase requisitions with
  * amount-based approval, purchase order approval, RFQs with supplier quotes and awards, and
  * the daily quotes-overdue reminder (`purchasing:rfq-reminders`, SC2); landed costs on receipts
- * and landed cost vouchers, and the supplier performance read model (SC3).
+ * and landed cost vouchers, and the supplier performance read model (SC3); supplier payments and
+ * refunds through the payments ledger / cash drawer, with voids (ST1).
  */
 class PurchasingServiceProvider extends ModuleServiceProvider
 {
+    public function register(): void
+    {
+        // ST1: goods receipt / purchase order lines for printing labels (contract declared by Products).
+        $this->app->bind(LabelSources::class, PurchaseLabelSources::class);
+    }
+
     public function boot(): void
     {
         Route::model('order', PurchaseOrder::class);
@@ -29,6 +40,8 @@ class PurchasingServiceProvider extends ModuleServiceProvider
         Route::model('requisition', PurchaseRequisition::class);
         Route::model('rfq', Rfq::class);
         Route::model('landedCostVoucher', LandedCostVoucher::class);
+        Route::model('supplierPayment', SupplierPayment::class);
+        Route::model('supplierRefund', SupplierRefund::class);
 
         parent::boot();
 
@@ -44,7 +57,7 @@ class PurchasingServiceProvider extends ModuleServiceProvider
             'purchases.manage' => 'Create, edit, place and cancel purchase orders; convert requisitions; run RFQs',
             'purchases.receive' => 'Receive goods and record supplier invoices',
             'purchases.return' => 'Return goods to suppliers',
-            'purchases.pay' => 'Record payments to suppliers',
+            'purchases.pay' => 'Record and void payments to suppliers and refunds from them',
             // SC2: requisitions and approval limits.
             'purchases.request' => 'Raise, edit and submit own purchase requisitions',
             'purchases.approve' => 'Approve requisitions and purchase orders up to the manager limit',

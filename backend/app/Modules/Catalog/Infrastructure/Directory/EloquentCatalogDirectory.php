@@ -112,4 +112,18 @@ class EloquentCatalogDirectory implements CatalogDirectory
                     ->map(fn (AttributeValue $v) => ['value' => $v->value, 'swatch_hex' => $v->swatch_hex])->values()->all(),
             ])->all();
     }
+
+    public function units(string $organizationId): array
+    {
+        return Unit::query()->withoutGlobalScope('organization')->where('organization_id', $organizationId)
+            ->orderBy('name')->orderBy('id')->get(['id', 'name', 'code', 'allow_decimal', 'is_active'])
+            ->map(fn (Unit $u) => ['id' => $u->id, 'name' => $u->name, 'code' => $u->code, 'allow_decimal' => $u->allow_decimal, 'is_active' => $u->is_active])->all();
+    }
+
+    public function taxRates(string $organizationId): array
+    {
+        return TaxRate::query()->withoutGlobalScope('organization')->where('organization_id', $organizationId)
+            ->orderBy('name')->orderBy('id')->get(['id', 'name', 'rate', 'is_active'])
+            ->map(fn (TaxRate $t) => ['id' => $t->id, 'name' => $t->name, 'rate' => (string) $t->rate, 'is_active' => $t->is_active])->all();
+    }
 }

@@ -471,6 +471,12 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Stock operations ST1 (implemented)
+
+- `imports` (organization, type, status with CHECK, file path / name / size, options jsonb, row counters, timestamps per stage, `created_by`) and `import_errors` (import, row, column, message, row values jsonb, stage `check|run`; at most `pos.imports.stored_errors` per import). Imports module.
+- `stocktakes` (organization, branch, store, `ST-` number, status `draft|counting|posted|cancelled`, scope `all|categories|products` + `scope_ids` jsonb, blind, notes, uncounted policy, started / posted / cancelled at + by, `adjustment_id`) with a partial unique index allowing **one open stocktake per store**; `stocktake_lines` (variant, batch, `system_quantity` snapshot taken at each count, `counted_quantity`, counted at / by, note, `is_extra`) unique per (stocktake, variant, batch). Inventory module. Posting writes one `count` stock adjustment whose lines keep counted / system pairs (Q1 CHECK `quantity = counted − system`).
+- `supplier_payments` adds `voided_at`, `voided_by`, `void_reason`; new `supplier_refunds` (`SREF-` number, supplier, branch, currency, amount > 0, method CHECK, reference, `received_on`, notes, void columns). Both post to `payments` (the ledger) with sources `supplier_payment`, `supplier_refund`, `supplier_payment_void`, `supplier_refund_void`.
+
 ## 3. Indexing strategy
 
 - Every tenant table: composite index starting with `(organization_id, …)`; branch tables `(organization_id, branch_id, …)`.

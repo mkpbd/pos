@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth, useCan } from '@/features/auth/use-auth'
+import { ImportButton } from '@/features/imports/components/import-button'
 import { useSupplierBalancesQuery } from '@/features/purchasing/api'
 import { SupplierStatementSheet } from '@/features/purchasing/pages/payment-pages'
 import { supplierListQuery, useArchiveSupplierMutation, useSaveSupplierMutation, useSuppliersQuery, type Supplier } from '@/features/suppliers/api'
@@ -145,6 +146,7 @@ export function SuppliersPage() {
         actions={
           <>
             <ExportMenu list="suppliers" query={supplierListQuery(filters)} disabled={!data?.items.length} />
+            <ImportButton type="suppliers" label="Import suppliers" />
             {canManage && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New supplier</Button>}
           </>
         }

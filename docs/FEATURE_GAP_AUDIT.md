@@ -72,10 +72,10 @@ batches, weighted-average cost, transfers, adjustments, CSV/Excel/PDF export of 
 
 | Gap | Pri | Evidence / notes |
 |---|---|---|
-| **Bulk import** (CSV/Excel) of products, opening stock, customers, suppliers, price updates | **P0** | No import route or library ✔ — onboarding a shop with thousands of SKUs is manual |
-| **Barcode generation & label printing** (product / shelf labels) | **P0** | `Barcode.php` only validates; no barcode library ✔ |
-| **Stocktake / cycle count** (count session, counted vs system, variance report, freeze) | **P0** | Only signed adjustments; see the manual error in §1 #1 |
-| **Supplier payments outside the cash register & payments ledger; no supplier refunds** | P0/P1 | Paying a supplier from the till doesn't change expected cash ✔ |
+| **Bulk import** (CSV/Excel) of products, opening stock, customers, suppliers, price updates | **Done (ST1)** | `/imports` with templates, dry run, error report |
+| **Barcode generation & label printing** (product / shelf labels) | **Done (ST1)** | in-store EAN-13, *Print labels* (A4 + thermal + shelf) |
+| **Stocktake / cycle count** (count session, counted vs system, variance report, freeze) | **Done (ST1)** | stocktake sessions with scan, blind mode, variance, snapshot posting |
+| **Supplier payments outside the cash register & payments ledger; no supplier refunds** | **Done (ST1)** | ledger + drawer, refunds, voids |
 | Box / carton units usable in buying & selling (unit conversions exist but no line uses them) | P1 | — |
 | Wholesale price used anywhere (stored, never used); price lists, quantity tiers, branch prices | P1 | — |
 | Purchase discounts and **bonus / free quantity** (10+1) on PO / receipt | P1 | Standard in BD FMCG & pharma — costs come out wrong without it |

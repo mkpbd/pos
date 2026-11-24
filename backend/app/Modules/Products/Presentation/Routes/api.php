@@ -4,6 +4,9 @@ use App\Modules\Products\Presentation\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+    // ST1: in-store barcodes and label data (before products/{product}).
+    Route::post('products/barcodes/generate', [ProductController::class, 'generateBarcodes'])->middleware('can:products.manage');
+    Route::get('products/labels', [ProductController::class, 'labels'])->middleware('can:products.view');
     Route::get('products/lookup', [ProductController::class, 'lookup'])->middleware('can:products.view');
     Route::get('products', [ProductController::class, 'index'])->middleware('can:products.view');
     Route::post('products', [ProductController::class, 'store'])->middleware('can:products.manage');

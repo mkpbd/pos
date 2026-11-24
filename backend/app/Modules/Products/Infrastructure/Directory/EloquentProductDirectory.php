@@ -69,6 +69,42 @@ class EloquentProductDirectory implements ProductDirectory
             ->all();
     }
 
+    public function variantIdByCode(string $organizationId, string $code): ?string
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return null;
+        }
+
+        $byBarcode = DB::table('product_barcodes')->where('organization_id', $organizationId)->where('barcode', $code)->value('variant_id');
+        if ($byBarcode !== null) {
+            return (string) $byBarcode;
+        }
+
+        // A SKU is unique among live variants; an archived variant may share it, so live ones win.
+        $bySku = DB::table('product_variants')->where('organization_id', $organizationId)
+            ->whereRaw('lower(sku) = ?', [mb_strtolower($code)])
+            ->orderByRaw('deleted_at IS NOT NULL')->orderBy('id')
+            ->value('id');
+
+        return $bySku === null ? null : (string) $bySku;
+    }
+
+    public function primaryBarcodes(string $organizationId, array $variantIds): array
+    {
+        if ($variantIds === []) {
+            return [];
+        }
+
+        $rows = WhereInChunks::get(DB::table('product_barcodes')->where('organization_id', $organizationId), 'variant_id', $variantIds, ['variant_id', 'barcode', 'id']);
+        $barcodes = [];
+        foreach ($rows->sortBy('id') as $row) {
+            $barcodes[(string) $row->variant_id] ??= (string) $row->barcode;
+        }
+
+        return $barcodes;
+    }
+
     public function images(string $organizationId, array $imageIds): array
     {
         $ids = array_values(array_unique(array_filter($imageIds, fn ($id) => is_string($id) && preg_match('/^[0-9a-f-]{36}$/i', $id) === 1)));

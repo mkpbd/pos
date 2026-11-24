@@ -1353,3 +1353,98 @@ test('G1b: the platform admin backs up the real database from System status, che
   await expect(admin.getByRole('table', { name: 'Recent backups' })).toContainText(latest!.sha256!.slice(0, 12))
   await admin.context().close()
 })
+
+test('ST1: products come in from a CSV file, get shop barcodes and labels, a stocktake counts them by scan, and a supplier refund is recorded and voided', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(180_000)
+  type Page = import('@playwright/test').Page
+  type Call = { status: number; body: { data: any; error?: any } }
+  const call = async (page: Page, method: string, url: string, body?: unknown, idempotent = false): Promise<Call> => {
+    const token = decodeURIComponent((await page.context().cookies()).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token, idempotent }) => {
+        const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }
+        if (idempotent) headers['Idempotency-Key'] = crypto.randomUUID()
+        const res = await fetch(url, { method, credentials: 'include', headers, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token, idempotent },
+    )
+  }
+  const owner = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage()
+  await owner.goto('/admin/login')
+  await owner.getByLabel('E-mail').fill('owner@demo.test')
+  await owner.getByLabel('Password').fill('password')
+  await owner.getByRole('button', { name: 'Sign in' }).click()
+  await expect(owner).not.toHaveURL(/\/admin\/login/)
+
+  // Import two products from a CSV file (the e2e server runs the queued dry run and import at once).
+  const stamp = String(Date.now()).slice(-6)
+  const csv = `name,sku,unit,cost_price,selling_price,category\nST1 Tea ${stamp},ST1-TEA-${stamp},pcs,40.00,55.00,ST1 Drinks ${stamp}\nST1 Coffee ${stamp},ST1-COF-${stamp},pcs,90.00,120.00,ST1 Drinks ${stamp}\n`
+  const token = decodeURIComponent((await owner.context().cookies()).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+  const upload = await owner.evaluate(
+    async ({ csv, token }) => {
+      const form = new FormData()
+      form.append('type', 'products')
+      form.append('file', new Blob([csv], { type: 'text/csv' }), 'products.csv')
+      const res = await fetch('/api/v1/imports', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-XSRF-TOKEN': token }, body: form })
+      return { status: res.status, body: (await res.json()) as { data: any } }
+    },
+    { csv, token },
+  )
+  expect(upload.status).toBe(201)
+  const importId = upload.body.data.id as string
+  await expect.poll(async () => (await call(owner, 'GET', `/api/v1/imports/${importId}`)).body.data.status, { timeout: 60_000 }).toBe('validated')
+  const checked = (await call(owner, 'GET', `/api/v1/imports/${importId}`)).body.data
+  expect(checked.to_create).toBe(2)
+  expect(checked.rows_error).toBe(0)
+  expect((await call(owner, 'POST', `/api/v1/imports/${importId}/run`)).status).toBeLessThan(300)
+  await expect.poll(async () => (await call(owner, 'GET', `/api/v1/imports/${importId}`)).body.data.status, { timeout: 60_000 }).toBe('completed')
+  expect((await call(owner, 'GET', `/api/v1/imports/${importId}`)).body.data.created).toBe(2)
+  await owner.goto(`/admin/imports/${importId}`)
+  await expect(owner.getByRole('heading', { level: 1, name: 'Products import' })).toBeVisible()
+  await expect(owner.getByText('Completed').first()).toBeVisible()
+
+  // The imported products get in-store EAN-13 barcodes and print as labels.
+  const found = (await call(owner, 'GET', `/api/v1/products?search=${encodeURIComponent(`ST1 Tea ${stamp}`)}`)).body.data as { id: string }[]
+  expect(found).toHaveLength(1)
+  const product = (await call(owner, 'GET', `/api/v1/products/${found[0]!.id}`)).body.data as { variants: { id: string }[] }
+  const variantId = product.variants[0]!.id
+  const generated = (await call(owner, 'POST', '/api/v1/products/barcodes/generate', { variant_ids: [variantId] })).body.data as { barcode: string; generated: boolean }[]
+  expect(generated[0]!.generated).toBe(true)
+  const barcode = generated[0]!.barcode
+  expect(barcode).toMatch(/^20\d{11}$/)
+  const labels = (await call(owner, 'GET', `/api/v1/products/labels?variant_ids[]=${variantId}`)).body.data as { labels: { barcode: string; barcode_format: string; price: string }[] }
+  expect(labels.labels[0]).toMatchObject({ barcode, barcode_format: 'ean13' })
+  await owner.goto(`/admin/products/labels?variant_ids=${variantId}`)
+  await expect(owner.getByText(barcode.slice(1, 7)).first()).toBeVisible()
+
+  // A stocktake of the store: two scans of the new barcode, then post → stock 2.
+  type StockRow = { store: { id: string } | null; variant: { id: string } | null; quantity: string }
+  const storeId = ((await call(owner, 'GET', '/api/v1/inventory/stock?search=Pran%20Mango%20Juice')).body.data as StockRow[]).find((r) => r.store)!.store!.id
+  const created = await call(owner, 'POST', '/api/v1/inventory/stocktakes', { store_id: storeId, scope: 'products', scope_ids: [found[0]!.id] })
+  expect(created.status).toBe(201)
+  const stocktakeId = created.body.data.id as string
+  expect((await call(owner, 'POST', `/api/v1/inventory/stocktakes/${stocktakeId}/start`)).status).toBe(200)
+  for (let i = 0; i < 2; i++) expect((await call(owner, 'POST', `/api/v1/inventory/stocktakes/${stocktakeId}/scan`, { barcode })).status).toBe(200)
+  await owner.goto(`/admin/inventory/stocktakes/${stocktakeId}`)
+  await expect(owner.getByText(`ST1 Tea ${stamp}`).first()).toBeVisible()
+  const posted = await call(owner, 'POST', `/api/v1/inventory/stocktakes/${stocktakeId}/post`, { uncounted_policy: 'ignore' })
+  expect(posted.status).toBe(200)
+  expect(posted.body.data.status).toBe('posted')
+  expect(posted.body.data.adjustment).not.toBeNull()
+  const after = (await call(owner, 'GET', `/api/v1/inventory/stock?variant_id=${variantId}&store_id=${storeId}`)).body.data as StockRow[]
+  expect(Number(after[0]!.quantity)).toBe(2)
+
+  // A supplier refund by bank transfer shows on the statement; voiding it adds the reversal.
+  const supplier = ((await call(owner, 'GET', '/api/v1/suppliers')).body.data as { id: string }[])[0]!
+  const refund = await call(owner, 'POST', '/api/v1/purchasing/supplier-refunds', { supplier_id: supplier.id, amount: '150.00', method: 'bank_transfer', reference: `ST1-${stamp}`, received_on: new Date().toISOString().slice(0, 10) }, true)
+  expect(refund.status).toBe(201)
+  expect(refund.body.data.number).toMatch(/^SREF-/)
+  expect((await call(owner, 'POST', `/api/v1/purchasing/supplier-refunds/${refund.body.data.id}/void`, { reason: 'Recorded twice' })).status).toBe(200)
+  const voidedAgain = await call(owner, 'POST', `/api/v1/purchasing/supplier-refunds/${refund.body.data.id}/void`, { reason: 'Again' })
+  expect(voidedAgain.body.error.code).toBe('ALREADY_VOIDED')
+  const statement = (await call(owner, 'GET', `/api/v1/purchasing/suppliers/${supplier.id}/statement`)).body.data
+  expect(JSON.stringify(statement)).toContain('refund_void')
+  await owner.context().close()
+})

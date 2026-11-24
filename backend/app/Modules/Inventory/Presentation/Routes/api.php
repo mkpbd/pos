@@ -4,6 +4,7 @@ use App\Modules\Inventory\Presentation\Http\Controllers\AdjustmentController;
 use App\Modules\Inventory\Presentation\Http\Controllers\ReorderRuleController;
 use App\Modules\Inventory\Presentation\Http\Controllers\ReplenishmentSettingsController;
 use App\Modules\Inventory\Presentation\Http\Controllers\StockController;
+use App\Modules\Inventory\Presentation\Http\Controllers\StocktakeController;
 use App\Modules\Inventory\Presentation\Http\Controllers\TransferController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,4 +30,16 @@ Route::prefix('inventory')->middleware(['auth:sanctum', 'tenant'])->group(functi
     Route::delete('reorder-rules/{reorderRule}', [ReorderRuleController::class, 'destroy'])->whereUuid('reorderRule')->middleware('can:inventory.manage');
     Route::get('replenishment-settings', [ReplenishmentSettingsController::class, 'show'])->middleware('can:inventory.view');
     Route::patch('replenishment-settings', [ReplenishmentSettingsController::class, 'update'])->middleware('can:inventory.manage');
+
+    // ST1: stocktake sessions. Reading needs inventory.view or inventory.stocktake (checked in the controller).
+    Route::get('stocktakes', [StocktakeController::class, 'index']);
+    Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware('can:inventory.stocktake');
+    Route::get('stocktakes/{stocktake}', [StocktakeController::class, 'show'])->whereUuid('stocktake');
+    Route::get('stocktakes/{stocktake}/lines', [StocktakeController::class, 'lines'])->whereUuid('stocktake');
+    Route::put('stocktakes/{stocktake}/lines', [StocktakeController::class, 'count'])->whereUuid('stocktake')->middleware('can:inventory.stocktake');
+    Route::post('stocktakes/{stocktake}/scan', [StocktakeController::class, 'scan'])->whereUuid('stocktake')->middleware('can:inventory.stocktake');
+    Route::delete('stocktakes/{stocktake}/lines/{lineId}/count', [StocktakeController::class, 'clear'])->whereUuid(['stocktake', 'lineId'])->middleware('can:inventory.stocktake');
+    Route::post('stocktakes/{stocktake}/start', [StocktakeController::class, 'start'])->whereUuid('stocktake')->middleware('can:inventory.stocktake');
+    Route::post('stocktakes/{stocktake}/post', [StocktakeController::class, 'post'])->whereUuid('stocktake')->middleware('can:inventory.adjust');
+    Route::post('stocktakes/{stocktake}/cancel', [StocktakeController::class, 'cancel'])->whereUuid('stocktake')->middleware('can:inventory.stocktake');
 });

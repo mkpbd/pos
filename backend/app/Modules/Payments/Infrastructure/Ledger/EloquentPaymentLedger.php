@@ -30,6 +30,22 @@ class EloquentPaymentLedger implements PaymentLedger
         return ['id' => $session->id, 'number' => $session->number, 'cash_register_id' => $session->cash_register_id];
     }
 
+    public function openSession(TenantUser $actor): ?array
+    {
+        /** @var RegisterSession|null $session */
+        $session = RegisterSession::query()
+            ->where('opened_by', $actor->getAuthIdentifier())
+            ->where('status', SessionStatus::Open)
+            ->first();
+
+        return $session === null ? null : [
+            'id' => $session->id,
+            'number' => $session->number,
+            'branch_id' => $session->branch_id,
+            'cash_register_id' => $session->cash_register_id,
+        ];
+    }
+
     public function record(TenantUser $actor, string $branchId, array $entries, PaymentSource $source): void
     {
         if ($entries === []) {

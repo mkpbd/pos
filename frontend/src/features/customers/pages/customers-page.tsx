@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { CatalogRecordDialog } from '@/features/catalog/components/catalog-record-dialog'
+import { ImportButton } from '@/features/imports/components/import-button'
 import {
   customerListQuery,
   useArchiveCustomerMutation,
@@ -146,6 +147,7 @@ export function CustomersPage() {
         actions={
           <>
             <ExportMenu list="customers" query={customerListQuery(filters)} disabled={!data?.items.length} />
+            <ImportButton type="customers" label="Import customers" />
             {canCreate && <Button onClick={() => setEditing(null)}><PlusIcon data-icon="inline-start" /> New customer</Button>}
           </>
         }

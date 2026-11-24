@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArchiveIcon, ArrowLeftIcon, ImagePlusIcon, Loader2Icon, XIcon } from 'lucide-react'
+import { ArchiveIcon, ArrowLeftIcon, ImagePlusIcon, Loader2Icon, TagIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { FormField } from '@/components/common/form-field'
@@ -121,6 +121,7 @@ function ImagesCard({ product }: { product: Product }) {
 
 function ProductForm({ product }: { product?: Product }) {
   const navigate = useNavigate()
+  const can = useCan()
   const save = useSaveProductMutation()
   const archive = useArchiveProductMutation()
   const [confirmArchive, setConfirmArchive] = useState(false)
@@ -162,7 +163,12 @@ function ProductForm({ product }: { product?: Product }) {
           </Button>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{product ? product.name : 'New product'}</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {product && can('products.view') && (
+            <Button asChild variant="outline">
+              <Link to={`/products/labels?variant_ids=${product.variants.map((v) => v.id).join(',')}`}><TagIcon data-icon="inline-start" /> Print labels</Link>
+            </Button>
+          )}
           {product && (
             <Button type="button" variant="outline" onClick={() => setConfirmArchive(true)}>
               <ArchiveIcon data-icon="inline-start" /> Archive

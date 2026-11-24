@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link, useNavigate } from 'react-router'
-import { ImageIcon, PlusIcon, SearchIcon, SparklesIcon } from 'lucide-react'
+import { ImageIcon, PlusIcon, SearchIcon, SparklesIcon, TagIcon } from 'lucide-react'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PaginationBar } from '@/components/common/pagination-bar'
@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { flattenCategoryTree, useCatalogList } from '@/features/catalog/api'
+import { ImportButton } from '@/features/imports/components/import-button'
 import { AI_HELP_PATH, aiSwitchedOn, MAX_BATCH_SUBJECTS } from '@/features/online-catalog/ai-help/model'
 import { productListQuery, useProductsQuery, useRestoreProductMutation } from '@/features/products/api'
 import { formatRange } from '@/lib/money'
@@ -66,6 +67,9 @@ export function ProductsPage() {
         actions={
           <>
             <ExportMenu list="products" query={productListQuery(filters)} disabled={!data?.items.length} />
+            <Button asChild variant="outline"><Link to="/products/labels"><TagIcon data-icon="inline-start" /> Print labels</Link></Button>
+            <ImportButton type="products" label="Import products" />
+            <ImportButton type="price_update" label="Update prices" />
             {canEdit && (
               <Button asChild>
                 <Link to="/products/new"><PlusIcon data-icon="inline-start" /> New product</Link>

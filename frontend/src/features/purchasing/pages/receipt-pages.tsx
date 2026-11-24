@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon, Loader2Icon, PlusIcon, Undo2Icon } from 'lucide-react'
+import { ArrowLeftIcon, Loader2Icon, PlusIcon, TagIcon, Undo2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { FormField } from '@/components/common/form-field'
@@ -318,7 +318,10 @@ export function ReceiptPage() {
           <Button asChild variant="ghost" size="icon" aria-label="Back to receipts"><Link to="/purchasing/receipts"><ArrowLeftIcon /></Link></Button>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{data.number}</h1>
         </div>
-        {can('purchases.return') && <Button variant="outline" onClick={() => setReturning(true)}><Undo2Icon data-icon="inline-start" /> Return goods</Button>}
+        <div className="flex flex-wrap gap-2">
+          {can('products.view') && <Button asChild variant="outline"><Link to={`/products/labels?goods_receipt_id=${data.id}`}><TagIcon data-icon="inline-start" /> Print labels</Link></Button>}
+          {can('purchases.return') && <Button variant="outline" onClick={() => setReturning(true)}><Undo2Icon data-icon="inline-start" /> Return goods</Button>}
+        </div>
       </div>
       <Card>
         <CardContent className="grid gap-2 pt-6 text-sm sm:grid-cols-4">

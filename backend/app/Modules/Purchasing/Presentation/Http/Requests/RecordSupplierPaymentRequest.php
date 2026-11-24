@@ -15,7 +15,8 @@ class RecordSupplierPaymentRequest extends FormRequest
             'supplier_id' => ['required', 'uuid'],
             'branch_id' => ['nullable', 'uuid'],
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:9999999999999999'],
-            'method' => ['required', Rule::enum(PaymentMethod::class)],
+            // ST1: the payments ledger's methods ("other" is kept only on older payments).
+            'method' => ['required', Rule::in(PaymentMethod::recordable())],
             'reference' => ['nullable', 'string', 'max:100'],
             'paid_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.app(OrganizationDate::class)->today()],
             'notes' => ['nullable', 'string', 'max:2000'],

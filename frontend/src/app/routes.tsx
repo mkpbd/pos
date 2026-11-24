@@ -64,6 +64,9 @@ const pages = {
   newAdjustment: page(() => import('@/features/inventory/pages/adjustment-pages'), 'NewAdjustmentPage'),
   adjustment: page(() => import('@/features/inventory/pages/adjustment-pages'), 'AdjustmentPage'),
   transfers: page(() => import('@/features/inventory/pages/transfer-pages'), 'TransfersPage'),
+  // ST1: stocktake sessions (count with a scanner, post the differences).
+  stocktakes: page(() => import('@/features/inventory/pages/stocktake-pages'), 'StocktakesPage'),
+  stocktake: page(() => import('@/features/inventory/pages/stocktake-pages'), 'StocktakePage'),
   newTransfer: page(() => import('@/features/inventory/pages/transfer-pages'), 'NewTransferPage'),
   purchaseOrders: page(() => import('@/features/purchasing/pages/order-pages'), 'PurchaseOrdersPage'),
   purchaseOrder: page(() => import('@/features/purchasing/pages/order-pages'), 'PurchaseOrderPage'),
@@ -72,6 +75,7 @@ const pages = {
   receipt: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReceiptPage'),
   purchaseReturns: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReturnsPage'),
   payments: page(() => import('@/features/purchasing/pages/payment-pages'), 'PaymentsPage'),
+  supplierRefunds: page(() => import('@/features/purchasing/pages/refund-pages'), 'SupplierRefundsPage'),
   reorder: page(() => import('@/features/supply-chain/pages/reorder-page'), 'ReorderPage'),
   supplier: page(() => import('@/features/supply-chain/pages/supplier-page'), 'SupplierPage'),
   inventorySettings: page(() => import('@/features/supply-chain/pages/inventory-settings-page'), 'InventorySettingsPage'),
@@ -144,10 +148,19 @@ const pages = {
   shortLinks: page(() => import('@/features/marketing/pages/short-links-page'), 'ShortLinksPage'),
   socialPosts: page(() => import('@/features/marketing/pages/social-page'), 'SocialPage'),
   productFeeds: page(() => import('@/features/marketing/pages/feeds-page'), 'ProductFeedsPage'),
+  // ST1: bulk import wizard and label printing.
+  imports: page(() => import('@/features/imports/pages/import-pages'), 'ImportsPage'),
+  newImport: page(() => import('@/features/imports/pages/import-pages'), 'NewImportPage'),
+  importDetail: page(() => import('@/features/imports/pages/import-pages'), 'ImportPage'),
+  productLabels: page(() => import('@/features/labels/pages/labels-page'), 'LabelsPage'),
 }
 
 /** Landed cost vouchers (SC3): creating, editing and posting. Mirrors LANDED_COST_PERMISSIONS.manage. */
 const LANDED_COST_MANAGE = 'purchases.landed_cost'
+/** Imports (ST1): each type has its own permission (products, stock, customers, suppliers). Mirrors IMPORT_PERMISSIONS. */
+const IMPORT_PERMISSIONS = ['products.manage', 'inventory.adjust', 'customers.manage', 'suppliers.manage']
+/** Stocktakes (ST1): viewing inventory or counting. Mirrors the Stocktakes tab. */
+const STOCKTAKE_PERMISSIONS = ['inventory.view', 'inventory.stocktake']
 const REGISTER_PERMISSIONS = ['cash_registers.view', 'cash_registers.operate', 'cash_registers.manage']
 /** Requesters see their own requisitions; approvers and purchasing staff see the branch's (SC2). */
 const REQUISITION_PERMISSIONS = ['purchases.view', 'purchases.request', 'purchases.approve', 'purchases.approve_high']
@@ -235,6 +248,8 @@ export const routes: RouteObject[] = [
               guarded('expenses.view', 'expenses', pages.expenses),
               guarded(['loyalty.view', 'loyalty.manage'], 'loyalty', pages.loyalty),
               guarded('products.view', 'products', pages.products),
+              // ST1: barcode / price / shelf labels (static segment wins over products/:productId).
+              guarded('products.view', 'products/labels', pages.productLabels),
               // Editing needs cost prices, so it requires both permissions.
               {
                 element: <RequirePermission permission="products.manage" />,
@@ -246,6 +261,9 @@ export const routes: RouteObject[] = [
               // Web listing on its own page for online store staff who do not edit products.
               guarded('online_catalog.view', 'products/:productId/online-store', pages.productListing),
               guarded('products.view', 'catalog', pages.catalog),
+              guarded(IMPORT_PERMISSIONS, 'imports', pages.imports),
+              guarded(IMPORT_PERMISSIONS, 'imports/new', pages.newImport),
+              guarded(IMPORT_PERMISSIONS, 'imports/:importId', pages.importDetail),
               guarded('customers.view', 'customers', pages.customers),
               guarded('suppliers.view', 'suppliers', pages.suppliers),
               // Catalog tab needs purchases.view as well (checked on the page).
@@ -258,6 +276,9 @@ export const routes: RouteObject[] = [
               guarded('inventory.view', 'inventory/adjustments/:adjustmentId', pages.adjustment),
               guarded('inventory.view', 'inventory/transfers', pages.transfers),
               guarded('inventory.transfer', 'inventory/transfers/new', pages.newTransfer),
+              // ST1: counters may hold inventory.stocktake without inventory.view; posting needs inventory.adjust (page and API).
+              guarded(STOCKTAKE_PERMISSIONS, 'inventory/stocktakes', pages.stocktakes),
+              guarded(STOCKTAKE_PERMISSIONS, 'inventory/stocktakes/:stocktakeId', pages.stocktake),
               guarded('inventory.manage', 'inventory/settings', pages.inventorySettings),
               guarded('purchases.view', 'purchasing/orders', pages.purchaseOrders),
               guarded('purchases.view', 'purchasing/reorder', pages.reorder),
@@ -277,6 +298,7 @@ export const routes: RouteObject[] = [
               guarded('purchases.view', 'purchasing/receipts/:receiptId', pages.receipt),
               guarded('purchases.view', 'purchasing/returns', pages.purchaseReturns),
               guarded('purchases.view', 'purchasing/payments', pages.payments),
+              guarded('purchases.view', 'purchasing/supplier-refunds', pages.supplierRefunds),
               guarded('purchases.view', 'purchasing/landed-costs', pages.landedCosts),
               guarded(LANDED_COST_MANAGE, 'purchasing/landed-costs/new', pages.landedCost),
               guarded('purchases.view', 'purchasing/landed-costs/:voucherId', pages.landedCost),

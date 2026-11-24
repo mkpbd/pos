@@ -39,6 +39,11 @@ class PaymentsPresenter
         'cash_out' => 'Cash out',
         'online_order' => 'Online orders',
         'online_order_refund' => 'Online order refunds',
+        // ST1: supplier money through the ledger (Purchasing).
+        'supplier_payment' => 'Supplier payments',
+        'supplier_payment_void' => 'Voided supplier payments',
+        'supplier_refund' => 'Supplier refunds',
+        'supplier_refund_void' => 'Voided supplier refunds',
     ];
 
     public function __construct(

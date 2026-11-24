@@ -113,6 +113,21 @@ return [
         'error_events' => env('POS_RETAIN_ERROR_EVENTS_DAYS', 90),
         'audit_logs' => env('POS_RETAIN_AUDIT_DAYS'),
         'system_backups' => env('POS_RETAIN_BACKUP_RECORDS_DAYS', 90),
+        // ST1: uploaded import files, counted from the import's end (completed, failed, cancelled).
+        'import_files' => env('POS_RETAIN_IMPORT_FILES_DAYS', 30),
+    ],
+
+    /*
+    | ST1: bulk import (Imports module). Files live on the private disk under
+    | imports/{organization}/{import}.{ext}; rows are imported in chunks, one transaction each.
+    */
+    'imports' => [
+        'disk' => env('POS_IMPORTS_DISK', 'local'),
+        'max_rows' => 20000,
+        'max_file_kb' => 10240,
+        'chunk_size' => 200,
+        // Errors kept per phase (dry run, run); the import page shows the first 200.
+        'stored_errors' => 1000,
     ],
 
 ];

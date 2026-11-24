@@ -7,9 +7,11 @@ use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
 use App\Modules\Customers\Application\Contracts\CustomerReviewStats;
 use App\Modules\Customers\Application\Contracts\CustomerShoppingLists;
 use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
+use App\Modules\Customers\Application\Imports\CustomersImport;
 use App\Modules\Customers\Application\Services\NoOnlineAccounts;
 use App\Modules\Customers\Application\Services\NoWebActivity;
 use App\Modules\Customers\Infrastructure\Directory\EloquentCustomerDirectory;
+use App\Modules\Imports\Application\Contracts\ImportHandler;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
 /**
@@ -27,6 +29,8 @@ class CustomersServiceProvider extends ModuleServiceProvider
         $this->app->bindIf(CustomerWebOrders::class, NoWebActivity::class);
         $this->app->bindIf(CustomerReviewStats::class, NoWebActivity::class);
         $this->app->bindIf(CustomerShoppingLists::class, NoWebActivity::class);
+        // ST1: customer import (Imports module).
+        $this->app->tag([CustomersImport::class], ImportHandler::TAG);
     }
 
     protected function permissions(): array

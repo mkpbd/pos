@@ -11,6 +11,7 @@ use App\Modules\CustomerAccounts\CustomerAccountsServiceProvider;
 use App\Modules\Customers\CustomersServiceProvider;
 use App\Modules\Expenses\ExpensesServiceProvider;
 use App\Modules\Geography\GeographyServiceProvider;
+use App\Modules\Imports\ImportsServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Loyalty\LoyaltyServiceProvider;
 use App\Modules\Marketing\MarketingServiceProvider;
@@ -77,6 +78,8 @@ return [
     MarketingServiceProvider::class,
     // P2b: Facebook & Instagram posting and catalog feeds (/feeds/*, before the storefront catch-all).
     SocialServiceProvider::class,
+    // ST1: bulk import (handlers are tagged by Products, Inventory, Customers and Suppliers).
+    ImportsServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

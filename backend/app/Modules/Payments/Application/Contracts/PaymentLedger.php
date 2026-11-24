@@ -24,6 +24,14 @@ interface PaymentLedger
     public function requireSession(TenantUser $actor, string $branchId): array;
 
     /**
+     * ST1: the actor's open register session in any branch (not locked), or null — lets a
+     * document that may name no branch (a supplier payment) book to the drawer's branch.
+     *
+     * @return array{id: string, number: string, branch_id: string, cash_register_id: string}|null
+     */
+    public function openSession(TenantUser $actor): ?array;
+
+    /**
      * Appends the entries. Cash needs the actor's open session in the branch (the drawer it
      * goes into or comes out of) and cannot take the drawer below zero; other methods are
      * linked to that session when one is open. Entries are immutable.

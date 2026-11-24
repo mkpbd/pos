@@ -56,4 +56,18 @@ interface CatalogDirectory
      * @return list<array{id: string, name: string, slug: string, display: string, is_filterable: bool, sort_order: int, values: list<array{value: string, swatch_hex: ?string}>}>
      */
     public function attributes(string $organizationId): array;
+
+    /**
+     * ST1: every unit of the organization (inactive ones included), ordered by name.
+     *
+     * @return list<array{id: string, name: string, code: string, allow_decimal: bool, is_active: bool}>
+     */
+    public function units(string $organizationId): array;
+
+    /**
+     * ST1: every tax rate of the organization (inactive ones included), ordered by name.
+     *
+     * @return list<array{id: string, name: string, rate: string, is_active: bool}>
+     */
+    public function taxRates(string $organizationId): array;
 }

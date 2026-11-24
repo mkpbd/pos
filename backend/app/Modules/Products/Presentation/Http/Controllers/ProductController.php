@@ -5,6 +5,7 @@ namespace App\Modules\Products\Presentation\Http\Controllers;
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
 use App\Modules\Products\Application\Actions\ArchiveProduct;
 use App\Modules\Products\Application\Actions\FindSellableVariant;
+use App\Modules\Products\Application\Actions\GenerateBarcodes;
 use App\Modules\Products\Application\Actions\ManageProductImages;
 use App\Modules\Products\Application\Actions\SaveOptionImages;
 use App\Modules\Products\Application\Actions\SaveProduct;
@@ -12,6 +13,7 @@ use App\Modules\Products\Application\Actions\SaveVariantGrid;
 use App\Modules\Products\Application\Contracts\VariantStock;
 use App\Modules\Products\Application\Contracts\VariantWebData;
 use App\Modules\Products\Application\DTOs\ProductData;
+use App\Modules\Products\Application\Queries\LabelData;
 use App\Modules\Products\Domain\ProductType;
 use App\Modules\Products\Infrastructure\Models\Product;
 use App\Modules\Products\Infrastructure\Models\ProductImage;
@@ -26,11 +28,13 @@ use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -184,6 +188,54 @@ class ProductController
         $product = $save($product, $request->optionData());
 
         return ApiResponse::success($this->present($request, $product->refresh()));
+    }
+
+    /**
+     * Generate in-store barcodes
+     *
+     * ST1: an EAN-13 "20" + 10-digit organization sequence + check digit for each variant without
+     * a barcode (all of them with `overwrite: true`, replacing their barcodes). At most 500 ids.
+     * Returns `[{variant_id, barcode, generated}]` in the given order.
+     */
+    public function generateBarcodes(Request $request, GenerateBarcodes $generate): JsonResponse
+    {
+        $data = $request->validate([
+            'variant_ids' => ['required', 'array', 'min:1', 'max:'.GenerateBarcodes::MAX_VARIANTS],
+            'variant_ids.*' => ['required', 'uuid'],
+            'overwrite' => ['sometimes', 'boolean'],
+        ]);
+
+        return ApiResponse::success($generate($data['variant_ids'], (bool) ($data['overwrite'] ?? false)));
+    }
+
+    /**
+     * Label data
+     *
+     * ST1: one source — `variant_ids[]`, `goods_receipt_id` (received quantities, batches; needs
+     * `purchases.view`), `purchase_order_id` (ordered quantities; needs `purchases.view`) or
+     * `category_id` (with sub-categories, active products). At most 2 000 products
+     * (422 `LABELS_TOO_MANY`). Returns `{shop: {name, currency}, labels: [...]}`.
+     */
+    public function labels(Request $request, LabelData $labels): JsonResponse
+    {
+        $sources = ['variant_ids', 'goods_receipt_id', 'purchase_order_id', 'category_id'];
+        $data = $request->validate([
+            'variant_ids' => ['required_without_all:goods_receipt_id,purchase_order_id,category_id', 'array', 'max:'.LabelData::MAX_LABELS],
+            'variant_ids.*' => ['required', 'uuid'],
+            'goods_receipt_id' => ['sometimes', 'uuid'],
+            'purchase_order_id' => ['sometimes', 'uuid'],
+            'category_id' => ['sometimes', 'uuid'],
+        ]);
+        if (count(array_intersect_key($data, array_flip($sources))) > 1) {
+            throw ValidationException::withMessages(['variant_ids' => ['Choose one source: products, a goods receipt, a purchase order or a category.']]);
+        }
+        if ((isset($data['goods_receipt_id']) || isset($data['purchase_order_id'])) && ! $request->user()?->can('purchases.view')) {
+            throw new AuthorizationException('You may not see purchase documents.');
+        }
+        /** @var TenantUser $user */
+        $user = $request->user();
+
+        return ApiResponse::success($labels($user, $this->tenant->requireOrganization(), $data));
     }
 
     private function present(Request $request, Product $product, bool $loadVariants = true): ProductResource

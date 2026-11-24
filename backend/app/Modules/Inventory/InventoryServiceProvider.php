@@ -2,18 +2,21 @@
 
 namespace App\Modules\Inventory;
 
+use App\Modules\Imports\Application\Contracts\ImportHandler;
 use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Inventory\Application\Contracts\ReplenishmentData;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Contracts\StockLevels;
 use App\Modules\Inventory\Application\Contracts\StockValuation;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
+use App\Modules\Inventory\Application\Imports\OpeningStockImport;
 use App\Modules\Inventory\Infrastructure\Directory\EloquentBatchDirectory;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLedger;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLevels;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockValuation;
 use App\Modules\Inventory\Infrastructure\Models\StockAdjustment;
 use App\Modules\Inventory\Infrastructure\Models\StockReorderRule;
+use App\Modules\Inventory\Infrastructure\Models\Stocktake;
 use App\Modules\Inventory\Infrastructure\Models\StockTransfer;
 use App\Modules\Inventory\Infrastructure\Notifications\NotifyLowStock;
 use App\Modules\Inventory\Infrastructure\Products\InventoryVariantStock;
@@ -25,7 +28,8 @@ use Illuminate\Support\Facades\Route;
 
 /**
  * Stock levels, the stock ledger, batches/expiry, adjustments, transfers and valuation;
- * per-store reorder rules and replenishment settings (SC1, `ReplenishmentData`).
+ * per-store reorder rules and replenishment settings (SC1, `ReplenishmentData`); stocktake
+ * sessions (ST1).
  */
 class InventoryServiceProvider extends ModuleServiceProvider
 {
@@ -38,6 +42,8 @@ class InventoryServiceProvider extends ModuleServiceProvider
         $this->app->bind(ReplenishmentData::class, EloquentReplenishmentData::class);
         // P1a: stock in the product variant grid (the contract is declared by Products).
         $this->app->bind(VariantStock::class, InventoryVariantStock::class);
+        // ST1: opening stock import (Imports module).
+        $this->app->tag([OpeningStockImport::class], ImportHandler::TAG);
     }
 
     public function boot(): void
@@ -45,6 +51,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
         Route::model('adjustment', StockAdjustment::class);
         Route::model('transfer', StockTransfer::class);
         Route::model('reorderRule', StockReorderRule::class);
+        Route::model('stocktake', Stocktake::class);
         Event::listen(StockFellBelowReorderLevel::class, NotifyLowStock::class);
 
         parent::boot();
@@ -57,6 +64,8 @@ class InventoryServiceProvider extends ModuleServiceProvider
             'inventory.adjust' => 'Post stock adjustments, including opening stock',
             'inventory.transfer' => 'Dispatch, receive and cancel stock transfers',
             'inventory.manage' => 'Manage per-store reorder rules and replenishment settings',
+            // ST1: counting only; posting a stocktake needs inventory.adjust.
+            'inventory.stocktake' => 'Count stock in stocktakes',
         ];
     }
 }

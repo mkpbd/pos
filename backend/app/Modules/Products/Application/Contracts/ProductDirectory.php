@@ -65,4 +65,19 @@ interface ProductDirectory
      * @return array<string, array{id: string, product_id: string, url: string, mime_type: string}>
      */
     public function images(string $organizationId, array $imageIds): array;
+
+    /**
+     * ST1 (stocktake scans): the variant a scanned code names — exact barcode first, then SKU
+     * (case-insensitive); archived and inactive variants included (their stock still counts).
+     */
+    public function variantIdByCode(string $organizationId, string $code): ?string;
+
+    /**
+     * ST1: one barcode per variant (the first one added), keyed by variant id; variants
+     * without a barcode are left out.
+     *
+     * @param  list<string>  $variantIds
+     * @return array<string, string>
+     */
+    public function primaryBarcodes(string $organizationId, array $variantIds): array;
 }

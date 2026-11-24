@@ -2,11 +2,16 @@
 
 namespace App\Modules\Products;
 
+use App\Modules\Imports\Application\Contracts\ImportHandler;
 use App\Modules\Products\Application\Actions\AssignProductCategories;
+use App\Modules\Products\Application\Contracts\LabelSources;
 use App\Modules\Products\Application\Contracts\ProductCategoryAssignment;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Products\Application\Contracts\VariantStock;
 use App\Modules\Products\Application\Contracts\VariantWebData;
+use App\Modules\Products\Application\Imports\PriceUpdateImport;
+use App\Modules\Products\Application\Imports\ProductsImport;
+use App\Modules\Products\Application\Services\NoLabelSources;
 use App\Modules\Products\Application\Services\NoVariantStock;
 use App\Modules\Products\Application\Services\NoVariantWebData;
 use App\Modules\Products\Infrastructure\Directory\EloquentProductDirectory;
@@ -25,6 +30,10 @@ class ProductsServiceProvider extends ModuleServiceProvider
         // P1a: replaced by Inventory (stock in the variant grid) and OnlineCatalog (web data).
         $this->app->bindIf(VariantStock::class, NoVariantStock::class);
         $this->app->bindIf(VariantWebData::class, NoVariantWebData::class);
+        // ST1: replaced by Purchasing (goods receipt / purchase order lines for labels).
+        $this->app->bindIf(LabelSources::class, NoLabelSources::class);
+        // ST1: product and price-update imports (Imports module).
+        $this->app->tag([ProductsImport::class, PriceUpdateImport::class], ImportHandler::TAG);
     }
 
     protected function permissions(): array

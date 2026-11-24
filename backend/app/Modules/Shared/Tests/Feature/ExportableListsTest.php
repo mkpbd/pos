@@ -48,6 +48,9 @@ class ExportableListsTest extends TestCase
             'goods receipts' => ['purchasing/receipts', 'purchasing/receipts?from=2026-01-01', 'Receipt', 'goods-receipts', 0],
             'purchase returns' => ['purchasing/returns', 'purchasing/returns', 'Return', 'purchase-returns', 0],
             'supplier payments' => ['purchasing/payments', 'purchasing/payments', 'Number', 'supplier-payments', 0],
+            // ST1.
+            'supplier refunds' => ['purchasing/supplier-refunds', 'purchasing/supplier-refunds', 'Number', 'supplier-refunds', 0],
+            'stocktake lines' => ['inventory/stocktakes/{stocktake}/lines', 'inventory/stocktakes/{stocktake}/lines?filter=all', 'Product', 'stocktake-lines', 1],
             'supplier statement' => ['purchasing/suppliers/{supplierId}/statement', 'purchasing/suppliers/{supplier}/statement', 'Date', 'supplier-statement', 0],
             'supplier catalog' => ['purchasing/supplier-products', 'purchasing/supplier-products?is_active=1', 'Product', 'supplier-catalog', 1],
             'reorder suggestions' => ['purchasing/reorder-suggestions', 'purchasing/reorder-suggestions?store_id={store}&only=purchase', 'Product', 'reorder-suggestions', 1],
@@ -103,7 +106,12 @@ class ExportableListsTest extends TestCase
         $this->stockUp($store, $syrup, '10', '60.00', 'B1', now()->addMonth()->toDateString());
         $this->checkout($this->cart($store, [[$syrup, '1']], [['cash', '60']], ['customer_id' => $customer->id]))->assertCreated();
         $this->postJson('/api/v1/customer-payments', ['customer_id' => $customer->id, 'branch_id' => $branch->id, 'amount' => '20', 'method' => 'cash'], ['Idempotency-Key' => (string) Str::uuid()])->assertCreated();
-        $uri = '/api/v1/'.strtr($uri, ['{customer}' => $customer->id, '{supplier}' => $supplier->id, '{promotion}' => $promotion->id, '{store}' => $store]);
+        // ST1: a started stocktake of the store (its lines are the export).
+        $stocktake = str_contains($uri, '{stocktake}') ? $this->postJson('/api/v1/inventory/stocktakes', ['store_id' => $store, 'scope' => 'all'])->json('data.id') : null;
+        if ($stocktake !== null) {
+            $this->postJson("/api/v1/inventory/stocktakes/{$stocktake}/start")->assertOk();
+        }
+        $uri = '/api/v1/'.strtr($uri, ['{customer}' => $customer->id, '{supplier}' => $supplier->id, '{promotion}' => $promotion->id, '{store}' => $store, '{stocktake}' => (string) $stocktake]);
         $separator = str_contains($uri, '?') ? '&' : '?';
 
         $xlsx = $this->get($uri.$separator.'export=xlsx')->assertOk();

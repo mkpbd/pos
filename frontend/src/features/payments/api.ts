@@ -42,6 +42,11 @@ export const PAYMENT_SOURCES: Record<string, string> = {
   cash_in: 'Cash in',
   cash_out: 'Cash out',
   online_order: 'Online orders',
+  // ST1: money paid to and refunded by suppliers, and their voids.
+  supplier_payment: 'Supplier payments',
+  supplier_refund: 'Supplier refunds',
+  supplier_payment_void: 'Voided supplier payments',
+  supplier_refund_void: 'Voided supplier refunds',
 }
 
 export type PaymentsLedgerParams = {

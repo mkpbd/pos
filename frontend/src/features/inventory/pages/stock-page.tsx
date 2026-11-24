@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
+import { ImportButton } from '@/features/imports/components/import-button'
 import { useBatchesQuery, useMovementsQuery, useStockQuery, MOVEMENT_LABELS, variantLabel } from '@/features/inventory/api'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { INVENTORY_TABS } from '@/features/inventory/sections'
@@ -30,6 +31,7 @@ function Header({ exportMenu }: { exportMenu: ReactNode }) {
         actions={
           <>
             {exportMenu}
+            <ImportButton type="opening_stock" label="Import opening stock" />
             {can('inventory.transfer') && <Button asChild variant="outline"><Link to="/inventory/transfers/new">New transfer</Link></Button>}
             {can('inventory.adjust') && <Button asChild><Link to="/inventory/adjustments/new"><PlusIcon data-icon="inline-start" /> New adjustment</Link></Button>}
           </>

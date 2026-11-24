@@ -30,6 +30,9 @@ class SupplierPaymentsExport extends PurchasingListExport
             ExportColumn::text('reference', 'Reference'),
             ExportColumn::money('amount', 'Amount'),
             ExportColumn::text('notes', 'Notes'),
+            // ST1: voided payments stay listed.
+            ExportColumn::dateTime('voided_at', 'Voided'),
+            ExportColumn::text('void_reason', 'Void reason'),
         ];
     }
 

@@ -10,6 +10,7 @@ use App\Modules\Suppliers\Infrastructure\Models\Supplier;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -173,9 +174,9 @@ class PurchasingWorkflowTest extends TestCase
             'lines' => [['variant_id' => $variant->id, 'quantity' => '10', 'unit_cost' => '50']],
         ])->json('data');
         $this->postJson("/api/v1/purchasing/receipts/{$receipt['id']}/returns", ['reason' => 'Wrong item', 'lines' => [['goods_receipt_line_id' => $receipt['lines'][0]['id'], 'quantity' => '2']]]);
-        $this->postJson('/api/v1/purchasing/payments', ['supplier_id' => $supplier->id, 'amount' => '250.50', 'method' => 'bank_transfer', 'paid_on' => '2026-10-20', 'reference' => 'TT-1'])
+        $this->postJson('/api/v1/purchasing/payments', ['supplier_id' => $supplier->id, 'amount' => '250.50', 'method' => 'bank_transfer', 'paid_on' => '2026-10-20', 'reference' => 'TT-1'], $this->key())
             ->assertCreated()->assertJsonPath('data.number', 'SPAY-000001');
-        $this->postJson('/api/v1/purchasing/payments', ['supplier_id' => $supplier->id, 'amount' => '0', 'method' => 'cash', 'paid_on' => '2026-10-20'])->assertStatus(422);
+        $this->postJson('/api/v1/purchasing/payments', ['supplier_id' => $supplier->id, 'amount' => '0', 'method' => 'cash', 'paid_on' => '2026-10-20'], $this->key())->assertStatus(422);
 
         // 100 opening + 500 receipt − 100 return − 250.50 payment = 249.50
         $this->getJson("/api/v1/purchasing/supplier-balances?supplier_ids[]={$supplier->id}")->assertOk()->assertJsonPath("data.{$supplier->id}", '249.50');
@@ -199,12 +200,12 @@ class PurchasingWorkflowTest extends TestCase
         $inventory = $this->createUserWithRole($org, SystemRole::InventoryManager, [$branch->id]);
         $accountant = $this->createUserWithRole($org, SystemRole::Accountant, [$branch->id]);
         $receipt = ['supplier_id' => $supplier->id, 'store_id' => $store, 'invoice_date' => now()->toDateString(), 'lines' => [['variant_id' => $variant->id, 'quantity' => '1', 'unit_cost' => '1']]];
-        $payment = ['supplier_id' => $supplier->id, 'amount' => '1', 'method' => 'cash', 'paid_on' => now()->toDateString()];
+        $payment = ['supplier_id' => $supplier->id, 'amount' => '1', 'method' => 'bank_transfer', 'paid_on' => now()->toDateString()];
 
         $this->actingAsUser($cashier)->getJson('/api/v1/purchasing/receipts')->assertForbidden();
         $this->actingAsUser($inventory)->postJson('/api/v1/purchasing/receipts', $receipt)->assertCreated();
         $this->actingAsUser($accountant)->postJson('/api/v1/purchasing/receipts', $receipt)->assertForbidden();
-        $this->actingAsUser($accountant)->postJson('/api/v1/purchasing/payments', $payment)->assertCreated();
+        $this->actingAsUser($accountant)->postJson('/api/v1/purchasing/payments', $payment, $this->key())->assertCreated();
         $this->actingAsUser($accountant)->getJson('/api/v1/purchasing/receipts')->assertOk()->assertJsonCount(1, 'data');
     }
 
@@ -229,5 +230,13 @@ class PurchasingWorkflowTest extends TestCase
         $this->actingAsUser($northClerk)->getJson("/api/v1/purchasing/receipts/{$id}")->assertNotFound();
         $this->actingAsUser($northClerk)->getJson('/api/v1/purchasing/receipts')->assertJsonCount(0, 'data');
         $this->actingAsUser($northClerk)->postJson("/api/v1/purchasing/receipts/{$id}/returns", ['reason' => 'x', 'lines' => [['goods_receipt_line_id' => $id, 'quantity' => '1']]])->assertNotFound();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function key(): array
+    {
+        return ['Idempotency-Key' => (string) Str::uuid()];
     }
 }

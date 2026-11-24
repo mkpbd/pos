@@ -7,6 +7,7 @@ export const INVENTORY_TABS: SectionTab[] = [
   { to: '/inventory/movements', label: 'Movements' },
   { to: '/inventory/adjustments', label: 'Adjustments' },
   { to: '/inventory/transfers', label: 'Transfers' },
+  { to: '/inventory/stocktakes', label: 'Stocktakes', permission: ['inventory.view', 'inventory.stocktake'] },
   { to: '/inventory/settings', label: 'Settings', permission: 'inventory.manage' },
 ]
 
@@ -21,6 +22,7 @@ export const PURCHASING_TABS: SectionTab[] = [
   { to: '/purchasing/returns', label: 'Returns', permission: 'purchases.view' },
   { to: '/purchasing/landed-costs', label: 'Landed costs', permission: 'purchases.view' },
   { to: '/purchasing/payments', label: 'Supplier payments', permission: 'purchases.view' },
+  { to: '/purchasing/supplier-refunds', label: 'Supplier refunds', permission: 'purchases.view' },
   { to: '/purchasing/supplier-performance', label: 'Supplier performance', permission: 'purchases.view' },
   { to: '/purchasing/settings', label: 'Settings', permission: 'purchases.settings' },
 ]

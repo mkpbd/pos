@@ -129,7 +129,7 @@ class LandedCostTest extends TestCase
             ->assertJsonPath('data.entries.0.reference', "Charge on {$receipt['number']}: Freight — Sea freight")
             ->assertJsonPath('data.entries.0.amount', '115.00')
             ->assertJsonPath('data.closing_balance', '115.00');
-        $this->postJson('/api/v1/purchasing/payments', ['supplier_id' => $forwarder->id, 'amount' => '115', 'method' => 'bank_transfer', 'paid_on' => now()->toDateString()])->assertCreated();
+        $this->postJson('/api/v1/purchasing/payments', ['supplier_id' => $forwarder->id, 'amount' => '115', 'method' => 'bank_transfer', 'paid_on' => now()->toDateString()], ['Idempotency-Key' => (string) Str::uuid()])->assertCreated();
         $this->getJson("/api/v1/purchasing/suppliers/{$forwarder->id}/statement")->assertJsonPath('data.closing_balance', '0.00');
 
         // A return still credits the goods at the supplier's price.

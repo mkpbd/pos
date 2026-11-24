@@ -20,9 +20,11 @@ use Illuminate\Support\Facades\DB;
  * Supplier dues (accounts payable) as of today, per supplier — the same balance as
  * Purchasing's SupplierAccount (SC3 included): opening balance + goods receipts at their
  * payable total + receipt charges the supplier billed (amount + tax) + posted landed cost
- * vouchers it billed − purchase returns − supplier payments. Aged from invoice dates (receipt
- * invoice date, voucher date); the opening balance is "over 90 days"; returns and payments
- * settle the oldest buckets first.
+ * vouchers it billed − purchase returns − supplier payments + supplier refunds (ST1). Aged from
+ * invoice dates (receipt invoice date, voucher date; a refund by the day it was received, since it
+ * re-opens what an earlier payment settled); the opening balance is "over 90 days"; returns and
+ * payments settle the oldest buckets first. Voided payments and refunds (ST1) are left out: as of
+ * today their void cancels them (the statement shows both lines).
  *
  * Branch scope: documents of the branches in scope; the opening balance and payments without
  * a branch are included only when the report covers every branch.
@@ -34,7 +36,7 @@ class SupplierDuesReport implements Report
         return new ReportDefinition(
             key: 'supplier_dues',
             title: 'Supplier dues',
-            description: 'What is owed to each supplier today (receipts, charges and landed cost vouchers less returns and payments), aged from invoice dates.',
+            description: 'What is owed to each supplier today (receipts, charges, landed cost vouchers and refunds received less returns and payments), aged from invoice dates.',
             group: ReportGroup::Purchasing,
             permission: 'reports.view',
             params: [ReportParam::branch(), ReportParam::supplier()],
@@ -76,10 +78,15 @@ class SupplierDuesReport implements Report
         $this->scope($returns, $context, 'pr.branch_id', 'pr.supplier_id', $supplier);
         $aging->addCredits($returns->groupBy('pr.supplier_id')->selectRaw('pr.supplier_id as party, SUM(pr.total) as amount'));
 
-        $payments = DB::table('supplier_payments as sp')->where('sp.organization_id', $org);
+        $payments = DB::table('supplier_payments as sp')->where('sp.organization_id', $org)->whereNull('sp.voided_at');
         $this->scope($payments, $context, 'sp.branch_id', 'sp.supplier_id', $supplier);
         $aging->addCredits((clone $payments)->groupBy('sp.supplier_id')->selectRaw('sp.supplier_id as party, SUM(sp.amount) as amount'));
         $lastPayments = (clone $payments)->groupBy('sp.supplier_id')->selectRaw('sp.supplier_id as party, MAX(sp.paid_on) as last_on')->pluck('last_on', 'party');
+
+        $refundBucket = $aging->bucketSql($context->sql->date('sr.received_on'));
+        $refunds = DB::table('supplier_refunds as sr')->where('sr.organization_id', $org)->whereNull('sr.voided_at');
+        $this->scope($refunds, $context, 'sr.branch_id', 'sr.supplier_id', $supplier);
+        $aging->addDebits($refunds->groupBy('sr.supplier_id')->groupByRaw($refundBucket)->selectRaw("sr.supplier_id as party, {$refundBucket} as bucket, SUM(sr.amount) as amount"));
 
         if ($all) {
             $openings = DB::table('suppliers')->where('organization_id', $org)->where('opening_balance', '<>', 0)

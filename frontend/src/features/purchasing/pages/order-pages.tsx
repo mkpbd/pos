@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon, BanIcon, CheckIcon, Loader2Icon, PackageCheckIcon, PlusIcon, SendIcon, XCircleIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, CheckIcon, Loader2Icon, PackageCheckIcon, PlusIcon, SendIcon, TagIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -211,6 +211,9 @@ function OrderView({ order }: { order: PurchaseOrder }) {
           {isPreApproved(order) && <Badge variant="success" title={preApprovalTitle(order)}>Pre-approved</Badge>}
         </div>
         <div className="flex flex-wrap gap-2">
+          {can('products.view') && order.status !== 'cancelled' && (
+            <Button asChild variant="outline"><Link to={`/products/labels?purchase_order_id=${order.id}`}><TagIcon data-icon="inline-start" /> Print labels</Link></Button>
+          )}
           {approver && (
             <>
               <Button variant="outline" onClick={() => { setRejectError(null); setRejecting(true) }}><BanIcon data-icon="inline-start" /> Reject</Button>

@@ -184,6 +184,112 @@ class PostStockAdjustment
     }
 
     /**
+     * ST1: posts a stock count whose system quantities were snapshotted earlier — a stocktake
+     * line keeps what the system held when it was last counted. Each line's signed quantity is
+     * `counted − system snapshot` (not `counted − on hand now`), so sales and receipts made after
+     * a shelf was counted stay in the stock; both numbers are kept on the line (the Q1 CHECK
+     * `quantity = counted − system` holds). A line without `system_quantity` is snapshotted now,
+     * under the row lock (the stocktake's "uncounted = zero" policy). Lines without a difference
+     * and products that no longer track stock are skipped; when nothing differs nothing is posted
+     * (`adjustment` null). Increases are valued at the stock row's current average cost (else the
+     * product's purchase price), so found stock does not move the average. Runs inside the
+     * caller's transaction (savepoint).
+     *
+     * @param  list<array{variant_id: string, batch_id: ?string, counted_quantity: string, system_quantity: ?string}>  $lines
+     * @return array{adjustment: ?StockAdjustment, system: list<string>} the system quantity used per input line
+     *
+     * @throws BusinessRuleViolation INSUFFICIENT_STOCK (a decrease larger than what is on hand now)
+     */
+    public function postCount(TenantUser $actor, string $storeId, array $lines, ?string $note = null): array
+    {
+        $organizationId = $this->tenant->requireOrganization();
+        $store = $this->storeAccess->require($actor, $storeId);
+        $lines = array_values($lines);
+        $variants = $this->products->variants($organizationId, array_values(array_unique(array_column($lines, 'variant_id'))));
+        $batchIds = array_map(fn (array $l) => $l['batch_id'] ?? null, $lines);
+
+        return DB::transaction(function () use ($actor, $organizationId, $store, $lines, $variants, $batchIds, $note) {
+            // Lock every level of the document before reading any (same order as the ledger: no deadlocks).
+            $onHand = $this->lockLevels($organizationId, $store, $lines, $batchIds, $lines);
+            $costs = StockLevel::query()->where('store_id', $store['id'])
+                ->whereIn('variant_id', array_values(array_unique(array_column($lines, 'variant_id'))))
+                ->get(['variant_id', 'batch_id', 'average_cost'])
+                ->mapWithKeys(fn (StockLevel $l) => [$this->lockKey($store['id'], $l->variant_id, $l->batch_id) => (string) $l->average_cost])
+                ->all();
+
+            $system = [];
+            $entries = [];
+            foreach ($lines as $i => $line) {
+                $key = $this->lockKey($store['id'], $line['variant_id'], $batchIds[$i]);
+                $system[$i] = Decimal::round((string) ($line['system_quantity'] ?? $onHand[$key] ?? '0'), 3);
+                $counted = Decimal::round((string) $line['counted_quantity'], 3);
+                $difference = Decimal::sub($counted, $system[$i], 3);
+                $variant = $variants[$line['variant_id']] ?? null;
+                if (Decimal::isZero($difference) || $variant === null || ! $variant['track_stock']) {
+                    continue;
+                }
+                $average = $costs[$key] ?? '0';
+                $entries[] = [
+                    'variant_id' => $line['variant_id'], 'batch_id' => $batchIds[$i], 'quantity' => $difference,
+                    'counted' => $counted, 'system' => $system[$i],
+                    'unit_cost' => Decimal::compare($average, '0') > 0 ? $average : (string) $variant['purchase_price'],
+                ];
+            }
+            if ($entries === []) {
+                return ['adjustment' => null, 'system' => $system];
+            }
+
+            $adjustment = StockAdjustment::query()->create([
+                'organization_id' => $organizationId,
+                'branch_id' => $store['branch_id'],
+                'store_id' => $store['id'],
+                'number' => $this->sequences->next($organizationId, 'stock_adjustment', 'ADJ-'),
+                'reason' => AdjustmentReason::Count->value,
+                'note' => $note,
+                'created_by' => $actor->getAuthIdentifier(),
+            ]);
+
+            $changes = [];
+            foreach ($entries as $entry) {
+                $increase = ! Decimal::isNegative($entry['quantity']);
+                $changes[] = new StockChange(
+                    storeId: $store['id'],
+                    variantId: $entry['variant_id'],
+                    batchId: $entry['batch_id'],
+                    type: $increase ? MovementType::AdjustmentIn : MovementType::AdjustmentOut,
+                    quantity: $increase ? $entry['quantity'] : Decimal::negate($entry['quantity'], 3),
+                    unitCost: $increase ? $entry['unit_cost'] : null,
+                );
+            }
+            $posted = $this->ledger->post($changes, new StockReference('stock_adjustment', $adjustment->id, $adjustment->number));
+
+            foreach ($entries as $i => $entry) {
+                $adjustment->lines()->create([
+                    'organization_id' => $organizationId,
+                    'variant_id' => $entry['variant_id'],
+                    'batch_id' => $entry['batch_id'],
+                    'quantity' => $entry['quantity'],
+                    'unit_cost' => $posted[$i]['unit_cost'] ?? '0',
+                    'counted_quantity' => $entry['counted'],
+                    'system_quantity' => $entry['system'],
+                ]);
+            }
+
+            $this->audit->record('stock_adjustment.posted', $adjustment, new: [
+                'number' => $adjustment->number,
+                'reason' => AdjustmentReason::Count->value,
+                'store_id' => $store['id'],
+                'lines' => count($entries),
+                'counted_lines' => count($lines),
+                'unchanged_lines' => count($lines) - count($entries),
+                'snapshots' => true,
+            ]);
+
+            return ['adjustment' => $adjustment, 'system' => $system];
+        });
+    }
+
+    /**
      * A stock count may list one product on several lines, but each product × batch only once.
      *
      * @param  list<array<string, mixed>>  $lines

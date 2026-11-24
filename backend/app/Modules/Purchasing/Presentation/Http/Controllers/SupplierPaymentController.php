@@ -3,23 +3,24 @@
 namespace App\Modules\Purchasing\Presentation\Http\Controllers;
 
 use App\Modules\Purchasing\Application\Actions\RecordSupplierPayment;
+use App\Modules\Purchasing\Application\Actions\VoidSupplierMoney;
 use App\Modules\Purchasing\Application\Queries\SupplierAccount;
 use App\Modules\Purchasing\Infrastructure\Models\SupplierPayment;
 use App\Modules\Purchasing\Presentation\Http\Exports\SupplierPaymentsExport;
 use App\Modules\Purchasing\Presentation\Http\Exports\SupplierStatementExport;
 use App\Modules\Purchasing\Presentation\Http\Requests\RecordSupplierPaymentRequest;
+use App\Modules\Purchasing\Presentation\Http\Support\SupplierMoneyPresenter;
 use App\Modules\Shared\Application\Contracts\TenantUser;
-use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
-use App\Modules\Suppliers\Application\Contracts\SupplierDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -27,41 +28,67 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SupplierPaymentController
 {
-    public function __construct(
-        private readonly TenantContext $tenant,
-        private readonly SupplierDirectory $suppliers,
-    ) {}
+    public function __construct(private readonly SupplierMoneyPresenter $presenter) {}
 
+    /**
+     * Supplier payments
+     *
+     * Filters: `supplier_id`, `from`/`to` (paid on), ST1: `voided` (true|false; both when omitted).
+     */
     public function index(Request $request, ListExporter $exports): Response
     {
-        $request->validate(['supplier_id' => ['sometimes', 'uuid'], 'from' => ['sometimes', 'date'], 'to' => ['sometimes', 'date']]);
+        $request->validate([
+            'supplier_id' => ['sometimes', 'uuid'], 'from' => ['sometimes', 'date'], 'to' => ['sometimes', 'date'],
+            'voided' => ['sometimes', Rule::in(['true', 'false', '1', '0'])],
+        ]);
         $query = SupplierPayment::query()
             ->when($request->query('supplier_id'), fn (Builder $q, string $v) => $q->where('supplier_id', $v))
             ->when($request->query('from'), fn (Builder $q, string $v) => $q->where('paid_on', '>=', $v))
-            ->when($request->query('to'), fn (Builder $q, string $v) => $q->where('paid_on', '<=', $v));
+            ->when($request->query('to'), fn (Builder $q, string $v) => $q->where('paid_on', '<=', $v))
+            ->when($request->has('voided'), fn (Builder $q) => in_array($request->query('voided'), ['true', '1'], true) ? $q->whereNotNull('voided_at') : $q->whereNull('voided_at'));
 
         ListQuery::apply($query, $request, sortable: ['created_at', 'paid_on', 'amount'], searchable: ['number', 'reference']);
         if ($format = ListExporter::requested($request)) {
-            return $exports->download($request, $format, SupplierPaymentsExport::class, RowSource::fromQuery($query, function (Collection $payments) {
-                $suppliers = $this->suppliers->summaries($this->tenant->requireOrganization(), $payments->pluck('supplier_id')->all());
-
-                return $payments->map(fn (SupplierPayment $p) => $this->present($p, $suppliers));
-            }));
+            return $exports->download($request, $format, SupplierPaymentsExport::class, RowSource::fromQuery($query, fn (Collection $payments) => $payments->map($this->presenter->presenter($payments))));
         }
         $page = $query->paginate(ListQuery::perPage($request));
-        $suppliers = $this->suppliers->summaries($this->tenant->requireOrganization(), collect($page->items())->pluck('supplier_id')->all());
+        $present = $this->presenter->presenter(collect($page->items()));
 
-        return ApiResponse::paginated($page, fn (SupplierPayment $p) => new JsonResource($this->present($p, $suppliers)));
+        return ApiResponse::paginated($page, fn (SupplierPayment $p) => new JsonResource($present($p)));
     }
 
+    /**
+     * Record a supplier payment
+     *
+     * `{supplier_id, amount, method, paid_on, reference?, notes?, branch_id?}`; methods: cash,
+     * bank_transfer, mobile_banking, cheque, card. ST1: booked in the payments ledger — cash
+     * comes out of the caller's open register session drawer (CASH_SESSION_REQUIRED,
+     * INSUFFICIENT_CASH); without `branch_id` the session's branch (or the user's only branch)
+     * is used. Requires an `Idempotency-Key`.
+     */
     public function store(RecordSupplierPaymentRequest $request, RecordSupplierPayment $record): JsonResponse
     {
         /** @var TenantUser $user */
         $user = $request->user();
         $payment = $record($user, $request->validated());
-        $suppliers = $this->suppliers->summaries($this->tenant->requireOrganization(), [$payment->supplier_id]);
 
-        return ApiResponse::created($this->present($payment, $suppliers));
+        return ApiResponse::created(($this->presenter->presenter(collect([$payment])))($payment));
+    }
+
+    /**
+     * Void a supplier payment
+     *
+     * `{reason}`. ST1: books the opposite ledger entry (cash back into the caller's drawer);
+     * the statement keeps the payment and shows the void. ALREADY_VOIDED on a second void.
+     */
+    public function void(Request $request, SupplierPayment $supplierPayment, VoidSupplierMoney $void): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']]);
+        /** @var TenantUser $user */
+        $user = $request->user();
+        $payment = $void->payment($user, $supplierPayment, trim($data['reason']));
+
+        return ApiResponse::success(($this->presenter->presenter(collect([$payment])))($payment));
     }
 
     /**
@@ -79,7 +106,8 @@ class SupplierPaymentController
     /**
      * Supplier statement
      *
-     * Receipts (+), returns (−) and payments (−) with running balance; `from`/`to` limit the period.
+     * Receipts (+), returns (−), payments (−) and ST1 refunds (+) with running balance; a void
+     * adds an opposite line (`payment_void` +, `refund_void` −) on its day. `from`/`to` limit the period.
      */
     public function statement(Request $request, string $supplierId, SupplierAccount $account, ListExporter $exports, SupplierStatementExport $export): Response
     {
@@ -91,27 +119,5 @@ class SupplierPaymentController
         }
 
         return ApiResponse::success($statement);
-    }
-
-    /**
-     * @param  array<string, array<string, mixed>>  $suppliers
-     * @return array<string, mixed>
-     */
-    private function present(SupplierPayment $p, array $suppliers): array
-    {
-        return [
-            'id' => $p->id,
-            'number' => $p->number,
-            'supplier' => $suppliers[$p->supplier_id] ?? null,
-            'branch_id' => $p->branch_id,
-            'currency' => $p->currency,
-            'amount' => $p->amount,
-            'method' => $p->method->value,
-            'reference' => $p->reference,
-            'paid_on' => $p->paid_on->toDateString(),
-            'notes' => $p->notes,
-            'created_by' => $p->created_by,
-            'created_at' => $p->created_at?->toIso8601String(),
-        ];
     }
 }

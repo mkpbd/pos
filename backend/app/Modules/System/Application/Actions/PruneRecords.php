@@ -2,6 +2,7 @@
 
 namespace App\Modules\System\Application\Actions;
 
+use App\Modules\Shared\Application\Contracts\RetentionTask;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\Schema;
  *  - notifications that were read (unread ones are kept),
  *  - error_events that are resolved / ignored and were last seen before the cut-off,
  *  - audit_logs only when POS_RETAIN_AUDIT_DAYS is set,
- *  - system_backups rows without a file (failed, or the file was deleted by backup retention).
+ *  - system_backups rows without a file (failed, or the file was deleted by backup retention),
+ *  - ST1: the RetentionTask steps other modules tag (Imports: uploaded files of finished imports).
  *
  * An install-wide maintenance path: it deletes rows of other modules' tables by design.
  */
@@ -39,6 +41,15 @@ final class PruneRecords
             }
 
             $counts[$table] = $this->prune($table, $rule['key'], fn (Builder $q) => $rule['where']($q, now()->subDays($days)), $dryRun);
+        }
+
+        // ST1: retention steps other modules add (e.g. Imports deletes old uploaded files).
+        foreach (app()->tagged(RetentionTask::TAG) as $task) {
+            /** @var RetentionTask $task */
+            $count = $task->prune($dryRun);
+            if ($count !== null) {
+                $counts[$task->name()] = $count;
+            }
         }
 
         if (! $dryRun) {

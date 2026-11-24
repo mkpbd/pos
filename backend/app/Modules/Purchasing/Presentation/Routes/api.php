@@ -10,6 +10,7 @@ use App\Modules\Purchasing\Presentation\Http\Controllers\RfqController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierPaymentController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierPerformanceController;
 use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierProductController;
+use App\Modules\Purchasing\Presentation\Http\Controllers\SupplierRefundController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(function () {
@@ -29,7 +30,14 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::get('returns/{purchaseReturn}', [GoodsReceiptController::class, 'showReturn'])->middleware('can:purchases.view');
 
     Route::get('payments', [SupplierPaymentController::class, 'index'])->middleware('can:purchases.view');
-    Route::post('payments', [SupplierPaymentController::class, 'store'])->middleware('can:purchases.pay');
+    // ST1: payments go through the payments ledger (cash out of the caller's drawer) and can be voided.
+    Route::post('payments', [SupplierPaymentController::class, 'store'])->middleware(['can:purchases.pay', 'idempotent']);
+    Route::post('payments/{supplierPayment}/void', [SupplierPaymentController::class, 'void'])->whereUuid('supplierPayment')->middleware('can:purchases.pay');
+    // ST1: money suppliers give back.
+    Route::get('supplier-refunds', [SupplierRefundController::class, 'index'])->middleware('can:purchases.view');
+    Route::post('supplier-refunds', [SupplierRefundController::class, 'store'])->middleware(['can:purchases.pay', 'idempotent']);
+    Route::get('supplier-refunds/{supplierRefund}', [SupplierRefundController::class, 'show'])->whereUuid('supplierRefund')->middleware('can:purchases.view');
+    Route::post('supplier-refunds/{supplierRefund}/void', [SupplierRefundController::class, 'void'])->whereUuid('supplierRefund')->middleware('can:purchases.pay');
     Route::get('supplier-balances', [SupplierPaymentController::class, 'balances'])->middleware('can:purchases.view');
     Route::get('suppliers/{supplierId}/statement', [SupplierPaymentController::class, 'statement'])->whereUuid('supplierId')->middleware('can:purchases.view');
 

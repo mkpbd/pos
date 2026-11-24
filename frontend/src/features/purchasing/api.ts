@@ -3,6 +3,7 @@ import { api, toPaginated, type Paginated } from '@/lib/api/client'
 import type { BatchRef, StoreRef } from '@/features/inventory/api'
 import { inventoryKeys } from '@/features/inventory/api'
 import type { ChargeInput, ReceiptCharge } from '@/features/landed-cost/api'
+import { useInvalidateMoney as useInvalidateLedger } from '@/features/payments/api'
 
 export type PurchaseOrderStatus = 'draft' | 'pending_approval' | 'ordered' | 'partially_received' | 'received' | 'cancelled'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_banking' | 'cheque' | 'card' | 'other'
@@ -100,9 +101,34 @@ export type SupplierPayment = {
   reference: string | null
   paid_on: string
   notes: string | null
+} & VoidState
+
+/** ST1: voiding books the opposite ledger entry (cash back into / out of the drawer); the row stays, marked void. */
+export type VoidState = {
+  voided_at?: string | null
+  voided_by?: { id: string; name: string | null } | null
+  void_reason?: string | null
 }
 
-export type StatementEntry = { date: string; type: 'goods_receipt' | 'receipt_charge' | 'landed_cost_voucher' | 'purchase_return' | 'payment'; id: string; number: string; reference: string | null; amount: string; balance: string }
+/** ST1: money a supplier gives back (overpayment, credit for returned goods); cash goes into the drawer. */
+export type SupplierRefund = {
+  id: string
+  number: string
+  supplier: SupplierRef | null
+  branch_id?: string | null
+  branch?: { id: string; name: string } | null
+  currency: string
+  amount: string
+  method: PaymentMethod
+  method_label?: string
+  reference: string | null
+  received_on: string
+  notes: string | null
+  created_at?: string
+} & VoidState
+
+/** Statement entries; refunds increase what is owed (they reverse a payment), voids reverse their entry. */
+export type StatementEntry = { date: string; type: 'goods_receipt' | 'receipt_charge' | 'landed_cost_voucher' | 'purchase_return' | 'payment' | 'refund' | 'payment_void' | 'refund_void'; id: string; number: string; reference: string | null; amount: string; balance: string }
 export type SupplierStatement = { supplier: SupplierRef; opening_balance: string; entries: StatementEntry[]; closing_balance: string }
 
 type LineInput = { variant_id: string; quantity: string; unit_cost?: string | null; tax_rate?: string | null; batch_number?: string; expires_on?: string | null; purchase_order_line_id?: string }
@@ -144,6 +170,7 @@ export const usePurchaseOrdersQuery = (params: Query) => usePaged<PurchaseOrder>
 export const useReceiptsQuery = (params: Query) => usePaged<GoodsReceipt>('/purchasing/receipts', params)
 export const useReturnsQuery = (params: Query) => usePaged<PurchaseReturn>('/purchasing/returns', params)
 export const usePaymentsQuery = (params: Query) => usePaged<SupplierPayment>('/purchasing/payments', params)
+export const useSupplierRefundsQuery = (params: Query) => usePaged<SupplierRefund>('/purchasing/supplier-refunds', params)
 export const usePurchaseOrderQuery = (id?: string) => useDocument<PurchaseOrder>(id ? `/purchasing/orders/${id}` : null)
 export const useReceiptQuery = (id?: string) => useDocument<GoodsReceipt>(id ? `/purchasing/receipts/${id}` : null)
 
@@ -209,11 +236,46 @@ export function usePostReturnMutation(receiptId: string) {
   })
 }
 
-export function useRecordPaymentMutation() {
+export type SupplierPaymentInput = { supplier_id: string; branch_id: string | null; amount: string; method: PaymentMethod; reference: string | null; paid_on: string; notes: string | null }
+export type SupplierRefundInput = Omit<SupplierPaymentInput, 'paid_on'> & { received_on: string }
+
+/** Money moved (ST1): purchasing documents, and the payments ledger / cash drawer. */
+function useInvalidateMoney() {
   const invalidate = useInvalidate()
+  const invalidateLedger = useInvalidateLedger()
+  return () => {
+    invalidate()
+    invalidateLedger()
+  }
+}
+
+/** Idempotent: pass the same key when retrying the same payment. */
+export function useRecordPaymentMutation() {
+  const invalidate = useInvalidateMoney()
   return useMutation({
-    mutationFn: (input: { supplier_id: string; amount: string; method: PaymentMethod; reference: string | null; paid_on: string; notes: string | null }) =>
-      api.post<SupplierPayment>('/purchasing/payments', input).then((r) => r.data),
+    mutationFn: ({ input, idempotencyKey }: { input: SupplierPaymentInput; idempotencyKey: string }) =>
+      api.post<SupplierPayment>('/purchasing/payments', input, { idempotencyKey }).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}
+
+/** Idempotent: pass the same key when retrying the same refund. */
+export function useRecordRefundMutation() {
+  const invalidate = useInvalidateMoney()
+  return useMutation({
+    mutationFn: ({ input, idempotencyKey }: { input: SupplierRefundInput; idempotencyKey: string }) =>
+      api.post<SupplierRefund>('/purchasing/supplier-refunds', input, { idempotencyKey }).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}
+
+export type VoidKind = 'payment' | 'refund'
+
+export function useVoidSupplierMoneyMutation() {
+  const invalidate = useInvalidateMoney()
+  return useMutation({
+    mutationFn: ({ kind, id, reason }: { kind: VoidKind; id: string; reason: string }) =>
+      api.post<SupplierPayment | SupplierRefund>(`/purchasing/${kind === 'payment' ? 'payments' : 'supplier-refunds'}/${id}/void`, { reason }).then((r) => r.data),
     onSuccess: invalidate,
   })
 }
