@@ -16,6 +16,7 @@ use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Contracts\OrderPageAttribution;
 use App\Modules\Orders\Application\Events\OrderPlaced;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
+use App\Modules\Orders\Application\Services\CodRiskPolicy;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -53,6 +54,9 @@ use Throwable;
  *
  * COD orders start `confirmed`; bank transfer orders start `pending_payment` and expire after
  * the method's hold hours. Guests get a one-time access token (stored hashed).
+ * BD1b (CodRiskPolicy, shoppers' orders only): cash on delivery to a blocked contact or
+ * delivery phone → 422 COD_NOT_AVAILABLE; the store's `cod_review` may hold a COD order as
+ * `pending_confirmation` (no confirmed_at) until staff confirm it after a call.
  *
  * Promotions (E8b): after the first repricing, the promotions with usage limits and the
  * coupon the order would use are locked (FOR UPDATE, sorted) and the cart is priced again,
@@ -83,6 +87,8 @@ class PlaceOrder
         private readonly PromotionRedemptions $redemptions,
         private readonly LocaleContext $locale,
         private readonly OrderPageAttribution $pages,
+        // BD1b: blocked numbers and the COD confirmation-call hold.
+        private readonly CodRiskPolicy $codRisk,
     ) {}
 
     /**
@@ -120,6 +126,26 @@ class PlaceOrder
     }
 
     /**
+     * BD1b: an order staff enter for a customer they spoke with (phone, Facebook, WhatsApp…) —
+     * the direct-lines placement (same transaction, pricing, promotion locks, coupon, stock,
+     * numbering, payment and notifications) with source `staff`, its `channel` and
+     * `created_by`. The guest-checkout setting does not apply and no access token is issued;
+     * the first history row is the staff member's ("Order entered by staff (Phone)").
+     * `$data['locale']` is the language of the customer's e-mails and text messages.
+     *
+     * @param  list<array{variant_id: string, quantity: string}>  $lines
+     * @param  array{customer_id: string, account_id: ?string}|null  $customer  the existing customer, null for a guest order
+     * @param  array<string, mixed>  $data  validated body (contact, address, shipping_method_id, payment_method, channel, coupon_code, notes, expected_total, locale)
+     * @return array{order: Order, access_token: null}
+     */
+    public function staff(array $lines, ?array $customer, array $data, string $actorId, string $siteUrl): array
+    {
+        $data = ['source' => Order::SOURCE_STAFF, 'created_by' => $actorId, 'attribution' => null] + $data;
+
+        return $this->locale->runAs(LocaleContext::BASE, fn () => $this->place(null, $lines, $customer, $data, ['ip' => null, 'user_agent' => null, 'site_url' => $siteUrl], (string) $data['locale']));
+    }
+
+    /**
      * @param  list<array{variant_id: string, quantity: string}>|null  $lines  direct lines (no cart) or null
      * @param  array{customer_id: string, account_id: string}|null  $customer
      * @param  array<string, mixed>  $data
@@ -130,12 +156,14 @@ class PlaceOrder
     {
         $organizationId = $this->tenant->requireOrganization();
         $settings = $this->storefront->settings();
-        if ($customer === null && ! $settings->guest_checkout_enabled) {
+        // BD1b: staff enter guest orders whatever the shop's guest-checkout setting.
+        $staffId = ($data['source'] ?? null) === Order::SOURCE_STAFF ? (string) $data['created_by'] : null;
+        if ($customer === null && $staffId === null && ! $settings->guest_checkout_enabled) {
             throw new BusinessRuleViolation('GUEST_CHECKOUT_DISABLED', 'Please sign in or create an account to place your order.');
         }
         $store = $this->fulfilmentStore($organizationId, $settings->fulfilment_store_id);
 
-        [$order, $token] = DB::transaction(function () use ($owner, $lines, $customer, $data, $client, $organizationId, $store, $locale) {
+        [$order, $token] = DB::transaction(function () use ($owner, $lines, $customer, $data, $client, $organizationId, $store, $locale, $staffId) {
             $customerId = $customer['customer_id'] ?? null;
             $cart = null;
             if ($owner !== null) {
@@ -145,7 +173,8 @@ class PlaceOrder
                 }
                 $price = fn () => $this->quoter->quote($cart, $data, $customerId);
             } else {
-                $price = fn () => $this->quoter->quoteLines($lines ?? [], $data, $customerId);
+                // BD1b: staff orders may carry a coupon code (landing pages never do).
+                $price = fn () => $this->quoter->quoteLines($lines ?? [], $data, $customerId, couponCode: $data['coupon_code'] ?? null);
             }
 
             $quote = $this->quoteUnderPromotionLocks($price);
@@ -172,6 +201,11 @@ class PlaceOrder
             }
             $method = $quote['method'];
             $paymentMethod = OrderPaymentMethod::from($data['payment_method']);
+            // BD1b: shoppers' orders (not staff-entered ones) — no cash on delivery to a blocked number.
+            $shopperOrder = ($data['source'] ?? Order::SOURCE_STOREFRONT) !== Order::SOURCE_STAFF;
+            if ($shopperOrder && $paymentMethod === OrderPaymentMethod::CashOnDelivery) {
+                $this->codRisk->ensureCodAvailable([$data['contact']['phone'] ?? null, $address['phone']]);
+            }
             $currency = $preview['currency'];
             $codFee = $paymentMethod === OrderPaymentMethod::CashOnDelivery
                 ? Money::of(ShippingFee::cashOnDelivery($method['cod_allowed'], $method['cod_fee'], true), $currency)
@@ -206,8 +240,13 @@ class PlaceOrder
 
             $initiation = $this->payments->initiate($paymentMethod->value, ['id' => $orderId, 'number' => $number, 'total' => $total->amount(), 'currency' => $currency]);
             $status = $initiation->awaitsPayment ? OrderStatus::PendingPayment : OrderStatus::Confirmed;
+            // BD1b: the store may hold shoppers' cash-on-delivery orders for a confirmation call.
+            if ($status === OrderStatus::Confirmed && $shopperOrder && $paymentMethod === OrderPaymentMethod::CashOnDelivery
+                && $this->codRisk->holdsForReview((string) $data['contact']['phone'])) {
+                $status = OrderStatus::PendingConfirmation;
+            }
             $holdHours = (int) ($payment['settings']['hold_hours'] ?? 48);
-            $token = $customer === null ? rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=') : null;
+            $token = $customer === null && $staffId === null ? rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=') : null;
 
             $order = Order::query()->create([
                 'id' => $orderId,
@@ -250,6 +289,9 @@ class PlaceOrder
                 // P2a.
                 'source' => $data['source'] ?? Order::SOURCE_STOREFRONT,
                 'attribution' => $this->attribution($data['attribution'] ?? null, $cart),
+                // BD1b: staff-entered orders.
+                'channel' => $staffId === null ? null : $data['channel'],
+                'created_by' => $staffId,
             ]);
 
             foreach ($quote['lines'] as $i => $line) {
@@ -317,9 +359,14 @@ class PlaceOrder
                 'order_id' => $orderId,
                 'from_status' => null,
                 'to_status' => $status,
-                'note' => 'Order placed',
-                'actor_user_id' => null,
-                'actor_type' => 'customer',
+                'note' => match (true) {
+                    // BD1b: "Order entered by staff (Phone)".
+                    $staffId !== null => 'Order entered by staff ('.(Order::CHANNELS[$data['channel']] ?? 'Other').')',
+                    $status === OrderStatus::PendingConfirmation => 'Order placed — awaiting confirmation',
+                    default => 'Order placed',
+                },
+                'actor_user_id' => $staffId,
+                'actor_type' => $staffId === null ? 'customer' : 'staff',
                 'created_at' => $now,
             ]);
 

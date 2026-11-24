@@ -20,7 +20,7 @@ class CustomerOrderHistory
 
     /** Status filter groups of the account order list. */
     public const GROUPS = [
-        'open' => [OrderStatus::PendingPayment, OrderStatus::Confirmed, OrderStatus::Processing, OrderStatus::Shipped],
+        'open' => [OrderStatus::PendingPayment, OrderStatus::PendingConfirmation, OrderStatus::Confirmed, OrderStatus::Processing, OrderStatus::Shipped],
         'delivered' => [OrderStatus::Delivered],
         'cancelled' => [OrderStatus::Cancelled],
     ];

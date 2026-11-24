@@ -471,6 +471,14 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Staff orders, order edits and cash-on-delivery checks BD1b (implemented)
+
+- `orders`: `source` CHECK adds `staff`; `channel` (`phone|facebook|whatsapp|instagram|walk_in|other` CHECK, staff orders only), `created_by` → users (null on delete), `revision` smallint default 1 (CHECK ≥ 1); status `pending_confirmation` (status is not CHECK-constrained). Index `(organization_id, contact_phone)`.
+- `order_edits` (organization, order, revision, reason, `before` / `after` jsonb — lines, totals, contact, address, delivery method, coupon — actor, created at); append-only (`prevent_order_detail_mutation`).
+- `order_lines`, `order_line_stock`, `order_promotions` now use `prevent_order_content_mutation()`: UPDATE is always refused; DELETE only inside an order edit's transaction (`SET LOCAL pos.order_edit = 'on'`, switched off right after). Other append-only tables keep `prevent_order_detail_mutation()`.
+- `blocked_phones` (organization, normalised phone, reason, created by, created at; unique `(organization_id, phone)`).
+- `storefront_settings`: `cod_review` `off|risky|all` CHECK (default `off`), `cod_review_min_success_rate` 0–100 CHECK (default 70), `cod_review_new_numbers` boolean.
+
 ### SMS and phone sign-in BD1a (implemented)
 
 - `sms_settings` (one row per organization: enabled, driver `log|http` CHECK, URL, method / body CHECKs, parameter names, `api_key` encrypted with APP_KEY, sender ID, extra params jsonb, success text, phone format CHECK, monthly limit, templates jsonb).

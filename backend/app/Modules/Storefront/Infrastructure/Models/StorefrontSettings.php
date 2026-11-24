@@ -34,11 +34,15 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $assistant_handoff whatsapp | contact | none (null = WhatsApp when a number is set, else contact; AI2b)
  * @property string $checkout_email the customer e-mail at checkout: required | optional | hidden (BD1a)
  * @property string $checkout_phone_verification SMS code check of the mobile number: off | cod | all (BD1a)
+ * @property string $cod_review cash-on-delivery orders held for a confirmation call: off | risky | all (BD1b)
+ * @property int $cod_review_min_success_rate `risky`: numbers below this delivery success rate (%) are held (BD1b)
+ * @property bool $cod_review_new_numbers `risky`: also hold numbers without a delivered order (BD1b)
  */
 #[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing', 'bangla_enabled', 'default_locale', 'bangla_digits',
     'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button',
     'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff',
-    'checkout_email', 'checkout_phone_verification'])]
+    'checkout_email', 'checkout_phone_verification',
+    'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -48,6 +52,9 @@ class StorefrontSettings extends Model
 
     /** BD1a: which orders need the mobile number checked with an SMS code. */
     public const PHONE_VERIFICATION_MODES = ['off', 'cod', 'all'];
+
+    /** BD1b: which cash-on-delivery orders wait for a confirmation call. */
+    public const COD_REVIEW_MODES = ['off', 'risky', 'all'];
 
     protected $table = 'storefront_settings';
 
@@ -66,13 +73,17 @@ class StorefrontSettings extends Model
         'assistant_daily_limit' => 200,
         'checkout_email' => 'optional',
         'checkout_phone_verification' => 'off',
+        'cod_review' => 'off',
+        'cod_review_min_success_rate' => 70,
+        'cod_review_new_numbers' => false,
     ];
 
     protected function casts(): array
     {
         return ['is_enabled' => 'boolean', 'guest_checkout_enabled' => 'boolean', 'return_window_days' => 'integer', 'allow_indexing' => 'boolean', 'bangla_enabled' => 'boolean', 'bangla_digits' => 'boolean',
             'share_buttons' => 'boolean', 'whatsapp_order_button' => 'boolean', 'whatsapp_chat_button' => 'boolean',
-            'assistant_enabled' => 'boolean', 'assistant_translations' => 'array', 'assistant_daily_limit' => 'integer'];
+            'assistant_enabled' => 'boolean', 'assistant_translations' => 'array', 'assistant_daily_limit' => 'integer',
+            'cod_review_min_success_rate' => 'integer', 'cod_review_new_numbers' => 'boolean'];
     }
 
     /**

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * A customer cancels their own order from the account area (E9). Allowed while it is
- * awaiting payment or confirmed and nothing was paid (paid orders need a refund, E10);
+ * awaiting payment, awaiting confirmation (BD1b) or confirmed and nothing was paid (paid orders need a refund, E10);
  * otherwise ORDER_NOT_CANCELLABLE. The E8a cancel path does the work in the same locked
  * transaction — stock back to the exact batches, history with actor `customer` — and
  * afterwards staff get an inbox notification and the shopper a confirmation e-mail.
@@ -23,7 +23,7 @@ class CancelOwnOrder
 
     public static function allowed(Order $order): bool
     {
-        return in_array($order->status, [OrderStatus::PendingPayment, OrderStatus::Confirmed], true)
+        return in_array($order->status, [OrderStatus::PendingPayment, OrderStatus::PendingConfirmation, OrderStatus::Confirmed], true)
             && $order->payment_status === PaymentStatus::Unpaid;
     }
 

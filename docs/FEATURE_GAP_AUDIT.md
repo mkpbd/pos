@@ -99,8 +99,8 @@ storefront, the page builder (B1–B21), shop assistant (AI2b).
 | **Record the shopper's bKash / Nagad "Send Money" transaction ID** (manual mobile payment) | **P0** | No field anywhere |
 | **SMS** (order placed / confirmed / shipped / delivered, OTP) | **Done (BD1a)** | generic HTTP gateway + test mode, order SMS, codes; due reminders → R1 |
 | **Phone-number checkout & OTP login** (e-mail is required today) | **Done (BD1a)** | e-mail required / optional / hidden, phone check by code, sign in with a code, track order |
-| **Staff-entered orders** (phone / Messenger / comment orders) and **editing an order** after the confirmation call | **P0** | `orders.source` allows only storefront / landing page ✔; no create/edit route |
-| **Fake-order protection for COD** (phone blocklist, verify-before-confirm, delivery success ratio, advance delivery charge) | **P0** | Nothing ✔; COD orders start confirmed |
+| **Staff-entered orders** (phone / Messenger / comment orders) and **editing an order** after the confirmation call | **Done (BD1b)** | *New order* / *Edit order* with live repricing, stock and promotion re-posting, change history |
+| **Fake-order protection for COD** (phone blocklist, verify-before-confirm, delivery success ratio, advance delivery charge) | **Done (BD1b)** except advance delivery charge (→ BD1c, needs bKash/Nagad payments) | blocked numbers, *Awaiting confirmation* hold, delivery history per number |
 | **Facebook Pixel + Conversions API, GA4, TikTok pixel** (or at least a "paste tracking code" setting) | **P0** for ad-driven shops | Nothing ✔ |
 | Courier API booking & automatic status (Pathao, Steadfast, RedX, Paperfly) | P1 | Couriers are name + phone + tracking link |
 | Abandoned-cart recovery; shipped / out-for-delivery / delivered notifications to shoppers; guest "track my order" page | P1 | — |

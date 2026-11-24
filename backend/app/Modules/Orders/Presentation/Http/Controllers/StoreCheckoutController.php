@@ -10,6 +10,7 @@ use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Actions\PlaceOrder;
 use App\Modules\Orders\Application\Services\CheckoutPhoneCheck;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
+use App\Modules\Orders\Application\Services\CodRiskPolicy;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Presentation\Http\Support\CheckoutVerifiedPhones;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
@@ -87,8 +88,11 @@ class StoreCheckoutController
      * `exceeds_stock`). Errors: `CART_EMPTY`, `CHECKOUT_UNAVAILABLE`.
      * BD1a: `contact` {email?, phone?} (optional) lets per-customer promotion limits count
      * the shopper's earlier orders by e-mail and mobile number, as placing the order will.
+     * BD1b: `cod_available` (bool) — false when `contact.phone`, `address.phone` or the saved
+     * address's phone is a blocked number; cash on delivery is then unusable (`payment_method`
+     * null, no COD fee) and placing the order with it → 422 `COD_NOT_AVAILABLE`.
      */
-    public function preview(Request $request, BranchDirectory $branches, TenantContext $tenant): JsonResponse
+    public function preview(Request $request, BranchDirectory $branches, TenantContext $tenant, CodRiskPolicy $codRisk): JsonResponse
     {
         $data = $request->validate([
             'contact' => ['sometimes', 'nullable', 'array'],
@@ -98,6 +102,7 @@ class StoreCheckoutController
             'address' => ['sometimes', 'nullable', 'array'],
             'address.division_id' => ['sometimes', 'nullable', 'integer'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
+            'address.phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
             'payment_method' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
@@ -115,7 +120,10 @@ class StoreCheckoutController
             throw new BusinessRuleViolation('CART_EMPTY', 'Your cart is empty.');
         }
 
-        return ApiResponse::success($this->quoter->quote($cart, $data, $this->account()?->customer_id, autoPickMethod: true)['preview']);
+        $quote = $this->quoter->quote($cart, $data, $this->account()?->customer_id, autoPickMethod: true);
+
+        // BD1b: `cod_available` false when the contact, delivery or saved-address phone is blocked.
+        return ApiResponse::success($codRisk->preview($quote['preview'], [$data['contact']['phone'] ?? null, $data['address']['phone'] ?? null, $quote['saved_address']['phone'] ?? null]));
     }
 
     /**
@@ -131,7 +139,9 @@ class StoreCheckoutController
      * `/order/{number}?token=…`; it is shown only here and in the confirmation e-mail.
      * Errors: `CART_EMPTY`, `CART_HAS_ISSUES` (details.cart), `CHECKOUT_UNAVAILABLE`,
      * `SHIPPING_UNAVAILABLE`, `PAYMENT_METHOD_UNAVAILABLE`, `INSUFFICIENT_STOCK`,
-     * `GUEST_CHECKOUT_DISABLED`, `TOTAL_CHANGED` (409), field errors.
+     * `GUEST_CHECKOUT_DISABLED`, `TOTAL_CHANGED` (409), field errors; BD1b: `COD_NOT_AVAILABLE`
+     * (cash on delivery to a blocked number). A COD order may start `pending_confirmation`
+     * (the store's `cod_review`: staff call to confirm it).
      *
      * P2a: `attribution` (optional) — the campaign the shopper came from (UTM parameters,
      * short link, first landing path, referrer host); sanitized and stored on the order.

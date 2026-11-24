@@ -14,6 +14,13 @@ class EloquentCustomerOnlineAccounts implements CustomerOnlineAccounts
         return $account === null ? null : self::present($account);
     }
 
+    public function accountId(string $customerId): ?string
+    {
+        $id = CustomerAccount::query()->where('customer_id', $customerId)->value('id');
+
+        return $id === null ? null : (string) $id;
+    }
+
     /**
      * @return array{email: ?string, email_verified_at: ?string, last_login_at: ?string, status: string, created_at: ?string}
      */

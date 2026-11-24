@@ -73,7 +73,7 @@ class EloquentPromotionShowcase implements PromotionShowcase
         if ($limits === []) {
             return [];
         }
-        $used = PromotionRedemption::query()->whereIn('promotion_id', array_keys($limits))
+        $used = PromotionRedemption::query()->whereIn('promotion_id', array_keys($limits))->whereNull('released_at')
             ->groupBy('promotion_id')->selectRaw('promotion_id, count(*) as n')->pluck('n', 'promotion_id')->all();
 
         $result = [];

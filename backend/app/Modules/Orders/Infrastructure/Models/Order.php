@@ -49,7 +49,10 @@ use LogicException;
  * @property string $contact_name
  * @property ?string $contact_email null for landing page orders placed without one (P2a)
  * @property string $contact_phone
- * @property string $source storefront | landing_page (P2a)
+ * @property string $source storefront | landing_page (P2a) | staff (BD1b)
+ * @property ?string $channel BD1b: where a staff order was taken (CHANNELS), null otherwise
+ * @property ?string $created_by BD1b: the staff member who entered the order
+ * @property int $revision BD1b: version of the contents (1 at placement, + 1 per edit)
  * @property ?array<string, string> $attribution campaign attribution (P2a, CampaignAttribution)
  * @property ?string $notes
  * @property ?string $access_token_hash
@@ -74,6 +77,8 @@ use LogicException;
     'contact_name', 'contact_email', 'contact_phone', 'notes', 'access_token_hash', 'courier_name', 'tracking_number',
     'placed_at', 'expires_at', 'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by',
     'cancel_reason', 'ip', 'user_agent', 'locale', 'source', 'attribution',
+    // BD1b.
+    'channel', 'created_by', 'revision',
 ])]
 class Order extends Model
 {
@@ -85,13 +90,29 @@ class Order extends Model
     /** P2a: placed through a landing page's order form. */
     public const SOURCE_LANDING_PAGE = 'landing_page';
 
-    public const SOURCES = [self::SOURCE_STOREFRONT, self::SOURCE_LANDING_PAGE];
+    /** BD1b: entered by staff (an order taken by phone, Facebook, WhatsApp…). */
+    public const SOURCE_STAFF = 'staff';
+
+    public const SOURCES = [self::SOURCE_STOREFRONT, self::SOURCE_LANDING_PAGE, self::SOURCE_STAFF];
+
+    /** BD1b: where a staff order was taken, with its label. */
+    public const CHANNELS = [
+        'phone' => 'Phone', 'facebook' => 'Facebook', 'whatsapp' => 'WhatsApp', 'instagram' => 'Instagram', 'walk_in' => 'Walk-in', 'other' => 'Other',
+    ];
 
     /** What the workflow may change after placement. */
     private const MUTABLE = [
         'status', 'payment_status', 'paid_total', 'refunded_total', 'shipping_method_id', 'courier_name', 'tracking_number', 'expires_at',
         'confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'updated_at',
     ];
+
+    /** BD1b: the contents an order edit (EditOrder, inside Order::revising) may replace too. */
+    private const REVISABLE = [
+        'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'cost_total',
+        'contact_name', 'contact_email', 'contact_phone', 'notes', 'shipping_method_name', 'eta_min_days', 'eta_max_days', 'revision',
+    ];
+
+    private static bool $revising = false;
 
     protected function casts(): array
     {
@@ -102,6 +123,7 @@ class Order extends Model
             'tax_mode' => TaxMode::class,
             'eta_min_days' => 'integer',
             'eta_max_days' => 'integer',
+            'revision' => 'integer',
             'subtotal' => 'decimal:2',
             'discount_total' => 'decimal:2',
             'tax_total' => 'decimal:2',
@@ -127,11 +149,33 @@ class Order extends Model
     protected static function booted(): void
     {
         static::updating(function (Order $order) {
-            if (array_diff(array_keys($order->getDirty()), self::MUTABLE) !== []) {
+            $allowed = self::$revising ? [...self::MUTABLE, ...self::REVISABLE] : self::MUTABLE;
+            if (array_diff(array_keys($order->getDirty()), $allowed) !== []) {
                 throw new LogicException('Placed orders keep their contents; only the workflow columns change.');
             }
         });
         static::deleting(fn () => throw new LogicException('Orders cannot be deleted.'));
+    }
+
+    /**
+     * BD1b: runs an order edit — inside `$edit` the order's contents (amounts, contact, notes,
+     * delivery method, revision; never its number, customer, payment method or store) may be
+     * replaced too. Only EditOrder calls this, inside its transaction.
+     *
+     * @template T
+     *
+     * @param  \Closure(): T  $edit
+     * @return T
+     */
+    public static function revising(\Closure $edit): mixed
+    {
+        $previous = self::$revising;
+        self::$revising = true;
+        try {
+            return $edit();
+        } finally {
+            self::$revising = $previous;
+        }
     }
 
     /**

@@ -13,7 +13,7 @@ import { useLocale } from '../i18n/locale'
 import { rich } from '../i18n/rich'
 import { usePriceFormat } from '../money'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
-import { OrderStatusBadge, OrderTimeline } from './order-view'
+import { AwaitingConfirmationNote, OrderStatusBadge, OrderTimeline } from './order-view'
 import { orderStatusLabel } from './returns-api'
 import { trackOrder, type TrackedOrder } from './track-api'
 
@@ -133,6 +133,7 @@ function TrackedOrderCard({ order }: { order: TrackedOrder }) {
           <OrderStatusBadge label={status} />
         </div>
         <p className="text-sm">{t('orders.trackOrder.placed', { date: formatDateTime(order.placed_at) })}</p>
+        <AwaitingConfirmationNote status={order.status} className="self-start" />
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           <div>
             <dt className="font-medium text-sf-heading">{t('orders.trackOrder.total')}</dt>

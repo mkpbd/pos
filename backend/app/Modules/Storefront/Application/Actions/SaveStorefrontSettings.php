@@ -25,7 +25,9 @@ class SaveStorefrontSettings
         // AI2b.
         'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff',
         // BD1a.
-        'checkout_email', 'checkout_phone_verification'];
+        'checkout_email', 'checkout_phone_verification',
+        // BD1b.
+        'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
@@ -43,7 +45,10 @@ class SaveStorefrontSettings
      * (off | cod | all) — switching the phone check on needs SMS codes to work for the
      * organization (SmsSender::otpReady), else SMS_NOT_READY.
      *
-     * @param  array{checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
+     * BD1b: `cod_review` (off | risky | all), `cod_review_min_success_rate` (0–100) and
+     * `cod_review_new_numbers` — which cash-on-delivery orders wait for a confirmation call.
+     *
+     * @param  array{cod_review?: string, cod_review_min_success_rate?: int, cod_review_new_numbers?: bool, checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {

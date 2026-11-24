@@ -279,7 +279,7 @@ class FulfilmentTest extends TestCase
         $this->shipped($e, 'Pathao');                           // shipped
 
         $board = $this->getJson('/api/v1/web-orders')->assertOk();
-        $this->assertSame(['all' => 5, 'pending_payment' => 1, 'confirmed' => 1, 'processing' => 0, 'shipped' => 1, 'delivered' => 2, 'cancelled' => 0, 'failed' => 0, 'cod_unremitted' => 2], $board->json('meta.status_counts'));
+        $this->assertSame(['all' => 5, 'pending_payment' => 1, 'pending_confirmation' => 0, 'confirmed' => 1, 'processing' => 0, 'shipped' => 1, 'delivered' => 2, 'cancelled' => 0, 'failed' => 0, 'cod_unremitted' => 2], $board->json('meta.status_counts'));
         $row = collect($board->json('data'))->firstWhere('id', $b);
         $this->assertSame(['Dhaka', 'Pathao', 'TRK 1/A', 'delivered'], [$row['district'], $row['courier_name'], $row['tracking_number'], $row['shipment_status']]);
 

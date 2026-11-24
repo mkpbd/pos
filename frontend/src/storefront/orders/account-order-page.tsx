@@ -22,7 +22,7 @@ import { reorderNotice, useAccountOrderQuery, useCancelOrderMutation, useReorder
 import { ReturnRequestDialog } from './return-request-dialog'
 import { canRequestReturn, orderStatusLabel } from './returns-api'
 import { CancelReturnDialog, OrderReturnsCard } from './returns-view'
-import { OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
+import { AwaitingConfirmationNote, OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
 
 const REASON_MAX = 200
 
@@ -147,6 +147,7 @@ function AccountOrderDetails({ order }: { order: AccountOrder }) {
           <OrderStatusBadge label={orderStatusLabel(t, order.status, order.status_label)} />
           <span>{rich(t('orders.placedAt'), { date: <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time> })}</span>
         </p>
+        <AwaitingConfirmationNote status={order.status} className="self-start" />
         <div className="flex flex-wrap gap-3">
           <button ref={buyAgainRef} type="button" className={primaryButtonClass} disabled={reorder.isPending} onClick={buyAgain}>
             <RotateCcwIcon aria-hidden className="size-4" />

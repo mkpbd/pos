@@ -18,7 +18,7 @@ import { orderStatusLabel } from './returns-api'
 import { rich } from '../i18n/rich'
 import type { OrderView } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
-import { OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
+import { AwaitingConfirmationNote, OrderAddressCard, OrderDeliveryCard, OrderItemsCard, OrderStatusBadge, OrderTimeline, OrderTotalsCard, PaymentInstructionsCard } from './order-view'
 
 /**
  * /order/:number — the confirmation page right after placing an order ("Thank you…") and the
@@ -167,6 +167,7 @@ export function OrderDetails({
           <OrderStatusBadge label={orderStatusLabel(t, order.status, order.status_label)} />
           <span>{rich(t('orders.placedAt'), { date: <time dateTime={order.placed_at}>{formatDateTime(order.placed_at)}</time> })}</span>
         </p>
+        <AwaitingConfirmationNote status={order.status} className="self-start" />
         {accountLink && (
           <p className="text-sm">
             <Link to={`/account/orders/${encodeURIComponent(order.number)}`} className="font-semibold text-sf-link hover:underline" data-testid="account-order-link">

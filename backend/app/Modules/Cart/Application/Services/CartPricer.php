@@ -85,16 +85,26 @@ class CartPricer
      * `{id, variant_id, quantity}` in the given order, priced exactly like cart lines (live
      * catalog data, stock at the fulfilment store, promotions, tax) — the cart path reuses it.
      *
+     * BD1b: `$held` (variant id => quantity) is stock an order being edited already holds: it
+     * counts as available on top of the fulfilment store's stock (the storefront passes none).
+     *
      * @param  list<array{id: string, variant_id: string, quantity: string}>  $items
+     * @param  array<string, string>  $held
      * @return array{cart: array<string, mixed>, lines: list<array<string, mixed>>, tax_mode: TaxMode, promotions: PromotionQuote}
      */
-    public function quoteItems(array $items, ?string $customerId, ?string $email, ?string $couponCode, ?string $cartId = null, ?string $phone = null): array
+    public function quoteItems(array $items, ?string $customerId, ?string $email, ?string $couponCode, ?string $cartId = null, ?string $phone = null, array $held = []): array
     {
         $organization = $this->organizations->summary($this->tenant->requireOrganization()) ?? [];
         $currency = (string) ($organization['base_currency'] ?? config('pos.default_currency'));
         $taxMode = TaxMode::tryFrom((string) ($organization['tax_mode'] ?? '')) ?? TaxMode::Exclusive;
 
         $variants = $this->catalog->variantsForCart(array_values(array_unique(array_column($items, 'variant_id'))));
+        foreach ($held as $variantId => $quantity) {
+            if (isset($variants[$variantId]) && $variants[$variantId]['max_quantity'] !== null) {
+                $variants[$variantId]['max_quantity'] = Decimal::add($variants[$variantId]['max_quantity'], Decimal::round((string) $quantity, 3), 3);
+                $variants[$variantId]['in_stock'] = Decimal::compare($variants[$variantId]['max_quantity'], '0') > 0;
+            }
+        }
 
         $lines = [];
         $calc = [];

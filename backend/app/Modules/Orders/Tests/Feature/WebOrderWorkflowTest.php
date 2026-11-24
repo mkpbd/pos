@@ -80,14 +80,14 @@ class WebOrderWorkflowTest extends TestCase
         $this->staff();
 
         $list = $this->getJson('/api/v1/web-orders')->assertOk();
-        $this->assertSame(['id', 'number', 'placed_at', 'status', 'status_label', 'payment_status', 'payment_method', 'contact_name', 'contact_phone', 'total', 'currency', 'item_count', 'district', 'courier_name', 'tracking_number', 'shipment_status', 'delivered_at', 'source', 'campaign'], array_keys($list->json('data.0')));
+        $this->assertSame(['id', 'number', 'placed_at', 'status', 'status_label', 'payment_status', 'payment_method', 'contact_name', 'contact_phone', 'total', 'currency', 'item_count', 'district', 'courier_name', 'tracking_number', 'shipment_status', 'delivered_at', 'source', 'channel', 'campaign', 'risk'], array_keys($list->json('data.0')));
         $this->assertSame(['WEB-000001', '510.00', '1'], [$list->json('data.0.number'), $list->json('data.0.total'), $list->json('data.0.item_count')]);
         $this->getJson('/api/v1/web-orders?status=pending_payment')->assertJsonPath('meta.pagination.total', 0);
         $this->getJson('/api/v1/web-orders?search=01712345678')->assertJsonPath('meta.pagination.total', 1);
         $this->getJson('/api/v1/web-orders?search=WEB-000001&payment_status=unpaid&from='.now('Asia/Dhaka')->toDateString())->assertJsonPath('meta.pagination.total', 1);
 
         $detail = $this->getJson("/api/v1/web-orders/{$id}")->assertOk()->json('data');
-        $this->assertSame(['process', 'cancel'], $detail['allowed_actions']);
+        $this->assertSame(['process', 'cancel', 'edit'], $detail['allowed_actions']);
         $this->assertNull($detail['customer']);
         $this->assertSame([], $detail['payments']);
         $this->assertSame('Ring the bell', $detail['notes']);
@@ -97,7 +97,7 @@ class WebOrderWorkflowTest extends TestCase
         $this->act($id, 'record-cod-payment')->assertStatus(422)->assertJsonPath('error.code', 'INVALID_STATUS_TRANSITION');
         $this->act($id, 'confirm-payment', ['reference' => 'X'])->assertStatus(422)->assertJsonPath('error.code', 'INVALID_STATUS_TRANSITION');
 
-        $this->act($id, 'process')->assertOk()->assertJsonPath('data.status', 'processing')->assertJsonPath('data.allowed_actions', ['ship', 'cancel']);
+        $this->act($id, 'process')->assertOk()->assertJsonPath('data.status', 'processing')->assertJsonPath('data.allowed_actions', ['ship', 'cancel', 'edit']);
         $this->act($id, 'ship', ['tracking_number' => 'T1'])->assertStatus(422)->assertJsonPath('error.code', 'VALIDATION_FAILED');
         // E10a: a courier id, not free text.
         $this->act($id, 'ship', ['courier_name' => 'Pathao', 'tracking_number' => 'PTH-1'])->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['courier_id']]]);
@@ -134,7 +134,7 @@ class WebOrderWorkflowTest extends TestCase
     {
         $id = $this->order(['JUICE' => 1], 'bank_transfer');
         $this->staff();
-        $this->getJson("/api/v1/web-orders/{$id}")->assertJsonPath('data.allowed_actions', ['confirm_payment', 'cancel'])
+        $this->getJson("/api/v1/web-orders/{$id}")->assertJsonPath('data.allowed_actions', ['confirm_payment', 'cancel', 'edit'])
             ->assertJsonPath('data.payment_instructions', 'Pay to Test Bank, account 123.');
 
         $this->act($id, 'confirm-payment', [])->assertStatus(422)->assertJsonPath('error.code', 'VALIDATION_FAILED');
@@ -219,7 +219,7 @@ class WebOrderWorkflowTest extends TestCase
 
         // The Online Store Manager runs orders and shipping, but not payment methods (ADR-016).
         $this->actingAsUser($manager);
-        $this->getJson("/api/v1/web-orders/{$id}")->assertOk()->assertJsonPath('data.allowed_actions', ['process', 'cancel']);
+        $this->getJson("/api/v1/web-orders/{$id}")->assertOk()->assertJsonPath('data.allowed_actions', ['process', 'cancel', 'edit']);
         $this->act($id, 'process')->assertOk();
         $this->getJson('/api/v1/shipping/zones')->assertOk()->assertJsonCount(2, 'data');
         $this->getJson('/api/v1/payment-gateways')->assertForbidden();

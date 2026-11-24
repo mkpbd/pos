@@ -56,6 +56,7 @@ export const orders = {
   'orders.page.thankYouName': 'Thank you, {name}!',
   'orders.page.confirmation': 'Your order number is {number}. We have sent a confirmation to {email}.',
   'orders.page.trackInAccount': 'Track this order in My orders',
+  'orders.page.willCall': 'We will call you to confirm your order.',
 
   'orders.list.title': 'My orders',
   'orders.list.statusNav': 'Order status',
@@ -103,6 +104,7 @@ export const orders = {
   'orders.reorder.skip.other': 'not available',
 
   'orders.status.pendingPayment': 'Awaiting payment',
+  'orders.status.pendingConfirmation': 'Awaiting confirmation',
   'orders.status.confirmed': 'Confirmed',
   'orders.status.processing': 'Processing',
   'orders.status.shipped': 'Shipped',

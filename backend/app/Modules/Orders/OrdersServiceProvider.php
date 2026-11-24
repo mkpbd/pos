@@ -107,6 +107,9 @@ class OrdersServiceProvider extends ModuleServiceProvider
             'web_orders.manage' => 'Process online store orders: confirm payments, ship, deliver, record cash on delivery, cancel',
             'web_orders.remit' => 'Record and view couriers\' cash-on-delivery remittances',
             'web_orders.refund' => 'Handle online returns of web orders (create, approve, reject, receive, refund) and cancel paid orders with a refund',
+            // BD1b.
+            'web_orders.create' => 'Enter orders taken by phone or chat',
+            'web_orders.edit' => 'Change unpaid orders before they ship',
         ];
     }
 }

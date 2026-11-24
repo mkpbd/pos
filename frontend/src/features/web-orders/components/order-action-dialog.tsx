@@ -27,6 +27,13 @@ type Copy = { title: string; description: string; submit: string; success: strin
 function copyFor(action: WebOrderAction, order: WebOrder, refundDue: string | null): Copy {
   const total = formatMoney(order.total, order.currency)
   switch (action) {
+    case 'confirm':
+      return {
+        title: `Confirm ${order.number}?`,
+        description: 'Confirm once you have spoken with the customer and they still want the order. It moves to Confirmed and can then be processed and shipped.',
+        submit: 'Confirm order',
+        success: `${order.number} confirmed.`,
+      }
     case 'confirm_payment':
       return {
         title: `Confirm payment for ${order.number}`,
@@ -84,6 +91,8 @@ const EMPTY: Fields = { reference: '', courier_id: '', tracking_number: '', note
 
 function bodyFor(action: WebOrderAction, f: Fields, refundDue: string | null): Record<string, unknown> | undefined {
   switch (action) {
+    case 'confirm':
+      return f.note.trim() ? { note: f.note.trim() } : {}
     case 'confirm_payment':
       return { reference: f.reference.trim() }
     case 'record_cod_payment':
@@ -208,6 +217,11 @@ export function OrderActionDialog({ order, action, onClose }: Props) {
               hint={action === 'confirm_payment' ? 'As shown on the bank statement.' : 'e.g. the rider\'s receipt number'}
             >
               <Input autoFocus maxLength={80} value={fields.reference} onChange={(e) => set({ reference: e.target.value })} />
+            </FormField>
+          )}
+          {action === 'confirm' && (
+            <FormField label="Note (optional)" error={errors.note} hint="Kept on the order's history, e.g. what the customer said on the call.">
+              <Textarea autoFocus rows={2} maxLength={200} value={fields.note} onChange={(e) => set({ note: e.target.value })} placeholder="e.g. Customer confirmed by phone" />
             </FormField>
           )}
           {action === 'ship' && (

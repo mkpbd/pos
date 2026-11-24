@@ -17,6 +17,7 @@ import { ProductImage } from '../../catalog/product-image'
 import { chooseValue, initialSelection, variantFor, type Selection } from '../../catalog/variant-selection'
 import { VariantSelector } from '../../catalog/variant-selector'
 import { checkoutPhoneCode } from '../../checkout/api'
+import { codUnavailable, withContactPhone } from '../../checkout/cod-availability'
 import { etaLabel } from '../../checkout/delivery'
 import { PlacementAttempts } from '../../checkout/placement-attempt'
 import { isAccountVerifiedPhone, needsPhoneCode } from '../../checkout/schema'
@@ -211,7 +212,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   const needsSignIn = data.guest_checkout === false && !me.data
   const lines = orderLines(variant?.in_stock ? variant : null, qty, withUpsell ? upsell : null)
   const base = { documentId: String(documentId ?? ''), elementId: element.id, lines }
-  const previewInput = toDirectPreviewInput(base, values, geoId)
+  // BD1b: the number goes along (once valid) so the preview can say whether cash on delivery is allowed for it.
+  const previewInput = withContactPhone(toDirectPreviewInput(base, values, geoId), values.phone)
   const [settledInput, debouncing] = useDebouncedValue(previewInput, PREVIEW_DEBOUNCE_MS)
   const preview = useDirectPreviewQuery(settledInput, !inactive && !unavailable && settledInput.lines.length > 0)
   const current = preview.isPlaceholderData ? null : (preview.data ?? null)
@@ -232,6 +234,9 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   }
   // Cash on delivery is not offered by every delivery method.
   if (values.payment_method === 'cod' && selectedMethod && !selectedMethod.cod_allowed && paymentMethods.length > 1) setValues((v) => ({ ...v, payment_method: '' }))
+  // BD1b: nor for a number the store has blocked.
+  const codBlockedForNumber = codUnavailable(shown)
+  if (values.payment_method === 'cod' && codUnavailable(current) && paymentMethods.length > 1) setValues((v) => ({ ...v, payment_method: '' }))
 
   // Placing the order.
   const place = useDirectOrderMutation()
@@ -276,6 +281,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     }
     setChecking(false)
     if (priced.issues.length > 0) return fail({ quantity: 'landing.orderForm.issues' }, { code: 'ITEMS_UNAVAILABLE', message: t('landing.orderForm.problem.itemsUnavailable') })
+    if (values.payment_method === 'cod' && codUnavailable(priced)) return fail({ payment_method: 'checkout.problem.codNotAvailable' }, { code: 'COD_NOT_AVAILABLE', message: t('checkout.problem.codNotAvailable') })
     setErrors({})
     setProblem(null)
     const touch = readAttribution()
@@ -295,7 +301,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
           const fresh = freshPreview(error)
           if (fresh) {
             queryClient.setQueryData<CheckoutPreview>(localized(directKeys.preview(previewInput), locale), fresh)
-          } else if (error instanceof ApiError && ['TOTAL_CHANGED', 'ITEMS_UNAVAILABLE', 'INSUFFICIENT_STOCK', 'SHIPPING_UNAVAILABLE', 'PAYMENT_METHOD_UNAVAILABLE'].includes(error.code)) {
+          } else if (error instanceof ApiError && ['TOTAL_CHANGED', 'ITEMS_UNAVAILABLE', 'INSUFFICIENT_STOCK', 'SHIPPING_UNAVAILABLE', 'PAYMENT_METHOD_UNAVAILABLE', 'COD_NOT_AVAILABLE'].includes(error.code)) {
             void queryClient.invalidateQueries({ queryKey: directKeys.previewAll })
           }
           if (error instanceof ApiError && error.code === 'PHONE_NOT_VERIFIED') {
@@ -586,6 +592,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
               onChange={(value) => set('payment_method', value)}
               selectedMethod={selectedMethod}
               currency={currency}
+              codBlockedForNumber={codBlockedForNumber}
             />
 
             {rules.note !== 'hidden' && (
@@ -757,6 +764,7 @@ function PaymentChoice({
   onChange,
   selectedMethod,
   currency,
+  codBlockedForNumber = false,
 }: {
   groupId: string
   errorId: string
@@ -766,6 +774,8 @@ function PaymentChoice({
   onChange: (value: string) => void
   selectedMethod: ShippingMethod | null
   currency: string | null
+  /** BD1b: the store does not allow cash on delivery for the typed number. */
+  codBlockedForNumber?: boolean
 }) {
   const { t } = useLocale()
   if (methods.length === 0) return null
@@ -774,8 +784,9 @@ function PaymentChoice({
       <legend className="mb-3 font-heading text-lg font-bold text-sf-heading">{t('landing.orderForm.payment')}</legend>
       <div className="flex flex-col gap-2">
         {methods.map((method) => {
-          const codBlocked = method.code === 'cod' && selectedMethod !== null && !selectedMethod.cod_allowed
-          const codFee = method.code === 'cod' && selectedMethod && !isZeroDecimal(selectedMethod.cod_fee) ? selectedMethod.cod_fee : null
+          const codForbidden = method.code === 'cod' && codBlockedForNumber
+          const codBlocked = (method.code === 'cod' && selectedMethod !== null && !selectedMethod.cod_allowed) || codForbidden
+          const codFee = method.code === 'cod' && !codForbidden && selectedMethod && !isZeroDecimal(selectedMethod.cod_fee) ? selectedMethod.cod_fee : null
           return (
             <label key={method.code} className={cn(RADIO_CARD, codBlocked && 'cursor-not-allowed opacity-60')} data-testid="order-form-payment">
               <input
@@ -791,7 +802,11 @@ function PaymentChoice({
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-sf-heading">{method.code === 'cod' ? t('landing.orderForm.cod') : method.display_name}</span>
                 <span className="block text-sm">{method.code === 'cod' ? t('landing.orderForm.codText') : t('checkout.payment.bankTransfer')}</span>
-                {codBlocked && selectedMethod && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>}
+                {codForbidden ? (
+                  <span className="block text-sm font-medium text-sf-sale" data-testid="cod-unavailable">{t('checkout.payment.codUnavailable')}</span>
+                ) : (
+                  codBlocked && selectedMethod && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>
+                )}
                 {codFee && <span className="block text-xs">{t('checkout.payment.codFee', { amount: formatPrice(codFee, currency) })}</span>}
               </span>
             </label>

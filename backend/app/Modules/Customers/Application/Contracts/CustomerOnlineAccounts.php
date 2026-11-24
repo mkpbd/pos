@@ -13,4 +13,10 @@ interface CustomerOnlineAccounts
      * @return array{email: ?string, email_verified_at: ?string, last_login_at: ?string, status: string, created_at: ?string}|null
      */
     public function forCustomer(string $customerId): ?array;
+
+    /**
+     * BD1b: the id of the customer's online account, or null (an order staff enter for the
+     * customer shows in that account).
+     */
+    public function accountId(string $customerId): ?string;
 }

@@ -8,6 +8,8 @@ use App\Modules\Orders\Application\Actions\CancelOrder;
 use App\Modules\Orders\Application\Actions\CancelOwnOrder;
 use App\Modules\Orders\Application\Contracts\OrderCampaigns;
 use App\Modules\Orders\Application\Contracts\OrderLineReviews;
+use App\Modules\Orders\Application\Queries\PhoneDeliveryReport;
+use App\Modules\Orders\Application\Services\OrderEditability;
 use App\Modules\Orders\Application\Services\ReturnPolicy;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
@@ -44,6 +46,10 @@ class OrderPresenter
         private readonly ReturnPolicy $returnPolicy,
         private readonly ReturnPresenter $returns,
         private readonly OrderCampaigns $campaigns,
+        // BD1b: the contact phone's delivery history on the staff detail.
+        private readonly PhoneDeliveryReport $phoneReport,
+        // BD1b: staff-entered orders and order edits on the staff detail.
+        private readonly OrderEditsPresenter $edits,
     ) {}
 
     /**
@@ -113,7 +119,8 @@ class OrderPresenter
             'tracking_number' => $order->tracking_number,
             // E10a: the courier's parcel tracking link (null without a courier template or number).
             'tracking_url' => $this->trackingUrl($order),
-            'history' => $order->history->map(fn (OrderStatusChange $h) => [
+            // BD1b: staff edits (from = to) are not status steps for the shopper.
+            'history' => $order->history->reject(fn (OrderStatusChange $h) => $h->from_status === $h->to_status)->map(fn (OrderStatusChange $h) => [
                 'status' => $h->to_status->value,
                 'label' => $h->to_status->label(),
                 'at' => $h->created_at->toIso8601String(),
@@ -148,7 +155,7 @@ class OrderPresenter
             'total' => (string) $order->total,
             'currency' => $order->currency,
             'item_count' => (int) $items,
-            'history' => $order->history->map(fn (OrderStatusChange $h) => [
+            'history' => $order->history->reject(fn (OrderStatusChange $h) => $h->from_status === $h->to_status)->map(fn (OrderStatusChange $h) => [
                 'status' => $h->to_status->value,
                 'at' => $h->created_at->toIso8601String(),
             ])->values()->all(),
@@ -250,7 +257,7 @@ class OrderPresenter
      *
      * @return array<string, mixed>
      */
-    public function staff(Order $order, bool $canManage, bool $canRefund = false): array
+    public function staff(Order $order, bool $canManage, bool $canRefund = false, bool $canEdit = false): array
     {
         $view = $this->storefront($order);
         $returns = $order->returns()->get();
@@ -263,8 +270,10 @@ class OrderPresenter
         $returnable = $this->returnPolicy->returnable($order);
         foreach ($view['lines'] as $i => $line) {
             $source = $order->lines->values()[$i];
-            $view['lines'][$i] = ['id' => $source->id] + $line + ['returnable_quantity' => self::quantity($returnable[$source->id] ?? '0')];
+            // BD1b: `variant_id` for the edit form.
+            $view['lines'][$i] = ['id' => $source->id, 'variant_id' => $source->variant_id] + $line + ['returnable_quantity' => self::quantity($returnable[$source->id] ?? '0')];
         }
+        $view['shipping_address'] = $this->edits->address($order, $view['shipping_address']);
         $deadline = $this->returnPolicy->deadline($order);
         $shipment = $order->shipment;
         $shipment?->loadMissing('events');
@@ -299,6 +308,8 @@ class OrderPresenter
             'customer_account_id' => $order->customer_account_id,
             // P2a: where it was placed and the campaign the shopper came from.
             'source' => $order->source,
+            // BD1b: channel, created_by, revision, edits and the edit form's ids.
+            ...$this->edits->details($order),
             'attribution' => $order->attribution,
             'campaign' => $this->campaigns->campaignsFor(['o' => $order->attribution])['o'] ?? null,
             'ip' => $order->ip,
@@ -343,6 +354,8 @@ class OrderPresenter
                 ])->values()->all(),
             ],
             'cod_remittance' => $this->remittanceOf($order),
+            // BD1b: the contact phone's delivery history (PhoneDeliveryReport).
+            'phone_report' => $this->phoneReport->forPhone($order->contact_phone),
             // E11: what cancelling would refund (paid orders that can still be cancelled), else null.
             'cancel_refund_amount' => CancelOrder::cancellableWithRefund($order)
                 ? Money::of((string) $order->paid_total, $order->currency)->minus(Money::of((string) $order->refunded_total, $order->currency))->amount()
@@ -353,6 +366,8 @@ class OrderPresenter
                 ...(! $canManage && $canRefund && CancelOrder::cancellableWithRefund($order) ? ['cancel'] : []),
                 // E10b: a return can be created (after the window only with override_window).
                 ...($canRefund && $this->returnPolicy->blocker($order, ignoreWindow: true) === null && $this->returnPolicy->anythingLeft($order) ? ['create_return'] : []),
+                // BD1b: change the order before it ships (web_orders.edit).
+                ...($canEdit && OrderEditability::blocker($order) === null ? ['edit'] : []),
             ],
         ];
     }
@@ -480,6 +495,8 @@ class OrderPresenter
             'delivered_at' => $order->delivered_at?->toIso8601String(),
             // P2a: cart checkout or landing page (the campaign is added by the list endpoint).
             'source' => $order->source,
+            // BD1b: where a staff order was taken (null for shoppers' orders).
+            'channel' => $order->channel,
         ];
     }
 
@@ -497,6 +514,8 @@ class OrderPresenter
 
         return array_keys(array_filter([
             'confirm_payment' => $unpaid && ! $cod && $order->status === OrderStatus::PendingPayment,
+            // BD1b: a cash-on-delivery order held for a confirmation call.
+            'confirm' => $order->status === OrderStatus::PendingConfirmation,
             'process' => $order->status === OrderStatus::Confirmed,
             'ship' => $order->status === OrderStatus::Processing,
             'deliver' => $shipped && ! $returned,

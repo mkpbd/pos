@@ -2,7 +2,9 @@
 
 use App\Modules\Orders\Presentation\Http\Controllers\AccountOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\AccountReturnController;
+use App\Modules\Orders\Presentation\Http\Controllers\BlockedPhoneController;
 use App\Modules\Orders\Presentation\Http\Controllers\CodRemittanceController;
+use App\Modules\Orders\Presentation\Http\Controllers\StaffOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutPhoneController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreDirectCheckoutController;
@@ -49,6 +51,17 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'a
 
 // Staff: web orders.
 Route::prefix('web-orders')->middleware(['auth:sanctum', 'tenant'])->group(function () {
+    // BD1b: blocked numbers and a number's delivery history (before the {webOrder} routes).
+    Route::get('blocked-phones', [BlockedPhoneController::class, 'index'])->middleware('can:web_orders.view');
+    Route::post('blocked-phones', [BlockedPhoneController::class, 'store'])->middleware('can:web_orders.manage');
+    Route::delete('blocked-phones/{blockedPhone}', [BlockedPhoneController::class, 'destroy'])->whereUuid('blockedPhone')->middleware('can:web_orders.manage');
+    Route::get('phone-report', [BlockedPhoneController::class, 'phoneReport'])->middleware('can:web_orders.view');
+
+    // BD1b: orders staff enter and changes before shipping (quote: web_orders.create or .edit, checked by the controller).
+    Route::post('quote', [StaffOrderController::class, 'quote']);
+    Route::post('/', [StaffOrderController::class, 'store'])->middleware(['can:web_orders.create', 'idempotent']);
+    Route::put('{webOrder}', [StaffOrderController::class, 'update'])->whereUuid('webOrder')->middleware(['can:web_orders.edit', 'idempotent']);
+
     Route::middleware('can:web_orders.view')->group(function () {
         Route::get('/', [WebOrderController::class, 'index']);
         Route::get('print', [WebOrderController::class, 'print']);
@@ -59,6 +72,9 @@ Route::prefix('web-orders')->middleware(['auth:sanctum', 'tenant'])->group(funct
         Route::post('{webOrder}/confirm-payment', [WebOrderController::class, 'confirmPayment'])->whereUuid('webOrder');
         Route::post('{webOrder}/process', [WebOrderController::class, 'process'])->whereUuid('webOrder');
         Route::post('bulk/process', [WebOrderController::class, 'bulkProcess']);
+        // BD1b: cash-on-delivery orders held for a confirmation call.
+        Route::post('{webOrder}/confirm', [WebOrderController::class, 'confirm'])->whereUuid('webOrder');
+        Route::post('bulk/confirm', [WebOrderController::class, 'bulkConfirm']);
         Route::post('{webOrder}/ship', [WebOrderController::class, 'ship'])->whereUuid('webOrder');
         Route::post('{webOrder}/shipment/events', [WebOrderController::class, 'shipmentEvent'])->whereUuid('webOrder');
         Route::post('{webOrder}/deliver', [WebOrderController::class, 'deliver'])->whereUuid('webOrder');

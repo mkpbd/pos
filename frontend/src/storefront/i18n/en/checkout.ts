@@ -79,6 +79,7 @@ export const checkout = {
     'Transfer the total to our bank account. You get the account details after placing the order, and we keep your order for you until the payment arrives.',
   'checkout.payment.notWith': 'Not available with {method}.',
   'checkout.payment.codFee': 'A cash on delivery fee of {amount} applies.',
+  'checkout.payment.codUnavailable': 'Cash on delivery is not available for this number.',
 
   'checkout.notes.heading': 'Order notes',
   'checkout.notes.label': 'Notes for the delivery (optional)',
@@ -122,6 +123,7 @@ export const checkout = {
   'checkout.problem.insufficientStock': 'Sorry, some items sold out while you were checking out. Please review your cart.',
   'checkout.problem.shippingUnavailable': 'We cannot deliver to this address with the chosen delivery method. Please choose another delivery method or address.',
   'checkout.problem.paymentUnavailable': 'The chosen payment method is not available for this order. Please choose another one.',
+  'checkout.problem.codNotAvailable': 'Cash on delivery is not available for this order. Please choose another payment method.',
   'checkout.problem.checkoutUnavailable': 'Online ordering is not available right now. Please try again later.',
   'checkout.problem.guestDisabled': 'Please sign in to place your order.',
   'checkout.problem.totalChanged': 'The total of your order has changed. Please check the order summary and confirm again.',

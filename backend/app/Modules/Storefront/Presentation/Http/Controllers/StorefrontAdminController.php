@@ -68,6 +68,10 @@ class StorefrontAdminController
      * at checkout; `checkout_phone_verification` off (default) | cod | all — which orders need
      * the mobile number checked with an SMS code (≠ off while SMS cannot send codes → 422
      * `SMS_NOT_READY`). Read-only `sms_ready` / `otp_ready` come with the settings.
+     * BD1b: `cod_review` off (default) | risky | all — shop and landing-page cash-on-delivery
+     * orders start `pending_confirmation` (all of them, or with `risky` those whose mobile
+     * number has a delivery success rate below `cod_review_min_success_rate` (0–100, default
+     * 70) and, with `cod_review_new_numbers` (default false), numbers without a delivered order).
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save, SmsSender $sms, TenantContext $tenant): JsonResponse
     {
@@ -95,6 +99,9 @@ class StorefrontAdminController
             'bangla_digits' => ['sometimes', 'boolean'],
             'checkout_email' => ['sometimes', 'string', Rule::in(StorefrontSettings::CHECKOUT_EMAIL_MODES)],
             'checkout_phone_verification' => ['sometimes', 'string', Rule::in(StorefrontSettings::PHONE_VERIFICATION_MODES)],
+            'cod_review' => ['sometimes', 'string', Rule::in(StorefrontSettings::COD_REVIEW_MODES)],
+            'cod_review_min_success_rate' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'cod_review_new_numbers' => ['sometimes', 'boolean'],
         ]);
 
         return ApiResponse::success(StorefrontPresenter::settings($save($data)) + $this->smsState($sms, $tenant));

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Order totals and statuses are read from the `orders` table read-only (organization-scoped),
  * the read-model exception of ARCHITECTURE §2 — Promotions does not depend on Orders.
- * Redemptions of orders cancelled later stay counted (like the list counts); `cancelled_orders`
+ * Redemptions of orders cancelled later stay counted; `cancelled_orders`
  * says how many of the orders were cancelled or failed.
  */
 class PromotionReport
@@ -42,7 +42,7 @@ class PromotionReport
             ->when($start !== null, fn ($q) => $q->where('created_at', '>=', $start->utc()))
             ->when($end !== null, fn ($q) => $q->where('created_at', '<', $end->utc()))
             ->orderBy('created_at')
-            ->get(['order_id', 'amount', 'created_at']);
+            ->get(['order_id', 'amount', 'created_at', 'released_at']);
 
         $orderIds = $rows->pluck('order_id')->unique()->values()->all();
         $orders = [];
@@ -51,6 +51,12 @@ class PromotionReport
                 $orders[$order->id] = $order;
             }
         }
+
+        // BD1b: a redemption released while its order stays open was replaced by an order edit
+        // (the edit recorded the order's promotions again); only cancelled orders keep theirs.
+        $rows = $rows->reject(fn ($row) => $row->released_at !== null
+            && ! in_array($orders[$row->order_id]->status ?? null, ['cancelled', 'failed'], true))->values();
+        $orders = array_intersect_key($orders, array_flip($rows->pluck('order_id')->unique()->all()));
 
         $discount = Money::zero($currency);
         $days = [];
@@ -88,7 +94,7 @@ class PromotionReport
             'timezone' => $timezone,
             'currency' => $currency,
             'redemptions' => $count,
-            'orders' => count($orderIds),
+            'orders' => $rows->pluck('order_id')->unique()->count(),
             'cancelled_orders' => $cancelled,
             'discount_total' => $discount->amount(),
             'order_revenue' => $revenue->amount(),

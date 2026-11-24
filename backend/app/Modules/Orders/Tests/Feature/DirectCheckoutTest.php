@@ -312,4 +312,25 @@ class DirectCheckoutTest extends TestCase
         $this->placeOrder($this->checkoutBody('510.00', ['attribution' => 'nonsense']))->assertCreated();
         $this->assertNull(Order::query()->withoutGlobalScopes()->where('number', 'WEB-000002')->firstOrFail()->attribution);
     }
+
+    public function test_blocked_numbers_and_the_cod_review_apply_to_order_forms(): void
+    {
+        $this->actingAsUser($this->tenant['admin']);
+        $this->postJson('/api/v1/web-orders/blocked-phones', ['phone' => '01712345678'])->assertCreated();
+        $this->patchJson('/api/v1/storefront/settings', ['cod_review' => 'all'])->assertOk();
+        $this->asVisitor();
+
+        // BD1b: the preview takes the mobile number; cash on delivery is unusable for a blocked one.
+        $preview = fn (array $contact) => $this->browse('POST', $this->storeUrl('checkout/direct/preview'), [
+            'document_id' => $this->document, 'element_id' => 'e_order',
+            'lines' => [['variant_id' => $this->v['SHIRT'], 'quantity' => 1]],
+            'address' => ['district_id' => self::DHAKA], 'payment_method' => 'cod',
+        ] + $contact)->assertOk();
+        $preview([])->assertJsonPath('data.cod_available', true)->assertJsonPath('data.payment_method', 'cod');
+        $preview(['contact' => ['phone' => '+880 1712-345678']])->assertJsonPath('data.cod_available', false)->assertJsonPath('data.payment_method', null);
+
+        $this->direct($this->body('1098.00'))->assertStatus(422)->assertJsonPath('error.code', 'COD_NOT_AVAILABLE');
+        $this->direct($this->body('1098.00', ['contact' => ['name' => 'Karim', 'phone' => '01811111111']]))->assertCreated()
+            ->assertJsonPath('data.order.status', 'pending_confirmation');
+    }
 }

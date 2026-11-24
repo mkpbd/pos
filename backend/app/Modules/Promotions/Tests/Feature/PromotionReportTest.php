@@ -10,7 +10,9 @@ use App\Modules\Shared\Tests\Concerns\InteractsWithTenancy;
 use App\Modules\Users\Domain\Roles\SystemRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -82,5 +84,23 @@ class PromotionReportTest extends TestCase
         $this->getJson("/api/v1/promotions/{$promotion->id}/report")->assertForbidden();
         $this->openStore('Other Shop', 'other.example.test');
         $this->getJson("/api/v1/promotions/{$promotion->id}/report")->assertNotFound();
+    }
+
+    public function test_report_skips_redemptions_replaced_by_an_order_edit_but_keeps_cancelled_orders(): void
+    {
+        $promotion = $this->makePromotion($this->tenant['organization'], ['name' => '50 off 400', 'type' => 'fixed', 'value' => '50', 'min_subtotal' => '400']);
+        $this->orderAt('2026-10-10 03:00:00', 'SHIRT', 1, '460.00');
+        $this->orderAt('2026-10-11 03:00:00', 'SHIRT', 1, '460.00');
+        $this->travelBack();
+
+        [$edited, $cancelled] = DB::table('promotion_redemptions')->where('promotion_id', $promotion->id)->orderBy('created_at')->get()->all();
+        // BD1b: an edit releases the order's redemption and records it again; a cancel only releases.
+        DB::table('promotion_redemptions')->whereIn('id', [$edited->id, $cancelled->id])->update(['released_at' => now()]);
+        DB::table('promotion_redemptions')->insert(array_merge((array) $edited, ['id' => (string) Str::uuid7(), 'released_at' => null]));
+        DB::table('orders')->where('id', $cancelled->order_id)->update(['status' => 'cancelled']);
+
+        $this->actingAsUser($this->tenant['admin']);
+        $report = $this->getJson("/api/v1/promotions/{$promotion->id}/report")->assertOk()->json('data');
+        $this->assertSame([2, 2, 1, '100.00'], [$report['redemptions'], $report['orders'], $report['cancelled_orders'], $report['discount_total']]);
     }
 }

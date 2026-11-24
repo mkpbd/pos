@@ -151,7 +151,8 @@ describe('checkout as a guest', () => {
       notes: 'Call before coming',
       expected_total: '960.00',
     })
-    expect(previews.at(-1)).toEqual({ address: { division_id: 3, district_id: 47 }, shipping_method_id: 'sm-home', payment_method: 'cod' })
+    // BD1b: the valid numbers go along for `cod_available`.
+    expect(previews.at(-1)).toEqual({ contact: { phone: '01811223344' }, address: { division_id: 3, district_id: 47, phone: '01811223344' }, shipping_method_id: 'sm-home', payment_method: 'cod' })
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Thank you, Karim!' })).toBeInTheDocument()
     expect(screen.getByTestId('order-number')).toHaveTextContent('WEB-000001')
@@ -274,7 +275,7 @@ describe('checkout as a customer', () => {
       payment_method: 'bank_transfer',
       expected_total: '960.00',
     })
-    expect(previews[0]).toEqual({ shipping_address_id: 'a-2' })
+    expect(previews[0]).toEqual({ contact: { phone: '01712345678' }, shipping_address_id: 'a-2' })
     const instructions = screen.getByTestId('payment-instructions')
     expect(instructions).toHaveTextContent('Demo Bank')
     expect(instructions).toHaveTextContent('Please transfer ৳960.00')

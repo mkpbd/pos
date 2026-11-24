@@ -133,6 +133,10 @@ const pages = {
   webOrders: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrdersPage'),
   webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
   webOrdersPrint: page(() => import('@/features/web-orders/pages/print-page'), 'WebOrdersPrintPage'),
+  // BD1b: orders taken by phone / chat, and changes to unpaid orders before they ship.
+  newWebOrder: page(() => import('@/features/web-orders/pages/order-entry-pages'), 'NewWebOrderPage'),
+  editWebOrder: page(() => import('@/features/web-orders/pages/order-entry-pages'), 'EditWebOrderPage'),
+  blockedNumbers: page(() => import('@/features/web-orders/pages/blocked-numbers-page'), 'BlockedNumbersPage'),
   webReturns: page(() => import('@/features/web-returns/pages/web-return-pages'), 'WebReturnsPage'),
   webReturn: page(() => import('@/features/web-returns/pages/web-return-pages'), 'WebReturnPage'),
   codRemittances: page(() => import('@/features/cod-remittances/pages/remittance-pages'), 'CodRemittancesPage'),
@@ -217,7 +221,11 @@ export const routes: RouteObject[] = [
                 children: [guarded('returns.create', 'sales/:saleId/return', pages.newReturn)],
               },
               guarded('web_orders.view', 'web-orders', pages.webOrders),
+              // BD1b: viewers see the list; adding and removing need web_orders.manage.
+              guarded('web_orders.view', 'web-orders/blocked-numbers', pages.blockedNumbers),
               guarded('web_orders.view', 'web-orders/:orderId', pages.webOrder),
+              guarded('web_orders.create', 'web-orders/new', pages.newWebOrder),
+              guarded('web_orders.edit', 'web-orders/:orderId/edit', pages.editWebOrder),
               // Viewers see returns read-only; approve / reject / receive / refund need web_orders.refund (E10b).
               guarded('web_orders.view', 'web-returns', pages.webReturns),
               guarded('web_orders.view', 'web-returns/:returnId', pages.webReturn),

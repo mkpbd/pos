@@ -21,6 +21,29 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### BD1b — Staff-entered and editable web orders, cash-on-delivery checks
+
+Second part of BD1 (Bangladesh commerce pack) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P0). No new packages.
+
+#### Added
+- **New order** on *Web orders* (`web_orders.create`): staff enter an order taken by phone, Facebook, WhatsApp, Instagram or in person — customer search or a typed contact, products, delivery address and method, payment method, coupon, note — with live totals from the server. It follows the normal workflow (process, ship, cash-on-delivery remittance, returns, e-mail and SMS). Staff cash-on-delivery orders start confirmed.
+- **Edit order** (`web_orders.edit`): change the products, quantities, contact, address, delivery method, coupon or note of an unpaid order that has not been handed to a courier. Prices and promotions are recalculated, stock goes back and is taken again, and a *Changes* card shows every change (who, when, why, total before → after, changed lines).
+- **Cash on delivery check** (*Online store settings*): hold shop and landing-page cash-on-delivery orders as *Awaiting confirmation* — off, only risky orders (success rate below a minimum, optionally new numbers) or all — until staff *Confirm order* after a call (one by one or in bulk).
+- **Delivery history** of a mobile number on the order page, the order list and the new-order form: orders, delivered, returned, cancelled, success rate.
+- **Blocked numbers** (*Web orders → Blocked numbers*, block from an order too): a blocked number cannot choose cash on delivery in the shop (it can still pay another way); staff orders only show a warning.
+- Shoppers see *Awaiting confirmation* and "We will call you to confirm your order." on the order and track pages.
+
+#### Changed
+- The sidebar marks only the most specific entry as active (e.g. *Blocked numbers*, not also *Web orders*).
+- The promotion report no longer counts a promotion use twice when an order edit recorded it again; the "X of Y claimed" note on the shop ignores released uses (cancelled or edited orders), like the usage limits do.
+
+#### Tests
+- Backend 1837 (PostgreSQL: 1836 pass, 1 opt-in PDF skip) (PostgreSQL); Pint clean. vitest 3018; mocked Playwright 573 (new `bd1b-order-entry`, `bd1b-cod-controls`).
+- Full-stack (PostgreSQL, desktop) 60 — new **BD1b** on Bazar Fresh: the review is set to all orders; a guest's cash-on-delivery order waits for confirmation; staff see the number's history, confirm the order after a call and block the number; the blocked number cannot pick cash on delivery; staff enter an order taken by phone (confirmed at once) and change its quantity (revision 2, *Changes* card). Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- `php artisan migrate`, `php artisan pos:permissions:sync`. Give `web_orders.create` / `web_orders.edit` (with `products.view` and `customers.view`) to staff who take orders by phone.
+
 ### BD1a — SMS, phone sign-in with a code, phone-only checkout, order SMS
 
 First part of BD1 (Bangladesh commerce pack) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P0). No new packages; no SMS vendor SDK — a generic HTTP gateway any Bangladeshi SMS provider can be set up with.

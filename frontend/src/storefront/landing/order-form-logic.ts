@@ -24,6 +24,8 @@ export type DirectPreviewInput = {
   address?: { district_id: GeoId }
   shipping_method_id?: string
   payment_method?: PaymentMethodCode
+  /** BD1b: the mobile number (once valid), for `cod_available`. */
+  contact?: { phone: string }
 }
 
 /** POST /store/checkout/direct (with an Idempotency-Key). */
@@ -248,6 +250,8 @@ export function orderProblem(error: unknown, t: Translate, pathname: string): Or
       return { code: error.code, message: t('checkout.problem.shippingUnavailable'), field: 'shipping_method_id' }
     case 'PAYMENT_METHOD_UNAVAILABLE':
       return { code: error.code, message: t('checkout.problem.paymentUnavailable'), field: 'payment_method' }
+    case 'COD_NOT_AVAILABLE':
+      return { code: error.code, message: t('checkout.problem.codNotAvailable'), field: 'payment_method' }
     case 'GUEST_CHECKOUT_DISABLED':
       return { code: error.code, message: t('landing.orderForm.problem.signIn'), link: { to: loginPathFor(pathname), label: t('checkout.problem.signIn') } }
     case 'TOTAL_CHANGED':

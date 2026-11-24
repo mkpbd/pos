@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { Link, Outlet, useLocation } from 'react-router'
 import { MenuIcon, StoreIcon } from 'lucide-react'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -27,35 +27,35 @@ function Brand({ subtitle, className }: { subtitle?: string; className?: string 
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const me = useAuth()
+  const { pathname } = useLocation()
+  const items = visibleNavItems(me)
+  const within = (to: string) => pathname === to || pathname.startsWith(`${to}/`)
+  // The most specific entry wins: /web-orders/blocked-numbers lights "Blocked numbers", not "Web orders" too.
+  const activeTo = items.filter((item) => within(item.to)).sort((a, b) => b.to.length - a.to.length)[0]?.to
 
   return (
     <nav aria-label="Main" className="flex flex-col gap-0.5 py-3 pr-3">
-      {visibleNavItems(me).map(({ to, label, icon: Icon }) => (
-        <NavLink
+      {items.map(({ to, label, icon: Icon }) => (
+        <Link
           key={to}
           to={to}
           onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              'group/nav flex items-center gap-1 rounded-md text-xs font-semibold tracking-wide uppercase transition-colors',
-              isActive ? 'font-bold text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:text-sidebar-accent-foreground',
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className={cn(
-                  'mx-2.5 flex size-10 shrink-0 items-center justify-center rounded-[5px] transition-colors',
-                  isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'group-hover/nav:bg-sidebar-accent',
-                )}
-              >
-                <Icon className="size-5" aria-hidden />
-              </span>
-              <span className="truncate">{label}</span>
-            </>
+          aria-current={to === activeTo ? 'page' : undefined}
+          className={cn(
+            'group/nav flex items-center gap-1 rounded-md text-xs font-semibold tracking-wide uppercase transition-colors',
+            to === activeTo ? 'font-bold text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:text-sidebar-accent-foreground',
           )}
-        </NavLink>
+        >
+          <span
+            className={cn(
+              'mx-2.5 flex size-10 shrink-0 items-center justify-center rounded-[5px] transition-colors',
+              to === activeTo ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'group-hover/nav:bg-sidebar-accent',
+            )}
+          >
+            <Icon className="size-5" aria-hidden />
+          </span>
+          <span className="truncate">{label}</span>
+        </Link>
       ))}
     </nav>
   )

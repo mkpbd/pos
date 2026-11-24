@@ -13,4 +13,9 @@ class NoOnlineAccounts implements CustomerOnlineAccounts
     {
         return null;
     }
+
+    public function accountId(string $customerId): ?string
+    {
+        return null;
+    }
 }

@@ -27,6 +27,8 @@ class PerformanceIndexesTest extends TestCase
         'customers_email_trgm_index' => 'ON public.customers USING gin (email gin_trgm_ops)',
         'sales_number_trgm_index' => 'ON public.sales USING gin (number gin_trgm_ops)',
         'sales_org_sold_at_id_index' => 'ON public.sales USING btree (organization_id, sold_at, id)',
+        // BD1b: a mobile number's delivery history.
+        'orders_organization_id_contact_phone_index' => 'ON public.orders USING btree (organization_id, contact_phone)',
     ];
 
     public function test_performance_indexes_exist_on_postgresql(): void

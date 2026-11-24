@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { BanknoteIcon, ExternalLinkIcon } from 'lucide-react'
+import { BanknoteIcon, ExternalLinkIcon, PhoneCallIcon } from 'lucide-react'
 import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { displayQuantity } from '../cart/quantity'
@@ -29,6 +29,18 @@ export function OrderStatusBadge({ label, className }: { label: string; classNam
     <span className={cn('rounded-full bg-sf-accent px-3 py-0.5 text-xs font-bold text-sf-accent-foreground', className)} data-testid="order-status">
       {label}
     </span>
+  )
+}
+
+/** BD1b: the store holds the cash-on-delivery order until it has called the shopper. */
+export function AwaitingConfirmationNote({ status, className }: { status: string; className?: string }) {
+  const { t } = useLocale()
+  if (status !== 'pending_confirmation') return null
+  return (
+    <p role="note" className={cn('inline-flex items-center gap-2 rounded-lg bg-sf-canvas px-4 py-3 text-sm font-medium text-sf-heading', className)} data-testid="awaiting-confirmation">
+      <PhoneCallIcon aria-hidden className="size-4 shrink-0" />
+      {t('orders.page.willCall')}
+    </p>
   )
 }
 

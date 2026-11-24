@@ -5,6 +5,7 @@ namespace App\Modules\Orders\Presentation\Http\Controllers;
 use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\Orders\Application\Actions\PlaceDirectOrder;
 use App\Modules\Orders\Application\Services\CheckoutPhoneCheck;
+use App\Modules\Orders\Application\Services\CodRiskPolicy;
 use App\Modules\Orders\Presentation\Http\Support\CheckoutVerifiedPhones;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
@@ -32,18 +33,23 @@ class StoreDirectCheckoutController
      * shipping_total, shipping_discount, cod_fee, total, currency, shipping_methods for the
      * district, shipping_method_id, payment_method, promotions, issues). Coupons do not apply.
      * Errors: `ORDER_FORM_UNAVAILABLE`, `CHECKOUT_UNAVAILABLE`, field errors on `lines`.
+     * BD1b: optional `contact: {phone}` → `cod_available` false for a blocked number (cash on
+     * delivery then unusable: `payment_method` null, no COD fee); true otherwise.
      */
-    public function preview(Request $request, PlaceDirectOrder $direct): JsonResponse
+    public function preview(Request $request, PlaceDirectOrder $direct, CodRiskPolicy $codRisk): JsonResponse
     {
         $data = $request->validate([
             ...$this->formRules(),
+            // BD1b: the mobile number, for `cod_available`.
+            'contact' => ['sometimes', 'nullable', 'array'],
+            'contact.phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'address' => ['sometimes', 'nullable', 'array'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
             'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(['cod', 'bank_transfer'])],
         ]);
 
-        return ApiResponse::success($direct->preview($data, $this->account()?->customer_id));
+        return ApiResponse::success($codRisk->preview($direct->preview($data, $this->account()?->customer_id), [$data['contact']['phone'] ?? null]));
     }
 
     /**
@@ -55,7 +61,8 @@ class StoreDirectCheckoutController
      * expected_total, attribution?}`. The shopper's cart is not touched. 201 `{order,
      * access_token, order_url}`. Errors: `ORDER_FORM_UNAVAILABLE`, `ITEMS_UNAVAILABLE`,
      * `CHECKOUT_UNAVAILABLE`, `SHIPPING_UNAVAILABLE`, `PAYMENT_METHOD_UNAVAILABLE`,
-     * `INSUFFICIENT_STOCK`, `GUEST_CHECKOUT_DISABLED`, `TOTAL_CHANGED` (409), field errors.
+     * `INSUFFICIENT_STOCK`, `GUEST_CHECKOUT_DISABLED`, `TOTAL_CHANGED` (409), field errors,
+     * BD1b `COD_NOT_AVAILABLE` (cash on delivery to a blocked number).
      * BD1a: the store's phone check applies as at checkout — `PHONE_NOT_VERIFIED` (422,
      * `details.phone`) unless the number is the account's verified one or was checked with
      * `checkout/phone/verify` in this session.

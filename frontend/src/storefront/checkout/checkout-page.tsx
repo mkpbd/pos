@@ -24,6 +24,7 @@ import type { Cart, CartCoupon, CheckoutEmailMode, CheckoutOptions, CheckoutPrev
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { checkoutPhoneCode, useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
 import { etaLabel, goodsTotal, methodFee } from './delivery'
+import { codUnavailable, withCheckoutPhones } from './cod-availability'
 import { PlacementAttempts } from './placement-attempt'
 import { changedPreview, placementProblem, type PlacementProblem } from './placement-errors'
 import {
@@ -176,6 +177,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   const paymentMethod = useWatch({ control, name: 'payment_method' })
   const contactName = useWatch({ control, name: 'name' })
   const contactPhone = useWatch({ control, name: 'phone' })
+  const addressPhone = useWatch({ control, name: 'address_phone' })
   const phoneNumber = bdPhoneFrom(contactPhone)
   const phoneValid = BD_MOBILE.test(phoneNumber)
   // A signed-in shopper whose verified number is the contact number needs no code.
@@ -195,7 +197,12 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
     return list?.find((item) => String(item.id) === value)?.id ?? value
   }
 
-  const previewInput = toPreviewInput({ address_choice: addressChoice, division_id: divisionId, district_id: districtId, shipping_method_id: shippingMethodId, payment_method: paymentMethod }, geoId)
+  // BD1b: the numbers go along (once valid) so the preview can say whether cash on delivery is allowed for them.
+  const previewInput = withCheckoutPhones(
+    toPreviewInput({ address_choice: addressChoice, division_id: divisionId, district_id: districtId, shipping_method_id: shippingMethodId, payment_method: paymentMethod }, geoId),
+    contactPhone,
+    addressPhone,
+  )
   const [settledInput, debouncing] = useDebouncedValue(previewInput, PREVIEW_DEBOUNCE_MS)
   const preview = useCheckoutPreviewQuery(settledInput, true)
   const current = preview.isPlaceholderData ? null : (preview.data ?? null)
@@ -215,10 +222,11 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
     if (next !== shippingMethodId) form.setValue('shipping_method_id', next)
   }, [current, shippingMethodId, form])
 
-  // Cash on delivery is not offered by every delivery method.
+  // Cash on delivery is not offered by every delivery method, nor (BD1b) for a blocked number.
+  const codBlockedForNumber = codUnavailable(shown)
   useEffect(() => {
-    if (paymentMethod === 'cod' && selectedMethod && !selectedMethod.cod_allowed) form.setValue('payment_method', '')
-  }, [paymentMethod, selectedMethod, form])
+    if (paymentMethod === 'cod' && ((selectedMethod && !selectedMethod.cod_allowed) || codUnavailable(current))) form.setValue('payment_method', '')
+  }, [paymentMethod, selectedMethod, current, form])
 
   // The recipient is the contact person until the shopper types another one.
   useEffect(() => {
@@ -297,6 +305,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
         return result
       case 'SHIPPING_UNAVAILABLE':
       case 'PAYMENT_METHOD_UNAVAILABLE':
+      case 'COD_NOT_AVAILABLE':
         if (result.field) form.setError(result.field, { type: 'server', message: result.message })
         void queryClient.invalidateQueries({ queryKey: checkoutKeys.previewAll })
         return result
@@ -399,7 +408,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
             currency={shown?.currency ?? null}
             freeShipping={Boolean(cart?.free_shipping) || (shown?.promotions ?? []).some((p) => p.kind === 'shipping')}
           />
-          <PaymentSection form={form} options={options} selectedMethod={selectedMethod} currency={shown?.currency ?? null} />
+          <PaymentSection form={form} options={options} selectedMethod={selectedMethod} currency={shown?.currency ?? null} codBlockedForNumber={codBlockedForNumber} />
           <NotesSection form={form} />
 
           <div className="flex flex-col gap-3 rounded-sf-card bg-sf-surface p-5 md:p-6">
@@ -733,7 +742,20 @@ const PAYMENT_DESCRIPTIONS: Record<string, MessageKey> = {
   bank_transfer: 'checkout.payment.bankTransfer',
 }
 
-function PaymentSection({ form, options, selectedMethod, currency }: { form: Form; options: CheckoutOptions; selectedMethod: ShippingMethod | null; currency: string | null }) {
+function PaymentSection({
+  form,
+  options,
+  selectedMethod,
+  currency,
+  codBlockedForNumber = false,
+}: {
+  form: Form
+  options: CheckoutOptions
+  selectedMethod: ShippingMethod | null
+  currency: string | null
+  /** BD1b: the store does not allow cash on delivery for the typed number. */
+  codBlockedForNumber?: boolean
+}) {
   const errors = form.formState.errors
   const errorId = useId()
   const { t } = useLocale()
@@ -751,12 +773,17 @@ function PaymentSection({ form, options, selectedMethod, currency }: { form: For
         <div className="flex flex-col gap-3">
           {options.payment_methods.map((method) => {
             const codBlocked = method.code === 'cod' && selectedMethod !== null && !selectedMethod.cod_allowed
-            const codFee = method.code === 'cod' && selectedMethod && !isZeroDecimal(selectedMethod.cod_fee) ? selectedMethod.cod_fee : null
+            const codForbidden = method.code === 'cod' && codBlockedForNumber
+            const codFee = method.code === 'cod' && !codForbidden && selectedMethod && !isZeroDecimal(selectedMethod.cod_fee) ? selectedMethod.cod_fee : null
             return (
-              <RadioCard key={method.code} value={method.code} registered={form.register('payment_method')} invalid={invalid} disabled={codBlocked} testId="payment-option">
+              <RadioCard key={method.code} value={method.code} registered={form.register('payment_method')} invalid={invalid} disabled={codBlocked || codForbidden} testId="payment-option">
                 <span className="block font-semibold text-sf-heading">{method.display_name}</span>
                 <span className="block text-sm">{method.code in PAYMENT_DESCRIPTIONS ? t(PAYMENT_DESCRIPTIONS[method.code]!) : ''}</span>
-                {codBlocked && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>}
+                {codForbidden ? (
+                  <span className="block text-sm font-medium text-sf-sale" data-testid="cod-unavailable">{t('checkout.payment.codUnavailable')}</span>
+                ) : (
+                  codBlocked && <span className="block text-sm font-medium text-sf-sale">{t('checkout.payment.notWith', { method: selectedMethod.name })}</span>
+                )}
                 {codFee && <span className="block text-xs">{t('checkout.payment.codFee', { amount: formatPrice(codFee, currency) })}</span>}
               </RadioCard>
             )

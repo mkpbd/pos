@@ -42,8 +42,16 @@ export type StorefrontSettings = {
   sms_ready?: boolean
   /** BD1a (read-only): SMS can send sign-in / checkout codes; needed for phone verification. */
   otp_ready?: boolean
+  /** BD1b: hold cash-on-delivery orders for a call — none, only risky ones or all (default off). */
+  cod_review?: CodReviewMode
+  /** BD1b: with `risky`, numbers whose delivery success rate is below this % are held (0–100, default 70). */
+  cod_review_min_success_rate?: number
+  /** BD1b: with `risky`, also hold orders from numbers that have no delivered order yet (default off). */
+  cod_review_new_numbers?: boolean
   updated_at: string | null
 }
+
+export type CodReviewMode = 'off' | 'risky' | 'all'
 
 export type StoreLocale = 'en' | 'bn'
 export type CheckoutEmailMode = 'required' | 'optional' | 'hidden'
@@ -425,6 +433,9 @@ export function useSaveStorefrontSettingsMutation() {
           | 'whatsapp_chat_button'
           | 'checkout_email'
           | 'checkout_phone_verification'
+          | 'cod_review'
+          | 'cod_review_min_success_rate'
+          | 'cod_review_new_numbers'
         >
       > & { assistant?: AssistantSettingsInput },
     ) =>

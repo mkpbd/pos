@@ -32,6 +32,8 @@ export function placementProblem(error: unknown, t: Translate): PlacementProblem
       return { code: error.code, message: t('checkout.problem.shippingUnavailable'), field: 'shipping_method_id' }
     case 'PAYMENT_METHOD_UNAVAILABLE':
       return { code: error.code, message: t('checkout.problem.paymentUnavailable'), field: 'payment_method' }
+    case 'COD_NOT_AVAILABLE':
+      return { code: error.code, message: t('checkout.problem.codNotAvailable'), field: 'payment_method' }
     case 'CHECKOUT_UNAVAILABLE':
       return { code: error.code, message: t('checkout.problem.checkoutUnavailable') }
     case 'GUEST_CHECKOUT_DISABLED':

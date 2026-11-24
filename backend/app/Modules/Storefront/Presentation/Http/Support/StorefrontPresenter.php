@@ -51,6 +51,10 @@ final class StorefrontPresenter
             // BD1a: the contact fields of the checkout.
             'checkout_email' => $s->checkout_email ?? 'optional',
             'checkout_phone_verification' => $s->checkout_phone_verification ?? 'off',
+            // BD1b: holding cash-on-delivery orders for a confirmation call.
+            'cod_review' => $s->cod_review ?? 'off',
+            'cod_review_min_success_rate' => (int) ($s->cod_review_min_success_rate ?? 70),
+            'cod_review_new_numbers' => (bool) ($s->cod_review_new_numbers ?? false),
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

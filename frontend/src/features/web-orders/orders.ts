@@ -4,6 +4,7 @@ import { compareDecimal, subtractDecimal } from '@/lib/money'
 
 /** Button label on the order page for each action. */
 export const ACTION_LABELS: Record<WebOrderAction, string> = {
+  confirm: 'Confirm order',
   confirm_payment: 'Confirm payment',
   process: 'Start processing',
   ship: 'Ship',
@@ -15,6 +16,7 @@ export const ACTION_LABELS: Record<WebOrderAction, string> = {
 type BadgeVariant = 'warning' | 'success' | 'destructive' | 'info' | 'soft' | 'outline'
 
 export const ORDER_STATUS: Record<WebOrderStatus, { label: string; variant: BadgeVariant }> = {
+  pending_confirmation: { label: 'Awaiting confirmation', variant: 'warning' },
   pending_payment: { label: 'Awaiting payment', variant: 'warning' },
   confirmed: { label: 'Confirmed', variant: 'info' },
   processing: { label: 'Processing', variant: 'soft' },
@@ -25,7 +27,7 @@ export const ORDER_STATUS: Record<WebOrderStatus, { label: string; variant: Badg
 }
 
 /** Statuses offered in the list filter (`failed` is not used yet). */
-export const FILTER_STATUSES: WebOrderStatus[] = ['pending_payment', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+export const FILTER_STATUSES: WebOrderStatus[] = ['pending_confirmation', 'pending_payment', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
 
 export const PAYMENT_STATUS: Record<WebPaymentStatus, { label: string; variant: BadgeVariant }> = {
   unpaid: { label: 'Unpaid', variant: 'outline' },
@@ -51,7 +53,12 @@ export function paymentBadge(status: string): { label: string; variant: BadgeVar
 /** Board tabs: every order, one per status, and delivered COD orders whose cash the courier still owes. */
 export type BoardTab = 'all' | WebOrderStatus | 'cod_unremitted'
 
-export const BOARD_TABS: BoardTab[] = ['all', 'pending_payment', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'cod_unremitted']
+export const BOARD_TABS: BoardTab[] = ['all', 'pending_confirmation', 'pending_payment', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'cod_unremitted']
+
+/** BD1b: "Awaiting confirmation" only shows while orders wait for a call (or it is the open tab); stores that hold no orders never see it. */
+export function visibleBoardTabs(current: BoardTab, counts: StatusCounts | null): BoardTab[] {
+  return BOARD_TABS.filter((t) => t !== 'pending_confirmation' || current === t || (counts?.pending_confirmation ?? 0) > 0)
+}
 
 export function boardTabLabel(tab: BoardTab): string {
   if (tab === 'all') return 'All'
@@ -90,6 +97,7 @@ export type WebOrderFilters = {
 export const ORDER_SOURCE_LABELS: Record<WebOrderSource, string> = {
   storefront: 'Online store',
   landing_page: 'Campaign page',
+  staff: 'Staff',
 }
 
 /** "Campaign page" / "Online store"; null for older orders without a source. */

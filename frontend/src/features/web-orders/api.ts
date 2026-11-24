@@ -1,17 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated, type Paginated } from '@/lib/api/client'
 import type { OrderReturnSummary } from '@/features/web-returns/api'
+import type { OrderRisk, PhoneReport } from '@/features/web-orders/risk'
+import type { OrderEdit } from '@/features/web-orders/order-entry-api'
 
-export type WebOrderStatus = 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed'
+/** BD1b: `pending_confirmation` = a cash-on-delivery order held until staff call the customer. */
+export type WebOrderStatus = 'pending_confirmation' | 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed'
 export type WebPaymentStatus = 'unpaid' | 'paid' | 'partially_refunded' | 'refunded'
 export type WebPaymentMethod = 'cod' | 'bank_transfer'
 
-/** Staff actions, in the order they are offered; the server decides which apply (`allowed_actions`). */
-export const WEB_ORDER_ACTIONS = ['confirm_payment', 'process', 'ship', 'deliver', 'record_cod_payment', 'cancel'] as const
+/** Staff actions, in the order they are offered; the server decides which apply (`allowed_actions`). BD1b: `confirm` after a call. */
+export const WEB_ORDER_ACTIONS = ['confirm', 'confirm_payment', 'process', 'ship', 'deliver', 'record_cod_payment', 'cancel'] as const
 export type WebOrderAction = (typeof WEB_ORDER_ACTIONS)[number]
 
-/** Where the order was placed (P2a): the shop's cart checkout or a campaign page's order form. */
-export type WebOrderSource = 'storefront' | 'landing_page'
+/** Where the order was placed (P2a): the shop's cart checkout or a campaign page's order form; BD1b: `staff` = entered by staff. */
+export type WebOrderSource = 'storefront' | 'landing_page' | 'staff'
 
 /** Campaign tags the shopper arrived with (P2a §3); keys are omitted when unknown. */
 export type OrderAttribution = {
@@ -52,11 +55,17 @@ export type WebOrderRow = OrderOrigin & {
   tracking_number?: string | null
   district?: string | null
   shipment_status?: ShipmentStatus | null
+  /** BD1b: the contact number's delivery record and block. */
+  risk?: OrderRisk | null
+  /** BD1b: where a staff-entered order was taken (phone, facebook…); null for shop orders. */
+  channel?: string | null
 }
 
 export type WebOrderLine = {
   /** Order line id (E10b; needed to return the line). */
   id?: string
+  /** BD1b: the variant ordered (the edit form starts from it). */
+  variant_id?: string | null
   product_name: string
   variant_name: string | null
   sku: string | null
@@ -83,6 +92,9 @@ export type WebOrderAddress = {
   area: string | null
   address_line: string
   postcode: string | null
+  /** BD1b: geography ids (the edit form starts from them). */
+  division_id?: number | null
+  district_id?: number | null
 }
 
 /** Who made a status change (E9): staff, the signed-in customer (self-service cancel) or the system. */
@@ -153,8 +165,15 @@ export type WebOrder = OrderOrigin & {
   notes: string | null
   cancel_reason: string | null
   payments: WebOrderPayment[]
-  /** Status actions plus `create_return` (E10b) when a return can be created. */
-  allowed_actions: (WebOrderAction | 'create_return')[]
+  /** Status actions plus `create_return` (E10b) when a return can be created; BD1b `edit` when it can still be changed. */
+  allowed_actions: (WebOrderAction | 'create_return' | 'edit')[]
+  /** BD1b: staff-entered orders and order changes. */
+  customer_id?: string | null
+  channel?: string | null
+  created_by?: { id: string; name: string | null } | null
+  revision?: number
+  edits?: OrderEdit[]
+  shipping_method_id?: string | null
   /** Returns on this order (E10b). */
   returns?: OrderReturnSummary[]
   /** End of the customer return window (E10b); staff may still create a return after it with an override. */
@@ -170,6 +189,8 @@ export type WebOrder = OrderOrigin & {
   shipment?: Shipment | null
   /** The courier remittance that paid this COD order (E10a), if any. */
   cod_remittance?: { id: string; number: string; received_at: string } | null
+  /** BD1b: delivery history of the contact number. */
+  phone_report?: PhoneReport | null
 }
 
 export type ShipmentStatus = 'handed_over' | 'in_transit' | 'delivered' | 'returned'
@@ -254,6 +275,7 @@ export function useWebOrderQuery(id: string | undefined) {
 
 /** URL segment of each action endpoint. */
 export const ACTION_PATHS: Record<WebOrderAction, string> = {
+  confirm: 'confirm',
   confirm_payment: 'confirm-payment',
   process: 'process',
   ship: 'ship',

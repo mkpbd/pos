@@ -75,6 +75,23 @@ class OrderWorkflow
         });
     }
 
+    /**
+     * BD1b: a cash-on-delivery order held for a call is confirmed with the customer:
+     * pending_confirmation → confirmed (history note: the staff note or "Confirmed after a call").
+     */
+    public function confirm(Order $order, ?string $note, string $actorId): Order
+    {
+        return $this->locked($order, function (Order $o) use ($note, $actorId) {
+            // pending_payment → confirmed is the bank transfer's payment confirmation, not this.
+            if ($o->status !== OrderStatus::PendingConfirmation) {
+                throw new BusinessRuleViolation('INVALID_STATUS_TRANSITION', "{$o->number} is {$o->status->label()}; only orders awaiting confirmation can be confirmed.", [
+                    'from' => $o->status->value, 'to' => OrderStatus::Confirmed->value, 'allowed' => array_map(fn (OrderStatus $s) => $s->value, $o->status->next()),
+                ]);
+            }
+            $this->move($o, OrderStatus::Confirmed, ['confirmed_at' => now()], $note ?? 'Confirmed after a call', $actorId, 'web_order.confirmed');
+        });
+    }
+
     public function process(Order $order, string $actorId): Order
     {
         return $this->locked($order, fn (Order $o) => $this->move($o, OrderStatus::Processing, [], null, $actorId, 'web_order.processing'));

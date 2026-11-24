@@ -65,11 +65,15 @@ class CheckoutQuoter
      * P2a: the same quote for lines that are not in a cart (a landing page's order form):
      * `[{variant_id, quantity}]`, priced through the cart's pricing path without a coupon.
      *
+     * BD1b: staff orders pass a `$couponCode`, and an order being edited the stock it already
+     * holds (`$held`, variant id => quantity), which counts as available.
+     *
      * @param  list<array{variant_id: string, quantity: string}>  $lines
      * @param  array<string, mixed>  $input
+     * @param  array<string, string>  $held
      * @return array<string, mixed> as quote()
      */
-    public function quoteLines(array $lines, array $input, ?string $customerId, bool $autoPickMethod = false): array
+    public function quoteLines(array $lines, array $input, ?string $customerId, bool $autoPickMethod = false, ?string $couponCode = null, array $held = []): array
     {
         [$email, $phone] = self::contact($input);
         $items = [];
@@ -77,7 +81,7 @@ class CheckoutQuoter
             $items[] = ['id' => 'line-'.$i, 'variant_id' => $line['variant_id'], 'quantity' => (string) $line['quantity']];
         }
 
-        return $this->complete($this->pricer->quoteItems($items, $customerId, $email, null, null, $phone), $input, $customerId, $autoPickMethod);
+        return $this->complete($this->pricer->quoteItems($items, $customerId, $email, $couponCode, null, $phone, $held), $input, $customerId, $autoPickMethod);
     }
 
     /**

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeftIcon, BanIcon, CheckIcon, HandCoinsIcon, PackageCheckIcon, PackageIcon, PrinterIcon, TruckIcon, type LucideIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, CheckIcon, HandCoinsIcon, PackageCheckIcon, PackageIcon, PencilIcon, PhoneCallIcon, PrinterIcon, TruckIcon, type LucideIcon } from 'lucide-react'
 import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useWebOrderQuery, WEB_ORDER_ACTIONS, type WebOrder, type WebOrderAction } from '@/features/web-orders/api'
+import { DeliveryHistoryCard } from '@/features/web-orders/components/delivery-history-card'
 import { OrderActionDialog } from '@/features/web-orders/components/order-action-dialog'
+import { OrderEditsCard } from '@/features/web-orders/components/order-edits-card'
+import { staffSourceLabel } from '@/features/web-orders/order-entry'
 import { ShipmentCard } from '@/features/web-orders/components/shipment-card'
 import { OrderReturnsCard } from '@/features/web-returns/components/order-returns-card'
 import {
@@ -35,6 +38,7 @@ export { WebOrdersPage } from '@/features/web-orders/pages/web-orders-board'
 // ── Detail ───────────────────────────────────────────────────────────────────
 
 const ACTION_ICONS: Record<WebOrderAction, LucideIcon> = {
+  confirm: PhoneCallIcon,
   confirm_payment: CheckIcon,
   process: PackageIcon,
   ship: TruckIcon,
@@ -129,7 +133,7 @@ function PaymentCard({ order, timeZone }: { order: WebOrder; timeZone: string | 
 function OriginCard({ order }: { order: WebOrder }) {
   const canMarketing = useCan()('marketing.view')
   const a = order.attribution ?? null
-  const placedOn = orderSourceLabel(order.source)
+  const placedOn = staffSourceLabel(order) ?? orderSourceLabel(order.source)
   const source = attributionSourceLabel(order)
   if (!placedOn && !order.campaign && !a) return null
 
@@ -139,6 +143,7 @@ function OriginCard({ order }: { order: WebOrder }) {
       <CardContent>
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4" data-testid="order-origin">
           {placedOn && <Field label="Placed on">{placedOn}</Field>}
+          {order.created_by && <Field label="Entered by">{order.created_by.name ?? 'Staff'}</Field>}
           <Field label="Campaign">
             {order.campaign ? (
               canMarketing ? <Link to={`/marketing/campaigns/${order.campaign.id}`} className="underline-offset-4 hover:underline">{order.campaign.name}</Link> : order.campaign.name
@@ -189,6 +194,9 @@ export function WebOrderPage() {
           <Badge variant={status.variant}>{order.status_label || status.label}</Badge>
         </div>
         <div className="flex flex-wrap gap-2">
+          {order.allowed_actions.includes('edit') && can('web_orders.edit') && (
+            <Button asChild variant="outline"><Link to={`/web-orders/${order.id}/edit`}><PencilIcon data-icon="inline-start" /> Edit order</Link></Button>
+          )}
           <div className="flex flex-wrap gap-2" aria-label="Print" role="group">
             <Button asChild variant="outline"><Link to={printPath([order.id], 'packing_slip')}><PrinterIcon data-icon="inline-start" /> Packing slip</Link></Button>
             <Button asChild variant="outline"><Link to={printPath([order.id], 'invoice')}><PrinterIcon data-icon="inline-start" /> Invoice</Link></Button>
@@ -232,7 +240,7 @@ export function WebOrderPage() {
               <Field label="Name">{order.contact.name}</Field>
               {order.contact.phone && <Field label="Phone">{order.contact.phone}</Field>}
               {order.contact.email && <Field label="E-mail">{order.contact.email}</Field>}
-              <Field label="Account">{order.customer ? `${order.customer.name}${order.customer.code ? ` (${order.customer.code})` : ''}` : 'Guest checkout'}</Field>
+              <Field label="Account">{order.customer ? `${order.customer.name}${order.customer.code ? ` (${order.customer.code})` : ''}` : order.source === 'staff' ? 'No customer record' : 'Guest checkout'}</Field>
             </dl>
           </CardContent>
         </Card>
@@ -269,6 +277,8 @@ export function WebOrderPage() {
       </div>
 
       <OriginCard order={order} />
+
+      {order.phone_report && <DeliveryHistoryCard report={order.phone_report} timeZone={timeZone} />}
 
       {order.shipment && <ShipmentCard order={order} shipment={order.shipment} timeZone={timeZone} canManage={can('web_orders.manage')} />}
 
@@ -360,6 +370,8 @@ export function WebOrderPage() {
           </CardContent>
         </Card>
       </div>
+
+      <OrderEditsCard order={order} timeZone={timeZone} />
 
       {(order.ip || order.user_agent) && (
         <p className="text-xs break-all text-muted-foreground">

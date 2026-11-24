@@ -4,9 +4,11 @@ namespace App\Modules\Orders\Presentation\Http\Controllers;
 
 use App\Modules\Media\Application\Contracts\MediaLibrary;
 use App\Modules\Orders\Application\Actions\CancelOrder;
+use App\Modules\Orders\Application\Actions\ConfirmOrdersInBulk;
 use App\Modules\Orders\Application\Actions\OrderWorkflow;
 use App\Modules\Orders\Application\Actions\ProcessOrdersInBulk;
 use App\Modules\Orders\Application\Contracts\OrderCampaigns;
+use App\Modules\Orders\Application\Queries\PhoneDeliveryReport;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -60,11 +62,13 @@ class WebOrderController
      * e-mail. Newest first, 25 per page. Rows: `{id, number, placed_at, status, status_label,
      * payment_status, payment_method, contact_name, contact_phone, total, currency,
      * item_count, district, courier_name, tracking_number, shipment_status, delivered_at,
-     * source, campaign: {id, name}|null}` (P2a: filter `source` storefront | landing_page).
+     * source, campaign: {id, name}|null}` (P2a: filter `source` storefront | landing_page; BD1b: staff).
      * `meta.status_counts`: `{all, <every status>: n, cod_unremitted}` for the current
      * filters except `status` (and except `cod_unremitted` for its own count).
+     * BD1b: rows add `risk: {success_rate: int|null, blocked: bool}` (the contact phone's
+     * delivery success rate and whether it is blocked; not in exports).
      */
-    public function index(Request $request, OrganizationDirectory $organizations, TenantContext $tenant, ListExporter $exports): Response
+    public function index(Request $request, OrganizationDirectory $organizations, TenantContext $tenant, ListExporter $exports, PhoneDeliveryReport $phoneReport): Response
     {
         $request->validate([
             'status' => ['sometimes', Rule::enum(OrderStatus::class)],
@@ -125,10 +129,15 @@ class WebOrderController
         $page = $query->paginate(ListQuery::perPage($request));
         // P2a: each row's campaign, resolved once for the page.
         $campaigns = $this->campaigns->campaignsFor(collect($page->items())->mapWithKeys(fn (Order $o) => [$o->id => $o->attribution])->all());
+        // BD1b: each row's phone risk, resolved once for the page (two grouped queries).
+        $risks = $phoneReport->riskFor(collect($page->items())->map(fn (Order $o) => $o->contact_phone)->all());
 
         return ApiResponse::paginated(
             $page,
-            fn (Order $o) => new JsonResource(OrderPresenter::row($o, Decimal::round((string) ($o->getAttribute('lines_sum_quantity') ?? '0'), 3)) + ['campaign' => $campaigns[$o->id] ?? null]),
+            fn (Order $o) => new JsonResource(OrderPresenter::row($o, Decimal::round((string) ($o->getAttribute('lines_sum_quantity') ?? '0'), 3)) + [
+                'campaign' => $campaigns[$o->id] ?? null,
+                'risk' => $risks[$o->contact_phone] ?? ['success_rate' => null, 'blocked' => false],
+            ]),
             ['status_counts' => $statusCounts],
         );
     }
@@ -186,8 +195,9 @@ class WebOrderController
      * The order view the shopper sees plus `id`, `customer` (`{id, name, code}` or null for
      * guests), `ip`, `user_agent`, `notes`, cancellation, status history with actor names,
      * `payments` (`[{method, amount, reference, recorded_at, recorded_by}]`) and
-     * `allowed_actions` (subset of confirm_payment, process, ship, deliver, record_cod_payment,
-     * cancel; empty without `web_orders.manage`). E10b: per line `id` and
+     * `allowed_actions` (subset of confirm_payment, confirm (BD1b), process, ship, deliver,
+     * record_cod_payment, cancel; empty without `web_orders.manage`). BD1b: `phone_report` —
+     * the contact phone's delivery history (as `GET web-orders/phone-report`). E10b: per line `id` and
      * `returnable_quantity`, `refunded_total`, `return_deadline`, `return_window_open`,
      * `returns [{id, number, status, status_label, refund_amount, created_at}]`, refunds in
      * `payments` (direction `out`) and `create_return` in `allowed_actions` (with
@@ -286,6 +296,42 @@ class WebOrderController
     }
 
     /**
+     * Confirm after a call
+     *
+     * BD1b: `{note? (≤ 200)}` — `pending_confirmation` → `confirmed` (a cash-on-delivery order
+     * the store held for a confirmation call). History note: the note or "Confirmed after a
+     * call". `INVALID_STATUS_TRANSITION` for any other status.
+     */
+    public function confirm(Request $request, Order $webOrder, OrderWorkflow $workflow): JsonResponse
+    {
+        $data = $request->validate(['note' => ['sometimes', 'nullable', 'string', 'max:200']]);
+
+        return $this->document($request, $workflow->confirm($webOrder, self::text($data, 'note'), $this->actor($request)));
+    }
+
+    /**
+     * Confirm (bulk)
+     *
+     * BD1b: `{ids: [uuid, …] (1–100)}` (alias `order_ids`): each order awaiting confirmation →
+     * confirmed on its own; never all-or-nothing. Same answer as bulk processing:
+     * `{results: [{id, number, ok, error_code?, message?}], succeeded, failed}`.
+     */
+    public function bulkConfirm(Request $request, ConfirmOrdersInBulk $confirm): JsonResponse
+    {
+        if (! $request->has('ids') && $request->has('order_ids')) {
+            $request->merge(['ids' => $request->input('order_ids')]);
+        }
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['required', 'uuid'],
+        ]);
+        $results = $confirm($data['ids'], $this->actor($request));
+        $succeeded = count(array_filter($results, fn (array $r) => $r['ok']));
+
+        return ApiResponse::success(['results' => $results, 'succeeded' => $succeeded, 'failed' => count($results) - $succeeded]);
+    }
+
+    /**
      * Mark delivered
      *
      * `shipped` → `delivered`; the shipment (if any) gets a `delivered` event. A parcel
@@ -363,7 +409,9 @@ class WebOrderController
 
     private function document(Request $request, Order $webOrder): JsonResponse
     {
-        return ApiResponse::success($this->presenter->staff($webOrder->fresh() ?? $webOrder, $request->user()->can('web_orders.manage'), $request->user()->can('web_orders.refund')));
+        return ApiResponse::success($this->presenter->staff($webOrder->fresh() ?? $webOrder, $request->user()->can('web_orders.manage'), $request->user()->can('web_orders.refund'),
+            // BD1b: `edit` in allowed_actions.
+            $request->user()->can('web_orders.edit')));
     }
 
     /**

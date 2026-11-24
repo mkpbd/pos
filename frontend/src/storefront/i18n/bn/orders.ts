@@ -56,6 +56,7 @@ export const orders: Translations<typeof en> = {
   'orders.page.thankYouName': 'ধন্যবাদ, {name}!',
   'orders.page.confirmation': 'আপনার অর্ডার নম্বর {number}। আমরা {email} ঠিকানায় একটি নিশ্চিতকরণ পাঠিয়েছি।',
   'orders.page.trackInAccount': 'আমার অর্ডার থেকে এই অর্ডারটি ট্র্যাক করুন',
+  'orders.page.willCall': 'অর্ডার নিশ্চিত করতে আমরা আপনাকে কল করব।',
 
   'orders.list.title': 'আমার অর্ডার',
   'orders.list.statusNav': 'অর্ডারের অবস্থা',
@@ -103,6 +104,7 @@ export const orders: Translations<typeof en> = {
   'orders.reorder.skip.other': 'পাওয়া যাচ্ছে না',
 
   'orders.status.pendingPayment': 'পেমেন্টের অপেক্ষায়',
+  'orders.status.pendingConfirmation': 'নিশ্চিতকরণের অপেক্ষায়',
   'orders.status.confirmed': 'নিশ্চিত হয়েছে',
   'orders.status.processing': 'প্রস্তুত হচ্ছে',
   'orders.status.shipped': 'পাঠানো হয়েছে',

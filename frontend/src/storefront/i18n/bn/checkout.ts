@@ -79,6 +79,7 @@ export const checkout: Translations<typeof en> = {
     'মোট টাকা আমাদের ব্যাংক অ্যাকাউন্টে ট্রান্সফার করুন। অর্ডার করার পর অ্যাকাউন্টের তথ্য পাবেন, আর পেমেন্ট আসা পর্যন্ত আমরা আপনার অর্ডারটি রেখে দেব।',
   'checkout.payment.notWith': '{method}-এর সাথে প্রযোজ্য নয়।',
   'checkout.payment.codFee': '{amount} ক্যাশ অন ডেলিভারি চার্জ প্রযোজ্য।',
+  'checkout.payment.codUnavailable': 'এই নম্বরের জন্য ক্যাশ অন ডেলিভারি প্রযোজ্য নয়।',
 
   'checkout.notes.heading': 'অর্ডার নোট',
   'checkout.notes.label': 'ডেলিভারির জন্য নোট (ঐচ্ছিক)',
@@ -122,6 +123,7 @@ export const checkout: Translations<typeof en> = {
   'checkout.problem.insufficientStock': 'দুঃখিত, আপনি চেকআউট করার সময় কিছু পণ্য বিক্রি হয়ে গেছে। অনুগ্রহ করে কার্টটি দেখে নিন।',
   'checkout.problem.shippingUnavailable': 'বেছে নেওয়া ডেলিভারি পদ্ধতিতে এই ঠিকানায় ডেলিভারি দেওয়া সম্ভব নয়। অনুগ্রহ করে অন্য ডেলিভারি পদ্ধতি বা ঠিকানা বেছে নিন।',
   'checkout.problem.paymentUnavailable': 'বেছে নেওয়া পেমেন্ট পদ্ধতিটি এই অর্ডারের জন্য প্রযোজ্য নয়। অনুগ্রহ করে অন্য একটি বেছে নিন।',
+  'checkout.problem.codNotAvailable': 'এই অর্ডারের জন্য ক্যাশ অন ডেলিভারি প্রযোজ্য নয়। অনুগ্রহ করে অন্য একটি পেমেন্ট পদ্ধতি বেছে নিন।',
   'checkout.problem.checkoutUnavailable': 'এই মুহূর্তে অনলাইনে অর্ডার নেওয়া হচ্ছে না। অনুগ্রহ করে পরে আবার চেষ্টা করুন।',
   'checkout.problem.guestDisabled': 'অর্ডার করতে অনুগ্রহ করে সাইন ইন করুন।',
   'checkout.problem.totalChanged': 'আপনার অর্ডারের মোট পরিবর্তিত হয়েছে। অনুগ্রহ করে অর্ডারের সারসংক্ষেপ দেখে আবার নিশ্চিত করুন।',

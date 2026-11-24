@@ -7,7 +7,8 @@ use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 /**
  * Web order lifecycle (ADR-003):
  *
- *   pending_payment → confirmed | cancelled
+ *   pending_payment      → confirmed | cancelled
+ *   pending_confirmation → confirmed | cancelled   (BD1b: a COD order held for a confirmation call)
  *   confirmed       → processing | cancelled
  *   processing      → shipped | cancelled
  *   shipped         → delivered
@@ -17,6 +18,7 @@ use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 enum OrderStatus: string
 {
     case PendingPayment = 'pending_payment';
+    case PendingConfirmation = 'pending_confirmation';
     case Confirmed = 'confirmed';
     case Processing = 'processing';
     case Shipped = 'shipped';
@@ -28,6 +30,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::PendingPayment => 'Awaiting payment',
+            self::PendingConfirmation => 'Awaiting confirmation',
             self::Confirmed => 'Confirmed',
             self::Processing => 'Processing',
             self::Shipped => 'Shipped',
@@ -43,7 +46,7 @@ enum OrderStatus: string
     public function next(): array
     {
         return match ($this) {
-            self::PendingPayment => [self::Confirmed, self::Cancelled],
+            self::PendingPayment, self::PendingConfirmation => [self::Confirmed, self::Cancelled],
             self::Confirmed => [self::Processing, self::Cancelled],
             self::Processing => [self::Shipped, self::Cancelled],
             self::Shipped => [self::Delivered],

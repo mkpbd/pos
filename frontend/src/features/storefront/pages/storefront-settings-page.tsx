@@ -33,6 +33,7 @@ import {
   type StorefrontDomain,
   type StorefrontSettings,
 } from '@/features/storefront/api'
+import { CodReviewCard } from '@/features/storefront/components/cod-review-card'
 import { SharingCard } from '@/features/storefront/components/sharing-card'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { documentPath, useDocumentsQuery } from '@/features/store-builder/api'
@@ -622,6 +623,7 @@ export function StorefrontSettingsPage() {
             <LanguagesCard settings={settings.data} canManage={canManage} />
             <AvailabilityCard settings={settings.data} canManage={canManage} />
             <CheckoutCard settings={settings.data} canManage={canManage} />
+            <CodReviewCard settings={settings.data} canManage={canManage} />
             {/* P2b: keyed by the saved number so the field shows the server's form after saving. */}
             <SharingCard key={settings.data.whatsapp_number ?? ''} settings={settings.data} canManage={canManage} />
           </div>

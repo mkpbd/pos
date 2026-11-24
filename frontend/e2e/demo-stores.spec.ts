@@ -2216,3 +2216,154 @@ test('BD1a: Bazar Fresh turns on SMS (test mode); a guest checks out with only a
     await adminContext.close()
   }
 })
+
+test('BD1b: Bazar Fresh holds cash-on-delivery orders for a call, staff confirm one and block the number, then enter and change an order taken by phone', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // Shoppers: a product in stock, put in a fresh cart.
+  const stocked = async (page: Page) => {
+    const list = (await getJson<{ data: { slug: string }[] }>(page, '/api/v1/store/products?in_stock=1&per_page=12')).body.data
+    for (const item of list) {
+      const product = (await getJson<{ data: { variants: { id: string; sku: string; in_stock: boolean }[] } }>(page, `/api/v1/store/products/${item.slug}`)).body.data
+      const variant = product.variants.find((v) => v.in_stock)
+      if (variant) return variant
+    }
+    throw new Error('No product in stock')
+  }
+  const fillCheckout = async (page: Page, phone: string) => {
+    const checkout = page.getByRole('form', { name: 'Checkout' })
+    await checkout.getByLabel('Full name').fill('Rokeya Khatun')
+    await checkout.getByLabel('Mobile number', { exact: true }).fill(phone)
+    await checkout.getByLabel('Recipient name').fill('Rokeya Khatun')
+    await checkout.getByLabel('Recipient mobile number').fill(phone)
+    await checkout.getByLabel('Division').selectOption({ label: 'Dhaka (ঢাকা)' })
+    await checkout.getByLabel('District').selectOption({ label: 'Dhaka (ঢাকা)' })
+    await checkout.getByLabel('Area / thana').fill('Uttara')
+    await checkout.getByLabel('Street address').fill('Sector 7, Road 12')
+    await checkout.getByRole('radio', { name: /Home delivery/ }).check()
+    return checkout
+  }
+  const shopperWithCart = async () => {
+    const context = await browser.newContext({ viewport: { width: 1400, height: 1000 } })
+    const page = await context.newPage()
+    await page.goto(`${base}/`)
+    const variant = await stocked(page)
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    const added = await page.evaluate(async ({ id, token }) => {
+      const res = await fetch('/api/v1/store/cart/items', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: JSON.stringify({ variant_id: id, quantity: 1 }) })
+      return res.status
+    }, { id: variant.id, token })
+    expect(added).toBeLessThan(300)
+    return { context, page, variant }
+  }
+
+  const phone = `018${String(Date.now()).slice(-8)}`
+  const staffPhone = `017${String(Date.now() + 7).slice(-8)}`
+  try {
+    // The owner holds every cash-on-delivery order until someone calls the customer.
+    const settings = await call('PATCH', '/api/v1/storefront/settings', { cod_review: 'all' })
+    expect(settings.status).toBe(200)
+    expect(settings.body.data).toMatchObject({ cod_review: 'all' })
+
+    // A guest orders with cash on delivery: the order waits for the call.
+    const first = await shopperWithCart()
+    await first.page.goto(`${base}/checkout`)
+    const checkout = await fillCheckout(first.page, phone)
+    await checkout.getByRole('radio', { name: /Cash on delivery/ }).check()
+    await checkout.getByRole('button', { name: 'Place order' }).click()
+    await expect(first.page.getByRole('heading', { level: 1, name: 'Thank you, Rokeya!' })).toBeVisible({ timeout: 20_000 })
+    await expect(first.page.getByTestId('awaiting-confirmation')).toHaveText('We will call you to confirm your order.')
+    const number = (await first.page.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
+    await first.context.close()
+
+    // Staff see it awaiting confirmation with the number's delivery history, confirm it after the call, and block the number.
+    const found = (await call('GET', `/api/v1/web-orders?search=${number}`)).body.data as { id: string; status: string; risk: { success_rate: number | null; blocked: boolean } }[]
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({ status: 'pending_confirmation', risk: { success_rate: null, blocked: false } })
+    await admin.goto(`${base}/admin/web-orders/${found[0].id}`)
+    await expect(admin.getByRole('heading', { name: number })).toBeVisible()
+    const history = admin.getByTestId('delivery-history')
+    await expect(history).toBeVisible()
+    await admin.getByRole('group', { name: 'Order actions' }).getByRole('button', { name: 'Confirm order' }).click()
+    const confirm = admin.getByRole('dialog', { name: `Confirm ${number}?` })
+    await confirm.getByLabel('Note (optional)').fill('Called Rokeya, she confirmed')
+    await confirm.getByRole('button', { name: 'Confirm order' }).click()
+    await expect(admin.getByRole('group', { name: 'Order actions' }).getByRole('button', { name: 'Start processing' })).toBeVisible()
+    await history.getByRole('button', { name: 'Block number' }).click()
+    const block = admin.getByRole('dialog', { name: `Block ${phone}?` })
+    await block.getByLabel('Reason (optional)').fill('Refused two parcels')
+    await block.getByRole('button', { name: 'Block number' }).click()
+    await expect(history.getByTestId('block-reason')).toContainText('Refused two parcels')
+    expect((await call('GET', `/api/v1/web-orders/${found[0].id}`)).body.data).toMatchObject({ status: 'confirmed', phone_report: { phone, blocked: true, orders: 1 } })
+
+    // The blocked number cannot choose cash on delivery any more.
+    const second = await shopperWithCart()
+    await second.page.goto(`${base}/checkout`)
+    await fillCheckout(second.page, phone)
+    await expect(second.page.getByTestId('cod-unavailable')).toHaveText('Cash on delivery is not available for this number.')
+    await expect(second.page.getByRole('radio', { name: /Cash on delivery/ })).toBeDisabled()
+    await second.context.close()
+
+    // An order taken by phone: staff enter it — never held, even with the check on.
+    const product = await stocked(admin)
+    await admin.goto(`${base}/admin/web-orders`)
+    await admin.getByRole('link', { name: 'New order' }).click()
+    await expect(admin.getByRole('heading', { name: 'New order' })).toBeVisible()
+    await admin.getByLabel('Name', { exact: true }).fill('Jamal Hossain')
+    await admin.getByLabel('Mobile number').fill(staffPhone)
+    await expect(admin.getByTestId('phone-history')).toContainText('New number')
+    await admin.getByRole('combobox', { name: 'Add a product' }).click()
+    await admin.getByPlaceholder('Name, SKU or barcode').fill(product.sku)
+    await admin.getByRole('option', { name: new RegExp(product.sku) }).first().click()
+    await admin.getByRole('combobox', { name: 'Division' }).click()
+    await admin.getByRole('option', { name: /^Dhaka/ }).first().click()
+    await admin.getByRole('combobox', { name: 'District' }).click()
+    await admin.getByRole('option', { name: /^Dhaka/ }).first().click()
+    await admin.getByLabel('Address', { exact: true }).fill('House 4, Road 2, Banani')
+    await admin.getByRole('radio', { name: /Home delivery/ }).check()
+    await admin.getByRole('radio', { name: 'Cash on delivery' }).check()
+    await expect(admin.getByTestId('quote-total')).toHaveText(/^BDT [\d,]+\.\d{2}$/)
+    const placedTotal = (await admin.getByTestId('quote-total').innerText()).trim()
+    await admin.getByRole('button', { name: 'Place order' }).click()
+    const staffHeading = admin.getByRole('heading', { name: /^WEB-\d{6}$/ })
+    await expect(staffHeading).toBeVisible({ timeout: 20_000 })
+    const staffNumber = (await staffHeading.innerText()).trim()
+    await expect(admin.getByTestId('order-origin')).toContainText('Staff · Phone')
+    await expect(admin.getByRole('group', { name: 'Order actions' }).getByRole('button', { name: 'Start processing' })).toBeVisible()
+
+    // The customer calls back for one more: staff change the order before it ships.
+    await admin.getByRole('link', { name: 'Edit order' }).click()
+    await expect(admin.getByRole('heading', { name: `Change order ${staffNumber}` })).toBeVisible()
+    await admin.getByLabel(/^Quantity of /).first().fill('2')
+    await admin.getByLabel('Reason for the change (optional)').fill('Customer asked for one more')
+    await expect(admin.getByTestId('quote-total')).not.toHaveText(placedTotal)
+    await admin.getByRole('button', { name: 'Save changes' }).click()
+    await expect(admin.getByRole('heading', { name: staffNumber })).toBeVisible({ timeout: 20_000 })
+    await expect(admin.getByTestId('order-edit-2')).toContainText(`Total ${placedTotal} →`)
+    await expect(admin.getByTestId('order-edit-2')).toContainText('Customer asked for one more')
+    const staffOrder = (await call('GET', `/api/v1/web-orders?search=${staffNumber}`)).body.data[0] as { id: string }
+    const detail = (await call('GET', `/api/v1/web-orders/${staffOrder.id}`)).body.data
+    expect(detail).toMatchObject({ source: 'staff', channel: 'phone', status: 'confirmed', revision: 2 })
+    expect(Number(detail.lines[0].quantity)).toBe(2)
+  } finally {
+    await call('PATCH', '/api/v1/storefront/settings', { cod_review: 'off' })
+    const blocks = ((await call('GET', `/api/v1/web-orders/blocked-phones?search=${phone}`)).body?.data ?? []) as { id: string }[]
+    for (const b of blocks) await call('DELETE', `/api/v1/web-orders/blocked-phones/${b.id}`)
+    await adminContext.close()
+  }
+})

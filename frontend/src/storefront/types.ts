@@ -789,6 +789,8 @@ export type CheckoutPreview = {
   shipping_method_id: string | null
   payment_method: PaymentMethodCode | null
   issues: CartIssue[]
+  /** BD1b: false when the given mobile number may not order with cash on delivery (it is then unusable here). Absent = available. */
+  cod_available?: boolean
 }
 
 export type CheckoutAddressInput = {
@@ -818,13 +820,16 @@ export type PlaceOrderInput = {
 
 /** The pricing part of the place body; the preview tolerates partial input. */
 export type CheckoutPreviewInput = {
+  /** BD1b: the contact number (once it is a valid mobile), for `cod_available`. */
+  contact?: { phone: string }
   shipping_address_id?: string
   address?: Partial<CheckoutAddressInput>
   shipping_method_id?: string
   payment_method?: PaymentMethodCode
 }
 
-export type OrderStatus = 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed' | (string & {})
+/** BD1b: `pending_confirmation` = a cash-on-delivery order the shop will call about before sending it. */
+export type OrderStatus = 'pending_confirmation' | 'pending_payment' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed' | (string & {})
 
 /** GET /store/orders/{number}?token= — and the `order` of the placement response. */
 export type OrderView = {

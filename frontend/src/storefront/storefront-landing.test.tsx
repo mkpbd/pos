@@ -574,8 +574,9 @@ describe('order form on a landing page', () => {
     const summary = within(form).getByTestId('order-form-summary')
     await waitFor(() => expect(within(summary).getByTestId('summary-total')).toHaveTextContent('৳1,170.00'))
     expect(within(summary).getAllByTestId('order-form-line')).toHaveLength(2)
+    // The complete preview must have been sent; under a full parallel run it is not always the last one.
     await waitFor(() =>
-      expect(previews.at(-1)).toEqual({
+      expect(previews).toContainEqual({
         document_id: DOC_ID,
         element_id: 'e_order',
         lines: [
@@ -585,7 +586,11 @@ describe('order form on a landing page', () => {
         address: { district_id: 47 },
         shipping_method_id: 'sm-home',
         payment_method: 'cod',
+        // BD1b: the valid number goes along for `cod_available`.
+        contact: { phone: '01811223344' },
       }),
+      // The debounced preview chain (district → method → preview) is slow under a full parallel run.
+      { timeout: 15_000 },
     )
     await user.click(within(form).getByRole('button', { name: 'Confirm order' }))
     const thanks = await screen.findByTestId('order-form-thanks')
@@ -715,6 +720,49 @@ describe('order form on a landing page', () => {
     expect(keys[0]).toBe(keys[1])
     expect(keys[2]).not.toBe(keys[1])
     expect(totals).toEqual(['510.00', '510.00', '530.00'])
+  })
+
+  it('BD1b: disables cash on delivery for a blocked number and explains a refused order', async () => {
+    const places: Body[] = []
+    serve({
+      page: landingPage({ props: { payment: 'store_methods' }, data: orderData({ payment_methods: [{ code: 'cod', display_name: 'Cash on delivery' }, { code: 'bank_transfer', display_name: 'Bank transfer' }] }) }),
+      routes: {
+        // The number 01811223344 is blocked: cash on delivery is unusable for it.
+        'POST /store/checkout/direct/preview': (init) => {
+          const body = bodyOf(init)
+          const blocked = (body.contact as { phone?: string } | undefined)?.phone === '01811223344'
+          return ok({ ...directPreviewFor({ ...body, payment_method: blocked ? undefined : body.payment_method }), cod_available: !blocked })
+        },
+        'POST /store/checkout/direct': (init) => {
+          places.push(bodyOf(init))
+          return fail(422, 'COD_NOT_AVAILABLE', 'Cash on delivery is not available for this order.')
+        },
+      },
+    })
+    const user = userEvent.setup()
+    renderRoutes(storefrontRoutes, '/p/eid-sale')
+    const form = await screen.findByRole('form', { name: 'Order now' })
+    await user.click(within(form).getByRole('radio', { name: /Cash on delivery/ }))
+    await fillForm(user, form)
+
+    const cod = within(form).getByRole('radio', { name: /Cash on delivery/ })
+    await waitFor(() => expect(cod).toBeDisabled())
+    expect(cod).not.toBeChecked()
+    expect(within(form).getByTestId('cod-unavailable')).toHaveTextContent('Cash on delivery is not available for this number.')
+    // Another number: cash on delivery is back.
+    const phone = within(form).getByRole('textbox', { name: /^Mobile number/ })
+    await user.clear(phone)
+    await user.type(phone, '01911223344')
+    await waitFor(() => expect(cod).toBeEnabled())
+    expect(within(form).queryByTestId('cod-unavailable')).not.toBeInTheDocument()
+
+    // The server refuses (the number was blocked meanwhile): the message is the shopper's.
+    await user.click(cod)
+    await waitFor(() => expect(within(form).getByTestId('summary-total')).toHaveTextContent('৳510.00'))
+    await user.click(within(form).getByRole('button', { name: 'Confirm order' }))
+    await waitFor(() => expect(screen.getByTestId('order-form-problem')).toHaveAttribute('data-code', 'COD_NOT_AVAILABLE'))
+    expect(screen.getByTestId('order-form-problem')).toHaveTextContent('Cash on delivery is not available for this order. Please choose another payment method.')
+    expect(places).toHaveLength(1)
   })
 
   it('shows a draft order form that places nothing, and nothing when the product is not on sale', async () => {

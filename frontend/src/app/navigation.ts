@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, MessageSquareTextIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, MessageSquareTextIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, PhoneOffIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -24,6 +24,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/sales', label: 'Sales', icon: ReceiptTextIcon, permission: 'sales.view' },
   { to: '/web-orders', label: 'Web orders', icon: ShoppingBagIcon, permission: 'web_orders.view' },
   { to: '/web-returns', label: 'Web returns', icon: PackageXIcon, permission: 'web_orders.view' },
+  // BD1b: numbers that may not order with cash on delivery.
+  { to: '/web-orders/blocked-numbers', label: 'Blocked numbers', icon: PhoneOffIcon, permission: 'web_orders.view' },
   { to: '/cod-remittances', label: 'COD remittances', icon: BanknoteIcon, permission: 'web_orders.remit' },
   { to: '/promotions', label: 'Promotions', icon: BadgePercentIcon, permission: 'promotions.view' },
   // P2a campaigns / short links (marketing.view), P2b social posts / product feeds (social.view).
