@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
 import { makeCurrentUser } from '@/test/fixtures'
-import { mockApi, ok, renderRoutes } from '@/test/utils'
+import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
 
 const settings = (guest?: boolean) => ({
   is_enabled: true, site_name: 'Berry Kids', meta_description: null, fulfilment_store_id: null, updated_at: null,
@@ -119,5 +119,94 @@ describe('search engine indexing setting', () => {
     const toggle = await screen.findByRole('switch', { name: 'Allow search engines to index the store' })
     expect(toggle).not.toBeChecked()
     expect(toggle).toBeDisabled()
+  })
+})
+
+describe('checkout contact settings (BD1a)', () => {
+  const branches = ok([], { pagination: { current_page: 1, per_page: 100, total: 0, last_page: 1 } })
+
+  it('saves the e-mail mode and the phone check when SMS can send codes', async () => {
+    const user = userEvent.setup()
+    const patches: unknown[] = []
+    let current: Record<string, unknown> = { ...settings(true), checkout_email: 'optional', checkout_phone_verification: 'off', sms_ready: true, otp_ready: true }
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage', 'sms.view'] })),
+      'GET /storefront/settings': () => ok(current),
+      'GET /storefront/domains': ok([]),
+      'GET /branches': branches,
+      'PATCH /storefront/settings': (init) => {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>
+        patches.push(body)
+        current = { ...current, ...body }
+        return ok(current)
+      },
+    })
+    renderRoutes(routes, '/storefront')
+
+    const email = await screen.findByRole('combobox', { name: 'Customer e-mail at checkout' })
+    expect(email).toHaveTextContent('Optional')
+    await user.click(email)
+    await user.click(await screen.findByRole('option', { name: 'Hidden' }))
+    await waitFor(() => expect(patches).toEqual([{ checkout_email: 'hidden' }]))
+    await waitFor(() => expect(email).toHaveTextContent('Hidden'))
+    expect(email).toHaveAccessibleDescription(/No e-mail field/)
+
+    const verify = screen.getByRole('combobox', { name: 'Check the phone with an SMS code' })
+    expect(verify).toHaveTextContent('Off')
+    await user.click(verify)
+    await user.click(await screen.findByRole('option', { name: 'Cash on delivery orders' }))
+    await waitFor(() => expect(patches[1]).toEqual({ checkout_phone_verification: 'cod' }))
+    await waitFor(() => expect(verify).toHaveAccessibleDescription(/Cash on delivery customers type a code/))
+  })
+
+  it('keeps the phone check off with a link to the SMS page while SMS cannot send codes', async () => {
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage', 'sms.view'] })),
+      'GET /storefront/settings': ok({ ...settings(true), sms_ready: false, otp_ready: false }),
+      'GET /storefront/domains': ok([]),
+      'GET /branches': branches,
+    })
+    renderRoutes(routes, '/storefront')
+
+    const verify = await screen.findByRole('combobox', { name: 'Check the phone with an SMS code' })
+    expect(verify).toBeDisabled()
+    expect(verify).toHaveAccessibleDescription(/Needs SMS that can send codes/)
+    expect(screen.getByRole('link', { name: 'Set up SMS' })).toHaveAttribute('href', '/settings/sms')
+    // Defaults when the server has not sent the new keys: e-mail optional.
+    expect(screen.getByRole('combobox', { name: 'Customer e-mail at checkout' })).toHaveTextContent('Optional')
+  })
+
+  it('shows SMS_NOT_READY when switching a saved check to another mode fails', async () => {
+    const user = userEvent.setup()
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage'] })),
+      'GET /storefront/settings': ok({ ...settings(true), checkout_phone_verification: 'cod', sms_ready: true, otp_ready: true }),
+      'GET /storefront/domains': ok([]),
+      'GET /branches': branches,
+      'PATCH /storefront/settings': fail(422, 'SMS_NOT_READY', 'SMS is not ready.'),
+    })
+    renderRoutes(routes, '/storefront')
+
+    const verify = await screen.findByRole('combobox', { name: 'Check the phone with an SMS code' })
+    expect(verify).toHaveTextContent('Cash on delivery orders')
+    await user.click(verify)
+    await user.click(await screen.findByRole('option', { name: 'All orders' }))
+    expect(await screen.findByText(/SMS cannot send codes yet, so phone checking stays off./)).toBeInTheDocument()
+    // Without sms.view there is no link, only a hint.
+    expect(screen.getByRole('alert')).toHaveTextContent('Ask an administrator to set up SMS.')
+  })
+
+  it('is read-only without storefront.manage', async () => {
+    mockApi({
+      'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view'] })),
+      'GET /storefront/settings': ok({ ...settings(true), checkout_email: 'required', otp_ready: true }),
+      'GET /storefront/domains': ok([]),
+      'GET /branches': branches,
+    })
+    renderRoutes(routes, '/storefront')
+    const email = await screen.findByRole('combobox', { name: 'Customer e-mail at checkout' })
+    expect(email).toHaveTextContent('Required')
+    expect(email).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Check the phone with an SMS code' })).toBeDisabled()
   })
 })

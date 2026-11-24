@@ -302,7 +302,7 @@ class PlaceOrder
                 ]);
             }
             if ($quote['redemptions'] !== []) {
-                $this->redemptions->record($orderId, $number, $customer['customer_id'] ?? null, $customer['account_id'] ?? null, $data['contact']['email'] ?? null, $quote['redemptions']);
+                $this->redemptions->record($orderId, $number, $customer['customer_id'] ?? null, $customer['account_id'] ?? null, $data['contact']['email'] ?? null, $quote['redemptions'], $data['contact']['phone'] ?? null);
             }
 
             OrderAddress::query()->create($address + [

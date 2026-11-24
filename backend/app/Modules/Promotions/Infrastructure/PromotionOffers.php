@@ -14,6 +14,7 @@ use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
 use App\Modules\Promotions\Infrastructure\Models\PromotionTarget;
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Domain\Translations;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -76,11 +77,12 @@ class PromotionOffers
 
     /**
      * The live automatic promotions the shopper may still use: total and per-customer
-     * limits not reached (per customer: by customer id, else by e-mail when known).
+     * limits not reached (per customer: by customer id, e-mail or BD1a mobile number — any
+     * of them that is known).
      *
      * @return list<Promotion>
      */
-    public function usableAutomatic(?string $customerId, ?string $email): array
+    public function usableAutomatic(?string $customerId, ?string $email, ?string $phone = null): array
     {
         $promotions = $this->liveAutomatic();
         $limited = array_values(array_filter($promotions, fn (Promotion $p) => $p->usage_limit !== null || $p->usage_limit_per_customer !== null));
@@ -90,9 +92,9 @@ class PromotionOffers
 
         $ids = array_map(fn (Promotion $p) => $p->id, $limited);
         $totals = $this->usage($ids);
-        $own = $this->customerUsage($ids, $customerId, $email);
+        $own = $this->customerUsage($ids, $customerId, $email, $phone);
 
-        return array_values(array_filter($promotions, fn (Promotion $p) => ! $this->limitReached($p, $totals[$p->id] ?? 0, $own[$p->id] ?? 0, $customerId !== null || $email !== null)));
+        return array_values(array_filter($promotions, fn (Promotion $p) => ! $this->limitReached($p, $totals[$p->id] ?? 0, $own[$p->id] ?? 0, $customerId !== null || $email !== null || $phone !== null)));
     }
 
     /**
@@ -101,7 +103,7 @@ class PromotionOffers
      *
      * @return array{0: ?Coupon, 1: ?CouponReason}
      */
-    public function coupon(string $code, ?string $customerId, ?string $email): array
+    public function coupon(string $code, ?string $customerId, ?string $email, ?string $phone = null): array
     {
         $code = CouponCode::normalize($code);
         if (! CouponCode::isValid($code)) {
@@ -122,8 +124,8 @@ class PromotionOffers
         if ($promotion->usage_limit !== null && ($this->usage([$promotion->id])[$promotion->id] ?? 0) >= $promotion->usage_limit) {
             return [$coupon, CouponReason::UsageLimitReached];
         }
-        if ($promotion->usage_limit_per_customer !== null && ($customerId !== null || $email !== null)
-            && ($this->customerUsage([$promotion->id], $customerId, $email)[$promotion->id] ?? 0) >= $promotion->usage_limit_per_customer) {
+        if ($promotion->usage_limit_per_customer !== null && ($customerId !== null || $email !== null || $phone !== null)
+            && ($this->customerUsage([$promotion->id], $customerId, $email, $phone)[$promotion->id] ?? 0) >= $promotion->usage_limit_per_customer) {
             return [$coupon, CouponReason::CustomerLimitReached];
         }
 
@@ -172,21 +174,31 @@ class PromotionOffers
     }
 
     /**
-     * Redemptions per promotion by this shopper: the customer's, else the e-mail's.
+     * Redemptions per promotion by this shopper: the customer's, else the e-mail's; BD1a: plus
+     * those made with the same mobile number (a redemption matching several counts once).
      *
      * @param  list<string>  $promotionIds
      * @return array<string, int>
      */
-    public function customerUsage(array $promotionIds, ?string $customerId, ?string $email): array
+    public function customerUsage(array $promotionIds, ?string $customerId, ?string $email, ?string $phone = null): array
     {
-        if ($promotionIds === [] || ($customerId === null && $email === null)) {
+        $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
+        $phone = $phone === null ? null : BangladeshMobile::normalize($phone);
+        if ($promotionIds === [] || ($customerId === null && $email === null && $phone === null)) {
             return [];
         }
 
         return PromotionRedemption::query()->whereIn('promotion_id', $promotionIds)->whereNull('released_at')
-            ->when($customerId !== null,
-                fn (Builder $q) => $q->where('customer_id', $customerId),
-                fn (Builder $q) => $q->where('email', mb_strtolower(trim((string) $email))))
+            ->where(function (Builder $q) use ($customerId, $email, $phone) {
+                if ($customerId !== null) {
+                    $q->orWhere('customer_id', $customerId);
+                } elseif ($email !== null) {
+                    $q->orWhere('email', $email);
+                }
+                if ($phone !== null) {
+                    $q->orWhere('phone', $phone);
+                }
+            })
             ->groupBy('promotion_id')->select('promotion_id', DB::raw('count(*) as uses'))
             ->pluck('uses', 'promotion_id')->map(fn ($n) => (int) $n)->all();
     }

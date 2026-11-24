@@ -115,6 +115,8 @@ return [
         'system_backups' => env('POS_RETAIN_BACKUP_RECORDS_DAYS', 90),
         // ST1: uploaded import files, counted from the import's end (completed, failed, cancelled).
         'import_files' => env('POS_RETAIN_IMPORT_FILES_DAYS', 30),
+        // BD1a: the SMS message log (one-time codes are always deleted after a day).
+        'sms_messages' => env('POS_RETAIN_SMS_DAYS', 180),
     ],
 
     /*

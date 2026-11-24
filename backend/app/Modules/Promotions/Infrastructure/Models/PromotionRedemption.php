@@ -22,14 +22,15 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $order_number
  * @property ?string $customer_id
  * @property ?string $customer_account_id
- * @property string $email
+ * @property ?string $email
+ * @property ?string $phone BD1a: the contact mobile number (01XXXXXXXXX), for guests' per-customer limits
  * @property string $kind
  * @property string $amount
  * @property CarbonImmutable $created_at
  * @property ?CarbonImmutable $released_at Q1: the order was cancelled; the use no longer counts
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'promotion_id', 'coupon_id', 'order_id', 'order_number', 'customer_id', 'customer_account_id', 'email', 'kind', 'amount', 'created_at'])]
+#[Fillable(['organization_id', 'promotion_id', 'coupon_id', 'order_id', 'order_number', 'customer_id', 'customer_account_id', 'email', 'phone', 'kind', 'amount', 'created_at'])]
 class PromotionRedemption extends Model
 {
     use AppendOnly, BelongsToOrganization, ChangesStorefrontContent, HasUuids;

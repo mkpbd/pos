@@ -32,13 +32,22 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?array<string, array<string, string>> $assistant_translations {bn: {greeting}} (AI2b)
  * @property int $assistant_daily_limit new assistant conversations per store-local day (AI2b)
  * @property ?string $assistant_handoff whatsapp | contact | none (null = WhatsApp when a number is set, else contact; AI2b)
+ * @property string $checkout_email the customer e-mail at checkout: required | optional | hidden (BD1a)
+ * @property string $checkout_phone_verification SMS code check of the mobile number: off | cod | all (BD1a)
  */
 #[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing', 'bangla_enabled', 'default_locale', 'bangla_digits',
     'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button',
-    'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff'])]
+    'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff',
+    'checkout_email', 'checkout_phone_verification'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
+
+    /** BD1a: the customer e-mail field at checkout. */
+    public const CHECKOUT_EMAIL_MODES = ['required', 'optional', 'hidden'];
+
+    /** BD1a: which orders need the mobile number checked with an SMS code. */
+    public const PHONE_VERIFICATION_MODES = ['off', 'cod', 'all'];
 
     protected $table = 'storefront_settings';
 
@@ -55,6 +64,8 @@ class StorefrontSettings extends Model
         'whatsapp_chat_button' => true,
         'assistant_enabled' => false,
         'assistant_daily_limit' => 200,
+        'checkout_email' => 'optional',
+        'checkout_phone_verification' => 'off',
     ];
 
     protected function casts(): array

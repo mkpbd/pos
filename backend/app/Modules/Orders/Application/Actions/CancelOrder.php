@@ -7,6 +7,7 @@ use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Orders\Application\Events\OrderCancelledWithRefund;
+use App\Modules\Orders\Application\Events\OrderStatusChanged;
 use App\Modules\Orders\Application\Services\RefundPayout;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -40,6 +41,8 @@ use Illuminate\Support\Facades\DB;
  * the order's promotion redemptions in the same transaction — usage limits and once-per-customer
  * coupons are given back (idempotent: released ones are skipped) — and the audit record of the
  * cancel lists them (`released_promotions`).
+ *
+ * BD1a: every cancel dispatches OrderStatusChanged (→ cancelled) after commit.
  */
 class CancelOrder
 {
@@ -209,6 +212,8 @@ class CancelOrder
             'actor_type' => $actorType,
             'created_at' => $now,
         ]);
+        // BD1a: after the cancelling transaction commits (order SMS and other listeners).
+        event(new OrderStatusChanged($locked->organization_id, $locked->id, $from->value, OrderStatus::Cancelled->value, $actorType));
 
         return $released === [] ? [] : ['released_promotions' => $released];
     }

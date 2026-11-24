@@ -5,7 +5,10 @@ import { CircleAlertIcon, CircleCheckIcon, Loader2Icon, PackageCheckIcon, TruckI
 import { ApiError } from '@/lib/api/client'
 import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
+import { PhoneCodeCheck, VerifiedMark } from '../../account/phone-code'
 import { loginPathFor } from '../../account/safe-next'
+import { BD_MOBILE } from '../../account/schemas'
+import { BootstrapContext } from '../../api'
 import { currentPrice } from '../../cart/add-several'
 import { displayQuantity } from '../../cart/quantity'
 import { QuantityStepper } from '../../cart/quantity-stepper'
@@ -13,8 +16,10 @@ import { Price } from '../../catalog/price'
 import { ProductImage } from '../../catalog/product-image'
 import { chooseValue, initialSelection, variantFor, type Selection } from '../../catalog/variant-selection'
 import { VariantSelector } from '../../catalog/variant-selector'
+import { checkoutPhoneCode } from '../../checkout/api'
 import { etaLabel } from '../../checkout/delivery'
 import { PlacementAttempts } from '../../checkout/placement-attempt'
+import { isAccountVerifiedPhone, needsPhoneCode } from '../../checkout/schema'
 import { SummaryTotals } from '../../checkout/summary-totals'
 import { useDebouncedValue } from '../../checkout/use-debounced-value'
 import { storeApi } from '../../http'
@@ -27,6 +32,7 @@ import {
   EMPTY_VALUES,
   freshPreview,
   maxQuantity,
+  normalizePhone,
   ORDER_FORM_FIELDS,
   orderFormErrors,
   orderFormFieldFor,
@@ -186,15 +192,22 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   }
   const servedDistricts = isObject(data.shipping) && isObject(data.shipping.districts) ? (data.shipping.districts as Record<string, string[]>) : null
 
+  // BD1a: the store may want the mobile number confirmed with an SMS code (all orders, or cash on delivery ones).
+  const verifyMode = useContext(BootstrapContext)?.checkout?.phone_verification ?? 'off'
   // The live summary.
   const unavailable = data.checkout_available === false || paymentMethods.length === 0
-  // Only a store that requires an account asks who is signed in (never from the editor canvas).
+  // Only a store that requires an account (or checks the number: a verified account number needs no code) asks who is signed in (never from the editor canvas).
   const me = useQuery({
     queryKey: localized(customerKeys.me, locale),
     queryFn: ({ signal }) => storeApi.get<Customer | null>('/store/account/me', { signal }).then((r) => r.data ?? null),
     staleTime: 5 * 60_000,
-    enabled: !canvas && data.guest_checkout === false,
+    enabled: !canvas && (data.guest_checkout === false || verifyMode !== 'off'),
   })
+  const [verifiedPhones, setVerifiedPhones] = useState<string[]>([])
+  const phoneNumber = normalizePhone(values.phone)
+  const phoneValid = BD_MOBILE.test(phoneNumber)
+  const codeNeeded = !inactive && needsPhoneCode(verifyMode, values.payment_method) && !isAccountVerifiedPhone(me.data ?? null, phoneNumber)
+  const phoneConfirmed = phoneValid && verifiedPhones.includes(phoneNumber)
   const needsSignIn = data.guest_checkout === false && !me.data
   const lines = orderLines(variant?.in_stock ? variant : null, qty, withUpsell ? upsell : null)
   const base = { documentId: String(documentId ?? ''), elementId: element.id, lines }
@@ -249,6 +262,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     const builder = builderAttributionAt(page.document?.id, event.currentTarget instanceof Element ? event.currentTarget : null, device)
     if (inactive || busy || unavailable) return
     const local = orderFormErrors(values, rules, variant)
+    if (codeNeeded && !phoneConfirmed && !local.phone) local.phone = 'checkout.verify.required'
     if (Object.keys(local).length > 0) return fail(local, null)
     if (needsSignIn) return fail({}, { code: 'SIGN_IN', message: t('landing.orderForm.problem.signIn'), link: { to: loginPathFor(pathname), label: t('checkout.problem.signIn') } })
     // The total of exactly what is ordered (the summary may still be catching up with the last change).
@@ -283,6 +297,11 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
             queryClient.setQueryData<CheckoutPreview>(localized(directKeys.preview(previewInput), locale), fresh)
           } else if (error instanceof ApiError && ['TOTAL_CHANGED', 'ITEMS_UNAVAILABLE', 'INSUFFICIENT_STOCK', 'SHIPPING_UNAVAILABLE', 'PAYMENT_METHOD_UNAVAILABLE'].includes(error.code)) {
             void queryClient.invalidateQueries({ queryKey: directKeys.previewAll })
+          }
+          if (error instanceof ApiError && error.code === 'PHONE_NOT_VERIFIED') {
+            // The session no longer holds the confirmation: the code step comes back.
+            const phone = typeof error.details.phone === 'string' ? error.details.phone : phoneNumber
+            setVerifiedPhones((list) => list.filter((p) => p !== phone && p !== phoneNumber))
           }
           const next: Errors = {}
           if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
@@ -496,6 +515,25 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
               <div className="grid gap-4 @lg:grid-cols-2">
                 {textField('name', t('landing.orderForm.name'), { autoComplete: 'name', maxLength: 120, required: true })}
                 {textField('phone', t('landing.orderForm.phone'), { type: 'tel', autoComplete: 'tel', inputMode: 'tel', placeholder: t('checkout.phonePlaceholder'), maxLength: 20, hint: t('landing.orderForm.phoneHint'), required: true })}
+                {codeNeeded && (
+                  <div className="@lg:col-span-2" data-testid="order-form-phone-check">
+                    {phoneConfirmed ? (
+                      <VerifiedMark label={t('checkout.verify.verified')} />
+                    ) : (
+                      <PhoneCodeCheck
+                        key={phoneValid ? phoneNumber : ''}
+                        phone={phoneValid ? phoneNumber : null}
+                        send={checkoutPhoneCode.send}
+                        verify={checkoutPhoneCode.verify}
+                        onVerified={(phone) => {
+                          setVerifiedPhones((list) => (list.includes(phone) ? list : [...list, phone]))
+                          setErrors(({ phone: _cleared, ...rest }) => rest)
+                        }}
+                        intro={t('checkout.verify.intro')}
+                      />
+                    )}
+                  </div>
+                )}
                 {rules.email !== 'hidden' && (
                   <div className="@lg:col-span-2">
                     {textField('email', rules.email === 'required' ? t('landing.orderForm.email') : t('landing.orderForm.emailOptional'), { type: 'email', autoComplete: 'email', inputMode: 'email', maxLength: 255, required: rules.email === 'required' })}

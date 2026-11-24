@@ -32,12 +32,17 @@ export const checkout: Translations<typeof en> = {
   'checkout.page.placeOrder': 'অর্ডার নিশ্চিত করুন',
   'checkout.page.blockedFix': 'অর্ডার করার আগে আপনার কার্ট ঠিক করুন।',
   'checkout.page.updatingTotal': 'মোট হিসাব হালনাগাদ হচ্ছে…',
+  'checkout.page.verifyPhoneFirst': 'অর্ডার করতে এসএমএস কোড দিয়ে আপনার মোবাইল নম্বর নিশ্চিত করুন।',
 
   'checkout.contact.heading': 'যোগাযোগ',
   'checkout.contact.fullName': 'পূর্ণ নাম',
   'checkout.contact.email': 'ই-মেইল',
   'checkout.contact.emailHint': 'অর্ডারের নিশ্চিতকরণ এই ঠিকানায় পাঠানো হবে।',
   'checkout.contact.mobile': 'মোবাইল নম্বর',
+  'checkout.contact.emailOptional': 'ই-মেইল (ঐচ্ছিক)',
+  'checkout.verify.intro': 'আমরা এসএমএসে ৬ অঙ্কের একটি কোড পাঠিয়ে আপনার মোবাইল নম্বর নিশ্চিত করি।',
+  'checkout.verify.verified': 'মোবাইল নম্বর যাচাই করা হয়েছে ✓',
+  'checkout.verify.required': 'এসএমএসে পাঠানো কোড দিয়ে অনুগ্রহ করে আপনার মোবাইল নম্বর নিশ্চিত করুন।',
   'checkout.phonePlaceholder': '01XXXXXXXXX',
 
   'checkout.address.heading': 'ডেলিভারি ঠিকানা',
@@ -127,6 +132,7 @@ export const checkout: Translations<typeof en> = {
   'checkout.problem.tooManyAttempts': 'অনেকবার চেষ্টা করা হয়েছে। এক মিনিট অপেক্ষা করে আবার চেষ্টা করুন।',
   'checkout.problem.sessionExpired': 'আপনার সেশনের মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন।',
   'checkout.problem.failed': 'আপনার অর্ডারটি করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।',
+  'checkout.problem.phoneNotVerified': 'অর্ডার করার আগে এসএমএস কোড দিয়ে আপনার মোবাইল নম্বর নিশ্চিত করুন।',
 
   'checkout.validation.name': 'অনুগ্রহ করে আপনার নাম লিখুন।',
   'checkout.validation.max100': 'সর্বোচ্চ 100 অক্ষর ব্যবহার করুন।',

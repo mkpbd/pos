@@ -4,7 +4,7 @@ import { storeApi } from '../http'
 import { useLocale } from '../i18n/locale'
 import { useNotice } from '../notices'
 import { accountKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
-import type { AddressInput, Customer, CustomerAddress, GeoDistrict, GeoDivision, SignInResult } from '../types'
+import type { AddressInput, Customer, CustomerAddress, GeoDistrict, GeoDivision, PhoneCodeSent, PhoneSignInResult, SignInResult } from '../types'
 import { clearLocalWishlist, readLocalWishlist } from '../wishlist/local-wishlist'
 
 /** The signed-in customer, null for guests (GET /store/account/me also issues the CSRF cookie). */
@@ -91,6 +91,47 @@ export function useRegisterMutation() {
   })
 }
 
+/* Phone sign-in (BD1a) ------------------------------------------------------------------ */
+
+export type PhoneCodePurpose = 'login' | 'verify_phone'
+
+/** POST /store/account/otp/send (202): a code by SMS — the same answer whether an account exists. */
+export function sendAccountCode(phone: string, purpose: PhoneCodePurpose): Promise<PhoneCodeSent> {
+  return storeApi.post<PhoneCodeSent>('/store/account/otp/send', { phone, purpose }).then((r) => r.data)
+}
+
+export type PhoneLoginInput = { phone: string; code: string; remember: boolean }
+
+/** POST /store/account/otp/login: signs in the account whose verified number this is, or asks for a name (`needs_profile`). */
+export function usePhoneLoginMutation() {
+  const complete = useSignInCompletion()
+  return useMutation({
+    mutationFn: async (input: PhoneLoginInput) => {
+      const result = (await storeApi.post<PhoneSignInResult>('/store/account/otp/login', input)).data
+      if (result.status === 'signed_in') await mergeLocalWishlist()
+      return result
+    },
+    onSuccess: (result) => {
+      if (result.status === 'signed_in') complete({ customer: result.customer, merge: result.merge ?? null })
+    },
+  })
+}
+
+export type PhoneRegisterInput = { name: string; email?: string | null }
+
+/** POST /store/account/otp/register (201 profile): creates the account for the confirmed number and signs in. */
+export function usePhoneRegisterMutation() {
+  const complete = useSignInCompletion()
+  return useMutation({
+    mutationFn: async (input: PhoneRegisterInput) => {
+      const customer = (await storeApi.post<Customer>('/store/account/otp/register', input)).data
+      await mergeLocalWishlist()
+      return customer
+    },
+    onSuccess: (customer) => complete({ customer, merge: null }),
+  })
+}
+
 /** Sign-out; an account page that is open then sends the visitor to the home page (RequireCustomer). */
 export function useLogoutMutation() {
   const queryClient = useQueryClient()
@@ -156,7 +197,8 @@ export function useResendVerificationMutation() {
 
 /* Profile ------------------------------------------------------------------------------ */
 
-export type ProfileInput = { name: string; phone: string | null }
+/** `email` only while the account has none (BD1a: it can be added once). */
+export type ProfileInput = { name: string; phone: string | null; email?: string }
 
 export function useProfileQuery() {
   const { locale } = useLocale()
@@ -174,16 +216,44 @@ export function useUpdateProfileMutation() {
     onSuccess: (profile, input) => {
       if (profile) setLocalizedData(queryClient, customerKeys.profile, locale, profile)
       const me = queryClient.getQueryData<Customer | null>(localized(customerKeys.me, locale))
-      if (me) setLocalizedData(queryClient, customerKeys.me, locale, { ...me, name: profile?.name ?? input.name, phone: profile?.phone ?? input.phone })
+      if (me) setLocalizedData(queryClient, customerKeys.me, locale, profile ? { ...me, ...profile } : { ...me, name: input.name, phone: input.phone })
       void queryClient.invalidateQueries({ queryKey: customerKeys.profile })
     },
   })
 }
 
-export type PasswordInput = { current_password: string; password: string; password_confirmation: string }
+/** POST /store/account/profile/phone (BD1a): the code confirms the number, which becomes the account's verified one. */
+export function useVerifyProfilePhoneMutation() {
+  const queryClient = useQueryClient()
+  const { locale } = useLocale()
+  return useMutation({
+    mutationFn: (input: { phone: string; code: string }) => storeApi.post<Customer | null>('/store/account/profile/phone', input).then((r) => r.data),
+    onSuccess: (profile, input) => {
+      const patch = profile && typeof profile === 'object' && 'id' in profile ? profile : { phone: input.phone, phone_verified: true }
+      for (const key of [customerKeys.profile, customerKeys.me]) {
+        const current = queryClient.getQueryData<Customer | null>(localized(key, locale))
+        if (current) setLocalizedData(queryClient, key, locale, { ...current, ...patch })
+      }
+      void queryClient.invalidateQueries({ queryKey: customerKeys.profile })
+      void queryClient.invalidateQueries({ queryKey: customerKeys.me })
+    },
+  })
+}
+
+/** Without `current_password` when the account has no password yet (BD1a: the first password of a phone-only account). */
+export type PasswordInput = { current_password?: string; password: string; password_confirmation: string }
 
 export function useChangePasswordMutation() {
-  return useMutation({ mutationFn: (input: PasswordInput) => storeApi.put<MaybeMessage>('/store/account/password', input).then((r) => r.data) })
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PasswordInput) => storeApi.put<MaybeMessage>('/store/account/password', input).then((r) => r.data),
+    onSuccess: (_data, input) => {
+      if (input.current_password === undefined) {
+        void queryClient.invalidateQueries({ queryKey: customerKeys.profile })
+        void queryClient.invalidateQueries({ queryKey: customerKeys.me })
+      }
+    },
+  })
 }
 
 /* Addresses ---------------------------------------------------------------------------- */

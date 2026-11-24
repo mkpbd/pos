@@ -30,6 +30,7 @@ use App\Modules\Reports\ReportsServiceProvider;
 use App\Modules\Reviews\ReviewsServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Shipping\ShippingServiceProvider;
+use App\Modules\Sms\SmsServiceProvider;
 use App\Modules\Social\SocialServiceProvider;
 use App\Modules\Storefront\StorefrontServiceProvider;
 use App\Modules\Suppliers\SuppliersServiceProvider;
@@ -80,6 +81,8 @@ return [
     SocialServiceProvider::class,
     // ST1: bulk import (handlers are tagged by Products, Inventory, Customers and Suppliers).
     ImportsServiceProvider::class,
+    // BD1a: text messages (SMS gateway, order messages, one-time phone codes).
+    SmsServiceProvider::class,
     // Registers the storefront catch-all page route, so it stays last.
     StorefrontServiceProvider::class,
 ];

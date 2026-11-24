@@ -252,6 +252,8 @@ export function orderProblem(error: unknown, t: Translate, pathname: string): Or
       return { code: error.code, message: t('landing.orderForm.problem.signIn'), link: { to: loginPathFor(pathname), label: t('checkout.problem.signIn') } }
     case 'TOTAL_CHANGED':
       return { code: error.code, message: t('checkout.problem.totalChanged') }
+    case 'PHONE_NOT_VERIFIED':
+      return { code: error.code, message: t('checkout.problem.phoneNotVerified'), field: 'phone' }
     case 'VALIDATION_FAILED':
       return { code: error.code, message: t('checkout.problem.checkFields') }
     case 'IDEMPOTENCY_REQUEST_IN_PROGRESS':

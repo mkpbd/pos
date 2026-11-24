@@ -9,7 +9,10 @@ import { isZeroDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { MAX_ADDRESSES, useAddressesQuery, useDistrictsQuery, useDivisionsQuery, useMeQuery } from '../account/api'
 import { FormAlert, Spinner, TextField, inputClass, primaryButtonClass, secondaryButtonClass } from '../account/form-controls'
+import { PhoneCodeCheck, VerifiedMark } from '../account/phone-code'
 import { loginPathFor } from '../account/safe-next'
+import { BD_MOBILE, bdPhoneFrom } from '../account/schemas'
+import { useStorefront } from '../api'
 import { useCartQuery } from '../cart/api'
 import { cartNeedsAttention } from '../cart/cart-helpers'
 import { couponNote } from '../cart/coupon-messages'
@@ -17,13 +20,25 @@ import { formatPrice } from '../money'
 import type { MessageKey } from '../i18n/en'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
-import type { Cart, CartCoupon, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
+import type { Cart, CartCoupon, CheckoutEmailMode, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
-import { useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
+import { checkoutPhoneCode, useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
 import { etaLabel, goodsTotal, methodFee } from './delivery'
 import { PlacementAttempts } from './placement-attempt'
 import { changedPreview, placementProblem, type PlacementProblem } from './placement-errors'
-import { checkoutSchema, formFieldFor, initialCheckoutValues, NEW_ADDRESS, toPlaceInput, toPreviewInput, type CheckoutValues, type GeoIdLookup } from './schema'
+import {
+  checkoutSchemaFor,
+  emailModeOf,
+  formFieldFor,
+  initialCheckoutValues,
+  isAccountVerifiedPhone,
+  needsPhoneCode,
+  NEW_ADDRESS,
+  toPlaceInput,
+  toPreviewInput,
+  type CheckoutValues,
+  type GeoIdLookup,
+} from './schema'
 import { SummaryLines, SummaryTotals } from './summary-totals'
 import { useDebouncedValue } from './use-debounced-value'
 import { withBuilderAttribution } from '../insights/builder-attribution'
@@ -141,9 +156,15 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   const [focusRequest, setFocusRequest] = useState<{ alertFirst: boolean } | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const alertRef = useRef<HTMLDivElement>(null)
+  // BD1a: the store's e-mail field and SMS-code check (the options are fresh; the bootstrap is the fallback).
+  const bootstrap = useStorefront()
+  const emailMode = emailModeOf(options.email_field, bootstrap.checkout?.email)
+  const verifyMode = options.phone_verification ?? bootstrap.checkout?.phone_verification ?? 'off'
+  const schema = useMemo(() => checkoutSchemaFor(emailMode), [emailMode])
+  const [verifiedPhones, setVerifiedPhones] = useState<string[]>([])
 
   const form = useForm<CheckoutValues>({
-    resolver: zodResolver(checkoutSchema),
+    resolver: zodResolver(schema),
     defaultValues: initialCheckoutValues(customer, addresses),
     shouldFocusError: false,
   })
@@ -155,6 +176,12 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   const paymentMethod = useWatch({ control, name: 'payment_method' })
   const contactName = useWatch({ control, name: 'name' })
   const contactPhone = useWatch({ control, name: 'phone' })
+  const phoneNumber = bdPhoneFrom(contactPhone)
+  const phoneValid = BD_MOBILE.test(phoneNumber)
+  // A signed-in shopper whose verified number is the contact number needs no code.
+  const codeNeeded = needsPhoneCode(verifyMode, paymentMethod) && !isAccountVerifiedPhone(customer, phoneNumber)
+  const phoneConfirmed = phoneValid && verifiedPhones.includes(phoneNumber)
+  const phoneBlocked = codeNeeded && !phoneConfirmed
 
   const divisions = useDivisionsQuery()
   const districts = useDistrictsQuery(divisionId)
@@ -211,7 +238,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       if (!current) return
       setProblem(null)
       const signedIn = customer !== null
-      const input = toPlaceInput(values, current.total, { signedIn, geoId })
+      const input = toPlaceInput(values, current.total, { signedIn, geoId, emailMode })
       // P2a: the campaign that brought the shopper (last touch of the past 30 days); B15: the builder page and section.
       const attribution = withBuilderAttribution(readAttribution())
       if (attribution) input.attribution = attribution
@@ -277,6 +304,13 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
       case 'GUEST_CHECKOUT_DISABLED':
         void queryClient.invalidateQueries({ queryKey: checkoutKeys.options })
         return result
+      case 'PHONE_NOT_VERIFIED': {
+        // The session no longer holds the confirmation (expired): the code step comes back.
+        const phone = typeof error.details.phone === 'string' ? error.details.phone : phoneNumber
+        setVerifiedPhones((list) => list.filter((p) => p !== phone && p !== phoneNumber))
+        form.setError('phone', { type: 'server', message: result.message })
+        return result
+      }
       case 'VALIDATION_FAILED': {
         let mapped = false
         for (const [key, messages] of Object.entries(error.fieldErrors)) {
@@ -293,8 +327,16 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   }
 
   const placeId = useId()
-  const blocked = place.isPending || !current || updating || needsAttention
-  const blockedReason = place.isPending ? null : needsAttention ? t('checkout.page.blockedFix') : updating || !current ? t('checkout.page.updatingTotal') : null
+  const blocked = place.isPending || !current || updating || needsAttention || phoneBlocked
+  const blockedReason = place.isPending
+    ? null
+    : needsAttention
+      ? t('checkout.page.blockedFix')
+      : updating || !current
+        ? t('checkout.page.updatingTotal')
+        : phoneBlocked
+          ? t('checkout.page.verifyPhoneFirst')
+          : null
   const confirming = problem?.code === 'TOTAL_CHANGED'
 
   return (
@@ -330,7 +372,22 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
         />
 
         <form ref={formRef} noValidate onSubmit={onSubmit} aria-label={t('checkout.page.formLabel')} className="flex min-w-0 flex-col gap-6 lg:order-first">
-          <ContactSection form={form} />
+          <ContactSection
+            form={form}
+            emailMode={emailMode}
+            phoneCheck={
+              codeNeeded
+                ? {
+                    phone: phoneValid ? phoneNumber : null,
+                    confirmed: phoneConfirmed,
+                    onVerified: (phone) => {
+                      setVerifiedPhones((list) => (list.includes(phone) ? list : [...list, phone]))
+                      form.clearErrors('phone')
+                    },
+                  }
+                : null
+            }
+          />
           <AddressSection form={form} customer={customer} addresses={addresses} divisions={divisions} districts={districts} />
           <DeliverySection
             form={form}
@@ -383,7 +440,9 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
 const sectionClass = 'flex flex-col gap-4 rounded-sf-card bg-sf-surface p-5 md:p-6'
 const headingClass = 'font-heading text-xl font-bold text-sf-heading'
 
-function ContactSection({ form }: { form: Form }) {
+type PhoneCheck = { phone: string | null; confirmed: boolean; onVerified: (phone: string) => void }
+
+function ContactSection({ form, emailMode, phoneCheck }: { form: Form; emailMode: CheckoutEmailMode; phoneCheck: PhoneCheck | null }) {
   const { errors } = form.formState
   const { t } = useLocale()
   const errorText = useErrorText()
@@ -394,16 +453,35 @@ function ContactSection({ form }: { form: Form }) {
       </h2>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label={t('checkout.contact.fullName')} autoComplete="name" maxLength={120} error={errorText(errors.name?.message)} className="sm:col-span-2" {...form.register('name')} />
-        <TextField
-          label={t('checkout.contact.email')}
-          type="email"
-          autoComplete="email"
-          maxLength={255}
-          error={errorText(errors.email?.message)}
-          hint={t('checkout.contact.emailHint')}
-          {...form.register('email')}
-        />
+        {emailMode !== 'hidden' && (
+          <TextField
+            label={emailMode === 'optional' ? t('checkout.contact.emailOptional') : t('checkout.contact.email')}
+            type="email"
+            autoComplete="email"
+            maxLength={255}
+            error={errorText(errors.email?.message)}
+            hint={t('checkout.contact.emailHint')}
+            {...form.register('email')}
+          />
+        )}
         <TextField label={t('checkout.contact.mobile')} type="tel" autoComplete="tel" placeholder={t('checkout.phonePlaceholder')} maxLength={20} error={errorText(errors.phone?.message)} {...form.register('phone')} />
+        {phoneCheck && (
+          <div className="sm:col-span-2" data-testid="checkout-phone-check">
+            {phoneCheck.confirmed ? (
+              <VerifiedMark label={t('checkout.verify.verified')} />
+            ) : (
+              <PhoneCodeCheck
+                // A new number starts over.
+                key={phoneCheck.phone ?? ''}
+                phone={phoneCheck.phone}
+                send={checkoutPhoneCode.send}
+                verify={checkoutPhoneCode.verify}
+                onVerified={phoneCheck.onVerified}
+                intro={t('checkout.verify.intro')}
+              />
+            )}
+          </div>
+        )}
       </div>
     </section>
   )

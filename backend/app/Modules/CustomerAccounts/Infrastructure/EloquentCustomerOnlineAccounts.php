@@ -15,7 +15,7 @@ class EloquentCustomerOnlineAccounts implements CustomerOnlineAccounts
     }
 
     /**
-     * @return array{email: string, email_verified_at: ?string, last_login_at: ?string, status: string, created_at: ?string}
+     * @return array{email: ?string, email_verified_at: ?string, last_login_at: ?string, status: string, created_at: ?string}
      */
     public static function present(CustomerAccount $account): array
     {

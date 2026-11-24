@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
-import type { CheckoutOptions, CheckoutPreview, CheckoutPreviewInput, OrderView, PlacedOrder, PlaceOrderInput } from '../types'
+import type { CheckoutOptions, CheckoutPreview, CheckoutPreviewInput, OrderView, PhoneCodeSent, PlacedOrder, PlaceOrderInput } from '../types'
 import { rememberOrderToken } from './order-token'
 
 const noClientRetry = (count: number, error: unknown) => !(error instanceof ApiError && error.status < 500) && count < 1
@@ -67,4 +67,13 @@ export function useOrderQuery(number: string, token: string | null) {
     staleTime: 30_000,
     retry: noClientRetry,
   })
+}
+
+/**
+ * BD1a: the checkout's SMS code (also used by the landing-page order form). A confirmed number is
+ * kept in the shopper's session for two hours, so placing the order needs nothing more.
+ */
+export const checkoutPhoneCode = {
+  send: (phone: string) => storeApi.post<PhoneCodeSent>('/store/checkout/phone/send', { phone }).then((r) => r.data),
+  verify: (phone: string, code: string) => storeApi.post<{ phone: string; verified: boolean }>('/store/checkout/phone/verify', { phone, code }).then((r) => r.data),
 }

@@ -55,8 +55,8 @@ class CartPricer
      * SaleCalculator amounts, and the organization's tax mode.
      *
      * `$email` (the contact e-mail at checkout) lets per-customer promotion limits count a
-     * guest's earlier orders; `$coupon` prices with another code than the cart's (false =
-     * the cart's code, null = none).
+     * guest's earlier orders (BD1a: so does `$phone`, the contact mobile number); `$coupon`
+     * prices with another code than the cart's (false = the cart's code, null = none).
      *
      * @return array{
      *   cart: array<string, mixed>,
@@ -68,7 +68,7 @@ class CartPricer
      *   promotions: PromotionQuote
      * }
      */
-    public function quote(?Cart $cart, ?string $email = null, string|false|null $coupon = false): array
+    public function quote(?Cart $cart, ?string $email = null, string|false|null $coupon = false, ?string $phone = null): array
     {
         $items = $cart === null ? [] : array_map(fn (CartItem $i) => [
             'id' => $i->id,
@@ -77,7 +77,7 @@ class CartPricer
         ], $cart->items()->orderBy('created_at')->orderBy('id')->get()->all());
         $couponCode = $coupon === false ? $cart?->coupon_code : $coupon;
 
-        return $this->quoteItems($items, $cart?->customer_id, $email, $couponCode, $cart?->id);
+        return $this->quoteItems($items, $cart?->customer_id, $email, $couponCode, $cart?->id, $phone);
     }
 
     /**
@@ -88,7 +88,7 @@ class CartPricer
      * @param  list<array{id: string, variant_id: string, quantity: string}>  $items
      * @return array{cart: array<string, mixed>, lines: list<array<string, mixed>>, tax_mode: TaxMode, promotions: PromotionQuote}
      */
-    public function quoteItems(array $items, ?string $customerId, ?string $email, ?string $couponCode, ?string $cartId = null): array
+    public function quoteItems(array $items, ?string $customerId, ?string $email, ?string $couponCode, ?string $cartId = null, ?string $phone = null): array
     {
         $organization = $this->organizations->summary($this->tenant->requireOrganization()) ?? [];
         $currency = (string) ($organization['base_currency'] ?? config('pos.default_currency'));
@@ -164,7 +164,7 @@ class CartPricer
             ];
         }
 
-        $promotions = $this->promotions->price($promoLines, $couponCode, $customerId, $email, $currency);
+        $promotions = $this->promotions->price($promoLines, $couponCode, $customerId, $email, $currency, $phone);
         foreach (array_keys($calc) as $i) {
             $discount = Discount::amount($promotions->lineDiscount($i));
             $calc[$i]['discount'] = $discount->isZero() ? null : $discount;

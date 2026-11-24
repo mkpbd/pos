@@ -471,6 +471,14 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### SMS and phone sign-in BD1a (implemented)
+
+- `sms_settings` (one row per organization: enabled, driver `log|http` CHECK, URL, method / body CHECKs, parameter names, `api_key` encrypted with APP_KEY, sender ID, extra params jsonb, success text, phone format CHECK, monthly limit, templates jsonb).
+- `sms_messages` (organization, phone, purpose CHECK, body with codes masked, segments, encoding CHECK, driver, status `queued|sent|failed|skipped` CHECK, error, provider status / response (truncated, key removed), attempts, `dedupe_key` unique per organization when set — one SMS per order event — related type / id, sent at; indexes by organization + created and organization + status). Pruned after `POS_RETAIN_SMS_DAYS`.
+- `sms_otps` (organization, phone, purpose `login|checkout|verify_phone` CHECK, `code_hash` HMAC-SHA256, attempts, expires / consumed at, IP; index organization + phone + purpose + created). Pruned after a day.
+- `customer_accounts`: `email` and `password` nullable, `phone_verified_at`; unique `(organization_id, phone) WHERE phone_verified_at IS NOT NULL` (two accounts may have typed the same number; only one can own it).
+- `storefront_settings`: `checkout_email` `required|optional|hidden` (default `optional`) and `checkout_phone_verification` `off|cod|all` CHECKs. `promotion_redemptions.phone` + index `(promotion_id, phone)`.
+
 ### Stock operations ST1 (implemented)
 
 - `imports` (organization, type, status with CHECK, file path / name / size, options jsonb, row counters, timestamps per stage, `created_by`) and `import_errors` (import, row, column, message, row values jsonb, stage `check|run`; at most `pos.imports.stored_errors` per import). Imports module.

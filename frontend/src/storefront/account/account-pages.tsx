@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useSearchParams } from 'react-router'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { HeartIcon, LogOutIcon, MapPinIcon, PackageIcon, ShoppingBagIcon, StarIcon, Undo2Icon, UserIcon } from 'lucide-react'
 import { ApiError } from '@/lib/api/client'
@@ -13,6 +13,7 @@ import type { Customer } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
 import { RecentOrders } from '../orders/recent-orders'
 import {
+  sendAccountCode,
   useChangePasswordMutation,
   useCustomer,
   useLogoutMutation,
@@ -20,9 +21,20 @@ import {
   useResendVerificationMutation,
   useUpdateProfileMutation,
   useVerifyEmailMutation,
+  useVerifyProfilePhoneMutation,
 } from './api'
 import { AuthCard, FormAlert, Spinner, SubmitButton, TextField, primaryButtonClass, secondaryButtonClass } from './form-controls'
-import { normalizeBdPhone, passwordSchema, profileSchema, type PasswordValues, type ProfileValues } from './schemas'
+import { PhoneCodeCheck, VerifiedMark } from './phone-code'
+import {
+  BD_MOBILE,
+  bdPhoneFrom,
+  firstPasswordSchema,
+  passwordSchema,
+  profileSchema,
+  type FirstPasswordValues,
+  type PasswordValues,
+  type ProfileValues,
+} from './schemas'
 
 const NAV: { to: string; label: MessageKey; end?: boolean }[] = [
   { to: '/account', label: 'account.nav.overview', end: true },
@@ -82,7 +94,8 @@ export function AccountShell({ title, children }: { title: string; children: Rea
 function VerificationBanner({ customer }: { customer: Customer }) {
   const resend = useResendVerificationMutation()
   const { t } = useLocale()
-  if (customer.email_verified) return null
+  // A phone-only account (BD1a) has no address to verify yet.
+  if (customer.email_verified || !customer.email) return null
 
   return (
     <div className="mb-6 rounded-sf-card border border-sf-primary bg-sf-primary/15 p-4 text-sm" data-testid="verification-banner">
@@ -120,7 +133,7 @@ export function AccountPage() {
     <AccountShell title={t('account.overview.title')}>
       <VerificationBanner customer={customer} />
       <p className="text-lg">{rich(t('account.overview.hello'), { name: <strong className="text-sf-heading">{customer.name}</strong> })}</p>
-      <p className="mt-1 text-sm">{t('account.overview.signedInAs', { email: customer.email })}</p>
+      <p className="mt-1 text-sm">{t('account.overview.signedInAs', { email: customer.email ?? customer.phone ?? '' })}</p>
       <RecentOrders />
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">
         {TILES.map(({ to, label, text, icon: Icon }) => (
@@ -143,13 +156,16 @@ export function ProfilePage() {
   const { t } = useLocale()
   useDocumentMeta(privatePage(t('account.profile.title')))
   const profile = useProfileQuery()
+  // BD1a: an account without a password chooses its first one; the form stays (with its "set" message) once it is.
+  const [firstPassword, setFirstPassword] = useState(false)
+  if (profile.data?.has_password === false && !firstPassword) setFirstPassword(true)
 
   return (
     <AccountShell title={t('account.profile.title')}>
       {profile.data ? (
         <div className="grid gap-6 xl:grid-cols-2">
           <ProfileForm profile={profile.data} />
-          <PasswordForm />
+          {firstPassword ? <FirstPasswordForm /> : <PasswordForm />}
         </div>
       ) : profile.error ? (
         <div className="rounded-sf-card bg-sf-surface p-6">
@@ -167,33 +183,93 @@ function ProfileForm({ profile }: { profile: Customer }) {
   const update = useUpdateProfileMutation()
   const { t } = useLocale()
   const [formError, setFormError] = useState<string | null>(null)
-  const form = useForm<ProfileValues>({ resolver: zodResolver(profileSchema), defaultValues: { name: profile.name, phone: profile.phone ?? '' } })
+  const form = useForm<ProfileValues>({ resolver: zodResolver(profileSchema), defaultValues: { name: profile.name, phone: profile.phone ?? '', email: '' } })
   const { errors } = form.formState
+  const typedPhone = useWatch({ control: form.control, name: 'phone' })
+  // BD1a: an account created with a mobile number can add an e-mail address once.
+  const canAddEmail = profile.email === null
 
   const onSubmit = form.handleSubmit((values) => {
     setFormError(null)
     const phone = values.phone.trim()
+    const email = canAddEmail ? values.email.trim() : ''
     update.mutate(
-      { name: values.name.trim(), phone: phone ? normalizeBdPhone(phone) : null },
+      { name: values.name.trim(), phone: phone ? bdPhoneFrom(phone) : null, ...(email ? { email } : {}) },
       {
-        onSuccess: (saved, input) => form.reset({ name: saved?.name ?? input.name, phone: (saved ? saved.phone : input.phone) ?? '' }),
+        onSuccess: (saved, input) => form.reset({ name: saved?.name ?? input.name, phone: (saved ? saved.phone : input.phone) ?? '', email: '' }),
         onError: (error) => {
-          if (!applyServerErrors(error, form.setError, ['name', 'phone'])) setFormError(storeFormError(error, t))
+          if (!applyServerErrors(error, form.setError, ['name', 'phone', 'email'])) setFormError(storeFormError(error, t))
         },
       },
     )
   })
 
   return (
-    <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-6" aria-labelledby="profile-heading">
-      <h2 id="profile-heading" className="text-xl font-bold">{t('account.profile.detailsHeading')}</h2>
-      <FormAlert message={formError} />
-      {update.isSuccess && !form.formState.isDirty && <p role="status" className="text-sm font-semibold text-sf-highlight">{t('account.profile.saved')}</p>}
-      <TextField label={t('account.field.fullName')} autoComplete="name" maxLength={120} error={errors.name?.message} {...form.register('name')} />
-      <TextField label={t('account.field.email')} type="email" value={profile.email} readOnly disabled hint={t('account.profile.emailHint')} />
-      <TextField label={t('account.field.mobileOptional')} type="tel" autoComplete="tel" maxLength={20} placeholder="01XXXXXXXXX" error={errors.phone?.message} {...form.register('phone')} />
-      <SubmitButton pending={update.isPending} pendingLabel={t('account.saving')} className="self-start">{t('account.profile.save')}</SubmitButton>
-    </form>
+    <div className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-6">
+      <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4" aria-labelledby="profile-heading">
+        <h2 id="profile-heading" className="text-xl font-bold">{t('account.profile.detailsHeading')}</h2>
+        <FormAlert message={formError} />
+        {update.isSuccess && !form.formState.isDirty && <p role="status" className="text-sm font-semibold text-sf-highlight">{t('account.profile.saved')}</p>}
+        <TextField label={t('account.field.fullName')} autoComplete="name" maxLength={120} error={errors.name?.message} {...form.register('name')} />
+        {canAddEmail ? (
+          <TextField label={t('account.field.emailOptional')} type="email" autoComplete="email" maxLength={254} hint={t('account.profile.addEmailHint')} error={errors.email?.message} {...form.register('email')} />
+        ) : (
+          <TextField label={t('account.field.email')} type="email" value={profile.email ?? ''} readOnly disabled hint={t('account.profile.emailHint')} />
+        )}
+        <TextField label={t('account.field.mobileOptional')} type="tel" autoComplete="tel" maxLength={20} placeholder="01XXXXXXXXX" error={errors.phone?.message} {...form.register('phone')} />
+        <SubmitButton pending={update.isPending} pendingLabel={t('account.saving')} className="self-start">{t('account.profile.save')}</SubmitButton>
+      </form>
+      <PhoneVerification profile={profile} typed={typedPhone} onVerified={(phone) => form.resetField('phone', { defaultValue: phone })} />
+    </div>
+  )
+}
+
+/**
+ * BD1a: the mobile number's state — "Verified", or "Verify" (a code by SMS, then
+ * POST /store/account/profile/phone, which also saves the number). Follows the number typed above.
+ */
+function PhoneVerification({ profile, typed, onVerified }: { profile: Customer; typed: string; onVerified: (phone: string) => void }) {
+  const { t } = useLocale()
+  const verify = useVerifyProfilePhoneMutation()
+  const [open, setOpen] = useState(false)
+  const [justVerified, setJustVerified] = useState<string | null>(null)
+  const phone = bdPhoneFrom(typed)
+  if (!BD_MOBILE.test(phone)) return null
+  const verified = (profile.phone_verified === true && profile.phone === phone) || justVerified === phone
+
+  return (
+    <section aria-label={t('account.profile.verifyPhoneLabel')} className="flex flex-col gap-2 border-t border-sf-border pt-4" data-testid="profile-phone-verification">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-medium text-sf-heading">{phone}</span>
+        {verified ? (
+          <VerifiedMark label={t('account.profile.phoneVerified')} />
+        ) : (
+          <span className="flex items-center gap-3">
+            <span className="text-sm">{t('account.profile.phoneNotVerified')}</span>
+            {!open && (
+              <button type="button" className={secondaryButtonClass} onClick={() => setOpen(true)}>
+                {t('account.profile.verifyPhone')}
+              </button>
+            )}
+          </span>
+        )}
+      </div>
+      {justVerified === phone && <p role="status" className="text-sm font-semibold text-sf-highlight">{t('account.profile.phoneVerifiedNow')}</p>}
+      {!verified && open && (
+        <PhoneCodeCheck
+          key={phone}
+          phone={phone}
+          send={(number) => sendAccountCode(number, 'verify_phone')}
+          verify={(number, code) => verify.mutateAsync({ phone: number, code })}
+          onVerified={(number) => {
+            setJustVerified(number)
+            setOpen(false)
+            onVerified(number)
+          }}
+          testId="profile-phone-code"
+        />
+      )}
+    </section>
   )
 }
 
@@ -223,6 +299,41 @@ function PasswordForm() {
       <TextField label={t('account.field.newPassword')} type="password" autoComplete="new-password" hint={t('account.field.passwordHint', { min: PASSWORD_MIN })} error={errors.password?.message} {...form.register('password')} />
       <TextField label={t('account.field.confirmNewPassword')} type="password" autoComplete="new-password" error={errors.password_confirmation?.message} {...form.register('password_confirmation')} />
       <SubmitButton pending={change.isPending} pendingLabel={t('account.saving')} className="self-start">{t('account.password.submit')}</SubmitButton>
+    </form>
+  )
+}
+
+/** BD1a: an account created with a mobile number chooses its first password (no current one). */
+function FirstPasswordForm() {
+  const change = useChangePasswordMutation()
+  const { t } = useLocale()
+  const [formError, setFormError] = useState<string | null>(null)
+  const form = useForm<FirstPasswordValues>({ resolver: zodResolver(firstPasswordSchema), defaultValues: { password: '', password_confirmation: '' } })
+  const { errors } = form.formState
+
+  const onSubmit = form.handleSubmit((values) => {
+    setFormError(null)
+    change.mutate(values, {
+      onError: (error) => {
+        if (!applyServerErrors(error, form.setError, ['password', 'password_confirmation'])) setFormError(storeFormError(error, t))
+      },
+    })
+  })
+
+  return (
+    <form noValidate onSubmit={onSubmit} className="flex flex-col gap-4 rounded-sf-card bg-sf-surface p-6" aria-labelledby="password-heading">
+      <h2 id="password-heading" className="text-xl font-bold">{t('account.password.setHeading')}</h2>
+      {change.isSuccess ? (
+        <p role="status" className="text-sm font-semibold text-sf-highlight">{t('account.password.setDone')}</p>
+      ) : (
+        <>
+          <p className="text-sm">{t('account.password.setIntro')}</p>
+          <FormAlert message={formError} />
+          <TextField label={t('account.field.newPassword')} type="password" autoComplete="new-password" hint={t('account.field.passwordHint', { min: PASSWORD_MIN })} error={errors.password?.message} {...form.register('password')} />
+          <TextField label={t('account.field.confirmNewPassword')} type="password" autoComplete="new-password" error={errors.password_confirmation?.message} {...form.register('password_confirmation')} />
+          <SubmitButton pending={change.isPending} pendingLabel={t('account.saving')} className="self-start">{t('account.password.setSubmit')}</SubmitButton>
+        </>
+      )}
     </form>
   )
 }
@@ -264,7 +375,7 @@ export function VerifyEmailPage() {
       <div className="flex flex-col items-center gap-5 text-center">
         {body}
         {(verify.isSuccess || verify.isError || !token) && onward}
-        {(verify.isError || !token) && customer && !customer.email_verified && <ResendLink />}
+        {(verify.isError || !token) && customer?.email && !customer.email_verified && <ResendLink />}
       </div>
     </AuthCard>
   )

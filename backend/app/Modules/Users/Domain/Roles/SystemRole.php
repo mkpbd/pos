@@ -61,6 +61,8 @@ enum SystemRole: string
                 // Phase 8: the AI assistant and insights; AI settings / budget (ai.manage) stay with the
                 // Organization Admin (this role held the undefined `ai.*` before Phase 8).
                 'ai.ask', 'ai.insights',
+                // BD1a: the SMS message log (order messages to customers).
+                'sms.view',
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
@@ -101,6 +103,8 @@ enum SystemRole: string
                 'marketing.*',
                 // P2b: Facebook & Instagram posts and product feeds.
                 'social.*',
+                // BD1a: sees the SMS message log; the gateway and its API key stay with the Organization Admin.
+                'sms.view',
                 'branches.view', 'products.view', 'inventory.view', 'customers.view',
             ],
         };

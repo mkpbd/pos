@@ -24,13 +24,15 @@ class EmailVerification
     ) {}
 
     /**
-     * Sends a new link (the previous one stops working). Nothing happens for a verified account.
+     * Sends a new link (the previous one stops working). Nothing happens for a verified account
+     * or one without an e-mail address.
      *
      * @param  string  $siteUrl  scheme and host of the storefront, for the link
      */
     public function send(CustomerAccount $account, string $siteUrl): void
     {
-        if ($account->email_verified_at !== null) {
+        // BD1a: accounts created with a mobile number may have no e-mail address.
+        if ($account->email_verified_at !== null || $account->email === null || $account->email === '') {
             return;
         }
 

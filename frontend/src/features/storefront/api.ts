@@ -34,10 +34,20 @@ export type StorefrontSettings = {
   whatsapp_chat_button?: boolean
   /** AI2b: the shopper support assistant (read with `readAssistantSettings`; off by default). */
   assistant?: unknown
+  /** BD1a: the e-mail field at checkout (default optional). */
+  checkout_email?: CheckoutEmailMode
+  /** BD1a: confirm the shopper's mobile number with an SMS code (default off). */
+  checkout_phone_verification?: CheckoutPhoneVerification
+  /** BD1a (read-only): SMS is on and can send order messages. */
+  sms_ready?: boolean
+  /** BD1a (read-only): SMS can send sign-in / checkout codes; needed for phone verification. */
+  otp_ready?: boolean
   updated_at: string | null
 }
 
 export type StoreLocale = 'en' | 'bn'
+export type CheckoutEmailMode = 'required' | 'optional' | 'hidden'
+export type CheckoutPhoneVerification = 'off' | 'cod' | 'all'
 
 export type StorefrontDomain = {
   id: string
@@ -413,6 +423,8 @@ export function useSaveStorefrontSettingsMutation() {
           | 'whatsapp_number'
           | 'whatsapp_order_button'
           | 'whatsapp_chat_button'
+          | 'checkout_email'
+          | 'checkout_phone_verification'
         >
       > & { assistant?: AssistantSettingsInput },
     ) =>

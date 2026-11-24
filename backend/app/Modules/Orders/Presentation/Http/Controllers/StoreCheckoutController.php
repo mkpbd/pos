@@ -8,14 +8,17 @@ use App\Modules\Cart\Presentation\Http\Support\CartCookie;
 use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Orders\Application\Actions\PlaceOrder;
+use App\Modules\Orders\Application\Services\CheckoutPhoneCheck;
 use App\Modules\Orders\Application\Services\CheckoutQuoter;
 use App\Modules\Orders\Infrastructure\Models\Order;
+use App\Modules\Orders\Presentation\Http\Support\CheckoutVerifiedPhones;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Domain\CampaignAttribution;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Storefront\Application\Queries\CheckoutContact;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,6 +35,7 @@ class StoreCheckoutController
         private readonly StorefrontConfig $storefront,
         private readonly ShoppingCart $carts,
         private readonly CheckoutQuoter $quoter,
+        private readonly CheckoutContact $contact,
     ) {}
 
     /**
@@ -40,6 +44,9 @@ class StoreCheckoutController
      * `available` is false with `reason` `no_fulfilment_store` (online ordering is switched off)
      * or `cart_empty`. `guest_checkout` false = guests must sign in. Payment instructions are
      * only shown after placing the order (`instructions_preview` is always null).
+     * BD1a: `email_field` required | optional | hidden (the customer e-mail field),
+     * `phone_verification` off | cod | all (which orders need the mobile number checked with an
+     * SMS code first — off while SMS cannot send codes) and `phone_login` (sign-in with a code).
      */
     public function options(Request $request, CheckoutPaymentMethods $payments, BranchDirectory $branches, TenantContext $tenant): JsonResponse
     {
@@ -64,6 +71,9 @@ class StoreCheckoutController
                 'instructions_preview' => null,
             ], $payments->enabled()),
             'signed_in' => $this->account() !== null,
+            'email_field' => $this->contact->emailMode(),
+            'phone_verification' => $this->contact->phoneVerification(),
+            'phone_login' => $this->contact->phoneLogin(),
         ]);
     }
 
@@ -75,10 +85,15 @@ class StoreCheckoutController
      * `shipping_method_id` or null), COD fee and total. `payment_method` is null when the
      * chosen method cannot be used. `issues` are the cart's (`unavailable`, `out_of_stock`,
      * `exceeds_stock`). Errors: `CART_EMPTY`, `CHECKOUT_UNAVAILABLE`.
+     * BD1a: `contact` {email?, phone?} (optional) lets per-customer promotion limits count
+     * the shopper's earlier orders by e-mail and mobile number, as placing the order will.
      */
     public function preview(Request $request, BranchDirectory $branches, TenantContext $tenant): JsonResponse
     {
         $data = $request->validate([
+            'contact' => ['sometimes', 'nullable', 'array'],
+            'contact.email' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'contact.phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'shipping_address_id' => ['sometimes', 'nullable', 'uuid'],
             'address' => ['sometimes', 'nullable', 'array'],
             'address.division_id' => ['sometimes', 'nullable', 'integer'],
@@ -86,6 +101,9 @@ class StoreCheckoutController
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
             'payment_method' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
+        if ($this->contact->emailMode() === 'hidden') {
+            unset($data['contact']['email']);
+        }
 
         $storeId = $this->storefront->settings()->fulfilment_store_id;
         $store = $storeId === null ? null : $branches->store($storeId, $tenant->requireOrganization());
@@ -117,8 +135,14 @@ class StoreCheckoutController
      *
      * P2a: `attribution` (optional) — the campaign the shopper came from (UTM parameters,
      * short link, first landing path, referrer host); sanitized and stored on the order.
+     *
+     * BD1a: `contact.email` follows the store's `email_field` — required, optional (null or
+     * omitted) or hidden (ignored, stored null). When the store checks phones
+     * (`phone_verification` `all`, or `cod` with cash on delivery) `contact.phone` must be the
+     * signed-in account's verified number or one checked with `checkout/phone/verify` in this
+     * session (2 hours), else 422 `PHONE_NOT_VERIFIED` (`details.phone`).
      */
-    public function place(Request $request, PlaceOrder $place, OrderPresenter $presenter): JsonResponse
+    public function place(Request $request, PlaceOrder $place, OrderPresenter $presenter, CheckoutPhoneCheck $phoneCheck, TenantContext $tenant): JsonResponse
     {
         $account = $this->account();
         foreach (['contact.phone', 'address.phone'] as $field) {
@@ -131,10 +155,15 @@ class StoreCheckoutController
         $useSaved = $account !== null && filled($request->input('shipping_address_id'));
         $addressRule = $useSaved ? 'sometimes' : 'required';
         $mobile = ['string', 'regex:'.BangladeshMobile::PATTERN];
+        $emailMode = $this->contact->emailMode();
         $data = $request->validate([
             'contact' => ['required', 'array'],
             'contact.name' => ['required', 'string', 'max:120'],
-            'contact.email' => ['required', 'string', 'email', 'max:255'],
+            'contact.email' => match ($emailMode) {
+                'required' => ['required', 'string', 'email', 'max:255'],
+                'hidden' => ['sometimes'],
+                default => ['sometimes', 'nullable', 'string', 'email', 'max:255'],
+            },
             'contact.phone' => ['required', ...$mobile],
             'shipping_address_id' => [$account === null ? 'prohibited' : 'sometimes', 'nullable', 'uuid'],
             'address' => [$addressRule, 'array'],
@@ -159,7 +188,8 @@ class StoreCheckoutController
         if ($useSaved) {
             unset($data['address']);
         }
-        $data['contact'] = array_map('trim', $data['contact']);
+        $email = $emailMode === 'hidden' || ! is_string($data['contact']['email'] ?? null) ? '' : trim($data['contact']['email']);
+        $data['contact'] = ['name' => trim($data['contact']['name']), 'email' => $email === '' ? null : $email, 'phone' => trim($data['contact']['phone'])];
         $data['save_address'] = $request->boolean('save_address');
         $data['notes'] = filled($data['notes'] ?? null) ? trim($data['notes']) : null;
         $data['attribution'] = CampaignAttribution::sanitize($data['attribution'] ?? null);
@@ -169,6 +199,9 @@ class StoreCheckoutController
                 $data['address'][$key] = trim($data['address'][$key]) === '' ? null : trim($data['address'][$key]);
             }
         }
+
+        // BD1a: before any stock or locking work.
+        $phoneCheck->ensure($data['contact']['phone'], $data['payment_method'], fn () => CheckoutVerifiedPhones::forShopper($request, $tenant->requireOrganization(), $account));
 
         $result = $place(
             CartCookie::owner($request),

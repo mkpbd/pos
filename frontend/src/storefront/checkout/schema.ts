@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { BD_MOBILE, normalizeBdPhone } from '../account/schemas'
+import { BD_MOBILE, bdPhoneFrom, normalizeBdPhone } from '../account/schemas'
 import type { MessageKey } from '../i18n/en'
-import type { CheckoutPreviewInput, Customer, CustomerAddress, GeoId, PaymentMethodCode, PlaceOrderInput } from '../types'
+import type { CheckoutEmailMode, CheckoutPreviewInput, Customer, CustomerAddress, GeoId, PaymentMethodCode, PhoneVerificationMode, PlaceOrderInput } from '../types'
 
 /** The "New address" choice of the address radio list (the other choices are address ids). */
 export const NEW_ADDRESS = 'new'
@@ -16,15 +16,26 @@ const mobile = (empty: MessageKey) =>
     .min(1, empty)
     .refine((v) => BD_MOBILE.test(normalizeBdPhone(v)), m('checkout.validation.phoneInvalid'))
 
+const emailFor = (mode: CheckoutEmailMode) =>
+  mode === 'required'
+    ? z.string().trim().min(1, m('checkout.validation.emailRequired')).pipe(z.email(m('checkout.validation.emailInvalid')))
+    : mode === 'optional'
+      ? z
+          .string()
+          .trim()
+          .refine((v) => v === '' || z.email().safeParse(v).success, m('checkout.validation.emailInvalid'))
+      : z.string()
+
 /**
  * The checkout form. Client checks give a quick answer; the server has the final say (its
  * 422 field errors land on these fields through SERVER_FIELDS). The inline address is only
- * checked when "New address" is chosen (always for guests).
+ * checked when "New address" is chosen (always for guests). BD1a: the e-mail is required,
+ * optional or not asked for, as the store chose.
  */
-export const checkoutSchema = z
+export const checkoutSchemaFor = (emailMode: CheckoutEmailMode) => z
   .object({
     name: z.string().trim().min(2, m('checkout.validation.name')).max(120, m('checkout.validation.max120')),
-    email: z.string().trim().min(1, m('checkout.validation.emailRequired')).pipe(z.email(m('checkout.validation.emailInvalid'))),
+    email: emailFor(emailMode),
     phone: mobile('checkout.validation.phoneRequired'),
     address_choice: z.string().min(1, m('checkout.validation.addressChoice')),
     recipient_name: z.string(),
@@ -58,6 +69,9 @@ export const checkoutSchema = z
     else if (line.length > 255) issue('address_line', 'checkout.validation.max255')
     if (values.postcode.trim() !== '' && !/^\d{4}$/.test(values.postcode.trim())) issue('postcode', 'checkout.validation.postcode')
   })
+
+/** The form with the e-mail required (the behaviour before BD1a). */
+export const checkoutSchema = checkoutSchemaFor('required')
 
 export type CheckoutValues = z.input<typeof checkoutSchema>
 export type CheckoutField = keyof CheckoutValues
@@ -144,11 +158,30 @@ export function toPreviewInput(values: Pick<CheckoutValues, 'address_choice' | '
   return input
 }
 
+/** The checkout's e-mail mode: the options' (fresh), else the bootstrap's; required when neither says. */
+export function emailModeOf(fromOptions: CheckoutEmailMode | undefined, fromBootstrap: CheckoutEmailMode | undefined): CheckoutEmailMode {
+  const mode = fromOptions ?? fromBootstrap
+  return mode === 'optional' || mode === 'hidden' ? mode : 'required'
+}
+
+/** BD1a: whether this order needs the mobile number confirmed with an SMS code. */
+export function needsPhoneCode(mode: PhoneVerificationMode | undefined, paymentMethod: string): boolean {
+  return mode === 'all' || (mode === 'cod' && paymentMethod === 'cod')
+}
+
+/** A signed-in shopper whose verified number is the contact number needs no code. */
+export function isAccountVerifiedPhone(customer: Customer | null, phone: string): boolean {
+  return customer?.phone_verified === true && customer.phone !== null && customer.phone === phone
+}
+
 /** The body of POST /store/checkout from validated values and the total the shopper saw. */
-export function toPlaceInput(values: CheckoutValues, expectedTotal: string, options: { signedIn: boolean; geoId?: GeoIdLookup }): PlaceOrderInput {
+export function toPlaceInput(values: CheckoutValues, expectedTotal: string, options: { signedIn: boolean; geoId?: GeoIdLookup; emailMode?: CheckoutEmailMode }): PlaceOrderInput {
   const geoId = options.geoId ?? asIs
+  const emailMode = options.emailMode ?? 'required'
+  const email = values.email.trim()
   const input: PlaceOrderInput = {
-    contact: { name: values.name.trim(), email: values.email.trim(), phone: normalizeBdPhone(values.phone.trim()) },
+    // BD1a: no e-mail when the store does not ask for it, or the optional field was left empty.
+    contact: { name: values.name.trim(), ...(emailMode !== 'hidden' && (email !== '' || emailMode === 'required') ? { email } : {}), phone: bdPhoneFrom(values.phone) },
     shipping_method_id: values.shipping_method_id,
     payment_method: values.payment_method as PaymentMethodCode,
     expected_total: expectedTotal,

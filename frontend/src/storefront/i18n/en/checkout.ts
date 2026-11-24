@@ -32,12 +32,17 @@ export const checkout = {
   'checkout.page.placeOrder': 'Place order',
   'checkout.page.blockedFix': 'Please fix your cart before placing the order.',
   'checkout.page.updatingTotal': 'Updating the total…',
+  'checkout.page.verifyPhoneFirst': 'Confirm your mobile number with the SMS code to place the order.',
 
   'checkout.contact.heading': 'Contact',
   'checkout.contact.fullName': 'Full name',
   'checkout.contact.email': 'E-mail',
   'checkout.contact.emailHint': 'We send the order confirmation here.',
   'checkout.contact.mobile': 'Mobile number',
+  'checkout.contact.emailOptional': 'E-mail (optional)',
+  'checkout.verify.intro': 'We confirm your mobile number with a 6-digit code by SMS.',
+  'checkout.verify.verified': 'Mobile number verified ✓',
+  'checkout.verify.required': 'Please confirm your mobile number with the code we send by SMS.',
   'checkout.phonePlaceholder': '01XXXXXXXXX',
 
   'checkout.address.heading': 'Delivery address',
@@ -127,6 +132,7 @@ export const checkout = {
   'checkout.problem.tooManyAttempts': 'Too many attempts. Please wait a minute and try again.',
   'checkout.problem.sessionExpired': 'Your session expired. Please try again.',
   'checkout.problem.failed': 'Your order could not be placed. Please try again.',
+  'checkout.problem.phoneNotVerified': 'Please confirm your mobile number with an SMS code before placing the order.',
 
   'checkout.validation.name': 'Please enter your name.',
   'checkout.validation.max100': 'Use at most 100 characters.',

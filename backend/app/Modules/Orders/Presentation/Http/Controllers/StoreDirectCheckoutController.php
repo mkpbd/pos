@@ -4,7 +4,10 @@ namespace App\Modules\Orders\Presentation\Http\Controllers;
 
 use App\Modules\CustomerAccounts\Infrastructure\Models\CustomerAccount;
 use App\Modules\Orders\Application\Actions\PlaceDirectOrder;
+use App\Modules\Orders\Application\Services\CheckoutPhoneCheck;
+use App\Modules\Orders\Presentation\Http\Support\CheckoutVerifiedPhones;
 use App\Modules\Orders\Presentation\Http\Support\OrderPresenter;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -53,8 +56,11 @@ class StoreDirectCheckoutController
      * access_token, order_url}`. Errors: `ORDER_FORM_UNAVAILABLE`, `ITEMS_UNAVAILABLE`,
      * `CHECKOUT_UNAVAILABLE`, `SHIPPING_UNAVAILABLE`, `PAYMENT_METHOD_UNAVAILABLE`,
      * `INSUFFICIENT_STOCK`, `GUEST_CHECKOUT_DISABLED`, `TOTAL_CHANGED` (409), field errors.
+     * BD1a: the store's phone check applies as at checkout — `PHONE_NOT_VERIFIED` (422,
+     * `details.phone`) unless the number is the account's verified one or was checked with
+     * `checkout/phone/verify` in this session.
      */
-    public function place(Request $request, PlaceDirectOrder $direct, OrderPresenter $presenter): JsonResponse
+    public function place(Request $request, PlaceDirectOrder $direct, OrderPresenter $presenter, CheckoutPhoneCheck $phoneCheck, TenantContext $tenant): JsonResponse
     {
         $phone = $request->input('contact.phone');
         if (is_string($phone) && trim($phone) !== '') {
@@ -84,6 +90,9 @@ class StoreDirectCheckoutController
         ]);
 
         $account = $this->account();
+        // BD1a: before any stock or locking work.
+        $phoneCheck->ensure((string) $data['contact']['phone'], (string) $data['payment_method'], fn () => CheckoutVerifiedPhones::forShopper($request, $tenant->requireOrganization(), $account));
+
         $result = $direct->place(
             $data,
             $account === null ? null : ['customer_id' => $account->customer_id, 'account_id' => $account->id],

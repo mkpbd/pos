@@ -148,6 +148,12 @@ function UtilityBar() {
         )}
         <nav aria-label={t('theme.topBar.label')} className="flex shrink-0 items-center gap-5">
           <LanguageSwitcher compact className="[&_button]:text-inherit" />
+          {/* BD1a: guests find an order by its number and mobile number. */}
+          {!customer && (
+            <Link to="/track-order" className={linkClass}>
+              {t('orders.trackOrder.link')}
+            </Link>
+          )}
           <Link to="/wishlist" className={linkClass}>
             {t('common.wishlist')}
           </Link>

@@ -207,7 +207,7 @@ export function OrderDeliveryCard({ order, showCourier = true }: { order: (Order
         <div>
           <dt className="font-medium text-sf-heading">{t('orders.delivery.contact')}</dt>
           <dd>
-            {order.contact.name} · {order.contact.phone} · {order.contact.email}
+            {[order.contact.name, order.contact.phone, order.contact.email].filter(Boolean).join(' · ')}
           </dd>
         </div>
       </dl>

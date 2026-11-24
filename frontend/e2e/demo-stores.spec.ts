@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect as baseExpect, test, type Page } from '@playwright/test'
 
@@ -2087,4 +2087,132 @@ test('B11: Loom & Lane — a staff editor sends a page for approval, the owner a
   const versions = await call('GET', `/api/v1/storefront/builder/documents/${laterDoc.id}/versions`)
   expect(versions.body.data[0]).toMatchObject({ kind: 'version', via: 'scheduled' })
   await ownerContext.close()
+})
+
+test('BD1a: Bazar Fresh turns on SMS (test mode); a guest checks out with only a phone after an SMS code, gets the order SMS, tracks the order, then signs in with a code', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const adminContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const admin = await adminContext.newPage()
+  await signIn(admin, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await adminContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return admin.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  // The owner turns SMS on in test mode (messages go to storage/logs/sms-*.log) and asks for a code on cash on delivery.
+  const sms = await call('PATCH', '/api/v1/sms/settings', { is_enabled: true, driver: 'log' })
+  expect(sms.status).toBe(200)
+  expect(sms.body.data).toMatchObject({ is_enabled: true, driver: 'log', ready: true, otp_ready: true, api_key_set: false })
+  const settings = await call('PATCH', '/api/v1/storefront/settings', { checkout_email: 'hidden', checkout_phone_verification: 'cod' })
+  expect(settings.status).toBe(200)
+  expect(settings.body.data).toMatchObject({ checkout_email: 'hidden', checkout_phone_verification: 'cod', otp_ready: true })
+
+  const logs = fileURLToPath(new URL('../../backend/storage/logs/', import.meta.url))
+  const phone = `019${String(Date.now()).slice(-8)}`
+  const codesFor = () =>
+    readdirSync(logs)
+      .filter((f) => /^sms-.*\.log$/.test(f))
+      .sort()
+      .flatMap((f) => readFileSync(`${logs}${f}`, 'utf8').split('\n'))
+      .filter((line) => line.includes(phone.slice(1)) && line.includes('"purpose":"otp"'))
+      .map((line) => /"text":"[^"]*?(\d{6})/.exec(line)?.[1] ?? '')
+  const nextCode = async (before: number) => {
+    await expect.poll(() => codesFor().length, { timeout: 30_000 }).toBeGreaterThan(before)
+    return codesFor().at(-1)!
+  }
+
+  try {
+    // A guest buys something in stock.
+    const shopperContext = await browser.newContext({ viewport: { width: 1400, height: 1000 } })
+    const shopper = await shopperContext.newPage()
+    await shopper.goto(`${base}/`)
+    const list = (await getJson<{ data: { slug: string }[] }>(shopper, '/api/v1/store/products?in_stock=1&per_page=12')).body.data
+    let variantId = ''
+    for (const item of list) {
+      const product = (await getJson<{ data: { variants: { id: string; in_stock: boolean }[] } }>(shopper, `/api/v1/store/products/${item.slug}`)).body.data
+      variantId = product.variants.find((v) => v.in_stock)?.id ?? ''
+      if (variantId) break
+    }
+    expect(variantId).not.toBe('')
+    const shopperToken = decodeURIComponent((await shopperContext.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    const added = await shopper.evaluate(async ({ variant, token }) => {
+      const res = await fetch('/api/v1/store/cart/items', { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: JSON.stringify({ variant_id: variant, quantity: 1 }) })
+      return res.status
+    }, { variant: variantId, token: shopperToken })
+    expect(added).toBeLessThan(300)
+
+    // Checkout: no e-mail field; cash on delivery needs the SMS code first.
+    await shopper.goto(`${base}/checkout`)
+    const checkout = shopper.getByRole('form', { name: 'Checkout' })
+    await checkout.getByLabel('Full name').fill('Shapla Begum')
+    await expect(checkout.getByLabel('E-mail')).toHaveCount(0)
+    await checkout.getByLabel('Mobile number', { exact: true }).fill(phone)
+    await checkout.getByLabel('Recipient name').fill('Shapla Begum')
+    await checkout.getByLabel('Recipient mobile number').fill(phone)
+    await checkout.getByLabel('Division').selectOption({ label: 'Dhaka (ঢাকা)' })
+    await checkout.getByLabel('District').selectOption({ label: 'Dhaka (ঢাকা)' })
+    await checkout.getByLabel('Area / thana').fill('Mirpur')
+    await checkout.getByLabel('Street address').fill('Road 3, House 9')
+    await checkout.getByRole('radio', { name: /Home delivery/ }).check()
+    await checkout.getByRole('radio', { name: /Cash on delivery/ }).check()
+    const check = shopper.getByTestId('checkout-phone-check')
+    const before = codesFor().length
+    await check.getByRole('button', { name: 'Send code' }).click()
+    const code = await nextCode(before)
+    expect(code).toMatch(/^\d{6}$/)
+    await check.getByLabel('Code from the SMS').fill(code)
+    await check.getByRole('button', { name: 'Verify' }).click()
+    await expect(check.getByTestId('phone-verified')).toBeVisible()
+    await checkout.getByRole('button', { name: 'Place order' }).click()
+    await expect(shopper.getByRole('heading', { level: 1, name: 'Thank you, Shapla!' })).toBeVisible({ timeout: 20_000 })
+    const number = (await shopper.getByText(/^WEB-\d{6}$/).first().innerText()).trim()
+
+    // The SMS log: the code is masked; the order SMS went out in test mode with the order number.
+    await expect
+      .poll(async () => ((await call('GET', `/api/v1/sms/messages?search=${phone}`)).body.data as { purpose: string }[]).map((m) => m.purpose).sort())
+      .toEqual(['order_placed', 'otp'])
+    const messages = (await call('GET', `/api/v1/sms/messages?search=${phone}`)).body.data as { purpose: string; body: string; status: string; driver: string }[]
+    const otpRow = messages.find((m) => m.purpose === 'otp')!
+    expect(otpRow.body).not.toContain(code)
+    expect(otpRow.body).toContain('••••••')
+    const placedRow = messages.find((m) => m.purpose === 'order_placed')!
+    expect(placedRow).toMatchObject({ status: 'sent', driver: 'log' })
+    expect(placedRow.body).toContain(number)
+    await shopperContext.close()
+
+    // Anyone with the number and the phone can track the order — no account needed.
+    const trackerContext = await browser.newContext({ viewport: { width: 1400, height: 1000 } })
+    const tracker = await trackerContext.newPage()
+    await tracker.goto(`${base}/track-order?number=${number}`)
+    await tracker.getByLabel('Mobile number').fill(phone)
+    await tracker.getByRole('button', { name: 'Track order' }).click()
+    await expect(tracker.getByTestId('tracked-order').getByRole('heading', { name: `Order ${number}` })).toBeVisible()
+
+    // The same number signs in with a code; a new account is made on the way.
+    await tracker.goto(`${base}/account/login`)
+    await expect(tracker.getByRole('tab', { name: 'Mobile number' })).toHaveAttribute('aria-selected', 'true')
+    await tracker.getByRole('textbox', { name: 'Mobile number' }).fill(phone)
+    const beforeLogin = codesFor().length
+    await tracker.getByRole('button', { name: 'Send code' }).click()
+    await tracker.getByLabel('Code from the SMS').fill(await nextCode(beforeLogin))
+    await tracker.getByRole('button', { name: 'Sign in' }).click()
+    const profile = tracker.getByRole('form', { name: 'Almost done' })
+    await profile.getByLabel('Full name').fill('Shapla Begum')
+    await profile.getByRole('button', { name: 'Create account' }).click()
+    await expect(tracker).toHaveURL(/\/account$/)
+    await expect(tracker.getByText(`Signed in as ${phone}`)).toBeVisible()
+    await trackerContext.close()
+  } finally {
+    await call('PATCH', '/api/v1/storefront/settings', { checkout_email: 'optional', checkout_phone_verification: 'off' })
+    await call('PATCH', '/api/v1/sms/settings', { is_enabled: false })
+    await adminContext.close()
+  }
 })

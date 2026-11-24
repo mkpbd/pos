@@ -290,6 +290,10 @@ class CheckoutTest extends TestCase
                 ['code' => 'bank_transfer', 'display_name' => 'Bank transfer', 'instructions_preview' => null],
             ],
             'signed_in' => false,
+            // BD1a: no SMS set up — optional e-mail, no phone check, no phone sign-in.
+            'email_field' => 'optional',
+            'phone_verification' => 'off',
+            'phone_login' => false,
         ]);
         $this->addToCart('SHIRT', 1);
         $this->browse('GET', $this->storeUrl('checkout/options'))->assertJsonPath('data.available', true)->assertJsonPath('data.reason', null);

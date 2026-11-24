@@ -60,7 +60,7 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 class StorefrontShellController
 {
     /** Storefront routes that exist in this phase (exact paths); content pages are looked up. */
-    private const KNOWN_PATHS = ['/', '/shop', '/search', '/blog', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
+    private const KNOWN_PATHS = ['/', '/shop', '/search', '/blog', '/newsletter/confirm', '/newsletter/unsubscribe', '/track-order', ...self::ACCOUNT_PATHS];
 
     /** Shopper pages (E7, E8a, E9, E10b returns): account, cart, wishlist and checkout. Personal, never indexed. */
     private const ACCOUNT_PATHS = [
@@ -69,8 +69,8 @@ class StorefrontShellController
         '/cart', '/wishlist', '/checkout',
     ];
 
-    /** Utility pages that search engines should not index. */
-    private const NOINDEX_PATHS = ['/search', '/newsletter/confirm', '/newsletter/unsubscribe', ...self::ACCOUNT_PATHS];
+    /** Utility pages that search engines should not index (BD1a: "track my order"). */
+    private const NOINDEX_PATHS = ['/search', '/newsletter/confirm', '/newsletter/unsubscribe', '/track-order', ...self::ACCOUNT_PATHS];
 
     /** Query parameters that neither filter a listing nor change its canonical URL (campaign tracking). */
     private const TRACKING_PARAMETERS = ['gclid', 'fbclid', 'msclkid', 'ref'];
@@ -191,6 +191,9 @@ class StorefrontShellController
         }
         if ($path === '/search') {
             $meta['title'] = $t('Search').' | '.$store;
+        }
+        if ($path === '/track-order') {
+            $meta['title'] = $t('Track your order').' | '.$store;
         }
         if (in_array($path, self::ACCOUNT_PATHS, true)) {
             $meta['title'] = $t(match ($path) {

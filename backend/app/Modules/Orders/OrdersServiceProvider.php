@@ -16,6 +16,7 @@ use App\Modules\Orders\Application\Events\OrderCancelledWithRefund;
 use App\Modules\Orders\Application\Events\OrderPlaced;
 use App\Modules\Orders\Application\Events\OrderReturnRequested;
 use App\Modules\Orders\Application\Events\OrderReturnUpdated;
+use App\Modules\Orders\Application\Events\OrderStatusChanged;
 use App\Modules\Orders\Application\Services\NoOrderLineReviews;
 use App\Modules\Orders\Infrastructure\Console\ExpirePendingOrdersCommand;
 use App\Modules\Orders\Infrastructure\EloquentAttributedOrders;
@@ -28,6 +29,7 @@ use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledNotificati
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledWithRefundNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderPlacedNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderReturnNotifications;
+use App\Modules\Orders\Infrastructure\Notifications\SendOrderSms;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -46,6 +48,8 @@ use Illuminate\Support\Facades\RateLimiter;
  * processing), print data and couriers' COD remittances; online returns and refunds (E10b):
  * customer requests, staff approval, receipt with restock to the original batches, refunds
  * through the payments ledger, and the `CustomerWebOrders` summary for the customer card.
+ * BD1a: phone-only checkout and the SMS code check of the mobile number, order text messages
+ * (OrderStatusChanged + SendOrderSms) and "track my order" with the order and mobile numbers.
  */
 class OrdersServiceProvider extends ModuleServiceProvider
 {
@@ -75,6 +79,9 @@ class OrdersServiceProvider extends ModuleServiceProvider
         Event::listen(OrderCancelledWithRefund::class, SendOrderCancelledWithRefundNotifications::class);
         Event::listen(OrderReturnRequested::class, [SendOrderReturnNotifications::class, 'requested']);
         Event::listen(OrderReturnUpdated::class, [SendOrderReturnNotifications::class, 'updated']);
+        // BD1a: the shopper's order text messages.
+        Event::listen(OrderPlaced::class, [SendOrderSms::class, 'placed']);
+        Event::listen(OrderStatusChanged::class, [SendOrderSms::class, 'statusChanged']);
 
         // Checkout preview and placement: per IP and cart (ADR-015).
         RateLimiter::for('checkout', function (Request $request) {
@@ -84,6 +91,9 @@ class OrdersServiceProvider extends ModuleServiceProvider
 
             return Limit::perMinute((int) config('pos.checkout_rate_limit'))->by('checkout:'.$request->ip().'|'.$who);
         });
+
+        // BD1a: "track my order" (order number + mobile number) per IP.
+        RateLimiter::for('order-track', fn (Request $request) => Limit::perMinute(10)->by('order-track:'.$request->ip()));
 
         if ($this->app->runningInConsole()) {
             $this->commands([ExpirePendingOrdersCommand::class]);

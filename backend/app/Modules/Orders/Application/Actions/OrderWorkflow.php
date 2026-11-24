@@ -2,6 +2,7 @@
 
 namespace App\Modules\Orders\Application\Actions;
 
+use App\Modules\Orders\Application\Events\OrderStatusChanged;
 use App\Modules\Orders\Domain\OrderPaymentMethod;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\PaymentStatus;
@@ -35,6 +36,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Shipping (E10a) creates the order's shipment with a courier; courier updates
  * (shipmentEvent) append shipment events, `delivered` delivers the order.
+ *
+ * BD1a: every status change dispatches OrderStatusChanged after commit.
  */
 class OrderWorkflow
 {
@@ -290,5 +293,7 @@ class OrderWorkflow
             'actor_type' => 'staff',
             'created_at' => now(),
         ]);
+        // BD1a: after the step's transaction commits (order SMS and other listeners).
+        event(new OrderStatusChanged($o->organization_id, $o->id, $from->value, $to->value, 'staff'));
     }
 }

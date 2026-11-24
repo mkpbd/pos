@@ -4,7 +4,9 @@ namespace App\Modules\Storefront\Presentation\Http\Controllers;
 
 use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Application\Support\TranslationInput;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Sms\Application\Contracts\SmsSender;
 use App\Modules\Storefront\Application\Actions\DeleteStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontDomain;
 use App\Modules\Storefront\Application\Actions\SaveStorefrontSettings;
@@ -12,6 +14,7 @@ use App\Modules\Storefront\Application\Actions\SaveTheme;
 use App\Modules\Storefront\Application\Contracts\StoreAssistantSettings;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
+use App\Modules\Storefront\Infrastructure\Models\StorefrontSettings;
 use App\Modules\Storefront\Presentation\Http\Support\StorefrontPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,9 +27,22 @@ class StorefrontAdminController
 {
     private const HOST_PATTERN = '/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/';
 
-    public function showSettings(StorefrontConfig $config): JsonResponse
+    public function showSettings(StorefrontConfig $config, SmsSender $sms, TenantContext $tenant): JsonResponse
     {
-        return ApiResponse::success(StorefrontPresenter::settings($config->settings()));
+        return ApiResponse::success(StorefrontPresenter::settings($config->settings()) + $this->smsState($sms, $tenant));
+    }
+
+    /**
+     * BD1a: whether SMS is set up (`sms_ready`) and can send sign-in / checkout codes
+     * (`otp_ready`) — read-only, beside the checkout phone-check setting.
+     *
+     * @return array{sms_ready: bool, otp_ready: bool}
+     */
+    private function smsState(SmsSender $sms, TenantContext $tenant): array
+    {
+        $organizationId = $tenant->requireOrganization();
+
+        return ['sms_ready' => $sms->ready($organizationId), 'otp_ready' => $sms->otpReady($organizationId)];
     }
 
     /**
@@ -48,8 +64,12 @@ class StorefrontAdminController
      * AI2b: `assistant` {enabled (default false), name ≤ 40 (blank = "Shop assistant"), greeting
      * ≤ 200 (blank clears), daily_conversation_limit 1–2000 (200), handoff whatsapp|contact|none,
      * translations: {bn: {greeting}}} — partial, audited with the other settings.
+     * BD1a: `checkout_email` required | optional (default) | hidden — the customer e-mail field
+     * at checkout; `checkout_phone_verification` off (default) | cod | all — which orders need
+     * the mobile number checked with an SMS code (≠ off while SMS cannot send codes → 422
+     * `SMS_NOT_READY`). Read-only `sms_ready` / `otp_ready` come with the settings.
      */
-    public function updateSettings(Request $request, SaveStorefrontSettings $save): JsonResponse
+    public function updateSettings(Request $request, SaveStorefrontSettings $save, SmsSender $sms, TenantContext $tenant): JsonResponse
     {
         $data = $request->validate([
             'assistant' => ['sometimes', 'array:enabled,name,greeting,daily_conversation_limit,handoff,translations'],
@@ -73,9 +93,11 @@ class StorefrontAdminController
             'bangla_enabled' => ['sometimes', 'boolean'],
             'default_locale' => ['sometimes', Rule::in(LocaleContext::SUPPORTED)],
             'bangla_digits' => ['sometimes', 'boolean'],
+            'checkout_email' => ['sometimes', 'string', Rule::in(StorefrontSettings::CHECKOUT_EMAIL_MODES)],
+            'checkout_phone_verification' => ['sometimes', 'string', Rule::in(StorefrontSettings::PHONE_VERIFICATION_MODES)],
         ]);
 
-        return ApiResponse::success(StorefrontPresenter::settings($save($data)));
+        return ApiResponse::success(StorefrontPresenter::settings($save($data)) + $this->smsState($sms, $tenant));
     }
 
     public function domains(): JsonResponse

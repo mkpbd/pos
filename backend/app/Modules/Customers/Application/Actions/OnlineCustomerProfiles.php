@@ -23,9 +23,11 @@ class OnlineCustomerProfiles
     ) {}
 
     /**
+     * BD1a: $email is null for accounts created with a mobile number.
+     *
      * @return string the new customer's id
      */
-    public function register(string $name, string $email, ?string $phone): string
+    public function register(string $name, ?string $email, ?string $phone): string
     {
         return DB::transaction(fn () => ($this->save)(null, [
             'name' => $name,
@@ -58,6 +60,21 @@ class OnlineCustomerProfiles
             /** @var Customer $customer */
             $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
             ($this->save)($customer, ['name' => $name, 'phone' => $this->phoneIfFree($phone, $customerId)]);
+        });
+    }
+
+    /**
+     * BD1a: an e-mail address added later to an account created with a mobile number — copied
+     * onto the customer only while the customer has none.
+     */
+    public function addEmail(string $customerId, string $email): void
+    {
+        DB::transaction(function () use ($customerId, $email) {
+            /** @var Customer $customer */
+            $customer = Customer::query()->lockForUpdate()->findOrFail($customerId);
+            if ($customer->email === null || $customer->email === '') {
+                ($this->save)($customer, ['email' => $email]);
+            }
         });
     }
 

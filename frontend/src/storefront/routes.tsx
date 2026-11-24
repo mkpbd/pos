@@ -66,6 +66,8 @@ export const storefrontRoutes: RouteObject[] = [
       { path: 'wishlist', element: lazyPage(() => import('./wishlist/wishlist-page'), 'WishlistPage') },
       { path: 'checkout', element: lazyPage(() => import('./checkout/checkout-page'), 'CheckoutPage') },
       { path: 'order/:number', element: lazyPage(() => import('./orders/order-page'), 'OrderPage') },
+      // BD1a: a guest's order by its number and mobile number (the order SMS links here).
+      { path: 'track-order', element: lazyPage(() => import('./orders/track-order-page'), 'TrackOrderPage') },
       { path: 'account/verify-email', element: lazyPage(account, 'VerifyEmailPage') },
       {
         element: <GuestOnly />,

@@ -36,6 +36,8 @@ export function placementProblem(error: unknown, t: Translate): PlacementProblem
       return { code: error.code, message: t('checkout.problem.checkoutUnavailable') }
     case 'GUEST_CHECKOUT_DISABLED':
       return { code: error.code, message: t('checkout.problem.guestDisabled'), link: { to: loginPathFor('/checkout'), label: t('checkout.problem.signIn') } }
+    case 'PHONE_NOT_VERIFIED':
+      return { code: error.code, message: t('checkout.problem.phoneNotVerified'), field: 'phone' }
     case 'TOTAL_CHANGED':
       return { code: error.code, message: t('checkout.problem.totalChanged') }
     case 'VALIDATION_FAILED':

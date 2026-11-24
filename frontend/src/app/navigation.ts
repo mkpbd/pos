@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, MessageSquareTextIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -52,6 +52,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/users', label: 'Users', icon: UsersIcon, permission: 'users.view' },
   { to: '/roles', label: 'Roles & permissions', icon: ShieldCheckIcon, permission: 'roles.view' },
   { to: '/organization', label: 'Organization', icon: BuildingIcon, permission: ['organization.view', 'ai.manage'] },
+  // BD1a: SMS gateway, order message templates and the message log.
+  { to: '/settings/sms', label: 'SMS', icon: MessageSquareTextIcon, permission: 'sms.view' },
   { to: '/audit-log', label: 'Audit log', icon: ScrollTextIcon, permission: 'audit.view' },
   { to: '/platform/organizations', label: 'All organizations', icon: Building2Icon, platform: true },
   { to: '/system-status', label: 'System status', icon: ActivityIcon },

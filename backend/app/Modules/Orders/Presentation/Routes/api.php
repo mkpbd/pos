@@ -4,6 +4,7 @@ use App\Modules\Orders\Presentation\Http\Controllers\AccountOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\AccountReturnController;
 use App\Modules\Orders\Presentation\Http\Controllers\CodRemittanceController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutController;
+use App\Modules\Orders\Presentation\Http\Controllers\StoreCheckoutPhoneController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreDirectCheckoutController;
 use App\Modules\Orders\Presentation\Http\Controllers\StoreOrderController;
 use App\Modules\Orders\Presentation\Http\Controllers\WebOrderController;
@@ -18,6 +19,11 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'c
     // P2a: a landing page's order form orders directly, without the cart.
     Route::post('checkout/direct/preview', [StoreDirectCheckoutController::class, 'preview'])->middleware('throttle:checkout')->name('store.checkout.direct.preview');
     Route::post('checkout/direct', [StoreDirectCheckoutController::class, 'place'])->middleware(['throttle:checkout', 'idempotent:visitor'])->name('store.checkout.direct');
+    // BD1a: checking the mobile number with an SMS code before placing an order.
+    Route::post('checkout/phone/send', [StoreCheckoutPhoneController::class, 'send'])->middleware('throttle:checkout')->name('store.checkout.phone.send');
+    Route::post('checkout/phone/verify', [StoreCheckoutPhoneController::class, 'verify'])->middleware('throttle:checkout')->name('store.checkout.phone.verify');
+    // BD1a: track an order with its number and mobile number (before orders/{number}).
+    Route::get('orders/track', [StoreOrderController::class, 'track'])->middleware('throttle:order-track')->name('store.orders.track');
     Route::get('orders/{number}', [StoreOrderController::class, 'show'])->where('number', '[A-Za-z0-9-]{1,40}')->name('store.orders.show');
 });
 

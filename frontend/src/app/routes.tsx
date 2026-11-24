@@ -47,6 +47,8 @@ const pages = {
   users: page(() => import('@/features/users/pages/users-page'), 'UsersPage'),
   roles: page(() => import('@/features/roles/pages/roles-page'), 'RolesPage'),
   organization: page(() => import('@/features/organization/pages/organization-page'), 'OrganizationPage'),
+  // BD1a: SMS gateway, templates and message log; changes need sms.manage (page and API).
+  sms: page(() => import('@/features/sms/pages/sms-page'), 'SmsPage'),
   auditLog: page(() => import('@/features/audit/pages/audit-log-page'), 'AuditLogPage'),
   signIns: page(() => import('@/features/audit/pages/sign-ins-page'), 'SignInsPage'),
   platformOrganizations: page(() => import('@/features/platform/pages/platform-organizations-page'), 'PlatformOrganizationsPage'),
@@ -340,6 +342,7 @@ export const routes: RouteObject[] = [
               guarded('users.view', 'users', pages.users),
               guarded('roles.view', 'roles', pages.roles),
               guarded(ORGANIZATION_PERMISSIONS, 'organization', pages.organization),
+              guarded('sms.view', 'settings/sms', pages.sms),
               guarded('audit.view', 'audit-log', pages.auditLog),
               guarded('audit.view', 'audit-log/sign-ins', pages.signIns),
               { element: <RequirePlatformAdmin />, children: [{ path: 'platform/organizations', ...pages.platformOrganizations }] },

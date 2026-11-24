@@ -7,6 +7,7 @@ use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Customers\Application\Actions\CustomerAddressBook;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
 use App\Modules\Sales\Domain\TaxMode;
+use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Money;
 use App\Modules\Shipping\Application\Contracts\ShippingRates;
@@ -22,7 +23,7 @@ use App\Modules\Shipping\Domain\ShippingFee;
  * Promotions (E8b) come with the cart pricing (product and order discounts, before tax);
  * a free-delivery promotion waives the delivery fee (`shipping_discount` = the waived fee,
  * `shipping_total` 0) but not the COD fee. Placement passes the contact e-mail so guests'
- * per-customer limits count.
+ * per-customer limits count; BD1a: and the contact mobile number (counted for everyone).
  *
  * Partial input is fine: without a district there are no delivery methods and no fee; an
  * unknown or unavailable method or payment method is reported as null.
@@ -55,9 +56,9 @@ class CheckoutQuoter
      */
     public function quote(?Cart $cart, array $input, ?string $customerId, bool $autoPickMethod = false): array
     {
-        $email = is_string($input['contact']['email'] ?? null) ? $input['contact']['email'] : null;
+        [$email, $phone] = self::contact($input);
 
-        return $this->complete($this->pricer->quote($cart, $email), $input, $customerId, $autoPickMethod);
+        return $this->complete($this->pricer->quote($cart, $email, false, $phone), $input, $customerId, $autoPickMethod);
     }
 
     /**
@@ -70,13 +71,27 @@ class CheckoutQuoter
      */
     public function quoteLines(array $lines, array $input, ?string $customerId, bool $autoPickMethod = false): array
     {
-        $email = is_string($input['contact']['email'] ?? null) ? $input['contact']['email'] : null;
+        [$email, $phone] = self::contact($input);
         $items = [];
         foreach (array_values($lines) as $i => $line) {
             $items[] = ['id' => 'line-'.$i, 'variant_id' => $line['variant_id'], 'quantity' => (string) $line['quantity']];
         }
 
-        return $this->complete($this->pricer->quoteItems($items, $customerId, $email, null), $input, $customerId, $autoPickMethod);
+        return $this->complete($this->pricer->quoteItems($items, $customerId, $email, null, null, $phone), $input, $customerId, $autoPickMethod);
+    }
+
+    /**
+     * The contact e-mail and (BD1a) mobile number of the checkout body, when given.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function contact(array $input): array
+    {
+        $email = is_string($input['contact']['email'] ?? null) && trim($input['contact']['email']) !== '' ? $input['contact']['email'] : null;
+        $phone = is_string($input['contact']['phone'] ?? null) ? BangladeshMobile::normalize($input['contact']['phone']) : null;
+
+        return [$email, $phone];
     }
 
     /**

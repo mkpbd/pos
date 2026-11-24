@@ -8,22 +8,24 @@ use App\Modules\Promotions\Domain\CouponCode;
 use App\Modules\Promotions\Domain\LineInput;
 use App\Modules\Promotions\Domain\PromotionEngine;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
+use App\Modules\Shared\Domain\BangladeshMobile;
 
 class EloquentPromotionPricing implements PromotionPricing
 {
     public function __construct(private readonly PromotionOffers $offers) {}
 
-    public function price(array $lines, ?string $couponCode, ?string $customerId, ?string $email, string $currency): PromotionQuote
+    public function price(array $lines, ?string $couponCode, ?string $customerId, ?string $email, string $currency, ?string $phone = null): PromotionQuote
     {
         $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
-        $automatic = array_map(fn (Promotion $p) => $this->offers->offer($p), $this->offers->usableAutomatic($customerId, $email));
+        $phone = $phone === null ? null : BangladeshMobile::normalize($phone);
+        $automatic = array_map(fn (Promotion $p) => $this->offers->offer($p), $this->offers->usableAutomatic($customerId, $email, $phone));
 
         $coupon = null;
         $couponOffer = null;
         $blocked = null;
         $code = $couponCode === null || trim($couponCode) === '' ? null : CouponCode::normalize($couponCode);
         if ($code !== null) {
-            [$coupon, $blocked] = $this->offers->coupon($code, $customerId, $email);
+            [$coupon, $blocked] = $this->offers->coupon($code, $customerId, $email, $phone);
             $couponOffer = $coupon === null ? null : $this->offers->offer($coupon->promotion, true);
         }
 

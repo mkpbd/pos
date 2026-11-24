@@ -19,6 +19,7 @@ final class FixedText
         'Checkout' => 'চেকআউট',
         'My account' => 'আমার অ্যাকাউন্ট',
         'Your order' => 'আপনার অর্ডার',
+        'Track your order' => 'অর্ডার ট্র্যাক করুন',
     ];
 
     public static function get(string $text, string $locale): string

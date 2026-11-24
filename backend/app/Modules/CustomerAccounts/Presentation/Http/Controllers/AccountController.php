@@ -133,9 +133,11 @@ class AccountController
         $account = $request->user('customer');
         $verification->send($account, $request->getSchemeAndHttpHost());
 
-        return ApiResponse::success(['message' => $account->email_verified_at === null
-            ? 'We have sent a new confirmation link to your e-mail address.'
-            : 'Your e-mail address is already confirmed.']);
+        return ApiResponse::success(['message' => match (true) {
+            $account->email === null => 'Add an e-mail address to your profile first.',
+            $account->email_verified_at === null => 'We have sent a new confirmation link to your e-mail address.',
+            default => 'Your e-mail address is already confirmed.',
+        }]);
     }
 
     /**
@@ -149,27 +151,37 @@ class AccountController
     /**
      * Update profile
      *
-     * Name and (Bangladeshi mobile) phone. The e-mail address cannot be changed yet.
+     * Name and (Bangladeshi mobile) phone — a changed number is no longer verified. `email` only
+     * while the account has none (BD1a: accounts created with a mobile number; unique in the
+     * store, a confirmation e-mail is sent); otherwise the e-mail address cannot be changed yet.
      */
-    public function updateProfile(UpdateProfileRequest $request, CustomerProfile $profile): JsonResponse
+    public function updateProfile(UpdateProfileRequest $request, CustomerProfile $profile, EmailVerification $verification): JsonResponse
     {
         $data = $request->validated();
+        /** @var CustomerAccount $account */
+        $account = $request->user('customer');
+        if ($profile->update($account, $data['name'], $data['phone'] ?? null, $data['email'] ?? null)) {
+            $verification->send($account, $request->getSchemeAndHttpHost());
+        }
 
-        return ApiResponse::success($profile->update($request->user('customer'), $data['name'], $data['phone'] ?? null));
+        return ApiResponse::success($profile->show($account));
     }
 
     /**
      * Change password
      *
-     * A wrong `current_password` is a field error.
+     * A wrong `current_password` is a field error. BD1a: an account without a password (created
+     * with a mobile number) sets its first one without `current_password`.
      */
     public function changePassword(Request $request, CustomerProfile $profile): JsonResponse
     {
+        /** @var CustomerAccount $account */
+        $account = $request->user('customer');
         $data = $request->validate([
-            'current_password' => ['required', 'string', 'max:255'],
+            'current_password' => [$account->password === null ? 'nullable' : 'required', 'string', 'max:255'],
             'password' => ['required', 'string', 'confirmed', 'max:255', Password::defaults()],
         ]);
-        $profile->changePassword($request->user('customer'), $data['current_password'], $data['password']);
+        $profile->changePassword($account, $data['current_password'] ?? null, $data['password']);
 
         return ApiResponse::success(['message' => 'Your password has been changed.']);
     }

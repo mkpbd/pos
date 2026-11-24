@@ -15,10 +15,27 @@ export function normalizeBdPhone(input: string): string {
 
 export const BD_MOBILE = /^01[3-9]\d{8}$/
 
+/** A typed mobile number as the server keeps it (01XXXXXXXXX): Bengali digits, +88, spaces and dashes allowed. */
+export function bdPhoneFrom(input: string): string {
+  return normalizeBdPhone(input.trim().replace(/[০-৯]/g, (digit) => String('০১২৩৪৫৬৭৮৯'.indexOf(digit))))
+}
+
 const optionalPhone = z
   .string()
   .trim()
   .refine((v) => v === '' || BD_MOBILE.test(normalizeBdPhone(v)), 'account.validation.phoneInvalid')
+
+const requiredPhone = z
+  .string()
+  .trim()
+  .min(1, 'account.validation.mobileRequired')
+  .refine((v) => BD_MOBILE.test(bdPhoneFrom(v)), 'account.validation.phoneInvalid')
+
+const optionalEmail = z
+  .string()
+  .trim()
+  .max(254)
+  .refine((v) => v === '' || z.email().safeParse(v).success, 'account.validation.emailInvalid')
 
 const confirmed = <T extends { password: string; password_confirmation: string }>(v: T) => v.password === v.password_confirmation
 
@@ -40,6 +57,17 @@ export const registerSchema = z
   .refine(confirmed, { path: ['password_confirmation'], message: 'account.validation.passwordsMismatch' })
 export type RegisterValues = z.infer<typeof registerSchema>
 
+/** BD1a: sign-in with a code — the mobile number step. */
+export const phoneLoginSchema = z.object({ phone: requiredPhone, remember: z.boolean() })
+export type PhoneLoginValues = z.infer<typeof phoneLoginSchema>
+
+/** BD1a: a new shopper after the code — name and an optional e-mail. */
+export const phoneProfileSchema = z.object({
+  name: z.string().trim().min(2, 'account.validation.nameRequired').max(120),
+  email: optionalEmail,
+})
+export type PhoneProfileValues = z.infer<typeof phoneProfileSchema>
+
 export const forgotSchema = z.object({ email })
 export type ForgotValues = z.infer<typeof forgotSchema>
 
@@ -51,6 +79,8 @@ export type ResetValues = z.infer<typeof resetSchema>
 export const profileSchema = z.object({
   name: z.string().trim().min(2, 'account.validation.nameRequired').max(120),
   phone: optionalPhone,
+  /** BD1a: only shown (and sent) while the account has no e-mail address. */
+  email: optionalEmail,
 })
 export type ProfileValues = z.infer<typeof profileSchema>
 
@@ -58,6 +88,12 @@ export const passwordSchema = z
   .object({ current_password: z.string().min(1, 'account.validation.currentPasswordRequired'), password: newPassword, password_confirmation: z.string() })
   .refine(confirmed, { path: ['password_confirmation'], message: 'account.validation.passwordsMismatch' })
 export type PasswordValues = z.infer<typeof passwordSchema>
+
+/** BD1a: the first password of an account that has none (no current password to give). */
+export const firstPasswordSchema = z
+  .object({ password: newPassword, password_confirmation: z.string() })
+  .refine(confirmed, { path: ['password_confirmation'], message: 'account.validation.passwordsMismatch' })
+export type FirstPasswordValues = z.infer<typeof firstPasswordSchema>
 
 export const addressSchema = z.object({
   label: z.string().trim().max(40, 'account.validation.maxChars'),

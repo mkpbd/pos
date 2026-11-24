@@ -21,6 +21,32 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### BD1a — SMS, phone sign-in with a code, phone-only checkout, order SMS
+
+First part of BD1 (Bangladesh commerce pack) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P0). No new packages; no SMS vendor SDK — a generic HTTP gateway any Bangladeshi SMS provider can be set up with.
+
+#### Added
+- **SMS settings** (*Settings → SMS*, `sms.view` / `sms.manage`): test mode (messages written to the server log) or an HTTP SMS gateway (URL, GET/POST, form/JSON, parameter names, write-only API key, sender ID, phone format, extra parameters, success text, monthly limit); *Send a test SMS*; English and Bangla templates for order placed / payment confirmed / shipped / delivered / cancelled with placeholders and an SMS-parts counter; message log with filters.
+- **Order SMS** to the shopper on those events (once per order and event, in the order's language).
+- **Sign in with a code** on the online store: mobile number → 6-digit SMS code; a new number gets a short "Almost done" step (name, optional e-mail). Profiles can verify the phone, add an e-mail once and set a first password.
+- **Checkout:** *Customer e-mail at checkout* (required / optional / hidden) and *Check the phone with an SMS code* (off / cash on delivery orders / all orders), also on landing-page order forms.
+- **Track order** page (`/track-order`): order number + mobile number, no account.
+- Per-customer promotion limits also count guests by phone.
+
+#### Changed
+- **Contact e-mail at checkout is optional by default** (was required). Order e-mails are skipped when there is none; the SMS carries the order link.
+- Shopper accounts may have no e-mail or no password; e-mail/password sign-in is unchanged for accounts that have both.
+
+#### Security
+- The SMS gateway address is checked on every send (https only; private, loopback, link-local / metadata and reserved addresses refused; the checked address is pinned; no redirects). The API key is encrypted, never returned, logged or audited. Codes are stored as HMACs, masked in the message log, rate-limited per phone / IP / store, 5 tries each; phone sign-in never opens an account whose number was not verified.
+
+#### Tests
+- Backend 1810 (PostgreSQL: 1809 pass, 1 opt-in PDF skip); Pint clean. vitest 2973; mocked Playwright 565 (new `bd1a-sms-admin`, `bd1a-phone-login`, `bd1a-checkout`, `bd1a-track-order`).
+- Full-stack (PostgreSQL, desktop) 59 — new **BD1a** on Bazar Fresh: SMS in test mode, e-mail hidden and a code required for cash on delivery; a guest verifies the phone with the code read from the SMS log, places the order, the log shows the masked code and the order SMS, the order is tracked by number + phone, and the same number signs in with a code and creates an account. Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- `php artisan migrate`, `php artisan pos:permissions:sync`; a queue worker must run for SMS. Stores that want e-mail at checkout set it back to Required.
+
 ### ST1 — Stock operations: bulk import, barcodes & labels, stocktakes, supplier money in the drawer
 
 From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P0). No new packages (Excel/CSV through the existing OpenSpout; barcodes drawn in-house).

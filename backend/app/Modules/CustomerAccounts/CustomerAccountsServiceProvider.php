@@ -7,6 +7,7 @@ use App\Modules\CustomerAccounts\Application\Services\NoGuestCart;
 use App\Modules\CustomerAccounts\Infrastructure\Auth\StorefrontCustomerProvider;
 use App\Modules\CustomerAccounts\Infrastructure\EloquentCustomerOnlineAccounts;
 use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
+use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -34,10 +35,24 @@ class CustomerAccountsServiceProvider extends ModuleServiceProvider
 
         Auth::provider('storefront_customers', fn ($app, array $config) => new StorefrontCustomerProvider($app['hash'], $config['model']));
 
-        // Same numbers as staff sign-in: per e-mail+IP and four times that per IP.
+        // Same numbers as staff sign-in: per e-mail (BD1a: or mobile number) + IP and four times that per IP.
         RateLimiter::for('customer-auth', fn (Request $request) => [
-            Limit::perMinute((int) config('pos.auth_rate_limit'))->by('customer-auth:'.mb_strtolower((string) $request->input('email')).'|'.$request->ip()),
+            Limit::perMinute((int) config('pos.auth_rate_limit'))->by('customer-auth:'.self::authIdentity($request).'|'.$request->ip()),
             Limit::perMinute(4 * (int) config('pos.auth_rate_limit'))->by('customer-auth:'.$request->ip()),
         ]);
+    }
+
+    /**
+     * Who a sign-in attempt is for: the e-mail address, else the (normalized) mobile number.
+     */
+    public static function authIdentity(Request $request): string
+    {
+        $email = mb_strtolower(trim((string) $request->input('email')));
+        if ($email !== '') {
+            return $email;
+        }
+        $phone = (string) $request->input('phone');
+
+        return $phone === '' ? '' : 'phone:'.(BangladeshMobile::normalize($phone) ?? mb_substr($phone, 0, 30));
     }
 }

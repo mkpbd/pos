@@ -135,6 +135,15 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // BD1a: text messages — test-mode messages and gateway outcomes (host, status, error; never the API key).
+        'sms' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/sms.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_SMS_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

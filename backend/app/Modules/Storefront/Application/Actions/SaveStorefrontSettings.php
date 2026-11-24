@@ -9,6 +9,7 @@ use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use App\Modules\Sms\Application\Contracts\SmsSender;
 use App\Modules\Storefront\Application\Queries\StorefrontConfig;
 use App\Modules\Storefront\Domain\WhatsAppNumber;
 use App\Modules\Storefront\Infrastructure\Models\StorefrontDomain;
@@ -22,20 +23,27 @@ class SaveStorefrontSettings
         // P2b.
         'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button',
         // AI2b.
-        'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff'];
+        'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff',
+        // BD1a.
+        'checkout_email', 'checkout_phone_verification'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
         private readonly BranchDirectory $branches,
         private readonly TenantContext $tenant,
         private readonly AuditTrail $audit,
+        private readonly SmsSender $sms,
     ) {}
 
     /**
      * AI2b: `assistant` {enabled?, name?, greeting?, daily_conversation_limit?, handoff?,
      * translations?: {bn: {greeting}}} — partial; a blank name or greeting clears it.
      *
-     * @param  array{is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
+     * BD1a: `checkout_email` (required | optional | hidden) and `checkout_phone_verification`
+     * (off | cod | all) — switching the phone check on needs SMS codes to work for the
+     * organization (SmsSender::otpReady), else SMS_NOT_READY.
+     *
+     * @param  array{checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {
@@ -62,6 +70,13 @@ class SaveStorefrontSettings
         return DB::transaction(function () use ($attributes, $assistant) {
             $settings = $this->config->settings();
             $before = $settings->exists ? $settings->only(self::AUDITED) : [];
+
+            // BD1a: the phone check can only be switched on while SMS codes can be sent.
+            $verification = $attributes['checkout_phone_verification'] ?? null;
+            if ($verification !== null && $verification !== 'off' && $verification !== $settings->checkout_phone_verification
+                && ! $this->sms->otpReady($this->tenant->requireOrganization())) {
+                throw new BusinessRuleViolation('SMS_NOT_READY', 'Set up SMS (with a gateway that can send codes) before checking phone numbers at checkout.');
+            }
 
             $settings->fill($attributes);
             if (is_array($assistant)) {

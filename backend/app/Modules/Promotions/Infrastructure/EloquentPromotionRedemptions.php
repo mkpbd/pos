@@ -7,6 +7,7 @@ use App\Modules\Promotions\Infrastructure\Models\Coupon;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Promotions\Infrastructure\Models\PromotionRedemption;
 use App\Modules\Shared\Application\Contracts\StorefrontContentVersion;
+use App\Modules\Shared\Domain\BangladeshMobile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -33,10 +34,11 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
         return $locked;
     }
 
-    public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, ?string $email, array $redemptions): void
+    public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, ?string $email, array $redemptions, ?string $phone = null): void
     {
         $now = now();
         $coupons = [];
+        $phone = $phone === null ? null : BangladeshMobile::normalize($phone);
         foreach ($redemptions as $redemption) {
             PromotionRedemption::query()->create([
                 'promotion_id' => $redemption['promotion_id'],
@@ -46,6 +48,7 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
                 'customer_id' => $customerId,
                 'customer_account_id' => $customerAccountId,
                 'email' => $email === null || trim($email) === '' ? null : mb_strtolower(trim($email)),
+                'phone' => $phone,
                 'kind' => $redemption['kind'],
                 'amount' => $redemption['amount'],
                 'created_at' => $now,

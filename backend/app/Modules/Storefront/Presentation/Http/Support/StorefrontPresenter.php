@@ -48,6 +48,9 @@ final class StorefrontPresenter
                 'handoff' => $s->assistantHandoffChoice(),
                 'translations' => TranslationInput::present($s->assistant_translations),
             ],
+            // BD1a: the contact fields of the checkout.
+            'checkout_email' => $s->checkout_email ?? 'optional',
+            'checkout_phone_verification' => $s->checkout_phone_verification ?? 'off',
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

@@ -35,6 +35,9 @@ use Carbon\CarbonImmutable;
  * AI2b: `assistant` {enabled (the store's switch AND AI available for the organization), name,
  * greeting (this language), handoff, handoff_url} — computed outside the content cache (the AI
  * switch is not storefront content); never limits or usage.
+ * BD1a: `checkout` {email: required|optional|hidden, phone_verification: off|cod|all} and
+ * `account` {phone_login} (CheckoutContact; outside the content cache — they follow the SMS
+ * set-up too).
  */
 class StorefrontBootstrap
 {
@@ -51,6 +54,7 @@ class StorefrontBootstrap
         private readonly CustomFonts $fonts,
         private readonly StoreAssistantSettings $assistant,
         private readonly AiFeatures $ai,
+        private readonly CheckoutContact $contact,
     ) {}
 
     /**
@@ -65,7 +69,22 @@ class StorefrontBootstrap
             'bootstrap',
             fn () => $this->compute(),
             fn () => self::earliest($this->schedule->nextChange(), $this->builder->partsNextChange()),
-        ) + ['assistant' => $this->assistant()];
+        ) + $this->live();
+    }
+
+    /**
+     * The parts computed on every request: AI2b assistant, BD1a checkout contact fields and
+     * phone sign-in.
+     *
+     * @return array<string, mixed>
+     */
+    private function live(): array
+    {
+        return [
+            'assistant' => $this->assistant(),
+            'checkout' => ['email' => $this->contact->emailMode(), 'phone_verification' => $this->contact->phoneVerification()],
+            'account' => ['phone_login' => $this->contact->phoneLogin()],
+        ];
     }
 
     /**
@@ -96,7 +115,7 @@ class StorefrontBootstrap
      */
     public function buildWithTheme(array $theme): array
     {
-        return $this->compute($theme, true) + ['assistant' => $this->assistant()];
+        return $this->compute($theme, true) + $this->live();
     }
 
     /**

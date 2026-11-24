@@ -233,6 +233,10 @@ export type StorefrontBootstrap = {
   entry_path?: string | null
   /** AI2b: the shopper support assistant; absent / null / `enabled: false` = no chat button. */
   assistant?: StoreAssistantBootstrap | null
+  /** BD1a: the checkout's e-mail field and SMS-code check of the mobile number; absent = e-mail required, no check. */
+  checkout?: { email: CheckoutEmailMode; phone_verification: PhoneVerificationMode }
+  /** BD1a: `phone_login` = shoppers can sign in with a code sent to their mobile (SMS gateway ready). */
+  account?: { phone_login: boolean }
 }
 
 /** AI2b: who a shopper is handed to when the assistant cannot help. */
@@ -599,13 +603,34 @@ export type SearchSuggestions = {
  * ------------------------------------------------------------------------------------- */
 
 /** GET /store/account/me (null for guests) and the `customer` of sign-in responses. */
-export type Customer = { id: string; name: string; email: string; phone: string | null; email_verified: boolean }
+export type Customer = {
+  id: string
+  name: string
+  /** BD1a: null for an account created by signing in with a mobile number (an e-mail can be added once). */
+  email: string | null
+  phone: string | null
+  email_verified: boolean
+  /** BD1a: the mobile number was confirmed with an SMS code. Absent (older payloads) = false. */
+  phone_verified?: boolean
+  /** BD1a: false for a phone-only account that never chose a password. Absent (older payloads) = true. */
+  has_password?: boolean
+}
 
 /** How the guest cart was folded into the customer's cart on sign-in. */
 export type CartMerge = { merged_lines: number; capped_lines: number }
 
 /** POST /store/account/login and /register. */
 export type SignInResult = { customer: Customer; merge: CartMerge | null }
+
+/** BD1a: POST /store/account/otp/send and /store/checkout/phone/send (202) — seconds until a new code may be asked for, and the code's lifetime. */
+export type PhoneCodeSent = { resend_after: number; expires_in: number }
+
+/** BD1a: POST /store/account/otp/login — signed in, or a new shopper who still has to give a name. */
+export type PhoneSignInResult = { status: 'signed_in'; customer: Customer; merge?: CartMerge | null } | { status: 'needs_profile'; phone: string }
+
+/** BD1a: the e-mail field at checkout, and when the mobile number must be confirmed with an SMS code. */
+export type CheckoutEmailMode = 'required' | 'optional' | 'hidden'
+export type PhoneVerificationMode = 'off' | 'cod' | 'all'
 
 export type GeoId = string | number
 
@@ -718,6 +743,12 @@ export type CheckoutOptions = {
   guest_checkout: boolean
   payment_methods: { code: PaymentMethodCode; display_name: string; instructions_preview?: string | null }[]
   signed_in: boolean
+  /** BD1a: the e-mail field; absent (older payloads) = required. */
+  email_field?: CheckoutEmailMode
+  /** BD1a: when the mobile number needs an SMS code; absent = off. */
+  phone_verification?: PhoneVerificationMode
+  /** BD1a: shoppers can sign in with a code sent to their mobile. */
+  phone_login?: boolean
 }
 
 /** A delivery method of the zone that serves a district. */
@@ -772,7 +803,8 @@ export type CheckoutAddressInput = {
 
 /** POST /store/checkout (with an Idempotency-Key header). */
 export type PlaceOrderInput = {
-  contact: { name: string; email: string; phone: string }
+  /** BD1a: `email` is left out when the store does not ask for it, or the shopper left the optional field empty. */
+  contact: { name: string; email?: string; phone: string }
   shipping_address_id?: string
   address?: CheckoutAddressInput
   save_address?: boolean
@@ -806,7 +838,7 @@ export type OrderView = {
   payment_instructions: string | null
   placed_at: string
   expires_at: string | null
-  contact: { name: string; email: string; phone: string }
+  contact: { name: string; email: string | null; phone: string }
   shipping_address: { recipient_name: string; phone: string; division: string; district: string; area: string | null; address_line: string; postcode: string | null }
   shipping_method_name: string | null
   eta_min_days: number | null

@@ -122,6 +122,46 @@ class OrderPresenter
     }
 
     /**
+     * BD1a: what "track my order" shows to someone who knows the order number and mobile
+     * number — status, payment, total, item count, status history and the courier parcel; no
+     * name, address, lines or e-mail.
+     *
+     * @return array<string, mixed>
+     */
+    public function tracking(Order $order): array
+    {
+        $order->loadMissing(['lines', 'history', 'shipment']);
+        $shipment = $order->shipment;
+        // Whole quantities count their units; a weighed (fractional) line counts as one item.
+        $items = $order->lines->sum(function (OrderLine $l) {
+            $quantity = Decimal::round((string) $l->quantity, 3);
+
+            return Decimal::compare($quantity, Decimal::round($quantity, 0)) === 0 ? max(1, (int) $quantity) : 1;
+        });
+
+        return [
+            'number' => $order->number,
+            'status' => $order->status->value,
+            'payment_method' => $order->payment_method->value,
+            'payment_status' => $order->payment_status->value,
+            'placed_at' => $order->placed_at->toIso8601String(),
+            'total' => (string) $order->total,
+            'currency' => $order->currency,
+            'item_count' => (int) $items,
+            'history' => $order->history->map(fn (OrderStatusChange $h) => [
+                'status' => $h->to_status->value,
+                'at' => $h->created_at->toIso8601String(),
+            ])->values()->all(),
+            'shipment' => $shipment === null ? null : [
+                'courier_name' => $shipment->courier_name,
+                'tracking_number' => $shipment->tracking_number,
+                'tracking_url' => $this->trackingUrl($order),
+                'status' => $shipment->status->value,
+            ],
+        ];
+    }
+
+    /**
      * The customer's own order in the account area (E9): the storefront view plus
      * `can_cancel`, the cancellation reason, and per line `product_id`, `variant_id`, the
      * customer's `review` of the product (`{id, rating, status}` or null) and `reviewable`

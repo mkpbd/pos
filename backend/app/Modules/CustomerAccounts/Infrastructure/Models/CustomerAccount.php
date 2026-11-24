@@ -18,18 +18,19 @@ use Illuminate\Notifications\Notifiable;
  * @property string $id
  * @property string $organization_id
  * @property string $customer_id
- * @property string $email
+ * @property ?string $email null for accounts created with a mobile number (BD1a)
  * @property ?string $phone
- * @property string $password
+ * @property ?string $password null until a phone-only account sets one (BD1a)
  * @property AccountStatus $status
  * @property ?CarbonImmutable $email_verified_at
+ * @property ?CarbonImmutable $phone_verified_at the phone was proven with an SMS code (BD1a)
  * @property ?string $email_verification_token_hash
  * @property ?CarbonImmutable $email_verification_sent_at
  * @property ?CarbonImmutable $last_login_at
  * @property ?CarbonImmutable $created_at
  * @property ?string $preferred_locale en | bn, from the last sign-up / sign-in (E12b)
  */
-#[Fillable(['organization_id', 'customer_id', 'email', 'phone', 'password', 'status'])]
+#[Fillable(['organization_id', 'customer_id', 'email', 'phone', 'phone_verified_at', 'password', 'status'])]
 #[Hidden(['password', 'remember_token', 'email_verification_token_hash'])]
 class CustomerAccount extends Authenticatable
 {
@@ -45,6 +46,7 @@ class CustomerAccount extends Authenticatable
             'password' => 'hashed',
             'status' => AccountStatus::class,
             'email_verified_at' => 'immutable_datetime',
+            'phone_verified_at' => 'immutable_datetime',
             'email_verification_sent_at' => 'immutable_datetime',
             'last_login_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',

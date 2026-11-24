@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ExternalLinkIcon, Loader2Icon, PlusIcon, StarIcon, Trash2Icon } from 'lucide-react'
@@ -26,6 +27,8 @@ import {
   useSetDomainEntryPathMutation,
   useStorefrontDomainsQuery,
   useStorefrontSettingsQuery,
+  type CheckoutEmailMode,
+  type CheckoutPhoneVerification,
   type StoreLocale,
   type StorefrontDomain,
   type StorefrontSettings,
@@ -33,6 +36,7 @@ import {
 import { SharingCard } from '@/features/storefront/components/sharing-card'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { documentPath, useDocumentsQuery } from '@/features/store-builder/api'
+import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap, handleFormError } from '@/lib/forms'
 
 const schema = z.object({
@@ -253,17 +257,106 @@ function CheckoutCard({ settings, canManage }: { settings: StorefrontSettings; c
     <Card>
       <CardHeader>
         <CardTitle>Checkout</CardTitle>
-        <CardDescription>Guests give their name, e-mail and phone at checkout instead of creating an account.</CardDescription>
+        <CardDescription>Guests give their contact details at checkout instead of creating an account.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <Switch id="guest-checkout" checked={allowed} disabled={!canManage || save.isPending} onCheckedChange={toggle} />
           <Label htmlFor="guest-checkout">Allow guest checkout</Label>
         </div>
+        <CheckoutContactFields settings={settings} canManage={canManage} />
         {/* Keyed by the saved value, so the field resets when the setting changes. */}
         <ReturnWindowForm key={settings.return_window_days ?? 7} settings={settings} canManage={canManage} />
       </CardContent>
     </Card>
+  )
+}
+
+const EMAIL_MODES: { value: CheckoutEmailMode; label: string }[] = [
+  { value: 'required', label: 'Required' },
+  { value: 'optional', label: 'Optional' },
+  { value: 'hidden', label: 'Hidden' },
+]
+const EMAIL_HINTS: Record<CheckoutEmailMode, string> = {
+  required: 'Every order needs an e-mail address.',
+  optional: 'Customers may leave it empty; order updates then go by SMS only.',
+  hidden: 'No e-mail field: customers give their name, mobile number and address.',
+}
+const VERIFICATION_MODES: { value: CheckoutPhoneVerification; label: string }[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'cod', label: 'Cash on delivery orders' },
+  { value: 'all', label: 'All orders' },
+]
+const VERIFICATION_HINTS: Record<CheckoutPhoneVerification, string> = {
+  off: 'Orders are placed without checking the mobile number.',
+  cod: 'Cash on delivery customers type a code sent to their mobile before ordering — fewer fake orders.',
+  all: 'Every customer types a code sent to their mobile before ordering.',
+}
+
+/** BD1a: the e-mail field at checkout and checking the mobile number with an SMS code. */
+function CheckoutContactFields({ settings, canManage }: { settings: StorefrontSettings; canManage: boolean }) {
+  const id = useId()
+  const can = useCan()
+  const save = useSaveStorefrontSettingsMutation()
+  const [error, setError] = useState<{ smsNotReady: boolean; message: string } | null>(null)
+  const email = settings.checkout_email ?? 'optional'
+  const verification = settings.checkout_phone_verification ?? 'off'
+  const otpReady = settings.otp_ready === true
+  const smsLink = can('sms.view') ? (
+    <Link to="/settings/sms" className="text-primary underline-offset-4 hover:underline">Set up SMS</Link>
+  ) : (
+    'Ask an administrator to set up SMS.'
+  )
+
+  const change = (input: { checkout_email: CheckoutEmailMode } | { checkout_phone_verification: CheckoutPhoneVerification }) => {
+    setError(null)
+    save.mutate(input, {
+      onSuccess: () => toast.success('Checkout settings saved.'),
+      onError: (e) => {
+        if (e instanceof ApiError && e.code === 'SMS_NOT_READY') setError({ smsNotReady: true, message: 'SMS cannot send codes yet, so phone checking stays off.' })
+        else {
+          const map = fieldErrorMap(e)
+          setError({ smsNotReady: false, message: map.checkout_email ?? map.checkout_phone_verification ?? map.form ?? e.message })
+        }
+      },
+    })
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-email`}>Customer e-mail at checkout</Label>
+        <Select value={email} onValueChange={(v) => change({ checkout_email: v as CheckoutEmailMode })} disabled={!canManage || save.isPending}>
+          <SelectTrigger id={`${id}-email`} className="w-full" aria-describedby={`${id}-email-hint`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {EMAIL_MODES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <p id={`${id}-email-hint`} className="text-sm text-muted-foreground">{EMAIL_HINTS[email]}</p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-verify`}>Check the phone with an SMS code</Label>
+        <Select
+          value={verification}
+          onValueChange={(v) => change({ checkout_phone_verification: v as CheckoutPhoneVerification })}
+          // Without SMS codes only "Off" can be chosen (a saved mode can still be switched off).
+          disabled={!canManage || save.isPending || (!otpReady && verification === 'off')}
+        >
+          <SelectTrigger id={`${id}-verify`} className="w-full" aria-describedby={`${id}-verify-hint`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {VERIFICATION_MODES.map((m) => <SelectItem key={m.value} value={m.value} disabled={m.value !== 'off' && !otpReady}>{m.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <p id={`${id}-verify-hint`} className="text-sm text-muted-foreground">
+          {otpReady ? VERIFICATION_HINTS[verification] : <>Needs SMS that can send codes. {smsLink}</>}
+        </p>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive sm:col-span-2">
+          {error.message} {error.smsNotReady && smsLink}
+        </p>
+      )}
+    </div>
   )
 }
 
