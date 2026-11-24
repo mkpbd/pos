@@ -38,6 +38,10 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- G1b: the error log writes through its own (committed) connection; its tests turn it on and roll it back. -->
+        <env name="POS_ERROR_LOG_ENABLED" value="false" force="true"/>
+        <env name="POS_BACKUP_ENABLED" value="false" force="true"/>
+        <env name="POS_OPS_ALERT_EMAILS" value="" force="true"/>
         <!-- Phase 8: tests never reach a real AI provider (they fake the HTTP client or bind FakeLanguageModel). -->
         <env name="AI_ENABLED" value="false" force="true"/>
         <env name="AI_API_KEY" value="" force="true"/>

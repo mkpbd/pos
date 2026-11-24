@@ -1275,3 +1275,81 @@ test('G1a: two-factor sign-in with a real authenticator code and a recovery code
     await expect(owner.getByRole('table', { name: 'Sign-ins' })).toContainText('Account locked')
   })
 })
+
+test('G1b: the platform admin backs up the real database from System status, checks the backup and sends a test e-mail; an owner is refused', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(180_000)
+  type Page = import('@playwright/test').Page
+  type Call = { status: number; body: { data: any; error?: any } }
+  const call = async (page: Page, method: string, url: string, body?: unknown): Promise<Call> => {
+    const token = decodeURIComponent((await page.context().cookies()).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const signIn = async (email: string) => {
+    const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage()
+    await page.goto('/admin/login')
+    await page.getByLabel('E-mail').fill(email)
+    await page.getByLabel('Password').fill('password')
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page).not.toHaveURL(/\/admin\/login/)
+    return page
+  }
+
+  // An organization owner keeps the simple page; the operations API refuses them.
+  const owner = await signIn('owner@demo.test')
+  expect((await call(owner, 'GET', '/api/v1/platform/system/status')).status).toBe(403)
+  await owner.goto('/admin/system-status')
+  await expect(owner.getByRole('heading', { level: 1, name: 'System status' })).toBeVisible()
+  await expect(owner.getByRole('heading', { name: 'Backups' })).toHaveCount(0)
+  await owner.context().close()
+
+  const admin = await signIn('admin@pos.test')
+  await admin.goto('/admin/system-status')
+  await expect(admin.getByRole('heading', { name: 'Health' })).toBeVisible()
+  await expect(admin.getByRole('heading', { name: 'Backups' })).toBeVisible()
+  await expect(admin.getByRole('heading', { name: 'Failed jobs' })).toBeVisible()
+  const status = (await call(admin, 'GET', '/api/v1/platform/system/status')).body.data
+  expect(status.checks.database).toBe('ok')
+  expect(status.checks.queue.driver).toBe('sync')
+
+  // Back up now (the e2e server runs queued jobs at once): a real pg_dump of the e2e database.
+  const before = ((await call(admin, 'GET', '/api/v1/platform/system/backups')).body.data as unknown[]).length
+  await admin.getByRole('button', { name: 'Back up now' }).click()
+  await admin.getByRole('alertdialog').getByRole('button', { name: 'Back up now' }).click()
+  type Backup = { id: string; status: string; size_bytes: number | null; sha256: string | null; file_name: string | null; verify_status: string | null; verify_mode: string | null }
+  let latest: Backup | undefined
+  await expect.poll(async () => {
+    const rows = (await call(admin, 'GET', '/api/v1/platform/system/backups')).body.data as Backup[]
+    latest = rows[0]
+    return rows.length > before ? latest?.status : 'waiting'
+  }, { timeout: 90_000 }).toBe('succeeded')
+  expect(latest!.size_bytes).toBeGreaterThan(10_000)
+  expect(latest!.sha256).toMatch(/^[0-9a-f]{64}$/)
+  expect(latest!.file_name).toMatch(/^pos-.+\.dump$/)
+
+  // The check reads the archive back with pg_restore.
+  expect((await call(admin, 'POST', `/api/v1/platform/system/backups/${latest!.id}/verify`)).status).toBe(202)
+  await expect.poll(async () => {
+    const rows = (await call(admin, 'GET', '/api/v1/platform/system/backups')).body.data as Backup[]
+    return rows.find((r) => r.id === latest!.id)?.verify_status ?? null
+  }, { timeout: 60_000 }).toBe('passed')
+  const after = (await call(admin, 'GET', '/api/v1/platform/system/status')).body.data
+  expect(after.checks.backups.last_success_at).not.toBeNull()
+  expect(after.checks.backups.verify_status).toBe('passed')
+
+  // A test e-mail through the configured mailer.
+  const mail = await call(admin, 'POST', '/api/v1/platform/system/mail-test', { to: 'ops@example.test' })
+  expect(mail.status).toBe(200)
+  expect(mail.body.data.sent).toBe(true)
+
+  // The page lists the new backup (by its short checksum) as checked.
+  await admin.reload()
+  await expect(admin.getByRole('table', { name: 'Recent backups' })).toContainText(latest!.sha256!.slice(0, 12))
+  await admin.context().close()
+})

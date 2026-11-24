@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### G1b — Operations: backups, restore check, system status, error log, data retention
+
+Second part of G1 (go-live essentials) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2. No new packages.
+
+#### Added
+- **Nightly database backups** (`POS_BACKUP_ENABLED`): `pg_dump` to a local folder at `POS_BACKUP_TIME` with a SHA-256 file, old copies removed after `POS_BACKUP_KEEP_DAYS` (the newest few always kept), an optional off-site command after each backup (`POS_BACKUP_AFTER_COMMAND`, e.g. rclone or `aws s3 cp`). The database password never appears on a command line.
+- **Backup check** 90 minutes later: checksum + `pg_restore --list`, and with `POS_BACKUP_VERIFY_DATABASE` a full restore into a scratch database (refused for the live one) with a look at the core tables.
+- **System status for platform admins:** warnings in plain words, health of the database, cache, scheduler and queue worker (heartbeats every minute), mail (with *Send test e-mail*), backup disk space, open errors and the last clean-up; **Backups** with *Back up now* and *Verify*; **Failed jobs** with retry, delete and retry all. Other users keep the simple status page.
+- **Built-in error log:** unexpected server errors grouped by kind with counts, first / last seen, the request path and id, and a stack trace; resolve, ignore or reopen; a resolved error that comes back reopens. Recorded on its own connection, so errors inside rolled-back transactions are kept; messages are sanitised (no SQL values, e-mail addresses or secrets).
+- **Alert e-mails** (`POS_OPS_ALERT_EMAILS`) for new or returning errors (rate-limited), failed backups, failed checks and failed off-site copies.
+- **Data retention** (`pos:prune-records`, daily): old sign-in history, read notifications, failed jobs, AI request logs, resolved errors and backup records; the audit log is kept unless `POS_RETAIN_AUDIT_DAYS` is set.
+
+#### Tests
+- Backend 1705 (PostgreSQL: 1704 pass, 1 opt-in PDF skip; real `pg_dump` / `pg_restore --list` on the test database, restore mode with a faked process because the app role may not create databases; error log incl. a rolled-back transaction; status rules; retention); Pint clean. vitest 2876; mocked Playwright 532 (new `g1b-operations`).
+- Full-stack (PostgreSQL, desktop) 57 — new **G1b**: the platform admin sees the operations page, backs up the real database, checks the backup and sends a test e-mail; an organization owner is refused. It found that on Windows `pg_dump` 18 fails ("could not generate restrict key") when started from the web server, whose environment has no `SystemRoot`; the backup tools now always pass it (with a test). Builder acceptance 5 (fresh database).
+
+#### Upgrade
+- `php artisan migrate`. Turn on backups and set the alert addresses (DEPLOYMENT_GUIDE → *Backups and restore*); make sure cron runs `schedule:run` and a queue worker is supervised — *System status* now tells you when either stops.
+
 ### G1a — Sign-in security: two-factor sign-in, account lockout, security headers
 
 First part of G1 (go-live essentials) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2. No new packages: the codes are computed in-house (RFC 6238) and the setup QR code uses the existing in-house encoder.

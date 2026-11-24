@@ -2,6 +2,7 @@
 
 use App\Modules\Shared\Infrastructure\Persistence\IdempotencyKey;
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
@@ -54,3 +55,18 @@ Schedule::command('storefront:publish-scheduled')->everyMinute()->withoutOverlap
 
 // Unpaid bank-transfer web orders are cancelled (and restocked) when their payment hold runs out.
 Schedule::command('orders:expire-pending')->everyMinute()->withoutOverlapping();
+
+// G1b: heartbeats for System status (the scheduler itself, and a queued job for the queue worker).
+Schedule::command('pos:heartbeat')->everyMinute();
+
+// G1b: data retention (config pos.retention).
+Schedule::command('pos:prune-records')->daily()->withoutOverlapping();
+
+// G1b: nightly database backup at POS_BACKUP_TIME (application timezone) and its restore check
+// 90 minutes later — only when POS_BACKUP_ENABLED.
+if (config('pos.backup.enabled')) {
+    $backupAt = preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', (string) config('pos.backup.time')) ? (string) config('pos.backup.time') : '02:00';
+    Schedule::command('pos:backup')->dailyAt($backupAt)->withoutOverlapping()->onOneServer();
+    Schedule::command('pos:backup:verify')->dailyAt(Carbon::createFromFormat('H:i', $backupAt)->addMinutes(90)->format('H:i'))
+        ->withoutOverlapping()->onOneServer();
+}

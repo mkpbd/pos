@@ -64,4 +64,55 @@ return [
         'hsts' => (bool) env('POS_HSTS', true),
     ],
 
+    /*
+    | G1b: who gets operations alerts (new / returning errors, failed backups and restore checks):
+    | comma-separated e-mail addresses. Empty = no alert mails (the status page still shows them).
+    */
+    'ops_alert_emails' => array_values(array_filter(array_map('trim', explode(',', (string) env('POS_OPS_ALERT_EMAILS', ''))))),
+
+    /*
+    | G1b: built-in error log (`error_events`, shown to platform admins). Unexpected server errors
+    | are recorded through a separate database connection, so a rolled-back transaction keeps them.
+    */
+    'error_log' => [
+        'enabled' => (bool) env('POS_ERROR_LOG_ENABLED', true),
+    ],
+
+    /*
+    | G1b: database backups with pg_dump (custom format) to a local folder, a checksum next to each
+    | file, an optional off-site hook (`{file}` = the shell-escaped path, e.g.
+    | `rclone copy {file} offsite:pos-backups`) and a nightly restore check (`pg_restore --list`, and
+    | a full restore into `verify_database` when set — never the live database).
+    */
+    'backup' => [
+        'enabled' => (bool) env('POS_BACKUP_ENABLED', false),
+        'path' => env('POS_BACKUP_PATH') ?: storage_path('app/backups'),
+        'keep_days' => (int) env('POS_BACKUP_KEEP_DAYS', 14),
+        // The newest N successful backups are always kept, however old.
+        'keep_min' => (int) env('POS_BACKUP_KEEP_MIN', 3),
+        // Daily, in the application timezone; the restore check runs 90 minutes later.
+        'time' => (string) env('POS_BACKUP_TIME', '02:00'),
+        // Directory holding pg_dump / pg_restore; empty = found on PATH.
+        'pg_bin' => (string) env('POS_PG_BIN', ''),
+        'after_command' => (string) env('POS_BACKUP_AFTER_COMMAND', ''),
+        'verify_database' => (string) env('POS_BACKUP_VERIFY_DATABASE', ''),
+        // Seconds pg_dump / pg_restore / the off-site hook may run.
+        'timeout' => (int) env('POS_BACKUP_TIMEOUT', 3600),
+    ],
+
+    /*
+    | G1b: data retention (`pos:prune-records`, daily), in days; empty or 0 = keep forever.
+    | Audit logs are kept forever unless POS_RETAIN_AUDIT_DAYS is set (financial records stay in
+    | their own tables either way, but who-did-what history older than that is gone).
+    */
+    'retention' => [
+        'login_activities' => env('POS_RETAIN_LOGIN_ACTIVITY_DAYS', 365),
+        'notifications' => env('POS_RETAIN_READ_NOTIFICATIONS_DAYS', 180),
+        'failed_jobs' => env('POS_RETAIN_FAILED_JOBS_DAYS', 30),
+        'ai_requests' => env('POS_RETAIN_AI_REQUESTS_DAYS', 365),
+        'error_events' => env('POS_RETAIN_ERROR_EVENTS_DAYS', 90),
+        'audit_logs' => env('POS_RETAIN_AUDIT_DAYS'),
+        'system_backups' => env('POS_RETAIN_BACKUP_RECORDS_DAYS', 90),
+    ],
+
 ];

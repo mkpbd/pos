@@ -54,6 +54,9 @@ const pages = {
   // G1a: two-factor setup when the organization requires it (full screen, outside the shell).
   twoFactorSetup: page(() => import('@/features/auth/pages/two-factor-setup-page'), 'TwoFactorSetupPage'),
   systemStatus: page(() => import('@/features/system/pages/system-status-page'), 'SystemStatusPage'),
+  // G1b: the built-in error log (platform admins only).
+  systemErrors: page(() => import('@/features/system/pages/system-errors-page'), 'SystemErrorsPage'),
+  systemError: page(() => import('@/features/system/pages/system-error-page'), 'SystemErrorPage'),
   stock: page(() => import('@/features/inventory/pages/stock-page'), 'StockPage'),
   batches: page(() => import('@/features/inventory/pages/stock-page'), 'BatchesPage'),
   movements: page(() => import('@/features/inventory/pages/stock-page'), 'MovementsPage'),
@@ -320,6 +323,13 @@ export const routes: RouteObject[] = [
               { element: <RequirePlatformAdmin />, children: [{ path: 'platform/organizations', ...pages.platformOrganizations }] },
               { path: 'profile', ...pages.profile },
               { path: 'system-status', ...pages.systemStatus },
+              {
+                element: <RequirePlatformAdmin />,
+                children: [
+                  { path: 'system-status/errors', ...pages.systemErrors },
+                  { path: 'system-status/errors/:errorId', ...pages.systemError },
+                ],
+              },
               { path: '*', element: <NotFoundPage /> },
             ],
           },

@@ -3,14 +3,26 @@ import { ErrorState, LoadingState } from '@/components/common/state-views'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCurrentUserQuery } from '@/features/auth/api'
 import { useHealthQuery } from '@/features/system/api'
+import { OperationsView } from '@/features/system/components/operations-view'
 
 const CHECK_LABELS: Record<string, string> = {
   database: 'Database (PostgreSQL)',
   cache: 'Cache',
 }
 
+/** /system-status — backend health for everyone; platform admins get the operations view (G1b). */
 export function SystemStatusPage() {
+  const { data: me, isPending } = useCurrentUserQuery()
+
+  // Inside the app the session is already loaded (RequireAuth); never show the wrong view while it loads.
+  if (isPending) return <LoadingState rows={2} label="Loading system status" />
+  if (me?.user.is_platform_admin) return <OperationsView adminEmail={me.user.email} />
+  return <BackendHealth />
+}
+
+function BackendHealth() {
   const { data, error, isPending, isFetching, refetch, dataUpdatedAt } = useHealthQuery()
 
   return (

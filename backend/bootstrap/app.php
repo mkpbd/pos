@@ -11,6 +11,7 @@ use App\Modules\Shared\Infrastructure\Http\Middleware\SecurityHeaders;
 use App\Modules\Storefront\Presentation\Http\Middleware\ResolveStorefront;
 use App\Modules\Storefront\Presentation\Http\Middleware\StartStorefrontSession;
 use App\Modules\Storefront\Presentation\Http\Middleware\StorefrontHttpCache;
+use App\Modules\System\Infrastructure\ErrorLog\ErrorRecorder;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -63,4 +64,8 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
         $exceptions->render(new ApiExceptionRenderer);
+        // G1b: unexpected errors also go to the built-in error log (normal logging continues).
+        $exceptions->report(function (Throwable $e): void {
+            ErrorRecorder::report($e);
+        });
     })->create();

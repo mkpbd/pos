@@ -47,6 +47,8 @@ Serving the SPA and API from the **same origin** is required for Sanctum cookie 
 
 **Store builder upgrade (B15):** `php artisan migrate` (page insight tables, `carts.builder_attribution`). The scheduler runs `marketing:prune-page-insights` daily (90-day retention, 2-day visitor hashes). `POST /api/v1/store/insights/events` receives anonymous beacons from shoppers' browsers (60/min per IP, 64 KB): keep it reachable on every store host and out of any cache; if a CDN/WAF sits in front, allow `text/plain` and `application/json` POST bodies there. No cookies are set and nothing personal is stored, so no consent banner change is needed for it; the storefront honours Do-Not-Track and Global Privacy Control.
 
+**Operations (G1b):** `php artisan migrate` (`system_backups`, `error_events`). The scheduler now also runs `pos:heartbeat` every minute and `pos:prune-records` daily; turn on nightly backups with `POS_BACKUP_ENABLED=true` (see *Backups and restore* below) and set `POS_OPS_ALERT_EMAILS`. Platform admins see backups, failed jobs, the error log and warnings under *System status*. The error log writes through a second connection to the same database (one extra connection per PHP worker while it records an error).
+
 **Sign-in security (G1a):** `php artisan migrate` (two-factor and lockout columns on `users`). New settings: `POS_LOCKOUT_MAX_ATTEMPTS` (10), `POS_LOCKOUT_MINUTES` (15), `POS_HSTS` (true — set false only if a subdomain must stay on plain HTTP, because the header covers subdomains). The lock and two-factor e-mails are queued: a mailer and a queue worker are needed. **`APP_KEY` now also protects two-factor secrets and recovery codes — rotating it turns off everyone's two-factor sign-in** (each user sets it up again; with a required policy they are sent to setup at the next sign-in). Laravel now sends the security headers itself; add the admin block under *Security checklist* to Nginx.
 
 **Quick fixes (Q1):** `php artisan migrate` (stock count quantities on adjustment lines; `promotion_redemptions.released_at` with an updated append-only trigger). **Public sign-up is now off by default** — set `POS_REGISTRATION_ENABLED=true` only on an install where anyone may create an organization (and put a CAPTCHA / rate limit in front of it). The legacy `PUT /api/v1/storefront/theme` is removed (405); anything that called it must save the theme draft and publish. `php artisan pos:permissions:sync` is harmless (only an unused role pattern was removed).
@@ -321,12 +323,49 @@ npm run build                   # publish frontend/dist
 | Queue workers | `php artisan queue:work redis --tries=3 --max-time=3600` | systemd/Supervisor, ≥2 workers |
 | Scheduler | `php artisan schedule:run` every minute (cron) — prunes idempotency keys daily, refreshes storefront product stats hourly, prunes expired guest carts daily (`cart:prune`), cancels expired unpaid bank-transfer orders every minute (`orders:expire-pending`), sends the daily reorder alerts (`purchasing:reorder-notifications`, hourly, from 07:00 organization time, once per store and day) and the quotes-overdue reminders (`purchasing:rfq-reminders`, hourly, from 07:00 organization time, once per RFQ and day), and caches the daily AI insights (`ai:daily-insights`, every 30 min, from 07:30 organization time, once per organization / branch and day; Phase 8) | cron |
 | Health probe | `GET /api/v1/health` (200 / 503) and `GET /up` | load balancer |
+| Heartbeat (G1b) | `pos:heartbeat` every minute from the scheduler; it queues a small job, so *System status* shows when the scheduler and the worker last ran | (scheduler) |
+| Backups (G1b) | `pos:backup` at `POS_BACKUP_TIME` and `pos:backup:verify` 90 minutes later, only when `POS_BACKUP_ENABLED=true` | (scheduler) |
+| Retention (G1b) | `pos:prune-records` daily (`--dry-run` to preview) | (scheduler) |
 
 ## Database
 
 - Application connects as a non-superuser role that owns the schema; a separate read-only role for reporting replicas (optional).
-- Daily base backups + WAL archiving (point-in-time recovery). Restore drills each release cycle.
 - Run migrations before switching traffic; migrations must be backward compatible with the previous release (expand → migrate → contract).
+- For a large or busy database, also keep WAL archiving / managed point-in-time recovery from your PostgreSQL host — the nightly dump below is a whole-database copy once a day, not a replacement for point-in-time recovery.
+
+## Backups and restore (G1b)
+
+**Settings** (`backend/.env`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `POS_BACKUP_ENABLED` | `false` | Nightly `pg_dump` at `POS_BACKUP_TIME` and a check 90 minutes later. "Back up now" works even when off. |
+| `POS_BACKUP_TIME` | `02:00` | Application timezone. |
+| `POS_BACKUP_PATH` | `storage/app/backups` | Folder for `pos-<db>-<date>.dump` + `.sha256` (created 0700, files 0600). Put it on a disk other than the database's, with room for `keep_days` copies. |
+| `POS_BACKUP_KEEP_DAYS` / `POS_BACKUP_KEEP_MIN` | `14` / `3` | Older files are removed, but the newest N good ones are always kept. |
+| `POS_PG_BIN` | empty | Folder with `pg_dump` / `pg_restore` (same major version as the server, e.g. `/usr/lib/postgresql/18/bin`); empty = on `PATH`. |
+| `POS_BACKUP_TIMEOUT` | `3600` | Seconds for one dump or restore. A run still "running" after timeout + 15 min is marked interrupted. |
+| `POS_BACKUP_AFTER_COMMAND` | empty | Off-site copy run after each good backup; `{file}` is replaced by the quoted path. Examples: `rclone copy {file} offsite:pos-backups` (also copy `{file}.sha256`), `aws s3 cp {file} s3://my-pos-backups/`. Runs without the database password in its environment. A failure is shown and e-mailed. |
+| `POS_BACKUP_VERIFY_DATABASE` | empty | A **separate, empty scratch database** for the full restore check (e.g. `pos_restore_check`, owned by the app role: `CREATE DATABASE pos_restore_check OWNER pos_app;`). Never the live database (refused). Empty = the check only confirms the checksum and that `pg_restore --list` can read the file. |
+| `POS_OPS_ALERT_EMAILS` | empty | Comma-separated addresses for backup / check / off-site failures and new server errors. Needs a working mailer and queue worker. |
+
+The password is passed to `pg_dump` / `pg_restore` through `PGPASSWORD` in the process environment, never on the command line. Backups normally run in the scheduler or a queue worker (CLI). With `QUEUE_CONNECTION=sync`, *Back up now* runs inside the web request instead: PHP-FPM clears the environment (`clear_env`), so set `POS_PG_BIN` explicitly, and the request may hit the web timeout on a big database — use a real queue in production. Backup files are not downloadable from the app: copy them off the server with the hook or your host's tooling, and keep at least one copy outside the server and outside the cloud account that runs it.
+
+**Check it works** after deploying: *System status* (platform admin) → **Back up now**, then **Verify**; or `php artisan pos:backup` and `php artisan pos:backup:verify`. The status page warns when the newest good backup is older than 26 hours, when a check failed, or when none was checked for 8 days.
+
+**Restoring (runbook):**
+1. Put the site in maintenance (`php artisan down`) and stop the queue workers and the scheduler.
+2. Pick the file (newest `succeeded` + `passed` row on *System status*, or the newest `.dump` in `POS_BACKUP_PATH`) and check it: `sha256sum -c pos-<db>-<date>.dump.sha256`.
+3. Restore into a **new** database first: `createdb -O pos_app pos_restored` then `pg_restore --no-owner --no-privileges --dbname=pos_restored pos-<db>-<date>.dump`.
+4. Point `DB_DATABASE` at `pos_restored` (or rename databases while nothing is connected), `php artisan optimize`, then `php artisan migrate --force` (applies anything newer than the backup).
+5. Start workers and the scheduler, `php artisan up`, sign in and check today's sales, stock and the last orders. Anything entered after the backup time must be re-entered (or recovered from point-in-time recovery if you keep it).
+6. Practise this on a copy at least once per release cycle; the nightly check with `POS_BACKUP_VERIFY_DATABASE` does steps 2–3 automatically.
+
+## Error log and data retention (G1b)
+
+- Unexpected server errors are grouped in the built-in error log (*System status → Errors*, platform admins) and e-mailed to `POS_OPS_ALERT_EMAILS` when new or back after being resolved. `POS_ERROR_LOG_ENABLED=false` turns recording off (the normal Laravel log is always written).
+- `pos:prune-records` (daily) deletes, in chunks: sign-in history older than `POS_RETAIN_LOGIN_ACTIVITY_DAYS` (365), **read** notifications older than `POS_RETAIN_READ_NOTIFICATIONS_DAYS` (180), failed jobs older than `POS_RETAIN_FAILED_JOBS_DAYS` (30), AI request logs older than `POS_RETAIN_AI_REQUESTS_DAYS` (365), resolved / ignored errors not seen for `POS_RETAIN_ERROR_EVENTS_DAYS` (90) and backup records without a file older than `POS_RETAIN_BACKUP_RECORDS_DAYS` (90). Empty or `0` keeps forever.
+- The audit log is **kept forever** unless `POS_RETAIN_AUDIT_DAYS` is set — check your legal / tax retention period first (sales, payments and stock movements stay in their own tables regardless).
 
 ## Security checklist
 
@@ -347,5 +386,5 @@ npm run build                   # publish frontend/dist
 - Upload storage outside the web root; images served through signed/authorized routes.
 - Rate limiters enabled; account lockout (G1a, `POS_LOCKOUT_*`); fail2ban or WAF on login endpoints (`/api/v1/auth/login`, `/auth/two-factor-challenge`, `/auth/tokens`).
 - Behind a load balancer or reverse proxy: `TRUSTED_PROXIES` lists exactly its addresses (or `*` only when PHP cannot be reached around it), so client IPs and HTTPS are taken from trusted headers only. `SESSION_DOMAIN` unset (or a parent covering every host).
-- Log shipping with `request_id` correlation; alerts on 5xx rate and queue backlog.
+- Log shipping with `request_id` correlation; alerts on 5xx rate and queue backlog. Built in (G1b): `POS_OPS_ALERT_EMAILS` for new server errors and backup failures, and *System status* warnings for a stopped scheduler or worker, failed jobs, low disk and debug mode.
 - AI (Phase 8): `AI_API_KEY` only in the secret store; outbound HTTPS limited to `api.anthropic.com`; a monthly token budget set (`AI_MONTHLY_TOKEN_BUDGET` or per organization); alert on `ai_requests` rows with `status = failed` (`provider_auth` = a bad or revoked key).
