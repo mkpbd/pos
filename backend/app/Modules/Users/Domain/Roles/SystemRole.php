@@ -63,6 +63,8 @@ enum SystemRole: string
                 'ai.ask', 'ai.insights',
                 // BD1a: the SMS message log (order messages to customers).
                 'sms.view',
+                // POS1b: store credit and gift cards / vouchers.
+                'store_credit.*', 'gift_cards.*',
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
@@ -72,6 +74,8 @@ enum SystemRole: string
                 'purchases.request',
                 // Phase 7: the dashboard of their branch (no cost, so no profit figures).
                 'dashboard.view',
+                // POS1b: sees a customer's store credit (to pay with it); adjusting / paying it out stays with managers.
+                'store_credit.view',
             ],
             self::InventoryManager => [
                 'branches.view', 'products.*', 'categories.*', 'brands.*', 'units.*',
@@ -92,6 +96,8 @@ enum SystemRole: string
                 'web_orders.view', 'web_orders.remit', 'web_orders.refund',
                 // Phase 8: the AI assistant and insights.
                 'ai.ask', 'ai.insights',
+                // POS1b: store credit balances and gift cards (read only).
+                'store_credit.view', 'gift_cards.view',
             ],
             // Custom CSS and payment gateway credentials stay with the Organization Admin (ADR-016).
             self::OnlineStoreManager => [

@@ -5,7 +5,9 @@ namespace App\Modules\Sales\Presentation\Http\Support;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\Inventory\Application\Contracts\BatchDirectory;
+use App\Modules\Sales\Application\Contracts\StoreCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
+use App\Modules\Sales\Application\Services\StoredValueTenders;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Sales\Infrastructure\Models\SaleLine;
@@ -35,6 +37,7 @@ class SalePresenter
         private readonly CustomerDirectory $customers,
         private readonly UserDirectory $users,
         private readonly BatchDirectory $batches,
+        private readonly StoreCredit $storeCredit,
     ) {}
 
     /**
@@ -173,6 +176,8 @@ class SalePresenter
                 'amount' => $p->amount,
                 'tendered' => $p->tendered,
                 'reference' => $p->reference,
+                // POS1b: the gift card a payment was made with (never the full code).
+                'gift_card_last4' => StoredValueTenders::giftCardLast4($p->method, $p->reference),
                 'created_at' => $p->created_at->toIso8601String(),
                 'created_by' => $users[$p->created_by] ?? null,
             ])->all(),
@@ -185,6 +190,8 @@ class SalePresenter
                 'footer' => $organization['receipt_footer'] ?? null,
                 'branch' => $branch,
                 'timezone' => $organization['timezone'] ?? null,
+                // POS1b: what the customer has left in store credit (now).
+                'customer_store_credit_balance' => $sale->customer_id === null ? null : $this->storeCredit->balance($sale->customer_id),
             ],
         ];
     }

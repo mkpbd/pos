@@ -174,6 +174,11 @@ class ReturnPlanner
                 $refundable[] = ['method' => $method->value, 'label' => $method->label(), 'max' => $left->amount()];
             }
         }
+        // POS1b: store credit (sales with a customer) and a new credit note, up to the whole refund.
+        if ($sale->customer_id !== null) {
+            $refundable[] = ['method' => PaymentMethod::StoreCredit->value, 'label' => PaymentMethod::StoreCredit->label(), 'max' => null];
+        }
+        $refundable[] = ['method' => PaymentMethod::GiftCard->value, 'label' => 'Gift card (credit note)', 'max' => null];
 
         return [
             'credit' => $credit->amount(),

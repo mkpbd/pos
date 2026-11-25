@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { addDecimal, compareDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { lineLabel, type Sale, type SaleLine } from '@/features/sales/api'
+import { paymentRowLabel } from '@/features/sales/payment-label'
 import type { ReceiptFormat } from '@/features/sales/receipt-formats'
 
 /** POS1a: the line was sold below or above its list price (changed at the till). */
@@ -125,10 +126,17 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
         {sale.coupon_code && <Row label="Coupon" value={sale.coupon_code} />}
         <Row label={sale.tax_mode === 'inclusive' ? 'Tax (included)' : 'Tax'} value={formatMoney(sale.tax_total)} />
         <Row label="TOTAL" value={formatMoney(sale.total, c)} bold />
-        {payments.map((p) => <Row key={p.id} label={`${p.method_label}${p.reference ? ` (${p.reference})` : ''}`} value={formatMoney(p.tendered ?? p.amount)} />)}
+        {payments.map((p) => {
+          // POS1b: a gift card row's reference names the card ("Gift card ••••1234").
+          const { label, reference } = paymentRowLabel(p)
+          return <Row key={p.id} label={`${label}${reference ? ` (${reference})` : ''}`} value={formatMoney(p.tendered ?? p.amount)} />
+        })}
         {!isZeroDecimal(sale.change_total) && <Row label="Change" value={formatMoney(sale.change_total)} />}
         {!isZeroDecimal(sale.due_total) && <Row label="Balance due" value={formatMoney(sale.due_total, c)} bold />}
         {sale.savings_total && compareDecimal(sale.savings_total, '0') > 0 && <Row label="You saved" value={formatMoney(sale.savings_total, c)} bold />}
+        {/* POS1b: what the customer still has to spend after this sale. */}
+        {sale.customer && sale.receipt.customer_store_credit_balance != null
+          && (!isZeroDecimal(sale.receipt.customer_store_credit_balance) || payments.some((p) => p.method === 'store_credit')) && <Row label="Store credit left" value={formatMoney(sale.receipt.customer_store_credit_balance, c)} />}
       </div>
       <Rule thermal={thermal} />
       <div className="text-center">

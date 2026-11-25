@@ -13,7 +13,9 @@ use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Application\Services\CustomerCredit;
+use App\Modules\Sales\Application\Services\IssuedCreditNotes;
 use App\Modules\Sales\Application\Services\ReturnPlanner;
+use App\Modules\Sales\Application\Services\StoredValueTenders;
 use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Infrastructure\Models\Sale;
@@ -52,6 +54,9 @@ class CompleteSaleReturn
         private readonly PaymentLedger $payments,
         private readonly LoyaltyProgram $loyalty,
         private readonly AuditTrail $audit,
+        // POS1b: refunds to store credit / as a credit note (its code is shown once).
+        private readonly StoredValueTenders $storedValue,
+        private readonly IssuedCreditNotes $creditNotes,
     ) {}
 
     /**
@@ -90,6 +95,17 @@ class CompleteSaleReturn
                     ->update(['released_at' => $now]);
             }
 
+            $this->payments->record($actor, $locked->branch_id, array_values(array_map(
+                fn (array $r) => new LedgerEntry(PaymentDirection::Out, LedgerMethod::from($r['method']->value), $r['amount'], $sale->customer_id, $r['reference']),
+                // Points, store credit and gift cards are value, not money (POS1b).
+                array_filter($refundLines, fn (array $r) => ! $r['method']->isStoredValue()),
+            )), new PaymentSource('sale_return', $locked->id, $locked->number));
+            // POS1b: refunds to store credit and as a new credit note (after the drawer: same lock order as checkout).
+            $stored = $this->storedValue->refund($refundLines, $sale->customer_id, $sale->currency, $locked->id, $locked->number, (string) $actor->getAuthIdentifier());
+            $refundLines = $stored['refunds'];
+            if ($stored['credit_note'] !== null) {
+                $this->creditNotes->put($locked->id, $stored['credit_note']);
+            }
             foreach ($refundLines as $refund) {
                 SaleReturnRefund::query()->create([
                     'organization_id' => $locked->organization_id,
@@ -101,10 +117,6 @@ class CompleteSaleReturn
                     'created_at' => $now,
                 ]);
             }
-            $this->payments->record($actor, $locked->branch_id, array_values(array_map(
-                fn (array $r) => new LedgerEntry(PaymentDirection::Out, LedgerMethod::from($r['method']->value), $r['amount'], $sale->customer_id, $r['reference']),
-                array_filter($refundLines, fn (array $r) => $r['method'] !== PaymentMethod::LoyaltyPoints),
-            )), new PaymentSource('sale_return', $locked->id, $locked->number));
 
             $locked->update([
                 'status' => ReturnStatus::Completed,
@@ -212,7 +224,9 @@ class CompleteSaleReturn
             $method = PaymentMethod::tryFrom((string) $refund['method']);
             $amount = Money::of((string) $refund['amount'], $currency);
             if ($method === null || ! array_key_exists($method->value, $limits)) {
-                $errors["refunds.{$i}.method"] = ['Nothing was paid this way on the invoice; refund in cash or the way it was paid.'];
+                $errors["refunds.{$i}.method"] = [$method === PaymentMethod::StoreCredit
+                    ? 'Only a sale with a customer can be refunded to store credit.'
+                    : 'Nothing was paid this way on the invoice; refund in cash or the way it was paid.'];
 
                 continue;
             }

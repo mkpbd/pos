@@ -13,7 +13,7 @@ use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
-use App\Modules\Sales\Domain\PaymentMethod;
+use App\Modules\Sales\Application\Services\StoredValueTenders;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Domain\SaleStatus;
 use App\Modules\Sales\Infrastructure\Models\Sale;
@@ -44,6 +44,7 @@ class CancelSale
         private readonly LoyaltyProgram $loyalty,
         private readonly AuditTrail $audit,
         private readonly PromotionRedemptions $redemptions,
+        private readonly StoredValueTenders $storedValue,
     ) {}
 
     public function __invoke(TenantUser $actor, Sale $sale, string $reason): Sale
@@ -86,12 +87,14 @@ class CancelSale
             }
 
             $this->payments->record($actor, $locked->branch_id, $paid
-                ->filter(fn (SalePayment $p) => $p->method !== PaymentMethod::LoyaltyPoints)
+                ->filter(fn (SalePayment $p) => ! $p->method->isStoredValue())
                 ->map(fn (SalePayment $p) => new LedgerEntry(PaymentDirection::Out, LedgerMethod::from($p->method->value), $p->amount, $locked->customer_id, $p->reference))
                 ->values()->all(), new PaymentSource('sale_cancellation', $locked->id, $locked->number));
             if ($locked->customer_id !== null) {
                 $this->loyalty->reverseSale($locked->customer_id, $locked->id, $locked->number);
             }
+            // POS1b: store credit and gift card value spent on the sale goes back.
+            $this->storedValue->reverseSale($locked->id, $paid->map(fn (SalePayment $p) => $p->method)->all());
 
             $this->redemptions->releaseSale($locked->id);
 

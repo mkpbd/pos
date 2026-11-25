@@ -80,7 +80,12 @@ export type SaleReturn = SaleReturnHeader & {
   refunds: SaleReturnRefund[]
   /** Only for pending returns: how it would be settled if approved now. */
   settlement: Settlement | null
+  /** POS1b: only in the response that completed the return with a gift card refund; `code` is shown once. */
+  credit_note?: CreditNote | null
 }
+
+/** POS1b: the credit note a "Gift card" refund issues; the full `code` never comes back again. */
+export type CreditNote = { code: string; code_last4: string; amount: string; expires_at: string | null }
 
 export type RefundInput = { method: RefundMethod; amount: string; reference: string | null }
 
@@ -157,7 +162,10 @@ function useInvalidateAfterReturn() {
   const invalidateMoney = useInvalidateMoney()
   return (saleReturn?: SaleReturn) => {
     invalidateMoney()
-    if (saleReturn) queryClient.setQueryData(returnsKeys.detail(saleReturn.id), saleReturn)
+    // The credit note code is shown once by the page; it is not kept in the cache.
+    if (saleReturn) queryClient.setQueryData(returnsKeys.detail(saleReturn.id), { ...saleReturn, credit_note: null })
+    void queryClient.invalidateQueries({ queryKey: ['gift-cards'] })
+    void queryClient.invalidateQueries({ queryKey: ['store-credit'] })
     void queryClient.invalidateQueries({ queryKey: returnsKeys.all })
     void queryClient.invalidateQueries({ queryKey: salesKeys.all })
     void queryClient.invalidateQueries({ queryKey: ['inventory'] })

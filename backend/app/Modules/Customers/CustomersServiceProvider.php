@@ -6,9 +6,11 @@ use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
 use App\Modules\Customers\Application\Contracts\CustomerReviewStats;
 use App\Modules\Customers\Application\Contracts\CustomerShoppingLists;
+use App\Modules\Customers\Application\Contracts\CustomerStoreCredit;
 use App\Modules\Customers\Application\Contracts\CustomerWebOrders;
 use App\Modules\Customers\Application\Imports\CustomersImport;
 use App\Modules\Customers\Application\Services\NoOnlineAccounts;
+use App\Modules\Customers\Application\Services\NoStoreCredit;
 use App\Modules\Customers\Application\Services\NoWebActivity;
 use App\Modules\Customers\Infrastructure\Directory\EloquentCustomerDirectory;
 use App\Modules\Imports\Application\Contracts\ImportHandler;
@@ -29,6 +31,8 @@ class CustomersServiceProvider extends ModuleServiceProvider
         $this->app->bindIf(CustomerWebOrders::class, NoWebActivity::class);
         $this->app->bindIf(CustomerReviewStats::class, NoWebActivity::class);
         $this->app->bindIf(CustomerShoppingLists::class, NoWebActivity::class);
+        // POS1b: store credit balances, replaced by the StoredValue module when installed.
+        $this->app->bindIf(CustomerStoreCredit::class, NoStoreCredit::class);
         // ST1: customer import (Imports module).
         $this->app->tag([CustomersImport::class], ImportHandler::TAG);
     }

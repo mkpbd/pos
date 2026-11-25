@@ -134,6 +134,8 @@ const pages = {
   customerPayments: page(() => import('@/features/payments/pages/payment-pages'), 'CustomerPaymentsPage'),
   expenses: page(() => import('@/features/expenses/pages/expenses-page'), 'ExpensesPage'),
   loyalty: page(() => import('@/features/loyalty/pages/loyalty-page'), 'LoyaltyPage'),
+  // POS1b: gift cards, vouchers and credit notes; issuing and voiding need gift_cards.manage (page and API).
+  giftCards: page(() => import('@/features/gift-cards/pages/gift-cards-page'), 'GiftCardsPage'),
   webOrders: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrdersPage'),
   webOrder: page(() => import('@/features/web-orders/pages/web-order-pages'), 'WebOrderPage'),
   webOrdersPrint: page(() => import('@/features/web-orders/pages/print-page'), 'WebOrdersPrintPage'),
@@ -267,6 +269,7 @@ export const routes: RouteObject[] = [
               guarded('payments.view', 'payments/customers', pages.customerPayments),
               guarded('expenses.view', 'expenses', pages.expenses),
               guarded(['loyalty.view', 'loyalty.manage'], 'loyalty', pages.loyalty),
+              guarded('gift_cards.view', 'gift-cards', pages.giftCards),
               guarded('products.view', 'products', pages.products),
               // ST1: barcode / price / shelf labels (static segment wins over products/:productId).
               guarded('products.view', 'products/labels', pages.productLabels),

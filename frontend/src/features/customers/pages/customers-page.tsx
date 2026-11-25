@@ -31,7 +31,7 @@ import { CustomerAccountSheet } from '@/features/customers/components/customer-a
 import { CustomerDialog } from '@/features/customers/components/customer-dialog'
 import { useLoyaltyBalancesQuery, useLoyaltySettingsQuery } from '@/features/loyalty/api'
 import { useCustomerBalancesQuery } from '@/features/sales/api'
-import { decimalPattern, formatMoney } from '@/lib/money'
+import { decimalPattern, formatMoney, isZeroDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
 const ALL = 'all'
@@ -138,6 +138,8 @@ export function CustomersPage() {
   const balances = useCustomerBalancesQuery(data?.items.map((c) => c.id) ?? [], canSeeBalances)
   const loyaltyOn = useLoyaltySettingsQuery().data?.is_enabled === true
   const points = useLoyaltyBalancesQuery(data?.items.map((c) => c.id) ?? [], loyaltyOn)
+  // POS1b: list rows carry store_credit_balance; the column shows only when someone on the page has credit.
+  const showStoreCredit = can('store_credit.view') && (data?.items ?? []).some((c) => c.store_credit_balance !== undefined && !isZeroDecimal(c.store_credit_balance))
 
   return (
     <div className="flex flex-col gap-6">
@@ -195,6 +197,7 @@ export function CustomersPage() {
                       <TableHead className="hidden lg:table-cell text-right">Credit limit</TableHead>
                       {canSeeBalances && <TableHead className="text-right">Balance owed</TableHead>}
                       {loyaltyOn && <TableHead className="hidden text-right sm:table-cell">Points</TableHead>}
+                      {showStoreCredit && <TableHead className="text-right">Store credit</TableHead>}
                       <TableHead>Status</TableHead>
                       <TableHead className="w-28"><span className="sr-only">Actions</span></TableHead>
                     </TableRow>
@@ -210,6 +213,9 @@ export function CustomersPage() {
                           <TableCell className="text-right font-mono text-sm">{balances.data?.[c.id] !== undefined ? formatMoney(balances.data[c.id], currency) : '…'}</TableCell>
                         )}
                         {loyaltyOn && <TableCell className="hidden text-right font-mono text-sm sm:table-cell">{points.data?.[c.id] ?? '…'}</TableCell>}
+                        {showStoreCredit && (
+                          <TableCell className="text-right font-mono text-sm">{c.store_credit_balance && !isZeroDecimal(c.store_credit_balance) ? formatMoney(c.store_credit_balance, currency) : '—'}</TableCell>
+                        )}
                         <TableCell>{c.archived_at ? <Badge variant="outline">Archived</Badge> : <Badge variant={c.is_active ? 'success' : 'outline'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>}</TableCell>
                         <TableCell className="text-right whitespace-nowrap">
                           <Button variant="ghost" size="icon-sm" aria-label={`Account of ${c.name}`} onClick={() => setAccount(c)}><FileTextIcon /></Button>

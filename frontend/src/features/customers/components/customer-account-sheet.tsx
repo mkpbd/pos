@@ -15,6 +15,7 @@ import { STATEMENT_ENTRY_LABELS, useCustomerStatementQuery, type Customer, type 
 import { OnlineAccountCard } from '@/features/customers/components/online-account-card'
 import { WebActivityCard } from '@/features/customers/components/web-activity-card'
 import { ReceivePaymentDialog } from '@/features/customers/components/receive-payment-dialog'
+import { StoreCreditCard } from '@/features/customers/components/store-credit-card'
 import { LOYALTY_TRANSACTION_LABELS, pointsValue, useAdjustPointsMutation, useLoyaltyAccountQuery, useLoyaltySettingsQuery } from '@/features/loyalty/api'
 import { fieldErrorMap } from '@/lib/forms'
 import { formatMoney } from '@/lib/money'
@@ -181,6 +182,7 @@ export function CustomerAccountSheet({ customer, onOpenChange }: { customer: Cus
         </SheetHeader>
         {customer && (
           <div className="flex flex-col gap-4 px-4">
+            {can('store_credit.view') && <StoreCreditCard customer={customer} />}
             <OnlineAccountCard customerId={customer.id} />
             <WebActivityCard customerId={customer.id} />
           </div>

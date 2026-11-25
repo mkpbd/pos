@@ -15,6 +15,7 @@ use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Application\Services\CustomerCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
+use App\Modules\Sales\Application\Services\StoredValueTenders;
 use App\Modules\Sales\Application\Services\TillCheckout;
 use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\PaymentSettlement;
@@ -58,6 +59,8 @@ class CompleteSale
         private readonly LoyaltyProgram $loyalty,
         // POS1a: promotion locks and redemptions, approvals consumed.
         private readonly TillCheckout $tillCheckout,
+        // POS1b: store credit and gift card tenders.
+        private readonly StoredValueTenders $storedValue,
     ) {}
 
     /**
@@ -89,6 +92,7 @@ class CompleteSale
         $serials = $this->serials($organizationId, $lines, $variants);
 
         $currency = $priced['currency'];
+        $this->storedValue->assertTenders(array_values($data['payments'] ?? []), $customer);
         $settlement = PaymentSettlement::settle(Money::of($priced['total'], $currency), array_map(fn (array $p) => [
             'method' => PaymentMethod::from($p['method']),
             'amount' => (string) $p['amount'],
@@ -219,6 +223,8 @@ class CompleteSale
                 }
             }
 
+            // POS1b: store credit and gift cards are spent here (gift card codes become "Gift card ••••1234").
+            $settlement['payments'] = $this->storedValue->spend($settlement['payments'], $customer['id'] ?? null, $priced['currency'], $sale->id, $number);
             foreach ($settlement['payments'] as $payment) {
                 SalePayment::query()->create([
                     'organization_id' => $organizationId,
@@ -236,7 +242,8 @@ class CompleteSale
 
             $this->payments->record($actor, $store['branch_id'], array_values(array_map(
                 fn (array $p) => new LedgerEntry(PaymentDirection::In, LedgerMethod::from($p['method']->value), $p['amount'], $customer['id'] ?? null, $p['reference']),
-                array_filter($settlement['payments'], fn (array $p) => $p['method'] !== PaymentMethod::LoyaltyPoints),
+                // Points, store credit and gift cards are value, not money (POS1b).
+                array_filter($settlement['payments'], fn (array $p) => ! $p['method']->isStoredValue()),
             )), new PaymentSource('sale', $sale->id, $number));
 
             if ($customer !== null) {

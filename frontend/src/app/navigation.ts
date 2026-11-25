@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, MessageSquareTextIcon, MonitorSmartphoneIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, PhoneOffIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
+import { ActivityIcon, SparklesIcon, ChartColumnIcon, LayoutDashboardIcon, BadgePercentIcon, MegaphoneIcon, MessageSquareTextIcon, MonitorSmartphoneIcon, BanknoteIcon, BoxesIcon, BuildingIcon, Building2Icon, ClipboardListIcon, ContactIcon, FileTextIcon, GiftIcon, GlobeIcon, HandCoinsIcon, ImagesIcon, PackageIcon, PackageXIcon, PhoneOffIcon, ReceiptIcon, ReceiptTextIcon, ScanBarcodeIcon, ScrollTextIcon, ShieldCheckIcon, ShoppingBagIcon, ShoppingCartIcon, StarIcon, StoreIcon, TagsIcon, TicketIcon, TruckIcon, Undo2Icon, UsersIcon, WalletIcon } from 'lucide-react'
 import type { CurrentUser } from '@/features/auth/types'
 
 export type NavItem = {
@@ -47,6 +47,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/customers', label: 'Customers', icon: ContactIcon, permission: 'customers.view' },
   { to: '/suppliers', label: 'Suppliers', icon: TruckIcon, permission: 'suppliers.view' },
   { to: '/loyalty', label: 'Loyalty', icon: GiftIcon, permission: ['loyalty.view', 'loyalty.manage'] },
+  // POS1b: gift cards sold at the till, vouchers and credit notes.
+  { to: '/gift-cards', label: 'Gift cards', icon: TicketIcon, permission: 'gift_cards.view' },
   { to: '/storefront', label: 'Online store', icon: GlobeIcon, permission: 'storefront.view' },
   { to: '/content', label: 'Content', icon: FileTextIcon, permission: ['cms.manage', 'forms.view'] },
   { to: '/media', label: 'Media library', icon: ImagesIcon, permission: 'media.manage' },

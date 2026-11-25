@@ -28,6 +28,8 @@ export type Customer = {
   archived_at: string | null
   /** Online store sign-in (E7). Only on GET /customers/{id}; absent from list rows. */
   online_account?: OnlineAccount | null
+  /** POS1b: store credit the customer can spend (NUMERIC string); on list rows and the detail. */
+  store_credit_balance?: string
 }
 
 export type OnlineAccountStatus = 'active' | 'disabled'

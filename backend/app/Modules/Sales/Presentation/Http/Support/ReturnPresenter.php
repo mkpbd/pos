@@ -5,8 +5,10 @@ namespace App\Modules\Sales\Presentation\Http\Support;
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Customers\Application\Contracts\CustomerDirectory;
 use App\Modules\Inventory\Application\Contracts\BatchDirectory;
+use App\Modules\Sales\Application\Services\IssuedCreditNotes;
 use App\Modules\Sales\Application\Services\ReturnPlanner;
 use App\Modules\Sales\Application\Services\SalesContext;
+use App\Modules\Sales\Application\Services\StoredValueTenders;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Infrastructure\Models\ReturnReason;
 use App\Modules\Sales\Infrastructure\Models\Sale;
@@ -31,6 +33,7 @@ class ReturnPresenter
         private readonly UserDirectory $users,
         private readonly BatchDirectory $batches,
         private readonly ReturnPlanner $planner,
+        private readonly IssuedCreditNotes $creditNotes,
     ) {}
 
     /**
@@ -107,9 +110,13 @@ class ReturnPresenter
                 'method_label' => $r->method->label(),
                 'amount' => $r->amount,
                 'reference' => $r->reference,
+                // POS1b: the credit note a gift card refund was issued as (never the full code).
+                'gift_card_last4' => StoredValueTenders::giftCardLast4($r->method, $r->reference),
                 'created_by' => $r->created_by === null ? null : ($users[$r->created_by] ?? null),
                 'created_at' => $r->created_at->toIso8601String(),
             ])->all(),
+            // POS1b: the credit note issued by completing this return — its full code only in that response.
+            'credit_note' => $this->creditNotes->take($return->id),
             'settlement' => $return->status === ReturnStatus::Pending
                 ? $this->planner->settlement(Sale::query()->findOrFail($return->sale_id), $return->total)
                 : null,

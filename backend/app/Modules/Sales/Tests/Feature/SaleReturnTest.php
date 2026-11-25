@@ -158,7 +158,8 @@ class SaleReturnTest extends TestCase
             ->assertJsonPath('data.settlement.credit', '1000.00')
             ->assertJsonPath('data.settlement.refund_due', '0.00')
             ->assertJsonPath('data.completes_immediately', true);
-        $this->assertSame(['cash'], array_column($preview->json('data.settlement.refundable'), 'method'));
+        // POS1b: store credit (the sale has a customer) and a credit note are always offered.
+        $this->assertSame(['cash', 'store_credit', 'gift_card'], array_column($preview->json('data.settlement.refundable'), 'method'));
 
         $this->returnRequest(['sale_id' => $sale['id'], 'lines' => [['sale_line_id' => $sale['lines'][0]['id'], 'quantity' => '1']]])
             ->assertCreated()->assertJsonPath('data.credited_total', '1000.00')->assertJsonPath('data.refunded_total', '0.00');

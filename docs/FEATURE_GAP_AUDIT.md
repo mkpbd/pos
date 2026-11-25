@@ -51,7 +51,7 @@ returns with approval, register X/Z reports, expenses, basic loyalty, per-branch
 | **Bangladesh VAT / Mushak** (6.3 invoice, 6.1/6.2 registers, 9.1 return, supplementary duty stacked on VAT) | P1 | Only a generic tax report exists |
 | **Promotions & coupons at the till** | **Done (POS1a)** | promotion channels online / till, coupons at the till, one discount per level |
 | **Price override / open-price items with manager approval at the till** | **Done (POS1a)** | change price with permission or a manager's PIN; open-price products |
-| **Exchanges**, **store credit / gift cards / vouchers**, customer advances | P1 | Return → approval → new sale; no credit balance |
+| **Exchanges**, **store credit / gift cards / vouchers**, customer advances | **Done (POS1b)** except exchanges (→ POS1c) | store credit with advances, gift cards, vouchers, credit notes |
 | **Receipts by SMS / e-mail / WhatsApp**, due (বাকি) reminders | P1 | Print only; no SMS provider at all |
 | **Silent receipt printing** (ESC/POS / print helper), **"no sale" drawer open** | P1 | Every print opens the browser dialog; drawer only via printer driver; real 58/80 mm printers untested |
 | **Cashier PIN login / quick switch / screen lock** | **Done (POS1a)** | tills, PIN sign-in, switch cashier, lock (auto after 5 min) |

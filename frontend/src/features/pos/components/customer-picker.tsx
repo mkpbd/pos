@@ -7,7 +7,14 @@ import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useCustomersQuery } from '@/features/customers/api'
 import type { CustomerRef } from '@/features/pos/cart-store'
 import { NewCustomerDialog } from '@/features/pos/components/new-customer-dialog'
+import { formatMoney, isZeroDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
+
+/** POS1b: search rows carry the customer's store credit (`store_credit_balance`); null when none. */
+function storeCreditOf(customer: object): string | null {
+  const balance = (customer as { store_credit_balance?: string | null }).store_credit_balance
+  return balance && !isZeroDecimal(balance) ? balance : null
+}
 
 type Props = { value: CustomerRef | null; onChange: (customer: CustomerRef | null) => void; open: boolean; onOpenChange: (open: boolean) => void }
 
@@ -55,6 +62,7 @@ export const CustomerPicker = forwardRef<HTMLButtonElement, Props>(function Cust
                     <div className="flex min-w-0 flex-col">
                       <span className="truncate">{c.name}</span>
                       <span className="text-xs text-muted-foreground">{[c.code, c.phone, c.group && `${c.group.name} −${c.group.discount_percent}%`].filter(Boolean).join(' · ')}</span>
+                      {storeCreditOf(c) && <span className="text-xs text-emerald-700 dark:text-emerald-400">Store credit {formatMoney(storeCreditOf(c))}</span>}
                     </div>
                   </CommandItem>
                 ))}

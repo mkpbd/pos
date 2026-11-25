@@ -92,7 +92,8 @@ export type SaleReturnSummary = {
 export type SalePayment = {
   id: string
   kind: 'payment' | 'reversal'
-  method: 'cash' | 'card' | 'mobile_banking' | 'loyalty_points'
+  /** POS1b: store_credit and gift_card (reference "Gift card ••••1234", never the full code). */
+  method: 'cash' | 'card' | 'mobile_banking' | 'loyalty_points' | 'store_credit' | 'gift_card'
   method_label: string
   amount: string
   tendered: string | null
@@ -126,6 +127,8 @@ export type Sale = SaleHeader & {
     footer: string | null
     branch: { id: string; code: string; name: string; address: string | null; phone: string | null; email: string | null } | null
     timezone: string | null
+    /** POS1b: the customer's store credit after the sale (null / absent for walk-in sales). */
+    customer_store_credit_balance?: string | null
   }
 }
 

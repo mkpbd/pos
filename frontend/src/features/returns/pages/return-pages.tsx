@@ -21,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
+import { CreditNoteDialog, type IssuedCreditNote } from '@/features/returns/components/credit-note-dialog'
 import { RefundsEditor } from '@/features/returns/components/refunds-editor'
 import { defaultRefunds, refundsProblem, toRefundInput, type RefundRow } from '@/features/returns/refunds'
 import {
@@ -44,6 +45,7 @@ import {
 } from '@/features/returns/api'
 import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
 import { lineLabel, useSaleQuery, type SaleLine } from '@/features/sales/api'
+import { paymentRowLabel } from '@/features/sales/payment-label'
 import { ApiError } from '@/lib/api/client'
 import { fieldErrorMap } from '@/lib/forms'
 import { compareDecimal, decimalPattern, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
@@ -266,6 +268,7 @@ export function ReturnPage() {
   const [refundErrors, setRefundErrors] = useState<Record<string, string>>({})
   const [rejecting, setRejecting] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [creditNote, setCreditNote] = useState<IssuedCreditNote | null>(null)
 
   if (isPending) return <LoadingState rows={6} label="Loading return" />
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />
@@ -286,7 +289,12 @@ export function ReturnPage() {
     if (!settlement || problem) return
     const refunds = toRefundInput(rows)
     approve.mutate({ id: ret.id, refunds, idempotencyKey: idempotency.keyFor({ id: ret.id, refunds }) }, {
-      onSuccess: (r) => { idempotency.settle(); toast.success(`${r.number} approved.`); setApproving(false) },
+      onSuccess: (r) => {
+        idempotency.settle()
+        toast.success(`${r.number} approved.`)
+        setApproving(false)
+        if (r.credit_note) setCreditNote({ ...r.credit_note, currency: r.currency, returnNumber: r.number, customerName: r.customer?.name ?? null })
+      },
       onError: (err) => {
         idempotency.settle(err)
         if (err instanceof ApiError && err.code === 'RETURN_ALREADY_DECIDED') setApproving(false)
@@ -379,12 +387,15 @@ export function ReturnPage() {
           <CardContent className="flex flex-col gap-2 text-sm">
             {pending && settlement && <SettlementSummary settlement={settlement} currency={c} />}
             {!pending && ret.refunds.length === 0 && <p className="text-muted-foreground">No money paid back.</p>}
-            {ret.refunds.map((r, i) => (
-              <div key={i} className="flex justify-between gap-2">
-                <span>{r.method_label}{r.reference && <span className="text-muted-foreground"> · {r.reference}</span>}</span>
-                <span className="font-mono">{formatMoney(r.amount, c)}</span>
-              </div>
-            ))}
+            {ret.refunds.map((r, i) => {
+              const row = paymentRowLabel(r)
+              return (
+                <div key={i} className="flex justify-between gap-2">
+                  <span>{row.label}{row.reference && <span className="text-muted-foreground"> · {row.reference}</span>}</span>
+                  <span className="font-mono">{formatMoney(r.amount, c)}</span>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
       </div>
@@ -439,6 +450,7 @@ export function ReturnPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CreditNoteDialog note={creditNote} onDone={() => setCreditNote(null)} />
     </div>
   )
 }
@@ -462,6 +474,7 @@ export function NewReturnPage() {
   const [previewed, setPreviewed] = useState<{ fingerprint: string; result: ReturnPreview } | null>(null)
   const [rows, setRows] = useState<RefundRow[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [creditNote, setCreditNote] = useState<{ note: IssuedCreditNote; returnId: string } | null>(null)
 
   const activeReasons = (reasons.data ?? []).filter((r) => r.is_active)
   const reason = activeReasons.find((r) => r.id === reasonId)
@@ -521,7 +534,9 @@ export function NewReturnPage() {
       onSuccess: (r) => {
         idempotency.settle()
         toast.success(r.status === 'completed' ? `${r.number} completed.` : `${r.number} sent for approval.`)
-        navigate(`/returns/${r.id}`)
+        // POS1b: a credit note code is shown once, before leaving for the return document.
+        if (r.credit_note) setCreditNote({ note: { ...r.credit_note, currency: r.currency, returnNumber: r.number, customerName: r.customer?.name ?? null }, returnId: r.id })
+        else navigate(`/returns/${r.id}`)
       },
       onError: (err) => {
         idempotency.settle(err)
@@ -655,6 +670,7 @@ export function NewReturnPage() {
           </Button>
         </div>
       )}
+      <CreditNoteDialog note={creditNote?.note ?? null} onDone={() => creditNote && navigate(`/returns/${creditNote.returnId}`)} />
     </div>
   )
 }

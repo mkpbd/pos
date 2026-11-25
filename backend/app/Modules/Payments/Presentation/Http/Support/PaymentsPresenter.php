@@ -44,6 +44,10 @@ class PaymentsPresenter
         'supplier_payment_void' => 'Voided supplier payments',
         'supplier_refund' => 'Supplier refunds',
         'supplier_refund_void' => 'Voided supplier refunds',
+        // POS1b: customer advances / store credit pay-outs and gift card sales (StoredValue).
+        'store_credit_top_up' => 'Customer advances',
+        'store_credit_withdrawal' => 'Store credit pay-outs',
+        'gift_card_sale' => 'Gift card sales',
     ];
 
     public function __construct(

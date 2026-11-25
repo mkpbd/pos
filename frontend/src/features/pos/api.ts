@@ -123,7 +123,7 @@ export type PricedCart = {
   discount_approved_by?: { id: string; name: string } | null
 }
 
-export type PaymentMethod = 'cash' | 'card' | 'mobile_banking' | 'loyalty_points'
+export type PaymentMethod = 'cash' | 'card' | 'mobile_banking' | 'loyalty_points' | 'store_credit' | 'gift_card'
 
 export const PAYMENT_METHODS: Record<PaymentMethod, string> = {
   cash: 'Cash',
@@ -131,6 +131,10 @@ export const PAYMENT_METHODS: Record<PaymentMethod, string> = {
   mobile_banking: 'Mobile banking',
   /** Only for a customer with enough points while the loyalty program is on. */
   loyalty_points: 'Loyalty points',
+  /** POS1b: the sale's customer's store credit (advances, refunds to credit). */
+  store_credit: 'Store credit',
+  /** POS1b: a gift card, voucher or credit note; `reference` carries the full code. */
+  gift_card: 'Gift card',
 }
 
 export type CheckoutInput = CartInput & {

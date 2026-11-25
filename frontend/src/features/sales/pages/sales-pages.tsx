@@ -18,6 +18,7 @@ import { useCan } from '@/features/auth/use-auth'
 import { lineLabel, salesListQuery, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleStatus } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
 import { LinePrice, LinePromotion, SaleOffersCard } from '@/features/sales/components/sale-pricing'
+import { paymentRowLabel } from '@/features/sales/payment-label'
 import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -235,15 +236,18 @@ export function SalePage() {
           <CardHeader><CardTitle>Payments</CardTitle></CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             {sale.payments.length === 0 && <p className="text-muted-foreground">No payment taken (full amount on account).</p>}
-            {sale.payments.map((p) => (
-              <div key={p.id} className="flex justify-between gap-2">
-                <span>
-                  {p.kind === 'reversal' ? 'Refunded — ' : ''}{p.method_label}{p.reference && <span className="text-muted-foreground"> · {p.reference}</span>}
-                  {p.tendered && <span className="text-muted-foreground"> (tendered {formatMoney(p.tendered)})</span>}
-                </span>
-                <span className="font-mono">{formatMoney(p.amount, c)}</span>
-              </div>
-            ))}
+            {sale.payments.map((p) => {
+              const row = paymentRowLabel(p)
+              return (
+                <div key={p.id} className="flex justify-between gap-2" data-testid="sale-payment">
+                  <span>
+                    {p.kind === 'reversal' ? 'Refunded — ' : ''}{row.label}{row.reference && <span className="text-muted-foreground"> · {row.reference}</span>}
+                    {p.tendered && <span className="text-muted-foreground"> (tendered {formatMoney(p.tendered)})</span>}
+                  </span>
+                  <span className="font-mono">{formatMoney(p.amount, c)}</span>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
         <Card>

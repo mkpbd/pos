@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { HistoryIcon, Loader2Icon, LockIcon, PauseIcon, ScanBarcodeIcon, ShoppingCartIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -16,7 +17,9 @@ import { CouponField } from '@/features/pos/components/coupon-field'
 import { CustomerPicker } from '@/features/pos/components/customer-picker'
 import { HeldSalesSheet } from '@/features/pos/components/held-sales-sheet'
 import { ManagerApprovalProvider } from '@/features/pos/components/manager-approval'
-import { PaymentDialog, type LoyaltyTender } from '@/features/pos/components/payment-dialog'
+import { PaymentDialog, type LoyaltyTender, type StoreCreditTender } from '@/features/pos/components/payment-dialog'
+import { StoredValueMenu } from '@/features/pos/components/stored-value-menu'
+import { codeFingerprint, storeCreditKey, tenderProblem, useStoreCreditQuery } from '@/features/pos/stored-value-api'
 import { PriceFlow, type PriceTarget } from '@/features/pos/components/price-flow'
 import { PricingProblem } from '@/features/pos/components/pricing-problem'
 import { CategoryBar, ProductGrid } from '@/features/pos/components/product-grid'
@@ -109,6 +112,13 @@ function PosTerminal() {
     ? { points: points.data[customerId] ?? 0, pointValue: loyaltySettings.data.point_value, minRedeemPoints: loyaltySettings.data.min_redeem_points }
     : null
 
+  // POS1b: the selected customer's store credit (cart line, payment tender, advance).
+  const queryClient = useQueryClient()
+  const canSeeCredit = can('store_credit.view')
+  const credit = useStoreCreditQuery(cart.customer?.id, canSeeCredit)
+  const creditBalance = credit.data && cart.customer ? credit.data.balance : null
+  const storeCredit: StoreCreditTender | null = priced?.customer && canSeeCredit ? { balance: priced.customer.id === cart.customer?.id ? creditBalance : null } : null
+
   const addItem = (item: PosItem) => {
     if (!item.sellable) {
       toast.error(`${item.product_name} is not for sale.`)
@@ -190,13 +200,15 @@ function PosTerminal() {
       if (canOperate && !session.data) setOpeningRegister(true)
       return
     }
+    checkout.reset()
     setPaying(true)
   }
 
   const complete = (payments: { method: PaymentMethod; amount: string; reference: string | null }[]) => {
     if (!cartInput) return
     const input = { ...cartInput, payments, held_sale_id: cart.heldSaleId }
-    const fingerprint = JSON.stringify(input)
+    // POS1b: the fingerprint is kept with the cart (localStorage), so a gift card code is only hashed into it.
+    const fingerprint = JSON.stringify({ ...input, payments: payments.map((p) => (p.method === 'gift_card' && p.reference ? { ...p, reference: codeFingerprint(p.reference) } : p)) })
     // Retrying the same payload (e.g. after a timeout) must reuse the key so it cannot sell twice.
     const key = cart.pendingCheckout?.fingerprint === fingerprint ? cart.pendingCheckout.key : crypto.randomUUID()
     apply((c) => ({ ...c, pendingCheckout: { fingerprint, key } }))
@@ -218,6 +230,11 @@ function PosTerminal() {
         if (isTillProblem(error)) {
           setPaying(false)
           setCheckoutProblem({ error, cart: JSON.stringify(cartInput) })
+        }
+        // POS1b: store credit / gift card refusals show at their tender in the payment dialog.
+        if (tenderProblem(error)) {
+          if (cart.customer) void queryClient.invalidateQueries({ queryKey: storeCreditKey(cart.customer.id) })
+          return
         }
         toast.error(retryable ? `${error.message} Press “Complete sale” again to retry safely.` : error.message)
       },
@@ -263,13 +280,25 @@ function PosTerminal() {
             <StoreSelect value={cart.storeId} onChange={(storeId) => apply((c) => ({ ...c, storeId }))} branchIds={branchId ? [branchId] : null} aria-label="Selling from store" />
           </div>
           <CustomerPicker value={cart.customer} onChange={(customer) => apply((c) => ({ ...c, customer, invoiceDiscount: undefined }))} open={customerOpen} onOpenChange={setCustomerOpen} />
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={() => setHeldOpen(true)}>
               <PauseIcon data-icon="inline-start" /> Held sales
             </Button>
             <Button type="button" variant="outline" onClick={() => setRecentOpen(true)}>
               <HistoryIcon data-icon="inline-start" /> Recent
             </Button>
+            <StoredValueMenu
+              customer={cart.customer}
+              creditBalance={creditBalance}
+              till={{
+                storeId: cart.storeId,
+                organization: me.organization?.name ?? null,
+                branch: me.branches.find((b) => b.id === branchId)?.name ?? null,
+                cashier: me.user.name,
+                currency: me.organization?.base_currency ?? 'BDT',
+                cashReady: sessionReady,
+              }}
+            />
             <Button
               type="button"
               variant="outline"
@@ -328,7 +357,11 @@ function PosTerminal() {
               {priced.customer.name}: owes {formatMoney(priced.customer.credit.outstanding, priced.currency)}
               {!isZeroDecimal(priced.customer.credit.credit_limit) && ` · credit available ${formatMoney(priced.customer.credit.available)}`}
               {!isZeroDecimal(priced.customer.group_discount_percent) && ` · group −${trimDecimal(priced.customer.group_discount_percent)}%`}
+              {creditBalance !== null && !isZeroDecimal(creditBalance) && <span data-testid="cart-store-credit"> · store credit {formatMoney(creditBalance, priced.currency)}</span>}
             </p>
+          )}
+          {!priced?.customer && cart.customer && creditBalance !== null && !isZeroDecimal(creditBalance) && (
+            <p className="text-xs text-muted-foreground" data-testid="cart-store-credit">{cart.customer.name}: store credit {formatMoney(creditBalance)}</p>
           )}
           {priced ? (
             <CartTotals priced={priced} cart={cart} canDiscount={canDiscount} apply={apply} />
@@ -355,6 +388,8 @@ function PosTerminal() {
           priced={priced}
           canCredit={can('sales.credit')}
           loyalty={loyalty}
+          storeCredit={storeCredit}
+          checkoutError={checkout.error}
           pending={checkout.isPending}
           onSubmit={complete}
         />

@@ -47,10 +47,18 @@ class CustomerController
 
         ListQuery::apply($query, $request, sortable: ['code', 'name', 'created_at'], searchable: ['code', 'name', 'phone', 'email'], defaultSort: 'name');
         if ($format = ListExporter::requested($request)) {
-            return $exports->download($request, $format, CustomersExport::class, RowSource::fromQuery($query, fn (Collection $customers) => $customers->map(fn (Customer $c) => new CustomerResource($c))));
+            return $exports->download($request, $format, CustomersExport::class, RowSource::fromQuery($query, function (Collection $customers) {
+                $balances = CustomerResource::storeCreditBalances($customers);
+
+                return $customers->map(fn (Customer $c) => (new CustomerResource($c))->withStoreCredit($balances[$c->id] ?? null));
+            }));
         }
 
-        return ApiResponse::paginated($query->paginate(ListQuery::perPage($request)), CustomerResource::class);
+        // POS1b: store credit balances of the page in one query (the till's customer search too).
+        $page = $query->paginate(ListQuery::perPage($request));
+        $balances = CustomerResource::storeCreditBalances($page->items());
+
+        return ApiResponse::paginated($page, fn (Customer $c) => (new CustomerResource($c))->withStoreCredit($balances[$c->id] ?? null));
     }
 
     public function store(SaveCustomerRequest $request, SaveCustomer $save): JsonResponse

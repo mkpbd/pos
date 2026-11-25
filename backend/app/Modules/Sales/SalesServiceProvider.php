@@ -4,6 +4,7 @@ namespace App\Modules\Sales;
 
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Application\Contracts\SaleBaskets;
+use App\Modules\Sales\Application\Services\IssuedCreditNotes;
 use App\Modules\Sales\Application\Services\NoLoyaltyProgram;
 use App\Modules\Sales\Infrastructure\EloquentSaleBaskets;
 use App\Modules\Sales\Infrastructure\Models\ReturnReason;
@@ -25,6 +26,9 @@ class SalesServiceProvider extends ModuleServiceProvider
         $this->app->bindIf(LoyaltyProgram::class, NoLoyaltyProgram::class);
         // P1b: POS sales as baskets for "frequently bought together" (OnlineCatalog).
         $this->app->bind(SaleBaskets::class, EloquentSaleBaskets::class);
+        // POS1b: credit notes issued in this request (their code is shown once). StoreCredit and
+        // GiftCards are bound by the StoredValue module.
+        $this->app->scoped(IssuedCreditNotes::class);
     }
 
     public function boot(): void

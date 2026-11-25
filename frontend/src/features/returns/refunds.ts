@@ -1,8 +1,16 @@
-import type { RefundInput, Settlement } from '@/features/returns/api'
+import type { RefundableMethod, RefundInput, Settlement } from '@/features/returns/api'
 import { compareDecimal, formatMoney, isZeroDecimal, MONEY_PATTERN, subtractDecimal, sumDecimals } from '@/lib/money'
-import type { RefundMethod } from '@/lib/payment-methods'
+import { REFUND_METHODS, type RefundMethod } from '@/lib/payment-methods'
 
 export type RefundRow = { key: string; method: RefundMethod; amount: string; reference: string }
+
+/** POS1b: refunds that move no money take no reference (store credit, a new credit note). */
+const NO_REFERENCE: RefundMethod[] = ['cash', 'store_credit', 'gift_card']
+
+export const takesReference = (method: RefundMethod) => !NO_REFERENCE.includes(method)
+
+/** The server's label, except a gift card refund, which is a new credit note (POS1b). */
+export const refundOptionLabel = (option: RefundableMethod) => (option.method === 'gift_card' ? REFUND_METHODS.gift_card : option.label)
 
 export const newRefundKey = () => crypto.randomUUID()
 
@@ -36,7 +44,7 @@ export function refundsProblem(rows: RefundRow[], settlement: Settlement, curren
     if (!MONEY_PATTERN.test(amount) || isZeroDecimal(amount)) return 'Enter an amount (up to 2 decimals) for every refund.'
     const option = settlement.refundable.find((o) => o.method === row.method)
     if (!option) return 'Choose a refund method the invoice allows.'
-    if (option.max !== null && compareDecimal(amount, option.max) > 0) return `${option.label} refunds are limited to ${formatMoney(option.max, currency)}.`
+    if (option.max !== null && compareDecimal(amount, option.max) > 0) return `${refundOptionLabel(option)} refunds are limited to ${formatMoney(option.max, currency)}.`
   }
   const remaining = refundsRemaining(rows, settlement.refund_due)
   if (isZeroDecimal(remaining)) return null
@@ -46,5 +54,5 @@ export function refundsProblem(rows: RefundRow[], settlement: Settlement, curren
 }
 
 export function toRefundInput(rows: RefundRow[]): RefundInput[] {
-  return rows.map((r) => ({ method: r.method, amount: r.amount.trim(), reference: r.method === 'cash' ? null : r.reference.trim() || null }))
+  return rows.map((r) => ({ method: r.method, amount: r.amount.trim(), reference: takesReference(r.method) ? r.reference.trim() || null : null }))
 }

@@ -6,9 +6,19 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { pointsFor, pointsValue } from '@/features/loyalty/api'
 import { PAYMENT_METHODS, type PaymentMethod, type PricedCart } from '@/features/pos/api'
+import { GiftCardCodeField, StoreCreditNote } from '@/features/pos/components/stored-value-tender'
+import { allocate, checkedCard, storedValueProblem, type TenderRow } from '@/features/pos/stored-value-tenders'
+import { lookupGiftCard, normalizeGiftCode, tenderProblem } from '@/features/pos/stored-value-api'
+import { ApiError } from '@/lib/api/client'
 import { compareDecimal, formatMoney, MONEY_PATTERN, subtractDecimal, sumDecimals } from '@/lib/money'
 
-type Tender = { method: PaymentMethod; amount: string; reference: string }
+type Tender = TenderRow
+
+let tenderIds = 0
+const tender = (method: PaymentMethod, amount: string): Tender => ({ id: ++tenderIds, method, amount, reference: '' })
+
+/** POS1b: the selected customer's store credit (`balance` null = not known to this user). */
+export type StoreCreditTender = { balance: string | null }
 
 /** The selected customer's redeemable points, when the loyalty program is on. */
 export type LoyaltyTender = { points: number; pointValue: string; minRedeemPoints: number }
@@ -46,7 +56,8 @@ function roundUp(amount: string, step: number): string {
 const positive = (v: string) => MONEY_PATTERN.test(v.trim()) && !/^0+(\.0+)?$/.test(v.trim())
 
 /**
- * Takes the payments for a priced cart: any mix of cash, card and mobile banking. Shows what
+ * Takes the payments for a priced cart: any mix of cash, card, mobile banking, loyalty points and
+ * (POS1b) the customer's store credit or gift cards (checked by code first). Shows what
  * is still due or the change to hand back. The server settles the payments again.
  */
 export function PaymentDialog({
@@ -55,6 +66,8 @@ export function PaymentDialog({
   priced,
   canCredit,
   loyalty,
+  storeCredit,
+  checkoutError,
   pending,
   onSubmit,
 }: {
@@ -63,12 +76,20 @@ export function PaymentDialog({
   priced: PricedCart
   canCredit: boolean
   loyalty?: LoyaltyTender | null
+  /** POS1b: offered only with a customer on the sale. */
+  storeCredit?: StoreCreditTender | null
+  /** POS1b: the last checkout refusal; store credit / gift card refusals show at their tender. */
+  checkoutError?: unknown
   pending: boolean
   onSubmit: (payments: { method: PaymentMethod; amount: string; reference: string | null }[]) => void
 }) {
   const total = priced.total
-  const [tenders, setTenders] = useState<Tender[]>([{ method: 'cash', amount: total, reference: '' }])
+  const [tenders, setTenders] = useState<Tender[]>(() => [tender('cash', total)])
   const [touched, setTouched] = useState(false)
+  // POS1b: a refusal stays at its tender until a stored-value tender is changed.
+  const [dismissedError, setDismissedError] = useState<unknown>(null)
+  const [focusId, setFocusId] = useState<number | null>(null)
+  const problem = checkoutError && checkoutError !== dismissedError ? tenderProblem(checkoutError, priced.currency) : null
 
   const valid = tenders.filter((t) => positive(t.amount))
   const tendered = sumDecimals(valid.map((t) => t.amount))
@@ -78,17 +99,21 @@ export function PaymentDialog({
   const nonCash = sumDecimals(valid.filter((t) => t.method !== 'cash').map((t) => t.amount))
   const hasDue = compareDecimal(due, '0') > 0
   const canUsePoints = !!loyalty && loyalty.points >= Math.max(loyalty.minRedeemPoints, 1)
-  const methods = METHODS.filter((m) => m !== 'loyalty_points' || canUsePoints || tenders.some((t) => t.method === m))
+  const creditBalance = storeCredit?.balance ?? null
+  const canUseCredit = !!priced.customer && !!storeCredit && (creditBalance === null || compareDecimal(creditBalance, '0') > 0)
+  const methods = METHODS.filter((m) =>
+    (m !== 'loyalty_points' || canUsePoints || tenders.some((t) => t.method === m))
+    && (m !== 'store_credit' || canUseCredit || tenders.some((t) => t.method === m)))
   const pointsTender = valid.find((t) => t.method === 'loyalty_points')
 
   const tenderError =
     tenders.some((t) => t.amount.trim() !== '' && !positive(t.amount)) ? 'Enter amounts greater than zero with up to 2 decimals.'
     : tenders.filter((t) => t.method === 'loyalty_points').length > 1 ? 'Use one loyalty points payment.'
     : pointsTender ? loyaltyProblem(pointsTender.amount.trim(), loyalty, priced.currency)
-    : null
+    : storedValueProblem(tenders, { hasCustomer: !!priced.customer, creditBalance, currency: priced.currency })
   const error =
     tenderError ? tenderError
-    : compareDecimal(nonCash, total) > 0 ? 'Card, mobile and points payments cannot exceed the total; only cash gives change.'
+    : compareDecimal(nonCash, total) > 0 ? 'Card, mobile, points, store credit and gift card payments cannot exceed the total; only cash gives change.'
     : hasDue && !priced.customer ? 'Collect the full amount, or choose a customer to leave the rest due.'
     : hasDue && !canCredit ? 'You are not allowed to sell on credit; collect the full amount.'
     : hasDue && compareDecimal(due, priced.customer?.credit.available ?? '0') > 0 ? `Only ${formatMoney(priced.customer?.credit.available ?? '0', priced.currency)} of credit is available for ${priced.customer?.name}.`
@@ -96,11 +121,77 @@ export function PaymentDialog({
 
   const set = (i: number, patch: Partial<Tender>) => setTenders((ts) => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)))
 
+  /** POS1b: a stored-value tender changed, so its checkout refusal no longer applies. */
+  const touchStoredValue = () => { if (checkoutError) setDismissedError(checkoutError) }
+
+  const changeMethod = (i: number, method: PaymentMethod) => {
+    const current = tenders[i]
+    if (!current || current.method === method) return
+    if (current.method === 'store_credit' || current.method === 'gift_card') touchStoredValue()
+    // The gift card code never moves to another method's reference.
+    const reset = current.method === 'gift_card' || method === 'gift_card' ? { reference: '', check: undefined } : {}
+    if (method === 'store_credit') {
+      touchStoredValue()
+      setTenders((ts) => allocate(ts.map((t, j) => (j === i ? { ...t, ...reset, method } : t)), current.id, creditBalance, total))
+    } else if (method === 'gift_card') {
+      setFocusId(current.id)
+      set(i, { ...reset, method, amount: '' })
+    } else {
+      set(i, { ...reset, method })
+    }
+  }
+
+  /** Adds a store credit tender up to the balance; the first cash / card tender keeps the rest. */
+  const addStoreCredit = () => {
+    const row = tender('store_credit', '')
+    touchStoredValue()
+    setTenders((ts) => allocate([row, ...ts], row.id, creditBalance, total))
+  }
+
+  const addGiftCard = () => {
+    const row = tender('gift_card', '')
+    setFocusId(row.id)
+    setTenders((ts) => [...ts, row])
+  }
+
+  /** Looks the typed code up; a usable card takes up to its balance of what is still due. */
+  const checkGiftCard = (id: number) => {
+    const row = tenders.find((t) => t.id === id)
+    const code = row ? normalizeGiftCode(row.reference) : ''
+    if (!code) return
+    touchStoredValue()
+    const update = (patch: (t: Tender) => Tender) => setTenders((ts) => ts.map((t) => (t.id === id && normalizeGiftCode(t.reference) === code ? patch(t) : t)))
+    update((t) => ({ ...t, check: { status: 'checking', code } }))
+    lookupGiftCard(code).then(
+      (card) => setTenders((ts) => {
+        const current = ts.find((t) => t.id === id)
+        if (!current || normalizeGiftCode(current.reference) !== code) return ts
+        const next = ts.map((t) => (t.id === id ? { ...t, check: { status: 'checked' as const, code, card } } : t))
+        const usable = card.usable && (!card.currency || card.currency === priced.currency) && card.balance !== null
+        return usable ? allocate(next, id, card.balance, total) : next
+      }),
+      (failure: unknown) => update((t) => ({
+        ...t,
+        check: {
+          status: 'failed',
+          code,
+          message: failure instanceof ApiError && failure.status === 429 ? 'Too many gift card checks; wait a minute and try again.' : failure instanceof Error ? failure.message : 'The gift card could not be checked.',
+        },
+      })),
+    )
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     setTouched(true)
     if (error || pending) return
-    onSubmit(valid.map((t) => ({ method: t.method, amount: t.amount.trim(), reference: t.method === 'card' || t.method === 'mobile_banking' ? t.reference.trim() || null : null })))
+    onSubmit(valid.map((t) => ({
+      method: t.method,
+      amount: t.amount.trim(),
+      reference: t.method === 'card' || t.method === 'mobile_banking' ? t.reference.trim() || null
+        : t.method === 'gift_card' ? normalizeGiftCode(t.reference)
+        : null,
+    })))
   }
 
   return (
@@ -115,21 +206,37 @@ export function PaymentDialog({
         </DialogHeader>
         <form id="payment-form" onSubmit={submit} noValidate className="flex flex-col gap-3">
           {tenders.map((t, i) => (
-            <div key={i} className="grid grid-cols-[9rem_1fr_auto] items-start gap-2">
-              <Select value={t.method} onValueChange={(v) => set(i, { method: v as PaymentMethod })}>
+            <div key={t.id} className="grid grid-cols-[9rem_1fr_auto] items-start gap-2">
+              <Select value={t.method} onValueChange={(v) => changeMethod(i, v as PaymentMethod)}>
                 <SelectTrigger className="w-full" aria-label={`Method of payment ${i + 1}`}><SelectValue /></SelectTrigger>
                 <SelectContent>{methods.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHODS[m]}</SelectItem>)}</SelectContent>
               </Select>
               <div className="flex flex-col gap-1">
+                {t.method === 'gift_card' && (
+                  <GiftCardCodeField
+                    index={i}
+                    tender={t}
+                    currency={priced.currency}
+                    autoFocus={focusId === t.id}
+                    problem={problem}
+                    onCodeChange={(reference) => { touchStoredValue(); set(i, { reference }) }}
+                    onCheck={() => checkGiftCard(t.id)}
+                  />
+                )}
                 <Input
                   aria-label={`Amount of payment ${i + 1}`}
                   inputMode="decimal"
-                  autoFocus={i === 0}
+                  autoFocus={i === 0 && focusId === null}
                   className="font-mono"
                   value={t.amount}
-                  onChange={(e) => set(i, { amount: e.target.value })}
+                  disabled={t.method === 'gift_card' && !checkedCard(t)?.usable && t.amount === ''}
+                  onChange={(e) => {
+                    if (t.method === 'store_credit' || t.method === 'gift_card') touchStoredValue()
+                    set(i, { amount: e.target.value })
+                  }}
                   onFocus={(e) => e.target.select()}
                 />
+                {t.method === 'store_credit' && <StoreCreditNote balance={creditBalance} currency={priced.currency} problem={problem} />}
                 {(t.method === 'card' || t.method === 'mobile_banking') && (
                   <Input aria-label={`Reference of payment ${i + 1}`} placeholder="Card / transaction reference" value={t.reference} onChange={(e) => set(i, { reference: e.target.value })} />
                 )}
@@ -139,14 +246,25 @@ export function PaymentDialog({
                   </p>
                 )}
               </div>
-              <Button type="button" variant="ghost" size="icon" aria-label={`Remove payment ${i + 1}`} disabled={tenders.length === 1} onClick={() => setTenders((ts) => ts.filter((_, j) => j !== i))}>
+              <Button type="button" variant="ghost" size="icon" aria-label={`Remove payment ${i + 1}`} disabled={tenders.length === 1} onClick={() => {
+                if (t.method === 'store_credit' || t.method === 'gift_card') touchStoredValue()
+                setTenders((ts) => ts.filter((_, j) => j !== i))
+              }}>
                 <Trash2Icon />
               </Button>
             </div>
           ))}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setTenders((ts) => [...ts, { method: 'card', amount: hasDue ? due : '', reference: '' }])}>
+            <Button type="button" variant="outline" size="sm" onClick={() => setTenders((ts) => [...ts, tender('card', hasDue ? due : '')])}>
               <PlusIcon data-icon="inline-start" /> Split payment
+            </Button>
+            {canUseCredit && !tenders.some((t) => t.method === 'store_credit') && (
+              <Button type="button" variant="outline" size="sm" onClick={addStoreCredit}>
+                Store credit{creditBalance !== null && ` (${formatMoney(creditBalance)})`}
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={addGiftCard}>
+              Gift card
             </Button>
             {canUsePoints && loyalty && !tenders.some((t) => t.method === 'loyalty_points') && (
               <Button
@@ -158,7 +276,7 @@ export function PaymentDialog({
                   const affordable = Math.min(loyalty.points, maxWholePoints(total, loyalty.pointValue))
                   if (affordable < Math.max(loyalty.minRedeemPoints, 1)) return
                   const amount = pointsValue(affordable, loyalty.pointValue)
-                  const pointsRow: Tender = { method: 'loyalty_points', amount, reference: '' }
+                  const pointsRow: Tender = tender('loyalty_points', amount)
                   setTenders((ts) => [pointsRow, ...ts.map((t, j) => (j === 0 ? { ...t, amount: subtractDecimal(total, amount, 2) } : t))].filter((t) => t === pointsRow || !/^0+(\.0+)?$/.test(t.amount)))
                 }}
               >

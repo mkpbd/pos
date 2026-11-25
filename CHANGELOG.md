@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### POS1b — Store credit (customer advances) and gift cards / vouchers
+
+Second part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). Exchanges follow in POS1c, printing / drawer / SMS receipts in POS1d. No new packages.
+
+#### Added
+- **Store credit** per customer: **advances** at the till or on the customer page (receipt `ADV-…`), **pay with store credit** at the till, **refund a return to store credit**, manager **adjustments** and **payouts**; the balance shows at the till, on receipts and on the customer page.
+- **Gift cards** sold at the till (any value, pre-printed numbers allowed, 12 months or no expiry; slip with the code shown once), **vouchers** issued free by managers, **credit notes** when a return is refunded to a gift card; **Gift cards** page (list, history, void); **Gift card balance** check at the till; pay with one or more gift cards, partly or fully.
+- Cancelling a sale gives back what it took from store credit and gift cards.
+
+#### Security
+- Gift card codes are stored only as a hash (plus the last four); the full code appears once. Stored idempotent replies are encrypted, so a code is not kept in clear even for retries. Lookups are limited to 20 a minute per user.
+
+#### Tests
+- Backend 1955 (PostgreSQL: 1954 pass, 1 opt-in PDF skip) (PostgreSQL); Pint clean. vitest 3163; mocked Playwright 609 (new `pos1b-till`, `pos1b-admin`).
+- Full-stack (PostgreSQL, desktop) 63 (62 in one run; the new POS1b test then failed only on a drawer left open by its earlier single run, fixed and passed) — new **POS1b** on Bazar Fresh: a customer advance and a gift card sold by card (the list never shows the code); at the till one sale is paid with the store credit, the gift card (typed in lower case) and cash, the receipt names the card by its last four, both balances are spent; one unit is returned and refunded as a credit note that can pay.
+
+#### Upgrade
+- `php artisan migrate`, `php artisan pos:permissions:sync`.
+
 ### POS1a — Till PIN, tills, manager approval, price changes and promotions at the till
 
 First part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). No new packages.

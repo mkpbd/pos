@@ -2628,3 +2628,116 @@ test('POS1a: Bazar Fresh sets up a till; a cashier signs in with a PIN, locks an
     await ownerContext.close()
   }
 })
+
+test('POS1b: Bazar Fresh takes a customer advance and sells a gift card; a till sale is paid with store credit, the gift card and cash; a return comes back as a credit note', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The till runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const find = (value: unknown, key: string): unknown => {
+    if (value && typeof value === 'object') {
+      if (key in (value as Record<string, unknown>)) return (value as Record<string, unknown>)[key]
+      for (const child of Object.values(value as Record<string, unknown>)) {
+        const hit = find(child, key)
+        if (hit !== undefined) return hit
+      }
+    }
+    return undefined
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  try {
+    // A drawer of its own, a customer with an advance, and a gift card sold over the counter.
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    // (an earlier run may have left the owner's drawer open: one open shift per person)
+    const current = await call('GET', '/api/v1/register-sessions/current')
+    if (!(current.status === 200 && current.body.data)) {
+      const register = await call('POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `S${stamp.slice(-6)}`, name: `Stored value ${stamp}` })
+      expect(register.status).toBe(201)
+      expect((await call('POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '1000' })).status).toBeLessThan(300)
+    }
+    const customerName = `Nusrat Jahan ${stamp}`
+    const customer = await call('POST', '/api/v1/customers', { name: customerName, phone: `015${stamp}` })
+    expect(customer.status).toBe(201)
+    const customerId = customer.body.data.id as string
+    const advance = await call('POST', `/api/v1/customers/${customerId}/store-credit/top-ups`, { store_id: store.id, amount: '100', method: 'cash' })
+    expect(advance.status).toBe(201)
+    expect(advance.body.data).toMatchObject({ balance: '100.00' })
+    expect(advance.body.data.receipt_number).toMatch(/^ADV-\d{6}$/)
+    const sold = await call('POST', '/api/v1/gift-cards/sell', { store_id: store.id, amount: '50', payments: [{ method: 'card', amount: '50' }] })
+    expect(sold.status).toBe(201)
+    const code = sold.body.data.gift_card.code as string
+    const last4 = sold.body.data.gift_card.code_last4 as string
+    expect(code).toMatch(/^[A-Z0-9]{4}(-[A-Z0-9]{4}){3}$/)
+    // The code is shown once: the list knows only its last four.
+    const listed = (await call('GET', `/api/v1/gift-cards?search=${last4}`)).body.data as Record<string, unknown>[]
+    expect(listed.length).toBeGreaterThan(0)
+    expect(JSON.stringify(listed)).not.toContain(code.replace(/-/g, ''))
+
+    // At the till: the customer's credit, the gift card and cash pay one sale.
+    await page.goto(`${base}/admin/pos`)
+    await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+    await page.getByRole('button', { name: 'Customer' }).click()
+    await page.getByPlaceholder('Name, phone or code').fill(customerName)
+    const option = page.getByRole('option', { name: new RegExp(customerName) })
+    await expect(option).toContainText('Store credit 100.00')
+    await option.click()
+    const items = (await call('GET', `/api/v1/pos/catalog?store_id=${store.id}&page=1`)).body.data as { product_name: string; price: string; on_hand: string | null; sellable: boolean; open_price?: boolean; track_batches: boolean; track_serials: boolean; allow_decimal: boolean }[]
+    const item = items.find((i) => i.sellable && !i.open_price && !i.track_serials && !i.track_batches && Number(i.price) >= 20 && (i.on_hand === null || Number(i.on_hand) >= 10))!
+    expect(item).toBeTruthy()
+    const esc = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const cart = page.getByRole('complementary', { name: 'Current sale' })
+    const units = Math.ceil(200 / Number(item.price))
+    for (let i = 0; i < units; i++) await page.getByRole('button', { name: new RegExp(esc(item.product_name)) }).first().click()
+    await expect(cart.getByTestId('cart-total')).not.toHaveText(/BDT 0\.00/)
+    await cart.getByRole('button', { name: /^Pay/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'Payment' })
+    await dialog.getByRole('button', { name: 'Store credit (100.00)' }).click()
+    await expect(dialog.getByLabel('Amount of payment 1')).toHaveValue('100.00')
+    await dialog.getByRole('button', { name: 'Gift card' }).click()
+    await dialog.getByLabel('Gift card code of payment 3').fill(code.toLowerCase())
+    await dialog.getByLabel('Gift card code of payment 3').press('Enter')
+    await expect(dialog.getByTestId('gift-card-status')).toContainText(`Gift card ••••${last4} · balance BDT 50.00`)
+    await expect(dialog.getByLabel('Amount of payment 3')).toHaveValue('50.00')
+    await dialog.getByRole('button', { name: 'Complete sale' }).click()
+    const done = page.getByRole('dialog', { name: /^Sale \S+ completed$/ })
+    await expect(done).toBeVisible({ timeout: 20_000 })
+    await expect(done.getByTestId('receipt')).toContainText(`Gift card ••••${last4}`)
+    const number = (await done.innerText()).match(/Sale (\S+) completed/)![1]!
+
+    // Both balances were spent; the payments ledger has no entry for them.
+    expect((await call('GET', `/api/v1/customers/${customerId}/store-credit`)).body.data).toMatchObject({ balance: '0.00' })
+    expect((await call('POST', '/api/v1/gift-cards/lookup', { code })).body.data).toMatchObject({ balance: '0.00' })
+    const sale = (await call('GET', `/api/v1/sales?search=${number}`)).body.data.find((s: { number: string }) => s.number === number) as { id: string }
+    const detail = (await call('GET', `/api/v1/sales/${sale.id}`)).body.data
+    expect((detail.payments as { method: string }[]).map((p) => p.method).sort()).toEqual(['cash', 'gift_card', 'store_credit'])
+
+    // One unit comes back: refunded as a new gift card (credit note), shown once.
+    const line = detail.lines[0] as { id: string }
+    const preview = await call('POST', '/api/v1/returns/preview', { sale_id: sale.id, lines: [{ sale_line_id: line.id, quantity: '1' }] })
+    expect(preview.status).toBe(200)
+    const due = String(find(preview.body.data, 'refund_due'))
+    expect(Number(due)).toBeGreaterThan(0)
+    const returned = await call('POST', '/api/v1/returns', { sale_id: sale.id, lines: [{ sale_line_id: line.id, quantity: '1' }], refunds: [{ method: 'gift_card', amount: due }] })
+    expect(returned.status).toBeLessThan(300)
+    const creditNote = returned.body.data.credit_note as { code: string; amount: string }
+    expect(Number(creditNote.amount)).toBe(Number(due))
+    expect((await call('POST', '/api/v1/gift-cards/lookup', { code: creditNote.code })).body.data).toMatchObject({ usable: true, kind: 'credit_note' })
+    expect(Number((await call('POST', '/api/v1/gift-cards/lookup', { code: creditNote.code })).body.data.balance)).toBe(Number(due))
+  } finally {
+    await context.close()
+  }
+})

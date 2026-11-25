@@ -5,7 +5,9 @@ namespace App\Modules\Shared\Infrastructure\Http\Middleware;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use App\Modules\Shared\Infrastructure\Persistence\IdempotencyKey;
 use Closure;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -76,7 +78,7 @@ class EnsureIdempotency
                 return ApiResponse::error('IDEMPOTENCY_KEY_REUSED', 'This Idempotency-Key was already used for a different request.', 409);
             }
             if ($existing !== null && $existing->status === 'completed') {
-                return response((string) $existing->response_body, (int) $existing->response_status, [
+                return response(self::readBody($existing->response_body), (int) $existing->response_status, [
                     'Content-Type' => 'application/json',
                     'Idempotent-Replayed' => 'true',
                 ]);
@@ -104,7 +106,8 @@ class EnsureIdempotency
             IdempotencyKey::query()->where('scope', $scope)->where('key', $key)->update([
                 'status' => 'completed',
                 'response_status' => $response->getStatusCode(),
-                'response_body' => $response->getContent(),
+                // POS1b: kept encrypted — a replay may carry a secret shown once (a gift card code).
+                'response_body' => Crypt::encryptString((string) $response->getContent()),
                 'updated_at' => now(),
             ]);
         } else {
@@ -112,6 +115,16 @@ class EnsureIdempotency
         }
 
         return $response;
+    }
+
+    /** The stored answer; rows written before POS1b are plain JSON. */
+    private static function readBody(?string $stored): string
+    {
+        try {
+            return Crypt::decryptString((string) $stored);
+        } catch (DecryptException) {
+            return (string) $stored;
+        }
     }
 
     private function release(string $scope, string $key): void

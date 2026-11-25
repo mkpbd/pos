@@ -3,10 +3,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Settlement } from '@/features/returns/api'
-import { newRefundKey, refundsRemaining, type RefundRow } from '@/features/returns/refunds'
+import { newRefundKey, refundOptionLabel, refundsRemaining, takesReference, type RefundRow } from '@/features/returns/refunds'
 import { compareDecimal, formatMoney, isZeroDecimal } from '@/lib/money'
 import type { RefundMethod } from '@/lib/payment-methods'
 import { cn } from '@/lib/utils'
+
+/** What happens to refunds that take no reference. */
+const REFUND_HINTS: Partial<Record<RefundMethod, string>> = {
+  cash: 'Paid out of your open register session.',
+  store_credit: 'Added to the customer’s store credit.',
+  gift_card: 'Issues a new credit note code, shown once.',
+}
 
 type Props = {
   settlement: Settlement
@@ -40,7 +47,7 @@ export function RefundsEditor({ settlement, currency, rows, onChange, errors = {
               <Select value={row.method} onValueChange={(v) => update(row.key, { method: v as RefundMethod })} disabled={disabled}>
                 <SelectTrigger className="w-full" aria-label={`Refund method ${i + 1}`} aria-invalid={methodError ? true : undefined}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {choices.map((o) => <SelectItem key={o.method} value={o.method}>{o.label}</SelectItem>)}
+                  {choices.map((o) => <SelectItem key={o.method} value={o.method}>{refundOptionLabel(o)}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Input
@@ -52,8 +59,8 @@ export function RefundsEditor({ settlement, currency, rows, onChange, errors = {
                 disabled={disabled}
                 onChange={(e) => update(row.key, { amount: e.target.value })}
               />
-              {row.method === 'cash' ? (
-                <span className="col-span-3 row-start-2 text-xs text-muted-foreground sm:col-span-1 sm:row-start-auto sm:self-center">Paid out of your open register session.</span>
+              {!takesReference(row.method) ? (
+                <span className="col-span-3 row-start-2 text-xs text-muted-foreground sm:col-span-1 sm:row-start-auto sm:self-center">{REFUND_HINTS[row.method] ?? ''}</span>
               ) : (
                 <Input
                   aria-label={`Refund reference ${i + 1}`}

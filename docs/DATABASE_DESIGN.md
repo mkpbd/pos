@@ -471,6 +471,13 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Store credit and gift cards POS1b (implemented)
+
+- `store_credit_entries` (organization, customer, type CHECK `top_up|withdrawal|sale_payment|sale_reversal|refund|adjustment`, signed amount ≠ 0, `balance_after` ≥ 0, currency, method, reference, reference type / id / number, receipt number, note, store, created by / at); append-only; the balance is the last `balance_after`.
+- `gift_cards` (organization, `code_hash` sha256 unique per organization, `code_last4`, kind CHECK `gift_card|voucher|credit_note`, initial value > 0, balance ≥ 0, currency, status CHECK `active|void`, expires at, customer, issued by / at, sale receipt number, source return, note, void reason / by / at) and append-only `gift_card_entries` (type CHECK `issue|redeem|sale_reversal|void`, signed amount, balance after, reference).
+- `sale_payments.method` and `sale_return_refunds.method` CHECKs add `store_credit` and `gift_card` (the refunds table had none before).
+- `idempotency_keys.response_body` is stored encrypted from now on.
+
 ### Till PIN, tills, approvals, prices and promotions at the till POS1a (implemented)
 
 - `users`: `pin_hash`, `pin_set_at`, `pin_failed_count`, `pin_locked_until`. `login_activities`: channel `pin`, `pos_terminal_id`.
