@@ -3,6 +3,7 @@
 namespace App\Modules\Promotions\Presentation\Http\Requests;
 
 use App\Modules\Promotions\Application\Actions\SavePromotion;
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Domain\PromotionType;
@@ -43,6 +44,9 @@ class SavePromotionRequest extends FormRequest
             'usage_limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000000'],
             'usage_limit_per_customer' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000000'],
             'coupon_code' => [$creating ? 'sometimes' : 'prohibited', 'nullable', 'string', 'max:40'],
+            // POS1a: where it applies — online and/or till (default: online).
+            'channels' => ['sometimes', 'array', 'min:1', 'max:2'],
+            'channels.*' => ['required', 'string', 'distinct', Rule::enum(PromotionChannel::class)],
         ];
     }
 

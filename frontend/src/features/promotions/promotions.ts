@@ -1,4 +1,4 @@
-import type { Promotion, PromotionInput, PromotionScope, PromotionState, PromotionTarget, PromotionTrigger, PromotionType } from '@/features/promotions/api'
+import type { Promotion, PromotionChannel, PromotionInput, PromotionScope, PromotionState, PromotionTarget, PromotionTrigger, PromotionType } from '@/features/promotions/api'
 import { fromZonedInput, toZonedInput } from '@/features/promotions/zoned-time'
 import { readBn, toTranslationsInput, validateBn, type BnValues, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
@@ -34,6 +34,17 @@ export const SCOPE_LABELS: Record<PromotionScope, string> = {
 export const TRIGGER_LABELS: Record<PromotionTrigger, string> = {
   automatic: 'Automatic',
   coupon: 'Coupon code',
+}
+
+/** POS1a: "Where it applies". */
+export const CHANNEL_LABELS: Record<PromotionChannel, string> = {
+  online: 'Online store',
+  till: 'Till',
+}
+
+/** A promotion's channels; servers before POS1a send none (online only). */
+export function channelsOf(p: { channels?: PromotionChannel[] }): PromotionChannel[] {
+  return p.channels?.length ? p.channels : ['online']
 }
 
 /** The rule shoppers' prices follow (mirrors the server's PromotionEngine). */
@@ -98,6 +109,8 @@ export type PromotionDraft = {
   usageLimitPerCustomer: string
   /** Bangla name and description (E12b), "" = not translated. */
   bn: BnValues
+  /** POS1a: where it applies; free shipping is online only. */
+  channels: PromotionChannel[]
 }
 
 export function toDraft(p: Promotion | undefined, timeZone: string | undefined): PromotionDraft {
@@ -118,6 +131,7 @@ export function toDraft(p: Promotion | undefined, timeZone: string | undefined):
     usageLimit: p?.usage_limit == null ? '' : String(p.usage_limit),
     usageLimitPerCustomer: p?.usage_limit_per_customer == null ? '' : String(p.usage_limit_per_customer),
     bn: readBn(p?.translations, PROMOTION_TRANSLATION_NAMES),
+    channels: p ? channelsOf(p) : ['online'],
   }
 }
 
@@ -153,6 +167,8 @@ export function validateDraft(d: PromotionDraft): Record<string, string> {
   for (const [key, value] of [['usage_limit', d.usageLimit], ['usage_limit_per_customer', d.usageLimitPerCustomer]] as const) {
     if (value.trim() && (!LIMIT.test(value.trim()) || Number(value) < 1)) errors[key] = 'A whole number of at least 1, or empty for no limit.'
   }
+  if (d.channels.length === 0) errors.channels = 'Choose at least one: the online store or the till.'
+  else if (d.type === 'free_shipping' && !d.channels.includes('online')) errors.channels = 'Free shipping applies to the online store only.'
   Object.assign(errors, validateBn(d.bn, PROMOTION_TRANSLATIONS))
   return errors
 }
@@ -180,6 +196,8 @@ export function toInput(d: PromotionDraft, timeZone: string | undefined, before?
     usage_limit: intOrNull(d.usageLimit),
     usage_limit_per_customer: intOrNull(d.usageLimitPerCustomer),
     translations: toTranslationsInput(d.bn, PROMOTION_TRANSLATION_NAMES, before),
+    // There is no shipping at the till.
+    channels: d.type === 'free_shipping' ? d.channels.filter((c) => c === 'online') : d.channels,
   }
 }
 

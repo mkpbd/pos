@@ -49,6 +49,8 @@ const pages = {
   organization: page(() => import('@/features/organization/pages/organization-page'), 'OrganizationPage'),
   // BD1a: SMS gateway, templates and message log; changes need sms.manage (page and API).
   sms: page(() => import('@/features/sms/pages/sms-page'), 'SmsPage'),
+  // POS1a: till devices (PIN sign-in); pos.terminals.manage.
+  tills: page(() => import('@/features/tills/pages/tills-page'), 'TillsPage'),
   auditLog: page(() => import('@/features/audit/pages/audit-log-page'), 'AuditLogPage'),
   signIns: page(() => import('@/features/audit/pages/sign-ins-page'), 'SignInsPage'),
   platformOrganizations: page(() => import('@/features/platform/pages/platform-organizations-page'), 'PlatformOrganizationsPage'),
@@ -91,6 +93,8 @@ const pages = {
   supplierPerformance: page(() => import('@/features/supplier-performance/pages/supplier-performance-page'), 'SupplierPerformancePage'),
   purchasingSettings: page(() => import('@/features/procurement/pages/purchasing-settings-page'), 'PurchasingSettingsPage'),
   posTerminal: page(() => import('@/features/pos/pages/pos-terminal-page'), 'PosTerminalPage'),
+  // POS1a: user tiles and a PIN pad on a device set up as a till (no sign-in needed to open it).
+  tillSignIn: page(() => import('@/features/pos/pages/till-sign-in-page'), 'TillSignInPage'),
   sales: page(() => import('@/features/sales/pages/sales-pages'), 'SalesPage'),
   sale: page(() => import('@/features/sales/pages/sales-pages'), 'SalePage'),
   storefrontSettings: page(() => import('@/features/storefront/pages/storefront-settings-page'), 'StorefrontSettingsPage'),
@@ -190,6 +194,8 @@ export const routes: RouteObject[] = [
     children: [
       // Reset links are valid whether or not someone is signed in on this browser.
       { path: 'reset-password', element: <ResetPasswordPage /> },
+      // POS1a: till PIN sign-in, also while someone is signed in (signing in by PIN switches the cashier).
+      { path: 'pos/sign-in', ...pages.tillSignIn },
       {
         element: <GuestOnly />,
         children: [
@@ -355,6 +361,7 @@ export const routes: RouteObject[] = [
               guarded('roles.view', 'roles', pages.roles),
               guarded(ORGANIZATION_PERMISSIONS, 'organization', pages.organization),
               guarded('sms.view', 'settings/sms', pages.sms),
+              guarded('pos.terminals.manage', 'settings/tills', pages.tills),
               guarded('audit.view', 'audit-log', pages.auditLog),
               guarded('audit.view', 'audit-log/sign-ins', pages.signIns),
               { element: <RequirePlatformAdmin />, children: [{ path: 'platform/organizations', ...pages.platformOrganizations }] },

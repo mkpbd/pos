@@ -45,6 +45,8 @@ export type Product = {
   track_batches: boolean
   track_serials: boolean
   max_discount_percent: string | null
+  /** POS1a: sold at a price typed at the till (absent before POS1a). */
+  open_price?: boolean
   options: ProductOption[] | null
   is_active: boolean
   archived_at: string | null
@@ -70,6 +72,8 @@ export type ProductInput = {
   track_batches: boolean
   track_serials: boolean
   max_discount_percent: string | null
+  /** POS1a: the price is typed at the till. */
+  open_price?: boolean
   is_active: boolean
   options: ProductOption[] | null
   variants: {

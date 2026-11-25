@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router'
+import { Link, Navigate, Outlet, useLocation } from 'react-router'
 import { MenuIcon, StoreIcon } from 'lucide-react'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { BranchSwitcher } from '@/app/layouts/branch-switcher'
 import { UserMenu } from '@/app/layouts/user-menu'
 import { NotificationBell } from '@/features/notifications/notification-bell'
 import { visibleNavItems } from '@/app/navigation'
+import { useTillLockStore } from '@/features/pos/till-lock'
 import { useAuth } from '@/features/auth/use-auth'
 import { cn } from '@/lib/utils'
 
@@ -64,6 +65,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 export function AppLayout() {
   const me = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { pathname } = useLocation()
+  // POS1a: while this cashier's till is locked, every other page leads back to the lock screen on the POS.
+  const tillLocked = useTillLockStore((s) => s.lockedUserId === me.user.id)
+  if (tillLocked && pathname !== '/pos') return <Navigate to="/pos" replace />
 
   return (
     <div className="min-h-svh bg-canvas text-foreground">

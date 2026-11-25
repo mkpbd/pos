@@ -17,6 +17,8 @@ class DatabaseAuditTrail implements AuditTrail
         'password', 'remember_token', 'token', 'current_password', 'password_confirmation',
         // G1a: two-factor secrets never reach the audit log.
         'two_factor_secret', 'two_factor_recovery_codes', 'recovery_codes', 'recovery_code',
+        // POS1a: till PINs.
+        'pin', 'pin_hash',
     ];
 
     public function __construct(

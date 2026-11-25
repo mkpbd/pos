@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { PricedCart, PricedLine } from '@/features/pos/api'
 import { cartOps, isValidQuantity, type Cart, type CartLine } from '@/features/pos/cart-store'
+import { GatedDiscount } from '@/features/pos/components/discount-gate'
 import { DiscountButton, DiscountPopover, SerialsDialog } from '@/features/pos/components/line-controls'
+import { LineMenu, LineNotes, LinePriceInfo, OffersApplied, SavingsRow } from '@/features/pos/components/price-display'
 import { compareDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
 
@@ -23,12 +25,19 @@ export function CartLines({
   priced,
   canDiscount,
   apply,
+  onChangePrice,
 }: {
   cart: Cart
   priced: PricedCart | undefined
   canDiscount: boolean
   apply: (change: (cart: Cart) => Cart) => void
+  /** POS1a: opens the price dialog for a line (change price / open price). */
+  onChangePrice?: (key: string) => void
 }) {
+  // POS1a: without sales.discount, a manager's approval on this cart unlocks the discount controls.
+  const discountAllowed = canDiscount || !!cart.discountApprovalId
+  const approveDiscounts = (id: string) => apply((c) => ({ ...c, discountApprovalId: id }))
+
   if (cart.lines.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
@@ -51,9 +60,10 @@ export function CartLines({
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">{line.label}</div>
                 <div className="text-xs text-muted-foreground">
-                  {formatMoney(p?.unit_price ?? line.price)}{line.unit_code && ` / ${line.unit_code}`}
+                  <LinePriceInfo line={line} priced={p} />{line.unit_code && ` / ${line.unit_code}`}
                   {line.discount && <Badge variant="secondary" className="ml-1">{discountText(line.discount)}</Badge>}
                 </div>
+                <LineNotes priced={p} />
               </div>
               <div className="text-right font-mono text-sm font-semibold" aria-label={`Amount of ${line.label}`}>
                 {p ? formatMoney(p.line_total) : <Loader2Icon className="inline size-3 animate-spin" aria-label="Pricing" />}
@@ -72,16 +82,18 @@ export function CartLines({
               <Button type="button" variant="outline" size="icon-sm" aria-label={`Increase ${line.label}`} onClick={() => apply((c) => cartOps.step(c, line.key, 1))}><PlusIcon /></Button>
               {line.track_serials && <SerialsDialog label={line.label} quantity={trimDecimal(line.quantity)} serials={line.serials} onChange={(serials) => update({ serials })} />}
               <div className="ml-auto flex items-center">
-                {canDiscount && (
-                  <DiscountPopover
-                    value={line.discount}
-                    onChange={(discount) => update({ discount })}
-                    label={`Discount on ${line.label}`}
-                    hint={p?.max_discount_percent ? `At most ${trimDecimal(p.max_discount_percent)}% for this product.` : undefined}
-                  >
-                    <DiscountButton discount={line.discount} aria-label={`Discount on ${line.label}`} />
-                  </DiscountPopover>
-                )}
+                <GatedDiscount
+                  allowed={discountAllowed}
+                  scope="line"
+                  description={`Give a discount on ${line.label}.`}
+                  onApproved={approveDiscounts}
+                  value={line.discount}
+                  onChange={(discount) => update({ discount })}
+                  label={`Discount on ${line.label}`}
+                  hint={p?.max_discount_percent ? `At most ${trimDecimal(p.max_discount_percent)}% for this product.` : undefined}
+                  trigger={<DiscountButton discount={line.discount} aria-label={`Discount on ${line.label}`} />}
+                />
+                {onChangePrice && <LineMenu line={line} onChangePrice={() => onChangePrice(line.key)} onListPrice={() => apply((c) => cartOps.setPrice(c, line.key, null))} />}
                 <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${line.label}`} onClick={() => apply((c) => cartOps.remove(c, line.key))}><Trash2Icon /></Button>
               </div>
             </div>
@@ -101,6 +113,9 @@ export function CartTotals({ priced, cart, canDiscount, apply }: { priced: Price
   const c = priced.currency
   const invoice = priced.invoice_discount
   const groupPercent = priced.customer && !isZeroDecimal(priced.customer.group_discount_percent) ? priced.customer.group_discount_percent : null
+  const discountAllowed = canDiscount || !!cart.discountApprovalId
+  // An order promotion is not the cashier's to edit; a manual discount replaces it.
+  const invoiceValue = invoice && invoice.source !== 'promotion' ? { type: invoice.type, value: invoice.value } : null
 
   return (
     <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-sm">
@@ -114,26 +129,44 @@ export function CartTotals({ priced, cart, canDiscount, apply }: { priced: Price
       )}
       <dt className="flex items-center gap-1 text-muted-foreground">
         Invoice discount
-        {invoice && <Badge variant="outline">{discountText(invoice)}{invoice.source === 'customer_group' && ' group'}</Badge>}
-        {(canDiscount || groupPercent) && (
+        {invoice && <Badge variant="outline">{discountText(invoice)}{invoice.source === 'customer_group' && ' group'}{invoice.source === 'promotion' && ' offer'}</Badge>}
+        {!discountAllowed && groupPercent ? (
+          // Removing the group discount needs no approval; a manual one asks for it when priced.
           <DiscountPopover
-            value={invoice ? { type: invoice.type, value: invoice.value } : null}
+            value={invoiceValue}
             onChange={(d) => apply((cart) => ({ ...cart, invoiceDiscount: d }))}
             label="Invoice discount"
-            hint={groupPercent ? `${priced.customer?.name} gets ${trimDecimal(groupPercent)}% as a group member.${canDiscount ? '' : ' You can only remove it.'}` : undefined}
+            hint={`${priced.customer?.name} gets ${trimDecimal(groupPercent)}% as a group member. A manager approves a different discount.`}
           >
             <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs">{invoice ? 'Change' : 'Add'}</Button>
           </DiscountPopover>
+        ) : (
+          <GatedDiscount
+            allowed={discountAllowed}
+            scope="invoice"
+            description="Give a discount on the whole sale."
+            onApproved={(id) => apply((cart) => ({ ...cart, discountApprovalId: id }))}
+            value={invoiceValue}
+            onChange={(d) => apply((cart) => ({ ...cart, invoiceDiscount: d }))}
+            label="Invoice discount"
+            hint={groupPercent ? `${priced.customer?.name} gets ${trimDecimal(groupPercent)}% as a group member.` : undefined}
+            trigger={<Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs">{invoice ? 'Change' : 'Add'}</Button>}
+          />
         )}
         {cart.invoiceDiscount !== undefined && groupPercent && (
           <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => apply((cart) => ({ ...cart, invoiceDiscount: undefined }))}>Reset</Button>
         )}
       </dt>
       <dd className="text-right font-mono">{isZeroDecimal(priced.invoice_discount_total) ? '—' : `−${formatMoney(priced.invoice_discount_total)}`}</dd>
+      {priced.discount_approved_by && (
+        <dd className="col-span-2 text-xs text-muted-foreground">Discounts approved by {priced.discount_approved_by.name}</dd>
+      )}
+      <OffersApplied priced={priced} />
       <dt className="text-muted-foreground">{priced.tax_mode === 'inclusive' ? 'Tax (included)' : 'Tax'}</dt>
       <dd className="text-right font-mono">{formatMoney(priced.tax_total)}</dd>
       <dt className="pt-1 text-lg font-semibold">Total</dt>
       <dd className="pt-1 text-right font-mono text-2xl font-bold" data-testid="cart-total">{formatMoney(priced.total, c)}</dd>
+      <SavingsRow priced={priced} />
     </dl>
   )
 }

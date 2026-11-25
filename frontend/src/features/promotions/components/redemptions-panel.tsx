@@ -25,12 +25,13 @@ export function RedemptionsPanel({ promotion }: { promotion: Promotion }) {
   const [page, setPage] = useState(1)
   const redemptions = useRedemptionsQuery(promotion.id, page)
   const canOpenOrders = can('web_orders.view')
+  const canOpenSales = can('sales.view')
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Redemptions</CardTitle>
-        <CardDescription>Every order that received this offer, with the discount it got. Cancelled orders keep their redemption.</CardDescription>
+        <CardDescription>Every order and till sale that received this offer, with the discount it got. Cancelled orders keep their redemption; a cancelled till sale gives it back.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {redemptions.isPending ? (
@@ -57,7 +58,14 @@ export function RedemptionsPanel({ promotion }: { promotion: Promotion }) {
                     return (
                       <TableRow key={r.id ?? `${r.order_id}-${i}`}>
                         <TableCell>
-                          {canOpenOrders ? (
+                          {r.sale_id ? (
+                            // POS1a: a sale at the till.
+                            canOpenSales ? (
+                              <Link to={`/sales/${r.sale_id}`} className="font-mono text-sm underline-offset-4 hover:underline">{r.sale_number ?? r.order_number ?? 'Till sale'}</Link>
+                            ) : (
+                              <span className="font-mono text-sm">{r.sale_number ?? r.order_number ?? 'Till sale'}</span>
+                            )
+                          ) : canOpenOrders ? (
                             <Link to={`/web-orders/${r.order_id}`} className="font-mono text-sm underline-offset-4 hover:underline">{r.order_number}</Link>
                           ) : (
                             <span className="font-mono text-sm">{r.order_number}</span>

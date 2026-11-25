@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EllipsisIcon, LockOpenIcon, PencilIcon, PlusIcon, SearchIcon, ShieldOffIcon } from 'lucide-react'
+import { EllipsisIcon, KeyRoundIcon, LockOpenIcon, PencilIcon, PlusIcon, SearchIcon, ShieldOffIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { ExportMenu } from '@/components/common/export-menu'
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useRolesQuery } from '@/features/roles/api'
-import { useResetUserTwoFactorMutation, useUnlockUserMutation, useUsersQuery, type ManagedUser, type UserStatus } from '@/features/users/api'
+import { useClearUserPinMutation, useResetUserTwoFactorMutation, useUnlockUserMutation, useUsersQuery, type ManagedUser, type UserStatus } from '@/features/users/api'
 import { UserFormDialog } from '@/features/users/components/user-form-dialog'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -46,6 +46,8 @@ export function UsersPage() {
   const [pending, setPending] = useState<PendingAction | null>(null)
   const unlock = useUnlockUserMutation()
   const resetTwoFactor = useResetUserTwoFactorMutation()
+  const [clearingPin, setClearingPin] = useState<ManagedUser | null>(null)
+  const clearPin = useClearUserPinMutation()
   const debouncedSearch = useDebouncedValue(search)
 
   const roles = useRolesQuery(can('roles.view'))
@@ -61,6 +63,8 @@ export function UsersPage() {
   // Not on yourself (use your profile), and an organization admin cannot touch a platform admin.
   const canResetTwoFactor = (user: ManagedUser) =>
     canManage && user.two_factor_enabled === true && user.id !== me.user.id && (!user.is_platform_admin || me.user.is_platform_admin)
+  // POS1a: same rule for clearing a till PIN.
+  const canClearPin = (user: ManagedUser) => canManage && user.pin_set === true && user.id !== me.user.id && (!user.is_platform_admin || me.user.is_platform_admin)
 
   const runPending = () => {
     if (!pending) return
@@ -174,6 +178,7 @@ export function UsersPage() {
                       <div className="flex flex-wrap gap-1">
                         <Badge variant={user.status === 'active' ? 'success' : 'outline'}>{user.status === 'active' ? 'Active' : 'Inactive'}</Badge>
                         {user.two_factor_enabled && <Badge variant="info" title="Two-factor sign-in is on">2FA</Badge>}
+                        {user.pin_set && <Badge variant="secondary" title="Has a till PIN">PIN set</Badge>}
                         {user.is_locked && <Badge variant="destructive">{lockedUntilLabel(user.locked_until)}</Badge>}
                       </div>
                     </TableCell>
@@ -184,7 +189,7 @@ export function UsersPage() {
                             <PencilIcon />
                           </Button>
                         )}
-                        {(canUnlock(user) || canResetTwoFactor(user)) && (
+                        {(canUnlock(user) || canResetTwoFactor(user) || canClearPin(user)) && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${user.name}`}>
@@ -200,6 +205,11 @@ export function UsersPage() {
                               {canResetTwoFactor(user) && (
                                 <DropdownMenuItem variant="destructive" onSelect={() => setPending({ kind: 'reset', user })}>
                                   <ShieldOffIcon /> Reset two-factor
+                                </DropdownMenuItem>
+                              )}
+                              {canClearPin(user) && (
+                                <DropdownMenuItem variant="destructive" onSelect={() => setClearingPin(user)}>
+                                  <KeyRoundIcon /> Clear PIN
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -229,6 +239,24 @@ export function UsersPage() {
         destructive={pending?.kind === 'reset'}
         pending={unlock.isPending || resetTwoFactor.isPending}
         onConfirm={runPending}
+      />
+
+      <ConfirmDialog
+        open={clearingPin !== null}
+        onOpenChange={(open) => !open && setClearingPin(null)}
+        title={`Clear the till PIN of ${clearingPin?.name ?? ''}?`}
+        description="For a forgotten or shared PIN. They can no longer sign in or approve at a till with it until they set a new one on their profile."
+        confirmLabel="Clear PIN"
+        pending={clearPin.isPending}
+        onConfirm={() => {
+          if (!clearingPin) return
+          const user = clearingPin
+          clearPin.mutate(user.id, {
+            onSuccess: () => toast.success(`Till PIN cleared for ${user.name}.`),
+            onError: (error) => toast.error(error.message),
+            onSettled: () => setClearingPin(null),
+          })
+        }}
       />
 
       {canManage && roles.data && (

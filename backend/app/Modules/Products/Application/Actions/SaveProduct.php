@@ -67,6 +67,7 @@ class SaveProduct
                 'max_discount_percent' => $data->maxDiscountPercent,
                 'options' => $data->options,
                 'is_active' => $data->isActive,
+                'open_price' => $data->openPrice ?? (bool) $product->open_price,
             ])->save();
 
             $this->syncVariants($product, $data, $existing, $organizationId);
@@ -239,7 +240,7 @@ class SaveProduct
      */
     private function snapshot(Product $product, Collection $variants): array
     {
-        $values = $product->only(['name', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'track_stock', 'track_batches', 'track_serials', 'max_discount_percent', 'is_active']);
+        $values = $product->only(['name', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'track_stock', 'track_batches', 'track_serials', 'max_discount_percent', 'open_price', 'is_active']);
         $values['type'] = $product->type->value;
         $values['variants'] = $variants->mapWithKeys(fn (ProductVariant $v) => [$v->sku => [
             'purchase_price' => $v->purchase_price,

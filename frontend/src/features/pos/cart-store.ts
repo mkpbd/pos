@@ -19,9 +19,15 @@ export type CartLine = {
   quantity: string
   discount: DiscountInput | null
   serials: string[]
+  /** POS1a: the product's price is typed at the till (absent on carts saved before POS1a). */
+  open_price?: boolean
+  /** POS1a: price typed at the till (open price) or changed by the cashier; null = catalog price. */
+  unit_price?: string | null
+  /** POS1a: manager approval of the changed price (bound to the variant). */
+  price_approval_id?: string | null
 }
 
-export type LineInfo = Pick<CartLine, 'label' | 'sku' | 'unit_code' | 'allow_decimal' | 'track_serials' | 'price'>
+export type LineInfo = Pick<CartLine, 'label' | 'sku' | 'unit_code' | 'allow_decimal' | 'track_serials' | 'price' | 'open_price'>
 
 export type Cart = {
   storeId: string | null
@@ -33,6 +39,10 @@ export type Cart = {
   heldSaleId: string | null
   /** Idempotency key of the checkout in progress, reused for retries of the same payload. */
   pendingCheckout: { fingerprint: string; key: string } | null
+  /** POS1a: manager approval for manual discounts (cashiers without sales.discount). */
+  discountApprovalId?: string | null
+  /** POS1a: coupon typed at the till. */
+  couponCode?: string | null
 }
 
 const emptyCart = (storeId: string | null = null): Cart => ({
@@ -65,9 +75,13 @@ const newKey = () => `${Date.now().toString(36)}-${(lineCounter++).toString(36)}
 
 /** Pure cart operations (exported for tests). */
 export const cartOps = {
-  addItem(cart: Cart, item: PosItem): Cart {
+  /** `unitPrice`: the price typed for an open-price item (lines at another price stay separate). */
+  addItem(cart: Cart, item: PosItem, unitPrice: string | null = null): Cart {
     // Serial-tracked goods get one line per scan so each unit's serial can be captured.
-    const existing = item.track_serials ? undefined : cart.lines.find((l) => l.variant_id === item.variant_id && l.discount === null)
+    // A changed price is never merged into: its approval belongs to that one line.
+    const existing = item.track_serials
+      ? undefined
+      : cart.lines.find((l) => l.variant_id === item.variant_id && l.discount === null && (l.unit_price ?? null) === unitPrice && !l.price_approval_id)
     if (existing) {
       return cartOps.setQuantity(cart, existing.key, trimDecimal(addDecimal(existing.quantity, '1')))
     }
@@ -83,8 +97,22 @@ export const cartOps = {
       quantity: '1',
       discount: null,
       serials: [],
+      open_price: item.open_price === true,
+      unit_price: unitPrice,
+      price_approval_id: null,
     }
     return { ...cart, lines: [...cart.lines, line] }
+  },
+
+  /** A new price for a line (`approvalId` when a manager approved it), or back to the catalog price with null. */
+  setPrice(cart: Cart, key: string, unitPrice: string | null, approvalId: string | null = null): Cart {
+    return { ...cart, lines: cart.lines.map((l) => (l.key === key ? { ...l, unit_price: unitPrice, price_approval_id: unitPrice === null ? null : approvalId } : l)) }
+  },
+
+  /** Drops every manager approval (expired or used); the same cart when there is none. */
+  clearApprovals(cart: Cart): Cart {
+    if (!cart.discountApprovalId && !cart.lines.some((l) => l.price_approval_id)) return cart
+    return { ...cart, discountApprovalId: null, lines: cart.lines.map((l) => (l.price_approval_id ? { ...l, price_approval_id: null } : l)) }
   },
 
   setQuantity(cart: Cart, key: string, quantity: string): Cart {
@@ -119,10 +147,15 @@ export const cartOps = {
         quantity: trimDecimal(l.quantity),
         discount: l.discount ?? null,
         serials: l.serials ?? [],
+        open_price: item?.open_price ?? false,
+        unit_price: l.unit_price ?? null,
+        price_approval_id: l.price_approval_id ?? null,
       }
     })
     const cart: Cart = { ...emptyCart(storeId), customer: held.customer, lines, notes: held.cart?.notes ?? '', heldSaleId: held.id }
     if (held.cart && 'invoice_discount' in held.cart) cart.invoiceDiscount = held.cart.invoice_discount ?? null
+    if (held.cart?.discount_approval_id) cart.discountApprovalId = held.cart.discount_approval_id
+    if (held.cart?.coupon_code) cart.couponCode = held.cart.coupon_code
     return cart
   },
 
@@ -144,10 +177,14 @@ export function toCartInput(cart: Cart): CartInput | null {
       quantity: l.quantity.trim(),
       discount: l.discount,
       ...(l.track_serials ? { serials: l.serials } : {}),
+      ...(l.unit_price ? { unit_price: l.unit_price } : {}),
+      ...(l.unit_price && l.price_approval_id ? { price_approval_id: l.price_approval_id } : {}),
     })),
     notes: cart.notes.trim() || null,
   }
   if (cart.invoiceDiscount !== undefined) input.invoice_discount = cart.invoiceDiscount
+  if (cart.discountApprovalId) input.discount_approval_id = cart.discountApprovalId
+  if (cart.couponCode) input.coupon_code = cart.couponCode
   return input
 }
 

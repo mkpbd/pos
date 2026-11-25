@@ -27,6 +27,7 @@ import {
   type PromotionTrigger,
   type PromotionType,
 } from '@/features/promotions/api'
+import { ChannelsField } from '@/features/promotions/components/channels-field'
 import { CouponsPanel } from '@/features/promotions/components/coupons-panel'
 import { RedemptionsPanel } from '@/features/promotions/components/redemptions-panel'
 import { ReportPanel } from '@/features/promotions/components/report-panel'
@@ -54,7 +55,7 @@ import { bnErrors } from '@/features/translations/translations'
 type Errors = Record<string, string>
 
 /** Error keys the form shows next to a field; anything else is listed above the form. */
-const SHOWN = new Set(['name', 'description', 'type', 'value', 'scope', 'target_ids', 'min_subtotal', 'max_discount', 'trigger', 'starts_at', 'ends_at', 'show_countdown', 'usage_limit', 'usage_limit_per_customer', 'form'])
+const SHOWN = new Set(['name', 'description', 'type', 'value', 'scope', 'target_ids', 'min_subtotal', 'max_discount', 'trigger', 'starts_at', 'ends_at', 'show_countdown', 'usage_limit', 'usage_limit_per_customer', 'channels', 'form'])
 
 const TABS = ['details', 'coupons', 'redemptions', 'report'] as const
 type Tab = (typeof TABS)[number]
@@ -70,6 +71,8 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
     setDraft((d) => {
       const next = { ...d, ...patch }
       if (next.type === 'free_shipping' && next.scope !== 'order') Object.assign(next, { scope: 'order', targets: [] })
+      // POS1a: no shipping at the till.
+      if (next.type === 'free_shipping' && next.channels.includes('till')) next.channels = ['online']
       if (!countdownAllowed(next)) next.showCountdown = false
       return next
     })
@@ -184,6 +187,15 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
+              <CardTitle>Where it applies</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChannelsField value={draft.channels} onChange={(channels) => set({ channels })} freeShipping={draft.type === 'free_shipping'} disabled={readOnly} error={errors.channels} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>How shoppers get it</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -246,7 +258,7 @@ function DetailsForm({ promotion, readOnly, onSaved }: { promotion?: Promotion; 
               <FormField label="Total uses" error={errors.usage_limit} hint="Empty: no limit.">
                 <Input inputMode="numeric" value={draft.usageLimit} onChange={(e) => set({ usageLimit: e.target.value })} />
               </FormField>
-              <FormField label="Uses per customer" error={errors.usage_limit_per_customer} hint="Counted by customer account, or by e-mail for guests.">
+              <FormField label="Uses per customer" error={errors.usage_limit_per_customer} hint="Counted by customer account, or by e-mail for online guests and phone number at the till.">
                 <Input inputMode="numeric" value={draft.usageLimitPerCustomer} onChange={(e) => set({ usageLimitPerCustomer: e.target.value })} />
               </FormField>
             </CardContent>
@@ -340,7 +352,7 @@ function PromotionView({ promotion }: { promotion?: Promotion }) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={promotion ? promotion.name : 'New promotion'}
-        description={promotion ? `${offerLabel(promotion.type, promotion.value, me.organization?.base_currency)} · ${SCOPE_LABELS[promotion.scope] ?? promotion.scope}` : 'A discount, free shipping or coupon offer for the online store.'}
+        description={promotion ? `${offerLabel(promotion.type, promotion.value, me.organization?.base_currency)} · ${SCOPE_LABELS[promotion.scope] ?? promotion.scope}` : 'A discount, free shipping or coupon offer for the online store or the till.'}
         actions={
           <>
             {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}

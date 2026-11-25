@@ -22,6 +22,8 @@ class LoginActivityResource extends JsonResource
             'failure_reason' => $this->failure_reason,
             'ip_address' => $this->ip_address,
             'user_agent' => $this->user_agent,
+            // POS1a: the till of a PIN sign-in (channel `pin`).
+            'pos_terminal_id' => $this->pos_terminal_id,
             'created_at' => $this->created_at->toIso8601String(),
         ];
     }

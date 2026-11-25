@@ -26,9 +26,20 @@ export type PosItem = {
   /** Quantity in the selected store (null for untracked items). */
   on_hand: string | null
   sellable: boolean
+  /** POS1a: the price is typed at the till when the item is added (absent before POS1a). */
+  open_price?: boolean
 }
 
-export type CartLineInput = { variant_id: string; quantity: string; discount: DiscountInput | null; serials?: string[] }
+export type CartLineInput = {
+  variant_id: string
+  quantity: string
+  discount: DiscountInput | null
+  serials?: string[]
+  /** POS1a: price typed at the till (open price) or changed by the cashier; omitted = catalog price. */
+  unit_price?: string
+  /** POS1a: manager approval for a changed price (bound to this line's variant). */
+  price_approval_id?: string
+}
 
 export type CartInput = {
   store_id: string
@@ -37,6 +48,10 @@ export type CartInput = {
   /** Omitted = the customer's group discount applies automatically; null = none. */
   invoice_discount?: DiscountInput | null
   notes?: string | null
+  /** POS1a: manager approval for manual item / invoice discounts (cashiers without sales.discount). */
+  discount_approval_id?: string
+  /** POS1a: coupon typed at the till; problems never fail the preview (see `PricedCart.coupon`). */
+  coupon_code?: string | null
 }
 
 export type PricedLine = {
@@ -61,7 +76,21 @@ export type PricedLine = {
   net_amount: string
   tax_amount: string
   line_total: string
+  /** POS1a: catalog price (null for open price). */
+  list_price?: string | null
+  /** POS1a: where `unit_price` came from. */
+  price_source?: PriceSource
+  price_approved_by?: { id: string; name: string } | null
+  open_price?: boolean
+  /** POS1a: till promotion on the line (none when the line has a manual discount or a changed price). */
+  promotion?: { name: string; amount: string } | null
 }
+
+/** POS1a: `catalog` list price, `override` changed at the till, `open` typed at the till. */
+export type PriceSource = 'catalog' | 'override' | 'open'
+
+/** POS1a: the coupon's state in the preview. */
+export type PricedCoupon = { code: string; status: 'applied' | 'invalid' | 'not_applicable'; reason?: string | null; message: string | null }
 
 export type PricedCart = {
   store: { id: string; code: string; name: string; branch_id: string; branch_name: string }
@@ -76,7 +105,8 @@ export type PricedCart = {
   currency: string
   tax_mode: 'inclusive' | 'exclusive'
   lines: PricedLine[]
-  invoice_discount: (DiscountInput & { source: 'manual' | 'customer_group' }) | null
+  /** POS1a: `promotion` = an order promotion or the coupon (an amount). */
+  invoice_discount: (DiscountInput & { source: 'manual' | 'customer_group' | 'promotion' }) | null
   subtotal: string
   item_discount_total: string
   invoice_discount_total: string
@@ -84,6 +114,13 @@ export type PricedCart = {
   net_total: string
   tax_total: string
   total: string
+  /** POS1a: till promotions applied to the cart (line and order level). */
+  promotions?: { name: string; kind: string; amount: string }[]
+  coupon?: PricedCoupon | null
+  /** POS1a: list price minus charged price plus every discount (positive only). */
+  savings_total?: string
+  /** POS1a: the manager who approved the manual discounts by PIN. */
+  discount_approved_by?: { id: string; name: string } | null
 }
 
 export type PaymentMethod = 'cash' | 'card' | 'mobile_banking' | 'loyalty_points'

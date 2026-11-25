@@ -36,4 +36,19 @@ interface PromotionRedemptions
      * @return list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>
      */
     public function release(string $orderId): array;
+
+    /**
+     * POS1a: the till variant of {@see self::record()} for a POS sale (lock first, inside the
+     * sale's transaction). Per-customer limits count the sale's customer id and mobile number.
+     *
+     * @param  list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>  $redemptions
+     */
+    public function recordForSale(string $saleId, string $saleNumber, ?string $customerId, ?string $phone, array $redemptions): void;
+
+    /**
+     * POS1a: gives a cancelled sale's promotions back, like {@see self::release()} for orders.
+     *
+     * @return list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>
+     */
+    public function releaseSale(string $saleId): array;
 }

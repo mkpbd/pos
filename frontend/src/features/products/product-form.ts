@@ -33,6 +33,8 @@ export const productFormSchema = z
     track_serials: z.boolean(),
     max_discount_percent: z.union([z.string().trim().regex(decimalPattern(2), 'A percentage.').refine((v) => Number(v) <= 100, 'At most 100.'), z.literal('')]),
     is_active: z.boolean(),
+    /** POS1a: the price is typed at the till for every sale. */
+    open_price: z.boolean(),
     /**
      * New products: the single price row. Existing products edit their variants in the
      * variant grid (P1a), so this is empty and the saved variants are sent unchanged.
@@ -60,7 +62,7 @@ export function toFormValues(product?: Product): ProductFormValues {
   if (!product) {
     return {
       name: '', description: '', type: 'standard', category_id: null, brand_id: null, unit_id: '', tax_rate_id: null,
-      track_stock: true, track_batches: false, track_serials: false, max_discount_percent: '', is_active: true, variants: [emptyVariant()],
+      track_stock: true, track_batches: false, track_serials: false, max_discount_percent: '', is_active: true, open_price: false, variants: [emptyVariant()],
     }
   }
 
@@ -77,6 +79,7 @@ export function toFormValues(product?: Product): ProductFormValues {
     track_serials: product.track_serials,
     max_discount_percent: product.max_discount_percent ?? '',
     is_active: product.is_active,
+    open_price: product.open_price ?? false,
     variants: [],
   }
 }
@@ -99,6 +102,7 @@ export function toProductInput(form: ProductFormValues, current?: Product): Prod
     track_serials: form.type === 'standard' && form.track_serials,
     max_discount_percent: form.max_discount_percent || null,
     is_active: form.is_active,
+    open_price: form.open_price,
   }
 
   if (current) {

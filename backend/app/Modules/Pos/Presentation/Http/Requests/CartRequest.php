@@ -7,8 +7,11 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * A POS cart: products and quantities with optional discounts. Prices, taxes and totals are
- * never accepted from the client — the server prices every cart.
+ * A POS cart: products and quantities with optional discounts. Taxes and totals are never
+ * accepted from the client — the server prices every cart. POS1a: a line's `unit_price` is
+ * the typed price of an open-price product or a changed price (`sales.price_override` or a
+ * manager's `price_approval_id`); `discount_approval_id` lets a cashier give manual
+ * discounts; `coupon_code` applies a till coupon.
  *
  * Leave `invoice_discount` out to apply the customer's group discount automatically;
  * send `null` for no invoice discount.
@@ -26,6 +29,11 @@ class CartRequest extends FormRequest
             ...$this->discountRules('lines.*.discount'),
             ...$this->discountRules('invoice_discount', ['sometimes']),
             'notes' => ['nullable', 'string', 'max:500'],
+            // POS1a: a typed (open) or changed price, the approvals and the coupon.
+            'lines.*.unit_price' => ['sometimes', 'nullable', 'regex:/^\d{1,8}(\.\d{1,2})?$/', 'not_regex:/^0+(\.0+)?$/'],
+            'lines.*.price_approval_id' => ['sometimes', 'nullable', 'uuid'],
+            'discount_approval_id' => ['sometimes', 'nullable', 'uuid'],
+            'coupon_code' => ['sometimes', 'nullable', 'string', 'max:40'],
         ];
     }
 
@@ -34,6 +42,8 @@ class CartRequest extends FormRequest
         return [
             'lines.*.quantity.regex' => 'Enter a quantity with up to 3 decimals.',
             'lines.*.quantity.not_regex' => 'The quantity must be greater than zero.',
+            'lines.*.unit_price.regex' => 'Enter a price of at most 99,999,999.99 with up to 2 decimals.',
+            'lines.*.unit_price.not_regex' => 'The price must be greater than zero.',
         ];
     }
 

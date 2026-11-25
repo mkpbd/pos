@@ -56,6 +56,8 @@ class PromotionPresenter
             'value' => (string) $p->value,
             'scope' => $p->scope->value,
             'trigger' => $p->trigger->value,
+            // POS1a: online and/or till.
+            'channels' => array_values($p->channels ?? ['online']),
             'starts_at' => $p->starts_at?->toIso8601String(),
             'ends_at' => $p->ends_at?->toIso8601String(),
             'show_countdown' => $p->show_countdown,
@@ -135,6 +137,8 @@ class PromotionPresenter
             'id' => $r->id,
             'order_id' => $r->order_id,
             'order_number' => $r->order_number,
+            // POS1a: a till redemption names the sale (order_number = its invoice number).
+            'sale_id' => $r->sale_id,
             'customer' => $r->customer_id === null || ! isset($customers[$r->customer_id]) ? null : ['id' => $r->customer_id, 'name' => $customers[$r->customer_id]['name']],
             'email' => $r->email,
             'kind' => $r->kind,

@@ -19,6 +19,8 @@ export type ManagedUser = {
   /** G1a: sign-in blocked after too many failed attempts, until this time. */
   locked_until?: string | null
   is_locked?: boolean
+  /** POS1a: the user has a till PIN. */
+  pin_set?: boolean
 }
 
 export type UserListParams = { page: number; search?: string; status?: UserStatus; role_id?: string; branch_id?: string }
@@ -75,6 +77,16 @@ export function useResetUserTwoFactorMutation() {
 
   return useMutation({
     mutationFn: (id: string) => api.post<unknown>(`/users/${id}/two-factor/reset`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
+  })
+}
+
+/** DELETE /users/{id}/pin (POS1a, users.manage): clears a forgotten or shared till PIN; the user sets a new one. */
+export function useClearUserPinMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/users/${id}/pin`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: userKeys.all }),
   })
 }

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
 import { setContextHeaderProvider } from '@/lib/api/client'
+import { useTillLockStore } from '@/features/pos/till-lock'
 import { useSessionStore } from '@/stores/session-store'
 import { cashier, makeCurrentUser, posCashier } from '@/test/fixtures'
 import { fail, mockApi, ok, renderRoutes } from '@/test/utils'
@@ -47,6 +48,16 @@ describe('app routes', () => {
     expect(within(nav).queryByRole('link', { name: 'Users' })).not.toBeInTheDocument()
     expect(within(nav).queryByRole('link', { name: 'Audit log' })).not.toBeInTheDocument()
     expect(within(nav).queryByRole('link', { name: 'All organizations' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a locked till on the POS lock screen: other pages lead back to it (POS1a)', async () => {
+    useTillLockStore.setState({ lockedUserId: 'u-4' })
+    mockApi({ 'GET /auth/me': ok(posCashier()), 'GET /branches': emptyPage })
+
+    const { router } = renderRoutes(routes, '/sales')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/pos'))
+    useTillLockStore.setState({ lockedUserId: null })
   })
 
   it('blocks direct navigation to pages without permission', async () => {

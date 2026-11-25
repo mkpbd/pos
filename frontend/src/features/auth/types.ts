@@ -32,6 +32,8 @@ export type CurrentUser = {
     phone: string | null
     is_platform_admin: boolean
     last_login_at: string | null
+    /** POS1a: a till PIN is set (some servers send it here rather than at the top level). */
+    pin_set?: boolean
   }
   organization: OrganizationSummary | null
   roles: { id: string; name: string; system_key: string | null }[]
@@ -41,4 +43,6 @@ export type CurrentUser = {
   ai_enabled?: boolean
   /** G1a: two-factor sign-in state (absent from servers before G1a). */
   two_factor?: CurrentUserTwoFactor
+  /** POS1a: the signed-in user has a till PIN (absent before POS1a). */
+  pin_set?: boolean
 }

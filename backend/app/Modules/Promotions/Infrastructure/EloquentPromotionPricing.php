@@ -5,8 +5,11 @@ namespace App\Modules\Promotions\Infrastructure;
 use App\Modules\Promotions\Application\Contracts\PromotionPricing;
 use App\Modules\Promotions\Application\DTOs\PromotionQuote;
 use App\Modules\Promotions\Domain\CouponCode;
+use App\Modules\Promotions\Domain\CouponReason;
 use App\Modules\Promotions\Domain\LineInput;
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionEngine;
+use App\Modules\Promotions\Domain\PromotionType;
 use App\Modules\Promotions\Infrastructure\Models\Promotion;
 use App\Modules\Shared\Domain\BangladeshMobile;
 
@@ -14,18 +17,27 @@ class EloquentPromotionPricing implements PromotionPricing
 {
     public function __construct(private readonly PromotionOffers $offers) {}
 
-    public function price(array $lines, ?string $couponCode, ?string $customerId, ?string $email, string $currency, ?string $phone = null): PromotionQuote
+    public function price(array $lines, ?string $couponCode, ?string $customerId, ?string $email, string $currency, ?string $phone = null, string $channel = self::CHANNEL_ONLINE): PromotionQuote
     {
         $email = $email === null || trim($email) === '' ? null : mb_strtolower(trim($email));
         $phone = $phone === null ? null : BangladeshMobile::normalize($phone);
-        $automatic = array_map(fn (Promotion $p) => $this->offers->offer($p), $this->offers->usableAutomatic($customerId, $email, $phone));
+        $on = PromotionChannel::from($channel);
+        $usable = $this->offers->usableAutomatic($customerId, $email, $phone, $on);
+        if ($on === PromotionChannel::Till) {
+            // Nothing is delivered from the till.
+            $usable = array_values(array_filter($usable, fn (Promotion $p) => $p->type !== PromotionType::FreeShipping));
+        }
+        $automatic = array_map(fn (Promotion $p) => $this->offers->offer($p), $usable);
 
         $coupon = null;
         $couponOffer = null;
         $blocked = null;
         $code = $couponCode === null || trim($couponCode) === '' ? null : CouponCode::normalize($couponCode);
         if ($code !== null) {
-            [$coupon, $blocked] = $this->offers->coupon($code, $customerId, $email, $phone);
+            [$coupon, $blocked] = $this->offers->coupon($code, $customerId, $email, $phone, $on);
+            if ($coupon !== null && $on === PromotionChannel::Till && $coupon->promotion->type === PromotionType::FreeShipping) {
+                [$coupon, $blocked] = [null, CouponReason::NotFound];
+            }
             $couponOffer = $coupon === null ? null : $this->offers->offer($coupon->promotion, true);
         }
 
@@ -35,6 +47,7 @@ class EloquentPromotionPricing implements PromotionPricing
 
         $inputs = array_map(fn (array $l) => new LineInput(
             $l['key'], $l['product_id'], $l['brand_id'] ?? null, $l['category_id'] ?? null, $l['quantity'], $l['unit_price'],
+            $l['promotable'] ?? true, $l['own_discount'] ?? '0',
         ), $lines);
         $result = PromotionEngine::apply($inputs, $automatic, $couponOffer, $blocked, $this->offers->now(), $currency, $code !== null);
         $couponId = fn (string $promotionId) => $couponOffer !== null && $couponOffer->id === $promotionId && $result->couponApplied ? $coupon->id : null;

@@ -1,9 +1,13 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { addDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
+import { addDecimal, compareDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
-import { lineLabel, type Sale } from '@/features/sales/api'
+import { lineLabel, type Sale, type SaleLine } from '@/features/sales/api'
 import type { ReceiptFormat } from '@/features/sales/receipt-formats'
+
+/** POS1a: the line was sold below or above its list price (changed at the till). */
+const priceChanged = (l: SaleLine): l is SaleLine & { list_price: string } =>
+  l.price_source === 'override' && l.list_price != null && compareDecimal(l.list_price, l.unit_price) !== 0
 
 const PAGE: Record<ReceiptFormat, string> = {
   '58mm': '@page { size: 58mm auto; margin: 0 }',
@@ -65,10 +69,11 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
             <div key={l.id}>
               <div>{lineLabel(l)}</div>
               <div className="flex justify-between">
-                <span>{trimDecimal(l.quantity)}{l.unit_code ? ` ${l.unit_code}` : ''} × {formatMoney(l.unit_price)}</span>
+                <span>{trimDecimal(l.quantity)}{l.unit_code ? ` ${l.unit_code}` : ''} × {priceChanged(l) && <><s>{formatMoney(l.list_price)}</s> </>}{formatMoney(l.unit_price)}</span>
                 <span>{formatMoney(l.line_total)}</span>
               </div>
-              {!isZeroDecimal(l.discount_amount) && <div className="flex justify-between"><span>  discount</span><span>-{formatMoney(l.discount_amount)}</span></div>}
+              {priceChanged(l) && l.price_approved_by?.name && <div>  price approved by {l.price_approved_by.name}</div>}
+              {!isZeroDecimal(l.discount_amount) && <div className="flex justify-between"><span>  {l.promotion ? l.promotion.name : 'discount'}</span><span>-{formatMoney(l.discount_amount)}</span></div>}
               {l.serials.length > 0 && <div>  S/N: {l.serials.join(', ')}</div>}
               {l.batches.map((b) => <div key={`${b.batch_number}`}>  Batch {b.batch_number}{b.expires_on ? ` exp ${b.expires_on}` : ''}</div>)}
             </div>
@@ -92,9 +97,14 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
                 <td className="py-1">
                   {lineLabel(l)}
                   <div className="text-xs text-gray-600">{l.sku}{l.serials.length > 0 && ` · S/N ${l.serials.join(', ')}`}{l.batches.map((b) => ` · Batch ${b.batch_number}`).join('')}</div>
+                  {l.promotion && <div className="text-xs text-gray-600">Offer: {l.promotion.name}</div>}
+                  {priceChanged(l) && l.price_approved_by?.name && <div className="text-xs text-gray-600">Price approved by {l.price_approved_by.name}</div>}
                 </td>
                 <td className="py-1 text-right">{trimDecimal(l.quantity)} {l.unit_code}</td>
-                <td className="py-1 text-right">{formatMoney(l.unit_price)}</td>
+                <td className="py-1 text-right">
+                  {priceChanged(l) && <div className="text-xs text-gray-600"><s>{formatMoney(l.list_price)}</s></div>}
+                  {formatMoney(l.unit_price)}
+                </td>
                 <td className="py-1 text-right">{isZeroDecimal(l.discount_amount) ? '—' : formatMoney(l.discount_amount)}</td>
                 <td className="py-1 text-right">{trimDecimal(l.tax_rate)}%</td>
                 <td className="py-1 text-right">{formatMoney(l.line_total)}</td>
@@ -108,11 +118,17 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
       <div className={cn('flex flex-col', !thermal && 'ml-auto w-72 gap-0.5')}>
         <Row label="Subtotal" value={formatMoney(sale.subtotal)} />
         {!isZeroDecimal(discount) && <Row label="Discount" value={`-${formatMoney(discount)}`} />}
+        {/* POS1a: the offers inside the discount above, and the coupon. */}
+        {(sale.promotions ?? []).filter((p) => !isZeroDecimal(p.amount)).map((p, i) => (
+          <Row key={`${p.name}-${i}`} label={`  incl. ${p.name}`} value={`-${formatMoney(p.amount)}`} />
+        ))}
+        {sale.coupon_code && <Row label="Coupon" value={sale.coupon_code} />}
         <Row label={sale.tax_mode === 'inclusive' ? 'Tax (included)' : 'Tax'} value={formatMoney(sale.tax_total)} />
         <Row label="TOTAL" value={formatMoney(sale.total, c)} bold />
         {payments.map((p) => <Row key={p.id} label={`${p.method_label}${p.reference ? ` (${p.reference})` : ''}`} value={formatMoney(p.tendered ?? p.amount)} />)}
         {!isZeroDecimal(sale.change_total) && <Row label="Change" value={formatMoney(sale.change_total)} />}
         {!isZeroDecimal(sale.due_total) && <Row label="Balance due" value={formatMoney(sale.due_total, c)} bold />}
+        {sale.savings_total && compareDecimal(sale.savings_total, '0') > 0 && <Row label="You saved" value={formatMoney(sale.savings_total, c)} bold />}
       </div>
       <Rule thermal={thermal} />
       <div className="text-center">

@@ -38,7 +38,10 @@ class CurrentUserResource extends JsonResource
                 'phone' => $this->phone,
                 'is_platform_admin' => $this->is_platform_admin,
                 'last_login_at' => $this->last_login_at?->toIso8601String(),
+                'pin_set' => $this->hasPin(),
             ],
+            // POS1a: a till PIN is set (also in `user.pin_set`).
+            'pin_set' => $this->hasPin(),
             'organization' => $organization,
             'roles' => $this->roles()->get(['roles.id', 'roles.name', 'roles.system_key'])->map(fn ($role) => [
                 'id' => $role->id,

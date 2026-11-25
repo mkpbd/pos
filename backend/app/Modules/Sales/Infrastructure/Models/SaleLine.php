@@ -35,12 +35,19 @@ use Illuminate\Support\Carbon;
  * @property string $unit_cost
  * @property string $cost_total
  * @property Carbon $created_at
+ * @property ?string $list_price POS1a: catalog price at the time (null for open-price products)
+ * @property string $price_source POS1a: catalog | override | open
+ * @property ?string $price_approved_by POS1a: the manager who approved a changed price
+ * @property ?string $price_approval_id POS1a: the till approval used
+ * @property string $promotion_discount POS1a: the promotion's part of discount_amount
+ * @property ?string $promotion_name POS1a
  */
 #[Table(timestamps: false)]
 #[Fillable([
     'organization_id', 'sale_id', 'position', 'variant_id', 'product_name', 'variant_name', 'sku', 'unit_code',
     'quantity', 'unit_price', 'discount_type', 'discount_value', 'line_subtotal', 'discount_amount',
     'invoice_discount_share', 'net_amount', 'tax_rate', 'tax_amount', 'line_total', 'unit_cost', 'cost_total', 'created_at',
+    'list_price', 'price_source', 'price_approved_by', 'price_approval_id', 'promotion_discount', 'promotion_name',
 ])]
 class SaleLine extends Model
 {
@@ -62,6 +69,8 @@ class SaleLine extends Model
             'unit_cost' => 'decimal:4',
             'cost_total' => 'decimal:2',
             'created_at' => 'datetime',
+            'list_price' => 'decimal:2',
+            'promotion_discount' => 'decimal:2',
         ];
     }
 

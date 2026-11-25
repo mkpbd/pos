@@ -42,12 +42,15 @@ use LogicException;
  * @property ?string $cancelled_by
  * @property ?string $cancellation_reason
  * @property Carbon $created_at
+ * @property ?string $coupon_code POS1a: the coupon applied
+ * @property ?string $discount_approved_by POS1a: the manager who approved the manual discounts
  */
 #[Fillable([
     'id', 'organization_id', 'branch_id', 'store_id', 'number', 'customer_id', 'status', 'tax_mode', 'currency',
     'subtotal', 'item_discount_total', 'invoice_discount_type', 'invoice_discount_value', 'invoice_discount_source',
     'invoice_discount_total', 'tax_total', 'total', 'paid_total', 'change_total', 'due_total', 'cost_total',
     'notes', 'sold_at', 'created_by', 'cancelled_at', 'cancelled_by', 'cancellation_reason',
+    'coupon_code', 'discount_approved_by',
 ])]
 class Sale extends Model
 {
@@ -100,5 +103,15 @@ class Sale extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(SalePayment::class)->orderBy('created_at');
+    }
+
+    /**
+     * POS1a: the promotions the sale used.
+     *
+     * @return HasMany<SalePromotion, $this>
+     */
+    public function promotions(): HasMany
+    {
+        return $this->hasMany(SalePromotion::class)->orderBy('id');
     }
 }

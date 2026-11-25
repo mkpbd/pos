@@ -50,11 +50,22 @@ describe('promotion draft', () => {
     expect(input).toEqual({
       name: 'Sale', description: null, type: 'free_shipping', value: null, scope: 'order', target_ids: [], min_subtotal: '3000', max_discount: null,
       trigger: 'automatic', starts_at: null, ends_at: '2026-11-08T00:00:00+06:00', show_countdown: false, is_active: true, usage_limit: null, usage_limit_per_customer: null,
+      channels: ['online'],
     })
     // Bangla texts: left out while there are none; clearing saved ones sends "" to remove them.
     expect(toInput(draft({ bn: { name: 'জুস', description: '' } }), TZ).translations).toEqual({ bn: { name: 'জুস', description: '' } })
     expect(toInput(draft(), TZ, { bn: { name: 'জুস' } }).translations).toEqual({ bn: { name: '', description: '' } })
     expect(toInput(toDraft(promotion(), TZ), TZ)).toMatchObject({ value: '10', scope: 'brands', target_ids: ['br-1'], ends_at: '2026-11-08T00:00:00+06:00', show_countdown: true })
+  })
+
+  it('keeps where it applies: online by default, the till too, at least one; free shipping online only (POS1a)', () => {
+    expect(toDraft(undefined, TZ).channels).toEqual(['online'])
+    expect(toDraft(promotion({ channels: undefined }), TZ).channels).toEqual(['online'])
+    expect(toDraft(promotion({ channels: ['till'] }), TZ).channels).toEqual(['till'])
+    expect(validateDraft(draft({ channels: [] }))).toEqual({ channels: 'Choose at least one: the online store or the till.' })
+    expect(validateDraft(draft({ type: 'free_shipping', value: '', channels: ['till'] }))).toEqual({ channels: 'Free shipping applies to the online store only.' })
+    expect(toInput(draft({ channels: ['online', 'till'] }), TZ).channels).toEqual(['online', 'till'])
+    expect(toInput(draft({ type: 'free_shipping', channels: ['online', 'till'] }), TZ).channels).toEqual(['online'])
   })
 
   it('maps server field errors onto fields', () => {

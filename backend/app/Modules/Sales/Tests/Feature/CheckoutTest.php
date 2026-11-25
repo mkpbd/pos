@@ -60,7 +60,8 @@ class CheckoutTest extends TestCase
         $this->actingAsUser($admin);
         $this->stockUp($store, $juice, '5');
 
-        $payload = $this->cart($store, [[$juice, '2', ['unit_price' => '0.01', 'line_total' => '0.02']]], [['card', '30']]);
+        // POS1a: `unit_price` is a price change now (permission or approval: TillPriceOverrideTest).
+        $payload = $this->cart($store, [[$juice, '2', ['price' => '0.01', 'line_total' => '0.02']]], [['card', '30']]);
         $this->checkout($payload + ['total' => '0.02', 'subtotal' => '0.02'])
             ->assertCreated()
             ->assertJsonPath('data.lines.0.unit_price', '15.00')

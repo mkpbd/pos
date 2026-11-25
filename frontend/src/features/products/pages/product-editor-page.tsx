@@ -37,7 +37,7 @@ import { trimDecimal } from '@/lib/money'
 const NONE = '__none__'
 const FIELDS = [
   'name', 'description', 'type', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'track_stock',
-  'track_batches', 'track_serials', 'max_discount_percent', 'is_active', 'variants',
+  'track_batches', 'track_serials', 'max_discount_percent', 'is_active', 'open_price', 'variants',
 ] as const
 
 function NullableSelect({ value, onChange, placeholder, options, ariaLabel }: {
@@ -234,6 +234,16 @@ function ProductForm({ product }: { product?: Product }) {
           </FormField>
           <Controller control={form.control} name="is_active" render={({ field }) => (
             <SwitchRow id="product-active" label="Active" hint="Inactive products cannot be sold." checked={field.value} onChange={field.onChange} />
+          )} />
+          {/* POS1a: open price. */}
+          <Controller control={form.control} name="open_price" render={({ field }) => (
+            <SwitchRow
+              id="product-open-price"
+              label="Price is entered at the till (open price)"
+              hint="The cashier types the price on every sale, e.g. for loose goods or repairs. No manager approval is needed, and till promotions don’t apply."
+              checked={field.value}
+              onChange={field.onChange}
+            />
           )} />
         </CardContent>
       </Card>

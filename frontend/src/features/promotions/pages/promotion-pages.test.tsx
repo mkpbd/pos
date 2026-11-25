@@ -119,6 +119,7 @@ describe('promotion editor', () => {
     expect(body).toEqual({
       name: 'Pran week', description: null, type: 'percent', value: '10', scope: 'brands', target_ids: ['br-1'], min_subtotal: null, max_discount: null,
       trigger: 'automatic', starts_at: null, ends_at: '2026-11-08T00:00:00+06:00', show_countdown: true, is_active: true, usage_limit: null, usage_limit_per_customer: 2,
+      channels: ['online'],
     })
     await waitFor(() => expect(router.state.location.pathname).toBe('/promotions/pr-9'))
     expect(toastSuccess).toHaveBeenCalledWith('Promotion created.')

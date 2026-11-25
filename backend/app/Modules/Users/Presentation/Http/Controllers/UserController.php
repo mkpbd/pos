@@ -3,6 +3,7 @@
 namespace App\Modules\Users\Presentation\Http\Controllers;
 
 use App\Modules\Authentication\Application\Actions\AdministerSignIn;
+use App\Modules\Authentication\Application\Actions\ManagePin;
 use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
@@ -101,5 +102,19 @@ class UserController
         $actor = $request->user();
 
         return ApiResponse::success(new UserResource($administer->resetTwoFactor($user, $actor)->load(['roles', 'branchMemberships'])));
+    }
+
+    /**
+     * Clear a user's till PIN
+     *
+     * POS1a: for a forgotten or shared PIN — the user sets a new one on their profile.
+     */
+    public function clearPin(Request $request, User $user, ManagePin $pins): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        $pins->clearByAdministrator($user, $actor);
+
+        return ApiResponse::noContent();
     }
 }

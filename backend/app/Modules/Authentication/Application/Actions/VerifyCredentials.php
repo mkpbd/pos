@@ -65,9 +65,10 @@ class VerifyCredentials
     }
 
     /**
-     * The account and its organization are active (also re-checked at the two-factor step).
+     * The account and its organization are active (also re-checked at the two-factor step and,
+     * POS1a, at a PIN sign-in).
      *
-     * @param  'session'|'token'  $channel
+     * @param  'session'|'token'|'pin'  $channel
      */
     public function assertCanSignIn(User $user, string $channel): void
     {

@@ -3,6 +3,7 @@
 namespace App\Modules\Promotions\Infrastructure;
 
 use App\Modules\Promotions\Application\Contracts\PromotionShowcase;
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Domain\PromotionType;
 use App\Modules\Promotions\Infrastructure\Models\Coupon;
@@ -86,7 +87,7 @@ class EloquentPromotionShowcase implements PromotionShowcase
 
     public function runningCouponPromotion(): ?string
     {
-        $candidates = Promotion::query()
+        $candidates = Promotion::query()->availableOn(PromotionChannel::Online)
             ->where('trigger', PromotionTrigger::Coupon)
             ->whereIn('type', [PromotionType::Percent, PromotionType::Fixed])
             ->where('is_active', true)
@@ -110,7 +111,7 @@ class EloquentPromotionShowcase implements PromotionShowcase
     public function liveAutomatic(int $limit): array
     {
         $now = CarbonImmutable::now();
-        $promotions = Promotion::query()
+        $promotions = Promotion::query()->availableOn(PromotionChannel::Online)
             ->where('trigger', PromotionTrigger::Automatic)
             ->where('is_active', true)
             ->where(fn (Builder $q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
@@ -154,7 +155,8 @@ class EloquentPromotionShowcase implements PromotionShowcase
     {
         $ids = array_values(array_unique(array_filter(array_map(fn ($id) => is_string($id) ? strtolower($id) : null, $ids), fn (?string $id) => $id !== null && preg_match(self::UUID, $id) === 1)));
 
-        return $ids === [] ? null : Promotion::query()->whereIn('id', $ids);
+        // POS1a: the store builder shows online promotions only.
+        return $ids === [] ? null : Promotion::query()->availableOn(PromotionChannel::Online)->whereIn('id', $ids);
     }
 
     private function name(Promotion $promotion): string

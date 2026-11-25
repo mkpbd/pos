@@ -18,15 +18,18 @@ export function DiscountPopover({
   onChange,
   label,
   hint,
+  defaultOpen = false,
   children,
 }: {
   value: DiscountInput | null
   onChange: (discount: DiscountInput | null) => void
   label: string
   hint?: string
+  /** POS1a: opens on mount (right after a manager approved discounts). */
+  defaultOpen?: boolean
   children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [type, setType] = useState<DiscountInput['type']>(value?.type ?? 'percent')
   const [amount, setAmount] = useState(value ? trimDecimal(value.value) : '')
   const valid = MONEY_PATTERN.test(amount.trim()) && (type === 'amount' || compareDecimal(amount.trim(), '100') <= 0)

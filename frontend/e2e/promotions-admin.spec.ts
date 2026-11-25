@@ -74,6 +74,7 @@ test('creates a coupon promotion, adds a code and generates a batch', async ({ p
   expect((await post).postDataJSON()).toEqual({
     name: 'Welcome 50', description: null, type: 'fixed', value: '50', scope: 'order', target_ids: [], min_subtotal: '500', max_discount: null,
     trigger: 'coupon', starts_at: null, ends_at: null, show_countdown: false, is_active: true, usage_limit: null, usage_limit_per_customer: 1,
+    channels: ['online'],
   })
 
   await expect(page).toHaveURL(/\/admin\/promotions\/pr-2\?tab=coupons$/)

@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { failureReasonLabel } from '@/features/audit/failure-reasons'
 import { changePasswordSchema, type ChangePasswordValues } from '@/features/auth/schemas'
 import { useAuth } from '@/features/auth/use-auth'
+import { TillPinCard } from '@/features/profile/components/till-pin-card'
 import { TwoFactorCard } from '@/features/profile/components/two-factor-card'
 import { useChangePasswordMutation, useDeviceTokensQuery, useMyLoginActivityQuery, useRevokeTokenMutation } from '@/features/profile/api'
 import { handleFormError } from '@/lib/forms'
@@ -172,6 +173,7 @@ export function ProfilePage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ChangePasswordCard />
         <TwoFactorCard />
+        <TillPinCard />
         <DevicesCard />
         <LoginActivityCard />
       </div>

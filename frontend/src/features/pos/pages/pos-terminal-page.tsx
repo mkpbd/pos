@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { HistoryIcon, Loader2Icon, PauseIcon, ScanBarcodeIcon, ShoppingCartIcon, Trash2Icon } from 'lucide-react'
+import { HistoryIcon, Loader2Icon, LockIcon, PauseIcon, ScanBarcodeIcon, ShoppingCartIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { StoreSelect } from '@/components/common/store-select'
@@ -12,12 +12,20 @@ import { useLoyaltyBalancesQuery, useLoyaltySettingsQuery } from '@/features/loy
 import { lookupCode, useCheckoutMutation, useHoldMutation, usePriceQuery, type HeldSale, type PaymentMethod, type PosItem, type PricedCart } from '@/features/pos/api'
 import { cartOps, toCartInput, usePosCart, type LineInfo } from '@/features/pos/cart-store'
 import { CartLines, CartTotals } from '@/features/pos/components/cart-panel'
+import { CouponField } from '@/features/pos/components/coupon-field'
 import { CustomerPicker } from '@/features/pos/components/customer-picker'
 import { HeldSalesSheet } from '@/features/pos/components/held-sales-sheet'
+import { ManagerApprovalProvider } from '@/features/pos/components/manager-approval'
 import { PaymentDialog, type LoyaltyTender } from '@/features/pos/components/payment-dialog'
+import { PriceFlow, type PriceTarget } from '@/features/pos/components/price-flow'
+import { PricingProblem } from '@/features/pos/components/pricing-problem'
 import { CategoryBar, ProductGrid } from '@/features/pos/components/product-grid'
 import { RecentSalesSheet } from '@/features/pos/components/recent-sales-sheet'
 import { RegisterSessionBar } from '@/features/pos/components/register-session-bar'
+import { TillLockScreen } from '@/features/pos/components/till-lock-screen'
+import { hasTillPin } from '@/features/pos/till-api'
+import { isTillProblem } from '@/features/pos/till-helpers'
+import { AUTO_LOCK_MS, useIdleTimer, useTillLockStore } from '@/features/pos/till-lock'
 import { useCurrentSessionQuery } from '@/features/registers/api'
 import type { Sale } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
@@ -30,8 +38,19 @@ import { useSessionStore } from '@/stores/session-store'
  * The POS terminal (critical workflows #3, #4, #8). Keyboard first:
  *   F2 search / scan · F4 customer · F8 hold · F9 pay · Esc clear search.
  * Barcode scanners type the code and press Enter. Every amount shown comes from the server.
+ *
+ * POS1a: the till locks (button, or after 5 minutes without input) and unlocks with the cashier's
+ * PIN; another cashier can take over from the lock screen. A new cashier gets a fresh terminal.
  */
 export function PosTerminalPage() {
+  const me = useAuth()
+  const branchId = useSessionStore((s) => s.activeBranchId) ?? ''
+  const locked = useTillLockStore((s) => s.lockedUserId === me.user.id)
+
+  return locked ? <TillLockScreen me={me} branchId={branchId} /> : <PosTerminal key={me.user.id} />
+}
+
+function PosTerminal() {
   const branchId = useSessionStore((s) => s.activeBranchId) ?? ''
   const can = useCan()
   const me = useAuth()
@@ -64,6 +83,17 @@ export function PosTerminalPage() {
   const checkout = useCheckoutMutation()
   const hold = useHoldMutation()
   const canDiscount = can('sales.discount')
+  const canOverride = can('sales.price_override')
+  // POS1a: an open-price item being added, or a line whose price changes.
+  const [priceTarget, setPriceTarget] = useState<PriceTarget | null>(null)
+  // POS1a: an approval / price / coupon refusal from checkout, shown until the cart changes.
+  const [checkoutProblem, setCheckoutProblem] = useState<{ error: Error; cart: string } | null>(null)
+  const problem = checkoutProblem && checkoutProblem.cart === JSON.stringify(cartInput) ? checkoutProblem.error : price.isError && cartInput ? price.error : null
+
+  // POS1a: lock the till after 5 minutes without input (only with a PIN to unlock it again).
+  const lockTill = useTillLockStore((s) => s.lock)
+  const pinSet = hasTillPin(me)
+  useIdleTimer(() => lockTill(me.user.id), AUTO_LOCK_MS, pinSet && !checkout.isPending)
 
   // Checkout needs the cashier's open register session in this branch.
   const canOperate = can('cash_registers.operate')
@@ -82,6 +112,10 @@ export function PosTerminalPage() {
   const addItem = (item: PosItem) => {
     if (!item.sellable) {
       toast.error(`${item.product_name} is not for sale.`)
+      return
+    }
+    if (item.open_price) {
+      setPriceTarget({ kind: 'add', item })
       return
     }
     apply((c) => cartOps.addItem(c, item))
@@ -132,7 +166,8 @@ export function PosTerminalPage() {
         unit_code: l.unit_code,
         allow_decimal: l.allow_decimal,
         track_serials: l.track_serials,
-        price: l.unit_price,
+        price: l.list_price ?? l.unit_price,
+        open_price: l.open_price ?? false,
       }]))
     } catch {
       // The cart is restored anyway; the cart panel shows the pricing problem.
@@ -179,6 +214,11 @@ export function PosTerminalPage() {
         }
         const retryable = !(error instanceof ApiError) || error.status === 0 || error.status >= 500 || error.code === 'IDEMPOTENCY_REQUEST_IN_PROGRESS'
         if (!retryable) apply((c) => ({ ...c, pendingCheckout: null }))
+        // POS1a: approvals, prices and the coupon are sorted out in the cart (manager approval, price, remove coupon).
+        if (isTillProblem(error)) {
+          setPaying(false)
+          setCheckoutProblem({ error, cart: JSON.stringify(cartInput) })
+        }
         toast.error(retryable ? `${error.message} Press “Complete sale” again to retry safely.` : error.message)
       },
     })
@@ -200,6 +240,7 @@ export function PosTerminalPage() {
   const itemCount = cart.lines.length
 
   return (
+    <ManagerApprovalProvider storeId={cart.storeId}>
     <div className="flex flex-col gap-3 lg:h-[calc(100svh-var(--topbar-height)-3rem)] lg:flex-row">
       <h1 className="sr-only">POS terminal</h1>
       <section className="flex min-h-0 flex-1 flex-col gap-3" aria-label="Products">
@@ -228,6 +269,15 @@ export function PosTerminalPage() {
             </Button>
             <Button type="button" variant="outline" onClick={() => setRecentOpen(true)}>
               <HistoryIcon data-icon="inline-start" /> Recent
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={checkout.isPending}
+              title={pinSet ? 'Locks by itself after 5 minutes without input' : 'Set a till PIN under Profile & security to unlock without signing out'}
+              onClick={() => lockTill(me.user.id)}
+            >
+              <LockIcon data-icon="inline-start" /> Lock
             </Button>
           </div>
         </div>
@@ -261,11 +311,17 @@ export function PosTerminalPage() {
           </Button>
         </div>
 
-        <CartLines cart={cart} priced={priced} canDiscount={canDiscount} apply={apply} />
+        <CartLines cart={cart} priced={priced} canDiscount={canDiscount} apply={apply} onChangePrice={(key) => setPriceTarget({ kind: 'line', key })} />
 
         <div className="flex flex-col gap-3 border-t p-3">
-          {price.isError && cartInput && (
-            <p role="alert" className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{price.error.message}</p>
+          {problem && <PricingProblem error={problem} cart={cart} apply={apply} onEnterPrice={(key) => setPriceTarget({ kind: 'line', key })} />}
+          {itemCount > 0 && (
+            <CouponField
+              code={cart.couponCode ?? null}
+              coupon={priced?.coupon}
+              onApply={(couponCode) => apply((c) => ({ ...c, couponCode }))}
+              onRemove={() => apply((c) => ({ ...c, couponCode: null }))}
+            />
           )}
           {priced?.customer && (
             <p className="text-xs text-muted-foreground">
@@ -326,6 +382,8 @@ export function PosTerminalPage() {
         destructive
         onConfirm={() => { apply((c) => cartOps.empty(c.storeId)); setClearing(false) }}
       />
+      {priceTarget && <PriceFlow target={priceTarget} cart={cart} apply={apply} canOverride={canOverride} onClose={() => setPriceTarget(null)} />}
     </div>
+    </ManagerApprovalProvider>
   )
 }

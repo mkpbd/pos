@@ -21,6 +21,30 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### POS1a — Till PIN, tills, manager approval, price changes and promotions at the till
+
+First part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). No new packages.
+
+#### Added
+- **Tills** (*Settings → Tills*, `pos.terminals.manage`): a manager sets up a counter computer as a till once; tills can be revoked.
+- **Till PIN** (*Profile → Till PIN*, 4–6 digits; *Users → Clear PIN*): on a till cashiers pick their name and type their PIN; 5 wrong PINs lock it for 15 minutes. **Lock** button and auto-lock after 5 minutes without use (the whole back office leads back to the lock screen); **Switch cashier** holds the current sale and signs in the next cashier.
+- **Manager approval by PIN** on the till screen: price changes and discounts by cashiers without the permission; each approval is for one sale, one cashier and (for prices) one item, valid 10 minutes, and kept on the sale.
+- **Change price** at the till (`sales.price_override` or approval) and **open-price products** (*Products → Price is entered at the till*).
+- **Promotions and coupons at the till**: promotions say where they apply (online store / till); the till shows each offer, the coupon status and "You save"; one discount per level (manual item discount over a promotion; on the sale: manual discount, then promotion or coupon, then the customer-group discount).
+- Sale and receipt show list vs charged price, who approved, the offers, the coupon and the savings.
+
+#### Changed
+- The Cashier role has `pos.sell` instead of all POS permissions (it cannot set up tills).
+- A cashier without `sales.discount` gets `APPROVAL_REQUIRED` instead of `DISCOUNT_NOT_ALLOWED` (the product's maximum discount still applies to everyone).
+- The promotion report counts online orders only (till sales show in the redemptions list).
+
+#### Tests
+- Backend 1927 (PostgreSQL: 1926 pass, 1 opt-in PDF skip) (PostgreSQL); Pint clean. vitest 3130; mocked Playwright 599 (new `pos1a-till`, `pos1a-admin`).
+- Full-stack (PostgreSQL, desktop) 62 (59 in one run; BD1b failed once under load and passed on a rerun together with BD1c and POS1a) — new **POS1a** on Bazar Fresh: the owner adds a cashier and sets an approval PIN, the cashier sets a till PIN, the owner sets up the till and signs out; the cashier signs in on the till with the PIN, opens a drawer, locks and unlocks, changes a price that the owner approves with a PIN on the same screen, and is paid in cash; the sale keeps the list price, the charged price and the approver.
+
+#### Upgrade
+- `php artisan migrate`, `php artisan pos:permissions:sync`; set up each counter computer as a till; tick *Till* on promotions that should apply at the counter.
+
 ### BD1c — bKash / Nagad / Rocket Send Money, advance delivery charge, ad pixels and tracking code
 
 Third and last part of BD1 (Bangladesh commerce pack) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P0). No new packages; no payment-gateway or ad-platform SDK.

@@ -38,7 +38,8 @@ class PromotionReport
         $start = $dateFrom === null ? null : CarbonImmutable::parse($dateFrom, $timezone)->startOfDay();
         $end = $dateTo === null ? null : CarbonImmutable::parse($dateTo, $timezone)->startOfDay()->addDay();
 
-        $rows = PromotionRedemption::query()->where('promotion_id', $promotion->id)
+        // POS1a: web orders only — till redemptions (sale_id) are not orders.
+        $rows = PromotionRedemption::query()->where('promotion_id', $promotion->id)->whereNotNull('order_id')
             ->when($start !== null, fn ($q) => $q->where('created_at', '>=', $start->utc()))
             ->when($end !== null, fn ($q) => $q->where('created_at', '<', $end->utc()))
             ->orderBy('created_at')

@@ -25,6 +25,8 @@ class UserResource extends JsonResource
             'two_factor_enabled' => $this->hasTwoFactorEnabled(),
             'is_locked' => $this->isLocked(),
             'locked_until' => $this->isLocked() ? $this->locked_until->toIso8601String() : null,
+            // POS1a: a till PIN is set.
+            'pin_set' => $this->hasPin(),
             'roles' => $this->whenLoaded('roles', fn () => $this->roles->map(fn ($role) => [
                 'id' => $role->id,
                 'name' => $role->name,

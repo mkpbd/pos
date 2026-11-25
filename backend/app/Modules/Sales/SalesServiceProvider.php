@@ -41,6 +41,8 @@ class SalesServiceProvider extends ModuleServiceProvider
         return [
             'sales.view' => 'View sales history, invoices and the daily sales summary of accessible branches',
             'sales.discount' => 'Give manual item and invoice discounts at the till (within product limits)',
+            // POS1a: without it a manager approves each changed price at the till.
+            'sales.price_override' => "Change an item's price at the till",
             'sales.credit' => 'Sell on credit: leave an amount due on a customer account (within the credit limit)',
             'sales.cancel' => 'Cancel completed sales without returns (restocks goods and reverses payments)',
             'returns.view' => 'View sales returns and their refunds in accessible branches',

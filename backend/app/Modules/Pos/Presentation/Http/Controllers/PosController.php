@@ -134,6 +134,8 @@ class PosController
             'image_url' => $v['image_url'] ?? null,
             'on_hand' => $v['track_stock'] ? ($onHand[$v['variant_id']] ?? '0.000') : null,
             'sellable' => $v['sellable'],
+            // POS1a: the cashier types the price.
+            'open_price' => (bool) ($v['open_price'] ?? false),
         ];
     }
 

@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useCan } from '@/features/auth/use-auth'
 import { lineLabel, salesListQuery, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleStatus } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
+import { LinePrice, LinePromotion, SaleOffersCard } from '@/features/sales/components/sale-pricing'
 import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -210,6 +211,7 @@ export function SalePage() {
               <TableRow key={l.id}>
                 <TableCell>
                   <div className="font-medium">{lineLabel(l)}</div>
+                  <LinePromotion line={l} />
                   <div className="font-mono text-xs text-muted-foreground">
                     {l.sku}
                     {l.batches.map((b) => ` · ${b.batch_number} (${trimDecimal(b.quantity)}${b.expires_on ? `, exp ${b.expires_on}` : ''})`).join('')}
@@ -217,7 +219,7 @@ export function SalePage() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{trimDecimal(l.quantity)} {l.unit_code}</TableCell>
-                <TableCell className="text-right font-mono">{formatMoney(l.unit_price)}</TableCell>
+                <TableCell className="text-right"><LinePrice line={l} cashierName={sale.cashier?.name ?? null} /></TableCell>
                 <TableCell className="text-right font-mono">{isZeroDecimal(l.discount_amount) && isZeroDecimal(l.invoice_discount_share) ? '—' : `−${formatMoney(l.discount_amount)}${isZeroDecimal(l.invoice_discount_share) ? '' : ` / −${formatMoney(l.invoice_discount_share)}`}`}</TableCell>
                 <TableCell className="hidden text-right font-mono sm:table-cell">{formatMoney(l.tax_amount)} <span className="text-xs text-muted-foreground">({trimDecimal(l.tax_rate)}%)</span></TableCell>
                 {sale.cost_total !== null && <TableCell className="hidden text-right font-mono md:table-cell">{l.unit_cost && formatMoney(l.unit_cost, undefined, 4)}</TableCell>}
@@ -261,6 +263,8 @@ export function SalePage() {
           </CardContent>
         </Card>
       </div>
+
+      <SaleOffersCard sale={sale} />
 
       {sale.returns.length > 0 && (
         <Card>

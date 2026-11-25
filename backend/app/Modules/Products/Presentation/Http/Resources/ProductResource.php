@@ -50,6 +50,7 @@ class ProductResource extends JsonResource
             'track_batches' => $this->track_batches,
             'track_serials' => $this->track_serials,
             'max_discount_percent' => $this->max_discount_percent,
+            'open_price' => (bool) $this->open_price,
             'options' => $this->options,
             // P1a: photos by colour and swatch styles.
             'photo_option' => $this->photo_option,

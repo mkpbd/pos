@@ -81,7 +81,7 @@ final class PromotionEngine
             if (! $offer->scope->isProductLevel() || $offer->type === PromotionType::FreeShipping) {
                 continue;
             }
-            $matching = array_values(array_filter($lines, fn (LineInput $l) => $offer->matches($l)));
+            $matching = array_values(array_filter($lines, fn (LineInput $l) => $l->promotable && $offer->matches($l)));
             if ($matching === []) {
                 $couponReason = $isCoupon($offer) ? CouponReason::NotApplicable : $couponReason;
 
@@ -163,7 +163,9 @@ final class PromotionEngine
                 $productPromotions[] = ['offer' => $picked, 'amount' => $lineDiscounts[$line->key]];
             }
         }
-        $afterProducts = $subtotal->minus(self::sum($lineDiscounts, $zero));
+        // POS1a: manual item discounts of the till are off the base too.
+        $own = array_reduce($lines, fn (Money $sum, LineInput $l) => $sum->plus(Money::of($l->ownDiscount, $currency)), $zero);
+        $afterProducts = $subtotal->minus(self::sum($lineDiscounts, $zero))->minus($own);
 
         // 2. Order level.
         $orderPromotion = null;

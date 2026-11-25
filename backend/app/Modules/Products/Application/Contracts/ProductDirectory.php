@@ -9,7 +9,7 @@ namespace App\Modules\Products\Application\Contracts;
  *   variant_id: string, product_id: string, product_name: string, variant_name: ?string, sku: string,
  *   track_stock: bool, track_batches: bool, track_serials: bool, allow_decimal: bool, unit_code: ?string,
  *   tax_rate: ?string, purchase_price: string, selling_price: string, reorder_level: string,
- *   max_discount_percent: ?string, category_id: ?string, sellable: bool
+ *   max_discount_percent: ?string, category_id: ?string, brand_id: ?string, open_price: bool, sellable: bool
  * }
  */
 interface ProductDirectory

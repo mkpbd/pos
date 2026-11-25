@@ -60,7 +60,7 @@ class DiscountAndTaxTest extends TestCase
             ->assertJsonPath('data.lines.0.net_amount', '200.00');
     }
 
-    public function test_cashiers_cannot_give_manual_discounts(): void
+    public function test_cashiers_need_a_managers_approval_for_manual_discounts(): void
     {
         ['admin' => $admin, 'organization' => $org, 'branch' => $branch] = $this->provisionTenant();
         $soap = $this->sellable($org, 'Soap', '50.00');
@@ -69,10 +69,12 @@ class DiscountAndTaxTest extends TestCase
         $this->stockUp($store, $soap, '5');
         $this->actingAsUser($this->createUserWithRole($org, SystemRole::Cashier, [$branch->id]));
 
+        // POS1a: APPROVAL_REQUIRED (the till asks a manager), was DISCOUNT_NOT_ALLOWED.
         $this->postJson('/api/v1/pos/price', $this->cart($store, [[$soap, '1', ['discount' => ['type' => 'amount', 'value' => '5']]]]))
-            ->assertStatus(422)->assertJsonPath('error.code', 'DISCOUNT_NOT_ALLOWED');
+            ->assertStatus(422)->assertJsonPath('error.code', 'APPROVAL_REQUIRED')
+            ->assertJsonPath('error.details.action', 'discount')->assertJsonPath('error.details.line', 0);
         $this->postJson('/api/v1/pos/price', $this->cart($store, [[$soap, '1']], [], ['invoice_discount' => ['type' => 'percent', 'value' => '5']]))
-            ->assertStatus(422)->assertJsonPath('error.code', 'DISCOUNT_NOT_ALLOWED');
+            ->assertStatus(422)->assertJsonPath('error.code', 'APPROVAL_REQUIRED')->assertJsonPath('error.details.action', 'discount');
         $this->postJson('/api/v1/pos/price', $this->cart($store, [[$soap, '1']]))->assertOk()->assertJsonPath('data.total', '50.00');
     }
 

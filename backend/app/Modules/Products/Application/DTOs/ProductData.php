@@ -25,6 +25,8 @@ final readonly class ProductData
         public ?array $options,
         public bool $isActive,
         public array $variants,
+        // POS1a: sold at a price typed at the till; null keeps the stored value (false when new).
+        public ?bool $openPrice = null,
     ) {}
 
     /**
@@ -54,6 +56,7 @@ final readonly class ProductData
             ),
             isActive: (bool) ($data['is_active'] ?? true),
             variants: array_map(VariantData::fromArray(...), $data['variants']),
+            openPrice: array_key_exists('open_price', $data) && $data['open_price'] !== null ? (bool) $data['open_price'] : null,
         );
     }
 }

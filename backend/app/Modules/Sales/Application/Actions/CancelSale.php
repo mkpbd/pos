@@ -11,6 +11,7 @@ use App\Modules\Payments\Domain\LedgerEntry;
 use App\Modules\Payments\Domain\PaymentDirection;
 use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
 use App\Modules\Payments\Domain\PaymentSource;
+use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\ReturnStatus;
@@ -31,7 +32,8 @@ use Illuminate\Support\Facades\DB;
  * cancelled, its stock goes back to the exact batches it came from at the cost it left
  * with, every payment gets a negative reversal entry (money handed back through the
  * payments ledger: cash comes out of the canceller's drawer), loyalty points are reversed,
- * and its serial numbers become sellable again. A sale with returns cannot be cancelled;
+ * its serial numbers become sellable again and (POS1a) its promotions are given back (usage
+ * limits and coupon uses no longer count it). A sale with returns cannot be cancelled;
  * returns are the way to take back part of a sale.
  */
 class CancelSale
@@ -41,6 +43,7 @@ class CancelSale
         private readonly PaymentLedger $payments,
         private readonly LoyaltyProgram $loyalty,
         private readonly AuditTrail $audit,
+        private readonly PromotionRedemptions $redemptions,
     ) {}
 
     public function __invoke(TenantUser $actor, Sale $sale, string $reason): Sale
@@ -89,6 +92,8 @@ class CancelSale
             if ($locked->customer_id !== null) {
                 $this->loyalty->reverseSale($locked->customer_id, $locked->id, $locked->number);
             }
+
+            $this->redemptions->releaseSale($locked->id);
 
             SaleLineSerial::query()
                 ->whereIn('sale_line_id', $lines->map(fn (SaleLine $l) => $l->id)->all())

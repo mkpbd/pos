@@ -20,8 +20,9 @@ class StartSession
 
     /**
      * @param  'totp'|'recovery_code'|null  $twoFactor  the second factor used (G1a), if any
+     * @param  array<string, mixed>  $context  POS1a: audit context of other sign-in methods (`channel` pin, the till)
      */
-    public function __invoke(User $user, bool $remember = false, ?string $twoFactor = null): void
+    public function __invoke(User $user, bool $remember = false, ?string $twoFactor = null, array $context = []): void
     {
         if (! $this->request->hasSession()) {
             throw new BusinessRuleViolation(
@@ -33,6 +34,6 @@ class StartSession
         Auth::guard('web')->login($user, $remember);
         $this->request->session()->regenerate();
 
-        $this->audit->record('auth.login', $user, context: ['channel' => 'session'] + ($twoFactor !== null ? ['two_factor' => $twoFactor] : []));
+        $this->audit->record('auth.login', $user, context: $context + ['channel' => 'session'] + ($twoFactor !== null ? ['two_factor' => $twoFactor] : []));
     }
 }

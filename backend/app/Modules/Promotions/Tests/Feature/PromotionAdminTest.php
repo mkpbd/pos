@@ -74,7 +74,7 @@ class PromotionAdminTest extends TestCase
 
         $list = $this->getJson('/api/v1/promotions')->assertOk();
         $this->assertSame(5, $list->json('meta.pagination.total'));
-        $this->assertSame(['id', 'name', 'type', 'value', 'scope', 'trigger', 'starts_at', 'ends_at', 'show_countdown', 'is_active', 'state', 'coupon_count', 'redemption_count', 'discount_total'], array_keys($list->json('data.0')));
+        $this->assertSame(['id', 'name', 'type', 'value', 'scope', 'trigger', 'channels', 'starts_at', 'ends_at', 'show_countdown', 'is_active', 'state', 'coupon_count', 'redemption_count', 'discount_total'], array_keys($list->json('data.0')));
         $names = fn (string $query) => array_column($this->getJson('/api/v1/promotions?'.$query)->assertOk()->json('data'), 'name');
         $this->assertEqualsCanonicalizing(['Shirt sale', 'Welcome 50'], $names('status=active'));
         $this->assertSame(['Later'], $names('status=scheduled'));

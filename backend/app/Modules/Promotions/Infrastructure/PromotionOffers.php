@@ -6,6 +6,7 @@ use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
 use App\Modules\Promotions\Domain\CouponCode;
 use App\Modules\Promotions\Domain\CouponReason;
 use App\Modules\Promotions\Domain\Offer;
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Infrastructure\Models\Coupon;
@@ -53,11 +54,22 @@ class PromotionOffers
     }
 
     /**
-     * Active automatic promotions inside their schedule.
+     * Active automatic promotions inside their schedule that apply on the channel (POS1a;
+     * the online store by default).
      *
      * @return list<Promotion>
      */
-    public function liveAutomatic(): array
+    public function liveAutomatic(PromotionChannel $channel = PromotionChannel::Online): array
+    {
+        return array_values(array_filter($this->allLiveAutomatic(), fn (Promotion $p) => $p->appliesOn($channel)));
+    }
+
+    /**
+     * Active automatic promotions inside their schedule, every channel (cached per request).
+     *
+     * @return list<Promotion>
+     */
+    private function allLiveAutomatic(): array
     {
         $this->forgetStale();
         if ($this->automatic === null) {
@@ -82,9 +94,9 @@ class PromotionOffers
      *
      * @return list<Promotion>
      */
-    public function usableAutomatic(?string $customerId, ?string $email, ?string $phone = null): array
+    public function usableAutomatic(?string $customerId, ?string $email, ?string $phone = null, PromotionChannel $channel = PromotionChannel::Online): array
     {
-        $promotions = $this->liveAutomatic();
+        $promotions = $this->liveAutomatic($channel);
         $limited = array_values(array_filter($promotions, fn (Promotion $p) => $p->usage_limit !== null || $p->usage_limit_per_customer !== null));
         if ($limited === []) {
             return $promotions;
@@ -99,11 +111,12 @@ class PromotionOffers
 
     /**
      * The coupon with the given code and why it cannot be used (null = it can, as far as
-     * the code and the limits go; the engine checks schedule and cart).
+     * the code and the limits go; the engine checks schedule and cart). POS1a: a code whose
+     * promotion does not apply on the channel is unknown there.
      *
      * @return array{0: ?Coupon, 1: ?CouponReason}
      */
-    public function coupon(string $code, ?string $customerId, ?string $email, ?string $phone = null): array
+    public function coupon(string $code, ?string $customerId, ?string $email, ?string $phone = null, PromotionChannel $channel = PromotionChannel::Online): array
     {
         $code = CouponCode::normalize($code);
         if (! CouponCode::isValid($code)) {
@@ -113,7 +126,8 @@ class PromotionOffers
         /** @var Coupon|null $coupon */
         $coupon = Coupon::query()->with('promotion')->whereRaw('lower(code) = ?', [mb_strtolower($code)])->first();
         $promotion = $coupon?->promotion;
-        if ($coupon === null || $promotion === null || ! $coupon->is_active || ! $promotion->is_active || $promotion->trigger !== PromotionTrigger::Coupon) {
+        if ($coupon === null || $promotion === null || ! $coupon->is_active || ! $promotion->is_active || $promotion->trigger !== PromotionTrigger::Coupon
+            || ! $promotion->appliesOn($channel)) {
             return [null, CouponReason::NotFound];
         }
         $this->loadTargets([$promotion]);

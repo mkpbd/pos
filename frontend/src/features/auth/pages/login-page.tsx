@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2Icon } from 'lucide-react'
@@ -13,6 +13,7 @@ import { AuthLayout } from '@/features/auth/components/auth-layout'
 import { TwoFactorChallengeForm } from '@/features/auth/components/two-factor-challenge-form'
 import { safeRedirect } from '@/features/auth/redirect'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
+import { useTillTerminalQuery } from '@/features/pos/till-api'
 import { ApiError } from '@/lib/api/client'
 import { handleFormError } from '@/lib/forms'
 
@@ -24,6 +25,8 @@ export function LoginPage() {
   const [step, setStep] = useState<'password' | 'two_factor'>('password')
   // "Create an account" only when public sign-up is on (never while unknown or on error).
   const signUpOpen = useAuthOptionsQuery().data?.registration_enabled === true
+  // POS1a: on a device set up as a till, cashiers sign in with a PIN (the password stays available).
+  const till = useTillTerminalQuery().data ?? null
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '', remember: false },
@@ -67,6 +70,11 @@ export function LoginPage() {
     )
   }
 
+  // POS1a: sent here on the way to the POS on a till: the PIN pad instead (unless the password was asked for).
+  if (till && params.get('method') !== 'password' && safeRedirect(params.get('redirect')).startsWith('/pos')) {
+    return <Navigate to="/pos/sign-in" replace />
+  }
+
   return (
     <AuthLayout
       title="Sign in"
@@ -108,6 +116,11 @@ export function LoginPage() {
           {login.isPending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
           Sign in
         </Button>
+        {till && (
+          <Button asChild variant="outline">
+            <Link to="/pos/sign-in">Use till PIN</Link>
+          </Button>
+        )}
       </form>
     </AuthLayout>
   )

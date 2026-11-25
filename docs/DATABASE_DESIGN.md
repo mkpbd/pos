@@ -471,6 +471,15 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Till PIN, tills, approvals, prices and promotions at the till POS1a (implemented)
+
+- `users`: `pin_hash`, `pin_set_at`, `pin_failed_count`, `pin_locked_until`. `login_activities`: channel `pin`, `pos_terminal_id`.
+- `pos_terminals` (organization, store, name, `token_hash` sha256, created by, last used, revoked at).
+- `pos_approvals` (organization, store, action `price_override|discount` CHECK, approver, requester, details jsonb, expires at, used at, sale id — used at and sale id set together).
+- `promotions.channels` (`online` / `till`, at least one); `promotion_redemptions.sale_id` (exactly one of order / sale, CHECK).
+- `sale_lines`: `list_price`, `price_source` `catalog|override|open` CHECK, `price_approved_by`, `price_approval_id`, `promotion_discount`, `promotion_name`; `sales`: `coupon_code`, `discount_approved_by`; append-only `sale_promotions` (sale, promotion, name, kind, amount).
+- `products.open_price` boolean.
+
 ### Send Money payments, advance delivery charge and ad tracking BD1c (implemented)
 
 - `payment_gateways` rows for `bkash_manual`, `nagad_manual`, `rocket_manual` (settings `account_number`, `account_type`, `hold_hours`; no column change).

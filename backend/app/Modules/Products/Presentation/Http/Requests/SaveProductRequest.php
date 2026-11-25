@@ -30,6 +30,8 @@ class SaveProductRequest extends FormRequest
             'track_batches' => ['boolean'],
             'track_serials' => ['boolean'],
             'max_discount_percent' => ['nullable', 'decimal:0,2', 'min:0', 'max:100'],
+            // POS1a: the price is typed at the till.
+            'open_price' => ['sometimes', 'boolean'],
             'is_active' => ['boolean'],
 
             'options' => ['nullable', 'array', 'max:3'],

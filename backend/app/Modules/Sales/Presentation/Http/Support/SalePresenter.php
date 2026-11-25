@@ -96,7 +96,12 @@ class SalePresenter
         $lines = $sale->lines()->with(['stock', 'serials'])->get();
         $payments = $sale->payments()->get();
         $batches = $this->batches->summaries($org, $lines->flatMap(fn (SaleLine $l) => $l->stock->pluck('batch_id'))->filter()->values()->all());
-        $users = $this->users->names($org, array_values(array_filter([$sale->created_by, $sale->cancelled_by, ...$payments->pluck('created_by')->all()])));
+        $users = $this->users->names($org, array_values(array_unique(array_filter([
+            $sale->created_by, $sale->cancelled_by, ...$payments->pluck('created_by')->all(),
+            // POS1a: the managers who approved changed prices and manual discounts.
+            $sale->discount_approved_by, ...$lines->pluck('price_approved_by')->all(),
+        ]))));
+        $till = SaleTillDetails::of($sale, $lines, $users);
         $organization = $this->context->organization();
         $taxNumber = trim((string) ($organization['tax_number'] ?? ''));
         $taxNumber = $taxNumber === '' ? null : $taxNumber;
@@ -121,7 +126,9 @@ class SalePresenter
                 'source' => $sale->invoice_discount_source,
             ],
             'cost_total' => $withCost ? $sale->cost_total : null,
-            'lines' => $lines->map(fn (SaleLine $l) => [
+            // POS1a: promotions, coupon, savings and the discount approver.
+            ...$till['sale'],
+            'lines' => $lines->map(fn (SaleLine $l) => $till['lines'][$l->id] + [
                 'id' => $l->id,
                 'variant_id' => $l->variant_id,
                 'product_name' => $l->product_name,

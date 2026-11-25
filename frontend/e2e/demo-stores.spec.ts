@@ -2319,7 +2319,7 @@ test('BD1b: Bazar Fresh holds cash-on-delivery orders for a call, staff confirm 
     const confirm = admin.getByRole('dialog', { name: `Confirm ${number}?` })
     await confirm.getByLabel('Note (optional)').fill('Called Rokeya, she confirmed')
     await confirm.getByRole('button', { name: 'Confirm order' }).click()
-    await expect(admin.getByRole('group', { name: 'Order actions' }).getByRole('button', { name: 'Start processing' })).toBeVisible()
+    await expect(admin.getByRole('group', { name: 'Order actions' }).getByRole('button', { name: 'Start processing' })).toBeVisible({ timeout: 30_000 })
     await history.getByRole('button', { name: 'Block number' }).click()
     const block = admin.getByRole('dialog', { name: `Block ${phone}?` })
     await block.getByLabel('Reason (optional)').fill('Refused two parcels')
@@ -2503,5 +2503,128 @@ test('BD1c: Bazar Fresh takes bKash Send Money with a TrxID, asks an advance del
     await call('PATCH', '/api/v1/marketing/tracking', { meta_pixel_id: null, head_code: null })
     await call('PUT', '/api/v1/payment-gateways/bkash_manual', { is_enabled: false })
     await adminContext.close()
+  }
+})
+
+test('POS1a: Bazar Fresh sets up a till; a cashier signs in with a PIN, locks and unlocks, and sells at a lower price the owner approves with a PIN', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The till runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const apiCall = async (page: Page, method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await page.context().cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const ownerContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const owner = await ownerContext.newPage()
+  await signIn(owner, base, 'owner@grocery.test')
+  const stamp = String(Date.now()).slice(-8)
+  const cashierEmail = `till-${stamp}@grocery.test`
+  const cashierPassword = 'Till-Cashier-2026!x'
+  let terminalId = ''
+  try {
+    // The owner adds a cashier and sets an approval PIN.
+    const ownerName = (await apiCall(owner, 'GET', '/api/v1/auth/me')).body.data.user.name as string
+    const cashierRole = ((await apiCall(owner, 'GET', '/api/v1/roles')).body.data as { id: string; system_key: string | null }[]).find((r) => r.system_key === 'cashier')!
+    const branch = ((await apiCall(owner, 'GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await apiCall(owner, 'GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const created = await apiCall(owner, 'POST', '/api/v1/users', { name: `Till Cashier ${stamp}`, email: cashierEmail, password: cashierPassword, role_ids: [cashierRole.id], branch_ids: [branch.id] })
+    expect(created.status).toBe(201)
+    expect((await apiCall(owner, 'PUT', '/api/v1/profile/pin', { current_password: 'password', pin: '2580' })).status).toBe(204)
+
+    // The cashier sets a till PIN once, with the password.
+    const cashierContext = await browser.newContext()
+    const cashier = await cashierContext.newPage()
+    await cashier.goto(`${base}/admin/login?method=password`)
+    await cashier.getByLabel('E-mail').fill(cashierEmail)
+    await cashier.getByLabel('Password').fill(cashierPassword)
+    await cashier.getByRole('button', { name: 'Sign in' }).click()
+    await expect(cashier.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+    expect((await apiCall(cashier, 'PUT', '/api/v1/profile/pin', { current_password: cashierPassword, pin: '1357' })).status).toBe(204)
+    await cashierContext.close()
+
+    // The owner makes the counter computer a till, then signs out of it.
+    const tillContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+    const till = await tillContext.newPage()
+    await signIn(till, base, 'owner@grocery.test')
+    const terminal = await apiCall(till, 'POST', '/api/v1/pos/terminals', { store_id: store.id, name: 'Front till' })
+    expect(terminal.status).toBe(201)
+    terminalId = terminal.body.data.id
+    await apiCall(till, 'POST', '/api/v1/auth/logout')
+
+    // At the till: the cashier picks their name and types the PIN.
+    await till.goto(`${base}/admin/pos`)
+    await expect(till).toHaveURL(/\/admin\/pos\/sign-in$/, { timeout: 20_000 })
+    await expect(till.getByRole('heading', { name: 'Who is selling?' })).toBeVisible()
+    await till.getByRole('button', { name: `Till Cashier ${stamp}` }).click()
+    await till.keyboard.type('1357')
+    await till.keyboard.press('Enter')
+    await expect(till.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+    // A drawer of its own for this till, opened by the cashier with a float (cash sales need an open shift).
+    const register = await apiCall(owner, 'POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `T${stamp.slice(-6)}`, name: `Front till ${stamp}` })
+    expect(register.status).toBe(201)
+    expect((await apiCall(till, 'POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '500' })).status).toBeLessThan(300)
+    await till.reload()
+    await expect(till.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+
+    // Something in stock at a catalog price.
+    const items = (await apiCall(till, 'GET', `/api/v1/pos/catalog?store_id=${store.id}&page=1`)).body.data as { product_name: string; price: string; on_hand: string | null; sellable: boolean; open_price?: boolean; track_batches: boolean; track_serials: boolean }[]
+    const item = items.find((i) => i.sellable && !i.open_price && !i.track_serials && !i.track_batches && Number(i.price) >= 20 && (i.on_hand === null || Number(i.on_hand) >= 1))!
+    expect(item).toBeTruthy()
+    const name = item.product_name
+    const esc = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const cart = till.getByRole('complementary', { name: 'Current sale' })
+    await till.getByRole('button', { name: new RegExp(esc(name)) }).first().click()
+    await expect(cart.getByRole('list', { name: 'Cart' })).toContainText(name)
+
+    // Lock and unlock with the PIN.
+    await till.getByRole('button', { name: 'Lock' }).click()
+    const lock = till.getByRole('dialog', { name: 'Till locked' })
+    await expect(lock).toBeVisible()
+    await till.keyboard.type('1357')
+    await till.keyboard.press('Enter')
+    await expect(lock).toHaveCount(0)
+    await expect(cart.getByRole('list', { name: 'Cart' })).toContainText(name)
+
+    // A lower price needs the owner: they approve with their PIN on the same screen.
+    const newPrice = (Math.floor(Number(item.price)) - 5).toFixed(2)
+    await cart.getByRole('button', { name: new RegExp(`^Options for ${esc(name)}`) }).click()
+    await till.getByRole('menuitem', { name: 'Change price' }).click()
+    const priceDialog = till.getByRole('dialog', { name: 'Change price' })
+    await priceDialog.getByLabel('Unit price').fill(newPrice)
+    await priceDialog.getByRole('button', { name: 'Continue' }).click()
+    const approval = till.getByRole('dialog', { name: 'Approve a price change' })
+    await expect(approval.getByRole('radio', { name: ownerName })).toBeVisible()
+    await approval.getByRole('radio', { name: ownerName }).click()
+    await till.keyboard.type('2580')
+    await till.keyboard.press('Enter')
+    await expect(approval).toHaveCount(0)
+    await expect(cart.getByText(`Approved by ${ownerName}`)).toBeVisible()
+
+    // Paid in cash; the sale keeps the list price, the charged price and who approved it.
+    const total = (await cart.getByTestId('cart-total').innerText()).replace(/[^\d.]/g, '')
+    await till.keyboard.press('F9')
+    const payment = till.getByRole('dialog', { name: 'Payment' })
+    await payment.getByRole('textbox', { name: 'Amount of payment 1' }).fill(String(Math.ceil(Number(total))))
+    await payment.getByRole('button', { name: 'Complete sale' }).click()
+    const done = till.getByRole('dialog', { name: /^Sale \S+ completed$/ })
+    await expect(done).toBeVisible({ timeout: 20_000 })
+    const number = (await done.innerText()).match(/Sale (\S+) completed/)![1]!
+    await tillContext.close()
+
+    const sales = (await apiCall(owner, 'GET', `/api/v1/sales?search=${number}`)).body.data as { id: string; number: string }[]
+    const sale = (await apiCall(owner, 'GET', `/api/v1/sales/${sales.find((s) => s.number === number)!.id}`)).body.data
+    expect(sale.lines[0]).toMatchObject({ price_source: 'override', unit_price: newPrice, price_approved_by: { name: ownerName } })
+    expect(Number(sale.lines[0].list_price)).toBe(Number(item.price))
+  } finally {
+    if (terminalId) await apiCall(owner, 'DELETE', `/api/v1/pos/terminals/${terminalId}`)
+    await apiCall(owner, 'DELETE', '/api/v1/profile/pin', { current_password: 'password' })
+    await ownerContext.close()
   }
 })

@@ -209,6 +209,9 @@ class EloquentProductDirectory implements ProductDirectory
                 'reorder_level' => $v->reorder_level,
                 'max_discount_percent' => $p->max_discount_percent,
                 'category_id' => $p->category_id,
+                // POS1a: promotions match brands; open-price products are priced at the till.
+                'brand_id' => $p->brand_id,
+                'open_price' => (bool) $p->open_price,
                 'sellable' => ! $v->trashed() && ! $p->trashed() && $v->is_active && $p->is_active,
             ]];
         });

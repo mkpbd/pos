@@ -35,10 +35,14 @@ use Laravel\Sanctum\HasApiTokens;
  * @property ?int $two_factor_last_step
  * @property int $failed_login_count
  * @property ?Carbon $locked_until
+ * @property ?string $pin_hash
+ * @property ?Carbon $pin_set_at
+ * @property int $pin_failed_count
+ * @property ?Carbon $pin_locked_until
  */
 #[UseFactory(UserFactory::class)]
 #[Fillable(['organization_id', 'name', 'email', 'phone', 'password', 'status'])]
-#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_last_step'])]
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_last_step', 'pin_hash'])]
 class User extends Authenticatable implements TenantUser
 {
     /** @use HasFactory<UserFactory> */
@@ -70,6 +74,10 @@ class User extends Authenticatable implements TenantUser
             'two_factor_last_step' => 'integer',
             'failed_login_count' => 'integer',
             'locked_until' => 'datetime',
+            // POS1a: till PIN (hashed) and its own lockout.
+            'pin_set_at' => 'datetime',
+            'pin_failed_count' => 'integer',
+            'pin_locked_until' => 'datetime',
         ];
     }
 
@@ -77,6 +85,12 @@ class User extends Authenticatable implements TenantUser
     public function hasTwoFactorEnabled(): bool
     {
         return $this->two_factor_confirmed_at !== null && ($this->getAttributes()['two_factor_secret'] ?? null) !== null;
+    }
+
+    /** POS1a: a till PIN is set (sign-in at a till, screen unlock, manager approvals). */
+    public function hasPin(): bool
+    {
+        return ($this->getAttributes()['pin_hash'] ?? null) !== null;
     }
 
     public function isLocked(): bool

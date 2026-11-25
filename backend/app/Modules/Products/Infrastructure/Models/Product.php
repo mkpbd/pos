@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool $track_batches
  * @property bool $track_serials
  * @property ?string $max_discount_percent
+ * @property bool $open_price POS1a: sold at a price typed at the till
  * @property ?list<array{name: string, values: list<string>}> $options
  * @property bool $is_active
  * @property ?string $photo_option P1a: the option whose values own photos
@@ -38,7 +39,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'organization_id', 'category_id', 'brand_id', 'unit_id', 'tax_rate_id', 'name', 'description', 'type',
     'track_stock', 'track_batches', 'track_serials', 'max_discount_percent', 'options', 'is_active',
-    'photo_option', 'option_styles',
+    'photo_option', 'option_styles', 'open_price',
 ])]
 class Product extends Model
 {
@@ -51,6 +52,7 @@ class Product extends Model
         'track_batches' => false,
         'track_serials' => false,
         'is_active' => true,
+        'open_price' => false,
     ];
 
     protected function casts(): array
@@ -61,6 +63,7 @@ class Product extends Model
             'track_batches' => 'boolean',
             'track_serials' => 'boolean',
             'max_discount_percent' => 'decimal:2',
+            'open_price' => 'boolean',
             'options' => 'array',
             'is_active' => 'boolean',
             'option_styles' => 'array',

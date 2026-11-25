@@ -13,9 +13,9 @@ use App\Modules\Payments\Domain\PaymentDirection;
 use App\Modules\Payments\Domain\PaymentMethod as LedgerMethod;
 use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
-use App\Modules\Sales\Application\Services\CartPricer;
 use App\Modules\Sales\Application\Services\CustomerCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
+use App\Modules\Sales\Application\Services\TillCheckout;
 use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\PaymentSettlement;
 use App\Modules\Sales\Domain\SaleStatus;
@@ -37,7 +37,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Critical workflows #8 and #9: successful checkout and inventory deduction.
  *
- * Prices the cart on the server (CartPricer), settles the payments, and then — in one
+ * Prices the cart on the server (CartPricer, through TillCheckout: POS1a promotion locks,
+ * redemptions and the managers' approvals it used), settles the payments, and then — in one
  * transaction — numbers the invoice, deducts stock through the ledger (FEFO batches,
  * INSUFFICIENT_STOCK unless the branch allows negative stock), and writes the immutable
  * invoice with its cost snapshot, batch allocations, serial numbers and payments.
@@ -50,12 +51,13 @@ class CompleteSale
     public function __construct(
         private readonly SalesContext $context,
         private readonly StoreAccess $storeAccess,
-        private readonly CartPricer $pricer,
         private readonly CustomerCredit $credit,
         private readonly StockLedger $stockLedger,
         private readonly SequenceGenerator $sequences,
         private readonly PaymentLedger $payments,
         private readonly LoyaltyProgram $loyalty,
+        // POS1a: promotion locks and redemptions, approvals consumed.
+        private readonly TillCheckout $tillCheckout,
     ) {}
 
     /**
@@ -65,9 +67,24 @@ class CompleteSale
      */
     public function __invoke(TenantUser $actor, array $data): Sale
     {
+        // POS1a: priced inside the transaction, so promotion usage limits count under their locks.
+        return DB::transaction(fn () => $this->complete($actor, $data));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function complete(TenantUser $actor, array $data): Sale
+    {
         $organizationId = $this->context->organizationId();
         $store = $this->storeAccess->require($actor, $data['store_id']);
-        [$priced, $variants, $customer] = $this->pricer->priceForCheckout($actor, $store, $data);
+        [$priced, $variants, $customer, $till] = $this->tillCheckout->price($actor, $store, $data);
+        if (($priced['coupon']['status'] ?? null) === 'invalid') {
+            throw new BusinessRuleViolation('COUPON_INVALID', $priced['coupon']['message'] ?? 'This coupon code is not valid.', [
+                'code' => $priced['coupon']['code'],
+                'reason' => $priced['coupon']['reason'],
+            ]);
+        }
         $lines = array_values($data['lines']);
         $serials = $this->serials($organizationId, $lines, $variants);
 
@@ -94,7 +111,7 @@ class CompleteSale
             throw new BusinessRuleViolation('CUSTOMER_REQUIRED', 'Choose the customer whose loyalty points are redeemed.');
         }
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $priced, $variants, $customer, $serials, $settlement, $hasDue, $redeemed, $data) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $priced, $variants, $customer, $serials, $settlement, $hasDue, $redeemed, $data, $till) {
             $this->payments->requireSession($actor, $store['branch_id']);
             if ($hasDue) {
                 $this->assertCredit($customer, $settlement['due']);
@@ -144,7 +161,11 @@ class CompleteSale
                 'notes' => filled($data['notes'] ?? null) ? trim($data['notes']) : null,
                 'sold_at' => $now,
                 'created_by' => $actor->getAuthIdentifier(),
+                // POS1a: the applied coupon and the manager who approved the manual discounts.
+                'coupon_code' => $till['coupon_code'],
+                'discount_approved_by' => $till['discount_approval']['approver_id'] ?? null,
             ]);
+            $this->tillCheckout->settle($sale, $till, $customer);
 
             foreach ($priced['lines'] as $i => $line) {
                 $saleLine = SaleLine::query()->create([
@@ -170,6 +191,13 @@ class CompleteSale
                     'unit_cost' => $costs[$i]['unit_cost'],
                     'cost_total' => $costs[$i]['cost_total']->amount(),
                     'created_at' => $now,
+                    // POS1a: list vs. charged price, who approved a changed price, the line's promotion.
+                    'list_price' => $line['list_price'],
+                    'price_source' => $line['price_source'],
+                    'price_approved_by' => $till['price_approvals'][$i]['approver_id'] ?? null,
+                    'price_approval_id' => $till['price_approvals'][$i]['id'] ?? null,
+                    'promotion_discount' => $line['promotion_discount'],
+                    'promotion_name' => $line['promotion']['name'] ?? null,
                 ]);
 
                 foreach ($stock[$i]['allocations'] ?? [] as $allocation) {

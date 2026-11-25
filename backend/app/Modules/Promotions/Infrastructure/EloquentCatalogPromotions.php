@@ -6,6 +6,7 @@ use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Promotions\Application\Contracts\CatalogPromotions;
 use App\Modules\Promotions\Domain\LineInput;
 use App\Modules\Promotions\Domain\Offer;
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionEngine;
 use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Domain\PromotionTrigger;
@@ -81,7 +82,7 @@ class EloquentCatalogPromotions implements CatalogPromotions
 
     public function isCountdownPromotion(string $promotionId): bool
     {
-        return Promotion::query()->whereKey($promotionId)
+        return Promotion::query()->whereKey($promotionId)->availableOn(PromotionChannel::Online)
             ->where('trigger', PromotionTrigger::Automatic)
             ->where('show_countdown', true)
             ->exists();
@@ -90,7 +91,7 @@ class EloquentCatalogPromotions implements CatalogPromotions
     public function nextChangeAt(): ?CarbonImmutable
     {
         $now = CarbonImmutable::now();
-        $base = fn () => Promotion::query()->where('trigger', PromotionTrigger::Automatic)->where('is_active', true);
+        $base = fn () => Promotion::query()->availableOn(PromotionChannel::Online)->where('trigger', PromotionTrigger::Automatic)->where('is_active', true);
         $times = array_filter([$base()->where('starts_at', '>', $now)->min('starts_at'), $base()->where('ends_at', '>', $now)->min('ends_at')]);
 
         return $times === [] ? null : CarbonImmutable::createFromTimestamp(min(array_map(fn ($t) => CarbonImmutable::parse($t)->getTimestamp(), $times)));

@@ -5,6 +5,7 @@ namespace App\Modules\Promotions\Application\Actions;
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Promotions\Domain\CouponCode;
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Domain\PromotionTrigger;
 use App\Modules\Promotions\Domain\PromotionType;
@@ -28,7 +29,8 @@ use Illuminate\Validation\ValidationException;
  * - product scopes need 1–500 targets that exist in the organization (products not
  *   archived); the order scope has none;
  * - the countdown needs an end and is for automatic product-scope promotions only;
- * - the end is after the start; the trigger cannot change once the promotion has coupons.
+ * - the end is after the start; the trigger cannot change once the promotion has coupons;
+ * - POS1a: channels (online and/or till, at least one); free delivery is online only.
  *
  * Failures are field errors (422 VALIDATION_FAILED).
  */
@@ -36,7 +38,7 @@ class SavePromotion
 {
     private const FIELDS = [
         'name', 'description', 'type', 'value', 'scope', 'min_subtotal', 'max_discount', 'trigger', 'starts_at', 'ends_at',
-        'show_countdown', 'is_active', 'usage_limit', 'usage_limit_per_customer',
+        'show_countdown', 'is_active', 'usage_limit', 'usage_limit_per_customer', 'channels',
     ];
 
     public const MAX_TARGETS = 500;
@@ -72,6 +74,11 @@ class SavePromotion
             }
         }
 
+        if (array_key_exists('channels', $attributes)) {
+            // Stored in a fixed order, each once.
+            $attributes['channels'] = array_values(array_intersect(PromotionChannel::values(), (array) $attributes['channels']));
+        }
+
         $merged = $this->merged($promotion, $attributes);
         $type = PromotionType::from($merged['type']);
         $scope = PromotionScope::from($merged['scope']);
@@ -84,6 +91,9 @@ class SavePromotion
             }
             $attributes['value'] = '0.00';
             $attributes['max_discount'] = null;
+            if (in_array(PromotionChannel::Till->value, $merged['channels'], true)) {
+                $errors['channels'][] = 'Free delivery offers apply to the online store only.';
+            }
         } elseif ($merged['value'] === null || Decimal::compare((string) $merged['value'], '0') <= 0) {
             $errors['value'][] = 'Enter a discount greater than zero.';
         } elseif ($type === PromotionType::Percent && Decimal::compare((string) $merged['value'], '100') > 0) {
@@ -187,7 +197,8 @@ class SavePromotion
             'starts_at' => $promotion->starts_at,
             'ends_at' => $promotion->ends_at,
             'show_countdown' => $promotion->show_countdown,
-        ] : ['value' => null, 'starts_at' => null, 'ends_at' => null, 'show_countdown' => false];
+            'channels' => $promotion->channels ?? [PromotionChannel::Online->value],
+        ] : ['value' => null, 'starts_at' => null, 'ends_at' => null, 'show_countdown' => false, 'channels' => [PromotionChannel::Online->value]];
 
         $merged = $attributes + $current;
         foreach (['type', 'scope', 'trigger'] as $enum) {
@@ -236,6 +247,7 @@ class SavePromotion
             'is_active' => $promotion->is_active,
             'usage_limit' => $promotion->usage_limit,
             'usage_limit_per_customer' => $promotion->usage_limit_per_customer,
+            'channels' => $promotion->channels,
             'translations' => $promotion->translations,
         ];
     }

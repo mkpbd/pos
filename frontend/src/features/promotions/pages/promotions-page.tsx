@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { PROMOTION_STATES, usePromotionsQuery, type PromotionRow, type PromotionState, type PromotionTrigger } from '@/features/promotions/api'
-import { APPLICATION_RULE, offerLabel, SCOPE_LABELS, STATE_BADGES, stateBadge, TRIGGER_LABELS } from '@/features/promotions/promotions'
+import { APPLICATION_RULE, CHANNEL_LABELS, channelsOf, offerLabel, SCOPE_LABELS, STATE_BADGES, stateBadge, TRIGGER_LABELS } from '@/features/promotions/promotions'
 import { formatDateTime } from '@/features/web-orders/orders'
 import { formatMoney } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -45,7 +45,7 @@ export function PromotionsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Promotions"
-        description="Discounts, coupon codes, free shipping and flash sales for the online store."
+        description="Discounts, coupon codes, free shipping and flash sales for the online store and the till."
         actions={
           <>
             <ExportMenu list="promotions" query={filters} disabled={!promotions.data?.items.length} />
@@ -57,7 +57,7 @@ export function PromotionsPage() {
           </>
         }
       />
-      <p className="-mt-3 text-sm text-muted-foreground">{APPLICATION_RULE} Promotions apply to web orders only.</p>
+      <p className="-mt-3 text-sm text-muted-foreground">{APPLICATION_RULE} Each promotion applies online, at the till or both.</p>
 
       <Card>
         <CardContent className="flex flex-col gap-4">
@@ -137,6 +137,9 @@ export function PromotionsPage() {
                             {p.show_countdown && (
                               <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-muted-foreground"><TimerIcon className="size-3" aria-hidden /> Flash sale</span>
                             )}
+                            <div className="mt-1 flex flex-wrap gap-1" data-testid="promotion-channels">
+                              {channelsOf(p).map((c) => <Badge key={c} variant={c === 'till' ? 'info' : 'outline'} className="font-normal">{CHANNEL_LABELS[c]}</Badge>)}
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm">
                             {offerLabel(p.type, p.value, currency)}

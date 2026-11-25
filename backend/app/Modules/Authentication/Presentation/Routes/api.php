@@ -3,6 +3,7 @@
 use App\Modules\Authentication\Presentation\Http\Controllers\AuthOptionsController;
 use App\Modules\Authentication\Presentation\Http\Controllers\LoginActivityController;
 use App\Modules\Authentication\Presentation\Http\Controllers\PasswordController;
+use App\Modules\Authentication\Presentation\Http\Controllers\PinController;
 use App\Modules\Authentication\Presentation\Http\Controllers\RegistrationController;
 use App\Modules\Authentication\Presentation\Http\Controllers\SessionController;
 use App\Modules\Authentication\Presentation\Http\Controllers\TokenController;
@@ -23,6 +24,12 @@ Route::prefix('auth')->group(function () {
         Route::post('reset-password', [PasswordController::class, 'reset'])->name('auth.password.reset');
     });
 
+    // POS1a: sign-in with a till PIN (guest or signed in — switch cashier) on a device set up as a till.
+    Route::post('pin', [PinController::class, 'signIn'])->middleware('throttle:till-pin')->name('auth.pin');
+    // POS1a: the POS screen unlock with the signed-in user's own PIN.
+    Route::post('pin/verify', [PinController::class, 'verify'])
+        ->middleware(['auth:sanctum', 'tenant:optional', 'throttle:till-pin'])->name('auth.pin.verify');
+
     Route::middleware(['auth:sanctum', 'tenant:optional'])->group(function () {
         Route::get('me', [SessionController::class, 'me'])->name('auth.me');
         Route::post('logout', [SessionController::class, 'logout'])->name('auth.logout');
@@ -40,6 +47,12 @@ Route::prefix('auth')->group(function () {
             Route::delete('two-factor', [TwoFactorController::class, 'destroy'])->name('auth.two-factor.destroy');
         });
     });
+});
+
+// POS1a: own till PIN (needs the current password).
+Route::middleware(['auth:sanctum', 'tenant:optional', 'throttle:auth'])->prefix('profile')->group(function () {
+    Route::put('pin', [PinController::class, 'update'])->name('profile.pin.update');
+    Route::delete('pin', [PinController::class, 'destroy'])->name('profile.pin.destroy');
 });
 
 Route::middleware(['auth:sanctum', 'tenant', 'can:audit.view'])

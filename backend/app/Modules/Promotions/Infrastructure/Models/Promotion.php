@@ -2,6 +2,7 @@
 
 namespace App\Modules\Promotions\Infrastructure\Models;
 
+use App\Modules\Promotions\Domain\PromotionChannel;
 use App\Modules\Promotions\Domain\PromotionScope;
 use App\Modules\Promotions\Domain\PromotionState;
 use App\Modules\Promotions\Domain\PromotionTrigger;
@@ -11,6 +12,8 @@ use App\Modules\Shared\Infrastructure\Persistence\Concerns\ChangesStorefrontCont
 use App\Modules\Shared\Infrastructure\Persistence\Concerns\TracksAuthor;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,10 +38,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?CarbonImmutable $created_at
  * @property ?CarbonImmutable $updated_at
  * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
+ * @property list<string> $channels POS1a: online and/or till (PromotionChannel)
  */
 #[Fillable([
     'name', 'description', 'type', 'value', 'scope', 'min_subtotal', 'max_discount', 'trigger', 'starts_at', 'ends_at',
-    'show_countdown', 'is_active', 'usage_limit', 'usage_limit_per_customer', 'translations',
+    'show_countdown', 'is_active', 'usage_limit', 'usage_limit_per_customer', 'translations', 'channels',
 ])]
 class Promotion extends Model
 {
@@ -48,6 +52,7 @@ class Promotion extends Model
         'value' => '0.00',
         'show_countdown' => false,
         'is_active' => true,
+        'channels' => '["online"]',
     ];
 
     protected function casts(): array
@@ -68,7 +73,24 @@ class Promotion extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
             'translations' => 'array',
+            'channels' => 'array',
         ];
+    }
+
+    /**
+     * POS1a: promotions that apply on the channel (the online store or the till).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function availableOn(Builder $query, PromotionChannel $channel): void
+    {
+        $query->whereJsonContains('channels', $channel->value);
+    }
+
+    public function appliesOn(PromotionChannel $channel): bool
+    {
+        return in_array($channel->value, $this->channels ?? [PromotionChannel::Online->value], true);
     }
 
     public function state(): PromotionState

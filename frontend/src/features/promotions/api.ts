@@ -10,6 +10,9 @@ export const PROMOTION_TRIGGERS = ['automatic', 'coupon'] as const
 export type PromotionTrigger = (typeof PROMOTION_TRIGGERS)[number]
 export const PROMOTION_STATES = ['active', 'scheduled', 'expired', 'inactive'] as const
 export type PromotionState = (typeof PROMOTION_STATES)[number]
+/** POS1a: where a promotion applies — the online store, the till, or both (at least one). */
+export const PROMOTION_CHANNELS = ['online', 'till'] as const
+export type PromotionChannel = (typeof PROMOTION_CHANNELS)[number]
 
 /** A row of GET /promotions. */
 export type PromotionRow = {
@@ -29,6 +32,8 @@ export type PromotionRow = {
   discount_total: string
   /** Flash sale; used by the homepage hot-deals picker when the API sends it. */
   show_countdown?: boolean
+  /** POS1a: where it applies (absent before POS1a: online only). */
+  channels?: PromotionChannel[]
 }
 
 export type PromotionTarget = { id: string; name: string }
@@ -68,6 +73,8 @@ export type PromotionInput = {
   usage_limit: number | null
   usage_limit_per_customer: number | null
   translations?: TranslationsInput
+  /** POS1a: at least one of `online`, `till`. */
+  channels: PromotionChannel[]
 }
 
 export type Coupon = {
@@ -81,8 +88,12 @@ export type Coupon = {
 
 export type Redemption = {
   id?: string
-  order_id: string
-  order_number: string
+  /** Null for a till sale (POS1a). */
+  order_id: string | null
+  order_number: string | null
+  /** POS1a: a redemption by a till sale (`order_number` then carries its invoice number). */
+  sale_id?: string | null
+  sale_number?: string | null
   customer?: { id: string; name: string | null } | string | null
   customer_name?: string | null
   email: string | null

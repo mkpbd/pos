@@ -60,7 +60,8 @@ class HeldSaleController
             'store_id' => $store['id'],
             'label' => filled($data['label'] ?? null) ? trim($data['label']) : null,
             'customer_id' => $data['customer_id'] ?? null,
-            'cart' => array_intersect_key($data, array_flip(['customer_id', 'lines', 'invoice_discount', 'notes'])),
+            // POS1a: lines keep `unit_price` / `price_approval_id`; the approvals may expire meanwhile.
+            'cart' => array_intersect_key($data, array_flip(['customer_id', 'lines', 'invoice_discount', 'notes', 'discount_approval_id', 'coupon_code'])),
             'lines_count' => count($data['lines']),
             'created_by' => $user->getAuthIdentifier(),
         ]);

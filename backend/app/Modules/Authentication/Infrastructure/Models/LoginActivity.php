@@ -19,10 +19,11 @@ use Illuminate\Support\Carbon;
  * @property ?string $failure_reason
  * @property ?string $ip_address
  * @property ?string $user_agent
+ * @property ?string $pos_terminal_id
  * @property Carbon $created_at
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'user_id', 'email', 'channel', 'succeeded', 'failure_reason', 'ip_address', 'user_agent', 'created_at'])]
+#[Fillable(['organization_id', 'user_id', 'email', 'channel', 'succeeded', 'failure_reason', 'ip_address', 'user_agent', 'pos_terminal_id', 'created_at'])]
 class LoginActivity extends Model
 {
     use BelongsToOrganization, HasUuids;

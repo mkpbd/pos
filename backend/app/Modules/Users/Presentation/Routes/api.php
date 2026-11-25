@@ -13,6 +13,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     // G1a: help with another user's sign-in.
     Route::post('users/{user}/unlock', [UserController::class, 'unlock'])->middleware('can:users.manage');
     Route::post('users/{user}/two-factor/reset', [UserController::class, 'resetTwoFactor'])->middleware('can:users.manage');
+    // POS1a: clear a forgotten or shared till PIN.
+    Route::delete('users/{user}/pin', [UserController::class, 'clearPin'])->middleware('can:users.manage');
 
     Route::get('roles', [RoleController::class, 'index'])->middleware('can:roles.view');
     Route::post('roles', [RoleController::class, 'store'])->middleware('can:roles.manage');

@@ -66,7 +66,8 @@ enum SystemRole: string
             ],
             self::Cashier => [
                 'branches.view', 'products.view', 'customers.view', 'customers.create',
-                'pos.*', 'sales.view', 'cash_registers.operate', 'returns.view', 'returns.create', 'payments.collect',
+                // POS1a: sells at the till; setting up till devices (pos.terminals.manage) stays with managers.
+                'pos.sell', 'sales.view', 'cash_registers.operate', 'returns.view', 'returns.create', 'payments.collect',
                 // SC2: branch staff raise purchase requisitions (their own).
                 'purchases.request',
                 // Phase 7: the dashboard of their branch (no cost, so no profit figures).

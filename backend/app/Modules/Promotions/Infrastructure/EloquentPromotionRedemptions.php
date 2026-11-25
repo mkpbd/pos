@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Q1: release() marks a cancelled order's redemptions released and uncounts its coupons.
+ * POS1a: the same for POS sales (recordForSale / releaseSale).
  */
 class EloquentPromotionRedemptions implements PromotionRedemptions
 {
@@ -36,15 +37,38 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
 
     public function record(string $orderId, string $orderNumber, ?string $customerId, ?string $customerAccountId, ?string $email, array $redemptions, ?string $phone = null): void
     {
+        $this->append(['order_id' => $orderId], $orderNumber, $customerId, $customerAccountId, $email, $redemptions, $phone);
+    }
+
+    public function recordForSale(string $saleId, string $saleNumber, ?string $customerId, ?string $phone, array $redemptions): void
+    {
+        $this->append(['sale_id' => $saleId], $saleNumber, $customerId, null, null, $redemptions, $phone);
+    }
+
+    public function release(string $orderId): array
+    {
+        return $this->releaseWhere('order_id', $orderId);
+    }
+
+    public function releaseSale(string $saleId): array
+    {
+        return $this->releaseWhere('sale_id', $saleId);
+    }
+
+    /**
+     * @param  array{order_id: string}|array{sale_id: string}  $document
+     * @param  list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>  $redemptions
+     */
+    private function append(array $document, string $number, ?string $customerId, ?string $customerAccountId, ?string $email, array $redemptions, ?string $phone): void
+    {
         $now = now();
         $coupons = [];
         $phone = $phone === null ? null : BangladeshMobile::normalize($phone);
         foreach ($redemptions as $redemption) {
-            PromotionRedemption::query()->create([
+            PromotionRedemption::query()->create($document + [
                 'promotion_id' => $redemption['promotion_id'],
                 'coupon_id' => $redemption['coupon_id'],
-                'order_id' => $orderId,
-                'order_number' => $orderNumber,
+                'order_number' => $number,
                 'customer_id' => $customerId,
                 'customer_account_id' => $customerAccountId,
                 'email' => $email === null || trim($email) === '' ? null : mb_strtolower(trim($email)),
@@ -63,10 +87,13 @@ class EloquentPromotionRedemptions implements PromotionRedemptions
         }
     }
 
-    public function release(string $orderId): array
+    /**
+     * @return list<array{promotion_id: string, coupon_id: ?string, kind: string, amount: string}>
+     */
+    private function releaseWhere(string $column, string $documentId): array
     {
         /** @var Collection<int, PromotionRedemption> $rows */
-        $rows = PromotionRedemption::query()->where('order_id', $orderId)->whereNull('released_at')
+        $rows = PromotionRedemption::query()->where($column, $documentId)->whereNull('released_at')
             ->orderBy('id')->lockForUpdate()->get();
         if ($rows->isEmpty()) {
             return [];

@@ -55,7 +55,26 @@ export type SaleLine = {
   returned_quantity: string
   /** Quantity reserved by returns awaiting approval. */
   pending_return_quantity: string
+  /** POS1a: catalog price at the time of sale; null for open-price items (absent before POS1a). */
+  list_price?: string | null
+  /** POS1a: where the charged `unit_price` came from. */
+  price_source?: SalePriceSource
+  /** POS1a: the manager who approved a price change by PIN; null when the cashier could change it. */
+  price_approved_by?: SalePerson | null
+  /** POS1a: the till promotion on this line. */
+  promotion?: { name: string; amount: string } | null
+  /** POS1a: the line's promotion discount (NUMERIC string). */
+  promotion_discount?: string
 }
+
+/** POS1a: `catalog` list price, `override` changed at the till, `open` typed at the till. */
+export type SalePriceSource = 'catalog' | 'override' | 'open'
+
+/** POS1a: a user named on the sale (approver). */
+export type SalePerson = { id: string; name: string | null }
+
+/** POS1a: an offer the sale got at the till. */
+export type SalePromotion = { name: string; kind: string; amount: string }
 
 export type SaleReturnStatus = 'pending' | 'completed' | 'rejected'
 
@@ -89,6 +108,14 @@ export type Sale = SaleHeader & {
   lines: SaleLine[]
   payments: SalePayment[]
   returns: SaleReturnSummary[]
+  /** POS1a: till promotions the sale got (absent before POS1a). */
+  promotions?: SalePromotion[]
+  /** POS1a: the coupon applied at the till. */
+  coupon_code?: string | null
+  /** POS1a: list price minus charged price plus all discounts (NUMERIC string). */
+  savings_total?: string
+  /** POS1a: the manager who approved the manual discount by PIN. */
+  discount_approved_by?: SalePerson | null
   receipt: {
     organization_name: string | null
     /** Seller BIN (organization tax number); printed under the shop name when set (Q1 §3). */

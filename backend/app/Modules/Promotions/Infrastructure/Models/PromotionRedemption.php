@@ -12,13 +12,15 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A promotion used by a placed order. Append-only, except `released_at` (Q1: set once when the
- * order is cancelled).
+ * A promotion used by a placed order or (POS1a) a POS sale — exactly one of `order_id` /
+ * `sale_id`; `order_number` is the document's number. Append-only, except `released_at` (Q1:
+ * set once when the order or sale is cancelled).
  *
  * @property string $id
  * @property string $promotion_id
  * @property ?string $coupon_id
- * @property string $order_id
+ * @property ?string $order_id
+ * @property ?string $sale_id POS1a
  * @property string $order_number
  * @property ?string $customer_id
  * @property ?string $customer_account_id
@@ -30,7 +32,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?CarbonImmutable $released_at Q1: the order was cancelled; the use no longer counts
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'promotion_id', 'coupon_id', 'order_id', 'order_number', 'customer_id', 'customer_account_id', 'email', 'phone', 'kind', 'amount', 'created_at'])]
+#[Fillable(['organization_id', 'promotion_id', 'coupon_id', 'order_id', 'sale_id', 'order_number', 'customer_id', 'customer_account_id', 'email', 'phone', 'kind', 'amount', 'created_at'])]
 class PromotionRedemption extends Model
 {
     use AppendOnly, BelongsToOrganization, ChangesStorefrontContent, HasUuids;

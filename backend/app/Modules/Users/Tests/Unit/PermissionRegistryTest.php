@@ -13,7 +13,7 @@ class PermissionRegistryTest extends TestCase
         $registry = new PermissionRegistry;
         $registry->register('Users', ['users.view' => 'View', 'users.manage' => 'Manage']);
         $registry->register('Sales', ['sales.view' => 'View', 'sales.void' => 'Void']);
-        $registry->register('Pos', ['pos.checkout' => 'Checkout']);
+        $registry->register('Pos', ['pos.sell' => 'Sell', 'pos.terminals.manage' => 'Set up tills']);
 
         return $registry;
     }
@@ -24,7 +24,7 @@ class PermissionRegistryTest extends TestCase
 
         $this->assertSame(['users.manage', 'users.view'], $registry->matching(['users.*']));
         $this->assertSame(['sales.view'], $registry->matching(['sales.view', 'unknown.*']));
-        $this->assertCount(5, $registry->matching(['*']));
+        $this->assertCount(6, $registry->matching(['*']));
         $this->assertSame([], $registry->matching([]));
     }
 
@@ -32,7 +32,8 @@ class PermissionRegistryTest extends TestCase
     {
         $granted = $this->registry()->matching(SystemRole::Cashier->permissionPatterns());
 
-        $this->assertSame(['pos.checkout', 'sales.view'], $granted);
+        // POS1a: cashiers sell at the till but do not set up till devices.
+        $this->assertSame(['pos.sell', 'sales.view'], $granted);
     }
 
     public function test_every_system_role_has_label_and_patterns(): void
