@@ -10,7 +10,9 @@ use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
  * for it, is valid for 10 minutes and is used by one sale.
  *
  * - `price_override` is bound to `details.variant_id` (any price the cashier then sends);
- * - `discount` covers the cart's manual item and invoice discounts.
+ * - `discount` covers the cart's manual item and invoice discounts;
+ * - `return` (POS1c, approver needs `returns.approve`) is bound to `details.sale_id` — the
+ *   original invoice of an exchange at the till; it is consumed by the exchange's new sale.
  */
 interface TillApprovals
 {
@@ -18,14 +20,17 @@ interface TillApprovals
 
     public const DISCOUNT = 'discount';
 
+    public const RETURN = 'return';
+
     /**
      * Checks an approval for this requester and action. For `price_override` pass
-     * `['variant_id' => …]`; an optional `store_id` must match the store it was given at.
+     * `['variant_id' => …]`, for `return` pass `['sale_id' => …]` (the original invoice); an
+     * optional `store_id` must match the store it was given at.
      *
      * @param  array<string, mixed>  $details
      * @return array{id: string, approver_id: string, approver_name: string}
      *
-     * @throws BusinessRuleViolation APPROVAL_INVALID — unknown, expired, used, another user's, action or variant
+     * @throws BusinessRuleViolation APPROVAL_INVALID — unknown, expired, used, another user's, action, variant or sale
      */
     public function check(string $approvalId, string $requesterId, string $action, array $details): array;
 

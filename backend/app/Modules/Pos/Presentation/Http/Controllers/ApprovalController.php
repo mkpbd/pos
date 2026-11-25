@@ -14,17 +14,18 @@ use Illuminate\Validation\Rule;
 /**
  * POS1a: manager approval at the till — a manager picks their name and types their PIN on the
  * cashier's screen; the approval id then goes with the cart (`price_approval_id` on a line,
- * `discount_approval_id` on the cart).
+ * `discount_approval_id` on the cart; POS1c: `approval_id` of an exchange).
  */
 class ApprovalController
 {
-    private const ACTIONS = [TillApprovals::PRICE_OVERRIDE, TillApprovals::DISCOUNT];
+    private const ACTIONS = [TillApprovals::PRICE_OVERRIDE, TillApprovals::DISCOUNT, TillApprovals::RETURN];
 
     /**
      * Who can approve
      *
      * Active users with a PIN, the action's permission (`price_override` → `sales.price_override`,
-     * `discount` → `sales.discount`) and access to the store's branch — not the requester.
+     * `discount` → `sales.discount`, `return` → `returns.approve`) and access to the store's
+     * branch — not the requester.
      */
     public function approvers(Request $request, GiveApproval $approvals): JsonResponse
     {
@@ -40,7 +41,8 @@ class ApprovalController
      * Approve with a manager's PIN
      *
      * Valid for 10 minutes, used once by the requester's checkout. `price_override` needs
-     * `details.variant_id`; `discount` may say `details.scope` (`line` / `invoice`). Errors:
+     * `details.variant_id`; `discount` may say `details.scope` (`line` / `invoice`); `return`
+     * (an exchange) needs `details.sale_id`, the original invoice. Errors:
      * `APPROVER_NOT_ALLOWED`, `PIN_INVALID` (`details.attempts_left`), `PIN_LOCKED` (423,
      * `details.retry_after`), `PIN_NOT_SET`.
      */
@@ -55,6 +57,7 @@ class ApprovalController
             'details.variant_id' => ['required_if:action,'.TillApprovals::PRICE_OVERRIDE, 'nullable', 'uuid'],
             'details.unit_price' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0.01', 'max:99999999.99'],
             'details.scope' => ['sometimes', 'nullable', Rule::in(['line', 'invoice'])],
+            'details.sale_id' => ['required_if:action,'.TillApprovals::RETURN, 'nullable', 'uuid'],
         ]);
 
         return ApiResponse::created($give($this->user($request), $data));

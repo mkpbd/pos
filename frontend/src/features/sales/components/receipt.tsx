@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { addDecimal, compareDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
+import { addDecimal, compareDecimal, formatMoney, isZeroDecimal, subtractDecimal, sumDecimals, trimDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
-import { lineLabel, type Sale, type SaleLine } from '@/features/sales/api'
+import { lineLabel, type Sale, type SaleExchange, type SaleLine } from '@/features/sales/api'
 import { paymentRowLabel } from '@/features/sales/payment-label'
 import type { ReceiptFormat } from '@/features/sales/receipt-formats'
 
@@ -63,6 +63,15 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
       </div>
       {sale.status === 'cancelled' && <div className="my-1 border border-black text-center font-bold">CANCELLED</div>}
       <Rule thermal={thermal} />
+
+      {/* POS1c: the items brought back, then the new items under their own heading. */}
+      {sale.exchange && (
+        <>
+          <ExchangeSection exchange={sale.exchange} thermal={thermal} currency={c} />
+          <Rule thermal={thermal} />
+          <div className={cn('font-bold', !thermal && 'mb-1')}>New items</div>
+        </>
+      )}
 
       {thermal ? (
         <div className="flex flex-col gap-1">
@@ -142,6 +151,28 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
       <div className="text-center">
         {sale.receipt.footer ? <div className="whitespace-pre-line">{sale.receipt.footer}</div> : <div>Thank you for shopping with us!</div>}
       </div>
+    </div>
+  )
+}
+
+/**
+ * POS1c: "Exchange for INV-… (RET-…)" with the returned items as negative amounts and the value
+ * that paid this sale. When part of the return went against what the customer still owed on the old
+ * invoice, that part is shown; when the value was more than this sale, the difference given back.
+ */
+function ExchangeSection({ exchange, thermal, currency }: { exchange: SaleExchange; thermal: boolean; currency: string }) {
+  const returned = sumDecimals(exchange.lines.map((l) => l.line_total))
+  const owed = subtractDecimal(returned, exchange.value, 2)
+  const refunded = subtractDecimal(exchange.value, exchange.applied, 2)
+  return (
+    <div className={cn('flex flex-col', !thermal && 'mb-3 w-full gap-0.5')} data-testid="receipt-exchange">
+      <div className="font-bold">Exchange for {exchange.original_sale_number} ({exchange.return_number})</div>
+      {exchange.lines.map((l, i) => (
+        <Row key={i} label={`${trimDecimal(l.quantity)} × ${lineLabel(l)}`} value={`-${formatMoney(l.line_total)}`} />
+      ))}
+      {compareDecimal(owed, '0') > 0 && <Row label="Against amount owed" value={formatMoney(owed)} />}
+      <Row label="Returned value" value={`-${formatMoney(exchange.value, currency)}`} bold />
+      {compareDecimal(refunded, '0') > 0 && <Row label="Refunded to customer" value={formatMoney(refunded, currency)} />}
     </div>
   )
 }

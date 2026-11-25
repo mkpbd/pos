@@ -11,7 +11,8 @@ export type TillTerminal = {
   users: { id: string; name: string }[]
 }
 
-export type ApprovalAction = 'price_override' | 'discount'
+/** POS1c: `return` = taking back items in an exchange (bound to `details.sale_id`). */
+export type ApprovalAction = 'price_override' | 'discount' | 'return'
 
 export type Approver = { id: string; name: string }
 

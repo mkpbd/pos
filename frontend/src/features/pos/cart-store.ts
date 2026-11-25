@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { CartInput, DiscountInput, HeldSale, PosItem } from '@/features/pos/api'
 import { itemLabel } from '@/features/pos/api'
+import type { ExchangeDraft } from '@/features/pos/exchange'
 import { addDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
 
 export type CustomerRef = { id: string; code: string; name: string; phone: string | null }
@@ -43,6 +44,8 @@ export type Cart = {
   discountApprovalId?: string | null
   /** POS1a: coupon typed at the till. */
   couponCode?: string | null
+  /** POS1c: the till is in exchange mode — items of this invoice come back and pay the cart. */
+  exchange?: ExchangeDraft | null
 }
 
 const emptyCart = (storeId: string | null = null): Cart => ({

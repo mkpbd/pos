@@ -41,6 +41,26 @@ class RequestSaleReturn
      */
     public function __invoke(TenantUser $actor, array $data): SaleReturn
     {
+        return DB::transaction(function () use ($actor, $data) {
+            $return = $this->open($actor, $data);
+
+            if (Gate::forUser($actor)->allows('returns.approve')) {
+                return ($this->complete)($actor, $return, $data['refunds'] ?? []);
+            }
+
+            return $return;
+        });
+    }
+
+    /**
+     * Writes the pending return (also used by an exchange at the till, which completes it at once).
+     *
+     * @param  array{sale_id: string, return_reason_id?: ?string, notes?: ?string, lines: list<array{sale_line_id: string, quantity: string, restock?: ?bool, serials?: ?list<string>}>}  $data
+     *
+     * @throws ValidationException|BusinessRuleViolation SALE_CANCELLED
+     */
+    public function open(TenantUser $actor, array $data): SaleReturn
+    {
         $sale = Sale::query()->find($data['sale_id']);
         if ($sale === null || ! $actor->canAccessBranch($sale->branch_id)) {
             throw ValidationException::withMessages(['sale_id' => ['The selected invoice does not exist.']]);
@@ -106,10 +126,6 @@ class RequestSaleReturn
                 'total' => $return->total,
                 'reason' => $reason?->name,
             ]);
-
-            if (Gate::forUser($actor)->allows('returns.approve')) {
-                return ($this->complete)($actor, $return, $data['refunds'] ?? []);
-            }
 
             return $return;
         });

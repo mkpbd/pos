@@ -60,15 +60,20 @@ class CompleteSaleReturn
     ) {}
 
     /**
+     * POS1c: `$exchange` (ExchangeItems only, never from clients) is the exchange's new sale:
+     * min(refund due, its total) is refunded as `exchange` naming the sale's number, and
+     * `$refunds` must add up to the rest.
+     *
      * @param  list<array{method: string, amount: string|int|float, reference?: ?string}>  $refunds
+     * @param  ?array{total: string, sale_number: string}  $exchange
      */
-    public function __invoke(TenantUser $actor, SaleReturn $return, array $refunds): SaleReturn
+    public function __invoke(TenantUser $actor, SaleReturn $return, array $refunds, ?array $exchange = null): SaleReturn
     {
         if (! $actor->canAccessBranch($return->branch_id)) {
             throw new NotFoundHttpException;
         }
 
-        return DB::transaction(function () use ($actor, $return, $refunds) {
+        return DB::transaction(function () use ($actor, $return, $refunds, $exchange) {
             // Same lock order as RequestSaleReturn: the sale first, then the return.
             /** @var Sale $sale */
             $sale = Sale::query()->whereKey($return->sale_id)->lockForUpdate()->firstOrFail();
@@ -82,7 +87,8 @@ class CompleteSaleReturn
             }
 
             $settlement = $this->planner->settlement($sale, $locked->total);
-            $refundLines = $this->refunds($refunds, $settlement, $sale->currency);
+            $applied = $exchange === null ? null : self::exchangeApplied($settlement['refund_due'], $exchange['total'], $sale->currency);
+            $refundLines = $this->refunds($refunds, $settlement, $sale->currency, $applied, $exchange['sale_number'] ?? null);
             $lines = $locked->lines()->get();
 
             $this->restock($sale, $locked, $lines);
@@ -97,8 +103,8 @@ class CompleteSaleReturn
 
             $this->payments->record($actor, $locked->branch_id, array_values(array_map(
                 fn (array $r) => new LedgerEntry(PaymentDirection::Out, LedgerMethod::from($r['method']->value), $r['amount'], $sale->customer_id, $r['reference']),
-                // Points, store credit and gift cards are value, not money (POS1b).
-                array_filter($refundLines, fn (array $r) => ! $r['method']->isStoredValue()),
+                // Points, store credit, gift cards (POS1b) and exchanges (POS1c) are value, not money.
+                array_filter($refundLines, fn (array $r) => $r['method']->isLedgerMoney()),
             )), new PaymentSource('sale_return', $locked->id, $locked->number));
             // POS1b: refunds to store credit and as a new credit note (after the drawer: same lock order as checkout).
             $stored = $this->storedValue->refund($refundLines, $sale->customer_id, $sale->currency, $locked->id, $locked->number, (string) $actor->getAuthIdentifier());
@@ -207,26 +213,37 @@ class CompleteSaleReturn
     /**
      * @param  list<array{method: string, amount: string|int|float, reference?: ?string}>  $refunds
      * @param  array{credit: string, refund_due: string, refundable: list<array{method: string, label: string, max: ?string}>}  $settlement
+     * @param  ?string  $exchange  POS1c: the part of the refund due that pays an exchange's new sale
+     * @param  ?string  $exchangeReference  POS1c: the new sale's number
      * @return list<array{method: PaymentMethod, amount: string, reference: ?string}>
      *
      * @throws BusinessRuleViolation REFUND_MISMATCH
      * @throws ValidationException
      */
-    private function refunds(array $refunds, array $settlement, string $currency): array
+    private function refunds(array $refunds, array $settlement, string $currency, ?string $exchange = null, ?string $exchangeReference = null): array
     {
         $limits = array_column($settlement['refundable'], 'max', 'method');
         $errors = [];
         $total = Money::zero($currency);
         $byMethod = [];
         $result = [];
+        $due = Money::of($settlement['refund_due'], $currency);
+        if ($exchange !== null) {
+            $due = $due->minus(Money::of($exchange, $currency));
+            if (! Decimal::isZero($exchange)) {
+                $result[] = ['method' => PaymentMethod::Exchange, 'amount' => Money::of($exchange, $currency)->amount(), 'reference' => $exchangeReference];
+            }
+        }
 
         foreach (array_values($refunds) as $i => $refund) {
             $method = PaymentMethod::tryFrom((string) $refund['method']);
             $amount = Money::of((string) $refund['amount'], $currency);
             if ($method === null || ! array_key_exists($method->value, $limits)) {
-                $errors["refunds.{$i}.method"] = [$method === PaymentMethod::StoreCredit
-                    ? 'Only a sale with a customer can be refunded to store credit.'
-                    : 'Nothing was paid this way on the invoice; refund in cash or the way it was paid.'];
+                $errors["refunds.{$i}.method"] = [match ($method) {
+                    PaymentMethod::StoreCredit => 'Only a sale with a customer can be refunded to store credit.',
+                    PaymentMethod::Exchange => 'Exchanges are made at the till; refund in cash or the way it was paid.',
+                    default => 'Nothing was paid this way on the invoice; refund in cash or the way it was paid.',
+                }];
 
                 continue;
             }
@@ -246,14 +263,29 @@ class CompleteSaleReturn
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
-        if (! $total->equals(Money::of($settlement['refund_due'], $currency))) {
-            throw new BusinessRuleViolation('REFUND_MISMATCH', "Refunds must add up to {$settlement['refund_due']} ({$settlement['credit']} is credited against the customer's balance).", [
-                'refund_due' => $settlement['refund_due'],
+        if (! $total->equals($due)) {
+            $message = $exchange === null
+                ? "Refunds must add up to {$due->amount()} ({$settlement['credit']} is credited against the customer's balance)."
+                : "Refunds must add up to {$due->amount()} (the returned value left after paying the new sale).";
+
+            throw new BusinessRuleViolation('REFUND_MISMATCH', $message, [
+                'refund_due' => $due->amount(),
                 'credit' => $settlement['credit'],
                 'refunds_total' => $total->amount(),
             ]);
         }
 
         return $result;
+    }
+
+    /**
+     * POS1c: the part of a return's refund due that pays an exchange's new sale — A = min(V, T).
+     */
+    public static function exchangeApplied(string $refundDue, string $saleTotal, string $currency): string
+    {
+        $due = Money::of($refundDue, $currency);
+        $total = Money::of($saleTotal, $currency);
+
+        return ($due->greaterThan($total) ? $total : $due)->amount();
     }
 }

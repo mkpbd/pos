@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type Paginated, toPaginated } from '@/lib/api/client'
-import type { RefundMethod } from '@/lib/payment-methods'
+import type { RecordedRefundMethod, RefundMethod } from '@/lib/payment-methods'
 import { useInvalidateMoney } from '@/features/payments/api'
 import { salesKeys, type SaleReturnStatus } from '@/features/sales/api'
 
@@ -47,6 +47,8 @@ export type SaleReturnHeader = {
   decided_by: Person | null
   decided_at: string | null
   rejection_reason: string | null
+  /** POS1c: the number of the sale this return paid in an exchange at the till (null otherwise; absent before POS1c). */
+  exchange_sale_number?: string | null
 }
 
 export type SaleReturnLine = {
@@ -67,7 +69,8 @@ export type SaleReturnLine = {
 }
 
 export type SaleReturnRefund = {
-  method: RefundMethod
+  /** POS1c: `exchange` = the part that paid the new sale of an exchange (reference: its invoice number). */
+  method: RecordedRefundMethod
   method_label: string
   amount: string
   reference: string | null
@@ -82,6 +85,8 @@ export type SaleReturn = SaleReturnHeader & {
   settlement: Settlement | null
   /** POS1b: only in the response that completed the return with a gift card refund; `code` is shown once. */
   credit_note?: CreditNote | null
+  /** POS1c: the sale this return paid in an exchange at the till (absent before POS1c). */
+  exchange_sale?: { id: string; number: string; total: string } | null
 }
 
 /** POS1b: the credit note a "Gift card" refund issues; the full `code` never comes back again. */

@@ -43,7 +43,8 @@ class ReturnPresenter
     public function headers(Collection $returns): callable
     {
         $org = $this->context->organizationId();
-        $sales = Sale::query()->whereKey($returns->pluck('sale_id')->unique())->pluck('number', 'id');
+        // The invoices and (POS1c) the sales the returns were exchanged for.
+        $sales = Sale::query()->whereKey($returns->pluck('sale_id')->merge($returns->pluck('exchange_sale_id')->filter())->unique()->values())->pluck('number', 'id');
         $stores = $this->branches->storeSummaries($org, $returns->pluck('store_id')->unique()->values()->all());
         $customers = $this->customers->summaries($org, $returns->pluck('customer_id')->filter()->unique()->values()->all());
         $reasons = ReturnReason::query()->whereKey($returns->pluck('return_reason_id')->filter()->unique())->pluck('name', 'id');
@@ -70,6 +71,7 @@ class ReturnPresenter
             'decided_by' => $r->decided_by === null ? null : ['id' => $r->decided_by, 'name' => $users[$r->decided_by] ?? null],
             'decided_at' => $r->decided_at?->toIso8601String(),
             'rejection_reason' => $r->rejection_reason,
+            'exchange_sale_number' => $r->exchange_sale_id === null ? null : ($sales[$r->exchange_sale_id] ?? null),
         ];
     }
 
@@ -117,9 +119,21 @@ class ReturnPresenter
             ])->all(),
             // POS1b: the credit note issued by completing this return — its full code only in that response.
             'credit_note' => $this->creditNotes->take($return->id),
+            // POS1c: the sale this return paid at the till (an exchange).
+            'exchange_sale' => $this->exchangeSale($return),
             'settlement' => $return->status === ReturnStatus::Pending
                 ? $this->planner->settlement(Sale::query()->findOrFail($return->sale_id), $return->total)
                 : null,
         ];
+    }
+
+    /**
+     * @return array{id: string, number: string, total: string}|null
+     */
+    private function exchangeSale(SaleReturn $return): ?array
+    {
+        $sale = $return->exchange_sale_id === null ? null : Sale::query()->find($return->exchange_sale_id);
+
+        return $sale === null ? null : ['id' => $sale->id, 'number' => $sale->number, 'total' => $sale->total];
     }
 }

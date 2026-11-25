@@ -36,11 +36,12 @@ use LogicException;
  * @property ?string $decided_by
  * @property ?Carbon $decided_at
  * @property ?string $rejection_reason
+ * @property ?string $exchange_sale_id POS1c: the sale this return paid at the till (an exchange)
  */
 #[Fillable([
     'id', 'organization_id', 'branch_id', 'store_id', 'sale_id', 'customer_id', 'number', 'status', 'return_reason_id', 'notes',
     'currency', 'subtotal', 'tax_total', 'total', 'credited_total', 'refunded_total',
-    'requested_by', 'requested_at', 'decided_by', 'decided_at', 'rejection_reason',
+    'requested_by', 'requested_at', 'decided_by', 'decided_at', 'rejection_reason', 'exchange_sale_id',
 ])]
 class SaleReturn extends Model
 {
@@ -71,7 +72,12 @@ class SaleReturn extends Model
     protected static function booted(): void
     {
         static::updating(function (SaleReturn $return) {
-            if ($return->getOriginal('status') !== ReturnStatus::Pending || array_diff(array_keys($return->getDirty()), self::DECISION) !== []) {
+            $dirty = array_keys($return->getDirty());
+            // POS1c: a completed exchange return is linked once to the sale it paid for.
+            if ($return->getOriginal('exchange_sale_id') === null && array_diff($dirty, ['exchange_sale_id', 'updated_at']) === []) {
+                return;
+            }
+            if ($return->getOriginal('status') !== ReturnStatus::Pending || array_diff($dirty, self::DECISION) !== []) {
                 throw new LogicException('Sale returns are immutable once decided; only the decision of a pending return can be recorded.');
             }
         });

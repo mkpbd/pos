@@ -19,7 +19,8 @@ class CheckoutRequest extends CartRequest
             'lines.*.serials' => ['sometimes', 'array', 'max:1000'],
             'lines.*.serials.*' => ['string', 'max:100'],
             'payments' => ['present', 'array', 'max:10'],
-            'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)],
+            // POS1c: `exchange` is set by the server for an exchange's returned value only.
+            'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)->except(PaymentMethod::Exchange)],
             'payments.*.amount' => ['required', 'decimal:0,2', 'gt:0', 'max:9999999999999'],
             'payments.*.reference' => ['nullable', 'string', 'max:100'],
             'held_sale_id' => ['nullable', 'uuid'],

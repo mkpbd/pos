@@ -17,6 +17,7 @@ use App\Modules\Sales\Application\Services\CustomerCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
 use App\Modules\Sales\Application\Services\StoredValueTenders;
 use App\Modules\Sales\Application\Services\TillCheckout;
+use App\Modules\Sales\Domain\ExchangeTender;
 use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\PaymentSettlement;
 use App\Modules\Sales\Domain\SaleStatus;
@@ -34,6 +35,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Critical workflows #8 and #9: successful checkout and inventory deduction.
@@ -65,19 +67,20 @@ class CompleteSale
 
     /**
      * @param  array{store_id: string, customer_id?: ?string, lines: list<array{variant_id: string, quantity: string, discount?: ?array{type: string, value: string}, serials?: ?list<string>}>, invoice_discount?: ?array{type: string, value: string}, notes?: ?string, payments: list<array{method: string, amount: string, reference?: ?string}>}  $data
+     * @param  ?ExchangeTender  $exchange  POS1c (ExchangeItems only): the returned value paying part of the sale
      *
      * @throws ValidationException|BusinessRuleViolation
      */
-    public function __invoke(TenantUser $actor, array $data): Sale
+    public function __invoke(TenantUser $actor, array $data, ?ExchangeTender $exchange = null): Sale
     {
         // POS1a: priced inside the transaction, so promotion usage limits count under their locks.
-        return DB::transaction(fn () => $this->complete($actor, $data));
+        return DB::transaction(fn () => $this->complete($actor, $data, $exchange));
     }
 
     /**
      * @param  array<string, mixed>  $data
      */
-    private function complete(TenantUser $actor, array $data): Sale
+    private function complete(TenantUser $actor, array $data, ?ExchangeTender $exchange): Sale
     {
         $organizationId = $this->context->organizationId();
         $store = $this->storeAccess->require($actor, $data['store_id']);
@@ -93,11 +96,19 @@ class CompleteSale
 
         $currency = $priced['currency'];
         $this->storedValue->assertTenders(array_values($data['payments'] ?? []), $customer);
-        $settlement = PaymentSettlement::settle(Money::of($priced['total'], $currency), array_map(fn (array $p) => [
+        $tenders = array_map(fn (array $p) => [
             'method' => PaymentMethod::from($p['method']),
             'amount' => (string) $p['amount'],
             'reference' => filled($p['reference'] ?? null) ? trim($p['reference']) : null,
-        ], $data['payments'] ?? []));
+        ], array_values($data['payments'] ?? []));
+        // POS1c: the exchange's returned value comes first (it never gives change).
+        if ($exchange !== null && ! Decimal::isZero($exchange->amount)) {
+            if (Money::of($exchange->amount, $currency)->greaterThan(Money::of($priced['total'], $currency))) {
+                throw new LogicException("The exchange value {$exchange->amount} exceeds the sale total {$priced['total']}.");
+            }
+            array_unshift($tenders, ['method' => PaymentMethod::Exchange, 'amount' => $exchange->amount, 'reference' => $exchange->returnNumber]);
+        }
+        $settlement = PaymentSettlement::settle(Money::of($priced['total'], $currency), $tenders);
 
         $hasDue = Decimal::compare($settlement['due'], '0') > 0;
         if ($hasDue && $customer === null) {
@@ -115,14 +126,14 @@ class CompleteSale
             throw new BusinessRuleViolation('CUSTOMER_REQUIRED', 'Choose the customer whose loyalty points are redeemed.');
         }
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $priced, $variants, $customer, $serials, $settlement, $hasDue, $redeemed, $data, $till) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $priced, $variants, $customer, $serials, $settlement, $hasDue, $redeemed, $data, $till, $exchange) {
             $this->payments->requireSession($actor, $store['branch_id']);
             if ($hasDue) {
                 $this->assertCredit($customer, $settlement['due']);
             }
 
             $saleId = (string) Str::uuid7();
-            $number = $this->sequences->next($organizationId, "sale:{$store['branch_id']}", $this->context->invoicePrefix().$store['branch_code'].'-');
+            $number = $exchange?->saleNumber ?? $this->invoiceNumber($store);
             $now = now();
 
             $changes = [];
@@ -242,8 +253,8 @@ class CompleteSale
 
             $this->payments->record($actor, $store['branch_id'], array_values(array_map(
                 fn (array $p) => new LedgerEntry(PaymentDirection::In, LedgerMethod::from($p['method']->value), $p['amount'], $customer['id'] ?? null, $p['reference']),
-                // Points, store credit and gift cards are value, not money (POS1b).
-                array_filter($settlement['payments'], fn (array $p) => ! $p['method']->isStoredValue()),
+                // Points, store credit, gift cards (POS1b) and exchanges (POS1c) are value, not money.
+                array_filter($settlement['payments'], fn (array $p) => $p['method']->isLedgerMoney()),
             )), new PaymentSource('sale', $sale->id, $number));
 
             if ($customer !== null) {
@@ -255,6 +266,17 @@ class CompleteSale
 
             return $sale;
         });
+    }
+
+    /**
+     * Takes the store branch's next invoice number (inside the caller's transaction). POS1c: an
+     * exchange reserves it before its return is completed, so the return can name the new sale.
+     *
+     * @param  array<string, mixed>  $store
+     */
+    public function invoiceNumber(array $store): string
+    {
+        return $this->sequences->next($this->context->organizationId(), "sale:{$store['branch_id']}", $this->context->invoicePrefix().$store['branch_code'].'-');
     }
 
     /**

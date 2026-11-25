@@ -21,6 +21,22 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### POS1c — Exchanges at the till
+
+Third part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). Printing / drawer / SMS receipts follow in POS1d. No new packages.
+
+#### Added
+- **Exchange** at the till: find the invoice (type or scan), choose what comes back (serials, reason, restock), check its value, then ring up the new items. The returned value pays the new sale; the customer pays the difference with any till method, or gets it back (cash, card, store credit, gift card credit note). Return and new sale are saved together and link to each other.
+- A cashier without return approval gets a **manager's PIN approval** for the return, tied to that invoice.
+- Receipt shows the exchange (items back, value, refund) before the new items; sale and return pages show the link and an **Exchange** badge; an exchange sale cannot be cancelled (return its items instead).
+
+#### Tests
+- Backend 1973 (1972 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3193; mocked Playwright 617 (new `pos1c-exchange`, `pos1c-admin`).
+- Full-stack (PostgreSQL, desktop) 64 (28 integration + 36 demo stores; the demo-store file passed in full on a fresh database after one run timed out in P2a, an online-shop test this phase did not change) — new **POS1c** on Bazar Fresh: an invoice of two units is exchanged at the till for two more (one back, the customer pays one in cash), the receipt shows the exchange, both documents link, the exchange sale refuses cancelling, then it is exchanged again with the difference refunded to store credit.
+
+#### Upgrade
+- `php artisan migrate`.
+
 ### POS1b — Store credit (customer advances) and gift cards / vouchers
 
 Second part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). Exchanges follow in POS1c, printing / drawer / SMS receipts in POS1d. No new packages.

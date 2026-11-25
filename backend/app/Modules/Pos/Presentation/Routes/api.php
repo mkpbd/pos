@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Pos\Presentation\Http\Controllers\ApprovalController;
+use App\Modules\Pos\Presentation\Http\Controllers\ExchangeController;
 use App\Modules\Pos\Presentation\Http\Controllers\HeldSaleController;
 use App\Modules\Pos\Presentation\Http\Controllers\PosController;
 use App\Modules\Pos\Presentation\Http\Controllers\TerminalController;
@@ -11,6 +12,8 @@ Route::prefix('pos')->middleware(['auth:sanctum', 'tenant', 'can:pos.sell'])->gr
     Route::get('lookup', [PosController::class, 'lookup']);
     Route::post('price', [PosController::class, 'price']);
     Route::post('checkout', [PosController::class, 'checkout'])->middleware('idempotent');
+    // POS1c: exchanges at the till.
+    Route::post('exchanges', [ExchangeController::class, 'store'])->middleware(['can:returns.create', 'idempotent']);
 
     Route::get('held', [HeldSaleController::class, 'index']);
     Route::post('held', [HeldSaleController::class, 'store']);

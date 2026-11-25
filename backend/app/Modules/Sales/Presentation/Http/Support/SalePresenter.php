@@ -8,6 +8,7 @@ use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Sales\Application\Contracts\StoreCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
 use App\Modules\Sales\Application\Services\StoredValueTenders;
+use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Sales\Infrastructure\Models\SaleLine;
@@ -83,8 +84,12 @@ class SalePresenter
         $stores = $this->branches->storeSummaries($org, $sales->pluck('store_id')->unique()->values()->all());
         $customers = $this->customers->summaries($org, $sales->pluck('customer_id')->filter()->unique()->values()->all());
         $users = $this->users->names($org, $sales->flatMap(fn (Sale $s) => [$s->created_by, $s->cancelled_by])->filter()->unique()->values()->all());
+        // POS1c: sales made by an exchange at the till (their return points at them).
+        $exchanges = array_flip(SaleReturn::query()->whereIn('exchange_sale_id', $sales->pluck('id')->all())->pluck('exchange_sale_id')->all());
 
-        return fn (Sale $sale) => $this->header($sale, $stores, $customers, $users);
+        return fn (Sale $sale) => $this->header($sale, $stores, $customers, $users) + [
+            'is_exchange' => isset($exchanges[$sale->id]),
+        ];
     }
 
     /**
@@ -181,6 +186,8 @@ class SalePresenter
                 'created_at' => $p->created_at->toIso8601String(),
                 'created_by' => $users[$p->created_by] ?? null,
             ])->all(),
+            // POS1c: the items this sale was exchanged for (null unless made by an exchange).
+            'exchange' => $this->exchange($sale, $payments),
             'receipt' => [
                 'organization_name' => $organization['name'] ?? null,
                 // Q1: the seller's BIN; the receipt is a tax invoice only when one is set.
@@ -193,6 +200,41 @@ class SalePresenter
                 // POS1b: what the customer has left in store credit (now).
                 'customer_store_credit_balance' => $sale->customer_id === null ? null : $this->storeCredit->balance($sale->customer_id),
             ],
+        ];
+    }
+
+    /**
+     * POS1c: the return whose value paid (part of) this sale — `value` is what the returned items
+     * were worth after any credit against the invoice's due (V), `applied` what paid this sale (A).
+     *
+     * @param  Collection<int, SalePayment>  $payments
+     * @return array<string, mixed>|null
+     */
+    private function exchange(Sale $sale, Collection $payments): ?array
+    {
+        $return = SaleReturn::query()->where('exchange_sale_id', $sale->id)->first();
+        if ($return === null) {
+            return null;
+        }
+
+        $lines = $return->lines()->get();
+        $saleLines = SaleLine::query()->whereKey($lines->pluck('sale_line_id'))->get()->keyBy('id');
+
+        return [
+            'return_id' => $return->id,
+            'return_number' => $return->number,
+            'original_sale_id' => $return->sale_id,
+            'original_sale_number' => Sale::query()->whereKey($return->sale_id)->value('number'),
+            'value' => $return->refunded_total,
+            'applied' => $payments->filter(fn (SalePayment $p) => $p->method === PaymentMethod::Exchange)
+                ->reduce(fn (string $sum, SalePayment $p) => Decimal::add($sum, $p->amount, 2), '0.00'),
+            'lines' => $lines->sortBy(fn (SaleReturnLine $l) => $saleLines[$l->sale_line_id]->position ?? 0)->values()
+                ->map(fn (SaleReturnLine $l) => [
+                    'product_name' => $saleLines[$l->sale_line_id]->product_name ?? null,
+                    'variant_name' => $saleLines[$l->sale_line_id]->variant_name ?? null,
+                    'quantity' => $l->quantity,
+                    'line_total' => $l->line_total,
+                ])->all(),
         ];
     }
 

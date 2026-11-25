@@ -7,6 +7,7 @@ use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Pos\Application\Contracts\TillApprovals;
 use App\Modules\Pos\Infrastructure\Models\PosApproval;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
+use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
@@ -14,8 +15,9 @@ use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use Illuminate\Validation\ValidationException;
 
 /**
- * POS1a: a manager approves a price change or a discount at the till by picking their name and
- * typing their PIN on the cashier's screen. The approver needs the action's permission and the
+ * POS1a: a manager approves a price change or a discount (POS1c: a return — an exchange) at the
+ * till by picking their name and typing their PIN on the cashier's screen. The approver needs
+ * the action's permission and the
  * store's branch; the PIN is checked with the PIN lockout and never stored or audited.
  */
 class GiveApproval
@@ -26,6 +28,7 @@ class GiveApproval
     public const PERMISSIONS = [
         TillApprovals::PRICE_OVERRIDE => 'sales.price_override',
         TillApprovals::DISCOUNT => 'sales.discount',
+        TillApprovals::RETURN => 'returns.approve',
     ];
 
     public function __construct(
@@ -105,6 +108,16 @@ class GiveApproval
     {
         if ($action === TillApprovals::DISCOUNT) {
             return isset($details['scope']) ? ['scope' => $details['scope']] : [];
+        }
+
+        if ($action === TillApprovals::RETURN) {
+            // The invoice whose items come back (tenant-scoped: another organization's is unknown).
+            $saleId = $details['sale_id'] ?? null;
+            if (! is_string($saleId) || ! Sale::query()->whereKey($saleId)->exists()) {
+                throw ValidationException::withMessages(['details.sale_id' => ['Choose the invoice of the exchange.']]);
+            }
+
+            return ['sale_id' => $saleId];
         }
 
         $variantId = $details['variant_id'] ?? null;

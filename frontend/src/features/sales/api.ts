@@ -26,6 +26,24 @@ export type SaleHeader = {
   cancelled_at: string | null
   cancelled_by: string | null
   cancellation_reason: string | null
+  /** POS1c: the sale was made in an exchange at the till (paid partly by returned items). */
+  is_exchange?: boolean
+}
+
+/**
+ * POS1c: the exchange that paid (part of) this sale — the return of items from an earlier invoice.
+ * `value` (V) is what the returned items were worth after any credit against the old invoice's due;
+ * `applied` (A = min(V, total)) is the part that paid this sale (the `exchange` payment row).
+ */
+export type SaleExchange = {
+  return_id: string
+  return_number: string
+  original_sale_id: string
+  original_sale_number: string
+  value: string
+  applied: string
+  /** The returned items; `line_total` is the positive value of each returned line. */
+  lines: { product_name: string; variant_name: string | null; quantity: string; line_total: string }[]
 }
 
 export type SaleLine = {
@@ -92,8 +110,11 @@ export type SaleReturnSummary = {
 export type SalePayment = {
   id: string
   kind: 'payment' | 'reversal'
-  /** POS1b: store_credit and gift_card (reference "Gift card ••••1234", never the full code). */
-  method: 'cash' | 'card' | 'mobile_banking' | 'loyalty_points' | 'store_credit' | 'gift_card'
+  /**
+   * POS1b: store_credit and gift_card (reference "Gift card ••••1234", never the full code).
+   * POS1c: exchange — the returned items' value (reference = the return number); never money.
+   */
+  method: 'cash' | 'card' | 'mobile_banking' | 'loyalty_points' | 'store_credit' | 'gift_card' | 'exchange'
   method_label: string
   amount: string
   tendered: string | null
@@ -117,6 +138,8 @@ export type Sale = SaleHeader & {
   savings_total?: string
   /** POS1a: the manager who approved the manual discount by PIN. */
   discount_approved_by?: SalePerson | null
+  /** POS1c: set when the sale was made in an exchange (absent before POS1c). */
+  exchange?: SaleExchange | null
   receipt: {
     organization_name: string | null
     /** Seller BIN (organization tax number); printed under the shop name when set (Q1 §3). */

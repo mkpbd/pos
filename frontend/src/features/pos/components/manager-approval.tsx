@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 const ACTION_TITLE: Record<ApprovalAction, string> = {
   price_override: 'Approve a price change',
   discount: 'Approve a discount',
+  return: 'Approve a return',
 }
 
 /** Provides `useManagerApproval()` for the till's store: one approval dialog at a time. */

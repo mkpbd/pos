@@ -231,7 +231,10 @@ export function ReturnsPage() {
                   <TableBody>
                     {data.items.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell><Link to={`/returns/${r.id}`} className="font-mono text-sm underline-offset-4 hover:underline">{r.number}</Link></TableCell>
+                        <TableCell>
+                          <Link to={`/returns/${r.id}`} className="font-mono text-sm underline-offset-4 hover:underline">{r.number}</Link>
+                          {r.exchange_sale_number && <Badge variant="info" className="ml-2" title={`Exchanged for ${r.exchange_sale_number}`}>Exchange</Badge>}
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{r.sale.number ?? '—'}</TableCell>
                         <TableCell className="hidden text-sm md:table-cell">{r.customer?.name ?? 'Walk-in'}</TableCell>
                         <TableCell className="hidden text-sm lg:table-cell">{new Date(r.requested_at).toLocaleString()}<div className="text-xs text-muted-foreground">{r.requested_by?.name}</div></TableCell>
@@ -306,10 +309,11 @@ export function ReturnPage() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="ghost" size="icon" aria-label="Back to returns"><Link to="/returns"><ArrowLeftIcon /></Link></Button>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{ret.number}</h1>
           <Badge variant={RETURN_STATUS[ret.status].variant}>{RETURN_STATUS[ret.status].label}</Badge>
+          {ret.exchange_sale && <Badge variant="info">Exchange</Badge>}
         </div>
         {pending && can('returns.approve') && (
           <div className="flex gap-2">
@@ -322,6 +326,16 @@ export function ReturnPage() {
       <Card>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-4">
           <div><span className="text-muted-foreground">Invoice</span><div className="font-medium"><Link to={`/sales/${ret.sale.id}`} className="font-mono underline-offset-4 hover:underline">{ret.sale.number}</Link></div></div>
+          {/* POS1c: the sale this return paid in an exchange at the till. */}
+          {ret.exchange_sale && (
+            <div>
+              <span className="text-muted-foreground">Exchanged for</span>
+              <div className="font-medium">
+                <Link to={`/sales/${ret.exchange_sale.id}`} className="font-mono underline-offset-4 hover:underline">{ret.exchange_sale.number}</Link>
+                <span className="text-muted-foreground"> · {formatMoney(ret.exchange_sale.total, ret.currency)}</span>
+              </div>
+            </div>
+          )}
           <div><span className="text-muted-foreground">Customer</span><div className="font-medium">{ret.customer?.name ?? 'Walk-in'}</div></div>
           <div><span className="text-muted-foreground">Reason</span><div className="font-medium">{ret.reason?.name ?? '—'}</div></div>
           <div><span className="text-muted-foreground">Store</span><div className="font-medium">{ret.store?.name} · {ret.branch?.name}</div></div>

@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useCan } from '@/features/auth/use-auth'
-import { lineLabel, salesListQuery, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleStatus } from '@/features/sales/api'
+import { lineLabel, salesListQuery, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleExchange, type SaleStatus } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
 import { LinePrice, LinePromotion, SaleOffersCard } from '@/features/sales/components/sale-pricing'
 import { paymentRowLabel } from '@/features/sales/payment-label'
@@ -131,6 +131,7 @@ export function SalesPage() {
                     <TableCell>
                       <Link to={`/sales/${s.id}`} className="font-mono text-sm underline-offset-4 hover:underline">{s.number}</Link>
                       {s.status === 'cancelled' && <Badge variant="destructive" className="ml-2">Cancelled</Badge>}
+                      {s.is_exchange && <Badge variant="info" className="ml-2">Exchange</Badge>}
                     </TableCell>
                     <TableCell className="text-sm">{new Date(s.sold_at).toLocaleTimeString()}</TableCell>
                     <TableCell className="hidden text-sm md:table-cell">{s.customer?.name ?? 'Walk-in'}</TableCell>
@@ -149,6 +150,39 @@ export function SalesPage() {
   )
 }
 
+/** POS1c: the return that paid this sale in an exchange at the till, and the invoice it came from. */
+function ExchangeCard({ exchange, currency, canViewReturns, canCancel }: { exchange: SaleExchange; currency: string; canViewReturns: boolean; canCancel: boolean }) {
+  return (
+    <Card role="region" aria-label="Exchange">
+      <CardHeader><CardTitle>Exchange</CardTitle></CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        <p>
+          Items from{' '}
+          <Link to={`/sales/${exchange.original_sale_id}`} className="font-mono underline underline-offset-4">{exchange.original_sale_number}</Link>
+          {' '}were returned on{' '}
+          {canViewReturns
+            ? <Link to={`/returns/${exchange.return_id}`} className="font-mono underline underline-offset-4">{exchange.return_number}</Link>
+            : <span className="font-mono">{exchange.return_number}</span>}
+          {' '}and paid for this sale.
+        </p>
+        <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
+          {exchange.lines.map((l, i) => (
+            <div key={i} className="contents">
+              <dt className="min-w-0 text-muted-foreground">{lineLabel(l)} × {trimDecimal(l.quantity)}</dt>
+              <dd className="text-right font-mono">−{formatMoney(l.line_total)}</dd>
+            </div>
+          ))}
+          <dt className="font-medium">Returned value</dt>
+          <dd className="text-right font-mono font-medium" data-testid="exchange-value">{formatMoney(exchange.value, currency)}</dd>
+          <dt className="text-muted-foreground">Applied to this sale</dt>
+          <dd className="text-right font-mono" data-testid="exchange-applied">{formatMoney(exchange.applied, currency)}</dd>
+        </dl>
+        {canCancel && <p className="text-muted-foreground">This sale can’t be cancelled because it was paid partly by an exchange. Return its items instead.</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function SalePage() {
   const { saleId } = useParams()
   const can = useCan()
@@ -162,21 +196,24 @@ export function SalePage() {
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />
 
   const c = sale.currency
+  // POS1c: a sale paid partly by returned items cannot be cancelled (the server refuses too).
+  const exchanged = !!sale.exchange || sale.payments.some((p) => p.method === 'exchange')
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="ghost" size="icon" aria-label="Back to sales"><Link to="/sales"><ArrowLeftIcon /></Link></Button>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{sale.number}</h1>
           {sale.status === 'cancelled' ? <Badge variant="destructive">Cancelled</Badge> : <Badge variant="success">Completed</Badge>}
+          {exchanged && <Badge variant="info">Exchange</Badge>}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setPrinting(true)}><PrinterIcon data-icon="inline-start" /> Receipt</Button>
           {can('returns.create') && sale.status === 'completed' && sale.lines.some((l) => !isZeroDecimal(returnableQuantity(l)) && !returnableQuantity(l).startsWith('-')) && (
             <Button asChild variant="outline"><Link to={`/sales/${sale.id}/return`}><Undo2Icon data-icon="inline-start" /> Return items</Link></Button>
           )}
-          {can('sales.cancel') && sale.status === 'completed' && sale.returns.length === 0 && (
+          {can('sales.cancel') && sale.status === 'completed' && sale.returns.length === 0 && !exchanged && (
             <Button variant="destructive" onClick={() => { setReason(''); setCancelling(true) }}><BanIcon data-icon="inline-start" /> Cancel sale</Button>
           )}
         </div>
@@ -269,6 +306,8 @@ export function SalePage() {
       </div>
 
       <SaleOffersCard sale={sale} />
+
+      {sale.exchange && <ExchangeCard exchange={sale.exchange} currency={c} canViewReturns={can('returns.view')} canCancel={can('sales.cancel') && sale.status === 'completed'} />}
 
       {sale.returns.length > 0 && (
         <Card>

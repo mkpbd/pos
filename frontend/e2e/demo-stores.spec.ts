@@ -2741,3 +2741,110 @@ test('POS1b: Bazar Fresh takes a customer advance and sells a gift card; a till 
     await context.close()
   }
 })
+
+test('POS1c: Bazar Fresh exchanges one item at the till and the customer pays the difference; the exchange sale cannot be cancelled and is itself exchanged with the difference refunded to store credit', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The till runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  try {
+    // An open drawer, a customer and an earlier invoice of two units, paid in cash.
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const current = await call('GET', '/api/v1/register-sessions/current')
+    if (!(current.status === 200 && current.body.data)) {
+      const register = await call('POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `X${stamp.slice(-6)}`, name: `Exchange ${stamp}` })
+      expect(register.status).toBe(201)
+      expect((await call('POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '2000' })).status).toBeLessThan(300)
+    }
+    const customerName = `Farhana Akter ${stamp}`
+    const customer = await call('POST', '/api/v1/customers', { name: customerName, phone: `016${stamp}` })
+    expect(customer.status).toBe(201)
+    const customerId = customer.body.data.id as string
+    const items = (await call('GET', `/api/v1/pos/catalog?store_id=${store.id}&page=1`)).body.data as { variant_id: string; product_name: string; price: string; on_hand: string | null; sellable: boolean; open_price?: boolean; track_batches: boolean; track_serials: boolean }[]
+    const item = items.find((i) => i.sellable && !i.open_price && !i.track_serials && !i.track_batches && Number(i.price) >= 20 && (i.on_hand === null || Number(i.on_hand) >= 10))!
+    expect(item).toBeTruthy()
+    const price = Number(item.price)
+    const original = await call('POST', '/api/v1/pos/checkout', { store_id: store.id, customer_id: customerId, lines: [{ variant_id: item.variant_id, quantity: '2' }], payments: [{ method: 'cash', amount: (price * 2).toFixed(2) }] })
+    expect(original.status).toBe(201)
+    const invoiceNumber = original.body.data.number as string
+
+    // At the till: one unit comes back, two go out; the customer pays one unit's price.
+    await page.goto(`${base}/admin/pos`)
+    await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+    const esc = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const productButton = page.getByRole('button', { name: new RegExp(`^${esc(item.product_name)}`) }).first()
+    await expect(productButton).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: 'Exchange', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Exchange items' })
+    await dialog.getByLabel('Invoice number').fill(invoiceNumber.toLowerCase())
+    await dialog.getByLabel('Invoice number').press('Enter')
+    await expect(dialog.getByTestId('returnable').first()).toHaveText('2')
+    await dialog.getByRole('button', { name: `More ${item.product_name}` }).first().click()
+    await dialog.getByRole('button', { name: 'Check value' }).click()
+    await expect(dialog.getByTestId('exchange-value')).toContainText(price.toFixed(2))
+    await dialog.getByRole('button', { name: 'Continue' }).click()
+    await expect(dialog).toHaveCount(0)
+
+    const cart = page.getByRole('complementary', { name: 'Current sale' })
+    await expect(cart.getByTestId('exchange-banner')).toContainText(`Exchange for ${invoiceNumber}`)
+    await productButton.click()
+    await productButton.click()
+    await expect(cart.getByTestId('exchange-difference')).toContainText(`Customer pays BDT ${price.toFixed(2)} more`)
+    await cart.getByRole('button', { name: /^Pay/ }).click()
+    const payment = page.getByRole('dialog', { name: 'Payment' })
+    await expect(payment.getByTestId('exchange-credit')).toContainText(invoiceNumber)
+    await expect(payment.getByLabel('Amount of payment 1')).toHaveValue(price.toFixed(2))
+    await payment.getByRole('button', { name: 'Complete exchange' }).click()
+    const done = page.getByRole('dialog', { name: /^Exchange \S+ completed$/ })
+    await expect(done).toBeVisible({ timeout: 20_000 })
+    await expect(done.getByTestId('receipt-exchange')).toContainText(invoiceNumber)
+    const number = (await done.innerText()).match(/Exchange (\S+) completed/)![1]!
+
+    // Both documents point at each other; only the cash is money in the drawer.
+    const sale = (await call('GET', `/api/v1/sales?search=${number}`)).body.data.find((s: { number: string }) => s.number === number) as { id: string; is_exchange: boolean }
+    expect(sale.is_exchange).toBe(true)
+    const detail = (await call('GET', `/api/v1/sales/${sale.id}`)).body.data
+    expect(detail.exchange).toMatchObject({ original_sale_number: invoiceNumber, value: price.toFixed(2), applied: price.toFixed(2) })
+    expect(detail.customer?.id).toBe(customerId)
+    expect((detail.payments as { method: string }[]).map((p) => p.method).sort()).toEqual(['cash', 'exchange'])
+    const returned = (await call('GET', `/api/v1/returns/${detail.exchange.return_id}`)).body.data
+    expect(returned.exchange_sale).toMatchObject({ id: sale.id, number })
+    expect(returned.status).toBe('completed')
+
+    // An exchange sale is not cancelled — its items are returned instead.
+    const cancel = await call('POST', `/api/v1/sales/${sale.id}/cancel`, { reason: 'Changed mind' })
+    expect(cancel.status).toBe(422)
+    expect(cancel.body.error.code).toBe('EXCHANGE_SALE_NOT_CANCELLABLE')
+
+    // The exchange sale is exchanged in turn: two units back, one out, the difference to store credit.
+    const line = (detail.lines as { id: string }[])[0]!
+    const again = await call('POST', '/api/v1/pos/exchanges', {
+      return: { sale_id: sale.id, lines: [{ sale_line_id: line.id, quantity: '2' }] },
+      store_id: store.id,
+      lines: [{ variant_id: item.variant_id, quantity: '1' }],
+      payments: [],
+      refunds: [{ method: 'store_credit', amount: price.toFixed(2) }],
+    })
+    expect(again.status).toBe(201)
+    expect(again.body.data.sale.customer?.id).toBe(customerId)
+    expect(again.body.data.sale.exchange).toMatchObject({ original_sale_number: number, applied: price.toFixed(2) })
+    expect((await call('GET', `/api/v1/customers/${customerId}/store-credit`)).body.data).toMatchObject({ balance: price.toFixed(2) })
+  } finally {
+    await context.close()
+  }
+})

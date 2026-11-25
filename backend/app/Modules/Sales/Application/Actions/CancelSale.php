@@ -14,6 +14,7 @@ use App\Modules\Payments\Domain\PaymentSource;
 use App\Modules\Promotions\Application\Contracts\PromotionRedemptions;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Application\Services\StoredValueTenders;
+use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Domain\SaleStatus;
 use App\Modules\Sales\Infrastructure\Models\Sale;
@@ -34,7 +35,8 @@ use Illuminate\Support\Facades\DB;
  * payments ledger: cash comes out of the canceller's drawer), loyalty points are reversed,
  * its serial numbers become sellable again and (POS1a) its promotions are given back (usage
  * limits and coupon uses no longer count it). A sale with returns cannot be cancelled;
- * returns are the way to take back part of a sale.
+ * returns are the way to take back part of a sale. Neither can (POS1c) a sale made by an
+ * exchange: its value came from a completed return.
  */
 class CancelSale
 {
@@ -58,6 +60,10 @@ class CancelSale
             $returns = SaleReturn::query()->where('sale_id', $locked->id)->whereIn('status', [ReturnStatus::Pending, ReturnStatus::Completed])->pluck('number');
             if ($returns->isNotEmpty()) {
                 throw new BusinessRuleViolation('SALE_HAS_RETURNS', "{$locked->number} has returns ({$returns->implode(', ')}); it can no longer be cancelled.", ['returns' => $returns->all()]);
+            }
+            // POS1c: a sale paid partly by an exchange keeps its return; take its items back instead.
+            if ($locked->payments()->where('method', PaymentMethod::Exchange->value)->exists()) {
+                throw new BusinessRuleViolation('EXCHANGE_SALE_NOT_CANCELLABLE', "{$locked->number} was made by an exchange and cannot be cancelled. Return its items instead.");
             }
 
             $lines = $locked->lines()->with('stock')->get();
@@ -87,7 +93,7 @@ class CancelSale
             }
 
             $this->payments->record($actor, $locked->branch_id, $paid
-                ->filter(fn (SalePayment $p) => ! $p->method->isStoredValue())
+                ->filter(fn (SalePayment $p) => $p->method->isLedgerMoney())
                 ->map(fn (SalePayment $p) => new LedgerEntry(PaymentDirection::Out, LedgerMethod::from($p->method->value), $p->amount, $locked->customer_id, $p->reference))
                 ->values()->all(), new PaymentSource('sale_cancellation', $locked->id, $locked->number));
             if ($locked->customer_id !== null) {

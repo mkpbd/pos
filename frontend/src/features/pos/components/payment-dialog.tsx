@@ -70,6 +70,7 @@ export function PaymentDialog({
   checkoutError,
   pending,
   onSubmit,
+  exchange,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -82,8 +83,10 @@ export function PaymentDialog({
   checkoutError?: unknown
   pending: boolean
   onSubmit: (payments: { method: PaymentMethod; amount: string; reference: string | null }[]) => void
+  /** POS1c: an exchange — the returned items pay `applied` of the total; the tenders settle the rest. */
+  exchange?: { applied: string; number: string } | null
 }) {
-  const total = priced.total
+  const total = exchange ? subtractDecimal(priced.total, exchange.applied, 2) : priced.total
   const [tenders, setTenders] = useState<Tender[]>(() => [tender('cash', total)])
   const [touched, setTouched] = useState(false)
   // POS1b: a refusal stays at its tender until a stored-value tender is changed.
@@ -202,6 +205,11 @@ export function PaymentDialog({
           <DialogDescription>
             Total to pay <span className="font-mono font-semibold text-foreground">{formatMoney(total, priced.currency)}</span>
             {priced.customer && ` · ${priced.customer.name}`}
+            {exchange && (
+              <span className="block" data-testid="exchange-credit">
+                New items {formatMoney(priced.total, priced.currency)} · Exchange credit ({exchange.number}) −{formatMoney(exchange.applied, priced.currency)}
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         <form id="payment-form" onSubmit={submit} noValidate className="flex flex-col gap-3">
@@ -315,7 +323,7 @@ export function PaymentDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Back to cart</Button>
           <Button type="submit" form="payment-form" disabled={pending}>
             {pending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
-            Complete sale
+            {exchange ? 'Complete exchange' : 'Complete sale'}
           </Button>
         </DialogFooter>
       </DialogContent>

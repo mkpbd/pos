@@ -30,6 +30,7 @@ class EloquentTillApprovals implements TillApprovals
             || $approval->used_at !== null
             || $approval->expires_at->isPast()
             || ($action === self::PRICE_OVERRIDE && ($approval->details['variant_id'] ?? null) !== ($details['variant_id'] ?? null))
+            || ($action === self::RETURN && (($details['sale_id'] ?? null) === null || ($approval->details['sale_id'] ?? null) !== $details['sale_id']))
             || (isset($details['store_id']) && $approval->store_id !== $details['store_id'])
         ) {
             throw self::invalid();

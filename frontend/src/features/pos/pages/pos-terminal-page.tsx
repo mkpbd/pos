@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { HistoryIcon, Loader2Icon, LockIcon, PauseIcon, ScanBarcodeIcon, ShoppingCartIcon, Trash2Icon } from 'lucide-react'
+import { ArrowLeftRightIcon, HistoryIcon, Loader2Icon, LockIcon, PauseIcon, ScanBarcodeIcon, ShoppingCartIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { StoreSelect } from '@/components/common/store-select'
@@ -15,6 +15,11 @@ import { cartOps, toCartInput, usePosCart, type LineInfo } from '@/features/pos/
 import { CartLines, CartTotals } from '@/features/pos/components/cart-panel'
 import { CouponField } from '@/features/pos/components/coupon-field'
 import { CustomerPicker } from '@/features/pos/components/customer-picker'
+import { ExchangeBanner, ExchangePayLabel } from '@/features/pos/components/exchange-banner'
+import { ExchangeCheckout } from '@/features/pos/components/exchange-checkout'
+import { ExchangeDialog } from '@/features/pos/components/exchange-dialog'
+import { withExchange, withoutExchange } from '@/features/pos/exchange'
+import { useExchangePending } from '@/features/pos/exchange-api'
 import { HeldSalesSheet } from '@/features/pos/components/held-sales-sheet'
 import { ManagerApprovalProvider } from '@/features/pos/components/manager-approval'
 import { PaymentDialog, type LoyaltyTender, type StoreCreditTender } from '@/features/pos/components/payment-dialog'
@@ -69,6 +74,8 @@ function PosTerminal() {
   const [clearing, setClearing] = useState(false)
   const [completed, setCompleted] = useState<Sale | null>(null)
   const [openingRegister, setOpeningRegister] = useState(false)
+  // POS1c: the exchange dialog (find the invoice, choose what comes back).
+  const [startingExchange, setStartingExchange] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
@@ -96,7 +103,9 @@ function PosTerminal() {
   // POS1a: lock the till after 5 minutes without input (only with a PIN to unlock it again).
   const lockTill = useTillLockStore((s) => s.lock)
   const pinSet = hasTillPin(me)
-  useIdleTimer(() => lockTill(me.user.id), AUTO_LOCK_MS, pinSet && !checkout.isPending)
+  // POS1c: an exchange in flight counts as busy too.
+  const exchangePending = useExchangePending()
+  useIdleTimer(() => lockTill(me.user.id), AUTO_LOCK_MS, pinSet && !checkout.isPending && !exchangePending)
 
   // Checkout needs the cashier's open register session in this branch.
   const canOperate = can('cash_registers.operate')
@@ -151,6 +160,10 @@ function PosTerminal() {
   }
 
   const holdCart = () => {
+    if (cart.exchange) {
+      toast.error('An exchange cannot be held; complete or cancel it.')
+      return
+    }
     if (!cartInput) {
       toast.error(cart.lines.length === 0 ? 'The cart is empty.' : 'Fix the highlighted quantities first.')
       return
@@ -166,6 +179,7 @@ function PosTerminal() {
 
   const resume = async (held: HeldSale) => {
     if (cart.lines.length > 0) throw new Error('Finish or hold the current cart first.')
+    if (cart.exchange) throw new Error('Complete or cancel the exchange first.')
     const storeId = held.store_id
     let info = new Map<string, LineInfo>()
     try {
@@ -287,6 +301,17 @@ function PosTerminal() {
             <Button type="button" variant="outline" onClick={() => setRecentOpen(true)}>
               <HistoryIcon data-icon="inline-start" /> Recent
             </Button>
+            {can('returns.create') && can('sales.view') && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!!cart.exchange || !!cart.heldSaleId}
+                title={cart.exchange ? 'An exchange is in progress' : cart.heldSaleId ? 'Finish the resumed held sale first' : 'Take back items of an earlier invoice for new ones'}
+                onClick={() => setStartingExchange(true)}
+              >
+                <ArrowLeftRightIcon data-icon="inline-start" /> Exchange
+              </Button>
+            )}
             <StoredValueMenu
               customer={cart.customer}
               creditBalance={creditBalance}
@@ -340,6 +365,7 @@ function PosTerminal() {
           </Button>
         </div>
 
+        {cart.exchange && <ExchangeBanner draft={cart.exchange} priced={pricingCurrent ? priced : undefined} onCancel={() => { apply(withoutExchange); toast.success('Exchange cancelled; nothing was returned.') }} />}
         <CartLines cart={cart} priced={priced} canDiscount={canDiscount} apply={apply} onChangePrice={(key) => setPriceTarget({ kind: 'line', key })} />
 
         <div className="flex flex-col gap-3 border-t p-3">
@@ -371,17 +397,43 @@ function PosTerminal() {
             </div>
           )}
           <div className="grid grid-cols-[auto_1fr] gap-2">
-            <Button type="button" variant="outline" size="lg" disabled={itemCount === 0 || hold.isPending} onClick={holdCart}>
+            <Button type="button" variant="outline" size="lg" disabled={itemCount === 0 || hold.isPending || !!cart.exchange} onClick={holdCart}>
               <PauseIcon data-icon="inline-start" /> Hold <kbd className="ml-1 text-xs opacity-70">F8</kbd>
             </Button>
             <Button type="button" size="lg" disabled={itemCount === 0} onClick={openPayment}>
-              Pay {priced && formatMoney(priced.total, priced.currency)} <kbd className="ml-1 text-xs opacity-70">F9</kbd>
+              {cart.exchange ? <ExchangePayLabel value={cart.exchange.value} priced={priced} /> : <>Pay {priced && formatMoney(priced.total, priced.currency)}</>} <kbd className="ml-1 text-xs opacity-70">F9</kbd>
             </Button>
           </div>
         </div>
       </aside>
 
-      {paying && priced && (
+      <ExchangeCheckout
+        open={paying && !!cart.exchange}
+        onOpenChange={setPaying}
+        cart={cart}
+        apply={apply}
+        cartInput={cartInput}
+        priced={priced}
+        canCredit={can('sales.credit')}
+        loyalty={loyalty}
+        storeCredit={storeCredit}
+        onTillProblem={(error) => setCheckoutProblem({ error, cart: JSON.stringify(cartInput) })}
+        onSessionLost={() => void session.refetch()}
+        onFinished={() => searchRef.current?.focus()}
+      />
+      {startingExchange && (
+        <ExchangeDialog
+          branchId={branchId}
+          onClose={() => setStartingExchange(false)}
+          onStart={(draft) => {
+            apply((c) => withExchange(c, draft))
+            setStartingExchange(false)
+            toast.success(`Exchange for ${draft.invoice.number} started. Add the new items, then pay.`)
+            searchRef.current?.focus()
+          }}
+        />
+      )}
+      {paying && priced && !cart.exchange && (
         <PaymentDialog
           open={paying}
           onOpenChange={(o) => { if (!checkout.isPending) setPaying(o) }}
@@ -415,7 +467,7 @@ function PosTerminal() {
         description="All items are removed from the cart."
         confirmLabel="Clear sale"
         destructive
-        onConfirm={() => { apply((c) => cartOps.empty(c.storeId)); setClearing(false) }}
+        onConfirm={() => { apply((c) => (c.exchange ? { ...cartOps.empty(c.storeId), customer: c.customer, exchange: c.exchange } : cartOps.empty(c.storeId))); setClearing(false) }}
       />
       {priceTarget && <PriceFlow target={priceTarget} cart={cart} apply={apply} canOverride={canOverride} onClose={() => setPriceTarget(null)} />}
     </div>

@@ -16,7 +16,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /**
  * Daily sales summary for the branches the user can access (or one branch): what was sold
  * on the organization's calendar day, what it cost, and the money taken per payment method
- * (net of reversals made that day).
+ * (net of reversals made that day). Value that is not money (loyalty points, store credit, gift
+ * cards and, POS1c, `exchange` — returned goods paying an exchange sale) is listed per method too;
+ * the money actually collected is the payments ledger (Payment collections report).
  */
 class SalesSummary
 {

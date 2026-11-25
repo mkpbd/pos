@@ -471,6 +471,12 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Exchanges POS1c (implemented)
+
+- `sale_returns.exchange_sale_id` (nullable, unique, FK → sales): the sale an exchange's returned value paid; set once (the immutability guard allows only this link).
+- `sale_payments.method` and `sale_return_refunds.method` CHECKs add `exchange` (value moved from the return to the new sale; never in `payment_entries`).
+- `pos_approvals.action` CHECK adds `return` (`details.sale_id` = the invoice).
+
 ### Store credit and gift cards POS1b (implemented)
 
 - `store_credit_entries` (organization, customer, type CHECK `top_up|withdrawal|sale_payment|sale_reversal|refund|adjustment`, signed amount ≠ 0, `balance_after` ≥ 0, currency, method, reference, reference type / id / number, receipt number, note, store, created by / at); append-only; the balance is the last `balance_after`.
