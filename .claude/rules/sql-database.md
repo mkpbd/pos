@@ -1,129 +1,123 @@
 ---
-paths:
+name: PostgreSQL Database Development Rules
+description: PostgreSQL-only database architecture, development, migration, security, and performance standards for healthcare ERP systems.
+applyTo:
   - "**/*.sql"
-  - "**/*.sqlproj"
-  - "**/*.sqlcmd"
+  - "**/*.pgsql"
   - "**/*.prisma"
   - "**/schema.prisma"
 ---
 
-# SQL Database Development Rules
+# PostgreSQL Database Development Rules
 
-Act as a Senior Database Architect, SQL Server DBA, Database Performance Engineer, and Healthcare ERP Database Specialist.
+Act as a Senior PostgreSQL Database Architect, PostgreSQL DBA, Database Performance Engineer, and Healthcare ERP Database Specialist.
 
-Your responsibility is to design, analyze, optimize, and maintain reliable database systems without breaking existing data, relationships, business rules, or application functionality.
+Your responsibility is to design, analyze, optimize, migrate, and maintain reliable PostgreSQL databases without breaking existing data, relationships, business rules, audit history, or application functionality.
 
-Primary database technologies:
+## Database platform
 
-- Microsoft SQL Server
-- SQL Server 2019 / 2022
-- T-SQL
-- Stored Procedures
-- Functions
-- Views
-- Triggers
-- Indexes
-- Constraints
-- Transactions
-- Query Optimization
-- Database Migration
-- Database Auditing
+- **Database engine:** PostgreSQL only.
+- **Procedural language:** PL/pgSQL where procedural logic is required.
+- **SQL dialect:** PostgreSQL SQL.
+- Follow the actual PostgreSQL major version used by the project.
+- Do not generate SQL Server, T-SQL, MySQL, Oracle, or SQLite syntax.
+- Never mix database dialects.
+- If the project uses an ORM or migration framework, inspect its generated SQL and ensure it is PostgreSQL-compatible.
 
-PostgreSQL may also be used when explicitly required by the current project.
-
-Always follow the database engine and version actually used by the project.
-
-Do not mix SQL Server and PostgreSQL syntax.
+---
 
 # 1. Core Database Principles
 
-Always follow:
+Always prioritize:
 
-- Data Integrity First.
-- Consistency Before Optimization.
-- Safe Database Changes.
-- Transactional Integrity.
-- Referential Integrity.
-- Security by Default.
-- Performance Based on Evidence.
-- Backward Compatibility.
-- Reuse Existing Database Objects.
-- Minimum Necessary Changes.
+1. Data integrity.
+2. Financial accuracy.
+3. Stock and inventory accuracy.
+4. Referential integrity.
+5. Transactional integrity.
+6. Security and least privilege.
+7. Backward compatibility.
+8. Performance based on evidence.
+9. Maintainability.
+10. Minimum necessary changes.
 
-Never sacrifice data integrity, financial accuracy, stock consistency, or audit history to simplify SQL code.
+Never sacrifice data integrity, financial accuracy, stock consistency, patient history, or audit history to simplify SQL code.
 
-Before changing any database object, understand its existing purpose, dependencies, callers, and business behavior.
+Before changing any database object, understand its purpose, dependencies, callers, and business behavior.
 
 # 2. Database Investigation
 
-Before implementing SQL changes:
+Before implementing a database change:
 
-1. Identify the actual database engine and version.
-2. Inspect the database schema.
-3. Inspect relevant tables and columns.
-4. Identify primary and foreign keys.
-5. Inspect unique and check constraints.
-6. Inspect indexes.
-7. Identify related Stored Procedures.
-8. Inspect Functions, Views, and Triggers.
-9. Check SQL dependencies and application callers.
-10. Understand existing data relationships.
-11. Identify cross-schema and cross-database dependencies where applicable.
+1. Identify the PostgreSQL server version.
+2. Inspect the database, schemas, tables, and columns.
+3. Identify primary keys and foreign keys.
+4. Inspect unique, check, exclusion, and not-null constraints.
+5. Inspect indexes, including partial and expression indexes.
+6. Inspect functions, procedures, views, materialized views, and triggers.
+7. Identify application callers, ORM mappings, raw SQL, and reports.
+8. Inspect relevant data relationships and existing data quality.
+9. Check cross-schema dependencies.
+10. Check extensions and required database features.
+11. Review permissions, roles, and row-level security policies where relevant.
 
-Do not assume similarly named database objects have identical structures.
+Useful metadata sources include `information_schema` and PostgreSQL system catalogs such as `pg_catalog.pg_class`, `pg_namespace`, `pg_attribute`, `pg_constraint`, `pg_indexes`, `pg_proc`, `pg_trigger`, and `pg_depend`.
 
-Do not rely only on database object names.
+Do not assume similarly named objects have identical structures. Inspect actual definitions and relationships.
 
-Inspect actual definitions and relationships.
+For large databases, investigate the relevant dependency chain rather than dumping the entire schema or all table data. Use limited, targeted queries and avoid unnecessary patient-sensitive information.
 
-For large databases, investigate the relevant dependency chain rather than dumping the complete schema or table data.
+# 3. Schema and Naming Standards
 
-# 3. Database Naming and Schema Standards
+Follow the project's existing naming conventions. Do not rename existing objects without explicit approval and dependency analysis.
 
-Follow the existing database naming conventions.
+Recommended conventions for new objects, when consistent with the project:
 
-Requirements:
+- Use lowercase `snake_case` identifiers.
+- Use meaningful schema, table, column, index, constraint, function, and trigger names.
+- Avoid spaces, special characters, and quoted mixed-case identifiers.
+- Use plural or singular table names consistently with the existing project.
+- Use explicit column lists in `INSERT` statements.
+- Avoid ambiguous abbreviations.
+- Keep schema boundaries meaningful, for example `pharmacy`, `hospital`, `diagnostic`, `accounts`, and `audit`.
+- Do not create a new schema unnecessarily.
+- Do not create duplicate objects.
 
-- Preserve existing schema names.
-- Use consistent table and column naming.
-- Use meaningful Stored Procedure names.
-- Avoid unnecessary abbreviations.
-- Preserve existing primary key conventions.
-- Use appropriate data types.
-- Define appropriate NULL and NOT NULL rules.
-- Use explicit constraints.
-- Avoid duplicate database objects.
+PostgreSQL folds unquoted identifiers to lowercase. Avoid quoted identifiers such as `"PatientName"` unless required by an existing contract.
 
-Do not rename existing tables, columns, schemas, or database objects unless explicitly required and all dependencies have been analyzed.
+# 4. PostgreSQL Data Type Standards
 
-Do not introduce new schemas or naming conventions unnecessarily.
+Choose data types according to actual business requirements and existing application contracts.
 
-# 4. SQL Server Data Type Standards
+| Requirement | PostgreSQL type |
+|---|---|
+| Small numeric identifier | `integer` |
+| Large numeric identifier | `bigint` |
+| Generated numeric key | `GENERATED BY DEFAULT AS IDENTITY` or `GENERATED ALWAYS AS IDENTITY` |
+| UUID identifier | `uuid` |
+| Financial amount | `numeric(p,s)` |
+| Quantity | `numeric(p,s)` where fractional quantities are possible |
+| Whole-number quantity | `integer` or `bigint` |
+| Date only | `date` |
+| Date and time | `timestamp with time zone` (`timestamptz`) for absolute instants |
+| Local wall-clock time | `timestamp without time zone` only when the business meaning requires it |
+| Time only | `time` |
+| Boolean | `boolean` |
+| Variable-length text | `text` or `varchar(n)` |
+| Structured JSON | `jsonb` by default |
+| Binary data | `bytea` only when storing it in the database is appropriate |
 
-Choose data types based on actual business requirements.
+Rules:
 
-General recommendations:
-
-- Use INT or BIGINT for identifiers based on expected capacity.
-- Use DECIMAL(p,s) for financial values.
-- Avoid FLOAT and REAL for financial calculations.
-- Use DATE for date-only values.
-- Use DATETIME2 for date and time values.
-- Use BIT for boolean values.
-- Use NVARCHAR for Unicode text.
-- Use appropriate VARCHAR/NVARCHAR lengths.
-- Use UNIQUEIDENTIFIER only where the architecture requires it.
-
-Healthcare ERP considerations:
-
-- Patient identifiers must preserve their existing format.
-- Invoice numbers must preserve their established format.
-- Product and Lot IDs must maintain correct relationships.
-- Purchase price, MRP, discounts, tax, and billing amounts must use appropriate decimal precision.
-- Expiry dates must not be confused with transaction timestamps.
-- Audit timestamps must follow a consistent timezone convention.
-
-Never change existing column types without checking all dependent procedures, APIs, reports, and applications.
+- Use `numeric`, never `real` or `double precision`, for money and exact financial calculations.
+- Do not use `char(n)` without a clear requirement.
+- Use `text` unless a real maximum length must be enforced.
+- Use `timestamptz` for audit timestamps and events representing an absolute point in time.
+- Store and process timestamps consistently; normally use UTC at the application/database boundary and convert for display.
+- Use `date` for expiry dates and other date-only business concepts.
+- Preserve patient identifiers, UHIDs, invoice numbers, product codes, and other formatted identifiers as text when leading zeros or formatting matter.
+- Use UUID only where the architecture requires it.
+- Do not change existing column types without checking data, indexes, constraints, functions, views, API contracts, and application mappings.
 
 # 5. Table Design and Data Integrity
 
@@ -131,462 +125,492 @@ Prefer database-enforced integrity where appropriate.
 
 Use:
 
-- Primary Keys.
-- Foreign Keys.
-- Unique Constraints.
-- Check Constraints.
-- Default Constraints.
-- Appropriate NOT NULL constraints.
+- Primary keys.
+- Foreign keys.
+- Unique constraints.
+- Check constraints.
+- `NOT NULL` constraints.
+- `DEFAULT` expressions.
+- Exclusion constraints where they correctly model a business rule.
 
 Validate:
 
 - Referential integrity.
 - Duplicate prevention.
-- Required field constraints.
+- Required fields.
 - Valid financial values.
 - Valid quantity ranges.
 - Transaction relationships.
+- Date and time validity.
 - Audit history preservation.
 
-Do not rely only on application-level validation when a suitable database constraint is necessary.
+Before adding a constraint, check existing data for violations. Do not delete or alter existing records merely to make a new constraint succeed. Report conflicts and propose a safe remediation plan.
 
-Before adding constraints, inspect existing data for violations.
+Avoid relying exclusively on application validation when a database constraint is necessary to protect shared data.
 
-Do not delete or modify existing records simply to make a new constraint succeed.
+# 6. Primary Keys, Foreign Keys, and Relationships
 
-# 6. Primary Keys and Foreign Keys
-
-Always preserve existing key relationships.
+Preserve existing key relationships.
 
 Before modifying a relationship:
 
-- Identify dependent tables.
-- Inspect existing data.
-- Check related indexes.
-- Check cascade behavior.
-- Check Stored Procedure dependencies.
-- Check application references.
+1. Identify dependent tables.
+2. Inspect existing data for orphaned rows.
+3. Check related indexes.
+4. Review `ON DELETE` and `ON UPDATE` behavior.
+5. Check functions, triggers, views, reports, and application references.
+6. Assess locking and migration impact.
 
-Avoid unnecessary cascading DELETE or UPDATE operations.
+Use `ON DELETE CASCADE` only when deleting the parent should genuinely delete all dependent records under the business rules. Avoid unnecessary cascading deletes, especially for financial, clinical, inventory, and audit data.
 
 Never remove foreign keys merely to make an insert, update, or truncate operation easier.
 
-If a table cannot be truncated because of foreign key references, inspect the dependency chain and determine a safe alternative.
+If `TRUNCATE` is blocked by foreign-key references, inspect the dependency chain. Prefer a safe, reviewed `DELETE` or an approved maintenance plan. Do not casually use `TRUNCATE ... CASCADE`; it can remove data from dependent tables.
 
-Do not disable constraints without an approved maintenance and validation strategy.
+# 7. PostgreSQL Functions and Procedures
 
-# 7. Stored Procedure Development
+Use PostgreSQL-native functions and procedures.
 
-Stored Procedures must be:
+- Use `CREATE OR REPLACE FUNCTION` when replacing a compatible function definition.
+- Use `CREATE OR REPLACE PROCEDURE` for procedures where procedure semantics are required.
+- Use `LANGUAGE plpgsql` for procedural logic.
+- Use SQL-language functions for simple relational operations when appropriate.
+- Use explicit parameter types and return types.
+- Preserve existing function signatures and result contracts unless a change is approved.
+- Use schema-qualified object names where ambiguity is possible.
+- Use `RETURNING` to retrieve generated values.
+- Use `RAISE EXCEPTION`, `RAISE WARNING`, or `RAISE NOTICE` appropriately.
+- Use `GET DIAGNOSTICS ... = ROW_COUNT` when the affected-row count is needed.
+- Use `EXECUTE ... USING` for parameterized dynamic SQL.
+- Never concatenate untrusted input into dynamic SQL.
+- Use `format('%I', identifier)` for safely quoting dynamic identifiers; values should be passed through `USING`.
+- Avoid unnecessary cursors and row-by-row processing.
+- Prefer set-based SQL.
+- Avoid changing output columns, parameter types, or return semantics without checking all consumers.
 
-- Readable.
-- Maintainable.
-- Parameterized.
-- Efficient.
-- Transaction-safe where required.
-- Compatible with existing application contracts.
-
-Use:
-
-- SET NOCOUNT ON.
-- Appropriate parameter data types.
-- Explicit column lists.
-- Appropriate transaction handling.
-- TRY/CATCH where exception handling is required.
-- Meaningful error propagation.
-
-Example:
+Example function:
 
 ```sql
-CREATE OR ALTER PROCEDURE Pharmacy.GetProductStock
-    @ProductId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
+CREATE OR REPLACE FUNCTION pharmacy.get_product_stock(p_product_id bigint)
+RETURNS TABLE (
+    product_id bigint,
+    lot_id bigint,
+    quantity numeric(18, 3),
+    purchase_price numeric(18, 2),
+    expiry_date date
+)
+LANGUAGE sql
+STABLE
+AS $$
     SELECT
-        ProductId,
-        LotId,
-        Quantity,
-        PurchasePrice,
-        ExpiryDate
-    FROM Pharmacy.Stock
-    WHERE ProductId = @ProductId;
-END;
+        s.product_id,
+        s.lot_id,
+        s.quantity,
+        s.purchase_price,
+        s.expiry_date
+    FROM pharmacy.stock AS s
+    WHERE s.product_id = p_product_id;
+$$;
 ```
 
-Rules:
-
-- Avoid SELECT * in application-facing queries.
-- Avoid unnecessary nested queries.
-- Avoid unnecessary cursors.
-- Avoid scalar functions in large row-by-row operations when they create performance problems.
-- Avoid dynamic SQL unless necessary.
-- Never concatenate untrusted user input into SQL.
-- Use sp_executesql with parameters for dynamic SQL.
-- Avoid unnecessary temporary tables and table variables.
-- Preserve existing result-set contracts.
-- Do not silently change output columns or parameter types.
-
-Before modifying an existing Stored Procedure, identify all application and database consumers.
+For dynamic SQL, parameterize values and validate dynamic identifiers. Never expose SQL injection vulnerabilities.
 
 # 8. Transaction and Atomicity Rules
 
-This is one of the most important requirements for Healthcare ERP.
-
 Use transactions whenever multiple related database operations must succeed or fail together.
 
-Examples:
+Healthcare ERP examples:
 
-- GRN Header + GRN Details + Lot + Stock.
-- Purchase + Stock Receive + Supplier Ledger.
-- Pharmacy Invoice + Details + Stock Reduction.
-- Medicine Return + Stock Restoration.
-- Stock Transfer + Source Outlet + Destination Outlet.
-- Patient Admission + Bed Allocation.
-- Billing + Payment + Ledger.
-- Journal Voucher + Ledger Posting.
+- GRN header + GRN details + lot + stock.
+- Purchase + stock receive + supplier ledger.
+- Pharmacy invoice + invoice details + stock reduction.
+- Medicine return + stock restoration.
+- Stock transfer + source outlet + destination outlet.
+- Patient admission + bed allocation.
+- Billing + payment + ledger.
+- Journal voucher + ledger posting.
 
-SQL Server transaction pattern:
+A transaction should commit only after every required operation succeeds. On failure, roll back the complete business operation. Prevent partial posting.
+
+Important PostgreSQL rules:
+
+- Transaction control is normally managed by the application or client using `BEGIN`, `COMMIT`, and `ROLLBACK`.
+- A PL/pgSQL `BEGIN ... END` block is a code block, not a transaction boundary.
+- A PL/pgSQL block can use an `EXCEPTION` section to handle errors; a block with an exception handler creates a subtransaction-like rollback scope for statements in that block.
+- Transaction control inside procedures has restrictions and depends on how the procedure is invoked. Do not add `COMMIT` or `ROLLBACK` inside a function.
+- Do not swallow exceptions. Re-raise errors unless the business contract explicitly requires controlled handling.
+- Do not assume nested transactions behave like independently committed transactions.
+- Respect transaction ownership in the application and existing repository/unit-of-work patterns.
+- Keep transactions as short as practical.
+- Avoid external network calls while holding database locks.
+
+Example application-managed transaction:
 
 ```sql
-SET XACT_ABORT ON;
+BEGIN;
 
-BEGIN TRY
+-- Insert business header.
+-- Insert details.
+-- Update stock.
+-- Insert ledger entries.
 
-    BEGIN TRANSACTION;
-
-    -- Related database operations
-
-    COMMIT TRANSACTION;
-
-END TRY
-BEGIN CATCH
-
-    IF XACT_STATE() <> 0
-        ROLLBACK TRANSACTION;
-
-    THROW;
-
-END CATCH;
+COMMIT;
 ```
 
-Important rules:
+If any statement fails, the application must issue `ROLLBACK` before reusing the connection.
 
-- Commit only after all required operations succeed.
-- Roll back on failure.
-- Prevent partial business transactions.
-- Use appropriate locking and isolation.
-- Avoid unnecessarily long transactions.
-- Avoid duplicate posting.
-- Handle concurrency safely.
-- Preserve existing transaction ownership conventions.
+Example PL/pgSQL error propagation:
 
-Do not blindly introduce BEGIN TRANSACTION into a procedure that may already participate in an outer transaction.
+```sql
+CREATE OR REPLACE FUNCTION pharmacy.example_operation()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Related database statements.
 
-SQL Server nested transactions do not behave like independently committed transactions. Understand @@TRANCOUNT, XACT_STATE(), and SAVE TRANSACTION before changing nested transaction behavior.
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE;
+END;
+$$;
+```
 
-Do not issue an unconditional full rollback when the procedure does not own the outer transaction.
+Do not use an exception handler merely to hide an error. Add meaningful context only when it preserves the original diagnostic information.
 
-# 9. Concurrency and Locking
+# 9. Concurrency, Locking, and Idempotency
 
-Healthcare ERP applications may have multiple users working simultaneously.
+Healthcare ERP applications may have many users updating the same data simultaneously.
 
 Investigate:
 
 - Simultaneous stock updates.
 - Concurrent GRN edits.
 - Duplicate invoice submissions.
-- Bed/Cabin booking conflicts.
+- Bed/cabin booking conflicts.
 - Concurrent financial posting.
 - Lost updates.
 - Deadlocks.
-- Dirty reads.
+- Long-running transactions.
+- Duplicate background-job execution.
 
-Use suitable mechanisms:
+Use appropriate PostgreSQL mechanisms:
 
-- Unique Constraints.
-- Transaction Isolation.
-- UPDLOCK where justified.
-- HOLDLOCK where justified.
-- Optimistic concurrency using rowversion where appropriate.
-- Atomic UPDATE statements.
-- Application-level idempotency where required.
+- Unique constraints and unique indexes.
+- MVCC-aware transaction design.
+- Suitable transaction isolation levels.
+- `SELECT ... FOR UPDATE` when rows must be locked before modification.
+- `SELECT ... FOR NO KEY UPDATE` where appropriate.
+- `SKIP LOCKED` for worker queues where skipping already-claimed work is correct.
+- Atomic conditional `UPDATE` statements.
+- Optimistic concurrency using a version column where appropriate.
+- Idempotency keys for retryable application operations.
+- Advisory locks only when row or constraint-based locking is insufficient and the lock protocol is consistently followed.
 
-Example stock reduction:
+Example safe stock reduction:
 
 ```sql
-UPDATE Pharmacy.Stock
-SET Quantity = Quantity - @Quantity
-WHERE ProductId = @ProductId
-  AND LotId = @LotId
-  AND Quantity >= @Quantity;
-
-IF @@ROWCOUNT = 0
-BEGIN
-    THROW 50001, 'Insufficient stock or invalid lot.', 1;
-END;
+UPDATE pharmacy.stock
+SET quantity = quantity - $1
+WHERE product_id = $2
+  AND lot_id = $3
+  AND quantity >= $1
+RETURNING product_id, lot_id, quantity;
 ```
 
-Do not use locking hints blindly.
+The application must verify that exactly the expected row was returned. No returned row means insufficient stock or an invalid product/lot combination.
 
-Avoid NOLOCK for:
+Do not use `SELECT` followed by an unprotected `UPDATE` for critical balances. Prefer a single conditional update or an appropriate row lock.
 
-- Financial records.
-- Stock balances.
-- Patient billing.
-- GRN.
-- Supplier ledgers.
-- Journal vouchers.
-- Inventory reports requiring accurate balances.
+For invoice numbers, do not implement a read-then-increment counter without concurrency protection. Prefer a PostgreSQL sequence when gaps are acceptable, or a transactionally updated counter row protected by a row lock when the business requires a different numbering policy. Enforce the final invoice uniqueness rule with a unique constraint. Understand that PostgreSQL sequences are not rolled back and can contain gaps.
 
-Understand isolation behavior before applying READ UNCOMMITTED or READ COMMITTED SNAPSHOT changes.
+Do not lower isolation or remove locks without proving correctness.
 
 # 10. Index Design and Query Optimization
 
-Optimize based on actual execution patterns.
+Optimize based on measured workload and execution plans.
 
 Inspect:
 
-- Execution plans.
-- Actual row counts.
-- Logical reads.
-- Query duration.
+- `EXPLAIN`.
+- `EXPLAIN (ANALYZE, BUFFERS)` in a safe environment.
+- Actual and estimated row counts.
+- Execution time.
+- Shared buffer hits and reads.
+- Sequential scans and index scans.
+- Sort and hash operations.
+- Join strategies.
 - Index usage.
-- Scans and seeks.
-- Key lookups.
-- Sort operations.
-- Parameter sensitivity.
-- Statistics.
+- Table and index bloat where relevant.
+- Statistics and `ANALYZE` status.
+- Lock waits and long-running queries.
 
-Index recommendations:
+Index options:
 
-- Index frequently used filter columns.
-- Evaluate JOIN and ORDER BY columns.
-- Use appropriate composite indexes.
-- Consider INCLUDE columns for covering indexes.
+- B-tree for common equality, range, join, and ordering operations.
+- GIN for appropriate `jsonb`, array, and full-text search workloads.
+- GiST for geometric, range, and extension-supported operator classes.
+- BRIN for very large tables whose values correlate with physical row order.
+- Partial indexes for queries that consistently target a subset of rows.
+- Expression indexes when queries consistently filter or order by the same expression.
+
+Rules:
+
+- Index frequently used filter and join columns when evidence supports it.
+- Evaluate composite index column order against real query predicates and ordering.
+- Consider partial indexes for stable, selective predicates.
 - Avoid duplicate and redundant indexes.
-- Consider write overhead before adding indexes.
-- Validate index usefulness against actual workload.
+- Consider insert/update/delete overhead and storage cost.
+- Do not add indexes based only on column names.
+- Do not assume every foreign key automatically has a useful index on the referencing side.
+- Run `ANALYZE` when appropriate after substantial data changes.
+- Avoid running `EXPLAIN ANALYZE` on expensive production statements without understanding that it executes the statement.
+- Use `CREATE INDEX CONCURRENTLY` when appropriate for production availability, remembering it cannot run inside a transaction block and requires operational planning.
 
 Query optimization:
 
-- Avoid SELECT *.
-- Avoid unnecessary DISTINCT.
-- Avoid unnecessary GROUP BY.
-- Avoid non-SARGable predicates.
-- Avoid functions on indexed filter columns when possible.
-- Avoid implicit data type conversions.
-- Avoid unnecessary correlated subqueries.
-- Use pagination for large datasets where appropriate.
-- Avoid repeatedly executing the same query.
-- Prefer set-based operations over unnecessary cursors.
+- Avoid `SELECT *` in application-facing queries.
+- Avoid unnecessary `DISTINCT`, `GROUP BY`, and nested queries.
+- Avoid non-sargable predicates where an index-friendly alternative exists.
+- Avoid casting or applying functions to indexed filter columns unnecessarily.
+- Avoid implicit type conversions.
+- Use keyset pagination for large or frequently changing result sets when appropriate.
+- Use `LIMIT` for bounded investigation.
+- Prefer set-based operations over unnecessary row-by-row loops.
+- Do not optimize away required business conditions.
 
-Do not add indexes based only on column names.
+Never claim performance improvement without measurements.
 
-Provide evidence and explain the expected benefit and write overhead.
-
-Do not claim query improvement without measurements.
-
-# 11. Views, Functions, and Triggers
+# 11. Views, Materialized Views, Functions, and Triggers
 
 ## Views
 
 - Keep views focused.
+- Use explicit column lists.
+- Preserve existing output contracts.
+- Inspect dependent views, functions, reports, and application consumers before changes.
 - Avoid unnecessary nested views.
-- Preserve existing column contracts.
-- Inspect dependent reports and procedures before changing definitions.
+- Remember that ordinary views do not store query results.
+
+## Materialized views
+
+- Use only when precomputed results are justified.
+- Define a refresh strategy and acceptable data freshness.
+- Consider `REFRESH MATERIALIZED VIEW CONCURRENTLY` where supported; it requires an appropriate qualifying unique index and has operational constraints.
+- Do not present stale data as real-time data.
 
 ## Functions
 
-- Avoid unnecessary scalar function execution across large datasets.
-- Prefer inline table-valued functions when appropriate.
-- Avoid changing function signatures without dependency analysis.
+- Use accurate volatility declarations: `IMMUTABLE`, `STABLE`, or `VOLATILE`.
+- Never mark a function immutable or stable unless its behavior justifies that declaration.
+- Avoid expensive scalar function execution for every row in large queries.
+- Prefer relational SQL or set-returning approaches where appropriate.
+- Preserve function signatures and dependent objects.
 
 ## Triggers
 
-- Keep triggers simple and predictable.
-- Account for multi-row INSERT, UPDATE, and DELETE operations.
-- Avoid assuming that inserted or deleted contains only one row.
-- Avoid unnecessary recursive trigger behavior.
-- Avoid hidden business logic inside triggers.
-- Investigate all side effects before modifying triggers.
-- Maintain appropriate transaction behavior.
-
-Never remove an existing trigger without inspecting its purpose and dependencies.
+- Keep triggers small, predictable, and documented.
+- Account for every affected row and multi-row statements.
+- Use `NEW` and `OLD` correctly for the trigger operation.
+- Choose `BEFORE`, `AFTER`, or `INSTEAD OF` based on the required behavior.
+- Avoid hidden business logic and unnecessary recursive trigger behavior.
+- Inspect all side effects before changing a trigger.
+- Preserve transaction and audit behavior.
+- Never remove a trigger without inspecting its purpose and dependencies.
 
 # 12. Database Migration Standards
 
-Database migrations must be dependency-aware and safe.
+Migrations must be dependency-aware, repeatable where designed to be repeatable, and safe.
 
 Before migration:
 
-1. Compare Source and Target schemas.
-2. Compare table definitions.
-3. Compare constraints.
-4. Compare indexes.
-5. Compare Stored Procedures.
-6. Compare Functions and Views.
-7. Compare Triggers.
-8. Identify shared dependencies.
-9. Identify existing data conflicts.
-10. Identify migration execution order.
+1. Compare source and target schemas.
+2. Compare table and column definitions.
+3. Compare data types, defaults, and nullability.
+4. Compare primary keys, foreign keys, and other constraints.
+5. Compare indexes.
+6. Compare functions and procedures.
+7. Compare views and materialized views.
+8. Compare triggers.
+9. Identify extensions, roles, grants, and RLS policies.
+10. Identify existing data conflicts.
+11. Identify dependencies and execution order.
+12. Estimate locking, rewrite, and downtime risks.
 
-Generate separate manual SQL scripts when requested.
-
-Suggested structure:
+Suggested manual script structure:
 
 ```text
 sql/
-└── Migrations/
-    └── FeatureName/
-        ├── 01_CreateSchema.sql
-        ├── 02_CreateTables.sql
-        ├── 03_AlterTables.sql
-        ├── 04_ConstraintsIndexes.sql
-        ├── 05_Functions.sql
-        ├── 06_StoredProcedures.sql
-        ├── 07_Views.sql
-        ├── 08_Triggers.sql
-        ├── 09_ReferenceData.sql
-        ├── 10_Validation.sql
-        └── 11_Rollback.sql
+└── migrations/
+    └── feature_name/
+        ├── 01_precheck.sql
+        ├── 02_create_schema.sql
+        ├── 03_create_tables.sql
+        ├── 04_alter_tables.sql
+        ├── 05_constraints_indexes.sql
+        ├── 06_functions.sql
+        ├── 07_procedures.sql
+        ├── 08_views.sql
+        ├── 09_triggers.sql
+        ├── 10_reference_data.sql
+        ├── 11_validation.sql
+        └── 12_rollback.sql
 ```
 
 Migration rules:
 
 - Preserve existing data.
-- Never drop or recreate existing tables as a shortcut.
-- Check object existence before creation.
-- Compare definitions before alteration.
-- Respect foreign key dependencies.
+- Never drop and recreate existing tables as a shortcut.
+- Inspect object existence and definition before changing it.
+- Do not assume `CREATE OR REPLACE` can change every object property or function return type.
+- Respect foreign-key and object dependencies.
 - Avoid duplicate reference data.
-- Use appropriate transactions.
+- Use transactions when supported and operationally safe.
 - Validate data after migration.
-- Document execution prerequisites.
+- Document prerequisites, expected locks, execution time, and deployment order.
 - Provide rollback scripts where practical.
+- A rollback must not destroy legitimate data created after deployment.
+- Make migrations idempotent only when safe; do not hide unexpected schema drift with broad `IF EXISTS` clauses.
+- Use versioned migration files and never silently edit an already-applied migration.
+- Do not directly execute production migrations without explicit approval.
 
-Important:
+For large tables, assess whether `ALTER TABLE` causes a table rewrite or strong lock. Prefer staged migrations where appropriate: add nullable column, backfill in batches, validate, then add constraints or set `NOT NULL` in a planned step.
 
-- A migration script must not assume that every statement can safely be rerun.
-- Use explicit existence and state checks.
-- Understand that GO separates SQL Server batches and cannot be used inside TRY/CATCH blocks.
-- Validate SQL syntax and dependencies for the target server version.
-- Do not directly execute production migrations without approval.
+For `CREATE INDEX CONCURRENTLY`, plan it outside a transaction block and check for invalid indexes after failures.
 
-For Source-to-Target ERP migration, never replace an existing shared Stored Procedure without checking every consumer.
+# 13. PostgreSQL Execution and Production Safety
 
-# 13. SQL Server Execution Safety
-
-Default mode: READ-ONLY ANALYSIS.
+Default mode: **READ-ONLY ANALYSIS**.
 
 During investigation, allowed operations include:
 
-- SELECT.
-- Read-only metadata queries.
-- Approved execution plan inspection.
-- Database object definition inspection.
+- `SELECT`.
+- Read-only queries against `information_schema` and `pg_catalog`.
+- Object definition inspection.
 - Dependency inspection.
+- Safe execution-plan inspection.
+- Read-only validation queries.
 
 Do not execute the following without explicit authorization:
 
-- INSERT.
-- UPDATE.
-- DELETE.
-- TRUNCATE.
-- DROP.
-- ALTER.
-- CREATE.
-- DISABLE CONSTRAINT.
-- DISABLE TRIGGER.
+- `INSERT`.
+- `UPDATE`.
+- `DELETE`.
+- `TRUNCATE`.
+- `DROP`.
+- `ALTER`.
+- `CREATE`.
+- `GRANT` or `REVOKE`.
+- Disabling triggers or constraints.
 - Production data corrections.
+- Production migrations.
 
-Even if the user requests a data correction, first inspect the affected records and explain the impact where the operation is potentially destructive.
+Even when a data correction is requested, first inspect the affected records and explain the expected impact when the operation is potentially destructive.
 
-For Production Database access:
+Production safety:
 
-- Prefer a dedicated read-only SQL login.
+- Prefer a dedicated read-only database role for investigation.
 - Apply least-privilege permissions.
-- Never use sysadmin or db_owner for routine analysis.
-- Never expose connection strings or credentials.
+- Do not use a superuser for routine application access.
+- Never expose connection strings, passwords, tokens, or secrets.
 - Avoid selecting unnecessary patient-sensitive data.
-- Use row limits for investigation queries.
+- Use row limits for investigation.
+- Confirm database, schema, and environment before any write operation.
+- Require a backup/recovery plan for high-risk changes.
+- Use a staging or restored production-like environment for validation whenever possible.
 
 A prompt-level read-only instruction is not a substitute for database permissions.
 
-# 14. Database Dependency Analysis
+# 14. Dependency Analysis
 
-When investigating a database feature, trace:
+When investigating a feature, trace the complete path:
 
-1. Frontend API consumer.
+1. Frontend consumer.
 2. Backend API endpoint.
-3. Service or handler.
-4. Repository or Dapper query.
-5. Stored Procedure.
-6. Functions and Views.
-7. Tables.
-8. Related Foreign Keys.
-9. Triggers.
-10. Other dependent procedures and reports.
+3. Service, handler, or application use case.
+4. Repository, ORM mapping, or Dapper query.
+5. PostgreSQL function or procedure, if used.
+6. Views and materialized views.
+7. Tables and columns.
+8. Primary and foreign keys.
+9. Indexes and constraints.
+10. Triggers and side effects.
+11. Reports, background jobs, integrations, and other consumers.
 
-Use database metadata and source-code references.
+Use PostgreSQL catalogs and source-code references.
 
-Important limitations:
+Limitations:
 
-- Metadata dependency views may not identify all dynamic SQL references.
-- Cross-database dependencies may require additional investigation.
+- Catalog dependency information may not identify every dynamic SQL reference.
 - Application-generated SQL requires source-code inspection.
-- External applications may call Stored Procedures directly.
+- External applications may call database routines directly.
+- Dynamic SQL, string-built queries, and ORM-generated queries may not appear in database dependency metadata.
 
-Never declare a database object unused solely because SQL dependency metadata returns no references.
+Never declare an object unused solely because catalog dependency information returns no references.
 
-# 15. SQL Security
+# 15. PostgreSQL Security
 
-Follow secure SQL practices.
+Follow secure database practices.
 
 Check:
 
 - Parameterized queries.
-- Dynamic SQL injection.
-- Least-privilege database access.
+- Dynamic SQL injection risks.
+- Role and schema permissions.
+- Least-privilege access.
 - Sensitive data exposure.
-- Excessive database permissions.
-- Encryption requirements where applicable.
+- Row-level security requirements.
 - Audit history protection.
-- Secure connection configuration.
+- TLS and secure connection configuration.
+- Backup encryption and access.
+- Extension security and trusted ownership.
+- `search_path` safety for security-sensitive routines.
 
 Do not:
 
 - Hardcode credentials.
-- Expose passwords.
-- Use untrusted string concatenation.
-- Grant unnecessary database privileges.
+- Expose passwords or secrets.
+- Concatenate untrusted values into SQL.
+- Grant unnecessary privileges.
+- Use superuser or broad owner roles for routine application access.
 - Log sensitive patient or financial data unnecessarily.
+- Assume RLS protects table owners, superusers, or roles with `BYPASSRLS`; understand and configure `FORCE ROW LEVEL SECURITY` where required.
+
+Use separate roles for migration ownership, application runtime, read-only reporting, and operational administration where practical.
+
+For `SECURITY DEFINER` functions:
+
+- Use only when necessary.
+- Set a safe, controlled `search_path`.
+- Schema-qualify referenced objects.
+- Restrict `EXECUTE` privileges.
+- Review privilege escalation risks.
 
 # 16. Healthcare ERP Database Integrity
 
-Database correctness is critical.
+Database correctness is critical. Apply only the rules relevant to the feature being changed.
 
 ## Pharmacy
 
 Preserve:
 
 - GRN relationships.
-- StockReceive relationships.
-- Lot IDs.
+- Stock receive relationships.
+- Lot and batch IDs.
 - Batch and expiry information.
 - Product-wise purchase prices.
 - MRP and sale prices.
 - OPD/IPD stock.
 - Outlet-wise stock.
-- Medicine Return.
-- Supplier Ledger.
+- Medicine return history.
+- Supplier ledger.
 - Invoice numbering.
+- Stock movement history.
 
 Check:
 
-- Duplicate Lot creation.
-- Duplicate StockReceive records.
+- Duplicate lot creation.
+- Duplicate stock receive records.
 - Incorrect stock balances.
 - Incorrect stock restoration.
 - Partial stock consumption.
@@ -594,8 +618,10 @@ Check:
 - Expiry inconsistencies.
 - Negative stock.
 - Incorrect FEFO behavior.
+- Concurrent sale and return operations.
+- Duplicate invoice posting.
 
-Never update stock without considering its complete movement history.
+Never update stock without considering its complete movement history. Use atomic stock operations and appropriate locking. For FEFO, consume eligible lots in expiry order and preserve correct lot/price traceability.
 
 ## Hospital
 
@@ -604,151 +630,156 @@ Preserve:
 - UHID.
 - Patient ID.
 - Admission ID.
-- Bed/Cabin relationships.
+- Bed/cabin relationships.
 - Booking history.
 - Patient transfers.
 - Billing records.
 - Discharge records.
 - Manual adjustment history.
 
-Prevent duplicate active allocations and inconsistent patient states.
+Prevent duplicate active allocations and inconsistent patient states. Use constraints and transaction-safe allocation logic where suitable.
 
 ## Accounts
 
 Preserve:
 
-- Chart of Accounts relationships.
-- Journal Voucher.
-- Debit and Credit.
-- General Ledger.
-- Cash and Bank.
-- Financial Posting.
-- Accounts Receivable.
-- Accounts Payable.
+- Chart of accounts relationships.
+- Journal vouchers.
+- Debit and credit entries.
+- General ledger.
+- Cash and bank records.
+- Financial posting.
+- Accounts receivable.
+- Accounts payable.
 
-Never allow invalid debit-credit posting or accidental historical ledger modifications.
+Never allow invalid debit-credit posting or accidental historical ledger modification. Validate balanced journal entries within the correct business transaction boundary.
 
 ## Diagnostic
 
 Preserve:
 
-- Investigation Invoices.
-- Investigation Details.
-- Report Results.
-- Sample Tracking.
-- Report Delivery.
-- Billing Relationships.
+- Investigation invoices.
+- Investigation details.
+- Report results.
+- Sample tracking.
+- Report delivery.
+- Billing relationships.
 
 Avoid modifying finalized diagnostic results without the existing authorization and audit workflow.
-
-Apply only the rules relevant to the actual feature being changed.
 
 # 17. Audit and Historical Data
 
 Preserve historical records for important business transactions.
 
-Check:
+Inspect existing audit conventions, such as:
 
-- CreatedBy.
-- CreatedDate.
-- ModifiedBy.
-- ModifiedDate.
+- `created_by`.
+- `created_at`.
+- `modified_by`.
+- `modified_at`.
 - Audit tables.
 - Before-and-after values.
 - User identity.
 - Transaction references.
+
+Use the project's established audit column names and types; do not rename them unnecessarily.
 
 For financial and stock adjustments:
 
 - Record required historical changes.
 - Prevent accidental deletion of audit history.
 - Preserve traceability.
-- Make audit records immutable through appropriate permissions and application design.
-
-Never overwrite historical records to simplify an update.
+- Record actor, timestamp, reason, and transaction reference where required.
+- Protect audit records through permissions and application design.
+- Avoid overwriting historical transactions to simplify an update.
 
 # 18. Reporting and Data Accuracy
 
 For database reports:
 
-- Verify JOIN relationships.
-- Avoid duplicate rows.
-- Verify aggregation.
-- Verify date filters.
-- Check timezone handling.
+- Verify join relationships.
+- Prevent unintended duplicate rows.
+- Verify aggregation and grouping.
+- Verify date filters and timezone behavior.
 - Preserve report column contracts.
-- Check NULL behavior.
+- Check `NULL` behavior and use `COALESCE` only when semantically correct.
 - Validate financial totals.
-- Ensure stock balances are calculated from correct transactions.
+- Ensure stock balances derive from correct movements.
+- Confirm pagination and sorting are deterministic.
+- Validate against known transaction examples.
 
 Do not optimize reports by removing necessary business conditions.
 
-Validate reports against known transaction examples.
-
-# 19. SQL Testing and Validation
+# 19. Testing and Validation
 
 After implementing a database change, validate:
 
-- SQL syntax.
-- Target server compatibility.
-- Object existence.
-- Column data types.
-- Primary and Foreign Keys.
-- Constraint behavior.
-- Stored Procedure results.
+- PostgreSQL syntax and target major-version compatibility.
+- Object existence and definitions.
+- Column data types and defaults.
+- Primary and foreign keys.
+- Unique and check constraints.
+- Function and procedure results.
+- Trigger behavior.
 - Transaction rollback.
 - Multi-row behavior.
 - Duplicate prevention.
 - Concurrent operation safety.
-- Performance where measurable.
+- RLS and permissions.
+- Query performance where measurable.
 - Existing application consumers.
+- Data integrity before and after migration.
 
 For critical stock and financial changes, include:
 
-- Successful operation test.
-- Failed operation test.
-- Rollback test.
-- Duplicate request test.
-- Concurrency test.
-- Boundary value test.
+1. Successful operation test.
+2. Failed operation test.
+3. Rollback test.
+4. Duplicate request test.
+5. Concurrent operation test.
+6. Boundary-value test.
+7. Historical-data preservation test.
+8. Permission and authorization test.
 
-Never claim a database operation was tested unless it was actually executed in a suitable environment.
+Never claim a database operation or migration was tested unless it was actually executed in a suitable environment. Clearly distinguish static review from executed testing.
 
 # 20. Token Efficiency and Investigation
 
 To reduce unnecessary context consumption:
 
-- Inspect relevant tables only.
+- Inspect only relevant schemas and tables.
 - Retrieve schema before retrieving data.
-- Inspect specific Stored Procedures instead of dumping every procedure.
-- Query database dependencies selectively.
-- Use TOP limits for investigation.
+- Inspect specific functions and procedures rather than dumping every routine.
+- Query dependencies selectively.
+- Use `LIMIT` for investigation.
 - Return concise metadata.
 - Avoid exporting huge record sets.
-- Avoid repeating unchanged schema analysis.
-- Reuse previous verified dependency mappings.
+- Avoid retrieving unnecessary patient-sensitive data.
+- Reuse previously verified dependency mappings when still valid.
 - Separate metadata discovery from data inspection.
+- Record verified findings in project documentation where useful.
 
 Never sacrifice necessary dependency analysis to save tokens.
 
 # 21. Database Change Report
 
-When reviewing or implementing SQL changes, summarize:
+When reviewing or implementing a database change, summarize:
 
-1. Database engine and version.
+1. PostgreSQL version.
 2. Affected schemas.
 3. Affected tables.
 4. New or modified columns.
 5. Constraints and indexes.
-6. Stored Procedures.
-7. Functions and Views.
+6. Functions and procedures.
+7. Views and materialized views.
 8. Triggers.
 9. Dependency impact.
 10. Transaction and concurrency handling.
 11. Data migration impact.
-12. Validation results.
-13. Rollback strategy.
-14. Remaining risks.
+12. Security and permission impact.
+13. Validation results.
+14. Rollback strategy.
+15. Remaining risks.
 
 Clearly distinguish:
 
@@ -756,25 +787,64 @@ Clearly distinguish:
 - Modified database objects.
 - Existing objects preserved.
 - Objects requiring manual review.
+- Scripts generated but not executed.
+- Changes actually applied and verified.
 
-# 22. Final Rules
+# 22. PostgreSQL Syntax Reference
 
+Use PostgreSQL-native equivalents. These are examples, not permission to mechanically replace syntax without understanding semantics.
+
+| Common SQL Server syntax | PostgreSQL equivalent |
+|---|---|
+| `GETDATE()` | `CURRENT_TIMESTAMP` |
+| `ISNULL(a, b)` | `COALESCE(a, b)` |
+| `TOP (10)` | `LIMIT 10` |
+| `SCOPE_IDENTITY()` | `INSERT ... RETURNING id` |
+| `IDENTITY(1,1)` | `GENERATED BY DEFAULT AS IDENTITY` |
+| `BIT` | `boolean` |
+| `UNIQUEIDENTIFIER` | `uuid` |
+| `NVARCHAR` | `varchar` or `text` |
+| `DATETIME` | `timestamp` or `timestamptz`, based on meaning |
+| `TRY/CATCH` | PL/pgSQL `EXCEPTION` block / application exception handling |
+| `THROW` | `RAISE EXCEPTION` in PL/pgSQL |
+| `@@ROWCOUNT` | `GET DIAGNOSTICS variable = ROW_COUNT` in PL/pgSQL |
+| `sp_executesql` | parameterized `EXECUTE ... USING` in PL/pgSQL or parameterized application SQL |
+| `GO` | No equivalent; use client-specific script/batch handling |
+| `NOLOCK` | No direct equivalent; understand MVCC and isolation levels |
+| `#temp` table | `CREATE TEMP TABLE` |
+| `MERGE` / upsert patterns | `INSERT ... ON CONFLICT` where appropriate |
+
+Additional PostgreSQL rules:
+
+- Use `ILIKE` for case-insensitive pattern matching when appropriate.
+- Use `RETURNING` to retrieve values from `INSERT`, `UPDATE`, and `DELETE`.
+- Use `ON CONFLICT` for atomic conflict handling when a suitable unique or exclusion constraint/index exists.
+- Use `FILTER (WHERE ...)` for conditional aggregate expressions where appropriate.
+- Use `LATERAL` when a correlated FROM item is required.
+- Use `generate_series()` for suitable series-generation tasks.
+- Use `jsonb` operators and functions for JSON data.
+- Use `IS DISTINCT FROM` when null-safe comparison is required.
+- Do not assume SQL Server and PostgreSQL have identical date, string, collation, identity, locking, or transaction semantics.
+
+# 23. Final Rules
+
+- Use PostgreSQL only.
 - Understand the actual database before changing it.
-- Preserve existing schema and data.
+- Preserve existing schema, data, and application contracts.
 - Trace database dependencies.
-- Use safe transactions.
+- Use safe, atomic business transactions.
+- Protect concurrency-sensitive operations.
 - Optimize based on evidence.
-- Prefer constraints for data integrity where appropriate.
+- Use constraints for data integrity where appropriate.
 - Preserve audit history.
-- Use read-only database access for investigation.
+- Use read-only access for investigation.
 - Generate manual SQL scripts when requested.
 - Never execute destructive production operations without explicit approval.
 - Never claim success without verification.
+- Clearly document assumptions and unresolved risks.
 
-Final priority:
+**Final priority:**
 
-**Data Integrity > Financial Accuracy > Stock Accuracy > Security > Transaction Safety > Performance > Maintainability.**
+**Data Integrity > Financial Accuracy > Stock Accuracy > Security > Transaction Safety > Performance > Maintainability**
 
-Final principle:
-
-Write safe SQL. Preserve historical data. Protect every business transaction. Make only necessary database changes.
+**Final principle:** Write safe PostgreSQL. Preserve historical data. Protect every business transaction. Make only necessary database changes.

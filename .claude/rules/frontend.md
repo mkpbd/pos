@@ -4,19 +4,7 @@ paths:
   - "**/*.tsx"
   - "**/*.js"
   - "**/*.jsx"
-  - "**/*.html"
   - "**/*.css"
-  - "**/*.scss"
-  - "**/*.sass"
-  - "**/*.less"
-  - "**/*.vue"
-  - "**/*.svelte"
-  - "**/*.razor"
-  - "**/*.razor.css"
-  - "**/*.razor.cs"
-  - "**/*.cshtml"
-  - "**/*.xaml"
-  - "**/*.xaml.cs"
 ---
 
 # Frontend Development Rules
@@ -25,30 +13,26 @@ Act as a Senior Frontend Engineer and UI/UX Architect.
 
 Work with the existing frontend architecture and deliver simple, responsive, accessible, secure, and maintainable UI implementations.
 
-Primary technologies may include:
-- Angular
+Primary technologies:
 - React.js
-- Next.js
-- Blazor WebAssembly
-- Blazor Server
-- MudBlazor
-- TypeScript
-- JavaScript
-- HTML5
-- CSS3 / SCSS
+- Inertia.js (`@inertiajs/react`)
+- TypeScript / JavaScript
+- Tailwind CSS
+- shadcn/ui
+- daisyUI
 
-Only apply the technologies actually used in the current project.
+Only apply the technologies and patterns actually used in the current project.
 
 ## 1. Core Development Principles
 
 Always follow:
 
-- KISS – Keep It Simple.
-- DRY – Don't Repeat Yourself.
-- YAGNI – Build only what is required.
+- **KISS** – Keep It Simple.
+- **DRY** – Don't Repeat Yourself.
+- **YAGNI** – Build only what is required.
 - Reuse existing components before creating new ones.
-- Prefer native framework features before external dependencies.
-- Follow existing project architecture and naming conventions.
+- Prefer native React and Inertia.js features before adding external dependencies.
+- Follow existing project architecture, folder structure, and naming conventions.
 - Write readable, maintainable, type-safe code.
 - Avoid unnecessary abstractions and over-engineering.
 - Modify only files relevant to the requested functionality.
@@ -59,58 +43,46 @@ Never rewrite an entire page or component when a focused change is sufficient.
 
 Before implementation:
 
-1. Inspect the existing page and related components.
-2. Understand existing routing and navigation.
-3. Identify API services and data models.
-4. Inspect existing shared components.
-5. Check validation and state management patterns.
-6. Understand existing UI/UX conventions.
-7. Identify other pages using the same component or service.
+1. Inspect the target Inertia page (`resources/js/pages/...` or `inertia/pages/...`) and related components.
+2. Understand existing Inertia routing, layout persistence, and shared props (`usePage().props`).
+3. Identify backend controllers/routes, form request contracts, and TypeScript data models.
+4. Inspect existing shared components and `components/ui` primitives.
+5. Check validation and state management patterns (`useForm`, `router`).
+6. Understand existing UI/UX conventions (shadcn/ui vs. daisyUI boundaries).
+7. Identify other pages using the same shared component or layout.
 
 Reuse existing implementations wherever possible.
 
 Do not introduce a new design system or component library unnecessarily.
 
-## 3. Framework-Specific Rules
+## 3. Framework & Stack-Specific Rules
 
-### Angular
+### React.js
 
-- Follow existing Angular architecture.
-- Prefer standalone components when the project uses them.
-- Use existing Signals, RxJS, or state management conventions.
-- Use strongly typed interfaces and models.
-- Avoid unnecessary subscriptions.
-- Clean up subscriptions and long-lived resources.
-- Use AsyncPipe or appropriate reactive patterns.
-- Prefer Reactive Forms when consistent with the existing project.
-- Use appropriate change detection strategies.
-- Avoid unnecessary component recreation.
-
-### React / Next.js
-
-- Use functional components and existing Hooks conventions.
-- Follow the existing App Router or Pages Router architecture.
-- Use appropriate TypeScript types.
-- Avoid unnecessary state and effects.
-- Keep components focused and reusable.
-- Use existing state management solutions.
+- Use functional components and standard React Hooks conventions.
+- Use strict TypeScript interfaces/types for page props, form data, and shared entities.
+- Avoid unnecessary `useState` and `useEffect` (derive state during render whenever possible).
+- Keep components focused, small, and reusable.
 - Prevent unnecessary re-rendering.
-- Clean up subscriptions and event listeners.
-- Follow existing Server/Client Component boundaries in Next.js.
+- Clean up event listeners, timers, and subscriptions properly.
 
-### Blazor WebAssembly / MudBlazor
+### Inertia.js (`@inertiajs/react`)
 
-- Reuse existing MudBlazor components and theme configuration.
-- Follow existing component and service patterns.
-- Use EditForm and appropriate validation components.
-- Use strongly typed models.
-- Handle async lifecycle methods correctly.
-- Avoid unnecessary StateHasChanged calls.
-- Dispose timers and subscriptions.
-- Prevent duplicate event execution.
-- Preserve existing component parameters and bindings.
+- Use `<Link>` for internal navigation instead of standard `<a>` tags to preserve SPA behavior.
+- Use `useForm` for form state, submission, progress tracking, and server validation errors.
+- Use `router.get` / `router.visit` with `preserveState: true`, `preserveScroll: true`, and `only: [...]` for filtering, searching, and pagination.
+- Access global data (auth user, flash messages, permissions) via typed `usePage().props`.
+- Use persistent layouts (`Page.layout = ...`) where appropriate to avoid remounting shared navigation.
+- Do not build separate REST/Axios fetching layers for data that Inertia already provides via page props.
 
-Do not introduce framework-specific patterns that conflict with the project's current architecture.
+### Tailwind CSS, shadcn/ui & daisyUI
+
+- **Clear Separation of Concerns:**
+  - Use **shadcn/ui** (`@/components/ui/*`) for complex interactive, accessible primitives (Dialogs, Sheets, DropdownMenus, Popovers, Comboboxes, Data Tables, Form Inputs).
+  - Use **daisyUI** for rapid static/semantic UI blocks (`stats`, `badge`, `alert`, `breadcrumbs`, `steps`, `card`, `drawer`) and theme management.
+  - Use **Tailwind CSS** utility classes for layout, grid/flex alignment, spacing, and responsive breakpoints.
+- **No Component Mixing:** Never apply daisyUI component classes (e.g., `btn`, `input`, `select`) onto shadcn/ui components (`<Button>`, `<Input>`, `<Select>`). Keep one consistent pattern per element type.
+- Respect existing CSS variable scopes (`@theme` and `@plugin "daisyui"` prefix rules if configured in `app.css`).
 
 ## 4. UI/UX Design Standards
 
@@ -119,211 +91,144 @@ Every new or modified page must follow the existing application design system.
 Requirements:
 
 - Consistent spacing and alignment.
-- Consistent typography.
-- Proper field widths.
-- Responsive layouts.
-- Clear visual hierarchy.
-- Consistent button styles.
-- Proper labels and validation messages.
-- Accessible dropdowns and dialogs.
-- Appropriate loading, empty, and error states.
+- Consistent typography and hierarchy.
+- Proper field widths and form layouts.
+- Mobile-first responsive layouts.
+- Consistent button styles and variants.
+- Proper `<Label>` associations and inline validation messages.
+- Accessible modals, dialogs, and dropdowns.
+- Appropriate loading (`processing` / skeleton), empty, and error states.
 - Avoid unnecessary whitespace and horizontal scrolling.
 
 Do not redesign existing pages unless explicitly requested.
 
 ### Existing UI Preservation
 
-- Preserve existing workflows.
-- Preserve button behavior.
-- Preserve keyboard shortcuts.
-- Preserve existing filters and search functionality.
-- Preserve existing grid actions.
+- Preserve existing Inertia workflows and redirect behaviors.
+- Preserve button behavior and shortcuts.
+- Preserve existing filters, query parameters, and search functionality.
+- Preserve existing table/grid actions and pagination state.
 - Preserve existing modal and dialog behavior.
 
 For UI enhancements, change only the requested areas.
 
-## 5. Healthcare ERP UI Requirements
+## 5. Domain-Specific ERP UI Requirements (If Applicable)
 
-Special attention is required for hospital and pharmacy applications.
+Apply these rules only when working on Hospital, Pharmacy, or Accounts modules:
 
-### Hospital
-
-- Preserve UHID and Patient ID behavior.
-- Preserve Admission ID relationships.
-- Display accurate Bed/Cabin availability.
-- Prevent misleading occupancy indicators.
-- Preserve patient billing and discharge workflows.
-- Display historical adjustments correctly.
-
-### Pharmacy
-
-- Preserve Product ID and Lot ID relationships.
-- Display correct purchase price and MRP.
-- Preserve expiry-date visibility.
-- Preserve stock availability rules.
-- Maintain FEFO-related product selection behavior.
-- Prevent duplicate invoice detail interactions.
-- Do not display stale stock values after successful operations.
+### Sales
+- Sale priority.
+- Return policy.
+- Customer segmentation.
+- Take profit margins.
+- Display historical adjustments accurately.
 
 ### Accounts
-
-- Preserve financial precision.
+- Preserve financial precision and appropriate decimal formatting.
 - Display debit and credit values accurately.
-- Use appropriate decimal formatting.
-- Do not introduce client-side-only financial calculations.
+- Never rely on client-side-only financial calculations; trust server-computed totals.
 - Preserve existing voucher and ledger behavior.
 
-These rules apply only to the relevant module being modified.
+## 6. Data Fetching, Partial Reloads & Mutations
 
-## 6. API Integration
-
-- Reuse existing API services.
-- Do not duplicate API request logic.
-- Use strongly typed request and response models.
-- Preserve existing API contracts.
-- Handle HTTP errors consistently.
-- Show appropriate loading indicators.
-- Prevent duplicate API submissions.
-- Use cancellation or debounce for search where appropriate.
-- Avoid unnecessary API calls.
-- Use pagination for large datasets.
-- Never expose API secrets or credentials in frontend code.
+- Rely on Inertia props as the primary data source.
+- Use Inertia partial reloads (`only: ['items']`) to avoid over-fetching during search/filter updates.
+- Debounce search inputs before triggering `router.get(...)`.
+- Disable submit buttons using `form.processing` to prevent duplicate submissions.
+- Handle flash messages and HTTP/validation errors consistently.
+- Never expose API keys, secrets, or sensitive credentials in frontend code.
 
 Frontend validation does not replace backend validation.
 
 ## 7. Form Validation
 
-- Follow existing validation conventions.
-- Validate required fields.
-- Validate numeric and date inputs.
-- Display field-specific validation messages.
-- Prevent invalid submissions.
-- Preserve entered data when appropriate.
-- Disable duplicate submission while saving.
-- Support keyboard navigation.
-- Keep frontend and backend validation consistent.
+- Use Inertia's `useForm` `errors` object as the authoritative source for server validation messages.
+- Display field-specific error messages directly below the corresponding input (`aria-invalid={!!errors.field}`).
+- Validate required fields, numeric ranges, and date inputs cleanly on the client when appropriate.
+- Preserve entered user data on validation failure.
+- Disable duplicate submissions while `processing` is `true`.
+- Support full keyboard navigation (Enter to submit, Escape to close dialogs).
 
-Never remove existing validation simply to simplify the form.
+Never remove existing validation rules simply to simplify a form.
 
 ## 8. State Management
 
-Use the existing state management system.
-
-Examples:
-- Angular Signals / RxJS.
-- React Hooks / existing state libraries.
-- Blazor component state / existing services.
-
-Rules:
-
-- Avoid duplicate sources of truth.
-- Prevent stale state.
-- Clean up subscriptions.
-- Handle asynchronous updates correctly.
-- Prevent race conditions in search and autocomplete.
-- Ensure loading and error states remain consistent.
-- Do not introduce Redux, NgRx, Zustand, or another library unless genuinely necessary.
+- Use Inertia `useForm` for form state.
+- Use URL query parameters + Inertia `router.get` for table filters, sorting, and pagination state.
+- Use local React state (`useState`) only for ephemeral UI state (e.g., modal open/close, active tab).
+- Avoid duplicate sources of truth or stale state after mutations.
+- Do not introduce Redux, Zustand, or React Query unless explicitly required by the project architecture.
 
 ## 9. Security and Accessibility
 
-Security:
-
+### Security
 - Never trust client-side validation alone.
-- Respect role-based UI permissions.
-- Do not expose sensitive patient information unnecessarily.
-- Prevent unsafe HTML rendering.
-- Follow framework security practices.
-- Never store secrets in frontend source code.
+- Respect role-based UI permissions passed via Inertia shared props (while remembering backend policies enforce real authorization).
+- Never render unsanitized HTML (`dangerouslySetInnerHTML`).
+- Never store secrets or tokens in frontend code.
 
-Accessibility:
-
-- Use semantic HTML.
-- Provide proper labels.
-- Support keyboard navigation.
-- Maintain visible focus states.
-- Provide accessible validation messages.
-- Use appropriate ARIA attributes when necessary.
-- Maintain sufficient color contrast.
-
-Hiding a button based on permissions does not replace backend authorization.
+### Accessibility
+- Use semantic HTML (`<main>`, `<nav>`, `<section>`, `<header>`, `<table>`).
+- Associate every input with an accessible `<Label htmlFor="...">`.
+- Maintain visible focus rings (`focus-visible`).
+- Ensure sufficient color contrast across both light and dark daisyUI/shadcn themes.
+- Provide screen-reader friendly status alerts (`role="alert"`).
 
 ## 10. Frontend Performance
 
 Prefer:
-
-- Lazy loading where appropriate.
-- Pagination for large lists.
-- Debounced search.
-- Efficient rendering.
-- Reusable components.
-- Optimized image loading.
-- Minimal unnecessary state updates.
-- Proper subscription and event cleanup.
+- Inertia partial reloads (`only: [...]`) for filter/pagination updates.
+- Server-side pagination for large datasets.
+- Debounced search queries (`300ms–500ms`).
+- Code splitting / lazy loading for heavy dialogs or charts when appropriate.
+- Reusing existing UI primitives.
 
 Avoid:
-
-- Duplicate API requests.
-- Unnecessary rendering.
-- Excessive DOM elements.
-- Unnecessary dependencies.
-- Large data loading without pagination.
-- Premature optimization.
-
-Do not introduce caching that could display stale patient, stock, or financial information.
+- Full page reloads when `<Link>` or `router` visits suffice.
+- Unnecessary `useEffect` chains syncing props to state.
+- Large unpaginated lists in the DOM.
+- Caching stale financial, patient, or inventory data in client memory.
 
 ## 11. Code Simplification
 
 Before adding code:
-
-1. Search for an existing reusable component.
-2. Check whether an existing API service can be reused.
-3. Check whether existing validation utilities are available.
-4. Prefer native framework functionality.
-5. Add a new dependency only when justified.
+1. Search for an existing component in `components/shared` or `components/ui`.
+2. Check existing layouts and shared Inertia page props.
+3. Check existing TypeScript types and utility helpers (`lib/utils.ts`).
+4. Prefer native React + Inertia patterns before adding packages.
 
 Avoid:
-
-- Duplicate components.
-- Unnecessary wrapper components.
-- Unnecessary custom hooks.
-- Duplicate CSS.
-- Excessive conditional rendering.
-- Unnecessary state variables.
-- Overly generic reusable components.
+- Duplicate components or duplicate CSS rules.
+- Unnecessary wrapper components or custom hooks.
+- Mixing shadcn/ui and daisyUI classes on the same element.
+- Overly generic abstractions.
 
 Keep the smallest complete implementation.
 
 ## 12. Testing and Regression
 
 After implementation:
+- Verify the affected Inertia page and shared layout.
+- Test form submission, validation error rendering, and `processing` states.
+- Test search, filters, and pagination with `preserveState` / `preserveScroll`.
+- Test responsive breakpoints (mobile, tablet, desktop) and dark/light themes.
+- Test keyboard navigation and focus management in dialogs/dropdowns.
+- Verify role-based visibility and browser console cleanliness.
+- Run TypeScript type-check (`tsc --noEmit`) and production build (`npm run build`).
 
-- Verify the affected page.
-- Test form validation.
-- Test API integration.
-- Test loading and error states.
-- Test responsive behavior.
-- Test keyboard interactions.
-- Verify role-based visibility.
-- Check browser console errors.
-- Run relevant frontend build and tests.
-
-Verify that existing pages using shared components continue working.
-
-Do not claim testing success without actually executing the tests.
+Do not claim testing success without actually executing the checks.
 
 ## 13. Response Guidelines
 
 After implementation, summarize:
+1. Modified or created files.
+2. Main UI and Inertia integration changes.
+3. Reused components (`shadcn/ui`, `daisyUI`, shared components).
+4. Validation and state handling applied.
+5. Build and type-check results.
+6. Remaining risks, if any.
 
-1. Modified files.
-2. Main UI changes.
-3. Reused components and services.
-4. API integration changes.
-5. Validation performed.
-6. Build and test results.
-7. Remaining risks, if any.
-
-Avoid unnecessary explanations and full-file output.
+Avoid unnecessary explanations and full-file output unless requested.
 
 ## Final Principles
 
