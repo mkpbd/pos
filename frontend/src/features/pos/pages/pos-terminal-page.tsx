@@ -36,7 +36,8 @@ import { isTillProblem } from '@/features/pos/till-helpers'
 import { AUTO_LOCK_MS, useIdleTimer, useTillLockStore } from '@/features/pos/till-lock'
 import { useCurrentSessionQuery } from '@/features/registers/api'
 import type { Sale } from '@/features/sales/api'
-import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
+import { TillMenu } from '@/features/pos/components/till-menu'
+import { TillReceiptDialog } from '@/features/pos/components/till-receipt-dialog'
 import { api, ApiError } from '@/lib/api/client'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
@@ -324,6 +325,7 @@ function PosTerminal() {
                 cashReady: sessionReady,
               }}
             />
+            <TillMenu storeId={cart.storeId} sessionReady={sessionReady} shop={me.organization?.name ?? null} />
             <Button
               type="button"
               variant="outline"
@@ -446,8 +448,9 @@ function PosTerminal() {
           onSubmit={complete}
         />
       )}
-      <ReceiptDialog
+      <TillReceiptDialog
         sale={completed}
+        fresh
         open={completed !== null}
         onOpenChange={(o) => { if (!o) { setCompleted(null); searchRef.current?.focus() } }}
         title={completed ? `Sale ${completed.number} completed` : 'Sale completed'}

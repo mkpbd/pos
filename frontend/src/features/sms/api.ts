@@ -18,8 +18,18 @@ export type SmsPhoneFormat = 'local' | '880' | 'plus880'
 export const ORDER_EVENTS = ['order_placed', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled'] as const
 export type OrderEvent = (typeof ORDER_EVENTS)[number]
 
+/** POS1d: the receipt of a sale at the till, sent from the till or the sale page ("Send receipt"). */
+export const SALE_RECEIPT_EVENT = 'sale_receipt'
+export type TemplateEvent = OrderEvent | typeof SALE_RECEIPT_EVENT
+
 export type SmsTemplate = { enabled: boolean; en: string; bn: string }
-export type SmsTemplates = Record<OrderEvent, SmsTemplate>
+/** `sale_receipt` is present when the server has it (POS1d). */
+export type SmsTemplates = Record<OrderEvent, SmsTemplate> & { sale_receipt?: SmsTemplate }
+
+/** The events the templates have, in display order: the order events, then the sale receipt when the server lists it. */
+export function templateEvents(templates: SmsTemplates): TemplateEvent[] {
+  return templates.sale_receipt ? [...ORDER_EVENTS, SALE_RECEIPT_EVENT] : [...ORDER_EVENTS]
+}
 
 export type SmsSettings = {
   is_enabled: boolean
@@ -81,8 +91,9 @@ const oneOf = <T extends string>(v: unknown, options: readonly T[], fallback: T)
 
 function normalizeTemplates(raw: unknown): SmsTemplates {
   const source = isObj(raw) ? raw : {}
+  const events: readonly TemplateEvent[] = isObj(source[SALE_RECEIPT_EVENT]) ? [...ORDER_EVENTS, SALE_RECEIPT_EVENT] : ORDER_EVENTS
   return Object.fromEntries(
-    ORDER_EVENTS.map((event) => {
+    events.map((event) => {
       const t = isObj(source[event]) ? (source[event] as Obj) : {}
       return [event, { enabled: t.enabled === true, en: str(t.en) ?? '', bn: str(t.bn) ?? '' }]
     }),
@@ -176,7 +187,7 @@ export function useSendTestSmsMutation() {
 }
 
 export type SmsStatus = 'queued' | 'sent' | 'failed' | 'skipped'
-export type SmsPurpose = OrderEvent | 'otp' | 'test'
+export type SmsPurpose = TemplateEvent | 'otp' | 'test'
 
 export type SmsMessage = {
   id: string
@@ -218,6 +229,7 @@ export const PURPOSE_LABELS: Record<SmsPurpose, string> = {
   order_shipped: 'Order shipped',
   order_delivered: 'Order delivered',
   order_cancelled: 'Order cancelled',
+  sale_receipt: 'Sale receipt',
   test: 'Test message',
 }
 

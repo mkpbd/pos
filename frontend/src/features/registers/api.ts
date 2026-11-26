@@ -42,7 +42,14 @@ export type SessionReport = RegisterSession & {
   by_method: { method: MoneyMethod; label: string; in: string; out: string; net: string }[]
   by_source: { source_type: string; label: string; in: string; out: string; entries: number }[]
   entries: PaymentEntry[]
+  /** POS1d: times the drawer was opened without a sale in this session (absent before POS1d). */
+  no_sale_count?: number
+  /** POS1d: those openings, oldest first. */
+  no_sale_openings?: NoSaleOpening[]
 }
+
+/** POS1d: a drawer opening without a sale ("No sale"), with the reason and the approving manager. */
+export type NoSaleOpening = { opened_at: string; reason: string; user_name: string | null; approved_by_name: string | null }
 
 export type CashRegisterInput = { branch_id?: string; code: string; name: string; is_active: boolean }
 export type CashMovementInput = { direction: PaymentDirection; amount: string; reason: string }

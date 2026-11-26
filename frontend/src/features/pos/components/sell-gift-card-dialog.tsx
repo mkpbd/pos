@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Loader2Icon, PlusIcon, PrinterIcon, Trash2Icon } from 'lucide-react'
+import { Loader2Icon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { FormField } from '@/components/common/form-field'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { CustomerRef } from '@/features/pos/cart-store'
 import { SlipPrinter, StoredValueSlip, type SlipData } from '@/features/pos/components/stored-value-slip'
+import { slipDocument } from '@/features/pos/printing/receipt-document'
+import { TillPrintButton } from '@/features/pos/printing/till-print-button'
 import {
   CARD_NUMBER_PATTERN,
   codeFingerprint,
@@ -132,9 +134,12 @@ export function SellGiftCardDialog({ till, customer, onClose }: { till: TillCont
             <div className="shadow-sm"><StoredValueSlip slip={slip} format={format} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={printing} onClick={() => setPrinting(true)}>
-              <PrinterIcon data-icon="inline-start" /> Print
-            </Button>
+            <TillPrintButton
+              job={{ key: `slip:${sold.receipt_number}`, build: () => slipDocument(slip), cash: payments.some((p) => p.method === 'cash') }}
+              auto
+              onBrowserPrint={() => setPrinting(true)}
+              disabled={printing}
+            />
             <Button autoFocus onClick={onClose}>Done</Button>
           </DialogFooter>
           {printing && <SlipPrinter slip={slip} format={format} onDone={donePrinting} />}

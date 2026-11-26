@@ -55,6 +55,24 @@ class FakeSmsSender implements SmsSender
         $this->events[] = ['org' => $orgId, 'event' => $event, 'phone' => $phone, 'locale' => $locale, 'vars' => $vars, 'order_id' => $orderId];
     }
 
+    /** @var array<string, bool> POS1d: event => enabled (default on) */
+    public array $templates = [];
+
+    public function templateEnabled(string $orgId, string $event): bool
+    {
+        return $this->templates[$event] ?? true;
+    }
+
+    public function renderTemplate(string $orgId, string $event, string $locale, array $vars): string
+    {
+        return trim($event.' '.$locale.' '.implode(' ', array_filter($vars, fn ($v) => $v !== null && $v !== '')));
+    }
+
+    public function messageStatus(string $orgId, string $messageId): ?string
+    {
+        return isset($this->queued[(int) $messageId - 1]) ? 'queued' : null;
+    }
+
     /**
      * @return list<string>
      */

@@ -9,6 +9,7 @@ import { content } from './en/content'
 import { demos } from './en/demos'
 import { landing } from './en/landing'
 import { orders } from './en/orders'
+import { receipts } from './en/receipts'
 import { payments } from './en/payments'
 import { promo } from './en/promo'
 import { reviews } from './en/reviews'
@@ -35,6 +36,7 @@ export const en = {
   ...checkout,
   ...account,
   ...orders,
+  ...receipts,
   ...payments,
   ...theme,
   ...demos,

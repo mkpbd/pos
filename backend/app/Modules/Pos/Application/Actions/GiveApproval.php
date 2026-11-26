@@ -29,6 +29,8 @@ class GiveApproval
         TillApprovals::PRICE_OVERRIDE => 'sales.price_override',
         TillApprovals::DISCOUNT => 'sales.discount',
         TillApprovals::RETURN => 'returns.approve',
+        // POS1d: opening the cash drawer without a sale.
+        TillApprovals::NO_SALE => 'pos.no_sale',
     ];
 
     public function __construct(
@@ -108,6 +110,10 @@ class GiveApproval
     {
         if ($action === TillApprovals::DISCOUNT) {
             return isset($details['scope']) ? ['scope' => $details['scope']] : [];
+        }
+
+        if ($action === TillApprovals::NO_SALE) {
+            return [];
         }
 
         if ($action === TillApprovals::RETURN) {

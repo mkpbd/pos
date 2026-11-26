@@ -119,6 +119,33 @@ class SmsMessenger implements SmsSender
         $this->queue($orgId, $phone, $event, $text, "order:{$orderId}:{$event}", 'order', $orderId);
     }
 
+    public function templateEnabled(string $orgId, string $event): bool
+    {
+        $templates = SmsTemplate::effective($this->config->settings($orgId)->templates);
+
+        return isset($templates[$event]) && $templates[$event]['enabled'];
+    }
+
+    public function renderTemplate(string $orgId, string $event, string $locale, array $vars): string
+    {
+        $templates = SmsTemplate::effective($this->config->settings($orgId)->templates);
+        if (! isset($templates[$event])) {
+            return '';
+        }
+
+        $vars['shop'] = isset($vars['shop']) && trim((string) $vars['shop']) !== '' ? $vars['shop'] : $this->config->shopName($orgId);
+
+        return SmsTemplate::render(SmsTemplate::textFor($event, $templates[$event], $locale), $vars);
+    }
+
+    public function messageStatus(string $orgId, string $messageId): ?string
+    {
+        $status = SmsMessage::query()->withoutGlobalScope('organization')
+            ->where('organization_id', $orgId)->whereKey($messageId)->value('status');
+
+        return is_string($status) ? $status : null;
+    }
+
     private function duplicate(string $orgId, string $dedupeKey): bool
     {
         return SmsMessage::query()->withoutGlobalScope('organization')

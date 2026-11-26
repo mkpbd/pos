@@ -222,6 +222,12 @@ class StorefrontShellController
             $status = 200;
             $meta['title'] = $t('Your order').' | '.$store;
         }
+        // POS1d: a till sale's digital receipt (personal, never indexed; the SPA asks the API).
+        if (preg_match('#^/receipt/[A-Za-z0-9]{32,48}$#', $path) === 1) {
+            $orderPage = true;
+            $status = 200;
+            $meta['title'] = $t('Your receipt').' | '.$store;
+        }
         if (preg_match('#^/(category|brand|product)/([A-Za-z0-9-]{1,120})$#', $path, $m) === 1 && ($found = $catalog->pageMeta($m[1], $m[2])) !== null) {
             $status = 200;
             $meta = [

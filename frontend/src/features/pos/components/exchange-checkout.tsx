@@ -21,7 +21,8 @@ import { storeCreditKey, tenderProblem } from '@/features/pos/stored-value-api'
 import { isTillProblem } from '@/features/pos/till-helpers'
 import { isRetryable, type RefundInput } from '@/features/returns/api'
 import { CreditNoteDialog } from '@/features/returns/components/credit-note-dialog'
-import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
+import { TillReceiptDialog } from '@/features/pos/components/till-receipt-dialog'
+import { tookCash } from '@/features/pos/printing/receipt-document'
 import { ApiError } from '@/lib/api/client'
 import { formatMoney, isZeroDecimal, sumDecimals, trimDecimal } from '@/lib/money'
 
@@ -175,8 +176,10 @@ export function ExchangeCheckout({ open, onOpenChange, cart, apply, cartInput, p
           exchange.reset()
         }}
       />
-      <ReceiptDialog
+      <TillReceiptDialog
         sale={result?.sale ?? null}
+        fresh
+        cash={!!result && (tookCash(result.sale) || refunded.some((r) => r.method === 'cash'))}
         open={!!completed && !completed.noteOpen}
         onOpenChange={(o) => { if (!o) { setCompleted(null); onFinished() } }}
         title={result ? `Exchange ${result.sale.number} completed` : 'Exchange completed'}

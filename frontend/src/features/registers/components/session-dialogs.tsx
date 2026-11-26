@@ -180,7 +180,7 @@ export function CashMovementDialog({ open, ...rest }: MovementProps & { open: bo
 
 type CloseProps = {
   onOpenChange: (open: boolean) => void
-  session: RegisterSession & { cash?: SessionReport['cash'] }
+  session: RegisterSession & { cash?: SessionReport['cash']; no_sale_count?: number }
   onClosed?: (report: SessionReport) => void
 }
 
@@ -212,6 +212,8 @@ function CloseSessionForm({ onOpenChange, session, onClosed, close }: CloseProps
         <DialogTitle>Close {session.number}</DialogTitle>
         <DialogDescription>
           Count the cash in the drawer. {expected !== null && <>Expected: <span className="font-mono">{formatMoney(expected, session.currency)}</span>.</>}
+          {/* POS1d: drawer openings without a sale this shift. */}
+          {session.no_sale_count !== undefined && <> No-sale openings: <span data-testid="close-no-sale-count">{session.no_sale_count}</span>.</>}
         </DialogDescription>
       </DialogHeader>
       <form id="close-session-form" onSubmit={submit} noValidate className="flex flex-col gap-4">

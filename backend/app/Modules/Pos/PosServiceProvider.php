@@ -3,7 +3,9 @@
 namespace App\Modules\Pos;
 
 use App\Modules\Authentication\Application\Contracts\TillDevices;
+use App\Modules\Pos\Application\Contracts\DrawerOpenings;
 use App\Modules\Pos\Application\Contracts\TillApprovals;
+use App\Modules\Pos\Application\Services\EloquentDrawerOpenings;
 use App\Modules\Pos\Application\Services\EloquentTillApprovals;
 use App\Modules\Pos\Application\Services\TerminalCookie;
 use App\Modules\Pos\Application\Services\TerminalRegistry;
@@ -26,6 +28,8 @@ class PosServiceProvider extends ModuleServiceProvider
         // POS1a: tills for the PIN sign-in (Authentication declares the contract) and manager approvals for Sales.
         $this->app->bind(TillDevices::class, TerminalRegistry::class);
         $this->app->bind(TillApprovals::class, EloquentTillApprovals::class);
+        // POS1d: no-sale drawer openings for the register session documents (Payments).
+        $this->app->bind(DrawerOpenings::class, EloquentDrawerOpenings::class);
     }
 
     public function boot(): void
@@ -47,6 +51,7 @@ class PosServiceProvider extends ModuleServiceProvider
         return [
             'pos.sell' => 'Use the POS terminal: look up products, hold carts and check out sales',
             'pos.terminals.manage' => 'Set up and remove till devices',
+            'pos.no_sale' => 'Open the cash drawer without a sale',
         ];
     }
 }

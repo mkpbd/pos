@@ -1,0 +1,37 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * POS1d: digital receipts from the till are text messages of their own purpose
+ * (`sale_receipt`, related to the sale).
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::unprepared(<<<'SQL'
+            ALTER TABLE sms_messages DROP CONSTRAINT IF EXISTS sms_messages_purpose_check;
+            ALTER TABLE sms_messages ADD CONSTRAINT sms_messages_purpose_check
+                CHECK (purpose IN ('otp', 'order_placed', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled', 'test', 'sale_receipt'));
+        SQL);
+    }
+
+    public function down(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        DB::unprepared(<<<'SQL'
+            ALTER TABLE sms_messages DROP CONSTRAINT IF EXISTS sms_messages_purpose_check;
+            ALTER TABLE sms_messages ADD CONSTRAINT sms_messages_purpose_check
+                CHECK (purpose IN ('otp', 'order_placed', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled', 'test'));
+        SQL);
+    }
+};

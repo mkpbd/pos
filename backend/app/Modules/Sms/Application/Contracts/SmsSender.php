@@ -12,6 +12,9 @@ interface SmsSender
     /** Order events with a message template (also the `sms_messages.purpose` used for them). */
     public const ORDER_EVENTS = ['order_placed', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled'];
 
+    /** POS1d: the digital receipt of a till sale (template event and `sms_messages.purpose`). */
+    public const SALE_RECEIPT = 'sale_receipt';
+
     /** SMS is switched on and the gateway is configured (driver `log`, or `http` with a URL). */
     public function ready(string $orgId): bool;
 
@@ -43,4 +46,18 @@ interface SmsSender
      * @param  array<string, string|null>  $vars
      */
     public function orderEvent(string $orgId, string $event, string $phone, string $locale, array $vars, string $orderId): void;
+
+    /** POS1d: whether the message template of an event (ORDER_EVENTS or SALE_RECEIPT) is switched on. */
+    public function templateEnabled(string $orgId, string $event): bool;
+
+    /**
+     * POS1d: the text of an event's template (ORDER_EVENTS or SALE_RECEIPT) in $locale (`bn` or
+     * `en`) with $vars filled in ({shop} defaults to the storefront / organization name).
+     *
+     * @param  array<string, string|null>  $vars
+     */
+    public function renderTemplate(string $orgId, string $event, string $locale, array $vars): string;
+
+    /** POS1d: the status of a message queue() returned (queued | sent | failed | skipped), null when unknown. */
+    public function messageStatus(string $orgId, string $messageId): ?string;
 }

@@ -21,6 +21,26 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### POS1d — Receipt printers, the cash drawer, and receipts by SMS / e-mail
+
+Last part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). No new packages: the ESC/POS encoder, Web Serial / WebUSB access and the QR command are written here.
+
+#### Added
+- **Receipt printer** per till (Till → Receipt printer): USB or serial receipt printers print **without the print dialog** in Chrome / Edge — paper 58 / 80 mm, cut, copies, print after every sale, **open the drawer on cash sales**, Test print, Forget printer. Bangla receipts print as a picture; a QR code links to the online receipt. Other browsers keep browser printing.
+- **Open drawer** without a sale (Till → Open drawer): a reason is required; cashiers need a manager's PIN; every opening is listed on the register session and its close report.
+- **Send receipt** by SMS or e-mail from the till and the sale page; a public **receipt page** on the shop (`/receipt/…`); new SMS template **Sale receipt**; the sale page lists where its receipt went.
+
+#### Security
+- Receipt links are long random tokens; the public receipt never shows costs, the customer's phone, e-mail or balance. Phone numbers and e-mail addresses are stored and audited only masked (`017••••678`). Sends are limited (10 a minute per user, 5 per sale); the page 30 a minute per address.
+
+#### Tests
+- Backend 1994 (1993 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3247; mocked Playwright 625 (one builder test, B21, failed once under full load and passed on rerun) (new `pos1d-till` with a fake serial printer checking the bytes, `pos1d-admin`).
+- Full-stack (PostgreSQL, desktop) 65 — new **POS1d** on Bazar Fresh: the owner opens the drawer without a sale (on the session's list), a sale's receipt goes out by SMS (test mode) from the sale page and by e-mail, and a shopper opens the public receipt (no phone number on it; an unknown link says not found).
+- Not tested on real printers: the bytes are checked against the ESC/POS commands; check a print (and a Bangla print) on each printer model.
+
+#### Upgrade
+- `php artisan migrate`, `php artisan pos:permissions:sync`.
+
 ### POS1c — Exchanges at the till
 
 Third part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). Printing / drawer / SMS receipts follow in POS1d. No new packages.

@@ -18,13 +18,13 @@ use Illuminate\Validation\Rule;
  */
 class ApprovalController
 {
-    private const ACTIONS = [TillApprovals::PRICE_OVERRIDE, TillApprovals::DISCOUNT, TillApprovals::RETURN];
+    private const ACTIONS = [TillApprovals::PRICE_OVERRIDE, TillApprovals::DISCOUNT, TillApprovals::RETURN, TillApprovals::NO_SALE];
 
     /**
      * Who can approve
      *
      * Active users with a PIN, the action's permission (`price_override` → `sales.price_override`,
-     * `discount` → `sales.discount`, `return` → `returns.approve`) and access to the store's
+     * `discount` → `sales.discount`, `return` → `returns.approve`, `no_sale` → `pos.no_sale`) and access to the store's
      * branch — not the requester.
      */
     public function approvers(Request $request, GiveApproval $approvals): JsonResponse
@@ -42,7 +42,8 @@ class ApprovalController
      *
      * Valid for 10 minutes, used once by the requester's checkout. `price_override` needs
      * `details.variant_id`; `discount` may say `details.scope` (`line` / `invoice`); `return`
-     * (an exchange) needs `details.sale_id`, the original invoice. Errors:
+     * (an exchange) needs `details.sale_id`, the original invoice; `no_sale` (POS1d: open the
+     * drawer without a sale) takes no details and is used by `POST /pos/drawer-openings`. Errors:
      * `APPROVER_NOT_ALLOWED`, `PIN_INVALID` (`details.attempts_left`), `PIN_LOCKED` (423,
      * `details.retry_after`), `PIN_NOT_SET`.
      */

@@ -11,6 +11,9 @@ use App\Modules\Sales\Infrastructure\Models\ReturnReason;
 use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Sales\Infrastructure\Models\SaleReturn;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -38,6 +41,10 @@ class SalesServiceProvider extends ModuleServiceProvider
         Route::model('returnReason', ReturnReason::class);
 
         parent::boot();
+
+        // POS1d: digital receipts — sending costs SMS credit; the public page is per IP.
+        RateLimiter::for('receipt-send', fn (Request $request) => Limit::perMinute(10)->by('receipt-send:'.($request->user()?->getAuthIdentifier() ?: $request->ip())));
+        RateLimiter::for('receipt-view', fn (Request $request) => Limit::perMinute(30)->by('receipt-view:'.$request->ip()));
     }
 
     protected function permissions(): array

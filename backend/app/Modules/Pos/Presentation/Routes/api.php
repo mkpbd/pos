@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Pos\Presentation\Http\Controllers\ApprovalController;
+use App\Modules\Pos\Presentation\Http\Controllers\DrawerOpeningController;
 use App\Modules\Pos\Presentation\Http\Controllers\ExchangeController;
 use App\Modules\Pos\Presentation\Http\Controllers\HeldSaleController;
 use App\Modules\Pos\Presentation\Http\Controllers\PosController;
@@ -23,7 +24,13 @@ Route::prefix('pos')->middleware(['auth:sanctum', 'tenant', 'can:pos.sell'])->gr
     // POS1a: manager approval by PIN.
     Route::get('approvers', [ApprovalController::class, 'approvers']);
     Route::post('approvals', [ApprovalController::class, 'store'])->middleware('throttle:pos-approval');
+
+    // POS1d: the cash drawer opened without a sale.
+    Route::post('drawer-openings', [DrawerOpeningController::class, 'store'])->middleware('idempotent');
 });
+
+// POS1d: no-sale drawer openings (`cash_registers.view` or `pos.no_sale`, checked in the controller).
+Route::get('pos/drawer-openings', [DrawerOpeningController::class, 'index'])->middleware(['auth:sanctum', 'tenant']);
 
 // POS1a: tills (devices set up for PIN sign-in).
 Route::prefix('pos')->middleware(['auth:sanctum', 'tenant', 'can:pos.terminals.manage'])->group(function () {

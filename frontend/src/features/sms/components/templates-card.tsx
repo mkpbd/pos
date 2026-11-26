@@ -7,19 +7,27 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/use-auth'
-import { ORDER_EVENTS, useSaveSmsSettingsMutation, type OrderEvent, type SmsSettings, type SmsTemplate, type SmsTemplates } from '@/features/sms/api'
+import { SALE_RECEIPT_EVENT, templateEvents, useSaveSmsSettingsMutation, type SmsSettings, type SmsTemplate, type SmsTemplates, type TemplateEvent } from '@/features/sms/api'
 import { analyzeSms, describeSms, EXAMPLE_VALUES, insertAt, renderSmsTemplate } from '@/features/sms/sms-text'
 import { fieldErrorMap } from '@/lib/forms'
 
 export const MAX_TEMPLATE = 480
 
-const EVENTS: Record<OrderEvent, { title: string; hint: string }> = {
+const EVENTS: Record<TemplateEvent, { title: string; hint: string }> = {
   order_placed: { title: 'Order placed', hint: 'Right after the customer places an online order.' },
   order_confirmed: { title: 'Payment received', hint: 'When an online payment for an order is confirmed.' },
   order_shipped: { title: 'Order shipped', hint: 'When the parcel is handed to the courier.' },
   order_delivered: { title: 'Order delivered', hint: 'When the order is marked delivered.' },
   order_cancelled: { title: 'Order cancelled', hint: 'When the order is cancelled.' },
+  sale_receipt: { title: 'Sale receipt', hint: 'When a shop sale’s receipt is sent by SMS from the till or the sale’s page.' },
 }
+
+/** POS1d: the sale receipt knows the invoice, not an order or a courier. */
+const SALE_RECEIPT_PLACEHOLDERS = ['shop', 'name', 'invoice', 'total', 'link']
+const SALE_RECEIPT_EXAMPLES = { invoice: 'INV-MAIN-000123', link: 'https://shop.example.com/receipt/k3Jx9QaZ' }
+
+const EMPTY: SmsTemplate = { enabled: false, en: '', bn: '' }
+const templateOf = (templates: SmsTemplates, event: TemplateEvent): SmsTemplate => templates[event] ?? EMPTY
 
 type Lang = 'en' | 'bn'
 const LANGS: { value: Lang; label: string }[] = [
@@ -27,7 +35,11 @@ const LANGS: { value: Lang; label: string }[] = [
   { value: 'bn', label: 'Bangla' },
 ]
 
-const sameTemplates = (a: SmsTemplates, b: SmsTemplates) => ORDER_EVENTS.every((e) => a[e].enabled === b[e].enabled && a[e].en === b[e].en && a[e].bn === b[e].bn)
+const sameTemplates = (a: SmsTemplates, b: SmsTemplates) =>
+  templateEvents(a).every((e) => {
+    const [x, y] = [templateOf(a, e), templateOf(b, e)]
+    return x.enabled === y.enabled && x.en === y.en && x.bn === y.bn
+  })
 
 /** SMS → Message templates: one per order event, in English and Bangla, with a live SMS counter. */
 export function TemplatesCard({ settings, canManage }: { settings: SmsSettings; canManage: boolean }) {
@@ -41,11 +53,12 @@ export function TemplatesCard({ settings, canManage }: { settings: SmsSettings; 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     const found: Record<string, string> = {}
-    for (const event of ORDER_EVENTS) {
+    for (const event of templateEvents(draft)) {
+      const template = templateOf(draft, event)
       for (const { value: lang } of LANGS) {
-        if (draft[event][lang].length > MAX_TEMPLATE) found[`templates.${event}.${lang}`] = `Up to ${MAX_TEMPLATE} characters.`
+        if (template[lang].length > MAX_TEMPLATE) found[`templates.${event}.${lang}`] = `Up to ${MAX_TEMPLATE} characters.`
       }
-      if (draft[event].enabled && draft[event].en.trim() === '') found[`templates.${event}.en`] = 'Write the English text, or switch this message off.'
+      if (template.enabled && template.en.trim() === '') found[`templates.${event}.en`] = 'Write the English text, or switch this message off.'
     }
     setErrors(found)
     if (Object.keys(found).length > 0) return
@@ -68,19 +81,19 @@ export function TemplatesCard({ settings, canManage }: { settings: SmsSettings; 
           <h2>Message templates</h2>
         </CardTitle>
         <CardDescription>
-          Texts sent to customers about their online orders, in the language they shopped in. Bangla texts use Unicode, so fewer characters fit in one SMS — each SMS part is charged.
+          Texts sent to customers about their online orders and shop receipts, in the language they shopped in. Bangla texts use Unicode, so fewer characters fit in one SMS — each SMS part is charged.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form noValidate onSubmit={onSubmit} aria-label="Message templates" className="flex flex-col gap-6">
-          {ORDER_EVENTS.map((event) => (
+          {templateEvents(draft).map((event) => (
             <TemplateEditor
               key={event}
               event={event}
-              value={draft[event]}
-              fallback={settings.default_templates[event]}
-              placeholders={settings.placeholders}
-              vars={vars}
+              value={templateOf(draft, event)}
+              fallback={settings.default_templates[event] ?? templateOf(settings.templates, event)}
+              placeholders={event === SALE_RECEIPT_EVENT ? SALE_RECEIPT_PLACEHOLDERS : settings.placeholders.filter((p) => p !== 'invoice')}
+              vars={event === SALE_RECEIPT_EVENT ? { ...vars, ...SALE_RECEIPT_EXAMPLES } : vars}
               canManage={canManage}
               errors={errors}
               onChange={(next) => setDraft((d) => ({ ...d, [event]: next }))}
@@ -105,7 +118,7 @@ export function TemplatesCard({ settings, canManage }: { settings: SmsSettings; 
 }
 
 type EditorProps = {
-  event: OrderEvent
+  event: TemplateEvent
   value: SmsTemplate
   fallback: SmsTemplate
   placeholders: string[]

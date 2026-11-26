@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { varianceTone, type SessionReport } from '@/features/registers/api'
+import { NoSaleOpeningsCard } from '@/features/registers/components/no-sale-openings'
 import { formatMoney } from '@/lib/money'
 
 /** X report (open session, live figures) or Z report (closed, frozen figures). */
@@ -104,6 +105,8 @@ export function SessionReportView({ report }: { report: SessionReport }) {
           </CardContent>
         </Card>
       )}
+
+      <NoSaleOpeningsCard report={report} />
 
       <Card>
         <CardHeader><CardTitle>Entries</CardTitle></CardHeader>

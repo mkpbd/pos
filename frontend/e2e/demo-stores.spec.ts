@@ -2848,3 +2848,93 @@ test('POS1c: Bazar Fresh exchanges one item at the till and the customer pays th
     await context.close()
   }
 })
+
+test('POS1d: Bazar Fresh opens the drawer without a sale (listed on the session), sends a receipt by SMS and e-mail, and the shopper opens the public receipt page', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The till runs on desktop')
+  test.setTimeout(300_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  try {
+    // An open drawer session, a customer with a phone and an e-mail, and a cash sale.
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    let current = await call('GET', '/api/v1/register-sessions/current')
+    if (!(current.status === 200 && current.body.data)) {
+      const register = await call('POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `D${stamp.slice(-6)}`, name: `Drawer ${stamp}` })
+      expect(register.status).toBe(201)
+      expect((await call('POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '1000' })).status).toBeLessThan(300)
+      current = await call('GET', '/api/v1/register-sessions/current')
+    }
+    const sessionId = current.body.data.id as string
+    const phone = `017${stamp}`
+    const customer = await call('POST', '/api/v1/customers', { name: `Tania Rahman ${stamp}`, phone, email: `tania${stamp}@example.test` })
+    expect(customer.status).toBe(201)
+    const items = (await call('GET', `/api/v1/pos/catalog?store_id=${store.id}&page=1`)).body.data as { variant_id: string; price: string; on_hand: string | null; sellable: boolean; open_price?: boolean; track_batches: boolean; track_serials: boolean }[]
+    const item = items.find((i) => i.sellable && !i.open_price && !i.track_serials && !i.track_batches && Number(i.price) >= 20 && (i.on_hand === null || Number(i.on_hand) >= 5))!
+    expect(item).toBeTruthy()
+    const sold = await call('POST', '/api/v1/pos/checkout', { store_id: store.id, customer_id: customer.body.data.id, lines: [{ variant_id: item.variant_id, quantity: '1' }], payments: [{ method: 'cash', amount: Number(item.price).toFixed(2) }] })
+    expect(sold.status).toBe(201)
+    const saleId = sold.body.data.id as string
+    const number = sold.body.data.number as string
+
+    // At the till: Open drawer (no sale) with a reason; no printer is set up, so it is opened by hand.
+    await page.goto(`${base}/admin/pos`)
+    await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+    await page.getByRole('button', { name: 'Till' }).click()
+    await page.getByRole('menuitem', { name: 'Open drawer' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Open drawer' })
+    await drawer.getByLabel('Reason').fill(`Change for a customer ${stamp}`)
+    await drawer.getByRole('button', { name: 'Open drawer' }).click()
+    await expect(page.getByText('Drawer opening recorded — open it by hand.')).toBeVisible({ timeout: 15_000 })
+    const session = (await call('GET', `/api/v1/register-sessions/${sessionId}`)).body.data
+    expect(session.no_sale_count).toBeGreaterThanOrEqual(1)
+    expect((session.no_sale_openings as { reason: string }[]).map((o) => o.reason)).toContain(`Change for a customer ${stamp}`)
+
+    // The receipt goes out by SMS (test mode) from the sale page, then by e-mail through the API.
+    expect((await call('PATCH', '/api/v1/sms/settings', { is_enabled: true, driver: 'log' })).status).toBe(200)
+    await page.goto(`${base}/admin/sales/${saleId}`)
+    await expect(page.getByRole('heading', { name: number })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: 'Send receipt' }).click()
+    const send = page.getByRole('dialog', { name: 'Send receipt' })
+    await expect(send.getByLabel('Mobile number')).toHaveValue(phone)
+    await send.getByRole('button', { name: 'Send' }).click()
+    await expect(send.getByRole('status')).toContainText('Sent to 017')
+    await expect(send.getByRole('status')).not.toContainText(phone)
+    await send.getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByRole('region', { name: 'Receipt sent' }).getByTestId('receipt-delivery').first()).toContainText('••••')
+    const mailed = await call('POST', `/api/v1/sales/${saleId}/receipt/send`, { channel: 'email' })
+    expect(mailed.status).toBe(201)
+    expect(mailed.body.data.recipient_masked).not.toContain(`tania${stamp}`)
+    const deliveries = (await call('GET', `/api/v1/sales/${saleId}`)).body.data.receipt_deliveries as { channel: string }[]
+    expect(deliveries.map((d) => d.channel).sort()).toEqual(['email', 'sms'])
+
+    // The shopper's link: the receipt on the shop, no sign-in, never the phone number.
+    const link = (await call('GET', `/api/v1/sales/${saleId}/receipt-link`)).body.data as { token: string; url: string | null }
+    expect(link.token).toMatch(/^[A-Za-z0-9]{32,48}$/)
+    const shopper = await browser.newContext()
+    const shopperPage = await shopper.newPage()
+    await shopperPage.goto(`${base}/receipt/${link.token}`)
+    await expect(shopperPage.getByRole('heading', { level: 1, name: `Receipt ${number}` })).toBeVisible({ timeout: 20_000 })
+    await expect(shopperPage.getByTestId('public-receipt')).toContainText(Number(item.price).toFixed(2))
+    await expect(shopperPage.getByTestId('public-receipt')).not.toContainText(phone)
+    await shopperPage.goto(`${base}/receipt/${'x'.repeat(40)}`)
+    await expect(shopperPage.getByRole('heading', { level: 1, name: 'Receipt not found' })).toBeVisible({ timeout: 20_000 })
+    await shopper.close()
+  } finally {
+    await context.close()
+  }
+})

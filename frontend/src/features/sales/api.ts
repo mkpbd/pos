@@ -11,7 +11,8 @@ export type SaleHeader = {
   sold_at: string
   store: { id: string; code: string; name: string } | null
   branch: { id: string; name: string } | null
-  customer: { id: string; code: string; name: string; phone: string | null } | null
+  /** `email` (POS1d) fills the "Send receipt" recipient when the document carries it. */
+  customer: { id: string; code: string; name: string; phone: string | null; email?: string | null } | null
   cashier: { id: string; name: string | null } | null
   tax_mode: 'inclusive' | 'exclusive'
   currency: string
@@ -140,6 +141,8 @@ export type Sale = SaleHeader & {
   discount_approved_by?: SalePerson | null
   /** POS1c: set when the sale was made in an exchange (absent before POS1c). */
   exchange?: SaleExchange | null
+  /** POS1d: receipts sent by SMS / e-mail, newest first (absent before POS1d). */
+  receipt_deliveries?: SaleReceiptDelivery[]
   receipt: {
     organization_name: string | null
     /** Seller BIN (organization tax number); printed under the shop name when set (Q1 §3). */
@@ -153,6 +156,21 @@ export type Sale = SaleHeader & {
     /** POS1b: the customer's store credit after the sale (null / absent for walk-in sales). */
     customer_store_credit_balance?: string | null
   }
+}
+
+/** POS1d: how a receipt is sent to the customer. */
+export type ReceiptChannel = 'sms' | 'email'
+
+/** POS1d: `queued` handed to the SMS / mail queue; `skipped` not sent (e.g. the SMS template is off); `failed`. */
+export type ReceiptDeliveryStatus = 'queued' | 'skipped' | 'failed'
+
+/** POS1d: one send of the receipt; the recipient is masked ("017••••123", "ra•••@gmail.com"). */
+export type SaleReceiptDelivery = {
+  channel: ReceiptChannel
+  recipient_masked: string
+  status: ReceiptDeliveryStatus
+  created_by_name: string | null
+  created_at: string
 }
 
 export type SalesSummary = {

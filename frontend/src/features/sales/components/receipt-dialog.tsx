@@ -22,6 +22,8 @@ export function ReceiptDialog({
   title,
   description,
   closeLabel = 'Close',
+  printAction,
+  actions,
 }: {
   sale: Sale | null
   open: boolean
@@ -29,6 +31,10 @@ export function ReceiptDialog({
   title: string
   description?: React.ReactNode
   closeLabel?: string
+  /** POS1d: replaces the Print button (the till prints on its receipt printer; `browser.print` is the fallback). */
+  printAction?: (browser: { print: () => void; printing: boolean }) => React.ReactNode
+  /** POS1d: more buttons before Print (e.g. "Send receipt"). */
+  actions?: React.ReactNode
 }) {
   const [format, setFormat] = useState<ReceiptFormat>(savedFormat)
   const [printing, setPrinting] = useState(false)
@@ -61,10 +67,13 @@ export function ReceiptDialog({
               {(Object.keys(RECEIPT_FORMATS) as ReceiptFormat[]).map((f) => <SelectItem key={f} value={f}>{RECEIPT_FORMATS[f]}</SelectItem>)}
             </SelectContent>
           </Select>
-          <div className="flex gap-2">
-            <Button variant="outline" disabled={!sale || printing} onClick={() => setPrinting(true)}>
-              <PrinterIcon data-icon="inline-start" /> Print
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            {actions}
+            {printAction ? printAction({ print: () => { if (sale) setPrinting(true) }, printing }) : (
+              <Button variant="outline" disabled={!sale || printing} onClick={() => setPrinting(true)}>
+                <PrinterIcon data-icon="inline-start" /> Print
+              </Button>
+            )}
             <Button autoFocus onClick={() => onOpenChange(false)}>{closeLabel}</Button>
           </div>
         </DialogFooter>

@@ -188,6 +188,8 @@ class SalePresenter
             ])->all(),
             // POS1c: the items this sale was exchanged for (null unless made by an exchange).
             'exchange' => $this->exchange($sale, $payments),
+            // POS1d: digital receipts sent by SMS / e-mail, newest first (recipients masked).
+            'receipt_deliveries' => SaleReceiptHistory::of($sale, $this->users, $org),
             'receipt' => [
                 'organization_name' => $organization['name'] ?? null,
                 // Q1: the seller's BIN; the receipt is a tax invoice only when one is set.

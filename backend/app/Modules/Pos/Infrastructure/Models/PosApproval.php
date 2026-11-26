@@ -15,13 +15,13 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $organization_id
  * @property string $store_id
- * @property string $action price_override|discount
+ * @property string $action price_override|discount|return|no_sale
+ * @property ?string $sale_id the sale that used it (no_sale: the drawer opening)
  * @property string $approver_id
  * @property string $requester_id
  * @property array<string, mixed> $details
  * @property Carbon $expires_at
  * @property ?Carbon $used_at
- * @property ?string $sale_id
  * @property Carbon $created_at
  */
 #[Table(timestamps: false)]

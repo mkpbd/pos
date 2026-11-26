@@ -10,6 +10,7 @@ use App\Modules\Payments\Domain\SessionStatus;
 use App\Modules\Payments\Infrastructure\Models\CashRegister;
 use App\Modules\Payments\Infrastructure\Models\Payment;
 use App\Modules\Payments\Infrastructure\Models\RegisterSession;
+use App\Modules\Pos\Application\Contracts\DrawerOpenings;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
@@ -55,6 +56,7 @@ class PaymentsPresenter
         private readonly BranchDirectory $branches,
         private readonly UserDirectory $users,
         private readonly DrawerCash $drawer,
+        private readonly DrawerOpenings $drawerOpenings,
     ) {}
 
     /**
@@ -130,6 +132,7 @@ class PaymentsPresenter
         $registers = CashRegister::query()->whereKey($sessions->pluck('cash_register_id')->unique())->get()->keyBy('id');
         $branches = collect($this->branches->summaries($org, $sessions->pluck('branch_id')->unique()->values()->all()))->keyBy('id');
         $users = $this->users->names($org, $sessions->flatMap(fn (RegisterSession $s) => [$s->opened_by, $s->closed_by])->filter()->unique()->values()->all());
+        $noSales = $this->drawerOpenings->countForSessions($sessions->pluck('id')->values()->all());
 
         return fn (RegisterSession $s) => [
             'id' => $s->id,
@@ -147,6 +150,8 @@ class PaymentsPresenter
             'closing_notes' => $s->closing_notes,
             'closed_by' => $s->closed_by === null ? null : ['id' => $s->closed_by, 'name' => $users[$s->closed_by] ?? null],
             'closed_at' => $s->closed_at?->toIso8601String(),
+            // POS1d: times the drawer was opened without a sale (the Pos module records them).
+            'no_sale_count' => $noSales[$s->id] ?? 0,
         ];
     }
 
@@ -196,6 +201,7 @@ class PaymentsPresenter
             'by_method' => $byMethod,
             'by_source' => array_values($bySource),
             'entries' => $entries->map($this->payments($entries))->all(),
+            'no_sale_openings' => $this->drawerOpenings->forSession($session->id),
         ];
     }
 

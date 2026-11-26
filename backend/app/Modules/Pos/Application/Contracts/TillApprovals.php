@@ -12,7 +12,9 @@ use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
  * - `price_override` is bound to `details.variant_id` (any price the cashier then sends);
  * - `discount` covers the cart's manual item and invoice discounts;
  * - `return` (POS1c, approver needs `returns.approve`) is bound to `details.sale_id` — the
- *   original invoice of an exchange at the till; it is consumed by the exchange's new sale.
+ *   original invoice of an exchange at the till; it is consumed by the exchange's new sale;
+ * - `no_sale` (POS1d, approver needs `pos.no_sale`) opens the cash drawer without a sale; it is
+ *   consumed by the drawer opening (its id goes where a sale id goes).
  */
 interface TillApprovals
 {
@@ -21,6 +23,9 @@ interface TillApprovals
     public const DISCOUNT = 'discount';
 
     public const RETURN = 'return';
+
+    /** POS1d: opening the cash drawer without a sale (approver needs `pos.no_sale`; no details). */
+    public const NO_SALE = 'no_sale';
 
     /**
      * Checks an approval for this requester and action. For `price_override` pass

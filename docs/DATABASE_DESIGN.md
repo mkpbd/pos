@@ -471,6 +471,13 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Drawer openings and digital receipts POS1d (implemented)
+
+- `pos_drawer_openings` (organization, branch, store, register session id + number copied, terminal, user, approved by, approval id, reason ≤ 200, opened at); append-only; index (organization, branch, opened at). `pos_approvals.action` CHECK adds `no_sale`.
+- `sale_receipt_links` (organization, sale unique, token unique — 40 random letters / digits, created at): the public receipt link, made on first need.
+- `sale_receipt_deliveries` (organization, sale, channel CHECK `sms|email`, recipient **masked only**, sms message id, status CHECK `queued|skipped|failed`, created by / at); append-only.
+- `sms_messages.purpose` CHECK adds `sale_receipt`.
+
 ### Exchanges POS1c (implemented)
 
 - `sale_returns.exchange_sale_id` (nullable, unique, FK → sales): the sale an exchange's returned value paid; set once (the immutability guard allows only this link).

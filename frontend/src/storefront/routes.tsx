@@ -68,6 +68,8 @@ export const storefrontRoutes: RouteObject[] = [
       { path: 'order/:number', element: lazyPage(() => import('./orders/order-page'), 'OrderPage') },
       // BD1a: a guest's order by its number and mobile number (the order SMS links here).
       { path: 'track-order', element: lazyPage(() => import('./orders/track-order-page'), 'TrackOrderPage') },
+      // POS1d: a shop sale's receipt from the link in the receipt SMS / e-mail (no sign-in, noindex).
+      { path: 'receipt/:token', element: lazyPage(() => import('./receipts/receipt-page'), 'ReceiptPage') },
       { path: 'account/verify-email', element: lazyPage(account, 'VerifyEmailPage') },
       {
         element: <GuestOnly />,

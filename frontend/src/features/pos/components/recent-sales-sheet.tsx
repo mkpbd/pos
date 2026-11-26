@@ -4,7 +4,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSaleQuery, useSalesQuery } from '@/features/sales/api'
-import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
+import { TillReceiptDialog } from '@/features/pos/components/till-receipt-dialog'
 import { formatMoney } from '@/lib/money'
 
 /** Last sales at the till, for reprinting a receipt. */
@@ -49,7 +49,7 @@ export function RecentSalesSheet({ open, onOpenChange }: { open: boolean; onOpen
           </div>
         </SheetContent>
       </Sheet>
-      <ReceiptDialog
+      <TillReceiptDialog
         sale={sale.data ?? null}
         open={selected !== null}
         onOpenChange={(o) => { if (!o) setSelected(null) }}

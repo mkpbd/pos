@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeftIcon, BanIcon, BanknoteIcon, PercentIcon, PrinterIcon, ReceiptTextIcon, TrendingUpIcon, Undo2Icon, WalletIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, BanknoteIcon, PercentIcon, PrinterIcon, ReceiptTextIcon, SendIcon, TrendingUpIcon, Undo2Icon, WalletIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
@@ -17,6 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useCan } from '@/features/auth/use-auth'
 import { lineLabel, salesListQuery, useCancelSaleMutation, useSaleQuery, useSalesQuery, useSalesSummaryQuery, type SaleExchange, type SaleStatus } from '@/features/sales/api'
 import { ReceiptDialog } from '@/features/sales/components/receipt-dialog'
+import { ReceiptDeliveriesCard } from '@/features/sales/components/receipt-deliveries-card'
+import { SendReceiptDialog } from '@/features/sales/components/send-receipt-dialog'
 import { LinePrice, LinePromotion, SaleOffersCard } from '@/features/sales/components/sale-pricing'
 import { paymentRowLabel } from '@/features/sales/payment-label'
 import { RETURN_STATUS, returnableQuantity } from '@/features/returns/status'
@@ -189,6 +191,8 @@ export function SalePage() {
   const { data: sale, error, isPending, refetch } = useSaleQuery(saleId)
   const cancel = useCancelSaleMutation()
   const [printing, setPrinting] = useState(false)
+  // POS1d: send the receipt by SMS / e-mail.
+  const [sending, setSending] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [reason, setReason] = useState('')
 
@@ -208,8 +212,11 @@ export function SalePage() {
           {sale.status === 'cancelled' ? <Badge variant="destructive">Cancelled</Badge> : <Badge variant="success">Completed</Badge>}
           {exchanged && <Badge variant="info">Exchange</Badge>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setPrinting(true)}><PrinterIcon data-icon="inline-start" /> Receipt</Button>
+          {can('pos.sell') && sale.status === 'completed' && (
+            <Button variant="outline" onClick={() => setSending(true)}><SendIcon data-icon="inline-start" /> Send receipt</Button>
+          )}
           {can('returns.create') && sale.status === 'completed' && sale.lines.some((l) => !isZeroDecimal(returnableQuantity(l)) && !returnableQuantity(l).startsWith('-')) && (
             <Button asChild variant="outline"><Link to={`/sales/${sale.id}/return`}><Undo2Icon data-icon="inline-start" /> Return items</Link></Button>
           )}
@@ -307,6 +314,8 @@ export function SalePage() {
 
       <SaleOffersCard sale={sale} />
 
+      <ReceiptDeliveriesCard deliveries={sale.receipt_deliveries ?? []} />
+
       {sale.exchange && <ExchangeCard exchange={sale.exchange} currency={c} canViewReturns={can('returns.view')} canCancel={can('sales.cancel') && sale.status === 'completed'} />}
 
       {sale.returns.length > 0 && (
@@ -328,6 +337,7 @@ export function SalePage() {
       )}
 
       <ReceiptDialog sale={sale} open={printing} onOpenChange={setPrinting} title={`Receipt ${sale.number}`} />
+      <SendReceiptDialog saleId={sale.id} customer={sale.customer ? { phone: sale.customer.phone, email: sale.customer.email ?? null } : null} open={sending} onOpenChange={setSending} />
       <Dialog open={cancelling} onOpenChange={setCancelling}>
         <DialogContent>
           <DialogHeader>

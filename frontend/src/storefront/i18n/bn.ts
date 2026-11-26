@@ -11,6 +11,7 @@ import { content } from './bn/content'
 import { demos } from './bn/demos'
 import { landing } from './bn/landing'
 import { orders } from './bn/orders'
+import { receipts } from './bn/receipts'
 import { payments } from './bn/payments'
 import { promo } from './bn/promo'
 import { reviews } from './bn/reviews'
@@ -33,6 +34,7 @@ export const bn: Translations<typeof en> = {
   ...checkout,
   ...account,
   ...orders,
+  ...receipts,
   ...payments,
   ...theme,
   ...demos,

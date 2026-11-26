@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Loader2Icon, PrinterIcon } from 'lucide-react'
+import { Loader2Icon } from 'lucide-react'
 import { FormField } from '@/components/common/form-field'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { CustomerRef } from '@/features/pos/cart-store'
 import type { TillContext } from '@/features/pos/components/sell-gift-card-dialog'
 import { SlipPrinter, StoredValueSlip, type SlipData } from '@/features/pos/components/stored-value-slip'
+import { slipDocument } from '@/features/pos/printing/receipt-document'
+import { TillPrintButton } from '@/features/pos/printing/till-print-button'
 import { TILL_MONEY_METHODS, tillReceiptFormat, useTopUpMutation, type TillMoneyMethod, type TopUpInput, type TopUpResult } from '@/features/pos/stored-value-api'
 import { compareDecimal, formatMoney, MONEY_PATTERN } from '@/lib/money'
 
@@ -109,9 +111,12 @@ export function CustomerAdvanceDialog({
             <div className="shadow-sm"><StoredValueSlip slip={slip} format={format} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={printing} onClick={() => setPrinting(true)}>
-              <PrinterIcon data-icon="inline-start" /> Print
-            </Button>
+            <TillPrintButton
+              job={{ key: `slip:${done.result.receipt_number}`, build: () => slipDocument(slip), cash: done.input.method === 'cash' }}
+              auto
+              onBrowserPrint={() => setPrinting(true)}
+              disabled={printing}
+            />
             <Button autoFocus onClick={onClose}>Done</Button>
           </DialogFooter>
           {printing && <SlipPrinter slip={slip} format={format} onDone={donePrinting} />}

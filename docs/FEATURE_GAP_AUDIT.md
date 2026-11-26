@@ -52,8 +52,8 @@ returns with approval, register X/Z reports, expenses, basic loyalty, per-branch
 | **Promotions & coupons at the till** | **Done (POS1a)** | promotion channels online / till, coupons at the till, one discount per level |
 | **Price override / open-price items with manager approval at the till** | **Done (POS1a)** | change price with permission or a manager's PIN; open-price products |
 | **Exchanges**, **store credit / gift cards / vouchers**, customer advances | **Done (POS1b, exchanges POS1c)** | store credit with advances, gift cards, vouchers, credit notes |
-| **Receipts by SMS / e-mail / WhatsApp**, due (বাকি) reminders | P1 | Print only; no SMS provider at all |
-| **Silent receipt printing** (ESC/POS / print helper), **"no sale" drawer open** | P1 | Every print opens the browser dialog; drawer only via printer driver; real 58/80 mm printers untested |
+| **Receipts by SMS / e-mail / WhatsApp**, due (বাকি) reminders | **Receipts by SMS / e-mail done (POS1d)**; WhatsApp and due reminders → R1 | public receipt link, SMS template, e-mail |
+| **Silent receipt printing** (ESC/POS / print helper), **"no sale" drawer open** | **Done (POS1d)** | ESC/POS over Web Serial / WebUSB (Chrome / Edge), drawer kick, no-sale openings with reason / PIN approval; real printers to be checked per model |
 | **Cashier PIN login / quick switch / screen lock** | **Done (POS1a)** | tills, PIN sign-in, switch cashier, lock (auto after 5 min) |
 | **Restaurant mode** (tables, kitchen tickets, modifiers, service charge, tips, split bill) | P1 if restaurants are a target | — |
 | Customer display, weighing scale & weight barcodes, barcode/shelf labels | P2 | Labels are P0 under stock (§4) |
