@@ -1,0 +1,66 @@
+# Claude Code - Project Session State
+
+## Project Information
+- Project: [Project Name]
+- Architecture: [Architecture]
+- Frontend: [Technology]
+- Backend: [Technology]
+- Database: [Database]
+- Last Updated: [Date and Time]
+
+## Current Task
+- Task: [Current feature or migration]
+- Status: IN_PROGRESS
+- Priority: HIGH
+
+## Objective
+[What needs to be accomplished]
+
+## Completed Work
+- [Completed item 1]
+- [Completed item 2]
+
+## Currently In Progress
+- [Exact implementation currently underway]
+
+## Pending Tasks
+1. [Next action]
+2. [Next action]
+3. [Next action]
+
+## Important Files Changed
+- [File path] - [What changed]
+- [File path] - [What changed]
+
+## Database Changes
+- [Tables / Stored Procedures / Views affected]
+- SQL scripts created: [Path]
+- Database scripts executed: [Yes/No/Not applicable]
+
+## Important Decisions
+- [Important architecture or business decision]
+
+## Existing Functionality Protection
+- [What must not be changed]
+- [Related modules that require regression testing]
+
+## Build and Testing
+- Backend Build: [Passed/Failed/Not Run]
+- Frontend Build: [Passed/Failed/Not Run]
+- Tests: [Passed/Failed/Not Run]
+- Regression: [Completed/Pending]
+
+## Blockers and Risks
+- [Known issue]
+- [Unresolved dependency]
+
+## Next Session Instructions
+1. Verify Git status and existing changes.
+2. Read this session state.
+3. Inspect the relevant source files.
+4. Continue from the first pending task.
+5. Do not repeat completed investigation unless necessary.
+6. Preserve all existing functionality.
+
+## Important Notes
+[Only essential information required for continuing this task]
