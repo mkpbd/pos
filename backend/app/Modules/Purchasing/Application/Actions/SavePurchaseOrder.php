@@ -37,7 +37,7 @@ class SavePurchaseOrder
     ) {}
 
     /**
-     * @param  array{supplier_id: string, store_id: string, order_date: string, expected_date?: ?string, notes?: ?string, lines: list<array{variant_id: string, quantity: string, unit_cost: string, tax_rate?: ?string, requisition_line_id?: ?string}>}  $data
+     * @param  array{supplier_id: string, store_id: string, order_date: string, expected_date?: ?string, notes?: ?string, lines: list<array{variant_id: string, quantity: string, unit_cost: string, tax_rate?: ?string, discount_percent?: ?string, bonus_quantity?: ?string, requisition_line_id?: ?string}>}  $data
      */
     public function __invoke(TenantUser $actor, ?PurchaseOrder $order, array $data): PurchaseOrder
     {
@@ -50,6 +50,7 @@ class SavePurchaseOrder
         $store = $this->storeAccess->require($actor, $data['store_id']);
         $lines = array_values($data['lines']);
         $variants = $this->lineRules->validate($organizationId, $lines, 'in', requireTracked: false, checkBatches: false, requireSellable: true);
+        $lines = $this->context->discountAndBonus($lines, $variants);
 
         foreach ($lines as $i => $line) {
             $lines[$i]['tax_rate'] = Decimal::round($line['tax_rate'] ?? $variants[$line['variant_id']]['tax_rate'] ?? '0', 4);
@@ -89,6 +90,8 @@ class SavePurchaseOrder
                     'quantity' => Decimal::round($line['quantity'], 3),
                     'unit_cost' => Decimal::round($line['unit_cost'], 4),
                     'tax_rate' => $line['tax_rate'],
+                    'discount_percent' => $line['discount_percent'],
+                    'bonus_quantity' => $line['bonus_quantity'],
                     'sort_order' => $i,
                     ...$totals['lines'][$i],
                 ]);

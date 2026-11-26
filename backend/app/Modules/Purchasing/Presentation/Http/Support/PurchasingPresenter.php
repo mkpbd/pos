@@ -102,6 +102,10 @@ class PurchasingPresenter
                     'line_subtotal' => $l->line_subtotal,
                     'line_tax' => $l->line_tax,
                     'line_total' => $l->line_total,
+                    // ST2a: line discount % and free units; the receipt's cost per unit after both.
+                    'discount_percent' => $l instanceof PurchaseReturnLine ? false : $l->discount_percent,
+                    'bonus_quantity' => $l instanceof PurchaseReturnLine ? false : $l->bonus_quantity,
+                    'effective_unit_cost' => $l instanceof GoodsReceiptLine ? $l->effective_unit_cost : false,
                     // SC3: landed cost from the receipt's charges, the cost the stock entered at,
                     // and what posted landed cost vouchers added later.
                     'landed_cost' => $l instanceof GoodsReceiptLine ? $l->landed_cost : false,
@@ -200,6 +204,9 @@ class PurchasingPresenter
                 'rfq_id' => $doc->rfq_id,
                 'approval_level' => $doc->approval_level?->value,
                 'submitted_at' => $doc->submitted_at?->toIso8601String(),
+                // ST2a: closed short.
+                'closed_at' => $doc->closed_at?->toIso8601String(),
+                'close_reason' => $doc->close_reason,
             ],
             $doc instanceof GoodsReceipt => $base + [
                 'purchase_order_id' => $doc->purchase_order_id,

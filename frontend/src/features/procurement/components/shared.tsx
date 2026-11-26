@@ -19,7 +19,7 @@ export function ApprovalLevelBadge({ level }: { level: ApprovalLevel | null | un
 }
 
 /** Reason prompt for a rejection (required, at most 500 characters). Render with a `key` so each opening starts empty. */
-export function ReasonDialog({ open, onOpenChange, title, description, confirmLabel, pending, error, onConfirm }: {
+export function ReasonDialog({ open, onOpenChange, title, description, confirmLabel, pending, error, onConfirm, max = REASON_MAX, hint = 'Shown to the requester.' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
@@ -28,12 +28,15 @@ export function ReasonDialog({ open, onOpenChange, title, description, confirmLa
   pending: boolean
   error?: string | null
   onConfirm: (reason: string) => void
+  /** Longest reason the endpoint accepts, and the text under the field. */
+  max?: number
+  hint?: string
 }) {
   const id = useId()
   const [reason, setReason] = useState('')
   const [touched, setTouched] = useState(false)
   const trimmed = reason.trim()
-  const invalid = trimmed === '' ? 'Give a reason.' : trimmed.length > REASON_MAX ? `At most ${REASON_MAX} characters.` : null
+  const invalid = trimmed === '' ? 'Give a reason.' : trimmed.length > max ? `At most ${max} characters.` : null
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -53,7 +56,7 @@ export function ReasonDialog({ open, onOpenChange, title, description, confirmLa
             <Label htmlFor={id}>Reason</Label>
             <Textarea id={id} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} aria-invalid={(touched && !!invalid) || undefined} aria-describedby={`${id}-hint`} />
             <p id={`${id}-hint`} className={touched && invalid ? 'text-sm text-destructive' : 'text-xs text-muted-foreground'}>
-              {touched && invalid ? invalid : `Shown to the requester. ${trimmed.length}/${REASON_MAX}`}
+              {touched && invalid ? invalid : `${hint} ${trimmed.length}/${max}`}
             </p>
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

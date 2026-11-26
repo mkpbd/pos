@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeftIcon, Loader2Icon, PlusIcon, TagIcon, Undo2Icon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -24,10 +24,11 @@ import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { PURCHASING_TABS } from '@/features/inventory/sections'
 import { variantLabel } from '@/features/inventory/api'
 import { linesSchema, toApiLine } from '@/features/inventory/lines'
-import { DocumentLinesTable } from '@/features/purchasing/components/document-totals'
+import { DocumentLinesTable, EFFECTIVE_COST_LABEL, LinesTotalsPreview } from '@/features/purchasing/components/document-totals'
 import { SupplierSelect } from '@/features/purchasing/components/supplier-select'
 import {
   today,
+  usePostDirectReturnMutation,
   usePostReceiptMutation,
   usePostReturnMutation,
   usePurchaseOrderQuery,
@@ -43,7 +44,8 @@ import { ReceiptLandedPreview } from '@/features/landed-cost/components/receipt-
 import { ReceiptCharges } from '@/features/landed-cost/components/receipt-charges'
 import { chargesSchema, hasLandedCosts, toChargeInput } from '@/features/landed-cost/charges'
 import { handleFormError } from '@/lib/forms'
-import { compareDecimal, formatMoney, subtractDecimal, trimDecimal } from '@/lib/money'
+import { addDecimal, compareDecimal, formatMoney, isZeroDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
+import { useIdempotencyKey } from '@/features/returns/api'
 
 export function ReceiptsPage() {
   const can = useCan()
@@ -106,7 +108,7 @@ export function ReceiptsPage() {
   )
 }
 
-const LINE_OPTIONS = { cost: 'required', tax: true, batch: 'in' } as const
+const LINE_OPTIONS = { cost: 'required', tax: true, batch: 'in', discount: true } as const
 const schema = z.object({
   supplier_id: z.string().min(1, 'Choose a supplier.'),
   store_id: z.string().min(1, 'Choose the receiving store.'),
@@ -139,6 +141,9 @@ function linesFromOrder(order: PurchaseOrder): LineValue[] {
       max_quantity: trimDecimal(open),
       unit_cost: trimDecimal(line.unit_cost),
       tax_rate: trimDecimal(line.tax_rate),
+      discount_percent: trimDecimal(line.discount_percent ?? ''),
+      // Free units come with the first delivery of the line; a later one starts at none.
+      bonus_quantity: isZeroDecimal(line.received_quantity) ? trimDecimal(line.bonus_quantity ?? '') : '',
       source_line_id: line.id,
     }))
 }
@@ -215,6 +220,7 @@ export function NewReceiptPage() {
         {/* relative: keeps the lines table's absolutely positioned sr-only text inside the card, so phones don't widen the page. */}
         <CardContent className="relative">
           <LinesEditor control={form.control} register={form.register} setValue={form.setValue} errors={errors} config={{ ...LINE_OPTIONS, fixedProducts: !!orderId, currency: me.organization?.base_currency }} />
+          <LinesTotalsPreview control={form.control} currency={me.organization?.base_currency} effectiveCost />
         </CardContent>
       </Card>
       <Card>
@@ -247,7 +253,10 @@ function ReturnDialog({ receipt, open, onOpenChange }: { receipt: GoodsReceipt; 
   const post = usePostReturnMutation(receipt.id)
   const form = useForm<z.infer<typeof returnSchema>>({ resolver: zodResolver(returnSchema), defaultValues: { reason: '', quantities: {} } })
   const { errors } = form.formState
-  const returnable = (receipt.lines ?? []).map((l) => ({ line: l, max: subtractDecimal(l.quantity, l.returned_quantity ?? '0') })).filter((r) => compareDecimal(r.max, '0') > 0)
+  // ST2a: free units came into stock too, so they can go back.
+  const returnable = (receipt.lines ?? [])
+    .map((l) => ({ line: l, max: subtractDecimal(addDecimal(l.quantity, l.bonus_quantity ?? '0'), l.returned_quantity ?? '0') }))
+    .filter((r) => compareDecimal(r.max, '0') > 0)
 
   const onSubmit = form.handleSubmit((values) => {
     const lines = Object.entries(values.quantities)
@@ -310,6 +319,7 @@ export function ReceiptPage() {
   // Only without data: a failed background refetch keeps the open form (and what was typed).
   if (!data) return <ErrorState error={error} onRetry={() => refetch()} />
   const landed = hasLandedCosts(data)
+  const discounted = (data.lines ?? []).some((l) => !isZeroDecimal(l.discount_percent) || !isZeroDecimal(l.bonus_quantity))
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -337,8 +347,12 @@ export function ReceiptPage() {
         subtotal={data.subtotal}
         taxTotal={data.tax_total}
         total={data.total}
+        discounts={discounted}
         extra={[
           { header: 'Returned', cell: (l) => trimDecimal(l.returned_quantity ?? '0') },
+          ...(discounted
+            ? [{ header: EFFECTIVE_COST_LABEL, cell: (l: PurchaseLine) => (l.effective_unit_cost ? formatMoney(l.effective_unit_cost, undefined, 4) : '—') }]
+            : []),
           ...(landed
             ? [
                 { header: 'Charges', cell: (l: PurchaseLine) => formatMoney(l.landed_cost ?? '0') },
@@ -355,6 +369,7 @@ export function ReceiptPage() {
 }
 
 export function ReturnsPage() {
+  const can = useCan()
   const [page, setPage] = useState(1)
   const { data, error, isPending, refetch } = useReturnsQuery({ page })
 
@@ -362,8 +377,13 @@ export function ReturnsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Purchasing"
-        description="Goods returned to suppliers. Start a return from the receipt."
-        actions={<ExportMenu list="purchaseReturns" disabled={!data?.items.length} />}
+        description="Goods returned to suppliers. Start a return from the receipt, or without one."
+        actions={
+          <>
+            <ExportMenu list="purchaseReturns" disabled={!data?.items.length} />
+            {can('purchases.return') && <Button asChild><Link to="/purchasing/returns/new"><PlusIcon data-icon="inline-start" /> New return (without receipt)</Link></Button>}
+          </>
+        }
       />
       <SectionTabs tabs={PURCHASING_TABS} label="Purchasing sections" />
       {isPending ? (
@@ -391,7 +411,11 @@ export function ReturnsPage() {
                     <TableCell className="font-mono text-sm">{r.number}</TableCell>
                     <TableCell className="text-sm">{r.supplier?.name}</TableCell>
                     <TableCell className="text-sm">{r.reason}</TableCell>
-                    <TableCell className="hidden md:table-cell"><Link to={`/purchasing/receipts/${r.goods_receipt_id}`} className="text-sm underline-offset-4 hover:underline">View receipt</Link></TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {r.goods_receipt_id
+                        ? <Link to={`/purchasing/receipts/${r.goods_receipt_id}`} className="text-sm underline-offset-4 hover:underline">View receipt</Link>
+                        : <span className="text-sm text-muted-foreground">Without receipt</span>}
+                    </TableCell>
                     <TableCell className="text-right font-mono">{formatMoney(r.total, r.currency)}</TableCell>
                   </TableRow>
                 ))}
@@ -402,5 +426,100 @@ export function ReturnsPage() {
         </>
       )}
     </div>
+  )
+}
+
+const DIRECT_LINE_OPTIONS = { cost: 'optional', batch: 'out' } as const
+const directSchema = z.object({
+  supplier_id: z.string().min(1, 'Choose a supplier.'),
+  store_id: z.string().min(1, 'Choose the store the goods leave.'),
+  reason: z.string().trim().min(1, 'Give a reason.').max(255),
+  notes: z.string().max(2000),
+  lines: linesSchema(DIRECT_LINE_OPTIONS),
+})
+type DirectValues = z.infer<typeof directSchema>
+
+/** ST2a: goods back to a supplier without the goods receipt (e.g. stock from before the system). */
+export function NewReturnPage() {
+  const navigate = useNavigate()
+  const me = useAuth()
+  const post = usePostDirectReturnMutation()
+  const key = useIdempotencyKey()
+  const form = useForm<DirectValues>({
+    resolver: zodResolver(directSchema),
+    defaultValues: { supplier_id: '', store_id: '', reason: '', notes: '', lines: [emptyLine()] },
+  })
+  const { errors } = form.formState
+  const storeId = useWatch({ control: form.control, name: 'store_id' })
+
+  const onSubmit = form.handleSubmit((values) => {
+    const input = {
+      supplier_id: values.supplier_id,
+      store_id: values.store_id,
+      reason: values.reason.trim(),
+      notes: values.notes.trim() || null,
+      lines: values.lines.map((l) => {
+        const { unit_cost, ...line } = toApiLine(l, DIRECT_LINE_OPTIONS)
+        // An empty cost is left out: the server credits the current average cost.
+        return unit_cost ? { ...line, unit_cost } : line
+      }),
+    }
+    post.mutate({ input, idempotencyKey: key.keyFor(input) }, {
+      onSuccess: (r) => {
+        key.settle()
+        toast.success(`${r.number} posted — stock reduced.`)
+        navigate('/purchasing/returns', { replace: true })
+      },
+      onError: (error) => {
+        key.settle(error)
+        handleFormError(error, form.setError, ['supplier_id', 'store_id', 'reason', 'notes', 'lines'], { nested: true })
+      },
+    })
+  })
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <Button asChild variant="ghost" size="icon" aria-label="Back to returns"><Link to="/purchasing/returns"><ArrowLeftIcon /></Link></Button>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">New return (without receipt)</h1>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>Return</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Supplier" error={errors.supplier_id?.message}>
+            <Controller control={form.control} name="supplier_id" render={({ field }) => <SupplierSelect value={field.value || null} onChange={field.onChange} invalid={!!errors.supplier_id} />} />
+          </FormField>
+          <FormField label="From store" error={errors.store_id?.message}>
+            <Controller control={form.control} name="store_id" render={({ field }) => <StoreSelect value={field.value || null} onChange={field.onChange} aria-label="From store" invalid={!!errors.store_id} />} />
+          </FormField>
+          <FormField label="Reason" error={errors.reason?.message}><Input placeholder="e.g. damaged, wrong item" {...form.register('reason')} /></FormField>
+          <FormField label="Notes" error={errors.notes?.message}><Textarea rows={1} {...form.register('notes')} /></FormField>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Goods returned</CardTitle>
+          <CardDescription>Stock leaves at its current average cost. The cost is the credit the supplier gives; leave it empty to use the average cost.</CardDescription>
+        </CardHeader>
+        {/* relative: keeps the lines table's absolutely positioned sr-only text inside the card, so phones don't widen the page. */}
+        <CardContent className="relative">
+          <LinesEditor
+            control={form.control}
+            register={form.register}
+            setValue={form.setValue}
+            errors={errors}
+            config={{ ...DIRECT_LINE_OPTIONS, storeId: storeId || null, stockedOnly: true, costPlaceholder: 'Avg. cost', currency: me.organization?.base_currency }}
+          />
+          <LinesTotalsPreview control={form.control} currency={me.organization?.base_currency} unpricedNote="Lines without a cost are credited at the current average cost; the server adds them to the total." />
+        </CardContent>
+      </Card>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={() => navigate('/purchasing/returns')}>Cancel</Button>
+        <Button type="submit" disabled={post.isPending}>
+          {post.isPending && <Loader2Icon data-icon="inline-start" className="animate-spin" />}
+          Post return
+        </Button>
+      </div>
+    </form>
   )
 }

@@ -471,6 +471,12 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Purchase discounts and bonus, short-close, direct returns ST2a (implemented)
+
+- `purchase_order_lines` and `goods_receipt_lines`: `discount_percent numeric(7,4)` (0 ≤ x < 100), `bonus_quantity numeric(18,3)` (≥ 0); `goods_receipt_lines.effective_unit_cost numeric(18,4)` (the stock cost before landed cost; backfilled = `unit_cost`).
+- `purchase_orders.status` adds `closed`; `closed_at`, `close_reason`.
+- `purchase_returns.goods_receipt_id` and `purchase_return_lines.goods_receipt_line_id` nullable (returns without a receipt).
+
 ### Drawer openings and digital receipts POS1d (implemented)
 
 - `pos_drawer_openings` (organization, branch, store, register session id + number copied, terminal, user, approved by, approval id, reason ≤ 200, opened at); append-only; index (organization, branch, opened at). `pos_approvals.action` CHECK adds `no_sale`.

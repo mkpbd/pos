@@ -4,11 +4,13 @@ namespace App\Modules\Purchasing\Application\Services;
 
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Suppliers\Application\Contracts\SupplierDirectory;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Lookups every purchasing document needs: the organization's currency and a usable supplier.
+ * Lookups every purchasing document needs: the organization's currency and a usable supplier,
+ * and (ST2a) the line discount % and bonus quantity of order and receipt lines.
  */
 class PurchasingContext
 {
@@ -43,5 +45,33 @@ class PurchasingContext
         }
 
         return $supplier;
+    }
+
+    /**
+     * ST2a: normalizes each line's `discount_percent` (4 dp) and `bonus_quantity` (3 dp), with
+     * `$defaults[$i]` (the purchase order line's values) or 0 when a line leaves them out. Free
+     * units come in whole units unless the product allows decimals.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array<string, array<string, mixed>>  $variants  StockLineRules::validate() result
+     * @param  array<int, array{discount_percent: string, bonus_quantity: string}>  $defaults
+     * @return list<array<string, mixed>>
+     */
+    public function discountAndBonus(array $lines, array $variants, array $defaults = []): array
+    {
+        $errors = [];
+        foreach ($lines as $i => $line) {
+            $lines[$i]['discount_percent'] = Decimal::round((string) ($line['discount_percent'] ?? $defaults[$i]['discount_percent'] ?? '0'), 4);
+            $lines[$i]['bonus_quantity'] = Decimal::round((string) ($line['bonus_quantity'] ?? $defaults[$i]['bonus_quantity'] ?? '0'), 3);
+            $variant = $variants[$line['variant_id']] ?? null;
+            if ($variant !== null && ! $variant['allow_decimal'] && ! Decimal::isWhole($lines[$i]['bonus_quantity'])) {
+                $errors["lines.{$i}.bonus_quantity"] = ["{$variant['product_name']} is sold in whole units ({$variant['unit_code']})."];
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $lines;
     }
 }

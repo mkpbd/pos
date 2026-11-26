@@ -13,7 +13,11 @@ type Options = {
   batch?: 'in' | 'out' | 'signed'
   /** Stock count (Q1 §1): the quantity is what was counted (0 or more); batch-tracked lines name the counted batch. */
   count?: boolean
+  /** ST2a purchase lines: discount % (0 to under 100) and free quantity. */
+  discount?: boolean
 }
+
+const DISCOUNT = /^\d{1,2}(\.\d{1,4})?$/
 
 const variantShape = z.object({
   id: z.string(),
@@ -44,6 +48,8 @@ export function linesSchema(options: Options) {
         batch_id: z.string().nullable(),
         source_line_id: z.string().optional(),
         max_quantity: z.string().optional(),
+        discount_percent: z.string().optional(),
+        bonus_quantity: z.string().optional(),
       }),
     )
     .min(1, 'Add at least one line.')
@@ -77,6 +83,14 @@ export function linesSchema(options: Options) {
         if (options.cost === 'optional' && cost !== '' && !COST.test(cost)) issue('unit_cost', 'Cost with up to 4 decimals.')
         if (options.tax && line.tax_rate.trim() !== '' && !decimalPattern(4).test(line.tax_rate.trim())) issue('tax_rate', 'A percentage.')
 
+        if (options.discount) {
+          const discount = (line.discount_percent ?? '').trim()
+          const bonus = (line.bonus_quantity ?? '').trim()
+          if (discount !== '' && !DISCOUNT.test(discount)) issue('discount_percent', 'From 0 to 99.9999 %.')
+          if (bonus !== '' && !QUANTITY.test(bonus)) issue('bonus_quantity', 'A quantity (up to 3 decimals).')
+          else if (line.variant && !line.variant.allow_decimal && bonus.includes('.') && !/\.0+$/.test(bonus)) issue('bonus_quantity', `Whole ${line.variant.unit_code ?? 'units'} only.`)
+        }
+
         if (line.variant?.track_batches && options.batch) {
           const mode = options.batch === 'signed' ? (negative ? 'out' : 'in') : options.batch
           if (mode === 'in' && line.batch_number.trim() === '') issue('batch_number', 'Batch number required.')
@@ -98,6 +112,7 @@ export function toApiLine(line: LineValue, options: Options & { sourceField?: st
     quantity,
     ...(options.cost && !negative ? { unit_cost: line.unit_cost.trim() || null } : {}),
     ...(options.tax ? { tax_rate: line.tax_rate.trim() || null } : {}),
+    ...(options.discount ? { discount_percent: line.discount_percent?.trim() || '0', bonus_quantity: line.bonus_quantity?.trim() || '0' } : {}),
     ...(tracksBatches && mode === 'in' ? { batch_number: line.batch_number.trim(), expires_on: line.expires_on || null } : {}),
     ...(tracksBatches && mode === 'out' ? { batch_id: line.batch_id } : {}),
     ...(options.sourceField && line.source_line_id ? { [options.sourceField]: line.source_line_id } : {}),

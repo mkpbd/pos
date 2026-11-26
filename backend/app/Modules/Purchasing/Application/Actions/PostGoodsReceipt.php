@@ -40,6 +40,12 @@ use Illuminate\Validation\ValidationException;
  * and the stock enters at unit cost + landed cost ÷ quantity. Charges without a charge
  * supplier are part of this invoice (`payable_total`); the others are payables on the charge
  * supplier's account (SupplierAccount).
+ *
+ * ST2a: lines may carry a discount % (the subtotal and the payable are discounted) and free
+ * units (`bonus_quantity`, e.g. 10 + 1); both default to the order line's values. Stock comes in
+ * as quantity + bonus at the effective unit cost = cost × (100 − discount %) ÷ 100 × quantity ÷
+ * (quantity + bonus), rounded once to 4 dp (= the unit cost without discount or bonus), plus the
+ * landed cost spread over the same units. Only `quantity` counts against the order.
  */
 class PostGoodsReceipt
 {
@@ -55,7 +61,7 @@ class PostGoodsReceipt
     ) {}
 
     /**
-     * @param  array{supplier_id: string, store_id: string, purchase_order_id?: ?string, supplier_invoice_number?: ?string, invoice_date: string, due_date?: ?string, notes?: ?string, lines: list<array{variant_id: string, quantity: string, unit_cost: string, tax_rate?: ?string, purchase_order_line_id?: ?string, batch_number?: ?string, expires_on?: ?string, manufactured_on?: ?string}>, charges?: list<array{type: string, description?: ?string, amount: string, tax_amount?: ?string, allocation: string, charge_supplier_id?: ?string}>}  $data
+     * @param  array{supplier_id: string, store_id: string, purchase_order_id?: ?string, supplier_invoice_number?: ?string, invoice_date: string, due_date?: ?string, notes?: ?string, lines: list<array{variant_id: string, quantity: string, unit_cost: string, tax_rate?: ?string, discount_percent?: ?string, bonus_quantity?: ?string, purchase_order_line_id?: ?string, batch_number?: ?string, expires_on?: ?string, manufactured_on?: ?string}>, charges?: list<array{type: string, description?: ?string, amount: string, tax_amount?: ?string, allocation: string, charge_supplier_id?: ?string}>}  $data
      */
     public function __invoke(TenantUser $actor, array $data): GoodsReceipt
     {
@@ -64,12 +70,23 @@ class PostGoodsReceipt
         $store = $this->storeAccess->require($actor, $data['store_id']);
         $lines = array_values($data['lines']);
         $variants = $this->lineRules->validate($organizationId, $lines, 'in', requireTracked: false, requireSellable: true);
+        $lines = $this->context->discountAndBonus($lines, $variants, $this->orderLineDefaults($data, $lines));
 
         foreach ($lines as $i => $line) {
             $lines[$i]['tax_rate'] = Decimal::round($line['tax_rate'] ?? $variants[$line['variant_id']]['tax_rate'] ?? '0', 4);
         }
         $currency = $this->context->currency();
         $totals = PurchaseTotals::calculate($lines, $currency);
+        foreach ($lines as $i => $line) {
+            $lines[$i]['stock_quantity'] = Decimal::add($line['quantity'], $line['bonus_quantity'], 3);
+            // cost × (100 − discount) × quantity ÷ (100 × (quantity + bonus)): exact until the one
+            // rounding at the end, so a line without discount or bonus keeps exactly its unit cost.
+            $lines[$i]['effective_unit_cost'] = Decimal::div(
+                Decimal::mul(Decimal::mul((string) $line['unit_cost'], Decimal::sub('100', $line['discount_percent'], 4), 8), (string) $line['quantity'], 11),
+                Decimal::mul('100', $lines[$i]['stock_quantity'], 3),
+                4,
+            );
+        }
         $dueDate = $data['due_date'] ?? Carbon::parse($data['invoice_date'])->addDays($supplier['payment_terms_days'])->toDateString();
         $charges = $this->charges(array_values($data['charges'] ?? []));
         $landed = $this->landedCosts($charges, $lines, $totals, $currency);
@@ -129,12 +146,15 @@ class PostGoodsReceipt
                     'quantity' => Decimal::round($line['quantity'], 3),
                     'unit_cost' => Decimal::round($line['unit_cost'], 4),
                     'tax_rate' => $line['tax_rate'],
+                    'discount_percent' => $line['discount_percent'],
+                    'bonus_quantity' => $line['bonus_quantity'],
+                    'effective_unit_cost' => $line['effective_unit_cost'],
                     ...$totals['lines'][$i],
                     'landed_cost' => $landed['lines'][$i]['landed_cost'],
                     'landed_unit_cost' => $landed['lines'][$i]['landed_unit_cost'],
                 ]);
                 // SC3: stock enters at the landed unit cost, so the weighted average includes the charges.
-                $changes[] = new StockChange($store['id'], $line['variant_id'], $batchId, MovementType::PurchaseReceipt, $line['quantity'], $landed['lines'][$i]['landed_unit_cost']);
+                $changes[] = new StockChange($store['id'], $line['variant_id'], $batchId, MovementType::PurchaseReceipt, $line['stock_quantity'], $landed['lines'][$i]['landed_unit_cost']);
             }
 
             $this->ledger->post($changes, new StockReference('goods_receipt', $receipt->id, $receipt->number));
@@ -199,7 +219,7 @@ class PostGoodsReceipt
         $allocated = $charges === []
             ? ['lines' => array_fill(0, count($lines), Money::zero($currency)->amount())]
             : LandedCostAllocator::allocate($charges, array_map(fn (array $l, int $i) => [
-                'quantity' => (string) $l['quantity'],
+                'quantity' => $l['stock_quantity'],
                 'value' => $totals['lines'][$i]['line_subtotal'],
             ], $lines, array_keys($lines)), $currency);
 
@@ -217,7 +237,7 @@ class PostGoodsReceipt
         return [
             'lines' => array_map(fn (array $l, int $i) => [
                 'landed_cost' => $allocated['lines'][$i],
-                'landed_unit_cost' => LandedCostAllocator::landedUnitCost((string) $l['unit_cost'], $allocated['lines'][$i], (string) $l['quantity']),
+                'landed_unit_cost' => LandedCostAllocator::landedUnitCost($l['effective_unit_cost'], $allocated['lines'][$i], $l['stock_quantity']),
             ], $lines, array_keys($lines)),
             'charges_total' => $chargesTotal->amount(),
             'charges_tax_total' => $chargesTax->amount(),
@@ -243,6 +263,36 @@ class PostGoodsReceipt
             SupplierProduct::query()->where('supplier_id', $supplierId)->where('variant_id', $variantId)
                 ->update(['last_purchase_cost' => $cost, 'last_purchased_at' => $now]);
         }
+    }
+
+    /**
+     * ST2a: per line, the discount % and bonus quantity of the order line it is received
+     * against (unlocked read: order lines cannot change once the order is placed).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  list<array<string, mixed>>  $lines
+     * @return array<int, array{discount_percent: string, bonus_quantity: string}>
+     */
+    private function orderLineDefaults(array $data, array $lines): array
+    {
+        $ids = array_values(array_filter(array_column($lines, 'purchase_order_line_id')));
+        if (! filled($data['purchase_order_id'] ?? null) || $ids === []) {
+            return [];
+        }
+        $orderLines = PurchaseOrderLine::query()->where('purchase_order_id', $data['purchase_order_id'])->whereKey($ids)
+            ->get(['id', 'discount_percent', 'bonus_quantity', 'received_quantity'])->keyBy('id');
+
+        $defaults = [];
+        foreach ($lines as $i => $line) {
+            $orderLine = $orderLines[$line['purchase_order_line_id'] ?? ''] ?? null;
+            if ($orderLine !== null) {
+                // The order's free units come with its first delivery only, so later part-deliveries do not count them again.
+                $bonus = Decimal::isZero($orderLine->received_quantity) ? $orderLine->bonus_quantity : '0';
+                $defaults[$i] = ['discount_percent' => $orderLine->discount_percent, 'bonus_quantity' => $bonus];
+            }
+        }
+
+        return $defaults;
     }
 
     /**

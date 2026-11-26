@@ -21,6 +21,22 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### ST2a — Purchase discounts and free quantity, short-close, returns without a receipt
+
+First part of ST2 (stock gaps) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). Transfers & documents (ST2b), selling units & price lists (ST2c), serial register & past-date valuation (ST2d) follow. No new packages.
+
+#### Added
+- **Disc %** and **Free qty** (e.g. 10 + 1) on purchase orders and goods receipts. Stock comes in with the free units at the true cost per unit; the supplier is owed the discounted total; landed costs are spread over the free units too; returns can send free units back at that cost.
+- **Close short** a part-received purchase order with a reason; the rest is no longer on order (reorder suggestions, supplier fill rate).
+- **Return without a receipt** (Purchase returns → New return): expired or damaged stock back to the rep, credited at the average cost or an agreed cost.
+
+#### Tests
+- Backend 2008 (2007 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3259; mocked Playwright 631 (new `st2a-purchasing`).
+- Full-stack (PostgreSQL, desktop) 66 (the first run caught the free-quantity box's label containing "Quantity of line 1"; renamed "Free qty of line 1", then all passed) — new **ST2a** on Bazar Fresh: 10 ordered at 5 % off with 1 free, 4 + 1 received at 76 each (380 owed), the order closed short from its page, one unit returned without a receipt (304 owed).
+
+#### Upgrade
+- `php artisan migrate`.
+
 ### POS1d — Receipt printers, the cash drawer, and receipts by SMS / e-mail
 
 Last part of POS1 (counter upgrades) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). No new packages: the ESC/POS encoder, Web Serial / WebUSB access and the QR command are written here.

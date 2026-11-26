@@ -139,6 +139,34 @@ class ChangePurchaseOrderStatus
     }
 
     /**
+     * ST2a: short-close a partly received order — the rest is no longer expected (not "on
+     * order" any more). Lines keep their received quantities; nothing is released.
+     */
+    public function close(PurchaseOrder $order, string $reason): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order, $reason) {
+            $locked = $this->lock($order);
+            if ($locked->status !== PurchaseOrderStatus::PartiallyReceived) {
+                throw new BusinessRuleViolation('PURCHASE_ORDER_NOT_CLOSABLE', "Purchase order {$locked->number} is {$locked->status->value}; only a partly received order can be closed short (cancel it when nothing was received).", [
+                    'status' => $locked->status->value,
+                ]);
+            }
+
+            $reason = trim($reason);
+            $open = $locked->lines()->get()->mapWithKeys(fn (PurchaseOrderLine $l) => [$l->id => Decimal::max(Decimal::sub($l->quantity, $l->received_quantity, 3), '0.000')])->all();
+            $locked->forceFill(['status' => PurchaseOrderStatus::Closed, 'closed_at' => now(), 'close_reason' => $reason])->save();
+            $this->history->order($locked, PurchaseOrderStatus::PartiallyReceived->value, PurchaseOrderStatus::Closed->value, 'Closed short: '.$reason);
+            $this->audit->record('purchase_order.closed', $locked, ['status' => PurchaseOrderStatus::PartiallyReceived->value], [
+                'status' => PurchaseOrderStatus::Closed->value,
+                'reason' => $reason,
+                'open_quantities' => $open,
+            ]);
+
+            return $locked;
+        });
+    }
+
+    /**
      * Whether a draft needs approval now: [level, note] — level NULL means it can be ordered.
      *
      * @return array{0: ?ApprovalLevel, 1: string}

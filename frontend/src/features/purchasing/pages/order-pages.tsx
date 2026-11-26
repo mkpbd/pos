@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon, BanIcon, CheckIcon, Loader2Icon, PackageCheckIcon, PlusIcon, SendIcon, TagIcon, XCircleIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, CheckIcon, Loader2Icon, PackageCheckIcon, PackageXIcon, PlusIcon, SendIcon, TagIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -24,7 +24,7 @@ import { useAuth, useCan } from '@/features/auth/use-auth'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { PURCHASING_TABS } from '@/features/inventory/sections'
 import { linesSchema, toApiLine } from '@/features/inventory/lines'
-import { DocumentLinesTable } from '@/features/purchasing/components/document-totals'
+import { DocumentLinesTable, LinesTotalsPreview } from '@/features/purchasing/components/document-totals'
 import { SupplierSelect } from '@/features/purchasing/components/supplier-select'
 import { PurchaseOrderCatalogHints } from '@/features/supply-chain/components/po-catalog-hints'
 import { PROCUREMENT_PERMISSIONS, usePurchaseOrderApprovalMutation } from '@/features/procurement/api'
@@ -103,7 +103,7 @@ export function PurchaseOrdersPage() {
   )
 }
 
-const LINE_OPTIONS = { cost: 'required', tax: true } as const
+const LINE_OPTIONS = { cost: 'required', tax: true, discount: true } as const
 const schema = z.object({
   supplier_id: z.string().min(1, 'Choose a supplier.'),
   store_id: z.string().min(1, 'Choose the receiving store.'),
@@ -130,6 +130,8 @@ function toFormLines(order: PurchaseOrder): LineValue[] {
     quantity: trimDecimal(l.quantity),
     unit_cost: trimDecimal(l.unit_cost),
     tax_rate: trimDecimal(l.tax_rate),
+    discount_percent: trimDecimal(l.discount_percent ?? ''),
+    bonus_quantity: trimDecimal(l.bonus_quantity ?? ''),
   }))
 }
 
@@ -174,6 +176,9 @@ function OrderView({ order }: { order: PurchaseOrder }) {
   const [confirm, setConfirm] = useState<'place' | 'cancel' | 'approve' | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [rejectError, setRejectError] = useState<string | null>(null)
+  const closeKey = useIdempotencyKey()
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState<string | null>(null)
   const receivable = order.status === 'ordered' || order.status === 'partially_received'
   const pending = order.status === 'pending_approval'
   const approver = pending && mayApprove({ approval_level: order.approval_level, owner: order.submitted_by ?? order.created_by, can_approve: order.can_approve }, me, can)
@@ -196,6 +201,23 @@ function OrderView({ order }: { order: PurchaseOrder }) {
           setConfirm(null)
           toast.error(e.message)
         }
+      },
+    })
+  }
+
+  // ST2a: stop expecting the rest of a partly received order.
+  const closeShort = (reason: string) => {
+    const payload = { id: order.id, action: 'close' as const, reason }
+    setCloseError(null)
+    status.mutate({ ...payload, idempotencyKey: closeKey.keyFor(payload) }, {
+      onSuccess: (o) => {
+        closeKey.settle()
+        setClosing(false)
+        toast.success(`${o.number} closed short.`)
+      },
+      onError: (e) => {
+        closeKey.settle(e)
+        setCloseError(e.message)
       },
     })
   }
@@ -223,6 +245,9 @@ function OrderView({ order }: { order: PurchaseOrder }) {
           {can('purchases.manage') && (order.status === 'draft' || order.status === 'ordered') && (
             <Button variant="outline" onClick={() => setConfirm('cancel')}><XCircleIcon data-icon="inline-start" /> Cancel order</Button>
           )}
+          {can('purchases.manage') && order.status === 'partially_received' && (
+            <Button variant="outline" onClick={() => { setCloseError(null); setClosing(true) }}><PackageXIcon data-icon="inline-start" /> Close short</Button>
+          )}
           {can('purchases.receive') && receivable && (
             <Button onClick={() => navigate(`/purchasing/receipts/new?order=${order.id}`)}><PackageCheckIcon data-icon="inline-start" /> Receive goods</Button>
           )}
@@ -235,6 +260,12 @@ function OrderView({ order }: { order: PurchaseOrder }) {
         </div>
       )}
       <OrderOrigin order={order} />
+      {order.status === 'closed' && (
+        <div role="note" className="rounded-md border p-3 text-sm">
+          <span className="font-medium">Closed short{order.closed_at && ` on ${order.closed_at.slice(0, 10)}`}:</span> {order.close_reason ?? '—'}
+          <span className="text-muted-foreground"> The quantities not received are no longer expected.</span>
+        </div>
+      )}
       <Card>
         <CardContent className="grid gap-2 pt-6 text-sm sm:grid-cols-3">
           <div><span className="text-muted-foreground">Supplier</span><div className="font-medium">{order.supplier?.name}</div></div>
@@ -249,6 +280,7 @@ function OrderView({ order }: { order: PurchaseOrder }) {
         subtotal={order.subtotal}
         taxTotal={order.tax_total}
         total={order.total}
+        discounts
         extra={{ header: 'Received', cell: (l) => trimDecimal(l.received_quantity ?? '0') }}
       />
       {(order.history ?? []).length > 0 && (
@@ -277,6 +309,19 @@ function OrderView({ order }: { order: PurchaseOrder }) {
         pending={approval.isPending}
         error={rejectError}
         onConfirm={(reason) => decide('reject', reason)}
+      />
+      <ReasonDialog
+        key={closing ? 'close-open' : 'close-closed'}
+        open={closing}
+        onOpenChange={setClosing}
+        title={`Close ${order.number} short`}
+        description="The goods not received yet are no longer expected from the supplier. What was received stays."
+        confirmLabel="Close short"
+        max={200}
+        hint="Kept on the order."
+        pending={status.isPending}
+        error={closeError}
+        onConfirm={closeShort}
       />
       <ConfirmDialog
         open={confirm === 'place' || confirm === 'cancel'}
@@ -383,6 +428,7 @@ function OrderForm({ order }: { order?: PurchaseOrder }) {
         <CardHeader><CardTitle>Items</CardTitle></CardHeader>
         <CardContent>
           <LinesEditor control={form.control} register={form.register} setValue={form.setValue} errors={errors} config={{ ...LINE_OPTIONS, currency: me.organization?.base_currency }} />
+          <LinesTotalsPreview control={form.control} currency={me.organization?.base_currency} />
           <div className="mt-3">
             <PurchaseOrderCatalogHints control={form.control} setValue={form.setValue} initialSupplierId={order?.supplier?.id} />
           </div>

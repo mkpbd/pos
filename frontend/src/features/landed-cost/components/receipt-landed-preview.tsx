@@ -21,7 +21,7 @@ export function ReceiptLandedPreview<T extends Form>({ control, currency }: { co
   if (charges.length === 0) return null
 
   const preview = previewLandedCosts(
-    lines.map((l) => ({ quantity: l.quantity ?? '', unit_cost: l.unit_cost ?? '' })),
+    lines.map((l) => ({ quantity: l.quantity ?? '', unit_cost: l.unit_cost ?? '', discount_percent: l.discount_percent ?? '', bonus_quantity: l.bonus_quantity ?? '' })),
     charges.map((ch) => ({ amount: ch.amount ?? '', allocation: ch.allocation })),
   )
   const onInvoice = sumMoney(charges.filter((ch) => !ch.charge_supplier_id).flatMap((ch) => [money(ch.amount), money(ch.tax_amount)]))

@@ -8,6 +8,7 @@ use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseReturn;
 use App\Modules\Purchasing\Presentation\Http\Exports\GoodsReceiptsExport;
 use App\Modules\Purchasing\Presentation\Http\Exports\PurchaseReturnsExport;
+use App\Modules\Purchasing\Presentation\Http\Requests\PostDirectPurchaseReturnRequest;
 use App\Modules\Purchasing\Presentation\Http\Requests\PostGoodsReceiptRequest;
 use App\Modules\Purchasing\Presentation\Http\Requests\PostPurchaseReturnRequest;
 use App\Modules\Purchasing\Presentation\Http\Support\PurchasingPresenter;
@@ -97,6 +98,17 @@ class GoodsReceiptController
     public function storeReturn(PostPurchaseReturnRequest $request, GoodsReceipt $receipt, PostPurchaseReturn $post): JsonResponse
     {
         return ApiResponse::created($this->presenter->document($post($this->user($request), $receipt, $request->validated())));
+    }
+
+    /**
+     * Return goods without a goods receipt (ST2a)
+     *
+     * Stock leaves at the current average cost; `unit_cost` (the supplier's credit per unit,
+     * before tax) defaults to it. Batch-tracked products need `batch_id`.
+     */
+    public function storeDirectReturn(PostDirectPurchaseReturnRequest $request, PostPurchaseReturn $post): JsonResponse
+    {
+        return ApiResponse::created($this->presenter->document($post->direct($this->user($request), $request->validated())));
     }
 
     public function showReturn(Request $request, PurchaseReturn $purchaseReturn): JsonResponse

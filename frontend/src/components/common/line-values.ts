@@ -12,8 +12,11 @@ export type LineValue = {
   source_line_id?: string
   /** Upper bound shown to the user (e.g. open quantity on the order). */
   max_quantity?: string
+  /** ST2a purchase lines: line discount % and free (bonus) units received on top of the quantity. */
+  discount_percent?: string
+  bonus_quantity?: string
 }
 
 export type LinesForm = { lines: LineValue[] }
 
-export const emptyLine = (): LineValue => ({ variant: null, quantity: '', unit_cost: '', tax_rate: '', batch_number: '', expires_on: '', batch_id: null })
+export const emptyLine = (): LineValue => ({ variant: null, quantity: '', unit_cost: '', tax_rate: '', batch_number: '', expires_on: '', batch_id: null, discount_percent: '', bonus_quantity: '' })

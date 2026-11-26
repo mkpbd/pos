@@ -25,6 +25,10 @@ type Config = {
   currency?: string
   /** Stock count: the quantity is what was counted; shows "In stock now" and the resulting difference per line. */
   count?: boolean
+  /** ST2a purchase lines: "Free qty" and "Disc %" columns. */
+  discount?: boolean
+  /** Placeholder of an empty cost (what the server uses instead); turns off the last-purchase-cost pre-fill. */
+  costPlaceholder?: string
 }
 
 type Props<T extends LinesForm> = {
@@ -116,7 +120,9 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
               {config.count && <th className="w-24 font-medium">In stock now</th>}
               <th className="w-28 font-medium">{config.count ? 'Counted quantity' : 'Quantity'}</th>
               {config.count && <th className="w-24 font-medium">Difference</th>}
+              {config.discount && <th className="w-20 font-medium">Free qty</th>}
               {config.cost && <th className="w-32 font-medium">Unit cost{config.cost === 'optional' && ' (opt.)'}</th>}
+              {config.discount && <th className="w-20 font-medium">Disc %</th>}
               {config.tax && <th className="w-24 font-medium">Tax %</th>}
               {config.batch && <th className="font-medium">Batch</th>}
               <th className="w-10"><span className="sr-only">Remove</span></th>
@@ -153,7 +159,7 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                             onChange={(option) => {
                               f.onChange(option)
                               // Pre-fill the last known cost; the user can overwrite it.
-                              if (config.cost && !line?.unit_cost && option.purchase_price) set(`lines.${i}.unit_cost`, option.purchase_price)
+                              if (config.cost && !config.costPlaceholder && !line?.unit_cost && option.purchase_price) set(`lines.${i}.unit_cost`, option.purchase_price)
                             }}
                           />
                         )}
@@ -176,10 +182,22 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                     {err('quantity') && <p className="text-xs text-destructive">{err('quantity')}</p>}
                   </td>
                   {config.count && <DifferenceCell line={countLine} counted={(line?.quantity ?? '').trim()} />}
+                  {config.discount && (
+                    <td className="pr-2">
+                      <Input aria-label={`Free qty of line ${i + 1}`} inputMode="decimal" placeholder="0" aria-invalid={!!err('bonus_quantity') || undefined} {...reg(`lines.${i}.bonus_quantity`)} />
+                      {err('bonus_quantity') && <p className="mt-1 text-xs text-destructive">{err('bonus_quantity')}</p>}
+                    </td>
+                  )}
                   {config.cost && (
                     <td className="pr-2">
-                      <Input aria-label={`Unit cost of line ${i + 1}`} inputMode="decimal" placeholder="0.00" aria-invalid={!!err('unit_cost') || undefined} disabled={config.signed && !config.count && negative} {...reg(`lines.${i}.unit_cost`)} />
+                      <Input aria-label={`Unit cost of line ${i + 1}`} inputMode="decimal" placeholder={config.costPlaceholder ?? '0.00'} aria-invalid={!!err('unit_cost') || undefined} disabled={config.signed && !config.count && negative} {...reg(`lines.${i}.unit_cost`)} />
                       {err('unit_cost') && <p className="mt-1 text-xs text-destructive">{err('unit_cost')}</p>}
+                    </td>
+                  )}
+                  {config.discount && (
+                    <td className="pr-2">
+                      <Input aria-label={`Discount % of line ${i + 1}`} inputMode="decimal" placeholder="0" aria-invalid={!!err('discount_percent') || undefined} {...reg(`lines.${i}.discount_percent`)} />
+                      {err('discount_percent') && <p className="mt-1 text-xs text-destructive">{err('discount_percent')}</p>}
                     </td>
                   )}
                   {config.tax && (

@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property ?string $requisition_line_id converted from this requisition line (directly or via an RFQ award)
  * @property string $quantity
  * @property string $received_quantity
+ * @property string $discount_percent ST2a: line discount %
+ * @property string $bonus_quantity ST2a: free units on top of the quantity (never counted against the order)
  * @property string $unit_cost
  * @property string $tax_rate
  * @property string $line_subtotal
@@ -22,7 +24,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $line_total
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'purchase_order_id', 'variant_id', 'requisition_line_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'received_quantity', 'sort_order'])]
+#[Fillable(['organization_id', 'purchase_order_id', 'variant_id', 'requisition_line_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'received_quantity', 'sort_order', 'discount_percent', 'bonus_quantity'])]
 class PurchaseOrderLine extends Model
 {
     use BelongsToOrganization, HasUuids;
@@ -37,6 +39,8 @@ class PurchaseOrderLine extends Model
             'line_tax' => 'decimal:2',
             'line_total' => 'decimal:2',
             'received_quantity' => 'decimal:3',
+            'discount_percent' => 'decimal:4',
+            'bonus_quantity' => 'decimal:3',
         ];
     }
 }

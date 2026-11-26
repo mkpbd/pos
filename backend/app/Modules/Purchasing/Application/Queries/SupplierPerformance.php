@@ -379,7 +379,8 @@ class SupplierPerformance
         $delivered = $complete ? ($completed ?? $first) : $first;
 
         $onTime = $expected !== null && $delivered !== null ? $delivered <= $expected : null;
-        $fillEligible = $order->status === 'received'
+        // ST2a: an order closed short is final, like a received one (its rest is not on order).
+        $fillEligible = in_array($order->status, ['received', 'closed'], true)
             || (in_array($order->status, ['ordered', 'partially_received'], true) && $expected !== null && $expected < $today)
             || ($order->status === 'cancelled' && Decimal::compare($received, '0') > 0);
         $overdueUndelivered = $delivered === null && $expected !== null && $expected < $today && $order->status !== 'cancelled';

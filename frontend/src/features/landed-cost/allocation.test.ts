@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allocateAmount, landedUnitCost, lineSubtotal, previewLandedCosts, sumMoney } from '@/features/landed-cost/allocation'
+import { allocateAmount, effectiveUnitCost, landedUnitCost, lineSubtotal, lineTax, previewLandedCosts, sumMoney } from '@/features/landed-cost/allocation'
 
 describe('allocateAmount (largest remainder, as Money::allocate)', () => {
   it('matches the server for the shared Money cases', () => {
@@ -86,5 +86,48 @@ describe('previewLandedCosts', () => {
     const preview = previewLandedCosts(lines, [{ amount: '', allocation: 'value' }, { amount: '-3', allocation: 'value' }])
     expect(preview.charges_total).toBe('0.00')
     expect(preview.lines.map((l) => l.landed_cost)).toEqual(['0.00', '0.00'])
+  })
+})
+
+describe('ST2a discount, tax and free units (PurchaseTotals)', () => {
+  it('takes the discount off before the one rounding', () => {
+    expect(lineSubtotal('10', '100', '5')).toBe('950.00')
+    // 99.9999 × 0.875 = 87.4999125 → 87.50
+    expect(lineSubtotal('3', '33.3333', '12.5')).toBe('87.50')
+    expect(lineSubtotal('10', '100', '')).toBe('1000.00')
+    expect(lineSubtotal('1', '10', '100')).toBe('0.00')
+    expect(lineSubtotal('1', '10', 'x')).toBe('0.00')
+  })
+
+  it('taxes the discounted subtotal, half away from zero', () => {
+    expect(lineTax('950.00', '15')).toBe('142.50')
+    expect(lineTax('87.50', '7.5')).toBe('6.56')
+    expect(lineTax('0.10', '5')).toBe('0.01')
+    expect(lineTax('100.00', '')).toBe('0.00')
+  })
+
+  it('spreads the discounted unit cost over the paid and free units, rounded once to 4 decimals', () => {
+    // 100 × 0.95 × 10 / 11 = 86.363636…
+    expect(effectiveUnitCost('10', '100', '5', '1')).toBe('86.3636')
+    expect(effectiveUnitCost('10', '100')).toBe('100.0000')
+    // Without discount or free units it is the unit cost exactly (not the rounded subtotal ÷ quantity).
+    expect(effectiveUnitCost('3', '0.335')).toBe('0.3350')
+    expect(effectiveUnitCost('3', '33.3333', '12.5')).toBe('29.1666')
+    expect(effectiveUnitCost('', '10')).toBeNull()
+    expect(effectiveUnitCost('10', '100', '100')).toBeNull()
+  })
+
+  it('lands charges on the effective cost over quantity + free units', () => {
+    const preview = previewLandedCosts([{ quantity: '10', unit_cost: '100', discount_percent: '5', bonus_quantity: '1' }], [{ amount: '110', allocation: 'value' }])
+    expect(preview.lines[0]).toEqual({ subtotal: '950.00', landed_cost: '110.00', landed_unit_cost: '96.3636' })
+    expect(preview.goods_total).toBe('950.00')
+  })
+
+  it('spreads a quantity charge over the paid and free units', () => {
+    const preview = previewLandedCosts(
+      [{ quantity: '10', unit_cost: '100', bonus_quantity: '1' }, { quantity: '9', unit_cost: '50' }],
+      [{ amount: '20', allocation: 'quantity' }],
+    )
+    expect(preview.lines.map((l) => l.landed_cost)).toEqual(['11.00', '9.00'])
   })
 })

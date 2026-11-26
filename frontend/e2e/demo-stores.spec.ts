@@ -2938,3 +2938,76 @@ test('POS1d: Bazar Fresh opens the drawer without a sale (listed on the session)
     await context.close()
   }
 })
+
+test('ST2a: Bazar Fresh orders 10 at 5 % off with 1 free, receives 4 + 1 free at the true cost, closes the order short, and returns a unit without a receipt', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  try {
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const items = (await call('GET', `/api/v1/pos/catalog?store_id=${store.id}&page=1`)).body.data as { variant_id: string; track_stock: boolean; track_batches: boolean; track_serials: boolean; allow_decimal: boolean }[]
+    const item = items.find((i) => i.track_stock && !i.track_batches && !i.track_serials)!
+    expect(item).toBeTruthy()
+    const supplier = await call('POST', '/api/v1/suppliers', { name: `Pran Foods ${stamp}` })
+    expect(supplier.status).toBe(201)
+    const supplierId = supplier.body.data.id as string
+    const onHand = async () => {
+      const rows = (await call('GET', `/api/v1/inventory/stock?variant_id=${item.variant_id}&store_id=${store.id}`)).body.data as { quantity: string }[]
+      return rows.reduce((sum, r) => sum + Number(r.quantity), 0)
+    }
+    const balance = async () => Number((await call('GET', `/api/v1/purchasing/supplier-balances?supplier_ids[]=${supplierId}`)).body.data[supplierId] ?? 0)
+
+    // An order of 10 at 100 with 5 % off and 1 free unit.
+    const order = await call('POST', '/api/v1/purchasing/orders', { supplier_id: supplierId, store_id: store.id, order_date: new Date().toISOString().slice(0, 10), lines: [{ variant_id: item.variant_id, quantity: '10', unit_cost: '100', tax_rate: '0', discount_percent: '5', bonus_quantity: '1' }] })
+    expect(order.status).toBe(201)
+    expect(order.body.data.total).toBe('950.00')
+    expect((await call('POST', `/api/v1/purchasing/orders/${order.body.data.id}/place`)).status).toBeLessThan(300)
+
+    // 4 come in with the free unit: stock +5 at 100 × 0.95 × 4 / 5 = 76 each; 380 owed.
+    const before = await onHand()
+    const receipt = await call('POST', '/api/v1/purchasing/receipts', {
+      supplier_id: supplierId, store_id: store.id, purchase_order_id: order.body.data.id, invoice_date: new Date().toISOString().slice(0, 10),
+      lines: [{ variant_id: item.variant_id, purchase_order_line_id: order.body.data.lines[0].id, quantity: '4', unit_cost: '100', tax_rate: '0' }],
+    })
+    expect(receipt.status).toBe(201)
+    expect(receipt.body.data.lines[0]).toMatchObject({ discount_percent: '5.0000', bonus_quantity: '1.000', effective_unit_cost: '76.0000' })
+    expect(receipt.body.data.total).toBe('380.00')
+    expect(await onHand()).toBeCloseTo(before + 5, 3)
+    expect(await balance()).toBeCloseTo(380, 2)
+
+    // The rest will not come: the order is closed short from its page.
+    await page.goto(`${base}/admin/purchasing/orders/${order.body.data.id}`)
+    await page.getByRole('button', { name: 'Close short' }).click()
+    const dialog = page.getByRole('dialog', { name: `Close ${order.body.data.number} short` })
+    await dialog.getByLabel('Reason').fill('Supplier is out of stock')
+    await dialog.getByRole('button', { name: 'Close short' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByText('Closed short').first()).toBeVisible()
+    expect((await call('GET', `/api/v1/purchasing/orders/${order.body.data.id}`)).body.data).toMatchObject({ status: 'closed', close_reason: 'Supplier is out of stock' })
+
+    // One unit goes back to the rep without a receipt, credited at 76: we owe 304.
+    const returned = await call('POST', '/api/v1/purchasing/returns', { supplier_id: supplierId, store_id: store.id, reason: 'Damaged', lines: [{ variant_id: item.variant_id, quantity: '1', unit_cost: '76' }] })
+    expect(returned.status).toBe(201)
+    expect(returned.body.data.lines[0].goods_receipt_line_id).toBeNull()
+    expect(await onHand()).toBeCloseTo(before + 4, 3)
+    expect(await balance()).toBeCloseTo(304, 2)
+  } finally {
+    await context.close()
+  }
+})

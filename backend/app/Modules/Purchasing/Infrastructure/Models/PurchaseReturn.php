@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $supplier_id
  * @property string $branch_id
  * @property string $store_id
- * @property string $goods_receipt_id
+ * @property ?string $goods_receipt_id NULL for a return without a goods receipt (ST2a)
  * @property string $reason
  * @property ?string $notes
  * @property string $currency

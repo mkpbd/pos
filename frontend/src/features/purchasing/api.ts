@@ -5,7 +5,7 @@ import { inventoryKeys } from '@/features/inventory/api'
 import type { ChargeInput, ReceiptCharge } from '@/features/landed-cost/api'
 import { useInvalidateMoney as useInvalidateLedger } from '@/features/payments/api'
 
-export type PurchaseOrderStatus = 'draft' | 'pending_approval' | 'ordered' | 'partially_received' | 'received' | 'cancelled'
+export type PurchaseOrderStatus = 'draft' | 'pending_approval' | 'ordered' | 'partially_received' | 'received' | 'cancelled' | 'closed'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_banking' | 'cheque' | 'card' | 'other'
 
 export type SupplierRef = { id: string; code: string; name: string }
@@ -21,6 +21,11 @@ export type PurchaseLine = {
   goods_receipt_line_id?: string
   unit_cost: string
   tax_rate: string
+  /** ST2a: line discount % and free units (order and receipt lines). */
+  discount_percent?: string
+  bonus_quantity?: string
+  /** ST2a receipts: line subtotal ÷ (quantity + free quantity) — what each unit in stock cost. */
+  effective_unit_cost?: string | null
   line_subtotal: string
   line_tax: string
   line_total: string
@@ -72,7 +77,15 @@ export type PurchaseOrderApproval = {
   can_approve?: boolean
 }
 
-export type PurchaseOrder = DocumentBase & PurchaseOrderApproval & { status: PurchaseOrderStatus; order_date: string; expected_date: string | null; ordered_at: string | null }
+export type PurchaseOrder = DocumentBase & PurchaseOrderApproval & {
+  status: PurchaseOrderStatus
+  order_date: string
+  expected_date: string | null
+  ordered_at: string | null
+  /** ST2a: closed short — the rest is no longer expected. */
+  closed_at?: string | null
+  close_reason?: string | null
+}
 export type GoodsReceipt = DocumentBase & {
   purchase_order_id: string | null
   supplier_invoice_number: string | null
@@ -89,7 +102,8 @@ export type GoodsReceipt = DocumentBase & {
   /** Landed cost vouchers posted against this receipt later. */
   landed_cost_vouchers?: { id: string; number: string; voucher_date?: string; amount?: string | null }[]
 }
-export type PurchaseReturn = DocumentBase & { goods_receipt_id: string; reason: string }
+/** ST2a: `goods_receipt_id` is null for a return without a receipt. */
+export type PurchaseReturn = DocumentBase & { goods_receipt_id: string | null; reason: string }
 
 export type SupplierPayment = {
   id: string
@@ -131,7 +145,7 @@ export type SupplierRefund = {
 export type StatementEntry = { date: string; type: 'goods_receipt' | 'receipt_charge' | 'landed_cost_voucher' | 'purchase_return' | 'payment' | 'refund' | 'payment_void' | 'refund_void'; id: string; number: string; reference: string | null; amount: string; balance: string }
 export type SupplierStatement = { supplier: SupplierRef; opening_balance: string; entries: StatementEntry[]; closing_balance: string }
 
-type LineInput = { variant_id: string; quantity: string; unit_cost?: string | null; tax_rate?: string | null; batch_number?: string; expires_on?: string | null; purchase_order_line_id?: string }
+type LineInput = { variant_id: string; quantity: string; unit_cost?: string | null; tax_rate?: string | null; discount_percent?: string; bonus_quantity?: string; batch_number?: string; expires_on?: string | null; purchase_order_line_id?: string }
 
 export type PurchaseOrderInput = { supplier_id: string; store_id: string; order_date: string; expected_date: string | null; notes: string | null; lines: LineInput[] }
 export type GoodsReceiptInput = {
@@ -214,7 +228,8 @@ export function useSavePurchaseOrderMutation() {
 export function usePurchaseOrderStatusMutation() {
   const invalidate = useInvalidate()
   return useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'place' | 'cancel' }) => api.post<PurchaseOrder>(`/purchasing/orders/${id}/${action}`).then((r) => r.data),
+    mutationFn: ({ id, action, reason, idempotencyKey }: { id: string; action: 'place' | 'cancel' | 'close'; reason?: string; idempotencyKey?: string }) =>
+      api.post<PurchaseOrder>(`/purchasing/orders/${id}/${action}`, reason === undefined ? undefined : { reason }, { idempotencyKey }).then((r) => r.data),
     onSuccess: invalidate,
   })
 }
@@ -232,6 +247,25 @@ export function usePostReturnMutation(receiptId: string) {
   return useMutation({
     mutationFn: (input: { reason: string; notes: string | null; lines: { goods_receipt_line_id: string; quantity: string }[] }) =>
       api.post<PurchaseReturn>(`/purchasing/receipts/${receiptId}/returns`, input).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}
+
+/** ST2a: a return without a goods receipt; an empty unit cost credits the current average cost. */
+export type DirectReturnInput = {
+  supplier_id: string
+  store_id: string
+  reason: string
+  notes: string | null
+  lines: { variant_id: string; quantity: string; batch_id?: string | null; unit_cost?: string }[]
+}
+
+/** Idempotent: pass the same key when retrying the same return. */
+export function usePostDirectReturnMutation() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ input, idempotencyKey }: { input: DirectReturnInput; idempotencyKey: string }) =>
+      api.post<PurchaseReturn>('/purchasing/returns', input, { idempotencyKey }).then((r) => r.data),
     onSuccess: invalidate,
   })
 }
@@ -287,6 +321,7 @@ export const PO_STATUS: Record<PurchaseOrderStatus, { label: string; variant: 'o
   partially_received: { label: 'Partially received', variant: 'warning' },
   received: { label: 'Received', variant: 'success' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
+  closed: { label: 'Closed short', variant: 'outline' },
 }
 
 export const PAYMENT_METHODS: Record<PaymentMethod, string> = {

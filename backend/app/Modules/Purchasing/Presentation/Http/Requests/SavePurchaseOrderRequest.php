@@ -19,6 +19,9 @@ class SavePurchaseOrderRequest extends FormRequest
             'lines.*.quantity' => ['required', 'regex:/^\d{1,15}(\.\d{1,3})?$/', 'not_regex:/^0+(\.0+)?$/'],
             'lines.*.unit_cost' => ['required', 'decimal:0,4', 'min:0', 'max:99999999999999'],
             'lines.*.tax_rate' => ['nullable', 'decimal:0,4', 'min:0', 'max:100'],
+            // ST2a: line discount % (below 100) and free units on top of the quantity.
+            'lines.*.discount_percent' => ['nullable', 'decimal:0,4', 'min:0', 'max:99.9999'],
+            'lines.*.bonus_quantity' => ['nullable', 'regex:/^\d{1,15}(\.\d{1,3})?$/'],
         ];
     }
 
@@ -28,6 +31,8 @@ class SavePurchaseOrderRequest extends FormRequest
             'lines.*.variant_id.distinct' => 'Each product may appear only once.',
             'lines.*.quantity.regex' => 'Enter a positive quantity with up to 3 decimals.',
             'lines.*.quantity.not_regex' => 'Enter a quantity greater than zero.',
+            'lines.*.discount_percent.max' => 'The discount must be below 100 %.',
+            'lines.*.bonus_quantity.regex' => 'Enter a free quantity of zero or more with up to 3 decimals.',
         ];
     }
 }

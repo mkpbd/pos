@@ -11,6 +11,8 @@ enum PurchaseOrderStatus: string
     case PartiallyReceived = 'partially_received';
     case Received = 'received';
     case Cancelled = 'cancelled';
+    // ST2a: short-closed after a partial receipt; the rest is no longer expected.
+    case Closed = 'closed';
 
     public function acceptsReceipts(): bool
     {

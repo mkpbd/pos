@@ -8,7 +8,8 @@
  *   its exact share in cents, and the leftover cents go to the largest fractional remainders
  *   (remainders compared at 12 decimals, ties to the earlier line) — so it sums exactly;
  * - a line's landed cost is the sum of its shares; stock enters at
- *   unit cost + landed cost ÷ quantity, rounded half away from zero to 4 decimals.
+ *   effective unit cost + landed cost ÷ (quantity + free quantity), rounded half away from zero
+ *   to 4 decimals (ST2a: the effective cost is unit cost less the discount × quantity ÷ (quantity + free)).
  *   (LandedCostAllocator on the server.)
  *
  * Decimal strings are scaled to bigints — never binary floats. The server recomputes all of it.
@@ -57,13 +58,54 @@ function divideRounded(a: bigint, b: bigint): bigint {
   return (2n * a + b) / (2n * b)
 }
 
-/** quantity × unit cost rounded half away from zero to 2 decimals ("0.00" when either is invalid). */
-export function lineSubtotal(quantity: string, unitCost: string): string {
+/** Discount % at scale 4; empty = 0, null when invalid or 100 % and above (ST2a). */
+function discountScaled(discountPercent: string | null | undefined): bigint | null {
+  if ((discountPercent ?? '').trim() === '') return 0n
+  const d = toScaled(discountPercent, 4)
+  return d === null || d >= 1_000_000n ? null : d
+}
+
+/**
+ * quantity × unit cost × (100 − discount %) ÷ 100, rounded once, half away from zero, to
+ * 2 decimals ("0.00" when an input is invalid) — PurchaseTotals on the server.
+ */
+export function lineSubtotal(quantity: string, unitCost: string, discountPercent = ''): string {
   const q = toScaled(quantity, 3)
   const c = toScaled(unitCost, 4)
-  if (q === null || c === null) return '0.00'
-  // q × c is at scale 7; down to cents (scale 2).
-  return fromScaled(divideRounded(q * c, 10n ** 5n), 2)
+  const d = discountScaled(discountPercent)
+  if (q === null || c === null || d === null) return '0.00'
+  // q × c × (10^6 − d) is at scale 3 + 4 + 4, and ÷ 100 for the percent; down to cents (scale 2).
+  return fromScaled(divideRounded(q * c * (1_000_000n - d), 10n ** 11n), 2)
+}
+
+/** Tax on a (discounted) 2-decimal line subtotal: subtotal × rate %, rounded to cents ("0.00" when invalid). */
+export function lineTax(subtotal: string, taxRate: string): string {
+  const s = toScaled(subtotal, 2)
+  const r = toScaled(taxRate.trim() === '' ? '0' : taxRate, 4)
+  if (s === null || r === null) return '0.00'
+  return fromScaled(divideRounded(s * r, 10n ** 6n), 2)
+}
+
+/**
+ * ST2a: what each unit that enters stock costs after the line discount and the free (bonus)
+ * units: unit cost × (100 − discount %) ÷ 100 × quantity ÷ (quantity + free quantity), rounded
+ * once to 4 decimals (no discount and no free units = the unit cost). Null while the quantity or
+ * cost is not usable.
+ */
+export function effectiveUnitCost(quantity: string, unitCost: string, discountPercent = '', bonusQuantity = ''): string | null {
+  const q = toScaled(quantity, 3)
+  const b = (bonusQuantity ?? '').trim() === '' ? 0n : toScaled(bonusQuantity, 3)
+  const c = toScaled(unitCost, 4)
+  const d = discountScaled(discountPercent)
+  if (q === null || b === null || c === null || d === null || q + b === 0n) return null
+  // c is at scale 4 (the result's); (10^6 − d) / 10^6 is the share kept; q / (q + b) share the same scale.
+  return fromScaled(divideRounded(c * (1_000_000n - d) * q, 1_000_000n * (q + b)), 4)
+}
+
+/** quantity + free quantity at 3 decimals (empty free quantity = 0). */
+function stockQuantity(quantity: string, bonusQuantity: string | undefined): string {
+  const b = (bonusQuantity ?? '').trim() === '' ? 0n : (toScaled(bonusQuantity, 3) ?? 0n)
+  return fromScaled((toScaled(quantity, 3) ?? 0n) + b, 3)
 }
 
 /**
@@ -118,7 +160,7 @@ export function sumMoney(values: (string | null | undefined)[]): string {
   return fromScaled(values.reduce<bigint>((sum, v) => sum + (toScaled(v, 2) ?? 0n), 0n), 2)
 }
 
-export type PreviewLine = { quantity: string; unit_cost: string }
+export type PreviewLine = { quantity: string; unit_cost: string; discount_percent?: string; bonus_quantity?: string }
 export type PreviewCharge = { amount: string; allocation: ChargeAllocation }
 
 export type LandedLinePreview = {
@@ -144,8 +186,9 @@ const POSITIVE_MONEY = /^\d{1,16}(\.\d{1,2})?$/
  * weigh zero; charges with an invalid amount are skipped (the form flags them).
  */
 export function previewLandedCosts(lines: PreviewLine[], charges: PreviewCharge[]): LandedCostPreview {
-  const subtotals = lines.map((l) => lineSubtotal(l.quantity, l.unit_cost))
-  const quantities = lines.map((l) => (toScaled(l.quantity, 3) === null ? '0' : l.quantity.trim()))
+  const subtotals = lines.map((l) => lineSubtotal(l.quantity, l.unit_cost, l.discount_percent))
+  // ST2a: by quantity counts the free units too (they enter stock).
+  const quantities = lines.map((l) => (toScaled(l.quantity, 3) === null ? '0' : stockQuantity(l.quantity, l.bonus_quantity)))
   const landed = lines.map(() => 0n)
   let problem: string | null = null
   const valid = charges.filter((c) => POSITIVE_MONEY.test(c.amount.trim()) && (toScaled(c.amount, 2) ?? 0n) > 0n)
@@ -167,7 +210,9 @@ export function previewLandedCosts(lines: PreviewLine[], charges: PreviewCharge[
   return {
     lines: lines.map((l, i) => {
       const cost = fromScaled(landed[i] as bigint, 2)
-      return { subtotal: subtotals[i] as string, landed_cost: cost, landed_unit_cost: landedUnitCost(l.unit_cost, cost, l.quantity) }
+      // ST2a: stock enters at the effective cost (after discount and free units) over quantity + free quantity.
+      const effective = effectiveUnitCost(l.quantity, l.unit_cost, l.discount_percent, l.bonus_quantity)
+      return { subtotal: subtotals[i] as string, landed_cost: cost, landed_unit_cost: effective === null ? null : landedUnitCost(effective, cost, stockQuantity(l.quantity, l.bonus_quantity)) }
     }),
     goods_total: goods,
     charges_total: chargesTotal,

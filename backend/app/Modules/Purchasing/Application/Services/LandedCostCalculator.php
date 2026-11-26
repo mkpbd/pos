@@ -26,6 +26,8 @@ use Illuminate\Support\Collection;
  *    consumed (the rest: sold, used, written off or returned).
  * 4. The on-hand shares are summed per stock level; the new average cost of a level is
  *    (quantity × average + Σ on-hand shares) ÷ quantity (4 dp).
+ *
+ * ST2a: a line's received units are its quantity + free units (what entered stock).
  */
 class LandedCostCalculator
 {
@@ -55,8 +57,9 @@ class LandedCostCalculator
             return ['lines' => [], 'levels' => [], 'on_hand_total' => '0.00', 'consumed_total' => '0.00', 'charges_total' => '0.00'];
         }
 
+        $units = fn (GoodsReceiptLine $l) => Decimal::add($l->quantity, $l->bonus_quantity, 3);
         $allocated = LandedCostAllocator::allocate($charges, $lines->map(fn (GoodsReceiptLine $l) => [
-            'quantity' => $l->quantity,
+            'quantity' => $units($l),
             'value' => $l->line_subtotal,
         ])->all(), $currency);
 
@@ -83,7 +86,7 @@ class LandedCostCalculator
         foreach ($groups as $group) {
             $available = $group['available'];
             foreach (array_reverse($group['lines']) as $line) {
-                $net = Decimal::sub($line->quantity, $line->returned_quantity, 3);
+                $net = Decimal::sub($units($line), $line->returned_quantity, 3);
                 $take = Decimal::compare($available, '0') > 0 ? Decimal::min($available, $net) : '0.000';
                 $take = Decimal::isNegative($take) ? '0.000' : $take;
                 $onHand[$line->id] = Decimal::round($take, 3);
@@ -104,7 +107,7 @@ class LandedCostCalculator
             $receipt = $byId[$line->goods_receipt_id];
             $amount = $allocated['lines'][$i];
             $lineOnHand = $onHand[$line->id] ?? '0.000';
-            $split = LandedCostAllocator::split($amount, $lineOnHand, $line->quantity, $currency);
+            $split = LandedCostAllocator::split($amount, $lineOnHand, $units($line), $currency);
             $onHandTotal = $onHandTotal->plus(Money::of($split['on_hand'], $currency));
             $consumedTotal = $consumedTotal->plus(Money::of($split['consumed'], $currency));
 
@@ -132,17 +135,17 @@ class LandedCostCalculator
                 'store_id' => $receipt->store_id,
                 'variant_id' => $line->variant_id,
                 'batch_id' => $line->batch_id,
-                'received_quantity' => Decimal::round($line->quantity, 3),
+                'received_quantity' => $units($line),
                 'returned_quantity' => Decimal::round($line->returned_quantity, 3),
                 'on_hand_quantity' => $lineOnHand,
-                'consumed_quantity' => Decimal::sub($line->quantity, $lineOnHand, 3),
+                'consumed_quantity' => Decimal::sub($units($line), $lineOnHand, 3),
                 'line_value' => $line->line_subtotal,
                 'amount' => $amount,
                 'on_hand_amount' => $split['on_hand'],
                 'consumed_amount' => $split['consumed'],
                 'landed_unit_cost' => $line->landed_unit_cost,
                 'previous_voucher_cost' => $priorAmount,
-                'new_landed_unit_cost' => LandedCostAllocator::landedUnitCost($line->landed_unit_cost, Decimal::add($priorAmount, $amount, 2), $line->quantity),
+                'new_landed_unit_cost' => LandedCostAllocator::landedUnitCost($line->landed_unit_cost, Decimal::add($priorAmount, $amount, 2), $units($line)),
             ];
         }
 

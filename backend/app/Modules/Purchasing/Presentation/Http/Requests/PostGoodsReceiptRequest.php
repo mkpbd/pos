@@ -32,6 +32,10 @@ class PostGoodsReceiptRequest extends FormRequest
             'lines.*.quantity' => ['required', 'regex:/^\d{1,15}(\.\d{1,3})?$/', 'not_regex:/^0+(\.0+)?$/'],
             'lines.*.unit_cost' => ['required', 'decimal:0,4', 'min:0', 'max:99999999999999'],
             'lines.*.tax_rate' => ['nullable', 'decimal:0,4', 'min:0', 'max:100'],
+            // ST2a: line discount % (below 100) and free units on top of the quantity. Left out on a
+            // line received against a purchase order, the order line's values apply.
+            'lines.*.discount_percent' => ['nullable', 'decimal:0,4', 'min:0', 'max:99.9999'],
+            'lines.*.bonus_quantity' => ['nullable', 'regex:/^\d{1,15}(\.\d{1,3})?$/'],
             'lines.*.batch_number' => ['nullable', 'string', 'max:64'],
             'lines.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
             'lines.*.manufactured_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.app(OrganizationDate::class)->today()],
@@ -64,6 +68,8 @@ class PostGoodsReceiptRequest extends FormRequest
         return [
             'lines.*.quantity.regex' => 'Enter a positive quantity with up to 3 decimals.',
             'lines.*.quantity.not_regex' => 'Enter a quantity greater than zero.',
+            'lines.*.discount_percent.max' => 'The discount must be below 100 %.',
+            'lines.*.bonus_quantity.regex' => 'Enter a free quantity of zero or more with up to 3 decimals.',
             'lines.*.purchase_order_line_id.prohibited' => 'Order lines can only be referenced when receiving against a purchase order.',
             'charges.*.amount.regex' => 'Enter an amount with up to 2 decimals.',
             'charges.*.amount.not_regex' => 'Enter an amount greater than zero.',

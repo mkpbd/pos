@@ -78,8 +78,8 @@ batches, weighted-average cost, transfers, adjustments, CSV/Excel/PDF export of 
 | **Supplier payments outside the cash register & payments ledger; no supplier refunds** | **Done (ST1)** | ledger + drawer, refunds, voids |
 | Box / carton units usable in buying & selling (unit conversions exist but no line uses them) | P1 | — |
 | Wholesale price used anywhere (stored, never used); price lists, quantity tiers, branch prices | P1 | — |
-| Purchase discounts and **bonus / free quantity** (10+1) on PO / receipt | P1 | Standard in BD FMCG & pharma — costs come out wrong without it |
-| Short-close a partly received PO; purchase return without a goods receipt (expired stock back to the rep) | P1 | — |
+| Purchase discounts and **bonus / free quantity** (10+1) on PO / receipt | **Done (ST2a)** — line discount %; whole-bill discount not yet | Standard in BD FMCG & pharma — costs come out wrong without it |
+| Short-close a partly received PO; purchase return without a goods receipt (expired stock back to the rep) | **Done (ST2a)** | — |
 | Transfer received short / damaged, transfer request & approval, challan print | P1 | Receive takes no quantities |
 | Print / e-mail PO, goods receipt, transfer documents | P1 | Only the RFQ has a document |
 | Serial-number stock register (phones, electronics) | P1 | Serials only captured at sale (deferred by design) |

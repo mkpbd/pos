@@ -95,6 +95,20 @@ class PurchaseOrderController
     }
 
     /**
+     * Close a partly received order short (ST2a)
+     *
+     * Only from `partially_received` (else `PURCHASE_ORDER_NOT_CLOSABLE` with the current
+     * `status`); the quantity still open is no longer expected.
+     */
+    public function close(Request $request, PurchaseOrder $order, ChangePurchaseOrderStatus $status): JsonResponse
+    {
+        $this->presenter->assertVisible($this->user($request), $order->branch_id);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:200']]);
+
+        return ApiResponse::success($this->present($request, $status->close($order, $data['reason'])));
+    }
+
+    /**
      * Submit a draft (SC2)
      *
      * Ordered at once when no approval is needed, else `pending_approval` (approvers notified).

@@ -20,6 +20,8 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::put('orders/{order}', [PurchaseOrderController::class, 'update'])->middleware('can:purchases.manage');
     Route::post('orders/{order}/place', [PurchaseOrderController::class, 'place'])->middleware('can:purchases.manage');
     Route::post('orders/{order}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('can:purchases.manage');
+    // ST2a: short-close a partly received order (same permission as cancelling).
+    Route::post('orders/{order}/close', [PurchaseOrderController::class, 'close'])->middleware('can:purchases.manage');
 
     Route::get('receipts', [GoodsReceiptController::class, 'index'])->middleware('can:purchases.view');
     Route::post('receipts', [GoodsReceiptController::class, 'store'])->middleware('can:purchases.receive');
@@ -27,6 +29,8 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::post('receipts/{receipt}/returns', [GoodsReceiptController::class, 'storeReturn'])->middleware('can:purchases.return');
 
     Route::get('returns', [GoodsReceiptController::class, 'returns'])->middleware('can:purchases.view');
+    // ST2a: a return without a goods receipt.
+    Route::post('returns', [GoodsReceiptController::class, 'storeDirectReturn'])->middleware('can:purchases.return');
     Route::get('returns/{purchaseReturn}', [GoodsReceiptController::class, 'showReturn'])->middleware('can:purchases.view');
 
     Route::get('payments', [SupplierPaymentController::class, 'index'])->middleware('can:purchases.view');

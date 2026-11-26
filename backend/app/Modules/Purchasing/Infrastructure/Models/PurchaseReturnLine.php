@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property string $id
  * @property string $purchase_return_id
- * @property string $goods_receipt_line_id
+ * @property ?string $goods_receipt_line_id NULL for a return without a goods receipt (ST2a)
  * @property string $variant_id
  * @property ?string $batch_id
  * @property string $quantity

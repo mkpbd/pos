@@ -39,6 +39,8 @@ use Illuminate\Support\Carbon;
  * @property ?string $rejected_by
  * @property ?Carbon $rejected_at
  * @property ?string $rejection_reason
+ * @property ?Carbon $closed_at ST2a: short-closed (status closed)
+ * @property ?string $close_reason
  * @property ?string $created_by
  * @property ?Carbon $created_at
  */
@@ -58,6 +60,7 @@ class PurchaseOrder extends Model
             'expected_date' => 'date',
             'ordered_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'closed_at' => 'datetime',
             'subtotal' => 'decimal:2',
             'tax_total' => 'decimal:2',
             'total' => 'decimal:2',
