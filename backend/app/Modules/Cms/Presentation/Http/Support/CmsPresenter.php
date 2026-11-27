@@ -5,6 +5,7 @@ namespace App\Modules\Cms\Presentation\Http\Support;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\ContactMessage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
+use App\Modules\Cms\Infrastructure\Models\NewsletterCampaign;
 use App\Modules\Cms\Infrastructure\Models\NewsletterSubscriber;
 use App\Modules\Shared\Application\Support\TranslationInput;
 use App\Modules\Shared\Domain\Translations;
@@ -123,6 +124,28 @@ final class CmsPresenter
             'confirmed_at' => $s->confirmed_at?->toIso8601String(),
             'unsubscribed_at' => $s->unsubscribed_at?->toIso8601String(),
             'created_at' => $s->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * BD2b. The list leaves out the body.
+     *
+     * @return array<string, mixed>
+     */
+    public static function campaign(NewsletterCampaign $c, bool $withBody = true): array
+    {
+        return [
+            'id' => $c->id,
+            'subject' => $c->subject,
+            ...($withBody ? ['body' => $c->body] : []),
+            'status' => $c->status->value,
+            'recipients_count' => $c->recipients_count,
+            'sent_count' => $c->sent_count,
+            'created_by' => $c->created_by,
+            'sent_by' => $c->sent_by,
+            'sent_at' => $c->sent_at?->toIso8601String(),
+            'created_at' => $c->created_at?->toIso8601String(),
+            'updated_at' => $c->updated_at?->toIso8601String(),
         ];
     }
 }

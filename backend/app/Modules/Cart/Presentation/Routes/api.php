@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Cart\Presentation\Http\Controllers\CartController;
+use App\Modules\Cart\Presentation\Http\Controllers\CartReminderController;
 use App\Modules\Cart\Presentation\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,4 +27,9 @@ Route::middleware(['storefront', 'storefront.session', 'throttle:storefront', 'c
             Route::post('merge', [WishlistController::class, 'merge']);
         });
     });
+});
+
+// BD2b: abandoned-cart reminder counts (Settings → Online store).
+Route::middleware(['auth:sanctum', 'tenant', 'can:storefront.view'])->prefix('storefront')->group(function () {
+    Route::get('cart-reminders/summary', [CartReminderController::class, 'summary']);
 });

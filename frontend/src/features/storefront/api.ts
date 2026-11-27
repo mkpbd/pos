@@ -58,8 +58,18 @@ export type StorefrontSettings = {
   cod_advance_hold_hours?: number
   /** BD1c (read-only): at least one bKash / Nagad / Rocket Send Money method is on; otherwise no advance is asked. */
   cod_advance_ready?: boolean
+  /** BD2b: remind signed-in shoppers of a cart they left (default off; present when the server has it). */
+  cart_reminders?: boolean
+  /** BD2b: hours after the cart's last change before the reminder goes (1–72, default 3). */
+  cart_reminder_after_hours?: number
+  /** BD2b: e-mail the shopper when the order is shipped / delivered (default on). */
+  email_shipped?: boolean
+  email_delivered?: boolean
   updated_at: string | null
 }
+
+/** BD2b: cart reminders sent in the last 30 days and how many of those shoppers ordered within 7 days. */
+export type CartReminderSummary = { sent_30d: number; ordered_30d: number }
 
 export type CodReviewMode = 'off' | 'risky' | 'all'
 export type CodAdvanceAmount = 'delivery' | 'fixed'
@@ -451,11 +461,24 @@ export function useSaveStorefrontSettingsMutation() {
           | 'cod_advance_amount'
           | 'cod_advance_fixed'
           | 'cod_advance_hold_hours'
+          | 'cart_reminders'
+          | 'cart_reminder_after_hours'
+          | 'email_shipped'
+          | 'email_delivered'
         >
       > & { assistant?: AssistantSettingsInput },
     ) =>
       api.patch<StorefrontSettings>('/storefront/settings', input).then((r) => r.data),
     onSuccess: (data) => queryClient.setQueryData(storefrontKeys.settings, data),
+  })
+}
+
+export function useCartReminderSummaryQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: ['storefront', 'cart-reminders', 'summary'] as const,
+    queryFn: ({ signal }) => api.get<CartReminderSummary>('/storefront/cart-reminders/summary', { signal }).then((r) => r.data),
+    enabled,
+    retry: false,
   })
 }
 

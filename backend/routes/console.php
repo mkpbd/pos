@@ -29,6 +29,9 @@ Schedule::command('marketing:prune-page-insights')->daily();
 // Guest carts expire 30 days after their last change.
 Schedule::command('cart:prune')->daily();
 
+// BD2b: abandoned-cart reminders to signed-in shoppers (hourly; each cart reminded at most once).
+Schedule::command('cart:reminders')->hourly()->withoutOverlapping();
+
 // AI2a: AI drafts of online store texts are kept 30 days.
 Schedule::command('online-catalog:prune-ai-drafts')->daily();
 

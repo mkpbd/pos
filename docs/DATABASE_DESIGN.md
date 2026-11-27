@@ -471,6 +471,11 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Cart reminders and newsletter campaigns BD2b (implemented)
+
+- `carts.reminder_sent_at`; storefront settings `cart_reminders`, `cart_reminder_after_hours` (1–72), `email_shipped`, `email_delivered`; `sms_messages.purpose` adds `cart_reminder`.
+- `newsletter_campaigns` (organization, subject ≤ 150, body markdown, status CHECK `draft|sending|sent`, recipients / sent counts, created / sent by, sent at).
+
 ### Delivery areas and weight fees BD2a (implemented)
 
 - `shipping_areas` (organization, district, name ≤ 80 unique per district ignoring case, `fee_adjustment numeric(18,2)` may be negative, active, sort order).

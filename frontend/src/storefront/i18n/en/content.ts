@@ -148,6 +148,9 @@ export const content = {
   'content.newsletter.noLonger': 'You will no longer receive our news and offers.',
   'content.newsletter.unsubscribing': 'Unsubscribing…',
   'content.newsletter.unsubscribe': 'Unsubscribe',
+  'content.newsletter.alreadyUnsubscribed': 'You were already unsubscribed',
+  'content.newsletter.alreadyUnsubscribedText': 'This address does not get our newsletter any more.',
+  'content.newsletter.unsubscribedText': 'You will no longer receive our newsletter.',
 
   'content.notFound.title': 'Page not found',
   'content.notFound.text': 'The page you are looking for does not exist or has moved.',

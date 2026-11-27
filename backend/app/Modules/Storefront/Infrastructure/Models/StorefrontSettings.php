@@ -41,13 +41,18 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $cod_advance_amount delivery (delivery charge + COD fee) | fixed (BD1c)
  * @property ?string $cod_advance_fixed the fixed advance (> 0) when `cod_advance_amount` is fixed (BD1c)
  * @property int $cod_advance_hold_hours hours the shopper has to pay the advance (1–168, BD1c)
+ * @property bool $cart_reminders remind signed-in shoppers of the cart they left (BD2b)
+ * @property int $cart_reminder_after_hours hours after the cart's last change before the reminder (1–72, BD2b)
+ * @property bool $email_shipped e-mail the shopper when the order is handed to the courier (BD2b)
+ * @property bool $email_delivered e-mail the shopper when the order is delivered (BD2b)
  */
 #[Fillable(['organization_id', 'is_enabled', 'site_name', 'meta_description', 'fulfilment_store_id', 'guest_checkout_enabled', 'return_window_days', 'allow_indexing', 'bangla_enabled', 'default_locale', 'bangla_digits',
     'share_buttons', 'whatsapp_number', 'whatsapp_order_button', 'whatsapp_chat_button',
     'assistant_enabled', 'assistant_name', 'assistant_greeting', 'assistant_translations', 'assistant_daily_limit', 'assistant_handoff',
     'checkout_email', 'checkout_phone_verification',
     'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers',
-    'cod_advance', 'cod_advance_amount', 'cod_advance_fixed', 'cod_advance_hold_hours'])]
+    'cod_advance', 'cod_advance_amount', 'cod_advance_fixed', 'cod_advance_hold_hours',
+    'cart_reminders', 'cart_reminder_after_hours', 'email_shipped', 'email_delivered'])]
 class StorefrontSettings extends Model
 {
     use BelongsToOrganization, ChangesStorefrontContent, HasUuids, TracksAuthor;
@@ -90,6 +95,10 @@ class StorefrontSettings extends Model
         'cod_advance' => 'off',
         'cod_advance_amount' => 'delivery',
         'cod_advance_hold_hours' => 24,
+        'cart_reminders' => false,
+        'cart_reminder_after_hours' => 3,
+        'email_shipped' => true,
+        'email_delivered' => true,
     ];
 
     protected function casts(): array
@@ -98,7 +107,8 @@ class StorefrontSettings extends Model
             'share_buttons' => 'boolean', 'whatsapp_order_button' => 'boolean', 'whatsapp_chat_button' => 'boolean',
             'assistant_enabled' => 'boolean', 'assistant_translations' => 'array', 'assistant_daily_limit' => 'integer',
             'cod_review_min_success_rate' => 'integer', 'cod_review_new_numbers' => 'boolean',
-            'cod_advance_fixed' => 'decimal:2', 'cod_advance_hold_hours' => 'integer'];
+            'cod_advance_fixed' => 'decimal:2', 'cod_advance_hold_hours' => 'integer',
+            'cart_reminders' => 'boolean', 'cart_reminder_after_hours' => 'integer', 'email_shipped' => 'boolean', 'email_delivered' => 'boolean'];
     }
 
     /**

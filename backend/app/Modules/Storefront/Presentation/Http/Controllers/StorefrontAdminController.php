@@ -81,6 +81,9 @@ class StorefrontAdminController
      * delivery (default: delivery charge + COD fee) | fixed (`cod_advance_fixed` > 0, capped at
      * the total); `cod_advance_hold_hours` 1–168 (24). Read-only `cod_advance_ready`: a Send
      * Money method is on (otherwise the advance acts as off).
+     * BD2b: `cart_reminders` (default false) — signed-in shoppers' carts left `cart_reminder_after_hours`
+     * (1–72, default 3) get one reminder (e-mail, else the `cart_reminder` SMS); `email_shipped` /
+     * `email_delivered` (default true) — e-mail the shopper when the order ships / is delivered.
      */
     public function updateSettings(Request $request, SaveStorefrontSettings $save, SmsSender $sms, TenantContext $tenant): JsonResponse
     {
@@ -115,6 +118,10 @@ class StorefrontAdminController
             'cod_advance_amount' => ['sometimes', 'string', Rule::in(StorefrontSettings::COD_ADVANCE_AMOUNTS)],
             'cod_advance_fixed' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'max:9999999', 'decimal:0,2'],
             'cod_advance_hold_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
+            'cart_reminders' => ['sometimes', 'boolean'],
+            'cart_reminder_after_hours' => ['sometimes', 'integer', 'min:1', 'max:72'],
+            'email_shipped' => ['sometimes', 'boolean'],
+            'email_delivered' => ['sometimes', 'boolean'],
         ]);
         if (isset($data['cod_advance_fixed'])) {
             $data['cod_advance_fixed'] = Decimal::round((string) $data['cod_advance_fixed'], 2);

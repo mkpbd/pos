@@ -4,6 +4,7 @@ namespace App\Modules\Cart;
 
 use App\Modules\Cart\Domain\CartOwner;
 use App\Modules\Cart\Infrastructure\Console\PruneCartsCommand;
+use App\Modules\Cart\Infrastructure\Console\SendCartRemindersCommand;
 use App\Modules\Cart\Infrastructure\EloquentCustomerShoppingLists;
 use App\Modules\Cart\Presentation\Http\Support\CartCookie;
 use App\Modules\Cart\Presentation\Http\Support\CartIdempotencyScope;
@@ -20,7 +21,8 @@ use Illuminate\Support\Facades\RateLimiter;
 /**
  * The online store's cart (guests by cookie, customers by account; always repriced through
  * CartPricer) and the customers' wishlists, with the guest → customer merge on sign-in and
- * the daily prune of expired guest carts (`cart:prune`).
+ * the daily prune of expired guest carts (`cart:prune`) and the hourly abandoned-cart reminders
+ * to signed-in shoppers (`cart:reminders`, BD2b).
  */
 class CartServiceProvider extends ModuleServiceProvider
 {
@@ -46,7 +48,7 @@ class CartServiceProvider extends ModuleServiceProvider
         });
 
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneCartsCommand::class]);
+            $this->commands([PruneCartsCommand::class, SendCartRemindersCommand::class]);
         }
     }
 }

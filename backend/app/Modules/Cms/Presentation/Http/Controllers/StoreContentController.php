@@ -10,6 +10,7 @@ use App\Modules\Cms\Infrastructure\Models\CmsPage;
 use App\Modules\Cms\Infrastructure\Models\FaqItem;
 use App\Modules\Cms\Presentation\Http\Support\CmsPresenter;
 use App\Modules\Shared\Application\Localization\LocaleContext;
+use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -116,5 +117,22 @@ class StoreContentController
         $newsletter->unsubscribe($request->validate(['token' => ['required', 'string', 'max:100']])['token']);
 
         return ApiResponse::success(['message' => 'You have been unsubscribed.']);
+    }
+
+    /**
+     * Unsubscribe through a campaign e-mail's signed link
+     *
+     * BD2b: `?signature=` from the link. `already_unsubscribed` is true when following it again.
+     * `TOKEN_INVALID` for a wrong signature or another store's subscriber.
+     */
+    public function unsubscribeSigned(Request $request, string $subscriber, NewsletterSubscriptions $newsletter): JsonResponse
+    {
+        // The storefront client adds `?lang=` to every store request.
+        if (! $request->hasValidRelativeSignatureWhileIgnoring(['lang'])) {
+            throw new BusinessRuleViolation('TOKEN_INVALID', 'This unsubscribe link is invalid.');
+        }
+        $already = $newsletter->unsubscribeById($subscriber);
+
+        return ApiResponse::success(['message' => 'You have been unsubscribed.', 'already_unsubscribed' => $already]);
     }
 }

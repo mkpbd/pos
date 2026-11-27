@@ -32,6 +32,7 @@ use App\Modules\Orders\Infrastructure\Notifications\SendOrderCancelledWithRefund
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderPlacedNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderReturnNotifications;
 use App\Modules\Orders\Infrastructure\Notifications\SendOrderSms;
+use App\Modules\Orders\Infrastructure\Notifications\SendOrderStatusEmails;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -86,6 +87,8 @@ class OrdersServiceProvider extends ModuleServiceProvider
         // BD1a: the shopper's order text messages.
         Event::listen(OrderPlaced::class, [SendOrderSms::class, 'placed']);
         Event::listen(OrderStatusChanged::class, [SendOrderSms::class, 'statusChanged']);
+        // BD2b: "on its way" / "delivered" e-mails to the shopper.
+        Event::listen(OrderStatusChanged::class, SendOrderStatusEmails::class);
 
         // Checkout preview and placement: per IP and cart (ADR-015).
         RateLimiter::for('checkout', function (Request $request) {

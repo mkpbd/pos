@@ -103,8 +103,8 @@ storefront, the page builder (B1–B21), shop assistant (AI2b).
 | **Fake-order protection for COD** (phone blocklist, verify-before-confirm, delivery success ratio, advance delivery charge) | **Done (BD1b, advance delivery charge BD1c)** | blocked numbers, *Awaiting confirmation* hold, delivery history per number |
 | **Facebook Pixel + Conversions API, GA4, TikTok pixel** (or at least a "paste tracking code" setting) | **Done (BD1c)** | Meta pixel + Conversions API (Purchase), GA4, TikTok, pasted head/body code |
 | Courier API booking & automatic status (Pathao, Steadfast, RedX, Paperfly) | P1 | Couriers are name + phone + tracking link |
-| Abandoned-cart recovery; shipped / out-for-delivery / delivered notifications to shoppers; guest "track my order" page | P1 | — |
-| Messenger inbox / comment-to-order; e-mail campaigns & web push (newsletter sign-up exists, nothing sends) | P1 | — |
+| Abandoned-cart recovery; shipped / out-for-delivery / delivered notifications to shoppers; guest "track my order" page | **Done (BD2b)** — signed-in carts only; track page BD1a | — |
+| Messenger inbox / comment-to-order; e-mail campaigns & web push (newsletter sign-up exists, nothing sends) | **E-mail campaigns done (BD2b)**; Messenger needs a Meta app, web push open | — |
 | Delivery areas below district (upazila / thana), weight-based fees | **Done (BD2a)** — the shop's own areas per district (no national upazila list) | — |
 | Bangla order e-mails, gift cards, click & collect, loyalty on web orders, review photos, change e-mail, link POS & online customer by phone | P2 | — |
 | Better search (typo tolerance, Banglish → Bangla; trigram index exists but unused) | P2 | — |

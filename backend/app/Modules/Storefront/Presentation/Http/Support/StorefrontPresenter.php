@@ -60,6 +60,11 @@ final class StorefrontPresenter
             'cod_advance_amount' => $s->cod_advance_amount ?? 'delivery',
             'cod_advance_fixed' => $s->cod_advance_fixed === null ? null : (string) $s->cod_advance_fixed,
             'cod_advance_hold_hours' => (int) ($s->cod_advance_hold_hours ?? 24),
+            // BD2b: abandoned-cart reminders and the shipped / delivered e-mails.
+            'cart_reminders' => (bool) ($s->cart_reminders ?? false),
+            'cart_reminder_after_hours' => (int) ($s->cart_reminder_after_hours ?? 3),
+            'email_shipped' => (bool) ($s->email_shipped ?? true),
+            'email_delivered' => (bool) ($s->email_delivered ?? true),
             'updated_at' => $s->updated_at?->toIso8601String(),
         ];
     }

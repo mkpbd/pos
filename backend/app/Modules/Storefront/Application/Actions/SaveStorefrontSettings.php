@@ -30,7 +30,9 @@ class SaveStorefrontSettings
         // BD1b.
         'cod_review', 'cod_review_min_success_rate', 'cod_review_new_numbers',
         // BD1c.
-        'cod_advance', 'cod_advance_amount', 'cod_advance_fixed', 'cod_advance_hold_hours'];
+        'cod_advance', 'cod_advance_amount', 'cod_advance_fixed', 'cod_advance_hold_hours',
+        // BD2b.
+        'cart_reminders', 'cart_reminder_after_hours', 'email_shipped', 'email_delivered'];
 
     public function __construct(
         private readonly StorefrontConfig $config,
@@ -55,7 +57,10 @@ class SaveStorefrontSettings
      * `cod_advance_fixed` (> 0, required once the amount is `fixed`, else 422) and
      * `cod_advance_hold_hours` (1–168) — the advance delivery charge of cash-on-delivery orders.
      *
-     * @param  array{cod_advance?: string, cod_advance_amount?: string, cod_advance_fixed?: ?string, cod_advance_hold_hours?: int, cod_review?: string, cod_review_min_success_rate?: int, cod_review_new_numbers?: bool, checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
+     * BD2b: `cart_reminders` and `cart_reminder_after_hours` (1–72) — the abandoned-cart reminders
+     * of `cart:reminders`; `email_shipped` / `email_delivered` — the shopper's order e-mails.
+     *
+     * @param  array{cart_reminders?: bool, cart_reminder_after_hours?: int, email_shipped?: bool, email_delivered?: bool, cod_advance?: string, cod_advance_amount?: string, cod_advance_fixed?: ?string, cod_advance_hold_hours?: int, cod_review?: string, cod_review_min_success_rate?: int, cod_review_new_numbers?: bool, checkout_email?: string, checkout_phone_verification?: string, is_enabled?: bool, site_name?: string, meta_description?: ?string, fulfilment_store_id?: ?string, guest_checkout_enabled?: bool, return_window_days?: int, allow_indexing?: bool, bangla_enabled?: bool, default_locale?: string, bangla_digits?: bool, share_buttons?: bool, whatsapp_number?: ?string, whatsapp_order_button?: bool, whatsapp_chat_button?: bool, assistant?: array<string, mixed>}  $attributes
      */
     public function __invoke(array $attributes): StorefrontSettings
     {

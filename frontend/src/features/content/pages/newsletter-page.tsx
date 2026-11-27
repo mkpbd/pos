@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { DownloadIcon, SearchIcon } from 'lucide-react'
+import { Link } from 'react-router'
+import { DownloadIcon, MailIcon, SearchIcon } from 'lucide-react'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -33,6 +34,10 @@ export function NewsletterPage() {
       <ContentHeader
         actions={
           <>
+            {/* BD2b: write and send newsletter e-mails to the confirmed subscribers. */}
+            <Button asChild variant="outline">
+              <Link to="/marketing/newsletter"><MailIcon data-icon="inline-start" /> Campaigns</Link>
+            </Button>
             <ExportMenu list="newsletterSubscribers" query={filters} disabled={!subscribers.data?.items.length} />
             <Button asChild variant="outline">
               <a href={NEWSLETTER_EXPORT_URL} download>

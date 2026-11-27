@@ -148,6 +148,9 @@ export const content: Translations<typeof en> = {
   'content.newsletter.noLonger': 'আপনি আর আমাদের খবর ও অফার পাবেন না।',
   'content.newsletter.unsubscribing': 'আনসাবস্ক্রাইব করা হচ্ছে…',
   'content.newsletter.unsubscribe': 'আনসাবস্ক্রাইব করুন',
+  'content.newsletter.alreadyUnsubscribed': 'আপনি আগেই আনসাবস্ক্রাইব করেছেন',
+  'content.newsletter.alreadyUnsubscribedText': 'এই ঠিকানায় আমাদের নিউজলেটার আর পাঠানো হয় না।',
+  'content.newsletter.unsubscribedText': 'আপনি আর আমাদের নিউজলেটার পাবেন না।',
 
   'content.notFound.title': 'পেজটি পাওয়া যায়নি',
   'content.notFound.text': 'আপনি যে পেজটি খুঁজছেন সেটি নেই অথবা অন্য কোথাও সরানো হয়েছে।',

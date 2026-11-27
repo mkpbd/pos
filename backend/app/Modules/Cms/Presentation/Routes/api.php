@@ -1,9 +1,11 @@
 <?php
 
+use App\Modules\Cms\Application\Actions\NewsletterSubscriptions;
 use App\Modules\Cms\Presentation\Http\Controllers\BlogCategoryController;
 use App\Modules\Cms\Presentation\Http\Controllers\BlogPostController;
 use App\Modules\Cms\Presentation\Http\Controllers\ContactMessageController;
 use App\Modules\Cms\Presentation\Http\Controllers\FaqController;
+use App\Modules\Cms\Presentation\Http\Controllers\NewsletterCampaignController;
 use App\Modules\Cms\Presentation\Http\Controllers\NewsletterSubscriberController;
 use App\Modules\Cms\Presentation\Http\Controllers\PageController;
 use App\Modules\Cms\Presentation\Http\Controllers\StoreBlogController;
@@ -25,6 +27,9 @@ Route::middleware(['storefront', 'throttle:storefront'])->prefix('store')->group
     Route::post('newsletter', [StoreContentController::class, 'subscribe'])->middleware('throttle:newsletter');
     Route::post('newsletter/confirm', [StoreContentController::class, 'confirm']);
     Route::post('newsletter/unsubscribe', [StoreContentController::class, 'unsubscribe']);
+    // BD2b: the signed link in campaign e-mails.
+    Route::post('newsletter/unsubscribe/{subscriber}', [StoreContentController::class, 'unsubscribeSigned'])
+        ->whereUuid('subscriber')->name(NewsletterSubscriptions::SIGNED_ROUTE);
 });
 
 // Content administration.
@@ -58,4 +63,18 @@ Route::middleware(['auth:sanctum', 'tenant', 'can:cms.manage'])->prefix('cms')->
 
     Route::get('newsletter-subscribers', [NewsletterSubscriberController::class, 'index']);
     Route::get('newsletter-subscribers/export', [NewsletterSubscriberController::class, 'export']);
+});
+
+// BD2b: newsletter campaigns (sent to the confirmed subscribers) and subscriber counts.
+Route::middleware(['auth:sanctum', 'tenant', 'can:cms.manage'])->prefix('newsletter')->group(function () {
+    Route::get('subscribers/summary', [NewsletterCampaignController::class, 'subscriberSummary']);
+    Route::get('campaigns', [NewsletterCampaignController::class, 'index']);
+    Route::post('campaigns', [NewsletterCampaignController::class, 'store']);
+    Route::get('campaigns/{newsletterCampaign}', [NewsletterCampaignController::class, 'show'])->whereUuid('newsletterCampaign');
+    Route::patch('campaigns/{newsletterCampaign}', [NewsletterCampaignController::class, 'update'])->whereUuid('newsletterCampaign');
+    Route::delete('campaigns/{newsletterCampaign}', [NewsletterCampaignController::class, 'destroy'])->whereUuid('newsletterCampaign');
+    Route::middleware('throttle:newsletter-send')->group(function () {
+        Route::post('campaigns/{newsletterCampaign}/test', [NewsletterCampaignController::class, 'test'])->whereUuid('newsletterCampaign');
+        Route::post('campaigns/{newsletterCampaign}/send', [NewsletterCampaignController::class, 'send'])->whereUuid('newsletterCampaign');
+    });
 });

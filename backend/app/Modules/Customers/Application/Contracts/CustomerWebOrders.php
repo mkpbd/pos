@@ -2,6 +2,8 @@
 
 namespace App\Modules\Customers\Application\Contracts;
 
+use Carbon\CarbonInterface;
+
 /**
  * The customer's web orders and returns for the customer card's "Web activity" (E10b).
  * Implemented by the Orders module; without it every customer has none.
@@ -21,4 +23,13 @@ interface CustomerWebOrders
      * }
      */
     public function summary(string $customerId): array;
+
+    /**
+     * BD2b: which windows saw a web order of their customer — placed at or after `from` and,
+     * when `to` is given, before it (any status but failed). Organization from the tenant context.
+     *
+     * @param  array<string, array{customer_id: string, from: CarbonInterface, to: ?CarbonInterface}>  $windows  keyed by the caller's id
+     * @return list<string> the keys of the windows with an order
+     */
+    public function orderedWithin(array $windows): array;
 }

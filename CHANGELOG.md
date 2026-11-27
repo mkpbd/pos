@@ -21,6 +21,22 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### BD2b — Cart reminders, shipped / delivered e-mails, newsletter campaigns
+
+Second part of BD2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P1). No new packages. From this phase on browser (Playwright) tests are not run, on the owner's instruction.
+
+#### Added
+- **Cart reminders** (Online store settings): a signed-in shopper who leaves items in the cart gets one reminder after N hours — e-mail, or SMS (*Cart reminder* template) without an e-mail; off by default; "Sent · ordered (30 days)" on the settings page.
+- **Shipped / delivered e-mails** to shoppers (courier, tracking link; review link once delivered), on by default with switches.
+- **Newsletter campaigns** (Marketing → Newsletter): draft, preview, send a test, send to every confirmed subscriber; each e-mail has a working unsubscribe link (signed, no sign-in).
+
+#### Tests
+- Backend 2131 (2130 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3347; typecheck, lint, build clean.
+- Browser tests (mocked and full-stack Playwright) not run.
+
+#### Upgrade
+- `php artisan migrate`; mail, queue worker and scheduler running.
+
 ### BD2a — Delivery areas inside a district, weight-based delivery fees
 
 First part of BD2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P1). Abandoned carts, shipped / delivered e-mails and newsletter campaigns follow in BD2b. No new packages.

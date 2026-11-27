@@ -168,6 +168,8 @@ const pages = {
   socialPosts: page(() => import('@/features/marketing/pages/social-page'), 'SocialPage'),
   productFeeds: page(() => import('@/features/marketing/pages/feeds-page'), 'ProductFeedsPage'),
   // BD1c: ad pixels, Conversions API and pasted tracking code.
+  newsletterCampaigns: page(() => import('@/features/marketing/pages/newsletter-pages'), 'NewsletterCampaignsPage'),
+  newsletterCampaign: page(() => import('@/features/marketing/pages/newsletter-pages'), 'NewsletterCampaignPage'),
   trackingPixels: page(() => import('@/features/marketing/pages/tracking-page'), 'TrackingPage'),
   // ST1: bulk import wizard and label printing.
   imports: page(() => import('@/features/imports/pages/import-pages'), 'ImportsPage'),
@@ -264,6 +266,9 @@ export const routes: RouteObject[] = [
               guarded('social.view', 'marketing/feeds', pages.productFeeds),
               // BD1c: changes need marketing.manage; the pasted code also storefront.custom_html (page and API).
               guarded('marketing.view', 'marketing/tracking', pages.trackingPixels),
+              // BD2b: newsletter campaigns go to the Cms subscribers, so cms.manage (page and API).
+              guarded('cms.manage', 'marketing/newsletter', pages.newsletterCampaigns),
+              guarded('cms.manage', 'marketing/newsletter/:campaignId', pages.newsletterCampaign),
               guarded('reviews.view', 'reviews', pages.reviews),
               // P1b: shoppers' questions; answering, rejecting and deleting need reviews.moderate (bell link ?status=pending).
               guarded('reviews.view', 'reviews/questions', pages.productQuestions),

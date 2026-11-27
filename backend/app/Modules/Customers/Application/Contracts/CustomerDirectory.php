@@ -19,8 +19,10 @@ interface CustomerDirectory
     public function find(string $customerId, string $organizationId): ?array;
 
     /**
+     * Contact summaries keyed by customer id (archived customers included; BD2b: with their state).
+     *
      * @param  list<string>  $customerIds
-     * @return array<string, array{id: string, code: string, name: string, phone: ?string, email: ?string}>
+     * @return array<string, array{id: string, code: string, name: string, phone: ?string, email: ?string, is_active: bool, archived: bool}>
      */
     public function summaries(string $organizationId, array $customerIds): array;
 

@@ -8,6 +8,7 @@ use App\Modules\Orders\Domain\ReturnStatus;
 use App\Modules\Orders\Infrastructure\Models\Order;
 use App\Modules\Orders\Infrastructure\Models\OrderReturn;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -48,5 +49,30 @@ class EloquentCustomerWebOrders implements CustomerWebOrders
                 ->whereHas('order', fn (Builder $q) => $q->where('customer_id', $customerId))->count(),
             'recent_orders' => $recent,
         ];
+    }
+
+    public function orderedWithin(array $windows): array
+    {
+        if ($windows === []) {
+            return [];
+        }
+        $earliest = min(array_map(fn (array $w) => CarbonImmutable::instance($w['from']), $windows));
+        $placed = Order::query()
+            ->whereIn('customer_id', array_values(array_unique(array_column($windows, 'customer_id'))))
+            ->where('status', '!=', OrderStatus::Failed->value)
+            ->where('placed_at', '>=', $earliest->utc())
+            ->get(['customer_id', 'placed_at'])
+            ->groupBy('customer_id');
+
+        $keys = [];
+        foreach ($windows as $key => $w) {
+            $hit = ($placed[$w['customer_id']] ?? collect())->contains(fn (Order $o) => $o->placed_at->greaterThanOrEqualTo($w['from'])
+                && ($w['to'] === null || $o->placed_at->lessThan($w['to'])));
+            if ($hit) {
+                $keys[] = (string) $key;
+            }
+        }
+
+        return $keys;
     }
 }

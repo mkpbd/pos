@@ -12,6 +12,9 @@ namespace App\Modules\Sms\Domain;
  *
  * R1: `due_reminder` — a customer's outstanding balance ({shop} {name} {due} {link}), sent on
  * demand from the customer page or on the scheduled reminder day.
+ *
+ * BD2b: `cart_reminder` — an abandoned-cart reminder to a signed-in shopper without an e-mail
+ * address ({shop} {name} {link}: the store's cart page), sent once per cart by `cart:reminders`.
  */
 final class SmsTemplate
 {
@@ -20,7 +23,7 @@ final class SmsTemplate
     public const MAX_LENGTH = 480;
 
     /** Events switched on until the merchant changes them (payment confirmations are off). */
-    public const ENABLED_BY_DEFAULT = ['order_placed' => true, 'order_confirmed' => false, 'order_shipped' => true, 'order_delivered' => true, 'order_cancelled' => true, 'sale_receipt' => true, 'due_reminder' => true];
+    public const ENABLED_BY_DEFAULT = ['order_placed' => true, 'order_confirmed' => false, 'order_shipped' => true, 'order_delivered' => true, 'order_cancelled' => true, 'sale_receipt' => true, 'due_reminder' => true, 'cart_reminder' => true];
 
     /**
      * @param  array<string, string|int|float|null>  $vars
@@ -74,6 +77,10 @@ final class SmsTemplate
             'due_reminder' => [
                 'en' => '{shop}: Dear {name}, your due balance is Tk {due}. Please pay at your earliest convenience. {link}',
                 'bn' => '{shop}: প্রিয় {name}, আপনার বাকি ৳{due}। অনুগ্রহ করে শীঘ্রই পরিশোধ করুন। {link}',
+            ],
+            'cart_reminder' => [
+                'en' => '{shop}: Hi {name}, you left something in your cart. Complete your order: {link}',
+                'bn' => '{shop}: প্রিয় {name}, আপনার কার্টে কিছু পণ্য রয়ে গেছে। অর্ডার সম্পন্ন করুন: {link}',
             ],
         ];
 

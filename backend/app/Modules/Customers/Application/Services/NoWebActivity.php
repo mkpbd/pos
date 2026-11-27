@@ -15,4 +15,9 @@ class NoWebActivity implements CustomerReviewStats, CustomerShoppingLists, Custo
     {
         return [];
     }
+
+    public function orderedWithin(array $windows): array
+    {
+        return [];
+    }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { useNewsletterTokenMutation } from '../api'
+import { useNewsletterSignedUnsubscribeMutation, useNewsletterTokenMutation } from '../api'
 import { storeFormError } from '../form-errors'
 import { useLocale } from '../i18n/locale'
 import { useDocumentMeta } from '../use-document-meta'
@@ -54,10 +54,25 @@ export function NewsletterUnsubscribePage() {
   const [params] = useSearchParams()
   const { t } = useLocale()
   const token = params.get('token') ?? ''
-  const unsubscribe = useNewsletterTokenMutation('unsubscribe')
+  // BD2b: campaign e-mails link with `?subscriber=…&signature=…` instead of a stored token.
+  const subscriber = params.get('subscriber') ?? ''
+  const signature = params.get('signature') ?? ''
+  const signed = subscriber !== '' && signature !== ''
+  const byToken = useNewsletterTokenMutation('unsubscribe')
+  const bySignature = useNewsletterSignedUnsubscribeMutation()
+  const unsubscribe = signed ? bySignature : byToken
 
-  if (!token) return <Frame title={t('content.newsletter.unsubscribeTitle')}><p>{t('content.newsletter.incomplete')}</p><HomeLink /></Frame>
-  if (unsubscribe.isSuccess) return <Frame title={t('content.newsletter.unsubscribed')}><p role="status">{unsubscribe.data.message}</p><HomeLink /></Frame>
+  if (!token && !signed) return <Frame title={t('content.newsletter.unsubscribeTitle')}><p>{t('content.newsletter.incomplete')}</p><HomeLink /></Frame>
+  if (bySignature.isSuccess) {
+    const already = bySignature.data.already_unsubscribed === true
+    return (
+      <Frame title={t(already ? 'content.newsletter.alreadyUnsubscribed' : 'content.newsletter.unsubscribed')}>
+        <p role="status">{t(already ? 'content.newsletter.alreadyUnsubscribedText' : 'content.newsletter.unsubscribedText')}</p>
+        <HomeLink />
+      </Frame>
+    )
+  }
+  if (byToken.isSuccess) return <Frame title={t('content.newsletter.unsubscribed')}><p role="status">{byToken.data.message}</p><HomeLink /></Frame>
 
   return (
     <Frame title={t('content.newsletter.unsubscribeHeading')}>
@@ -65,7 +80,7 @@ export function NewsletterUnsubscribePage() {
       <button
         type="button"
         disabled={unsubscribe.isPending}
-        onClick={() => unsubscribe.mutate(token)}
+        onClick={() => (signed ? bySignature.mutate({ subscriber, signature }) : byToken.mutate(token))}
         className="rounded-sf-button bg-sf-accent px-6 py-3 font-semibold text-sf-accent-foreground transition hover:brightness-110 disabled:opacity-70"
       >
         {unsubscribe.isPending ? t('content.newsletter.unsubscribing') : t('content.newsletter.unsubscribe')}

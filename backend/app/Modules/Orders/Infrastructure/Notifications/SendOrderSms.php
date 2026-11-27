@@ -104,12 +104,14 @@ class SendOrderSms
         }
     }
 
-    private static function trackLink(string $site, Order $order): string
+    /** The store's "track my order" page for the order (BD2b: also linked by SendOrderStatusEmails). */
+    public static function trackLink(string $site, Order $order): string
     {
         return rtrim($site, '/').'/track-order?number='.rawurlencode($order->number);
     }
 
-    private function trackingLink(Order $order): ?string
+    /** The courier's tracking page for the order's shipment, or null (BD2b: also for the e-mails). */
+    public function trackingLink(Order $order): ?string
     {
         $shipment = $order->shipment;
         if ($shipment === null || $shipment->courier_id === null || $shipment->tracking_number === null) {

@@ -22,15 +22,18 @@ export type OrderEvent = (typeof ORDER_EVENTS)[number]
 export const SALE_RECEIPT_EVENT = 'sale_receipt'
 /** R1: what a customer owes (scheduled, or "Send due reminder" on the customer's account). */
 export const DUE_REMINDER_EVENT = 'due_reminder'
-export type TemplateEvent = OrderEvent | typeof SALE_RECEIPT_EVENT | typeof DUE_REMINDER_EVENT
+/** BD2b: a signed-in shopper left items in the cart (sent when the shopper has no e-mail address). */
+export const CART_REMINDER_EVENT = 'cart_reminder'
+const EXTRA_EVENTS = [SALE_RECEIPT_EVENT, DUE_REMINDER_EVENT, CART_REMINDER_EVENT] as const
+export type TemplateEvent = OrderEvent | (typeof EXTRA_EVENTS)[number]
 
 export type SmsTemplate = { enabled: boolean; en: string; bn: string }
-/** `sale_receipt` (POS1d) and `due_reminder` (R1) are present when the server has them. */
-export type SmsTemplates = Record<OrderEvent, SmsTemplate> & { sale_receipt?: SmsTemplate; due_reminder?: SmsTemplate }
+/** `sale_receipt` (POS1d), `due_reminder` (R1) and `cart_reminder` (BD2b) are present when the server has them. */
+export type SmsTemplates = Record<OrderEvent, SmsTemplate> & { sale_receipt?: SmsTemplate; due_reminder?: SmsTemplate; cart_reminder?: SmsTemplate }
 
-/** The events the templates have, in display order: the order events, then the sale receipt and due reminder when the server lists them. */
+/** The events the templates have, in display order: the order events, then the sale receipt and the reminders when the server lists them. */
 export function templateEvents(templates: SmsTemplates): TemplateEvent[] {
-  return [...ORDER_EVENTS, ...([SALE_RECEIPT_EVENT, DUE_REMINDER_EVENT] as const).filter((e) => templates[e])]
+  return [...ORDER_EVENTS, ...EXTRA_EVENTS.filter((e) => templates[e])]
 }
 
 export type SmsSettings = {
@@ -93,7 +96,7 @@ const oneOf = <T extends string>(v: unknown, options: readonly T[], fallback: T)
 
 function normalizeTemplates(raw: unknown): SmsTemplates {
   const source = isObj(raw) ? raw : {}
-  const events: readonly TemplateEvent[] = [...ORDER_EVENTS, ...([SALE_RECEIPT_EVENT, DUE_REMINDER_EVENT] as const).filter((e) => isObj(source[e]))]
+  const events: readonly TemplateEvent[] = [...ORDER_EVENTS, ...EXTRA_EVENTS.filter((e) => isObj(source[e]))]
   return Object.fromEntries(
     events.map((event) => {
       const t = isObj(source[event]) ? (source[event] as Obj) : {}
@@ -233,6 +236,7 @@ export const PURPOSE_LABELS: Record<SmsPurpose, string> = {
   order_cancelled: 'Order cancelled',
   sale_receipt: 'Sale receipt',
   due_reminder: 'Due reminder',
+  cart_reminder: 'Cart reminder',
   test: 'Test message',
 }
 

@@ -185,6 +185,93 @@ export function useSubscribersQuery(params: SubscriberListParams) {
   })
 }
 
+// ── Newsletter campaigns (BD2b) ──────────────────────────────────────────────
+
+export type CampaignStatus = 'draft' | 'sending' | 'sent'
+/** A newsletter e-mail: subject + markdown body; sent once to every confirmed subscriber. */
+export type NewsletterCampaign = {
+  id: string
+  subject: string
+  body: string
+  status: CampaignStatus
+  recipients_count: number
+  sent_count: number
+  sent_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+export type NewsletterCampaignInput = { subject: string; body: string }
+export type SubscriberSummary = { confirmed: number; pending: number; unsubscribed: number }
+
+export const NEWSLETTER_CAMPAIGNS_PATH = '/newsletter/campaigns'
+const campaignKeys = {
+  all: ['cms', 'campaigns'] as const,
+  list: (page: number) => ['cms', 'campaigns', 'list', page] as const,
+  one: (id: string) => ['cms', 'campaigns', id] as const,
+  summary: ['cms', 'subscribers', 'summary'] as const,
+}
+
+export function useNewsletterCampaignsQuery(page: number) {
+  return useQuery({
+    queryKey: campaignKeys.list(page),
+    queryFn: ({ signal }) => api.get<NewsletterCampaign[]>(NEWSLETTER_CAMPAIGNS_PATH, { signal, query: { page } }).then(toPaginated),
+    placeholderData: (previous) => previous,
+    // Counts move while a campaign is sending.
+    refetchInterval: (query) => (query.state.data?.items.some((c) => c.status === 'sending') ? 3000 : false),
+  })
+}
+
+export function useNewsletterCampaignQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: campaignKeys.one(id ?? ''),
+    queryFn: ({ signal }) => api.get<NewsletterCampaign>(`${NEWSLETTER_CAMPAIGNS_PATH}/${id}`, { signal }).then((r) => r.data),
+    enabled: id !== undefined,
+    refetchInterval: (query) => (query.state.data?.status === 'sending' ? 3000 : false),
+  })
+}
+
+export function useSubscriberSummaryQuery() {
+  return useQuery({
+    queryKey: campaignKeys.summary,
+    queryFn: ({ signal }) => api.get<SubscriberSummary>('/newsletter/subscribers/summary', { signal }).then((r) => r.data),
+  })
+}
+
+export function useSaveNewsletterCampaignMutation(id?: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: NewsletterCampaignInput) =>
+      (id ? api.patch<NewsletterCampaign>(`${NEWSLETTER_CAMPAIGNS_PATH}/${id}`, input) : api.post<NewsletterCampaign>(NEWSLETTER_CAMPAIGNS_PATH, input)).then((r) => r.data),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(campaignKeys.one(saved.id), saved)
+      void queryClient.invalidateQueries({ queryKey: ['cms', 'campaigns', 'list'] })
+    },
+  })
+}
+
+export function useDeleteNewsletterCampaignMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`${NEWSLETTER_CAMPAIGNS_PATH}/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: campaignKeys.all }),
+  })
+}
+
+export function useTestNewsletterCampaignMutation(id: string) {
+  return useMutation({ mutationFn: (email: string) => api.post(`${NEWSLETTER_CAMPAIGNS_PATH}/${id}/test`, { email }) })
+}
+
+export function useSendNewsletterCampaignMutation(id: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => api.post<NewsletterCampaign>(`${NEWSLETTER_CAMPAIGNS_PATH}/${id}/send`).then((r) => r.data),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: campaignKeys.all }),
+  })
+}
+
 // ── Blog (E11) ───────────────────────────────────────────────────────────────
 
 /** `scheduled` = published with a future `published_at`. */

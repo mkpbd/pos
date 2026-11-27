@@ -135,3 +135,16 @@ export function useNewsletterMutation() {
 export function useNewsletterTokenMutation(action: 'confirm' | 'unsubscribe') {
   return useMutation({ mutationFn: (token: string) => storeApi.post<Message>(`/store/newsletter/${action}`, { token }).then((r) => r.data) })
 }
+
+/**
+ * BD2b: the signed unsubscribe link of a campaign e-mail. The signature covers the path and its
+ * query, so `lang` is left out (`lang: undefined` stops the store client from adding it).
+ */
+export function useNewsletterSignedUnsubscribeMutation() {
+  return useMutation({
+    mutationFn: ({ subscriber, signature }: { subscriber: string; signature: string }) =>
+      storeApi
+        .post<Message & { already_unsubscribed: boolean }>(`/store/newsletter/unsubscribe/${encodeURIComponent(subscriber)}`, undefined, { query: { signature, lang: undefined } })
+        .then((r) => r.data),
+  })
+}

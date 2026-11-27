@@ -18,6 +18,9 @@ interface SmsSender
     /** R1: a customer's due (বাকি) reminder (template event and `sms_messages.purpose`). */
     public const DUE_REMINDER = 'due_reminder';
 
+    /** BD2b: an abandoned-cart reminder to a signed-in shopper (template event and `sms_messages.purpose`). */
+    public const CART_REMINDER = 'cart_reminder';
+
     /** SMS is switched on and the gateway is configured (driver `log`, or `http` with a URL). */
     public function ready(string $orgId): bool;
 

@@ -40,12 +40,14 @@ class CmsServiceProvider extends ModuleServiceProvider
         // Public forms (ADR-015): a handful per visitor per hour.
         RateLimiter::for('contact', fn (Request $request) => Limit::perHour(5)->by($request->ip()));
         RateLimiter::for('newsletter', fn (Request $request) => Limit::perHour(5)->by($request->ip()));
+        // BD2b: campaign test copies and sends, per staff user.
+        RateLimiter::for('newsletter-send', fn (Request $request) => Limit::perMinute(10)->by($request->user()?->getAuthIdentifier() ?: $request->ip()));
     }
 
     protected function permissions(): array
     {
         return [
-            'cms.manage' => 'Manage content pages, the FAQ and the blog, read contact messages, export newsletter subscribers',
+            'cms.manage' => 'Manage content pages, the FAQ and the blog, read contact messages, export newsletter subscribers, send newsletter campaigns',
         ];
     }
 }

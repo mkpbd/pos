@@ -8,8 +8,10 @@ use App\Modules\Cms\Infrastructure\Notifications\ConfirmNewsletterSubscription;
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 /**
@@ -22,6 +24,9 @@ class NewsletterSubscriptions
     public const RESEND_AFTER_MINUTES = 10;
 
     public const CONFIRM_WITHIN_DAYS = 7;
+
+    /** BD2b: name of the signed unsubscribe route (campaign e-mails). */
+    public const SIGNED_ROUTE = 'store.newsletter.unsubscribe-signed';
 
     public function __construct(
         private readonly TenantContext $tenant,
@@ -102,22 +107,54 @@ class NewsletterSubscriptions
      */
     public function unsubscribe(string $token): void
     {
-        DB::transaction(function () use ($token) {
-            $subscriber = NewsletterSubscriber::query()
-                ->where('unsubscribe_token_hash', hash('sha256', $token))
-                ->lockForUpdate()
-                ->first();
+        $this->markUnsubscribed(NewsletterSubscriber::query()->where('unsubscribe_token_hash', hash('sha256', $token)));
+    }
+
+    /**
+     * BD2b: the signed link in campaign e-mails (the caller checks the signature). Idempotent.
+     *
+     * @return bool whether the subscriber had already unsubscribed
+     */
+    public function unsubscribeById(string $subscriberId): bool
+    {
+        return $this->markUnsubscribed(NewsletterSubscriber::query()->whereKey($subscriberId));
+    }
+
+    /**
+     * BD2b: the store page that unsubscribes one subscriber without a stored token:
+     * `{site}/newsletter/unsubscribe?subscriber={id}&signature={sig}`. The signature belongs to
+     * the API route the page posts to (`POST /api/v1/store/newsletter/unsubscribe/{id}?signature=`),
+     * signed relative to the host; it never expires.
+     */
+    public function signedUnsubscribeUrl(string $siteUrl, string $subscriberId): string
+    {
+        parse_str((string) parse_url(URL::signedRoute(self::SIGNED_ROUTE, ['subscriber' => $subscriberId], absolute: false), PHP_URL_QUERY), $query);
+
+        return rtrim($siteUrl, '/').'/newsletter/unsubscribe?'.http_build_query(['subscriber' => $subscriberId, 'signature' => $query['signature']]);
+    }
+
+    /**
+     * @param  Builder<NewsletterSubscriber>  $query  matches the one subscriber
+     * @return bool whether the subscriber had already unsubscribed
+     */
+    private function markUnsubscribed(Builder $query): bool
+    {
+        return DB::transaction(function () use ($query) {
+            $subscriber = $query->lockForUpdate()->first();
 
             if ($subscriber === null) {
                 throw new BusinessRuleViolation('TOKEN_INVALID', 'This unsubscribe link is invalid.');
             }
-            if ($subscriber->status !== SubscriberStatus::Unsubscribed) {
-                $subscriber->update([
-                    'status' => SubscriberStatus::Unsubscribed,
-                    'unsubscribed_at' => now(),
-                    'confirm_token_hash' => null,
-                ]);
+            if ($subscriber->status === SubscriberStatus::Unsubscribed) {
+                return true;
             }
+            $subscriber->update([
+                'status' => SubscriberStatus::Unsubscribed,
+                'unsubscribed_at' => now(),
+                'confirm_token_hash' => null,
+            ]);
+
+            return false;
         });
     }
 }

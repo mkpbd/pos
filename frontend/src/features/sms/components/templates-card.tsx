@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/use-auth'
-import { DUE_REMINDER_EVENT, SALE_RECEIPT_EVENT, templateEvents, useSaveSmsSettingsMutation, type SmsSettings, type SmsTemplate, type SmsTemplates, type TemplateEvent } from '@/features/sms/api'
+import { CART_REMINDER_EVENT, DUE_REMINDER_EVENT, SALE_RECEIPT_EVENT, templateEvents, useSaveSmsSettingsMutation, type SmsSettings, type SmsTemplate, type SmsTemplates, type TemplateEvent } from '@/features/sms/api'
 import { analyzeSms, describeSms, EXAMPLE_VALUES, insertAt, renderSmsTemplate } from '@/features/sms/sms-text'
 import { fieldErrorMap } from '@/lib/forms'
 
@@ -21,6 +21,7 @@ const EVENTS: Record<TemplateEvent, { title: string; hint: string }> = {
   order_cancelled: { title: 'Order cancelled', hint: 'When the order is cancelled.' },
   sale_receipt: { title: 'Sale receipt', hint: 'When a shop sale’s receipt is sent by SMS from the till or the sale’s page.' },
   due_reminder: { title: 'Due reminder', hint: 'When a customer who owes money is reminded — on the schedule in Organization → Alerts & reminders, or from the customer’s account.' },
+  cart_reminder: { title: 'Cart reminder', hint: 'When a signed-in shopper with no e-mail address left items in the cart — switch cart reminders on in Online store settings.' },
 }
 
 /** POS1d: the sale receipt knows the invoice, not an order or a courier. */
@@ -31,10 +32,15 @@ const SALE_RECEIPT_EXAMPLES = { invoice: 'INV-MAIN-000123', link: 'https://shop.
 const DUE_REMINDER_PLACEHOLDERS = ['shop', 'name', 'due', 'link']
 const DUE_REMINDER_EXAMPLES = { due: '2,450.00', link: 'https://shop.example.com/account' }
 
+/** BD2b: the cart reminder links to the store's cart. */
+const CART_REMINDER_PLACEHOLDERS = ['shop', 'name', 'link']
+const CART_REMINDER_EXAMPLES = { link: 'https://shop.example.com/cart' }
+
 /** Placeholders and example values of an event's template (the order events share the server's list). */
 function eventPlaceholders(event: TemplateEvent, all: string[], vars: Record<string, string>): { placeholders: string[]; vars: Record<string, string> } {
   if (event === SALE_RECEIPT_EVENT) return { placeholders: SALE_RECEIPT_PLACEHOLDERS, vars: { ...vars, ...SALE_RECEIPT_EXAMPLES } }
   if (event === DUE_REMINDER_EVENT) return { placeholders: DUE_REMINDER_PLACEHOLDERS, vars: { ...vars, ...DUE_REMINDER_EXAMPLES } }
+  if (event === CART_REMINDER_EVENT) return { placeholders: CART_REMINDER_PLACEHOLDERS, vars: { ...vars, ...CART_REMINDER_EXAMPLES } }
   return { placeholders: all.filter((p) => p !== 'invoice' && p !== 'due'), vars }
 }
 

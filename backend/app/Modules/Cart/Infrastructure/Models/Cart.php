@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?string $converted_order_id the web order this cart became (never used again)
  * @property ?string $coupon_code the applied coupon (E8b), upper-case
  * @property ?CarbonImmutable $updated_at
+ * @property ?CarbonImmutable $reminder_sent_at BD2b: when the abandoned-cart reminder went out (once per cart)
  * @property ?array<string, mixed> $builder_attribution B15: the builder page last added from ({document_id, node_id?, device?}; B13: experiments?)
  */
 #[Fillable(['organization_id', 'customer_id', 'token_hash', 'expires_at', 'converted_order_id', 'coupon_code', 'builder_attribution'])]
@@ -30,6 +31,7 @@ class Cart extends Model
         return [
             'expires_at' => 'immutable_datetime',
             'builder_attribution' => 'array',
+            'reminder_sent_at' => 'immutable_datetime',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
