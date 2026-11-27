@@ -18,6 +18,8 @@ class EloquentAttributedOrders implements AttributedOrders
 {
     public function __construct(private readonly TenantContext $tenant) {}
 
+    // The ranges come in the organization's timezone; they go to SQL in UTC, because a bound
+    // Carbon loses its offset and PostgreSQL would read it as UTC (up to a day off near midnight).
     public function groups(CarbonImmutable $from, CarbonImmutable $to, string $timezone): array
     {
         $organizationId = $this->tenant->requireOrganization();
@@ -30,8 +32,8 @@ class EloquentAttributedOrders implements AttributedOrders
 
         $rows = Order::query()->toBase()
             ->leftJoinSub($lines, 'l', 'l.order_id', '=', 'orders.id')
-            ->where('orders.placed_at', '>=', $from)
-            ->where('orders.placed_at', '<', $to)
+            ->where('orders.placed_at', '>=', $from->utc())
+            ->where('orders.placed_at', '<', $to->utc())
             ->selectRaw("to_char((orders.placed_at AT TIME ZONE ?)::date, 'YYYY-MM-DD') AS day", [$timezone])
             ->selectRaw("orders.attribution->>'short_link' AS short_link")
             ->selectRaw("orders.attribution->>'utm_campaign' AS utm_campaign")
@@ -62,8 +64,8 @@ class EloquentAttributedOrders implements AttributedOrders
     public function builderGroups(CarbonImmutable $from, CarbonImmutable $to, string $timezone, ?string $documentId = null, ?string $device = null): array
     {
         $rows = Order::query()->toBase()
-            ->where('orders.placed_at', '>=', $from)
-            ->where('orders.placed_at', '<', $to)
+            ->where('orders.placed_at', '>=', $from->utc())
+            ->where('orders.placed_at', '<', $to->utc())
             ->whereNotIn('orders.status', [OrderStatus::Cancelled->value, OrderStatus::Failed->value])
             ->whereRaw("orders.attribution->'builder'->>'document_id' IS NOT NULL")
             ->when($documentId !== null, fn ($q) => $q->whereRaw("orders.attribution->'builder'->>'document_id' = ?", [strtolower((string) $documentId)]))
@@ -88,8 +90,8 @@ class EloquentAttributedOrders implements AttributedOrders
     public function experimentGroups(CarbonImmutable $from, CarbonImmutable $to, string $timezone, string $documentId, string $experimentId, ?string $device = null): array
     {
         $rows = Order::query()->toBase()
-            ->where('orders.placed_at', '>=', $from)
-            ->where('orders.placed_at', '<', $to)
+            ->where('orders.placed_at', '>=', $from->utc())
+            ->where('orders.placed_at', '<', $to->utc())
             ->whereNotIn('orders.status', [OrderStatus::Cancelled->value, OrderStatus::Failed->value])
             ->whereRaw("orders.attribution->'builder'->>'document_id' = ?", [strtolower($documentId)])
             ->whereRaw("orders.attribution->'builder'->'experiments'->>? IN ('A', 'B')", [$experimentId])

@@ -182,7 +182,7 @@ describe('TransfersPage', () => {
     const row = (await screen.findByText('TRF-000001')).closest('tr') as HTMLElement
     await user.click(within(row).getByRole('button', { name: 'Receive' }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(within(dialog).getByText('The goods are added to Shop floor.')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Everything sent is added to Shop floor\./)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Receive goods' }))
 
     await waitFor(() => expect(received).toBe(true))

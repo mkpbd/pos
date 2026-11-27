@@ -85,6 +85,9 @@ export type PurchaseOrder = DocumentBase & PurchaseOrderApproval & {
   /** ST2a: closed short — the rest is no longer expected. */
   closed_at?: string | null
   close_reason?: string | null
+  /** ST2b: last e-mailed to the supplier. */
+  emailed_at?: string | null
+  emailed_to?: string | null
 }
 export type GoodsReceipt = DocumentBase & {
   purchase_order_id: string | null
@@ -188,6 +191,10 @@ export const useSupplierRefundsQuery = (params: Query) => usePaged<SupplierRefun
 export const usePurchaseOrderQuery = (id?: string) => useDocument<PurchaseOrder>(id ? `/purchasing/orders/${id}` : null)
 export const useReceiptQuery = (id?: string) => useDocument<GoodsReceipt>(id ? `/purchasing/receipts/${id}` : null)
 
+/** ST2b: printable documents. */
+export const purchaseOrderPdfPath = (id: string): string => `/purchasing/orders/${id}/pdf`
+export const receiptPdfPath = (id: string): string => `/purchasing/receipts/${id}/pdf`
+
 export function useSupplierStatementQuery(supplierId: string | null, params: { from?: string; to?: string }) {
   return useQuery({
     queryKey: [...purchasingKeys.all, 'statement', supplierId, params],
@@ -230,6 +237,16 @@ export function usePurchaseOrderStatusMutation() {
   return useMutation({
     mutationFn: ({ id, action, reason, idempotencyKey }: { id: string; action: 'place' | 'cancel' | 'close'; reason?: string; idempotencyKey?: string }) =>
       api.post<PurchaseOrder>(`/purchasing/orders/${id}/${action}`, reason === undefined ? undefined : { reason }, { idempotencyKey }).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}
+
+/** ST2b: e-mail the order PDF to the supplier (`to` defaults to the supplier's address on the server). */
+export function useEmailPurchaseOrderMutation() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, to }: { id: string; to?: string }) =>
+      api.post<{ emailed_at: string; emailed_to: string }>(`/purchasing/orders/${id}/email`, to ? { to } : {}).then((r) => r.data),
     onSuccess: invalidate,
   })
 }

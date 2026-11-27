@@ -10,6 +10,7 @@ import { emptyLine, type LineValue } from '@/components/common/line-values'
 import { LinesEditor } from '@/components/common/lines-editor'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
+import { PdfButton } from '@/components/common/pdf-button'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { StoreSelect } from '@/components/common/store-select'
@@ -28,6 +29,7 @@ import { DocumentLinesTable, EFFECTIVE_COST_LABEL, LinesTotalsPreview } from '@/
 import { SupplierSelect } from '@/features/purchasing/components/supplier-select'
 import {
   today,
+  receiptPdfPath,
   usePostDirectReturnMutation,
   usePostReceiptMutation,
   usePostReturnMutation,
@@ -329,6 +331,7 @@ export function ReceiptPage() {
           <h1 className="font-heading text-2xl font-semibold tracking-tight">{data.number}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <PdfButton path={receiptPdfPath(data.id)} filename={`${data.number}.pdf`} />
           {can('products.view') && <Button asChild variant="outline"><Link to={`/products/labels?goods_receipt_id=${data.id}`}><TagIcon data-icon="inline-start" /> Print labels</Link></Button>}
           {can('purchases.return') && <Button variant="outline" onClick={() => setReturning(true)}><Undo2Icon data-icon="inline-start" /> Return goods</Button>}
         </div>

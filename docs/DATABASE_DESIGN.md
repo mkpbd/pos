@@ -471,6 +471,12 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Transfer receiving, requests and documents ST2b (implemented)
+
+- `stock_transfers.status` adds `requested` and `rejected`; `requested_by` / `requested_at`, `rejected_by` / `rejected_at`, `rejection_reason`, `loss_total numeric(18,2)`; `dispatched_at` nullable (a request is not dispatched yet).
+- `stock_transfer_lines`: `requested_quantity`, `received_quantity` (null until received; backfilled = quantity for received transfers), `damaged_quantity` (default 0), `receive_note`; CHECK received ≥ 0, damaged ≥ 0, received + damaged ≤ quantity.
+- `purchase_orders.emailed_at`, `emailed_to`.
+
 ### Purchase discounts and bonus, short-close, direct returns ST2a (implemented)
 
 - `purchase_order_lines` and `goods_receipt_lines`: `discount_percent numeric(7,4)` (0 ≤ x < 100), `bonus_quantity numeric(18,3)` (≥ 0); `goods_receipt_lines.effective_unit_cost numeric(18,4)` (the stock cost before landed cost; backfilled = `unit_cost`).

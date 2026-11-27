@@ -80,8 +80,8 @@ batches, weighted-average cost, transfers, adjustments, CSV/Excel/PDF export of 
 | Wholesale price used anywhere (stored, never used); price lists, quantity tiers, branch prices | P1 | — |
 | Purchase discounts and **bonus / free quantity** (10+1) on PO / receipt | **Done (ST2a)** — line discount %; whole-bill discount not yet | Standard in BD FMCG & pharma — costs come out wrong without it |
 | Short-close a partly received PO; purchase return without a goods receipt (expired stock back to the rep) | **Done (ST2a)** | — |
-| Transfer received short / damaged, transfer request & approval, challan print | P1 | Receive takes no quantities |
-| Print / e-mail PO, goods receipt, transfer documents | P1 | Only the RFQ has a document |
+| Transfer received short / damaged, transfer request & approval, challan print | **Done (ST2b)** | Receive takes no quantities |
+| Print / e-mail PO, goods receipt, transfer documents | **Done (ST2b)** — PO e-mailed; receipt and challan print only | Only the RFQ has a document |
 | Serial-number stock register (phones, electronics) | P1 | Serials only captured at sale (deferred by design) |
 | Stock valuation as of a past date (month-end) | P1 | Only "as of now"; FIFO option P2 |
 | Recipes / BOM / kits & combos | P2 (P1 restaurants) | — |

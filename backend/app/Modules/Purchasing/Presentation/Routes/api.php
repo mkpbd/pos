@@ -22,10 +22,14 @@ Route::prefix('purchasing')->middleware(['auth:sanctum', 'tenant'])->group(funct
     Route::post('orders/{order}/cancel', [PurchaseOrderController::class, 'cancel'])->middleware('can:purchases.manage');
     // ST2a: short-close a partly received order (same permission as cancelling).
     Route::post('orders/{order}/close', [PurchaseOrderController::class, 'close'])->middleware('can:purchases.manage');
+    // ST2b: the PO as PDF and e-mailed to the supplier; the goods receipt as PDF.
+    Route::get('orders/{order}/pdf', [PurchaseOrderController::class, 'pdf'])->middleware('can:purchases.view');
+    Route::post('orders/{order}/email', [PurchaseOrderController::class, 'email'])->middleware('can:purchases.manage');
 
     Route::get('receipts', [GoodsReceiptController::class, 'index'])->middleware('can:purchases.view');
     Route::post('receipts', [GoodsReceiptController::class, 'store'])->middleware('can:purchases.receive');
     Route::get('receipts/{receipt}', [GoodsReceiptController::class, 'show'])->middleware('can:purchases.view');
+    Route::get('receipts/{receipt}/pdf', [GoodsReceiptController::class, 'pdf'])->middleware('can:purchases.view');
     Route::post('receipts/{receipt}/returns', [GoodsReceiptController::class, 'storeReturn'])->middleware('can:purchases.return');
 
     Route::get('returns', [GoodsReceiptController::class, 'returns'])->middleware('can:purchases.view');

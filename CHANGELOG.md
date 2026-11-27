@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### ST2b — Transfers received short / damaged, transfer requests, challan / PO / GRN documents
+
+Second part of ST2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). No new packages.
+
+#### Added
+- **Receive a transfer** with what really arrived: received, damaged and short per line; only good units enter stock; the loss value and a **Discrepancy** badge show on the transfer.
+- **Request stock** from any store (e.g. the central warehouse); the sending store **dispatches** (quantities and batches can be reduced) or **rejects** it; the requester can cancel.
+- **Print challan** for transfers; **Print** purchase orders and goods receipts; **E-mail to supplier** sends the purchase order as a PDF.
+
+#### Fixed
+- Marketing campaign stats, page insights and A/B test results counted orders by UTC day bounds instead of the shop's day between midnight and 6 am Dhaka time (orders of the morning fell outside "today").
+
+#### Tests
+- Backend 2033 (2032 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3274; mocked Playwright 637 (new `st2b-transfers`).
+- Full-stack (PostgreSQL, desktop) 67 — new **ST2b** on Bazar Fresh: a new back store requests 3 units from the shop floor, the floor dispatches them, 1 is received, 1 damaged, 1 short (stock, loss, discrepancy); the challan, a purchase order and its receipt print as PDFs and the order is e-mailed to the supplier.
+
+#### Upgrade
+- `php artisan migrate`.
+
 ### ST2a — Purchase discounts and free quantity, short-close, returns without a receipt
 
 First part of ST2 (stock gaps) from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). Transfers & documents (ST2b), selling units & price lists (ST2c), serial register & past-date valuation (ST2d) follow. No new packages.

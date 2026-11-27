@@ -15,9 +15,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $batch_id
  * @property string $quantity
  * @property string $unit_cost captured at dispatch
+ * @property ?string $received_quantity set when received (null before)
+ * @property string $damaged_quantity
+ * @property ?string $requested_quantity set on lines of a transfer request
+ * @property ?string $receive_note
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'stock_transfer_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost'])]
+#[Fillable(['organization_id', 'stock_transfer_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'received_quantity', 'damaged_quantity', 'requested_quantity', 'receive_note'])]
 class StockTransferLine extends Model
 {
     use BelongsToOrganization, HasUuids;
@@ -27,6 +31,9 @@ class StockTransferLine extends Model
         return [
             'quantity' => 'decimal:3',
             'unit_cost' => 'decimal:4',
+            'received_quantity' => 'decimal:3',
+            'damaged_quantity' => 'decimal:3',
+            'requested_quantity' => 'decimal:3',
         ];
     }
 

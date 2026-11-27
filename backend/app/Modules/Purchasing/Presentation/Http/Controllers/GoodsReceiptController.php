@@ -4,6 +4,7 @@ namespace App\Modules\Purchasing\Presentation\Http\Controllers;
 
 use App\Modules\Purchasing\Application\Actions\PostGoodsReceipt;
 use App\Modules\Purchasing\Application\Actions\PostPurchaseReturn;
+use App\Modules\Purchasing\Infrastructure\Documents\GoodsReceiptDocument;
 use App\Modules\Purchasing\Infrastructure\Models\GoodsReceipt;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseReturn;
 use App\Modules\Purchasing\Presentation\Http\Exports\GoodsReceiptsExport;
@@ -17,6 +18,7 @@ use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Suppliers\Application\Contracts\SupplierDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -75,6 +77,21 @@ class GoodsReceiptController
         $this->presenter->assertVisible($this->user($request), $receipt->branch_id);
 
         return ApiResponse::success($this->presenter->document($receipt));
+    }
+
+    /**
+     * The goods receipt PDF (ST2b)
+     */
+    public function pdf(Request $request, GoodsReceipt $receipt, GoodsReceiptDocument $document, SupplierDirectory $suppliers): Response
+    {
+        $this->presenter->assertVisible($this->user($request), $receipt->branch_id);
+        $supplier = $suppliers->contacts($receipt->organization_id, [$receipt->supplier_id])[$receipt->supplier_id];
+
+        return response($document->render($receipt), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.GoodsReceiptDocument::filename($receipt, $supplier).'"',
+            'Cache-Control' => 'no-store, private',
+        ]);
     }
 
     public function returns(Request $request, ListExporter $exports): Response

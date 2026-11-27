@@ -77,6 +77,7 @@ class InventoryPresenter
             'unit_code' => $variant['unit_code'],
             'track_batches' => $variant['track_batches'],
             'allow_decimal' => $variant['allow_decimal'],
+            'track_serials' => $variant['track_serials'],
         ];
     }
 }

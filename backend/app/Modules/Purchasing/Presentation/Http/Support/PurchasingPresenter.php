@@ -207,6 +207,9 @@ class PurchasingPresenter
                 // ST2a: closed short.
                 'closed_at' => $doc->closed_at?->toIso8601String(),
                 'close_reason' => $doc->close_reason,
+                // ST2b: last e-mailed to the supplier.
+                'emailed_at' => $doc->emailed_at?->toIso8601String(),
+                'emailed_to' => $doc->emailed_to,
             ],
             $doc instanceof GoodsReceipt => $base + [
                 'purchase_order_id' => $doc->purchase_order_id,

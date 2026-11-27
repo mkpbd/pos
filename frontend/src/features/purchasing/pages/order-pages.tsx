@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeftIcon, BanIcon, CheckIcon, Loader2Icon, PackageCheckIcon, PackageXIcon, PlusIcon, SendIcon, TagIcon, XCircleIcon } from 'lucide-react'
+import { ArrowLeftIcon, BanIcon, CheckIcon, Loader2Icon, MailIcon, PackageCheckIcon, PackageXIcon, PlusIcon, SendIcon, TagIcon, XCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
@@ -11,13 +11,16 @@ import { emptyLine, type LineValue } from '@/components/common/line-values'
 import { LinesEditor } from '@/components/common/lines-editor'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
+import { PdfButton } from '@/components/common/pdf-button'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { StoreSelect } from '@/components/common/store-select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth, useCan } from '@/features/auth/use-auth'
@@ -34,14 +37,18 @@ import { historyTimeline, APPROVAL_LEVEL } from '@/features/procurement/procurem
 import { useIdempotencyKey } from '@/features/returns/api'
 import {
   PO_STATUS,
+  purchaseOrderPdfPath,
   today,
+  useEmailPurchaseOrderMutation,
   usePurchaseOrderQuery,
   usePurchaseOrdersQuery,
   usePurchaseOrderStatusMutation,
   useSavePurchaseOrderMutation,
   type PurchaseOrder,
 } from '@/features/purchasing/api'
-import { handleFormError } from '@/lib/forms'
+import { fieldErrorMap, handleFormError } from '@/lib/forms'
+import { useSupplierQuery } from '@/features/suppliers/api'
+import { formatDateTime } from '@/features/web-orders/orders'
 import { formatMoney, trimDecimal } from '@/lib/money'
 
 export function PurchaseOrdersPage() {
@@ -165,6 +172,54 @@ function OrderOrigin({ order }: { order: PurchaseOrder }) {
   )
 }
 
+/** ST2b: send the order PDF to the supplier; the address is prefilled from the supplier record. */
+function EmailOrderDialog({ order, onClose }: { order: PurchaseOrder; onClose: () => void }) {
+  const can = useCan()
+  const email = useEmailPurchaseOrderMutation()
+  const supplier = useSupplierQuery(can('suppliers.view') ? order.supplier?.id : undefined)
+  const [to, setTo] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const address = to ?? supplier.data?.email ?? ''
+
+  const send = (e: FormEvent) => {
+    e.preventDefault()
+    setErrors({})
+    email.mutate({ id: order.id, to: address.trim() || undefined }, {
+      onSuccess: (r) => {
+        toast.success(`${order.number} e-mailed to ${r.emailed_to}.`)
+        onClose()
+      },
+      onError: (err) => setErrors(fieldErrorMap(err)),
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <form onSubmit={send} noValidate className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>E-mail {order.number}</DialogTitle>
+            <DialogDescription>{order.supplier?.name ?? 'The supplier'} gets the purchase order as a PDF attachment.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="po-email-to">To</Label>
+            <Input id="po-email-to" type="email" value={address} placeholder={supplier.isFetching ? 'Loading…' : 'supplier@example.com'} onChange={(e) => setTo(e.target.value)} aria-invalid={!!errors.to || undefined} />
+            {errors.to && <p className="text-sm text-destructive">{errors.to}</p>}
+          </div>
+          {errors.form && <p role="alert" className="text-sm text-destructive">{errors.form}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={email.isPending}>
+              {email.isPending ? <Loader2Icon data-icon="inline-start" className="animate-spin" /> : <SendIcon data-icon="inline-start" />}
+              Send e-mail
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function OrderView({ order }: { order: PurchaseOrder }) {
   const me = useAuth()
   const can = useCan()
@@ -179,6 +234,7 @@ function OrderView({ order }: { order: PurchaseOrder }) {
   const closeKey = useIdempotencyKey()
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
+  const [emailing, setEmailing] = useState(false)
   const receivable = order.status === 'ordered' || order.status === 'partially_received'
   const pending = order.status === 'pending_approval'
   const approver = pending && mayApprove({ approval_level: order.approval_level, owner: order.submitted_by ?? order.created_by, can_approve: order.can_approve }, me, can)
@@ -233,6 +289,10 @@ function OrderView({ order }: { order: PurchaseOrder }) {
           {isPreApproved(order) && <Badge variant="success" title={preApprovalTitle(order)}>Pre-approved</Badge>}
         </div>
         <div className="flex flex-wrap gap-2">
+          <PdfButton path={purchaseOrderPdfPath(order.id)} filename={`${order.number}.pdf`} />
+          {can('purchases.manage') && receivable && (
+            <Button variant="outline" onClick={() => setEmailing(true)}><MailIcon data-icon="inline-start" /> E-mail to supplier</Button>
+          )}
           {can('products.view') && order.status !== 'cancelled' && (
             <Button asChild variant="outline"><Link to={`/products/labels?purchase_order_id=${order.id}`}><TagIcon data-icon="inline-start" /> Print labels</Link></Button>
           )}
@@ -260,6 +320,11 @@ function OrderView({ order }: { order: PurchaseOrder }) {
         </div>
       )}
       <OrderOrigin order={order} />
+      {order.emailed_at && (
+        <p role="note" className="text-sm text-muted-foreground">
+          E-mailed to <span className="text-foreground">{order.emailed_to}</span> on {formatDateTime(order.emailed_at, me.organization?.timezone)}
+        </p>
+      )}
       {order.status === 'closed' && (
         <div role="note" className="rounded-md border p-3 text-sm">
           <span className="font-medium">Closed short{order.closed_at && ` on ${order.closed_at.slice(0, 10)}`}:</span> {order.close_reason ?? '—'}
@@ -289,6 +354,7 @@ function OrderView({ order }: { order: PurchaseOrder }) {
           <CardContent><Timeline entries={historyTimeline(order.history ?? [])} timeZone={me.organization?.timezone} label="Order history" /></CardContent>
         </Card>
       )}
+      {emailing && <EmailOrderDialog order={order} onClose={() => setEmailing(false)} />}
       <ConfirmDialog
         open={confirm === 'approve'}
         onOpenChange={(open) => !open && setConfirm(null)}

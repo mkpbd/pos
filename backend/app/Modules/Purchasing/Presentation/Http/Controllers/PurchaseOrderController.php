@@ -3,9 +3,11 @@
 namespace App\Modules\Purchasing\Presentation\Http\Controllers;
 
 use App\Modules\Purchasing\Application\Actions\ChangePurchaseOrderStatus;
+use App\Modules\Purchasing\Application\Actions\EmailPurchaseOrder;
 use App\Modules\Purchasing\Application\Actions\SavePurchaseOrder;
 use App\Modules\Purchasing\Application\Services\ApprovalRules;
 use App\Modules\Purchasing\Domain\PurchaseOrderStatus;
+use App\Modules\Purchasing\Infrastructure\Documents\PurchaseOrderDocument;
 use App\Modules\Purchasing\Infrastructure\Models\PurchaseOrder;
 use App\Modules\Purchasing\Presentation\Http\Exports\PurchaseOrdersExport;
 use App\Modules\Purchasing\Presentation\Http\Requests\SavePurchaseOrderRequest;
@@ -16,6 +18,7 @@ use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use App\Modules\Suppliers\Application\Contracts\SupplierDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,6 +68,36 @@ class PurchaseOrderController
         $this->presenter->assertVisible($this->user($request), $order->branch_id);
 
         return ApiResponse::success($this->present($request, $order));
+    }
+
+    /**
+     * The purchase order PDF for the supplier (ST2b)
+     */
+    public function pdf(Request $request, PurchaseOrder $order, PurchaseOrderDocument $document, SupplierDirectory $suppliers): Response
+    {
+        $this->presenter->assertVisible($this->user($request), $order->branch_id);
+        $supplier = $suppliers->contacts($order->organization_id, [$order->supplier_id])[$order->supplier_id];
+
+        return response($document->render($order), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.PurchaseOrderDocument::filename($order, $supplier).'"',
+            'Cache-Control' => 'no-store, private',
+        ]);
+    }
+
+    /**
+     * E-mail the purchase order to the supplier (ST2b)
+     *
+     * Ordered or partly received orders only. `to` defaults to the supplier's e-mail address.
+     * Queues the e-mail with the PDF attached and records `emailed_at` / `emailed_to`.
+     */
+    public function email(Request $request, PurchaseOrder $order, EmailPurchaseOrder $email): JsonResponse
+    {
+        $this->presenter->assertVisible($this->user($request), $order->branch_id);
+        $data = $request->validate(['to' => ['nullable', 'string', 'email', 'max:255']]);
+        $sent = $email->send($order, $data['to'] ?? null);
+
+        return ApiResponse::success(['emailed_at' => $sent->emailed_at?->toIso8601String(), 'emailed_to' => $sent->emailed_to]);
     }
 
     public function update(SavePurchaseOrderRequest $request, PurchaseOrder $order, SavePurchaseOrder $save): JsonResponse

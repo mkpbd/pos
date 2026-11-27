@@ -20,13 +20,20 @@ use Illuminate\Support\Carbon;
  * @property TransferStatus $status
  * @property ?string $note
  * @property ?string $dispatched_by
- * @property Carbon $dispatched_at
+ * @property ?Carbon $dispatched_at
  * @property ?string $completed_by
  * @property ?Carbon $completed_at
+ * @property ?string $requested_by
+ * @property ?Carbon $requested_at
+ * @property ?string $rejected_by
+ * @property ?Carbon $rejected_at
+ * @property ?string $rejection_reason
+ * @property string $loss_total
  */
 #[Fillable([
     'organization_id', 'number', 'from_branch_id', 'from_store_id', 'to_branch_id', 'to_store_id', 'status', 'note',
     'dispatched_by', 'dispatched_at', 'completed_by', 'completed_at',
+    'requested_by', 'requested_at', 'rejected_by', 'rejected_at', 'rejection_reason', 'loss_total',
 ])]
 class StockTransfer extends Model
 {
@@ -38,6 +45,9 @@ class StockTransfer extends Model
             'status' => TransferStatus::class,
             'dispatched_at' => 'datetime',
             'completed_at' => 'datetime',
+            'requested_at' => 'datetime',
+            'rejected_at' => 'datetime',
+            'loss_total' => 'decimal:2',
         ];
     }
 

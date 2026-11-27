@@ -3011,3 +3011,89 @@ test('ST2a: Bazar Fresh orders 10 at 5 % off with 1 free, receives 4 + 1 free at
     await context.close()
   }
 })
+
+test('ST2b: a Bazar Fresh warehouse requests stock, the shop floor dispatches it, it is received short and damaged; the challan, purchase order and receipt print and the order is e-mailed', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+  const pdf = (url: string) => page.evaluate(async (u) => {
+    const res = await fetch(u, { credentials: 'include' })
+    return { status: res.status, type: res.headers.get('content-type') ?? '', size: (await res.arrayBuffer()).byteLength }
+  }, url)
+
+  const stamp = String(Date.now()).slice(-6)
+  try {
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const floor = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const warehouse = await call('POST', `/api/v1/branches/${branch.id}/stores`, { code: `W${stamp}`, name: `Back store ${stamp}`, type: 'warehouse' })
+    expect(warehouse.status).toBe(201)
+    const items = (await call('GET', `/api/v1/pos/catalog?store_id=${floor.id}&page=1`)).body.data as { variant_id: string; product_name: string; track_stock: boolean; track_batches: boolean; track_serials: boolean; on_hand: string | null }[]
+    const item = items.find((i) => i.track_stock && !i.track_batches && !i.track_serials && Number(i.on_hand) >= 5)!
+    expect(item).toBeTruthy()
+    const onHand = async (storeId: string) => ((await call('GET', `/api/v1/inventory/stock?variant_id=${item.variant_id}&store_id=${storeId}`)).body.data as { quantity: string }[])
+      .reduce((sum, r) => sum + Number(r.quantity), 0)
+    const floorBefore = await onHand(floor.id)
+
+    // The warehouse asks the shop floor for 3: nothing moves yet; the floor is a store anyone may ask.
+    expect(((await call('GET', '/api/v1/inventory/transfers/source-stores')).body.data as { id: string }[]).map((s) => s.id)).toContain(floor.id)
+    const request = await call('POST', '/api/v1/inventory/transfers/requests', { from_store_id: floor.id, to_store_id: warehouse.body.data.id, lines: [{ variant_id: item.variant_id, quantity: '3' }] })
+    expect(request.status).toBe(201)
+    expect(request.body.data.status).toBe('requested')
+    expect(await onHand(floor.id)).toBeCloseTo(floorBefore, 3)
+
+    // The floor dispatches it from the transfer page.
+    await page.goto(`${base}/admin/inventory/transfers/${request.body.data.id}`)
+    await page.getByRole('button', { name: 'Dispatch', exact: true }).click()
+    const dispatch = page.getByRole('dialog', { name: `Dispatch ${request.body.data.number}` })
+    await expect(dispatch.getByLabel('Send of line 1')).toHaveValue(/^3(\.0+)?$/)
+    await dispatch.getByRole('button', { name: 'Dispatch goods' }).click()
+    await expect(dispatch).toBeHidden({ timeout: 15_000 })
+    expect(await onHand(floor.id)).toBeCloseTo(floorBefore - 3, 3)
+
+    // The warehouse gets 1 good and 1 damaged; 1 never arrived.
+    await page.getByRole('button', { name: 'Receive', exact: true }).click()
+    const receive = page.getByRole('dialog', { name: `Receive ${request.body.data.number}` })
+    await receive.getByLabel('Received of line 1').fill('1')
+    await receive.getByLabel('Damaged of line 1').fill('1')
+    await expect(receive.getByLabel('Short of line 1')).toHaveText(/^1(\.0+)?$/)
+    await receive.getByRole('button', { name: 'Receive goods' }).click()
+    await expect(receive).toBeHidden({ timeout: 15_000 })
+    await expect(page.getByText('Discrepancy').first()).toBeVisible()
+    await expect(page.getByTestId('loss-total')).not.toHaveText(/^BDT 0\.00$/)
+    expect(await onHand(warehouse.body.data.id)).toBeCloseTo(1, 3)
+    const transfer = (await call('GET', `/api/v1/inventory/transfers/${request.body.data.id}`)).body.data
+    expect(transfer).toMatchObject({ status: 'received', has_discrepancy: true })
+    expect(transfer.lines[0]).toMatchObject({ received_quantity: '1.000', damaged_quantity: '1.000', short_quantity: '1.000' })
+
+    // Documents: the challan, a purchase order (then e-mailed) and its goods receipt.
+    const challan = await pdf(`/api/v1/inventory/transfers/${request.body.data.id}/challan.pdf`)
+    expect(challan).toMatchObject({ status: 200 })
+    expect(challan.type).toContain('pdf')
+    const supplier = await call('POST', '/api/v1/suppliers', { name: `Square Toiletries ${stamp}`, email: `orders${stamp}@square.example.test` })
+    const order = await call('POST', '/api/v1/purchasing/orders', { supplier_id: supplier.body.data.id, store_id: floor.id, order_date: new Date().toISOString().slice(0, 10), lines: [{ variant_id: item.variant_id, quantity: '6', unit_cost: '50', tax_rate: '0' }] })
+    expect(order.status).toBe(201)
+    expect((await call('POST', `/api/v1/purchasing/orders/${order.body.data.id}/place`)).status).toBeLessThan(300)
+    expect((await pdf(`/api/v1/purchasing/orders/${order.body.data.id}/pdf`)).status).toBe(200)
+    const mailed = await call('POST', `/api/v1/purchasing/orders/${order.body.data.id}/email`, {})
+    expect(mailed.status).toBe(200)
+    expect(mailed.body.data.emailed_to).toBe(`orders${stamp}@square.example.test`)
+    const receipt = await call('POST', '/api/v1/purchasing/receipts', { supplier_id: supplier.body.data.id, store_id: floor.id, purchase_order_id: order.body.data.id, invoice_date: new Date().toISOString().slice(0, 10), lines: [{ variant_id: item.variant_id, purchase_order_line_id: order.body.data.lines[0].id, quantity: '6', unit_cost: '50', tax_rate: '0' }] })
+    expect(receipt.status).toBe(201)
+    expect((await pdf(`/api/v1/purchasing/receipts/${receipt.body.data.id}/pdf`)).status).toBe(200)
+  } finally {
+    await context.close()
+  }
+})

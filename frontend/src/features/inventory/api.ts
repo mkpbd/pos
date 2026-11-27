@@ -12,6 +12,8 @@ export type VariantRef = {
   unit_code: string | null
   track_batches: boolean
   allow_decimal: boolean
+  /** ST2b transfer lines: serial-tracked lines are received in full. */
+  track_serials?: boolean
 }
 
 export type BatchRef = { id: string; batch_number: string; expires_on: string | null }
@@ -72,7 +74,19 @@ export type Adjustment = {
   created_at: string
 }
 
-export type TransferStatus = 'in_transit' | 'received' | 'cancelled'
+export type TransferStatus = 'requested' | 'in_transit' | 'received' | 'cancelled' | 'rejected'
+
+/** ST2b: what arrived (received / damaged / short) and, for requests, what was asked for. */
+export type TransferLine = DocumentLine & {
+  received_quantity?: string | null
+  damaged_quantity?: string | null
+  short_quantity?: string | null
+  receive_note?: string | null
+  requested_quantity?: string | null
+}
+
+/** A user reference: an id from older servers, or `{id, name}`. */
+export type UserRef = string | { id: string; name: string | null } | null
 
 export type Transfer = {
   id: string
@@ -82,11 +96,25 @@ export type Transfer = {
   to_store: StoreRef | null
   note: string | null
   lines_count?: number | null
-  lines?: DocumentLine[]
+  lines?: TransferLine[]
   can_receive: boolean
   can_cancel: boolean
-  dispatched_at: string
+  /** ST2b requests: the source branch may dispatch or reject (absent → worked out from the user's branches). */
+  can_dispatch?: boolean
+  can_reject?: boolean
+  /** Null while the transfer is only requested. */
+  dispatched_at: string | null
+  dispatched_by?: UserRef
   completed_at: string | null
+  completed_by?: UserRef
+  /** ST2b: Σ (sent − received) × unit cost; any line received short. */
+  loss_total?: string | null
+  has_discrepancy?: boolean
+  requested_by?: UserRef
+  requested_at?: string | null
+  rejected_by?: UserRef
+  rejected_at?: string | null
+  rejection_reason?: string | null
 }
 
 export type AdjustmentInput = {
@@ -96,6 +124,19 @@ export type AdjustmentInput = {
   /** Each line sends either a signed `quantity` or, for reason `count`, the `counted_quantity`. */
   lines: { variant_id: string; quantity?: string; counted_quantity?: string; unit_cost?: string | null; batch_id?: string | null; batch_number?: string | null; expires_on?: string | null }[]
 }
+
+export type TransferRequestInput = {
+  from_store_id: string
+  to_store_id: string
+  note: string | null
+  lines: { variant_id: string; quantity: string }[]
+}
+
+/** ST2b: body of a transfer action — receive (per-line received / damaged), dispatch of a request (quantities, batch), reject (reason). */
+export type TransferActionBody =
+  | { lines: { line_id: string; received_quantity: string; damaged_quantity: string; note: string | null }[] }
+  | { lines: { line_id: string; quantity: string; batch_id?: string }[] }
+  | { reason: string }
 
 export type TransferInput = {
   from_store_id: string
@@ -123,6 +164,28 @@ export const useStockQuery = (params: Query) => usePagedList<StockRow>('/invento
 export const useMovementsQuery = (params: Query) => usePagedList<Movement>('/inventory/movements', params)
 export const useAdjustmentsQuery = (params: Query) => usePagedList<Adjustment>('/inventory/adjustments', params)
 export const useTransfersQuery = (params: Query) => usePagedList<Transfer>('/inventory/transfers', params)
+
+export function useTransferQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: [...inventoryKeys.all, 'transfer', id],
+    queryFn: ({ signal }) => api.get<Transfer>(`/inventory/transfers/${id}`, { signal }).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+/** ST2b: every active store of the organization a branch may request stock from (not limited to the user's branches). */
+export type SourceStore = { id: string; code: string; name: string; branch: { id: string; name: string } }
+
+export function useTransferSourceStoresQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: [...inventoryKeys.all, 'transfer-source-stores'],
+    queryFn: ({ signal }) => api.get<SourceStore[]>('/inventory/transfers/source-stores', { signal }).then((r) => r.data),
+    enabled,
+  })
+}
+
+/** ST2b: delivery challan PDF of a transfer. */
+export const transferChallanPath = (id: string): string => `/inventory/transfers/${id}/challan.pdf`
 
 export function useAdjustmentQuery(id: string | undefined) {
   return useQuery({
@@ -187,8 +250,18 @@ export function useCompleteTransferMutation() {
   const invalidate = useInvalidateInventory()
 
   return useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'receive' | 'cancel' }) =>
-      api.post<Transfer>(`/inventory/transfers/${id}/${action}`).then((r) => r.data),
+    mutationFn: ({ id, action, body }: { id: string; action: 'receive' | 'cancel' | 'dispatch' | 'reject'; body?: TransferActionBody }) =>
+      api.post<Transfer>(`/inventory/transfers/${id}/${action}`, body).then((r) => r.data),
+    onSuccess: invalidate,
+  })
+}
+
+/** ST2b: ask another store for stock; nothing moves until the source dispatches it. */
+export function useRequestTransferMutation() {
+  const invalidate = useInvalidateInventory()
+
+  return useMutation({
+    mutationFn: (input: TransferRequestInput) => api.post<Transfer>('/inventory/transfers/requests', input).then((r) => r.data),
     onSuccess: invalidate,
   })
 }

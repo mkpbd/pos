@@ -20,9 +20,15 @@ Route::prefix('inventory')->middleware(['auth:sanctum', 'tenant'])->group(functi
 
     Route::get('transfers', [TransferController::class, 'index'])->middleware('can:inventory.view');
     Route::post('transfers', [TransferController::class, 'store'])->middleware('can:inventory.transfer');
+    Route::get('transfers/source-stores', [TransferController::class, 'sourceStores'])->middleware('can:inventory.transfer');
     Route::get('transfers/{transfer}', [TransferController::class, 'show'])->middleware('can:inventory.view');
+    Route::get('transfers/{transfer}/challan.pdf', [TransferController::class, 'challan'])->middleware('can:inventory.view');
     Route::post('transfers/{transfer}/receive', [TransferController::class, 'receive'])->middleware('can:inventory.transfer');
     Route::post('transfers/{transfer}/cancel', [TransferController::class, 'cancel'])->middleware('can:inventory.transfer');
+    // ST2b: transfer requests (the destination asks, the source dispatches or rejects).
+    Route::post('transfers/requests', [TransferController::class, 'request'])->middleware('can:inventory.transfer');
+    Route::post('transfers/{transfer}/dispatch', [TransferController::class, 'dispatch'])->middleware('can:inventory.transfer');
+    Route::post('transfers/{transfer}/reject', [TransferController::class, 'reject'])->middleware('can:inventory.transfer');
 
     // SC1: per-store reorder rules and replenishment settings.
     Route::get('reorder-rules', [ReorderRuleController::class, 'index'])->middleware('can:inventory.view');

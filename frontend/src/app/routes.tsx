@@ -72,6 +72,9 @@ const pages = {
   stocktakes: page(() => import('@/features/inventory/pages/stocktake-pages'), 'StocktakesPage'),
   stocktake: page(() => import('@/features/inventory/pages/stocktake-pages'), 'StocktakePage'),
   newTransfer: page(() => import('@/features/inventory/pages/transfer-pages'), 'NewTransferPage'),
+  // ST2b: transfer requests and the transfer detail (receive short / damaged, dispatch a request, challan).
+  requestTransfer: page(() => import('@/features/inventory/pages/transfer-pages'), 'RequestTransferPage'),
+  transfer: page(() => import('@/features/inventory/pages/transfer-pages'), 'TransferPage'),
   purchaseOrders: page(() => import('@/features/purchasing/pages/order-pages'), 'PurchaseOrdersPage'),
   purchaseOrder: page(() => import('@/features/purchasing/pages/order-pages'), 'PurchaseOrderPage'),
   receipts: page(() => import('@/features/purchasing/pages/receipt-pages'), 'ReceiptsPage'),
@@ -300,6 +303,8 @@ export const routes: RouteObject[] = [
               guarded('inventory.view', 'inventory/adjustments/:adjustmentId', pages.adjustment),
               guarded('inventory.view', 'inventory/transfers', pages.transfers),
               guarded('inventory.transfer', 'inventory/transfers/new', pages.newTransfer),
+              guarded('inventory.transfer', 'inventory/transfers/request', pages.requestTransfer),
+              guarded('inventory.view', 'inventory/transfers/:transferId', pages.transfer),
               // ST1: counters may hold inventory.stocktake without inventory.view; posting needs inventory.adjust (page and API).
               guarded(STOCKTAKE_PERMISSIONS, 'inventory/stocktakes', pages.stocktakes),
               guarded(STOCKTAKE_PERMISSIONS, 'inventory/stocktakes/:stocktakeId', pages.stocktake),
