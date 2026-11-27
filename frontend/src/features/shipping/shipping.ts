@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import type { Courier, CourierInput, District, Division, MethodInput, ShippingMethod, ShippingZone } from '@/features/shipping/api'
+import type { AreaInput, Courier, CourierInput, District, Division, MethodInput, ShippingArea, ShippingMethod, ShippingZone } from '@/features/shipping/api'
 import { readBn, toTranslationsInput, translationsSchema, type TranslationsMap } from '@/features/translations/translations'
 import { ApiError } from '@/lib/api/client'
-import { formatMoney, MONEY_PATTERN } from '@/lib/money'
+import { formatMoney, MONEY_PATTERN, trimDecimal } from '@/lib/money'
 
 export type DivisionGroup = { division: Division; districts: District[] }
 
@@ -70,13 +70,22 @@ export const methodSchema = z
     eta_max_days: days,
     is_active: z.boolean(),
     sort_order: z.number({ error: 'A whole number.' }).int('A whole number.').min(0, 'A whole number.'),
+    /** BD2a: weight pricing on/off, the kg the fee covers and the fee per extra kg. */
+    weight_pricing: z.boolean(),
+    weight_included_kg: z.string().trim(),
+    fee_per_extra_kg: z.string().trim(),
     translations: translationsSchema(METHOD_TRANSLATIONS),
   })
   .refine((v) => v.eta_min_days <= v.eta_max_days, { path: ['eta_max_days'], message: 'At least the minimum.' })
+  .refine((v) => !v.weight_pricing || KG_PATTERN.test(v.weight_included_kg), { path: ['weight_included_kg'], message: 'Kilograms, up to 3 decimals (0 or more).' })
+  .refine((v) => !v.weight_pricing || MONEY_PATTERN.test(v.fee_per_extra_kg), { path: ['fee_per_extra_kg'], message: 'Per extra kg: a non-negative amount with at most 2 decimals.' })
   .refine((v) => !v.cod_allowed || MONEY_PATTERN.test(v.cod_fee), { path: ['cod_fee'], message: 'COD fee: a non-negative amount with at most 2 decimals.' })
 
 export type MethodValues = z.infer<typeof methodSchema>
-export const METHOD_FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'translations'] as const
+export const METHOD_FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'weight_included_kg', 'fee_per_extra_kg', 'translations'] as const
+
+/** A weight in kg: up to 7 whole digits and 3 decimals. */
+const KG_PATTERN = /^\d{1,7}(\.\d{1,3})?$/
 
 export function toMethodValues(method: ShippingMethod | null, nextSortOrder = 0): MethodValues {
   return {
@@ -90,6 +99,9 @@ export function toMethodValues(method: ShippingMethod | null, nextSortOrder = 0)
     eta_max_days: method?.eta_max_days ?? 3,
     is_active: method?.is_active ?? true,
     sort_order: method?.sort_order ?? nextSortOrder,
+    weight_pricing: method?.weight_included_kg != null,
+    weight_included_kg: method?.weight_included_kg != null ? trimDecimal(method.weight_included_kg) : '1',
+    fee_per_extra_kg: method?.fee_per_extra_kg ?? '0.00',
     translations: { bn: readBn(method?.translations, METHOD_TRANSLATION_NAMES) },
   }
 }
@@ -107,8 +119,51 @@ export function toMethodInput(v: MethodValues, before?: TranslationsMap): Method
     eta_max_days: v.eta_max_days,
     is_active: v.is_active,
     sort_order: v.sort_order,
+    weight_included_kg: v.weight_pricing ? v.weight_included_kg : null,
+    fee_per_extra_kg: v.weight_pricing ? v.fee_per_extra_kg : '0.00',
     translations: toTranslationsInput(v.translations.bn, METHOD_TRANSLATION_NAMES, before),
   }
+}
+
+/** "BDT 60.00 + BDT 20.00 per kg over 1 kg" — the weight part of a method's fee, or null without weight pricing. */
+export function weightSummary(method: Pick<ShippingMethod, 'weight_included_kg' | 'fee_per_extra_kg'>, currency?: string): string | null {
+  if (method.weight_included_kg == null) return null
+  return `+ ${formatMoney(method.fee_per_extra_kg ?? '0', currency)} per kg over ${trimDecimal(method.weight_included_kg)} kg`
+}
+
+// ── Delivery areas (BD2a) ────────────────────────────────────────────────────
+
+export const AREA_NAME_MAX = 80
+
+/** A fee change: an amount with at most 2 decimals, may be negative (a cheaper area). */
+const SIGNED_MONEY = /^-?\d{1,16}(\.\d{1,2})?$/
+
+export const areaSchema = z.object({
+  name: z.string().trim().min(1, 'Required.').max(AREA_NAME_MAX, `At most ${AREA_NAME_MAX} characters.`),
+  fee_adjustment: z.string().trim().regex(SIGNED_MONEY, 'An amount like 20 or -10 (at most 2 decimals).'),
+  is_active: z.boolean(),
+  sort_order: z.number({ error: 'A whole number.' }).int('A whole number.').min(0, 'A whole number.'),
+})
+
+export type AreaValues = z.infer<typeof areaSchema>
+export const AREA_FIELDS = ['name', 'fee_adjustment', 'is_active', 'sort_order'] as const
+
+export function toAreaValues(area: ShippingArea | null, nextSortOrder = 0): AreaValues {
+  return { name: area?.name ?? '', fee_adjustment: area?.fee_adjustment ?? '0.00', is_active: area?.is_active ?? true, sort_order: area?.sort_order ?? nextSortOrder }
+}
+
+export function toAreaInput(v: AreaValues, districtId: number): AreaInput {
+  return { district_id: districtId, name: v.name, fee_adjustment: v.fee_adjustment, is_active: v.is_active, sort_order: v.sort_order }
+}
+
+/** "+ BDT 20.00", "− BDT 10.00" or "No change". */
+export function adjustmentLabel(amount: string, currency?: string): string {
+  if (/^-?0+(\.0+)?$/.test(amount)) return 'No change'
+  return amount.startsWith('-') ? `− ${formatMoney(amount.slice(1), currency)}` : `+ ${formatMoney(amount, currency)}`
+}
+
+export function sortAreas(areas: ShippingArea[]): ShippingArea[] {
+  return [...areas].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
 }
 
 // ── Couriers (E10a) ──────────────────────────────────────────────────────────

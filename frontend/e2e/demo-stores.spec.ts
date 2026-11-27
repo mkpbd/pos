@@ -3321,3 +3321,77 @@ test('R1: Bazar Fresh sets its alerts, reminds a customer of a due by SMS and Wh
     await context.close()
   }
 })
+
+test('BD2a: Bazar Fresh adds a delivery area and weight pricing; a 3 kg parcel to that area is quoted base + area + per-kg, the store lists the area, and an order there needs it', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-6)
+  try {
+    // A district the store delivers to, and one of its delivery methods.
+    const zones = (await call('GET', '/api/v1/shipping/zones')).body.data as { is_active: boolean; districts: { id: number }[]; methods: { id: string; is_active: boolean; fee: string; free_over: string | null }[] }[]
+    const zone = zones.find((z) => z.is_active && z.districts.length > 0 && z.methods.some((m) => m.is_active))!
+    expect(zone).toBeTruthy()
+    const districtId = zone.districts[0]!.id
+    const method = zone.methods.find((m) => m.is_active)!
+    const district = ((await call('GET', '/api/v1/geography/districts')).body.data as { id: number; division_id: number }[]).find((d) => d.id === districtId)!
+
+    // An area 30 dearer, and weight pricing: 1 kg included, 20 per extra kg.
+    const area = await call('POST', '/api/v1/shipping/areas', { district_id: districtId, name: `Mirpur ${stamp}`, fee_adjustment: '30', is_active: true, sort_order: 0 })
+    expect(area.status).toBe(201)
+    expect((await call('PATCH', `/api/v1/shipping/methods/${method.id}`, { weight_included_kg: '1', fee_per_extra_kg: '20' })).status).toBe(200)
+    const units = (await call('GET', '/api/v1/units')).body.data as { id: string; code: string }[]
+    const product = await call('POST', '/api/v1/products', {
+      name: `Rice 1.5 kg ${stamp}`, type: 'standard', unit_id: (units.find((u) => u.code === 'pcs') ?? units[0]!).id, track_stock: false,
+      variants: [{ sku: `RICE-${stamp}`, purchase_price: '80', selling_price: '100', weight_grams: 1500 }],
+    })
+    expect(product.status).toBe(201)
+    const variantId = product.body.data.variants[0].id as string
+    // On sale online (a new product is not), so the quote can price it.
+    const listed = await call('PUT', `/api/v1/online-catalog/products/${product.body.data.id}`, { is_published: true, is_featured: false })
+    expect(listed.status).toBe(200)
+
+    // Two bags = 3 kg: base fee, +30 for the area, +40 for the 2 extra kg.
+    const quote = await call('POST', '/api/v1/web-orders/quote', {
+      lines: [{ variant_id: variantId, quantity: '2' }],
+      address: { division_id: district.division_id, district_id: districtId, area_id: area.body.data.id },
+      shipping_method_id: method.id, payment_method: 'cod',
+    })
+    expect(quote.status).toBe(200)
+    expect(quote.body.data.shipping_breakdown).toMatchObject({ base_fee: Number(method.fee).toFixed(2), area_adjustment: '30.00', weight_fee: '40.00' })
+
+    // The store lists the area for that district (names only).
+    const storeAreas = await page.evaluate(async (u) => (await (await fetch(u, { headers: { Accept: 'application/json' } })).json()) as { data: { id: string; name: string }[] }, `/api/v1/store/shipping/areas?district_id=${districtId}`)
+    expect(storeAreas.data.map((a) => a.name)).toContain(`Mirpur ${stamp}`)
+    expect(JSON.stringify(storeAreas.data)).not.toContain('fee_adjustment')
+
+    // A staff order to that district must name its area.
+    const order = await call('POST', '/api/v1/web-orders', {
+      contact: { name: `Karim ${stamp}`, phone: `0171${stamp}0` }, lines: [{ variant_id: variantId, quantity: '1' }],
+      address: { recipient_name: `Karim ${stamp}`, phone: `0171${stamp}0`, division_id: district.division_id, district_id: districtId, address_line: 'House 3, Road 1' },
+      shipping_method_id: method.id, payment_method: 'cod', channel: 'phone', expected_total: '0',
+    })
+    expect(order.status).toBe(422)
+    expect(JSON.stringify(order.body.error)).toContain('address.area_id')
+
+    // The admin Shipping page offers the area editor.
+    await page.goto(`${base}/admin/storefront/shipping`)
+    await expect(page.getByRole('button', { name: /^Areas of / }).first()).toBeVisible({ timeout: 20_000 })
+  } finally {
+    await context.close()
+  }
+})

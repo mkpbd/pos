@@ -90,7 +90,8 @@ class EditOrder
         $coupon = array_key_exists('coupon_code', $data) ? StaffOrderPricing::coupon($data['coupon_code']) : $locked->coupon_code;
         $input = [
             'contact' => $data['contact'],
-            'address' => ['district_id' => (int) $data['address']['district_id']],
+            // BD2a: the delivery area prices the delivery too.
+            'address' => ['district_id' => (int) $data['address']['district_id'], 'area_id' => $data['address']['area_id'] ?? null],
             'shipping_method_id' => $data['shipping_method_id'],
             'payment_method' => $locked->payment_method->value,
         ];
@@ -103,6 +104,12 @@ class EditOrder
             ]);
         }
         $address = $this->address($data['address']);
+        // BD2a: as at placement — an area of the district when it has areas; its name and id are kept.
+        if ($quote['area_error'] !== null) {
+            throw ValidationException::withMessages($quote['area_error']);
+        }
+        $address['area'] = $quote['area']['name'] ?? $address['area'];
+        $address['area_id'] = $quote['area']['id'] ?? null;
         if ($quote['method'] === null) {
             throw new BusinessRuleViolation('SHIPPING_UNAVAILABLE', 'We do not deliver to this district with the chosen delivery method. Choose another delivery method or address.', [
                 'district_id' => $address['district_id'],
@@ -143,6 +150,9 @@ class EditOrder
             'tax_total' => $preview['tax_total'],
             'shipping_total' => $preview['shipping_total'],
             'shipping_discount' => $quote['shipping_discount'],
+            'shipping_base_fee' => $method['base_fee'],
+            'shipping_area_adjustment' => $method['area_adjustment'],
+            'shipping_weight_fee' => $method['weight_fee'],
             'coupon_code' => $quote['coupon_code'],
             'cod_fee' => $codFee->amount(),
             'total' => $total->amount(),

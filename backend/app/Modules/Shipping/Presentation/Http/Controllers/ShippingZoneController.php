@@ -71,7 +71,8 @@ class ShippingZoneController
      * Add a delivery method
      *
      * Free delivery from `free_over` (goods total after tax); `cod_fee` is charged when the
-     * shopper pays cash on delivery; ETA in days (0–30, min ≤ max).
+     * shopper pays cash on delivery; ETA in days (0–30, min ≤ max). BD2a: weight pricing —
+     * `weight_included_kg` (null = off) and `fee_per_extra_kg` per started kg above it.
      */
     public function storeMethod(Request $request, ShippingZone $zone, ManageShippingMethods $methods): JsonResponse
     {
@@ -140,6 +141,9 @@ class ShippingZoneController
             'eta_max_days' => [$required, 'integer', 'min:0', 'max:30'],
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0', 'max:9999'],
+            // BD2a: weight pricing (null = off).
+            'weight_included_kg' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:9999999', 'decimal:0,3'],
+            'fee_per_extra_kg' => ['sometimes', 'nullable', ...$money],
             // E12b: {bn: {name, description}} (partial; blank removes).
             ...TranslationInput::rules(ManageShippingMethods::TRANSLATABLE),
         ]);

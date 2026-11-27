@@ -96,6 +96,13 @@ class StoreCheckoutController
      * BD1c: `cod_advance` `{amount, methods: [{code, display_name, account_number, account_type,
      * instructions}]}` when cash on delivery is priced and the store asks for the delivery
      * charge in advance (`cod_advance`; `risky` judged on the first phone given), else null.
+     * BD2a: `address.area_id` (a delivery area of the district, GET store/shipping/areas) and
+     * the cart's weight price the delivery; `shipping_breakdown` `{base_fee, area_adjustment,
+     * weight_fee}` explains the chosen method's fee before free-over (null without a method);
+     * each `shipping_methods` entry carries the same three fields. Placing the order needs
+     * `address.area_id` when the district has active areas (field error `address.area_id`; for
+     * a saved address whose area matches none of them, `shipping_address_id`); the order keeps
+     * the area's name in `shipping_address.area` and shows `shipping_breakdown` too.
      */
     public function preview(Request $request, BranchDirectory $branches, TenantContext $tenant, CodRiskPolicy $codRisk, CodAdvancePolicy $codAdvance): JsonResponse
     {
@@ -107,6 +114,8 @@ class StoreCheckoutController
             'address' => ['sometimes', 'nullable', 'array'],
             'address.division_id' => ['sometimes', 'nullable', 'integer'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
+            // BD2a: the delivery area (prices the delivery).
+            'address.area_id' => ['sometimes', 'nullable', 'uuid'],
             'address.phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
             'payment_method' => ['sometimes', 'nullable', 'string', 'max:30'],
@@ -190,6 +199,8 @@ class StoreCheckoutController
             'address.division_id' => [$addressRule, 'integer', 'exists:geo_divisions,id'],
             'address.district_id' => [$addressRule, 'integer', 'exists:geo_districts,id'],
             'address.area' => ['sometimes', 'nullable', 'string', 'max:100'],
+            // BD2a: a delivery area of the district — required when the district has active areas.
+            'address.area_id' => ['sometimes', 'nullable', 'uuid'],
             'address.address_line' => [$addressRule, 'string', 'max:255'],
             'address.postcode' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}$/'],
             'save_address' => ['sometimes', 'boolean'],

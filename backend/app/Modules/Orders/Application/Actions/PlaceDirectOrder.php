@@ -56,7 +56,8 @@ class PlaceDirectOrder
         $this->ensureCheckoutAvailable();
         $lines = $this->lines($form, $data['lines']);
         $input = [
-            'address' => isset($data['address']['district_id']) ? ['district_id' => (int) $data['address']['district_id']] : null,
+            // BD2a: with the delivery area.
+            'address' => isset($data['address']['district_id']) ? ['district_id' => (int) $data['address']['district_id'], 'area_id' => $data['address']['area_id'] ?? null] : null,
             'shipping_method_id' => $data['shipping_method_id'] ?? null,
             'payment_method' => $form['payment'] === 'cod_only' && ($data['payment_method'] ?? null) !== null ? 'cod' : ($data['payment_method'] ?? null),
         ];
@@ -122,6 +123,8 @@ class PlaceDirectOrder
                 'division_id' => $divisionId,
                 'district_id' => $districtId,
                 'area' => $this->blankToNull($data['address']['area'] ?? null),
+                // BD2a.
+                'area_id' => $data['address']['area_id'] ?? null,
                 'address_line' => trim((string) $data['address']['address_line']),
                 'postcode' => $this->blankToNull($data['address']['postcode'] ?? null),
             ],

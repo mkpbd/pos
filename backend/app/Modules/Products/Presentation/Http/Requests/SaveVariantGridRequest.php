@@ -33,6 +33,8 @@ class SaveVariantGridRequest extends FormRequest
             'variants.*.compare_at_price' => ['sometimes', 'nullable', 'regex:/^\d{1,16}(\.\d{1,2})?$/'],
             'variants.*.reorder_level' => ['nullable', 'decimal:0,3', 'min:0', 'max:999999999999999'],
             'variants.*.is_active' => ['boolean'],
+            // BD2a: delivery weight in grams (null = not set); left out = kept.
+            'variants.*.weight_grams' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000'],
             ...SaveProductRequest::packAndPriceRules(),
             'variants.*.opening_stock' => ['sometimes', 'nullable', 'regex:/^\d{1,15}(\.\d{1,3})?$/'],
 

@@ -58,6 +58,7 @@ export const checkout = {
   'checkout.address.chooseDistrict': 'Choose a district',
   'checkout.address.chooseDivisionFirst': 'Choose a division first',
   'checkout.address.area': 'Area / thana',
+  'checkout.address.chooseArea': 'Choose your area',
   'checkout.address.postcode': 'Postcode (optional)',
   'checkout.address.street': 'Street address',
   'checkout.address.streetPlaceholder': 'House, road, block',
@@ -71,6 +72,10 @@ export const checkout = {
   'checkout.delivery.free': 'Free',
   'checkout.delivery.eta': 'Delivery in {eta}',
   'checkout.delivery.freeOver': 'Free on orders of {amount} or more',
+  'checkout.delivery.includes': 'incl. {parts}',
+  'checkout.delivery.areaExtra': '{amount} for your area',
+  'checkout.delivery.areaLess': '{amount} less for your area',
+  'checkout.delivery.weightExtra': '{amount} for the parcel weight',
 
   'checkout.payment.heading': 'Payment method',
   'checkout.payment.none': 'No payment method is available right now. Please try again later.',
@@ -153,6 +158,7 @@ export const checkout = {
   'checkout.validation.division': 'Please choose a division.',
   'checkout.validation.district': 'Please choose a district.',
   'checkout.validation.area': 'Please enter the area or thana.',
+  'checkout.validation.areaChoice': 'Please choose your area or thana.',
   'checkout.validation.addressLine': 'Please enter the street address.',
   'checkout.validation.postcode': 'A postcode has 4 digits.',
 } as const satisfies Messages

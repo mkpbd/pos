@@ -57,6 +57,8 @@ class StaffOrderController
             'address' => ['sometimes', 'nullable', 'array'],
             'address.division_id' => ['sometimes', 'nullable', 'integer'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
+            // BD2a: the delivery area (prices the delivery).
+            'address.area_id' => ['sometimes', 'nullable', 'uuid'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
             'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(OrderPaymentMethod::values())],
             'coupon_code' => ['sometimes', 'nullable', 'string', 'max:40'],
@@ -75,7 +77,7 @@ class StaffOrderController
      *
      * `web_orders.create`, header `Idempotency-Key`. Body: the quote body without `order_id`,
      * plus required `contact {name, phone, email?}`, `address {recipient_name, phone,
-     * division_id, district_id, area?, address_line, postcode?}`, `shipping_method_id`,
+     * division_id, district_id, area?, area_id?, address_line, postcode?}`, `shipping_method_id`,
      * `payment_method` (cod | bank_transfer), `channel` (phone | facebook | whatsapp |
      * instagram | walk_in | other), `expected_total`; optional `notes` (≤ 500), `locale`
      * (en | bn, default the store's language: the customer's e-mails and text messages).
@@ -165,6 +167,8 @@ class StaffOrderController
             'address.division_id' => ['required', 'integer', 'exists:geo_divisions,id'],
             'address.district_id' => ['required', 'integer', 'exists:geo_districts,id'],
             'address.area' => ['sometimes', 'nullable', 'string', 'max:100'],
+            // BD2a: a delivery area of the district — required when the district has active areas.
+            'address.area_id' => ['sometimes', 'nullable', 'uuid'],
             'address.address_line' => ['required', 'string', 'max:255'],
             'address.postcode' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}$/'],
             'shipping_method_id' => ['required', 'uuid'],

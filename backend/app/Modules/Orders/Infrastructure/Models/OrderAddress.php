@@ -22,7 +22,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $division_name
  * @property int $district_id
  * @property string $district_name
- * @property ?string $area
+ * @property ?string $area free text, or the name of the delivery area chosen (BD2a)
+ * @property ?string $area_id BD2a: the Shipping delivery area chosen, null for free text
  * @property string $address_line
  * @property ?string $postcode
  * @property CarbonImmutable $created_at
@@ -30,7 +31,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Table(timestamps: false)]
 #[Fillable([
     'organization_id', 'order_id', 'kind', 'recipient_name', 'phone', 'email', 'division_id', 'division_name',
-    'district_id', 'district_name', 'area', 'address_line', 'postcode', 'created_at',
+    'district_id', 'district_name', 'area', 'area_id', 'address_line', 'postcode', 'created_at',
 ])]
 class OrderAddress extends Model
 {

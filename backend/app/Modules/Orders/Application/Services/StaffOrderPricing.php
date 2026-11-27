@@ -61,7 +61,8 @@ class StaffOrderPricing
         $customerId = $order !== null ? $order->customer_id : ($this->customer($data['customer_id'] ?? null)['customer_id'] ?? null);
         $input = [
             'contact' => $data['contact'] ?? null,
-            'address' => isset($data['address']['district_id']) ? ['district_id' => (int) $data['address']['district_id']] : null,
+            // BD2a: with the delivery area.
+            'address' => isset($data['address']['district_id']) ? ['district_id' => (int) $data['address']['district_id'], 'area_id' => $data['address']['area_id'] ?? null] : null,
             'shipping_method_id' => $data['shipping_method_id'] ?? null,
             // An edit keeps the order's payment method.
             'payment_method' => $order !== null ? $order->payment_method->value : ($data['payment_method'] ?? null),

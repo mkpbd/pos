@@ -87,6 +87,8 @@ class ProductResource extends JsonResource
             'selling_price' => $variant->selling_price,
             'wholesale_price' => $variant->wholesale_price,
             'reorder_level' => $variant->reorder_level,
+            // BD2a: delivery weight in grams (null = not set).
+            'weight_grams' => $variant->weight_grams,
             'barcodes' => $variant->barcodes->pluck('barcode')->values(),
             // ST2c: the pack barcodes among them (units > 1), e.g. a carton of 24.
             'packs' => $variant->barcodes->filter(fn (ProductBarcode $b) => Decimal::compare($b->units, '1') > 0)

@@ -6,42 +6,63 @@ use App\Modules\Shared\Application\Localization\LocaleContext;
 use App\Modules\Shared\Domain\Translations;
 use App\Modules\Shipping\Application\Contracts\ShippingRates;
 use App\Modules\Shipping\Domain\DeliveryOverview;
+use App\Modules\Shipping\Domain\ShippingFee;
+use App\Modules\Shipping\Infrastructure\Models\ShippingArea;
 use App\Modules\Shipping\Infrastructure\Models\ShippingMethod;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZone;
 use App\Modules\Shipping\Infrastructure\Models\ShippingZoneDistrict;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Str;
 
 class EloquentShippingRates implements ShippingRates
 {
     /** E12b: names and descriptions in the request's language (orders snapshot the base name). */
     public function __construct(private readonly LocaleContext $locale) {}
 
-    public function methodsForDistrict(int $districtId): array
+    public function methodsForDistrict(int $districtId, ?string $areaId = null, int $weightGrams = 0): array
     {
         $zoneId = ShippingZoneDistrict::query()->where('district_id', $districtId)->value('zone_id');
         if ($zoneId === null || ! ShippingZone::query()->whereKey($zoneId)->where('is_active', true)->exists()) {
             return [];
         }
+        // BD2a: an unknown area, or one of another district, adds nothing (callers validate it).
+        $adjustment = $areaId === null || ! Str::isUuid($areaId) ? null : ShippingArea::query()
+            ->whereKey($areaId)->where('district_id', $districtId)->where('is_active', true)->value('fee_adjustment');
+        $adjustment = $adjustment === null ? '0.00' : (string) $adjustment;
 
         return ShippingMethod::query()
             ->where('zone_id', $zoneId)
             ->where('is_active', true)
             ->orderBy('sort_order')->orderBy('name')
             ->get()
-            ->map(fn (ShippingMethod $m) => self::option($m, $this->locale->current()))
+            ->map(fn (ShippingMethod $m) => array_merge(self::option($m, $this->locale->current()), ShippingFee::forDelivery(
+                (string) $m->fee, $adjustment, $m->weight_included_kg === null ? null : (string) $m->weight_included_kg, (string) $m->fee_per_extra_kg, max(0, $weightGrams),
+            )))
             ->values()
             ->all();
     }
 
-    public function methodForDistrict(string $methodId, int $districtId): ?array
+    public function methodForDistrict(string $methodId, int $districtId, ?string $areaId = null, int $weightGrams = 0): ?array
     {
-        foreach ($this->methodsForDistrict($districtId) as $method) {
+        foreach ($this->methodsForDistrict($districtId, $areaId, $weightGrams) as $method) {
             if ($method['id'] === $methodId) {
                 return $method;
             }
         }
 
         return null;
+    }
+
+    public function areas(int $districtId): array
+    {
+        return ShippingArea::query()
+            ->where('district_id', $districtId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')->orderBy('name')
+            ->get(['id', 'name', 'fee_adjustment'])
+            ->map(fn (ShippingArea $a) => ['id' => $a->id, 'name' => $a->name, 'fee_adjustment' => (string) $a->fee_adjustment])
+            ->values()
+            ->all();
     }
 
     public function districtMethods(): array

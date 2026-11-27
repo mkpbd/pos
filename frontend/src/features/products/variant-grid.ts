@@ -25,6 +25,8 @@ const tierSchema = z.object({
 })
 /** ST2c: the selling price at one branch. */
 const branchPriceSchema = z.object({ branch_id: z.string().min(1, 'Choose a branch.'), price: money })
+/** BD2a: a variant's weight in whole grams ("" = not set). */
+export const weightGrams = z.union([z.string().trim().regex(/^[1-9]\d{0,6}$/, 'Whole grams above 0.').refine((v) => Number(v) <= 1_000_000, 'At most 1,000,000 g.'), z.literal('')])
 
 const rowSchema = z.object({
   id: z.string().optional(),
@@ -37,6 +39,7 @@ const rowSchema = z.object({
   wholesale_price: optionalMoney,
   compare_at_price: optionalMoney,
   reorder_level: z.union([z.string().trim().regex(decimalPattern(3), 'Up to 3 decimals.'), z.literal('')]),
+  weight_grams: weightGrams,
   is_active: z.boolean(),
   /** New rows only: quantity put in stock when saved ("" = none). */
   opening_stock: z.union([z.string().trim().regex(QUANTITY, 'A positive quantity.'), z.literal('')]),
@@ -153,7 +156,7 @@ export function splitBarcodes(value: string): string[] {
 export function emptyRow(optionValues: Record<string, string> = {}): GridRow {
   return {
     option_values: optionValues, sku: '', barcodes: '', purchase_price: '', selling_price: '', wholesale_price: '', compare_at_price: '',
-    reorder_level: '', is_active: true, opening_stock: '', removed: false, packs: [], price_tiers: [], branch_prices: [],
+    reorder_level: '', weight_grams: '', is_active: true, opening_stock: '', removed: false, packs: [], price_tiers: [], branch_prices: [],
   }
 }
 
@@ -171,6 +174,7 @@ export function toGridValues(product: Product): VariantGridValues {
     wholesale_price: v.wholesale_price ?? '',
     compare_at_price: v.compare_at_price ?? '',
     reorder_level: trimLevel(v.reorder_level),
+    weight_grams: v.weight_grams != null ? String(v.weight_grams) : '',
     is_active: v.is_active,
     opening_stock: '',
     packs: (v.packs ?? []).map((p) => ({ barcode: p.barcode, units: trimDecimal(p.units), pack_name: p.pack_name ?? '' })),
@@ -288,6 +292,7 @@ export function generateRows(options: GridOption[], existing: GridRow[], skuBase
       wholesale_price: template?.wholesale_price ?? '',
       compare_at_price: template?.compare_at_price ?? '',
       reorder_level: template?.reorder_level ?? '',
+      weight_grams: template?.weight_grams ?? '',
     }
   })
   const removed = existing.filter((r) => r.id && !used.has(r)).map((r) => ({ ...r, removed: true, is_active: false, opening_stock: '' }))
@@ -384,6 +389,7 @@ export function toGridInput(form: VariantGridValues): { input: VariantGridInput;
       wholesale_price: v.wholesale_price.trim() || null,
       compare_at_price: v.compare_at_price.trim() || null,
       reorder_level: v.reorder_level.trim() || '0',
+      weight_grams: v.weight_grams.trim() ? Number(v.weight_grams.trim()) : null,
       is_active: v.is_active,
       ...(!v.id && isPositive(v.opening_stock) ? { opening_stock: v.opening_stock.trim() } : {}),
     })

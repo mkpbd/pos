@@ -807,7 +807,14 @@ export type ShippingMethod = {
   cod_fee: string
   eta_min_days: number
   eta_max_days: number
+  /** BD2a: how `fee` is made up — the method's own fee, the area's change (may be negative) and the extra-weight charge. */
+  base_fee?: string
+  area_adjustment?: string
+  weight_fee?: string
 }
+
+/** BD2a: GET /store/shipping/areas — the areas / thanas of a district the shopper chooses from. */
+export type DeliveryArea = { id: string; name: string }
 
 /** A promotion used by a priced order (checkout preview, placed order). */
 export type AppliedPromotion = { name: string; kind: 'product' | 'order' | 'shipping'; amount: string }
@@ -845,6 +852,8 @@ export type CheckoutAddressInput = {
   division_id: GeoId
   district_id: GeoId
   area?: string
+  /** BD2a: the chosen area of a district that has areas (then `area` is left out). */
+  area_id?: string
   address_line: string
   postcode?: string
 }

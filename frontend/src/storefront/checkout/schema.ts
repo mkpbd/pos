@@ -33,7 +33,7 @@ const emailFor = (mode: CheckoutEmailMode) =>
  * checked when "New address" is chosen (always for guests). BD1a: the e-mail is required,
  * optional or not asked for, as the store chose.
  */
-export const checkoutSchemaFor = (emailMode: CheckoutEmailMode) => z
+export const checkoutSchemaFor = (emailMode: CheckoutEmailMode, options: { areas?: boolean } = {}) => z
   .object({
     name: z.string().trim().min(2, m('checkout.validation.name')).max(120, m('checkout.validation.max120')),
     email: emailFor(emailMode),
@@ -44,6 +44,8 @@ export const checkoutSchemaFor = (emailMode: CheckoutEmailMode) => z
     division_id: z.string(),
     district_id: z.string(),
     area: z.string(),
+    /** BD2a: the chosen area when the district has areas (the typed `area` is then not used). */
+    area_id: z.string(),
     address_line: z.string(),
     postcode: z.string(),
     save_address: z.boolean(),
@@ -63,7 +65,9 @@ export const checkoutSchemaFor = (emailMode: CheckoutEmailMode) => z
     if (values.division_id === '') issue('division_id', 'checkout.validation.division')
     if (values.district_id === '') issue('district_id', 'checkout.validation.district')
     const area = values.area.trim()
-    if (area.length < 2) issue('area', 'checkout.validation.area')
+    if (options.areas) {
+      if (values.area_id === '') issue('area_id', 'checkout.validation.areaChoice')
+    } else if (area.length < 2) issue('area', 'checkout.validation.area')
     else if (area.length > 100) issue('area', 'checkout.validation.max100')
     const line = values.address_line.trim()
     if (line.length < 3) issue('address_line', 'checkout.validation.addressLine')
@@ -88,6 +92,7 @@ export const FIELD_ORDER: CheckoutField[] = [
   'division_id',
   'district_id',
   'area',
+  'area_id',
   'address_line',
   'postcode',
   'save_address',
@@ -107,6 +112,7 @@ export const SERVER_FIELDS: Record<string, CheckoutField> = {
   'address.division_id': 'division_id',
   'address.district_id': 'district_id',
   'address.area': 'area',
+  'address.area_id': 'area_id',
   'address.address_line': 'address_line',
   'address.postcode': 'postcode',
   address: 'address_line',
@@ -135,6 +141,7 @@ export function initialCheckoutValues(customer: Customer | null, addresses: Cust
     division_id: '',
     district_id: '',
     area: '',
+    area_id: '',
     address_line: '',
     postcode: '',
     save_address: customer !== null,
@@ -150,10 +157,17 @@ export type GeoIdLookup = (kind: 'division' | 'district', value: string) => GeoI
 const asIs: GeoIdLookup = (_kind, value) => value
 
 /** The pricing part of the form for POST /store/checkout/preview (partial input is fine). */
-export function toPreviewInput(values: Pick<CheckoutValues, 'address_choice' | 'division_id' | 'district_id' | 'shipping_method_id' | 'payment_method'>, geoId: GeoIdLookup = asIs): CheckoutPreviewInput {
+export function toPreviewInput(
+  values: Pick<CheckoutValues, 'address_choice' | 'division_id' | 'district_id' | 'shipping_method_id' | 'payment_method'> & { area_id?: string },
+  geoId: GeoIdLookup = asIs,
+): CheckoutPreviewInput {
   const input: CheckoutPreviewInput = {}
   if (values.address_choice && values.address_choice !== NEW_ADDRESS) input.shipping_address_id = values.address_choice
-  else if (values.district_id) input.address = { division_id: geoId('division', values.division_id), district_id: geoId('district', values.district_id) }
+  else if (values.district_id) {
+    input.address = { division_id: geoId('division', values.division_id), district_id: geoId('district', values.district_id) }
+    // BD2a: the area changes the delivery fee.
+    if (values.area_id) input.address.area_id = values.area_id
+  }
   if (values.shipping_method_id) input.shipping_method_id = values.shipping_method_id
   if (values.payment_method) input.payment_method = values.payment_method as PaymentMethodCode
   return input
@@ -197,7 +211,8 @@ export function toPlaceInput(values: CheckoutValues, expectedTotal: string, opti
       district_id: geoId('district', values.district_id),
       address_line: values.address_line.trim(),
     }
-    if (values.area.trim()) input.address.area = values.area.trim()
+    if (values.area_id) input.address.area_id = values.area_id
+    else if (values.area.trim()) input.address.area = values.area.trim()
     if (values.postcode.trim()) input.address.postcode = values.postcode.trim()
     if (options.signedIn) input.save_address = values.save_address
   }

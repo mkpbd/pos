@@ -27,12 +27,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $eta_max_days
  * @property bool $is_active
  * @property int $sort_order
+ * @property ?string $weight_included_kg BD2a: null = no weight pricing
+ * @property string $fee_per_extra_kg BD2a: per started kg above weight_included_kg
  * @property-read ShippingZone $zone
  * @property ?array<string, array<string, string>> $translations {"bn": {field: text}} (E12b)
  */
 #[Fillable([
     'organization_id', 'zone_id', 'name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee',
-    'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'translations',
+    'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'translations', 'weight_included_kg', 'fee_per_extra_kg',
 ])]
 class ShippingMethod extends Model
 {
@@ -44,6 +46,7 @@ class ShippingMethod extends Model
         'sort_order' => 0,
         'cod_allowed' => true,
         'cod_fee' => '0.00',
+        'fee_per_extra_kg' => '0.00',
     ];
 
     protected function casts(): array
@@ -58,6 +61,8 @@ class ShippingMethod extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'translations' => 'array',
+            'weight_included_kg' => 'decimal:3',
+            'fee_per_extra_kg' => 'decimal:2',
         ];
     }
 

@@ -471,6 +471,12 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Delivery areas and weight fees BD2a (implemented)
+
+- `shipping_areas` (organization, district, name ≤ 80 unique per district ignoring case, `fee_adjustment numeric(18,2)` may be negative, active, sort order).
+- `shipping_methods.weight_included_kg numeric(10,3)` (null = off), `fee_per_extra_kg numeric(18,2)`; `product_variants.weight_grams integer` (> 0).
+- `order_addresses.area_id` (snapshot, no foreign key); `orders.shipping_base_fee`, `shipping_area_adjustment`, `shipping_weight_fee` (null before BD2a).
+
 ### Alerts and reminders R1 (implemented)
 
 - `alert_runs` (kind, subject, local day; unique) — claims each daily alert once (summary per organization, expiry per store, open register per session, due reminders per organization).

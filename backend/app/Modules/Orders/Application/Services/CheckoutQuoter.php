@@ -6,11 +6,14 @@ use App\Modules\Cart\Application\Services\CartPricer;
 use App\Modules\Cart\Infrastructure\Models\Cart;
 use App\Modules\Customers\Application\Actions\CustomerAddressBook;
 use App\Modules\OnlinePayments\Application\Contracts\CheckoutPaymentMethods;
+use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Sales\Domain\TaxMode;
+use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Shared\Domain\BangladeshMobile;
 use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Money;
 use App\Modules\Shipping\Application\Contracts\ShippingRates;
+use App\Modules\Shipping\Domain\ParcelWeight;
 use App\Modules\Shipping\Domain\ShippingFee;
 
 /**
@@ -27,6 +30,13 @@ use App\Modules\Shipping\Domain\ShippingFee;
  *
  * Partial input is fine: without a district there are no delivery methods and no fee; an
  * unknown or unavailable method or payment method is reported as null.
+ *
+ * BD2a: the delivery is priced for the address's delivery area (`address.area_id`; a saved
+ * address's area matched by name) and the weight of the priced lines (Σ variant
+ * `weight_grams` × quantity, rounded up to whole grams; no weight counts 0). The quote says
+ * which area was used (`area`) and, for placement, the field error when the district has
+ * active areas and none of them was chosen, or the area is not one of the district's
+ * (`area_error`; the preview just ignores such an area).
  */
 class CheckoutQuoter
 {
@@ -35,6 +45,9 @@ class CheckoutQuoter
         private readonly ShippingRates $shipping,
         private readonly CheckoutPaymentMethods $payments,
         private readonly CustomerAddressBook $addresses,
+        // BD2a: the variants' weights.
+        private readonly ProductDirectory $products,
+        private readonly TenantContext $tenant,
     ) {}
 
     /**
@@ -51,7 +64,9 @@ class CheckoutQuoter
      *   goods_total: string,
      *   shipping_discount: string,
      *   redemptions: list<array{promotion_id: string, coupon_id: ?string, name: string, kind: string, amount: string}>,
-     *   coupon_code: ?string
+     *   coupon_code: ?string,
+     *   area: ?array{id: string, name: string},
+     *   area_error: ?array<string, list<string>>
      * }
      */
     public function quote(?Cart $cart, array $input, ?string $customerId, bool $autoPickMethod = false): array
@@ -118,7 +133,8 @@ class CheckoutQuoter
             $districtId = (int) $input['address']['district_id'];
         }
 
-        $methods = $districtId === null ? [] : $this->shipping->methodsForDistrict($districtId);
+        [$area, $areaError] = $districtId === null ? [null, null] : $this->area($districtId, $savedAddress, $input);
+        $methods = $districtId === null ? [] : $this->shipping->methodsForDistrict($districtId, $area['id'] ?? null, $this->weightGrams($quote['lines']));
         $method = null;
         foreach ($methods as $candidate) {
             if ($candidate['id'] === ($input['shipping_method_id'] ?? null)) {
@@ -174,6 +190,8 @@ class CheckoutQuoter
                 'tax_total' => $view['tax_total'],
                 'shipping_total' => $delivery->amount(),
                 'shipping_discount' => $shippingDiscount->amount(),
+                // BD2a: the chosen method's fee before free_over / promotions, explained.
+                'shipping_breakdown' => $method === null ? null : self::breakdown($method),
                 'cod_fee' => $codFee->amount(),
                 'total' => $total->amount(),
                 'currency' => $currency,
@@ -197,6 +215,65 @@ class CheckoutQuoter
             'shipping_discount' => $shippingDiscount->amount(),
             'redemptions' => $redemptions,
             'coupon_code' => $couponCode,
+            'area' => $area,
+            'area_error' => $areaError,
         ];
+    }
+
+    /**
+     * BD2a: `{base_fee, area_adjustment, weight_fee}` of a priced delivery method.
+     *
+     * @param  array<string, mixed>  $method
+     * @return array{base_fee: string, area_adjustment: string, weight_fee: string}
+     */
+    public static function breakdown(array $method): array
+    {
+        return ['base_fee' => $method['base_fee'], 'area_adjustment' => $method['area_adjustment'], 'weight_fee' => $method['weight_fee']];
+    }
+
+    /**
+     * BD2a: the delivery area of the address (`{id, name}` or null) and the field error placing
+     * the order would raise (null when fine). A saved address uses the district's area of the
+     * same name; an inline address its `area_id`.
+     *
+     * @param  array<string, mixed>|null  $savedAddress
+     * @param  array<string, mixed>  $input
+     * @return array{0: ?array{id: string, name: string}, 1: ?array<string, list<string>>}
+     */
+    private function area(int $districtId, ?array $savedAddress, array $input): array
+    {
+        $areas = $this->shipping->areas($districtId);
+        if ($savedAddress !== null) {
+            $name = mb_strtolower(trim((string) ($savedAddress['area'] ?? '')));
+            foreach ($areas as $candidate) {
+                if (mb_strtolower($candidate['name']) === $name) {
+                    return [['id' => $candidate['id'], 'name' => $candidate['name']], null];
+                }
+            }
+
+            return [null, $areas === [] ? null : ['shipping_address_id' => ['Choose the delivery area for this address: enter the address again and pick its area.']]];
+        }
+
+        $areaId = is_string($input['address']['area_id'] ?? null) && $input['address']['area_id'] !== '' ? strtolower($input['address']['area_id']) : null;
+        if ($areaId === null) {
+            return [null, $areas === [] ? null : ['address.area_id' => ['Choose the delivery area.']]];
+        }
+        foreach ($areas as $candidate) {
+            if ($candidate['id'] === $areaId) {
+                return [['id' => $candidate['id'], 'name' => $candidate['name']], null];
+            }
+        }
+
+        return [null, ['address.area_id' => ['Choose an area of the selected district.']]];
+    }
+
+    /**
+     * BD2a: the priced lines' weight (Domain\ParcelWeight).
+     *
+     * @param  list<array<string, mixed>>  $lines  CartPricer lines
+     */
+    private function weightGrams(array $lines): int
+    {
+        return $lines === [] ? 0 : ParcelWeight::grams($lines, $this->products->variants($this->tenant->requireOrganization(), array_values(array_unique(array_column($lines, 'variant_id')))));
     }
 }

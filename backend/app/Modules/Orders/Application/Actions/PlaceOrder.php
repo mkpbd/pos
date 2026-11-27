@@ -198,6 +198,12 @@ class PlaceOrder
             }
 
             $address = $this->address($customer, $data, $quote['saved_address']);
+            // BD2a: a district with delivery areas needs one of them; the order keeps its name and id.
+            if ($quote['area_error'] !== null) {
+                throw ValidationException::withMessages($quote['area_error']);
+            }
+            $address['area'] = $quote['area']['name'] ?? $address['area'];
+            $address['area_id'] = $quote['area']['id'] ?? null;
             if ($quote['method'] === null) {
                 throw new BusinessRuleViolation('SHIPPING_UNAVAILABLE', 'We do not deliver to this district with the chosen delivery method. Choose another delivery method or address.', [
                     'district_id' => $address['district_id'],
@@ -284,6 +290,10 @@ class PlaceOrder
                 'tax_total' => $preview['tax_total'],
                 'shipping_total' => $preview['shipping_total'],
                 'shipping_discount' => $quote['shipping_discount'],
+                // BD2a: the delivery fee breakdown.
+                'shipping_base_fee' => $method['base_fee'],
+                'shipping_area_adjustment' => $method['area_adjustment'],
+                'shipping_weight_fee' => $method['weight_fee'],
                 'coupon_code' => $quote['coupon_code'],
                 'cod_fee' => $codFee->amount(),
                 // BD1c: the advance delivery charge (0 = none).
@@ -397,7 +407,8 @@ class PlaceOrder
         });
 
         if ($customer !== null && ($data['save_address'] ?? false) && isset($data['address'])) {
-            $this->saveAddress($customer['customer_id'], $data['address']);
+            // BD2a: an area picked from the district's list is saved by its name.
+            $this->saveAddress($customer['customer_id'], ['area' => OrderAddress::query()->where('order_id', $order->id)->value('area')] + $data['address']);
         }
 
         try {

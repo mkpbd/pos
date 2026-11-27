@@ -51,6 +51,8 @@ class SaveProductRequest extends FormRequest
             'variants.*.wholesale_price' => ['nullable', 'decimal:0,2', 'min:0', 'max:9999999999999999'],
             'variants.*.reorder_level' => ['nullable', 'decimal:0,3', 'min:0', 'max:999999999999999'],
             'variants.*.is_active' => ['boolean'],
+            // BD2a: delivery weight in grams (null = not set); left out = kept.
+            'variants.*.weight_grams' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000'],
             ...self::packAndPriceRules(),
         ];
     }

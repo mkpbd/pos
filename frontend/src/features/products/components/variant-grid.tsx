@@ -55,6 +55,7 @@ const COLUMNS = [
   { key: 'wholesale_price', label: 'Wholesale price', short: 'Wholesale', decimal: true, width: 'w-24' },
   { key: 'compare_at_price', label: 'Compare-at price', short: 'Compare-at (web)', decimal: true, width: 'w-24' },
   { key: 'reorder_level', label: 'Reorder level', short: 'Reorder at', decimal: true, width: 'w-20' },
+  { key: 'weight_grams', label: 'Weight (g)', short: 'Weight (g)', decimal: true, width: 'w-20' },
   { key: 'opening_stock', label: 'Opening stock', short: 'Stock', decimal: true, width: 'w-20' },
 ] as const
 type ColumnKey = (typeof COLUMNS)[number]['key']

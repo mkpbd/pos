@@ -146,7 +146,7 @@ class SaveVariantGrid
                 // ST2c: left out = kept.
                 'price_tiers' => $row['price_tiers'] ?? null,
                 'branch_prices' => $row['branch_prices'] ?? null,
-            ];
+            ] + (array_key_exists('weight_grams', $row) ? ['weight_grams' => $row['weight_grams']] : []);
         }
 
         $productData = ProductData::fromArray([

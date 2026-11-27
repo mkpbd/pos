@@ -22,7 +22,7 @@ export type DirectPreviewInput = {
   document_id: string
   element_id: string
   lines: DirectLine[]
-  address?: { district_id: GeoId }
+  address?: { district_id: GeoId; area_id?: string }
   shipping_method_id?: string
   payment_method?: PaymentMethodCode
   /** BD1b: the mobile number (once valid), for `cod_available`. */
@@ -35,7 +35,7 @@ export type DirectOrderInput = {
   element_id: string
   lines: DirectLine[]
   contact: { name: string; phone: string; email?: string }
-  address: { district_id: GeoId; division_id?: GeoId; area?: string; address_line: string }
+  address: { district_id: GeoId; division_id?: GeoId; area?: string; area_id?: string; address_line: string }
   shipping_method_id: string
   payment_method: PaymentMethodCode
   note?: string
@@ -55,6 +55,8 @@ export type OrderFormValues = {
   division_id: string
   district_id: string
   area: string
+  /** BD2a: the chosen area when the district has delivery areas. */
+  area_id: string
   address_line: string
   note: string
   shipping_method_id: string
@@ -73,6 +75,7 @@ export const ORDER_FORM_FIELDS: readonly OrderFormField[] = [
   'division_id',
   'district_id',
   'area',
+  'area_id',
   'address_line',
   'shipping_method_id',
   'payment_method',
@@ -86,6 +89,7 @@ export const EMPTY_VALUES: OrderFormValues = {
   division_id: '',
   district_id: '',
   area: '',
+  area_id: '',
   address_line: '',
   note: '',
   shipping_method_id: '',
@@ -106,8 +110,8 @@ export function normalizePhone(value: string): string {
 
 export type OrderFormRules = { email: OrderFormEmailField; note: OrderFormNoteField }
 
-/** Every field's problem (a message key); empty = ready to place. */
-export function orderFormErrors(values: OrderFormValues, rules: OrderFormRules, variant: ProductVariant | null): Partial<Record<OrderFormField, MessageKey>> {
+/** Every field's problem (a message key); empty = ready to place. `hasAreas`: the district has delivery areas (BD2a). */
+export function orderFormErrors(values: OrderFormValues, rules: OrderFormRules, variant: ProductVariant | null, hasAreas = false): Partial<Record<OrderFormField, MessageKey>> {
   const errors: Partial<Record<OrderFormField, MessageKey>> = {}
   if (!variant) errors.variant = 'landing.orderForm.errorVariant'
   else if (!variant.in_stock) errors.variant = 'landing.orderForm.errorSoldOut'
@@ -124,7 +128,9 @@ export function orderFormErrors(values: OrderFormValues, rules: OrderFormRules, 
   }
   if (values.division_id === '') errors.division_id = 'checkout.validation.division'
   if (values.district_id === '') errors.district_id = 'checkout.validation.district'
-  if (values.area.trim().length > 100) errors.area = 'checkout.validation.max100'
+  if (hasAreas) {
+    if (values.area_id === '') errors.area_id = 'checkout.validation.areaChoice'
+  } else if (values.area.trim().length > 100) errors.area = 'checkout.validation.max100'
   const line = values.address_line.trim()
   if (line.length < 3) errors.address_line = 'landing.orderForm.errorAddress'
   else if (line.length > 255) errors.address_line = 'checkout.validation.max255'
@@ -170,11 +176,11 @@ export type GeoIdLookup = (kind: 'division' | 'district', value: string) => GeoI
 /** The pricing part of the form for the preview. */
 export function toDirectPreviewInput(
   base: { documentId: string; elementId: string; lines: DirectLine[] },
-  values: Pick<OrderFormValues, 'district_id' | 'shipping_method_id' | 'payment_method'>,
+  values: Pick<OrderFormValues, 'district_id' | 'shipping_method_id' | 'payment_method'> & { area_id?: string },
   geoId: GeoIdLookup,
 ): DirectPreviewInput {
   const input: DirectPreviewInput = { document_id: base.documentId, element_id: base.elementId, lines: base.lines }
-  if (values.district_id) input.address = { district_id: geoId('district', values.district_id) }
+  if (values.district_id) input.address = { district_id: geoId('district', values.district_id), ...(values.area_id ? { area_id: values.area_id } : {}) }
   if (values.shipping_method_id) input.shipping_method_id = values.shipping_method_id
   if (isPlaceableMethod(values.payment_method)) input.payment_method = values.payment_method
   return input
@@ -202,7 +208,8 @@ export function toDirectOrderInput(
   const email = values.email.trim()
   if (rules.email !== 'hidden' && email) input.contact.email = email
   const area = values.area.trim()
-  if (area) input.address.area = area
+  if (values.area_id) input.address.area_id = values.area_id
+  else if (area) input.address.area = area
   const note = values.note.trim()
   if (rules.note !== 'hidden' && note) input.note = note
   if (attribution) input.attribution = attribution
@@ -217,6 +224,7 @@ const SERVER_FIELDS: Record<string, OrderFormField> = {
   'address.division_id': 'division_id',
   'address.district_id': 'district_id',
   'address.area': 'area',
+  'address.area_id': 'area_id',
   'address.address_line': 'address_line',
   address: 'address_line',
   shipping_method_id: 'shipping_method_id',

@@ -4,12 +4,13 @@ import type {
   OrderChannel,
   OrderEdit,
   QuoteLine,
+  QuoteShippingMethod,
   StaffOrderInput,
   StaffQuote,
   StaffQuoteInput,
 } from '@/features/web-orders/order-entry-api'
 import { ApiError } from '@/lib/api/client'
-import { compareDecimal, formatMoney, trimDecimal } from '@/lib/money'
+import { compareDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { normalizedMobile } from '@/features/web-orders/risk'
 
 /** BD1b order entry and edit: the form's draft and how it becomes the quote and save bodies. */
@@ -43,7 +44,8 @@ export type OrderDraft = {
   customer: DraftCustomer | null
   contact: { name: string; phone: string; email: string }
   lines: DraftLine[]
-  address: { recipient_name: string; phone: string; division_id: number | null; district_id: number | null; area: string; address_line: string; postcode: string }
+  /** `area_id`: BD2a, the chosen delivery area ('' = none; the typed `area` is used). */
+  address: { recipient_name: string; phone: string; division_id: number | null; district_id: number | null; area: string; area_id: string; address_line: string; postcode: string }
   /** Until the recipient is typed in, it follows the contact. */
   recipientEdited: boolean
   shipping_method_id: string
@@ -63,7 +65,7 @@ export function emptyDraft(): OrderDraft {
     customer: null,
     contact: { name: '', phone: '', email: '' },
     lines: [],
-    address: { recipient_name: '', phone: '', division_id: null, district_id: null, area: '', address_line: '', postcode: '' },
+    address: { recipient_name: '', phone: '', division_id: null, district_id: null, area: '', area_id: '', address_line: '', postcode: '' },
     recipientEdited: false,
     shipping_method_id: '',
     payment_method: '',
@@ -97,6 +99,7 @@ export function draftFromOrder(order: WebOrder): OrderDraft | null {
       division_id: Number(a.division_id),
       district_id: Number(a.district_id),
       area: a.area ?? '',
+      area_id: a.area_id ?? '',
       address_line: a.address_line,
       postcode: a.postcode ?? '',
     },
@@ -166,7 +169,11 @@ export function quoteInputFrom(draft: OrderDraft, opts: { orderId?: string; paym
     input.contact = { name: draft.contact.name.trim(), phone, ...(draft.contact.email.trim() ? { email: draft.contact.email.trim() } : {}) }
   }
   if (draft.address.district_id !== null) {
-    input.address = { district_id: draft.address.district_id, ...(draft.address.division_id !== null ? { division_id: draft.address.division_id } : {}) }
+    input.address = {
+      district_id: draft.address.district_id,
+      ...(draft.address.division_id !== null ? { division_id: draft.address.division_id } : {}),
+      ...(draft.address.area_id ? { area_id: draft.address.area_id } : {}),
+    }
   }
   if (draft.shipping_method_id) input.shipping_method_id = draft.shipping_method_id
   const payment = opts.paymentMethod ?? draft.payment_method
@@ -191,8 +198,8 @@ export function effectivePaymentMethod(draft: OrderDraft, quote: StaffQuote | un
 
 export type DraftErrors = Record<string, string>
 
-/** What the form checks before submitting; the server checks everything again. Keys are body paths. */
-export function validateDraft(draft: OrderDraft, mode: 'create' | 'edit', chosen: { shippingMethodId: string; paymentMethod: WebPaymentMethod | '' }): DraftErrors {
+/** What the form checks before submitting; the server checks everything again. Keys are body paths. `hasAreas`: the district has delivery areas (BD2a). */
+export function validateDraft(draft: OrderDraft, mode: 'create' | 'edit', chosen: { shippingMethodId: string; paymentMethod: WebPaymentMethod | '' }, hasAreas = false): DraftErrors {
   const errors: DraftErrors = {}
   if (!draft.contact.name.trim()) errors['contact.name'] = 'Enter the customer’s name.'
   if (!draft.contact.phone.trim()) errors['contact.phone'] = 'Enter the customer’s mobile number.'
@@ -208,6 +215,7 @@ export function validateDraft(draft: OrderDraft, mode: 'create' | 'edit', chosen
   else if (!normalizedPhone(draft.address.phone)) errors['address.phone'] = 'Enter a Bangladesh mobile number (01XXXXXXXXX).'
   if (draft.address.division_id === null) errors['address.division_id'] = 'Choose a division.'
   if (draft.address.district_id === null) errors['address.district_id'] = 'Choose a district.'
+  else if (hasAreas && !draft.address.area_id) errors['address.area_id'] = 'Choose the area.'
   if (!draft.address.address_line.trim()) errors['address.address_line'] = 'Enter the address.'
   if (!chosen.shippingMethodId) errors.shipping_method_id = 'Choose a delivery method.'
   if (mode === 'create') {
@@ -226,7 +234,7 @@ function addressBody(draft: OrderDraft): StaffOrderInput['address'] {
     phone: normalizedPhone(a.phone) ?? a.phone.trim(),
     division_id: a.division_id as number,
     district_id: a.district_id as number,
-    ...(a.area.trim() ? { area: a.area.trim() } : {}),
+    ...(a.area_id ? { area_id: a.area_id } : a.area.trim() ? { area: a.area.trim() } : {}),
     address_line: a.address_line.trim(),
     ...(a.postcode.trim() ? { postcode: a.postcode.trim() } : {}),
   }
@@ -259,6 +267,16 @@ export function createBodyFrom(draft: OrderDraft, chosen: { shippingMethodId: st
 
 export function editBodyFrom(draft: OrderDraft, shippingMethodId: string, expectedTotal: string): EditOrderInput {
   return { ...common(draft, shippingMethodId, expectedTotal), ...(draft.reason.trim() ? { reason: draft.reason.trim() } : {}) }
+}
+
+/** BD2a: "incl. BDT 20.00 for the area · BDT 40.00 for weight" — what a method's shown fee adds; null when nothing. */
+export function deliveryFeeNote(method: Pick<QuoteShippingMethod, 'fee' | 'area_adjustment' | 'weight_fee'>, currency?: string): string | null {
+  if (isZeroDecimal(method.fee)) return null
+  const parts: string[] = []
+  const area = method.area_adjustment
+  if (area && !isZeroDecimal(area)) parts.push(area.startsWith('-') ? `${formatMoney(area.slice(1), currency)} less for the area` : `${formatMoney(area, currency)} for the area`)
+  if (method.weight_fee && !isZeroDecimal(method.weight_fee)) parts.push(`${formatMoney(method.weight_fee, currency)} for weight`)
+  return parts.length ? `incl. ${parts.join(' · ')}` : null
 }
 
 /** The stock problem of a priced line, if any. */

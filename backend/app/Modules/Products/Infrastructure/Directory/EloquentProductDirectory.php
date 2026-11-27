@@ -234,6 +234,8 @@ class EloquentProductDirectory implements ProductDirectory
                 'price_tiers' => $tiers->get($v->id, []),
                 'packs' => $packs->get($v->id, []),
                 'reorder_level' => $v->reorder_level,
+                // BD2a: delivery weight in grams (null = not set; the cart counts it as 0).
+                'weight_grams' => $v->weight_grams,
                 'max_discount_percent' => $p->max_discount_percent,
                 'category_id' => $p->category_id,
                 // POS1a: promotions match brands; open-price products are priced at the till.

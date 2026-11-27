@@ -243,7 +243,7 @@ class SaveProduct
                 'reorder_level' => $variantData->reorderLevel,
                 'is_active' => $variantData->isActive,
                 'sort_order' => $position,
-            ])->save();
+            ] + ($variantData->setsWeight ? ['weight_grams' => $variantData->weightGrams] : []))->save();
 
             $current = $variant->barcodes()->pluck('barcode')->all();
             foreach (array_diff($variantData->barcodes, $current) as $barcode) {
@@ -313,6 +313,7 @@ class SaveProduct
             'purchase_price' => $v->purchase_price,
             'selling_price' => $v->selling_price,
             'wholesale_price' => $v->wholesale_price,
+            'weight_grams' => $v->weight_grams,
             'is_active' => $v->is_active,
             'barcodes' => $v->barcodes->pluck('barcode')->sort()->values()->all(),
             // ST2c: pack barcodes, quantity breaks and branch prices are audited like prices.

@@ -58,6 +58,7 @@ export const checkout: Translations<typeof en> = {
   'checkout.address.chooseDistrict': 'জেলা বেছে নিন',
   'checkout.address.chooseDivisionFirst': 'আগে বিভাগ বেছে নিন',
   'checkout.address.area': 'এলাকা / থানা',
+  'checkout.address.chooseArea': 'আপনার এলাকা বেছে নিন',
   'checkout.address.postcode': 'পোস্টকোড (ঐচ্ছিক)',
   'checkout.address.street': 'রাস্তার ঠিকানা',
   'checkout.address.streetPlaceholder': 'বাড়ি, রোড, ব্লক',
@@ -71,6 +72,10 @@ export const checkout: Translations<typeof en> = {
   'checkout.delivery.free': 'ফ্রি',
   'checkout.delivery.eta': '{eta}-এর মধ্যে ডেলিভারি',
   'checkout.delivery.freeOver': '{amount} বা তার বেশি অর্ডারে ফ্রি',
+  'checkout.delivery.includes': '{parts} সহ',
+  'checkout.delivery.areaExtra': 'আপনার এলাকার জন্য {amount}',
+  'checkout.delivery.areaLess': 'আপনার এলাকার জন্য {amount} কম',
+  'checkout.delivery.weightExtra': 'পার্সেলের ওজনের জন্য {amount}',
 
   'checkout.payment.heading': 'পেমেন্ট পদ্ধতি',
   'checkout.payment.none': 'এই মুহূর্তে কোনো পেমেন্ট পদ্ধতি চালু নেই। অনুগ্রহ করে পরে আবার চেষ্টা করুন।',
@@ -153,6 +158,7 @@ export const checkout: Translations<typeof en> = {
   'checkout.validation.division': 'অনুগ্রহ করে একটি বিভাগ বেছে নিন।',
   'checkout.validation.district': 'অনুগ্রহ করে একটি জেলা বেছে নিন।',
   'checkout.validation.area': 'অনুগ্রহ করে এলাকা বা থানার নাম লিখুন।',
+  'checkout.validation.areaChoice': 'অনুগ্রহ করে আপনার এলাকা বা থানা বেছে নিন।',
   'checkout.validation.addressLine': 'অনুগ্রহ করে রাস্তার ঠিকানা লিখুন।',
   'checkout.validation.postcode': 'পোস্টকোড 4 অঙ্কের হয়।',
 }

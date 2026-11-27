@@ -7,6 +7,8 @@ export const customerKeys = {
   wishlist: ['store', 'wishlist'] as const,
   divisions: ['store', 'geo', 'divisions'] as const,
   districts: (division: string) => ['store', 'geo', 'districts', division] as const,
+  /** BD2a: the delivery areas of a district. */
+  areas: (district: string) => ['store', 'shipping', 'areas', district] as const,
 }
 
 /** Checkout and order queries (E8a). */

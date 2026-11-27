@@ -72,7 +72,7 @@ class CheckoutTest extends TestCase
             $preview['currency'], $preview['prices_include_tax'], $preview['shipping_method_id'], $preview['payment_method'], $preview['issues'],
         ]);
         $this->assertCount(3, $preview['lines']);
-        $this->assertSame(['id', 'name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days'], array_keys($preview['shipping_methods'][0]));
+        $this->assertSame(['id', 'name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'base_fee', 'area_adjustment', 'weight_fee'], array_keys($preview['shipping_methods'][0]));
 
         $key = (string) Str::uuid();
         $placed = $this->placeOrder($this->checkoutBody('1296.50'), $key)->assertCreated();

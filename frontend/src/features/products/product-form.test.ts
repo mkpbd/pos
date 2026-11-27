@@ -20,7 +20,7 @@ describe('product form', () => {
     expect(input.max_discount_percent).toBeNull()
     expect(input.variants[0]).toEqual({
       sku: null, name: null, option_values: {}, purchase_price: '10', selling_price: '15',
-      wholesale_price: null, reorder_level: '0', barcodes: ['96385074', '4006381333931'], is_active: true,
+      wholesale_price: null, reorder_level: '0', barcodes: ['96385074', '4006381333931'], weight_grams: null, is_active: true,
     })
   })
 
@@ -38,7 +38,13 @@ describe('product form', () => {
 
     expect(input.name).toBe('Polo Shirt')
     expect(input.options).toEqual([{ name: 'Size', values: ['M'] }])
-    expect(input.variants).toEqual([{ id: 'v-m', sku: 'POLO-M', name: null, option_values: { Size: 'M' }, purchase_price: '300.00', selling_price: '450.00', wholesale_price: null, reorder_level: '2.000', barcodes: ['111'], is_active: true }])
+    expect(input.variants).toEqual([{ id: 'v-m', sku: 'POLO-M', name: null, option_values: { Size: 'M' }, purchase_price: '300.00', selling_price: '450.00', wholesale_price: null, reorder_level: '2.000', barcodes: ['111'], weight_grams: null, is_active: true }])
+  })
+
+  it('sends the weight of a new product and keeps a saved one (BD2a)', () => {
+    const input = toProductInput({ ...toFormValues(), name: 'Rice', unit_id: 'u-1', variants: [priced({ weight_grams: '5000' })] })
+    expect(input.variants[0]!.weight_grams).toBe(5000)
+    expect(productFormSchema.safeParse({ ...toFormValues(), name: 'Rice', unit_id: 'u-1', variants: [priced({ weight_grams: 'abc' })] }).success).toBe(false)
   })
 
   it('services never track stock', () => {

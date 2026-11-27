@@ -105,7 +105,7 @@ storefront, the page builder (B1–B21), shop assistant (AI2b).
 | Courier API booking & automatic status (Pathao, Steadfast, RedX, Paperfly) | P1 | Couriers are name + phone + tracking link |
 | Abandoned-cart recovery; shipped / out-for-delivery / delivered notifications to shoppers; guest "track my order" page | P1 | — |
 | Messenger inbox / comment-to-order; e-mail campaigns & web push (newsletter sign-up exists, nothing sends) | P1 | — |
-| Delivery areas below district (upazila / thana), weight-based fees | P1 | — |
+| Delivery areas below district (upazila / thana), weight-based fees | **Done (BD2a)** — the shop's own areas per district (no national upazila list) | — |
 | Bangla order e-mails, gift cards, click & collect, loyalty on web orders, review photos, change e-mail, link POS & online customer by phone | P2 | — |
 | Better search (typo tolerance, Banglish → Bangla; trigram index exists but unused) | P2 | — |
 | Meta live posting tested only against a fake Graph API; checkout load test; Lighthouse | Unverified | — |

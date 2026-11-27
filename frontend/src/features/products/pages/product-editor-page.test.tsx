@@ -97,11 +97,13 @@ describe('ProductEditorPage', () => {
 
     await user.clear(selling)
     await user.type(selling, '26')
+    // BD2a: the parcel weight of the variant.
+    await user.type(screen.getByLabelText('Weight (g) for Default'), '450')
     await user.click(screen.getByRole('button', { name: 'Save variants' }))
     expect(await screen.findByText('Barcode "96385074" is already assigned to another product.')).toBeInTheDocument()
     expect(body).toEqual({
       options: null,
-      variants: [{ id: 'v-1', option_values: {}, sku: 'SKU-000001', barcodes: ['96385074'], purchase_price: '18.50', selling_price: '26', wholesale_price: null, compare_at_price: null, reorder_level: '0', is_active: true, price_tiers: [], branch_prices: [] }],
+      variants: [{ id: 'v-1', option_values: {}, sku: 'SKU-000001', barcodes: ['96385074'], purchase_price: '18.50', selling_price: '26', wholesale_price: null, compare_at_price: null, reorder_level: '0', weight_grams: 450, is_active: true, price_tiers: [], branch_prices: [] }],
     })
   })
 

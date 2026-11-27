@@ -12,6 +12,7 @@ final readonly class VariantData
      * @param  array<string, array{units: string, pack_name: ?string}>  $packs  ST2c: barcodes sent as objects, by code
      * @param  list<array{min_quantity: string, price: string}>|null  $priceTiers  ST2c: null keeps the stored list
      * @param  list<array{branch_id: string, price: string}>|null  $branchPrices  ST2c: null keeps the stored list
+     * @param  bool  $setsWeight  BD2a: false (weight_grams left out) keeps the stored weight
      */
     public function __construct(
         public ?string $id,
@@ -27,6 +28,8 @@ final readonly class VariantData
         public array $packs = [],
         public ?array $priceTiers = null,
         public ?array $branchPrices = null,
+        public ?int $weightGrams = null,
+        public bool $setsWeight = false,
     ) {}
 
     /**
@@ -72,6 +75,8 @@ final readonly class VariantData
                 'branch_id' => strtolower((string) $b['branch_id']),
                 'price' => Decimal::round((string) $b['price'], 2),
             ], $data['branch_prices'])) : null,
+            weightGrams: isset($data['weight_grams']) ? (int) $data['weight_grams'] : null,
+            setsWeight: array_key_exists('weight_grams', $data),
         );
     }
 }

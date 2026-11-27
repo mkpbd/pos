@@ -17,6 +17,8 @@ export type ProductVariant = {
   reorder_level: string
   barcodes: string[]
   is_active: boolean
+  /** BD2a: parcel weight in grams for delivery fees; null = not set. */
+  weight_grams?: number | null
   /** Online compare-at ("was") price (P1a variant grid). */
   compare_at_price?: string | null
   /** Stock on hand (P1a); null for services and products without stock tracking. */
@@ -98,6 +100,8 @@ export type ProductInput = {
     /** ST2c: a pack barcode is sent as `{barcode, units, pack_name}`. */
     barcodes: (string | VariantPack)[]
     is_active: boolean
+    /** BD2a: grams; null = not set. */
+    weight_grams?: number | null
     price_tiers?: PriceTier[]
     branch_prices?: BranchPrice[]
   }[]
@@ -121,6 +125,8 @@ export type VariantGridInput = {
     compare_at_price: string | null
     reorder_level: string
     is_active: boolean
+    /** BD2a: grams; null = not set. */
+    weight_grams: number | null
     /** New variants only: put in stock through Inventory's opening stock (note "Variant grid"). */
     opening_stock?: string
   }[]

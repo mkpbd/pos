@@ -50,6 +50,9 @@ class ShippingPresenter
         return ['id' => $m->id, 'zone_id' => $m->zone_id] + EloquentShippingRates::option($m) + [
             'is_active' => $m->is_active,
             'sort_order' => $m->sort_order,
+            // BD2a: weight pricing (null = off).
+            'weight_included_kg' => $m->weight_included_kg === null ? null : (string) $m->weight_included_kg,
+            'fee_per_extra_kg' => (string) $m->fee_per_extra_kg,
             // E12b: {bn: {name, description}}.
             'translations' => TranslationInput::present($m->translations),
         ];

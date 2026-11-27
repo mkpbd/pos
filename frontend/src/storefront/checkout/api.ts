@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/api/client'
 import { storeApi } from '../http'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
-import type { CheckoutOptions, CheckoutPreview, CheckoutPreviewInput, OrderView, PhoneCodeSent, PlacedOrder, PlaceOrderInput } from '../types'
+import type { CheckoutOptions, DeliveryArea, CheckoutPreview, CheckoutPreviewInput, OrderView, PhoneCodeSent, PlacedOrder, PlaceOrderInput } from '../types'
 import { rememberOrderToken } from './order-token'
 
 const noClientRetry = (count: number, error: unknown) => !(error instanceof ApiError && error.status < 500) && count < 1
@@ -65,6 +65,20 @@ export function useOrderQuery(number: string, token: string | null) {
     queryKey: localized(checkoutKeys.order(number), locale),
     queryFn: ({ signal }) => storeApi.get<OrderView>(`/store/orders/${encodeURIComponent(number)}`, { signal, query: { token } }).then((r) => r.data),
     staleTime: 30_000,
+    retry: noClientRetry,
+  })
+}
+
+/**
+ * BD2a: the areas / thanas of a district (empty when the store has none there: the area is then typed).
+ * Shared by the checkout and the landing-page order form.
+ */
+export function useDeliveryAreasQuery(districtId: string, enabled = true) {
+  return useQuery({
+    queryKey: customerKeys.areas(districtId),
+    queryFn: ({ signal }) => storeApi.get<DeliveryArea[]>('/store/shipping/areas', { signal, query: { district_id: districtId } }).then((r) => r.data),
+    enabled: enabled && districtId !== '',
+    staleTime: 5 * 60_000,
     retry: noClientRetry,
   })
 }

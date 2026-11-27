@@ -12,11 +12,12 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Delivery methods of a zone. Amounts are stored at 2 decimals; the delivery time needs
- * eta_min_days ≤ eta_max_days (0–30).
+ * eta_min_days ≤ eta_max_days (0–30). BD2a: weight pricing — `weight_included_kg` (null = off)
+ * and `fee_per_extra_kg` per started kg above it.
  */
 class ManageShippingMethods
 {
-    private const FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order'];
+    private const FIELDS = ['name', 'description', 'fee', 'free_over', 'cod_allowed', 'cod_fee', 'eta_min_days', 'eta_max_days', 'is_active', 'sort_order', 'weight_included_kg', 'fee_per_extra_kg'];
 
     /** E12b: translatable texts with the limits of their base fields. */
     public const TRANSLATABLE = ['name' => ['max:60'], 'description' => ['max:160']];
@@ -68,13 +69,19 @@ class ManageShippingMethods
     private function attributes(array $data): array
     {
         $attributes = array_intersect_key($data, array_flip(self::FIELDS));
-        foreach (['fee', 'cod_fee', 'free_over'] as $money) {
+        foreach (['fee', 'cod_fee', 'free_over', 'fee_per_extra_kg'] as $money) {
             if (array_key_exists($money, $attributes) && $attributes[$money] !== null) {
                 $attributes[$money] = Decimal::round((string) $attributes[$money], 2);
             }
         }
-        if (array_key_exists('cod_fee', $attributes) && $attributes['cod_fee'] === null) {
-            $attributes['cod_fee'] = '0.00';
+        foreach (['cod_fee', 'fee_per_extra_kg'] as $zeroWhenBlank) {
+            if (array_key_exists($zeroWhenBlank, $attributes) && $attributes[$zeroWhenBlank] === null) {
+                $attributes[$zeroWhenBlank] = '0.00';
+            }
+        }
+        // BD2a: null = no weight pricing.
+        if (array_key_exists('weight_included_kg', $attributes) && $attributes['weight_included_kg'] !== null) {
+            $attributes['weight_included_kg'] = Decimal::round((string) $attributes['weight_included_kg'], 3);
         }
         if (array_key_exists('description', $attributes) && is_string($attributes['description'])) {
             $attributes['description'] = trim($attributes['description']) === '' ? null : trim($attributes['description']);

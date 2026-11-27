@@ -16,9 +16,9 @@ import { Price } from '../../catalog/price'
 import { ProductImage } from '../../catalog/product-image'
 import { chooseValue, initialSelection, variantFor, type Selection } from '../../catalog/variant-selection'
 import { VariantSelector } from '../../catalog/variant-selector'
-import { checkoutPhoneCode } from '../../checkout/api'
+import { checkoutPhoneCode, useDeliveryAreasQuery } from '../../checkout/api'
 import { codUnavailable, withContactPhone } from '../../checkout/cod-availability'
-import { etaLabel } from '../../checkout/delivery'
+import { etaLabel, feeNote } from '../../checkout/delivery'
 import { PlacementAttempts } from '../../checkout/placement-attempt'
 import { isAccountVerifiedPhone, needsPhoneCode } from '../../checkout/schema'
 import { SummaryTotals } from '../../checkout/summary-totals'
@@ -113,6 +113,7 @@ const FIELD_LABELS: Record<OrderFormField, MessageKey> = {
   division_id: 'checkout.address.division',
   district_id: 'checkout.address.district',
   area: 'landing.orderForm.area',
+  area_id: 'checkout.address.area',
   address_line: 'landing.orderForm.addressLine',
   shipping_method_id: 'landing.orderForm.delivery',
   payment_method: 'landing.orderForm.payment',
@@ -192,6 +193,8 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
   const set = (field: keyof OrderFormValues, value: string) => setValues((v) => ({ ...v, [field]: value }))
 
   const { divisions, districts } = useGeo(!canvas, values.division_id)
+  // BD2a: a district with delivery areas has the shopper choose one (it can change the delivery fee).
+  const areaList = useDeliveryAreasQuery(values.district_id, !canvas).data ?? []
   const geoId: GeoIdLookup = (kind, value) => {
     const list: { id: GeoDivision['id'] }[] | undefined = kind === 'division' ? divisions.data : districts.data
     return list?.find((item) => String(item.id) === value)?.id ?? value
@@ -279,7 +282,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     // B15: the page and section this order is placed from (read now: the event ends with this tick).
     const builder = builderAttributionAt(page.document?.id, event.currentTarget instanceof Element ? event.currentTarget : null, device)
     if (inactive || busy || unavailable) return
-    const local = orderFormErrors(values, rules, variant)
+    const local = orderFormErrors(values, rules, variant, areaList.length > 0)
     if (codeNeeded && !phoneConfirmed && !local.phone) local.phone = 'checkout.verify.required'
     if (Object.keys(local).length > 0) return fail(local, null)
     if (needsSignIn) return fail({}, { code: 'SIGN_IN', message: t('landing.orderForm.problem.signIn'), link: { to: loginPathFor(pathname), label: t('checkout.problem.signIn') } })
@@ -402,7 +405,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
     </div>
   )
 
-  const geoSelect = (field: 'division_id' | 'district_id', label: string, options: { id: GeoDivision['id']; name: string; name_bn: string | null }[] | undefined, placeholder: string, disabled: boolean) => (
+  const geoSelect = (field: 'division_id' | 'district_id' | 'area_id', label: string, options: { id: GeoDivision['id']; name: string; name_bn: string | null }[] | undefined, placeholder: string, disabled: boolean) => (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id(field)} className="text-sm font-semibold text-sf-heading">
         {label}
@@ -416,7 +419,7 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
           const value = e.target.value
           // B13: the district chosen here decides "Only shoppers in …" sections (kept in this browser only).
           if (field === 'district_id' && !canvas) rememberDistrict(value)
-          setValues((v) => ({ ...v, [field]: value, ...(field === 'division_id' ? { district_id: '' } : {}) }))
+          setValues((v) => ({ ...v, [field]: value, ...(field === 'division_id' ? { district_id: '', area_id: '' } : field === 'district_id' ? { area_id: '' } : {}) }))
         }}
         aria-invalid={errors[field] ? true : undefined}
         aria-required
@@ -579,7 +582,11 @@ function OrderFormBody({ element, data }: { element: El<'order_form'>; data: Ord
                   values.division_id ? (districts.isPending ? t('checkout.address.loading') : t('checkout.address.chooseDistrict')) : t('checkout.address.chooseDivisionFirst'),
                   !values.division_id || !districts.data,
                 )}
-                <div className="@lg:col-span-2">{textField('area', t('landing.orderForm.area'), { maxLength: 100 })}</div>
+                <div className="@lg:col-span-2">
+                  {areaList.length > 0
+                    ? geoSelect('area_id', t('checkout.address.area'), areaList.map((a) => ({ id: a.id, name: a.name, name_bn: null })), t('checkout.address.chooseArea'), false)
+                    : textField('area', t('landing.orderForm.area'), { maxLength: 100 })}
+                </div>
                 <div className="@lg:col-span-2">
                   {textField('address_line', t('landing.orderForm.addressLine'), { autoComplete: 'street-address', maxLength: 255, placeholder: t('landing.orderForm.addressLinePlaceholder'), required: true })}
                 </div>
@@ -741,6 +748,7 @@ function DeliveryChoice({
         {methods.map((method) => {
           const fee = freeShipping ? '0.00' : method.fee
           const eta = etaLabel(method.eta_min_days, method.eta_max_days, t)
+          const note = feeNote(method, fee, t, (amount) => formatPrice(amount, currency))
           return (
             <label key={method.id} className={RADIO_CARD} data-testid="order-form-shipping">
               <input type="radio" name={groupId} value={method.id} checked={value === method.id} onChange={() => onChange(method.id)} aria-invalid={error ? true : undefined} className="mt-1 size-5 shrink-0 accent-sf-accent" />
@@ -749,6 +757,11 @@ function DeliveryChoice({
                   <span className="font-semibold text-sf-heading">{method.name}</span>
                   <span className="font-semibold text-sf-heading">{isZeroDecimal(fee) ? t('checkout.delivery.free') : formatPrice(fee, currency)}</span>
                 </span>
+                {note && (
+                  <span className="block text-xs" data-testid="order-form-fee-note">
+                    {note}
+                  </span>
+                )}
                 {eta && <span className="block text-sm">{t('checkout.delivery.eta', { eta })}</span>}
               </span>
             </label>

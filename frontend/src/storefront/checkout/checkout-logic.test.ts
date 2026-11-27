@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api/client'
-import { isMessageKey } from '../i18n/translate'
+import { bn } from '../i18n/bn'
+import { createTranslator, isMessageKey } from '../i18n/translate'
 import { addressFixture, customerFixture, previewFixture, shippingMethodFixture, tEn } from '../test-fixtures'
-import { etaLabel, goodsTotal, methodFee } from './delivery'
+import { etaLabel, feeNote, goodsTotal, methodFee } from './delivery'
 import { isOpenOutcome, PlacementAttempts, stableStringify } from './placement-attempt'
 import { changedPreview, placementProblem, RETRY_MESSAGE } from './placement-errors'
-import { checkoutSchema, formFieldFor, initialCheckoutValues, NEW_ADDRESS, toPlaceInput, toPreviewInput, type CheckoutValues } from './schema'
+import { checkoutSchema, checkoutSchemaFor, formFieldFor, initialCheckoutValues, NEW_ADDRESS, toPlaceInput, toPreviewInput, type CheckoutValues } from './schema'
 
 function keys() {
   let n = 0
@@ -205,5 +206,50 @@ describe('delivery display', () => {
     expect(methodFee({ ...method, free_over: null }, '5000.00')).toBe('60.00')
     // A free-shipping promotion (E8b) waives every method's fee.
     expect(methodFee({ ...method, free_over: null }, '10.00', true)).toBe('0.00')
+  })
+})
+
+describe('delivery areas and weight (BD2a)', () => {
+  const price = (amount: string) => `৳${amount}`
+  const guest = (overrides: Partial<CheckoutValues> = {}): CheckoutValues => ({
+    ...initialCheckoutValues(null, undefined),
+    name: 'Karim',
+    email: 'k@example.com',
+    phone: '01811223344',
+    recipient_name: 'Karim',
+    address_phone: '01811223344',
+    division_id: '3',
+    district_id: '47',
+    address_line: 'Road 3',
+    shipping_method_id: 'sm-1',
+    payment_method: 'cod',
+    ...overrides,
+  })
+
+  it('needs an area chosen when the district has areas, else the typed area', () => {
+    const withAreas = checkoutSchemaFor('required', { areas: true })
+    const missing = withAreas.safeParse(guest())
+    expect(missing.success).toBe(false)
+    expect(missing.error?.issues.map((i) => [i.path.join('.'), i.message])).toEqual([['area_id', 'checkout.validation.areaChoice']])
+    expect(withAreas.safeParse(guest({ area_id: 'ar-1' })).success).toBe(true)
+    expect(checkoutSchema.safeParse(guest()).error?.issues[0]?.path).toEqual(['area'])
+    expect(formFieldFor('address.area_id')).toBe('area_id')
+  })
+
+  it('sends the area id instead of the typed area', () => {
+    expect(toPreviewInput({ ...guest({ area_id: 'ar-1' }) }).address).toEqual({ division_id: '3', district_id: '47', area_id: 'ar-1' })
+    const input = toPlaceInput(guest({ area_id: 'ar-1', area: 'old text' }), '960.00', { signedIn: false })
+    expect(input.address).toMatchObject({ area_id: 'ar-1' })
+    expect(input.address).not.toHaveProperty('area')
+  })
+
+  it('explains what the fee includes, unless delivery is free', () => {
+    const method = shippingMethodFixture('sm-1', { fee: '100.00', base_fee: '60.00', area_adjustment: '20.00', weight_fee: '20.00' })
+    expect(feeNote(method, '100.00', tEn, price)).toBe('incl. ৳20.00 for your area · ৳20.00 for the parcel weight')
+    expect(feeNote({ area_adjustment: '-10.00', weight_fee: '0.00' }, '50.00', tEn, price)).toBe('incl. ৳10.00 less for your area')
+    expect(feeNote(method, '0.00', tEn, price)).toBeNull()
+    expect(feeNote({}, '60.00', tEn, price)).toBeNull()
+    const tBn = createTranslator(bn, { locale: 'bn', banglaDigits: false })
+    expect(feeNote(method, '100.00', tBn, price)).toBe('আপনার এলাকার জন্য ৳20.00 · পার্সেলের ওজনের জন্য ৳20.00 সহ')
   })
 })

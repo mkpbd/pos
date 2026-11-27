@@ -327,3 +327,97 @@ describe('edit order', () => {
     expect(screen.getAllByRole('link', { name: 'Back to the order' })[0]).toHaveAttribute('href', '/web-orders/wo-9')
   })
 })
+
+describe('delivery areas (BD2a)', () => {
+  const areas = [
+    { id: 'ar-1', district_id: 26, name: 'Mirpur', fee_adjustment: '20.00', is_active: true, sort_order: 0 },
+    { id: 'ar-2', district_id: 26, name: 'Old Town', fee_adjustment: '0.00', is_active: false, sort_order: 1 },
+  ]
+  /** Mirpur adds 20 and the heavy parcel 40 to the 60 of home delivery. */
+  function pricedWithArea(input: StaffQuoteInput) {
+    const q = priced(input)
+    if (input.address?.area_id !== 'ar-1') return q
+    return { ...q, shipping_total: '120.00', total: (Number(q.total) + 60).toFixed(2), shipping_methods: q.shipping_methods.map((m) => ({ ...m, fee: '120.00', base_fee: '60.00', area_adjustment: '20.00', weight_fee: '40.00' })) }
+  }
+
+  it('has staff choose an active area of the district, shows what it adds and sends its id', async () => {
+    let placed: Record<string, unknown> | null = null
+    const quotes: StaffQuoteInput[] = []
+    mockApi({
+      'GET /auth/me': ok(orderClerk()),
+      'GET /geography/divisions': ok(divisions),
+      'GET /geography/districts': ok(districts),
+      'GET /shipping/areas': (_init, url) => ok(url.searchParams.get('district_id') === '26' ? areas : []),
+      'GET /web-orders/phone-report': ok(report),
+      'GET /products': paged([romperProduct]),
+      'POST /web-orders/quote': (init) => {
+        const input = body(init) as StaffQuoteInput
+        quotes.push(input)
+        return ok(pricedWithArea(input))
+      },
+      'POST /web-orders': (init) => {
+        placed = body(init)
+        return { status: 201, ...ok(staffOrder()) }
+      },
+      'GET /web-orders/wo-9': ok(staffOrder()),
+    })
+    const user = userEvent.setup()
+    renderRoutes(routes, '/web-orders/new')
+    expect(await screen.findByRole('heading', { name: 'New order' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Name'), 'Ayesha Rahman')
+    await user.type(screen.getByLabelText('Mobile number'), '01711000000')
+    await user.click(screen.getByRole('combobox', { name: 'Add a product' }))
+    await user.click(await screen.findByRole('option', { name: /Baby Romper — Size M/ }))
+    await chooseOption(user, 'Division', 'Dhaka')
+    await chooseOption(user, 'District', 'Dhaka')
+    await user.type(screen.getByLabelText('Address'), 'House 12, Road 5')
+    await user.click(await screen.findByRole('radio', { name: /Home delivery/ }, WAIT))
+    await user.click(screen.getByRole('radio', { name: 'Cash on delivery' }))
+
+    // The free-text area became a required choice of the district's active areas.
+    expect(await screen.findByRole('combobox', { name: 'Area / thana' }, WAIT)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Area (optional)')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Place order' })).toBeEnabled(), WAIT)
+    await user.click(screen.getByRole('button', { name: 'Place order' }))
+    expect(await screen.findByText('Choose the area.')).toBeInTheDocument()
+    expect(placed).toBeNull()
+
+    await user.click(screen.getByRole('combobox', { name: 'Area / thana' }))
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['Mirpur'])
+    await user.click(screen.getByRole('option', { name: 'Mirpur' }))
+    await waitFor(() => expect(screen.getAllByTestId('delivery-fee-note')[0]).toHaveTextContent('incl. 20.00 for the area · 40.00 for weight'), WAIT)
+    expect(quotes.at(-1)).toMatchObject({ address: { district_id: 26, area_id: 'ar-1' } })
+    await waitFor(() => expect(screen.getByTestId('quote-total')).toHaveTextContent('BDT 870.00'), WAIT)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Place order' })).toBeEnabled(), WAIT)
+    await user.click(screen.getByRole('button', { name: 'Place order' }))
+    await waitFor(() => expect(placed).not.toBeNull())
+    expect(placed!.address).toEqual({ recipient_name: 'Ayesha Rahman', phone: '01711000000', division_id: 3, district_id: 26, area_id: 'ar-1', address_line: 'House 12, Road 5' })
+  })
+
+  it('starts an edit from the order’s area', async () => {
+    let saved: Record<string, unknown> | null = null
+    const order = staffOrder({ shipping_address: { ...staffOrder().shipping_address!, area: 'Mirpur', area_id: 'ar-1' } })
+    mockApi({
+      'GET /auth/me': ok(orderClerk()),
+      'GET /geography/divisions': ok(divisions),
+      'GET /geography/districts': ok(districts),
+      'GET /shipping/areas': ok(areas),
+      'GET /web-orders/phone-report': ok(report),
+      'GET /products': paged([romperProduct]),
+      'GET /web-orders/wo-9': ok(order),
+      'POST /web-orders/quote': (init) => ok(pricedWithArea(body(init) as StaffQuoteInput)),
+      'PUT /web-orders/wo-9': (init) => {
+        saved = body(init)
+        return ok(order)
+      },
+    })
+    const user = userEvent.setup()
+    renderRoutes(routes, '/web-orders/wo-9/edit')
+    expect(await screen.findByRole('combobox', { name: 'Area / thana' }, WAIT)).toHaveTextContent('Mirpur')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled(), WAIT)
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(saved).not.toBeNull())
+    expect(saved!.address).toMatchObject({ district_id: 26, area_id: 'ar-1' })
+    expect(saved!.address).not.toHaveProperty('area')
+  })
+})

@@ -25,6 +25,21 @@ export function methodFee(method: ShippingMethod, goods: string, freeShipping = 
   return method.fee
 }
 
+/**
+ * BD2a: what the shown fee includes beyond the method's own fee — "incl. ৳20 for your area · ৳40 for
+ * weight" — or null when nothing (or when delivery is free anyway).
+ */
+export function feeNote(method: Pick<ShippingMethod, 'area_adjustment' | 'weight_fee'>, shownFee: string, t: Translate, price: (amount: string) => string): string | null {
+  if (isZeroDecimal(shownFee)) return null
+  const parts: string[] = []
+  const area = method.area_adjustment
+  if (area && !isZeroDecimal(area)) {
+    parts.push(area.trim().startsWith('-') ? t('checkout.delivery.areaLess', { amount: price(area.trim().slice(1)) }) : t('checkout.delivery.areaExtra', { amount: price(area) }))
+  }
+  if (method.weight_fee && !isZeroDecimal(method.weight_fee)) parts.push(t('checkout.delivery.weightExtra', { amount: price(method.weight_fee) }))
+  return parts.length ? t('checkout.delivery.includes', { parts: parts.join(' · ') }) : null
+}
+
 export function isFree(amount: string): boolean {
   return isZeroDecimal(amount)
 }

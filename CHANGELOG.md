@@ -21,6 +21,21 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### BD2a — Delivery areas inside a district, weight-based delivery fees
+
+First part of BD2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P1). Abandoned carts, shipped / delivered e-mails and newsletter campaigns follow in BD2b. No new packages.
+
+#### Added
+- **Delivery areas** (Shipping → zone → Areas): the shop's own areas or thanas in a district, each with a fee up or down (e.g. Mirpur +20, Savar +40). Checkout, the order form on landing pages and staff orders ask for the area when a district has areas.
+- **Weight pricing** on delivery methods (kg included, fee per extra kg, rounded up) and a **Weight (g)** per product variant; the store explains the delivery fee ("incl. ৳20 for your area · ৳40 for the parcel weight").
+
+#### Tests
+- Backend 2111 (2110 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3335; mocked Playwright 660 (new `bd2a-delivery-areas`).
+- Full-stack (PostgreSQL, desktop) 71 across runs (integration 28 and 42 demo-store tests in the full and fresh-database runs — ST2b's receipt PDF download dropped once under the single-threaded test server and passed on the rerun; the new BD2a test first quoted an unpublished product (no weight is priced for an unavailable line) and opened the wrong Shipping page, was fixed to publish the product and passed) — new **BD2a** on Bazar Fresh: an area +30 and weight pricing (1 kg included, 20 per kg); a 3 kg staff quote to that area shows base + 30 + 40; the store lists the area (no fees); a staff order there without the area is refused; the Shipping page offers the area editor.
+
+#### Upgrade
+- `php artisan migrate`.
+
 ### R1 — Loss-prevention, returns and dead-stock reports; daily summary and alerts; due reminders
 
 From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §6 and the due (বাকি) reminders (P1). No new packages.

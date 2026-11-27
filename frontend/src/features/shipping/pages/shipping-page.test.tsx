@@ -129,6 +129,7 @@ describe('shipping zones', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Add method' }))
     await waitFor(() => expect(created).toEqual({
       name: 'Express', description: null, fee: '150', free_over: null, cod_allowed: false, cod_fee: '0.00', eta_min_days: 1, eta_max_days: 1, is_active: true, sort_order: 1,
+      weight_included_kg: null, fee_per_extra_kg: '0.00',
     }))
 
     await user.click(screen.getByRole('button', { name: 'Edit Home delivery' }))
@@ -142,6 +143,62 @@ describe('shipping zones', () => {
     const confirm = await screen.findByRole('alertdialog', { name: 'Delete Home delivery?' })
     await user.click(within(confirm).getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(deleted).toBe(true))
+  })
+
+  it('prices a method by weight and keeps the areas of a district (BD2a)', async () => {
+    const user = userEvent.setup()
+    let patched: unknown
+    let created: unknown
+    let deleted = false
+    let areas = [{ id: 'a-1', district_id: 26, name: 'Mirpur', fee_adjustment: '20.00', is_active: true, sort_order: 0 }]
+    const zone = { ...insideDhaka(), methods: [{ ...insideDhaka().methods[0]!, weight_included_kg: '1.000', fee_per_extra_kg: '20.00' }] }
+    mockApi({
+      'GET /auth/me': ok(orderManager()),
+      'GET /shipping/zones': ok([zone]),
+      ...geo,
+      'PATCH /shipping/methods/sm-1': (init) => {
+        patched = JSON.parse(String(init.body))
+        return ok({ id: 'sm-1', ...(patched as object) })
+      },
+      'GET /shipping/areas': () => ok(areas),
+      'POST /shipping/areas': (init) => {
+        created = JSON.parse(String(init.body))
+        areas = [...areas, { ...(created as typeof areas[number]), id: 'a-2' }]
+        return { status: 201, ...ok(areas[1]) }
+      },
+      'DELETE /shipping/areas/a-1': () => {
+        deleted = true
+        areas = areas.filter((a) => a.id !== 'a-1')
+        return { status: 204 }
+      },
+    })
+    renderRoutes(routes, '/storefront/shipping')
+
+    expect(await screen.findByText('+ BDT 20.00 per kg over 1 kg')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit Home delivery' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Edit Home delivery' })
+    expect(within(dialog).getByRole('switch', { name: 'Weight pricing' })).toBeChecked()
+    await user.clear(within(dialog).getByLabelText('Kg included'))
+    await user.type(within(dialog).getByLabelText('Kg included'), '2')
+    await user.clear(within(dialog).getByLabelText('Per extra kg (BDT)'))
+    await user.type(within(dialog).getByLabelText('Per extra kg (BDT)'), '15')
+    await user.click(within(dialog).getByRole('button', { name: 'Save method' }))
+    await waitFor(() => expect(patched).toMatchObject({ weight_included_kg: '2', fee_per_extra_kg: '15' }))
+
+    await user.click(screen.getByRole('button', { name: 'Areas of Inside Dhaka' }))
+    dialog = await screen.findByRole('dialog', { name: 'Areas in Inside Dhaka' })
+    const table = await within(dialog).findByRole('table', { name: 'Areas in Dhaka' })
+    expect(within(table).getByText('+ BDT 20.00')).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Area name'), 'Uttara')
+    await user.clear(within(dialog).getByLabelText('Fee change (BDT)'))
+    await user.type(within(dialog).getByLabelText('Fee change (BDT)'), '-10')
+    await user.click(within(dialog).getByRole('button', { name: 'Add area' }))
+    await waitFor(() => expect(created).toEqual({ district_id: 26, name: 'Uttara', fee_adjustment: '-10', is_active: true, sort_order: 1 }))
+    expect(await within(dialog).findByText('− BDT 10.00')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete area Mirpur' }))
+    await waitFor(() => expect(deleted).toBe(true))
+    await waitFor(() => expect(within(dialog).queryByText('Mirpur')).not.toBeInTheDocument())
   })
 
   it('shows the Shipping and Payments tabs only to their managers', async () => {

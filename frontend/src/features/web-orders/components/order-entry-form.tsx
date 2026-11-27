@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { useCan } from '@/features/auth/use-auth'
 import { isRetryable, useIdempotencyKey } from '@/features/returns/api'
-import { useDistrictsQuery, useDivisionsQuery } from '@/features/shipping/api'
+import { useDistrictsQuery, useDivisionsQuery, useShippingAreasQuery } from '@/features/shipping/api'
+import { sortAreas } from '@/features/shipping/shipping'
 import type { WebOrder, WebPaymentMethod } from '@/features/web-orders/api'
 import { isSendMoneyCode } from '@/features/online-payments/gateway-form'
 import { CustomerSearch } from '@/features/web-orders/components/customer-search'
@@ -23,6 +24,7 @@ import {
   changedPreview,
   CHANNEL_LABELS,
   createBodyFrom,
+  deliveryFeeNote,
   editBodyFrom,
   effectivePaymentMethod,
   effectiveShippingMethod,
@@ -59,7 +61,7 @@ import { useDebouncedValue } from '@/lib/use-debounced-value'
 /** Error keys shown next to a field; any other server error is listed above the submit button. */
 const FIELD_KEYS = new Set([
   'customer_id', 'contact.name', 'contact.phone', 'contact.email', 'lines',
-  'address.recipient_name', 'address.phone', 'address.division_id', 'address.district_id', 'address.area', 'address.address_line', 'address.postcode',
+  'address.recipient_name', 'address.phone', 'address.division_id', 'address.district_id', 'address.area', 'address.area_id', 'address.address_line', 'address.postcode',
   'shipping_method_id', 'payment_method', 'channel', 'coupon_code', 'notes', 'reason',
 ])
 const LINE_KEY = /^lines\.(\d+)\.(variant_id|quantity)$/
@@ -128,8 +130,12 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
   const set = (patch: Partial<OrderDraft>) => update({ ...draft, ...patch })
   const setAddress = (patch: Partial<OrderDraft['address']>) => update({ ...draft, address: { ...draft.address, ...patch } })
 
+  // BD2a: a district with active delivery areas has one chosen (it can change the delivery fee).
+  const areas = useShippingAreasQuery(draft.address.district_id)
+  const areaList = sortAreas((areas.data ?? []).filter((a) => a.is_active))
+
   const codRefused = paymentMethod === 'cod' && !!quote && !!shippingMethodId && settled && quote.payment_method === null
-  const clientErrors = tried ? validateDraft(draft, mode, { shippingMethodId, paymentMethod }) : {}
+  const clientErrors = tried ? validateDraft(draft, mode, { shippingMethodId, paymentMethod }, areaList.length > 0) : {}
   if (tried && codRefused && !clientErrors.payment_method) clientErrors.payment_method = 'Cash on delivery is not available with this delivery method.'
   const errors: DraftErrors = { ...clientErrors, ...serverErrors }
   const otherErrors = Object.entries(serverErrors).filter(([k]) => !FIELD_KEYS.has(k) && !LINE_KEY.test(k))
@@ -182,7 +188,7 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
     setTried(true)
     setFormError(null)
     setServerErrors({})
-    const problems = validateDraft(draft, mode, { shippingMethodId, paymentMethod })
+    const problems = validateDraft(draft, mode, { shippingMethodId, paymentMethod }, areaList.length > 0)
     if (Object.keys(problems).length > 0 || codRefused) {
       setFormError('Please correct the highlighted fields.')
       return
@@ -317,7 +323,7 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
               </FormField>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="order-division">Division</Label>
-                <Select value={draft.address.division_id !== null ? String(draft.address.division_id) : ''} onValueChange={(v) => setAddress({ division_id: Number(v), district_id: null })}>
+                <Select value={draft.address.division_id !== null ? String(draft.address.division_id) : ''} onValueChange={(v) => setAddress({ division_id: Number(v), district_id: null, area_id: '' })}>
                   <SelectTrigger id="order-division" className="w-full" aria-invalid={errors['address.division_id'] ? true : undefined}><SelectValue placeholder="Choose a division" /></SelectTrigger>
                   <SelectContent>
                     {divisionList.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
@@ -327,7 +333,7 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="order-district">District</Label>
-                <Select value={draft.address.district_id !== null ? String(draft.address.district_id) : ''} onValueChange={(v) => setAddress({ district_id: Number(v) })} disabled={draft.address.division_id === null}>
+                <Select value={draft.address.district_id !== null ? String(draft.address.district_id) : ''} onValueChange={(v) => setAddress({ district_id: Number(v), area_id: '' })} disabled={draft.address.division_id === null}>
                   <SelectTrigger id="order-district" className="w-full" aria-invalid={errors['address.district_id'] ? true : undefined}><SelectValue placeholder="Choose a district" /></SelectTrigger>
                   <SelectContent>
                     {districtList.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
@@ -335,9 +341,22 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
                 </Select>
                 {errors['address.district_id'] && <ErrorText>{errors['address.district_id']}</ErrorText>}
               </div>
-              <FormField label="Area (optional)" error={errors['address.area']}>
-                <Input value={draft.address.area} maxLength={120} onChange={(e) => setAddress({ area: e.target.value })} />
-              </FormField>
+              {areaList.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="order-area">Area / thana</Label>
+                  <Select value={draft.address.area_id} onValueChange={(v) => setAddress({ area_id: v })}>
+                    <SelectTrigger id="order-area" className="w-full" aria-invalid={errors['address.area_id'] ? true : undefined}><SelectValue placeholder="Choose the area" /></SelectTrigger>
+                    <SelectContent>
+                      {areaList.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {errors['address.area_id'] && <ErrorText>{errors['address.area_id']}</ErrorText>}
+                </div>
+              ) : (
+                <FormField label="Area (optional)" error={errors['address.area'] ?? errors['address.area_id']}>
+                  <Input value={draft.address.area} maxLength={120} onChange={(e) => setAddress({ area: e.target.value })} />
+                </FormField>
+              )}
               <FormField label="Postcode (optional)" error={errors['address.postcode']}>
                 <Input value={draft.address.postcode} maxLength={10} inputMode="numeric" onChange={(e) => setAddress({ postcode: e.target.value })} />
               </FormField>
@@ -355,6 +374,7 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
               ) : (
                 quote.shipping_methods.map((m) => {
                   const eta = etaLabel(m.eta_min_days, m.eta_max_days)
+                  const note = deliveryFeeNote(m)
                   return (
                     <label key={m.id} className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm has-[:checked]:border-primary">
                       <input type="radio" name="shipping-method" className="mt-0.5 size-4 accent-primary" checked={shippingMethodId === m.id} onChange={() => set({ shipping_method_id: m.id })} />
@@ -363,6 +383,7 @@ export function OrderEntryForm({ mode, initial, order }: Props) {
                         <span className="block text-xs text-muted-foreground">
                           {[eta, m.free_over ? `free from ${formatMoney(m.free_over)}` : null, m.cod_allowed ? null : 'no cash on delivery'].filter(Boolean).join(' · ')}
                         </span>
+                        {note && <span className="block text-xs text-muted-foreground" data-testid="delivery-fee-note">{note}</span>}
                       </span>
                       <span className="font-mono">{isZeroDecimal(m.fee) ? 'Free' : formatMoney(m.fee)}</span>
                     </label>

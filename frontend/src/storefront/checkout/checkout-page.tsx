@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { useForm, useWatch, type UseFormReturn } from 'react-hook-form'
+import { useForm, useWatch, type Resolver, type UseFormReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDownIcon, CircleAlertIcon, Loader2Icon, LockIcon, ShoppingBagIcon, TruckIcon } from 'lucide-react'
@@ -20,10 +20,10 @@ import { formatPrice } from '../money'
 import type { MessageKey } from '../i18n/en'
 import { useLocale } from '../i18n/locale'
 import { checkoutKeys, customerKeys, localized, setLocalizedData } from '../store-keys'
-import type { Cart, CartCoupon, CheckoutEmailMode, CodAdvance, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, GeoId, ShippingMethod } from '../types'
+import type { Cart, CartCoupon, CheckoutEmailMode, CodAdvance, CheckoutOptions, CheckoutPreview, Customer, CustomerAddress, DeliveryArea, GeoId, ShippingMethod } from '../types'
 import { privatePage, useDocumentMeta } from '../use-document-meta'
-import { checkoutPhoneCode, useCheckoutOptionsQuery, useCheckoutPreviewQuery, usePlaceOrderMutation } from './api'
-import { etaLabel, goodsTotal, methodFee } from './delivery'
+import { checkoutPhoneCode, useCheckoutOptionsQuery, useCheckoutPreviewQuery, useDeliveryAreasQuery, usePlaceOrderMutation } from './api'
+import { etaLabel, feeNote, goodsTotal, methodFee } from './delivery'
 import { codUnavailable, withCheckoutPhones } from './cod-availability'
 import { PlacementAttempts } from './placement-attempt'
 import { changedPreview, placementProblem, type PlacementProblem } from './placement-errors'
@@ -166,7 +166,11 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   const bootstrap = useStorefront()
   const emailMode = emailModeOf(options.email_field, bootstrap.checkout?.email)
   const verifyMode = options.phone_verification ?? bootstrap.checkout?.phone_verification ?? 'off'
-  const schema = useMemo(() => checkoutSchemaFor(emailMode), [emailMode])
+  // BD2a: a new address in a district with delivery areas needs one chosen (the areas as loaded for it).
+  const resolver: Resolver<CheckoutValues> = (values, context, resolverOptions) => {
+    const areas = values.address_choice === NEW_ADDRESS ? queryClient.getQueryData<DeliveryArea[]>(customerKeys.areas(values.district_id)) : undefined
+    return zodResolver(checkoutSchemaFor(emailMode, { areas: (areas?.length ?? 0) > 0 }))(values, context, resolverOptions)
+  }
   const [verifiedPhones, setVerifiedPhones] = useState<string[]>([])
   // BD1c: the ad pixels' InitiateCheckout, once per visit of the checkout.
   useTrackOnce(cart ? 'checkout' : null, () => {
@@ -174,7 +178,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   })
 
   const form = useForm<CheckoutValues>({
-    resolver: zodResolver(schema),
+    resolver,
     defaultValues: initialCheckoutValues(customer, addresses),
     shouldFocusError: false,
   })
@@ -182,6 +186,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
   const addressChoice = useWatch({ control, name: 'address_choice' })
   const divisionId = useWatch({ control, name: 'division_id' })
   const districtId = useWatch({ control, name: 'district_id' })
+  const areaId = useWatch({ control, name: 'area_id' })
   const shippingMethodId = useWatch({ control, name: 'shipping_method_id' })
   const paymentMethod = useWatch({ control, name: 'payment_method' })
   const contactName = useWatch({ control, name: 'name' })
@@ -196,6 +201,8 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
 
   const divisions = useDivisionsQuery()
   const districts = useDistrictsQuery(divisionId)
+  const areas = useDeliveryAreasQuery(districtId, addressChoice === NEW_ADDRESS)
+  const areaList = addressChoice === NEW_ADDRESS ? (areas.data ?? []) : []
   // B13: the district last chosen here (or of the saved address picked) decides "Only shoppers in …" sections; it stays in this browser.
   const chosenDistrict = addresses.find((address) => address.id === addressChoice)?.district.id ?? districtId
   useEffect(() => {
@@ -208,7 +215,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
 
   // BD1b: the numbers go along (once valid) so the preview can say whether cash on delivery is allowed for them.
   const previewInput = withCheckoutPhones(
-    toPreviewInput({ address_choice: addressChoice, division_id: divisionId, district_id: districtId, shipping_method_id: shippingMethodId, payment_method: paymentMethod }, geoId),
+    toPreviewInput({ address_choice: addressChoice, division_id: divisionId, district_id: districtId, area_id: areaId, shipping_method_id: shippingMethodId, payment_method: paymentMethod }, geoId),
     contactPhone,
     addressPhone,
   )
@@ -406,7 +413,7 @@ function CheckoutForm({ customer, addresses, options, cart }: { customer: Custom
                 : null
             }
           />
-          <AddressSection form={form} customer={customer} addresses={addresses} divisions={divisions} districts={districts} />
+          <AddressSection form={form} customer={customer} addresses={addresses} divisions={divisions} districts={districts} areas={areaList} />
           <DeliverySection
             form={form}
             methods={methods}
@@ -507,7 +514,7 @@ function ContactSection({ form, emailMode, phoneCheck }: { form: Form; emailMode
 
 type GeoQuery = { data?: { id: GeoId; name: string; name_bn: string | null }[]; isPending: boolean; isError: boolean }
 
-function AddressSection({ form, customer, addresses, divisions, districts }: { form: Form; customer: Customer | null; addresses: CustomerAddress[]; divisions: GeoQuery; districts: GeoQuery }) {
+function AddressSection({ form, customer, addresses, divisions, districts, areas }: { form: Form; customer: Customer | null; addresses: CustomerAddress[]; divisions: GeoQuery; districts: GeoQuery; areas: DeliveryArea[] }) {
   const choice = useWatch({ control: form.control, name: 'address_choice' })
   const errors = form.formState.errors
   const errorId = useId()
@@ -521,7 +528,7 @@ function AddressSection({ form, customer, addresses, divisions, districts }: { f
         <h2 id="checkout-address" className={headingClass}>
           {t('checkout.address.heading')}
         </h2>
-        <NewAddressFields form={form} divisions={divisions} districts={districts} canSave={customer !== null} bookFull={false} />
+        <NewAddressFields form={form} divisions={divisions} districts={districts} areas={areas} canSave={customer !== null} bookFull={false} />
       </section>
     )
   }
@@ -554,22 +561,30 @@ function AddressSection({ form, customer, addresses, divisions, districts }: { f
           {errorText(errors.address_choice.message)}
         </p>
       )}
-      {choice === NEW_ADDRESS && <NewAddressFields form={form} divisions={divisions} districts={districts} canSave bookFull={addresses.length >= MAX_ADDRESSES} />}
+      {choice === NEW_ADDRESS && <NewAddressFields form={form} divisions={divisions} districts={districts} areas={areas} canSave bookFull={addresses.length >= MAX_ADDRESSES} />}
     </fieldset>
   )
 }
 
 const selectClass = cn(inputClass, 'appearance-auto')
 
-function NewAddressFields({ form, divisions, districts, canSave, bookFull }: { form: Form; divisions: GeoQuery; districts: GeoQuery; canSave: boolean; bookFull: boolean }) {
+function NewAddressFields({ form, divisions, districts, areas, canSave, bookFull }: { form: Form; divisions: GeoQuery; districts: GeoQuery; areas: DeliveryArea[]; canSave: boolean; bookFull: boolean }) {
   const { errors } = form.formState
   const { t } = useLocale()
   const errorText = useErrorText()
   const divisionId = useWatch({ control: form.control, name: 'division_id' })
   const districtId = useWatch({ control: form.control, name: 'district_id' })
-  const divisionField = form.register('division_id', { onChange: () => form.setValue('district_id', '') })
+  const areaId = useWatch({ control: form.control, name: 'area_id' })
+  const divisionField = form.register('division_id', {
+    onChange: () => {
+      form.setValue('district_id', '')
+      form.setValue('area_id', '')
+    },
+  })
+  // BD2a: another district has other areas.
+  const districtField = form.register('district_id', { onChange: () => form.setValue('area_id', '') })
 
-  const select = (name: 'division_id' | 'district_id', label: string, value: string, options: GeoQuery['data'], placeholder: string, registered: ReturnType<Form['register']>, disabled: boolean) => (
+  const select = (name: 'division_id' | 'district_id' | 'area_id', label: string, value: string, options: GeoQuery['data'], placeholder: string, registered: ReturnType<Form['register']>, disabled: boolean) => (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={`checkout-${name}`} className="text-sm font-medium text-sf-heading">
         {label}
@@ -629,10 +644,15 @@ function NewAddressFields({ form, divisions, districts, canSave, bookFull }: { f
           districtId,
           divisionId ? districts.data : [],
           divisionId ? (districts.isPending ? t('checkout.address.loading') : t('checkout.address.chooseDistrict')) : t('checkout.address.chooseDivisionFirst'),
-          form.register('district_id'),
+          districtField,
           !divisionId || !districts.data,
         )}
-        <TextField label={t('checkout.address.area')} maxLength={100} error={errorText(errors.area?.message)} {...form.register('area')} />
+        {/* BD2a: a district with delivery areas has the shopper choose one (it can change the delivery fee). */}
+        {areas.length > 0 ? (
+          select('area_id', t('checkout.address.area'), areaId, areas.map((a) => ({ id: a.id, name: a.name, name_bn: null })), t('checkout.address.chooseArea'), form.register('area_id'), false)
+        ) : (
+          <TextField label={t('checkout.address.area')} maxLength={100} error={errorText(errors.area?.message)} {...form.register('area')} />
+        )}
         <TextField
           label={t('checkout.address.postcode')}
           inputMode="numeric"
@@ -709,6 +729,7 @@ function DeliverySection({
         {methods.map((method) => {
           const fee = methodFee(method, goods, freeShipping)
           const eta = etaLabel(method.eta_min_days, method.eta_max_days, t)
+          const note = feeNote(method, fee, t, price)
           return (
             <RadioCard key={method.id} value={method.id} registered={form.register('shipping_method_id')} invalid={invalid} testId="shipping-option">
               <span className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -716,6 +737,11 @@ function DeliverySection({
                 <span className="font-semibold text-sf-heading">{isZeroDecimal(fee) ? t('checkout.delivery.free') : price(fee)}</span>
               </span>
               {method.description && <span className="block text-sm">{method.description}</span>}
+              {note && (
+                <span className="block text-xs" data-testid="shipping-fee-note">
+                  {note}
+                </span>
+              )}
               <span className="block text-xs">
                 {eta && t('checkout.delivery.eta', { eta })}
                 {eta && method.free_over && !isZeroDecimal(fee) ? ' · ' : ''}

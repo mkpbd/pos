@@ -53,7 +53,8 @@ class OrderEditsPresenter
             return $view;
         }
 
-        return $view + ['division_id' => $address->division_id, 'district_id' => $address->district_id];
+        // BD2a: `area_id` — the delivery area chosen (null for a free-text area).
+        return $view + ['division_id' => $address->division_id, 'district_id' => $address->district_id, 'area_id' => $address->area_id];
     }
 
     /**

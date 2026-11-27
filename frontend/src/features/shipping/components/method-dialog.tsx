@@ -26,7 +26,7 @@ export function MethodDialog({ zone, method, currency, onClose }: Props) {
   const save = useSaveMethodMutation()
   const form = useForm<MethodValues>({ resolver: zodResolver(methodSchema), defaultValues: toMethodValues(method, zone.methods.length) })
   const { errors } = form.formState
-  const [codAllowed, isActive, name, description] = useWatch({ control: form.control, name: ['cod_allowed', 'is_active', 'name', 'description'] })
+  const [codAllowed, isActive, name, description, weightPricing] = useWatch({ control: form.control, name: ['cod_allowed', 'is_active', 'name', 'description', 'weight_pricing'] })
   const money = currency ? ` (${currency})` : ''
 
   const onSubmit = form.handleSubmit((values) =>
@@ -76,6 +76,20 @@ export function MethodDialog({ zone, method, currency, onClose }: Props) {
             <FormField label={`COD fee${money}`} error={errors.cod_fee?.message}>
               <Input inputMode="decimal" className="font-mono" {...form.register('cod_fee')} />
             </FormField>
+          )}
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <Switch id="method-weight" checked={weightPricing} onCheckedChange={(v) => form.setValue('weight_pricing', v, { shouldDirty: true })} />
+            <Label htmlFor="method-weight" className="font-normal">Weight pricing</Label>
+          </div>
+          {weightPricing && (
+            <>
+              <FormField label="Kg included" error={errors.weight_included_kg?.message} hint="The fee covers parcels up to this weight.">
+                <Input inputMode="decimal" className="font-mono" {...form.register('weight_included_kg')} />
+              </FormField>
+              <FormField label={`Per extra kg${money}`} error={errors.fee_per_extra_kg?.message} hint="Each started kg above it adds this.">
+                <Input inputMode="decimal" className="font-mono" {...form.register('fee_per_extra_kg')} />
+              </FormField>
+            </>
           )}
           <FormField label="Sort order" error={errors.sort_order?.message}>
             <Input type="number" min={0} {...form.register('sort_order', { valueAsNumber: true })} />

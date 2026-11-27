@@ -280,10 +280,10 @@ function ProductForm({ product }: { product?: Product }) {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <div className="grid min-w-3xl grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.6fr)_3rem] items-start gap-2 text-xs font-medium text-muted-foreground">
-                <span>SKU</span><span>Cost</span><span>Selling</span><span>Wholesale</span><span>Reorder at</span><span>Barcodes</span><span>Active</span>
+              <div className="grid min-w-3xl grid-cols-[repeat(6,minmax(0,1fr))_minmax(0,1.6fr)_3rem] items-start gap-2 text-xs font-medium text-muted-foreground">
+                <span>SKU</span><span>Cost</span><span>Selling</span><span>Wholesale</span><span>Reorder at</span><span>Weight (g)</span><span>Barcodes</span><span>Active</span>
               </div>
-              <div className="grid min-w-3xl grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.6fr)_3rem] items-start gap-2 border-t py-2">
+              <div className="grid min-w-3xl grid-cols-[repeat(6,minmax(0,1fr))_minmax(0,1.6fr)_3rem] items-start gap-2 border-t py-2">
                 <VariantFields index={0} register={form.register} control={form.control} errors={errors} />
               </div>
             </div>

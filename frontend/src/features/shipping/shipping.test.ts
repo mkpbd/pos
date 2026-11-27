@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { District, Division, ShippingZone } from '@/features/shipping/api'
-import { districtOwners, feeSummary, groupDistricts, methodSchema, toggleDivision, toMethodInput, toMethodValues, zoneSaveError } from '@/features/shipping/shipping'
+import { adjustmentLabel, areaSchema, districtOwners, feeSummary, groupDistricts, methodSchema, sortAreas, toAreaInput, toAreaValues, toggleDivision, toMethodInput, toMethodValues, weightSummary, zoneSaveError } from '@/features/shipping/shipping'
 import { ApiError } from '@/lib/api/client'
 
 const divisions: Division[] = [{ id: 3, name: 'Dhaka' }, { id: 2, name: 'Chattogram' }, { id: 9, name: 'Empty' }]
@@ -59,6 +59,7 @@ describe('shipping method form', () => {
     const v = methodSchema.parse({ ...toMethodValues(null, 2), name: ' Courier ', fee: '120', cod_allowed: false, cod_fee: '' })
     expect(toMethodInput(v)).toEqual({
       name: 'Courier', description: null, fee: '120', free_over: null, cod_allowed: false, cod_fee: '0.00', eta_min_days: 1, eta_max_days: 3, is_active: true, sort_order: 2,
+      weight_included_kg: null, fee_per_extra_kg: '0.00', translations: undefined,
     })
     expect(toMethodInput(v, { bn: { name: 'হোম' } }).translations).toEqual({ bn: { name: '', description: '' } })
   })
@@ -66,5 +67,35 @@ describe('shipping method form', () => {
   it('summarises fees', () => {
     expect(feeSummary({ fee: '60.00', free_over: '2000.00' }, 'BDT')).toBe('BDT 60.00 · free over BDT 2,000.00')
     expect(feeSummary({ fee: '0.00', free_over: null })).toBe('Free')
+  })
+})
+
+describe('BD2a weight pricing and delivery areas', () => {
+  it('turns weight pricing on and off', () => {
+    const off = toMethodValues(null)
+    expect(off).toMatchObject({ weight_pricing: false, weight_included_kg: '1', fee_per_extra_kg: '0.00' })
+    const on = methodSchema.parse({ ...off, name: 'Home', weight_pricing: true, weight_included_kg: '2.5', fee_per_extra_kg: '20' })
+    expect(toMethodInput(on)).toMatchObject({ weight_included_kg: '2.5', fee_per_extra_kg: '20' })
+    // Off sends null whatever was typed.
+    expect(toMethodInput({ ...on, weight_pricing: false })).toMatchObject({ weight_included_kg: null, fee_per_extra_kg: '0.00' })
+    expect(methodSchema.safeParse({ ...off, name: 'Home', weight_pricing: true, weight_included_kg: '-1' }).success).toBe(false)
+    expect(methodSchema.safeParse({ ...off, name: 'Home', weight_pricing: true, fee_per_extra_kg: 'x' }).success).toBe(false)
+    // A saved method with weight pricing opens with it on.
+    const saved = { id: 'sm-1', name: 'Home', description: null, fee: '60.00', free_over: null, cod_allowed: true, cod_fee: '0.00', eta_min_days: 1, eta_max_days: 2, is_active: true, sort_order: 0, weight_included_kg: '1.000', fee_per_extra_kg: '20.00' }
+    expect(toMethodValues(saved)).toMatchObject({ weight_pricing: true, weight_included_kg: '1', fee_per_extra_kg: '20.00' })
+    expect(weightSummary(saved, 'BDT')).toBe('+ BDT 20.00 per kg over 1 kg')
+    expect(weightSummary({ weight_included_kg: null })).toBeNull()
+  })
+
+  it('checks areas and allows negative fee changes', () => {
+    const values = areaSchema.parse({ ...toAreaValues(null, 3), name: ' Mirpur ', fee_adjustment: '-10' })
+    expect(toAreaInput(values, 26)).toEqual({ district_id: 26, name: 'Mirpur', fee_adjustment: '-10', is_active: true, sort_order: 3 })
+    expect(areaSchema.safeParse({ ...values, fee_adjustment: '1.234' }).success).toBe(false)
+    expect(areaSchema.safeParse({ ...values, name: '' }).success).toBe(false)
+    expect(adjustmentLabel('20.00', 'BDT')).toBe('+ BDT 20.00')
+    expect(adjustmentLabel('-10.00', 'BDT')).toBe('− BDT 10.00')
+    expect(adjustmentLabel('0.00')).toBe('No change')
+    const area = (id: string, name: string, sort_order: number) => ({ id, district_id: 26, name, fee_adjustment: '0.00', is_active: true, sort_order })
+    expect(sortAreas([area('a', 'Uttara', 1), area('b', 'Mirpur', 1), area('c', 'Banani', 0)]).map((a) => a.name)).toEqual(['Banani', 'Mirpur', 'Uttara'])
   })
 })

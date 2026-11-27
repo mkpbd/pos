@@ -109,6 +109,12 @@ class OrderPresenter
             'tax_total' => (string) $order->tax_total,
             'shipping_total' => (string) $order->shipping_total,
             'shipping_discount' => (string) $order->shipping_discount,
+            // BD2a: the delivery method's fee before free_over / promotions, explained (null before BD2a).
+            'shipping_breakdown' => $order->shipping_base_fee === null ? null : [
+                'base_fee' => (string) $order->shipping_base_fee,
+                'area_adjustment' => (string) $order->shipping_area_adjustment,
+                'weight_fee' => (string) $order->shipping_weight_fee,
+            ],
             'promotions' => $order->promotions->map(fn (OrderPromotion $p) => [
                 'name' => $p->name,
                 'kind' => $p->kind,

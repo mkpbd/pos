@@ -10,7 +10,7 @@ namespace App\Modules\Products\Application\Contracts;
  *   track_stock: bool, track_batches: bool, track_serials: bool, allow_decimal: bool, unit_code: ?string,
  *   tax_rate: ?string, purchase_price: string, selling_price: string, wholesale_price: ?string,
  *   price_tiers: list<array{min_quantity: string, price: string}>,
- *   packs: list<array{barcode: string, units: string, pack_name: ?string}>, reorder_level: string,
+ *   packs: list<array{barcode: string, units: string, pack_name: ?string}>, reorder_level: string, weight_grams: ?int,
  *   max_discount_percent: ?string, category_id: ?string, brand_id: ?string, open_price: bool, sellable: bool
  * }
  */

@@ -23,12 +23,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $selling_price
  * @property ?string $wholesale_price
  * @property string $reorder_level
+ * @property ?int $weight_grams BD2a: delivery weight; null = not set (counts 0)
  * @property bool $is_active
  * @property int $sort_order
  */
 #[Fillable([
     'organization_id', 'product_id', 'sku', 'name', 'option_values', 'purchase_price', 'selling_price',
-    'wholesale_price', 'reorder_level', 'is_active', 'sort_order',
+    'wholesale_price', 'reorder_level', 'is_active', 'sort_order', 'weight_grams',
 ])]
 class ProductVariant extends Model
 {
@@ -49,6 +50,7 @@ class ProductVariant extends Model
             'selling_price' => 'decimal:2',
             'wholesale_price' => 'decimal:2',
             'reorder_level' => 'decimal:3',
+            'weight_grams' => 'integer',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];

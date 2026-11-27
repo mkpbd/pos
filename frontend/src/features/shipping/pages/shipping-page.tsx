@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { MapPinIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/common/confirm-dialog'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
@@ -9,10 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth } from '@/features/auth/use-auth'
 import { useDeleteMethodMutation, useDeleteZoneMutation, useShippingZonesQuery, type ShippingMethod, type ShippingZone } from '@/features/shipping/api'
+import { AreasDialog } from '@/features/shipping/components/areas-dialog'
 import { MethodDialog } from '@/features/shipping/components/method-dialog'
 import { ShippingTabs } from '@/features/shipping/components/shipping-tabs'
 import { ZoneDialog } from '@/features/shipping/components/zone-dialog'
-import { feeSummary } from '@/features/shipping/shipping'
+import { feeSummary, weightSummary } from '@/features/shipping/shipping'
 import { etaLabel } from '@/features/web-orders/orders'
 import { StorefrontHeader } from '@/features/storefront/components/storefront-header'
 import { formatMoney } from '@/lib/money'
@@ -28,10 +29,11 @@ function districtSummary(zone: ShippingZone): string {
 
 type Deleting = { kind: 'zone'; zone: ShippingZone } | { kind: 'method'; method: ShippingMethod }
 
-function ZoneCard({ zone, currency, onEdit, onAddMethod, onEditMethod, onDelete }: {
+function ZoneCard({ zone, currency, onEdit, onAreas, onAddMethod, onEditMethod, onDelete }: {
   zone: ShippingZone
   currency: string | undefined
   onEdit: () => void
+  onAreas: () => void
   onAddMethod: () => void
   onEditMethod: (m: ShippingMethod) => void
   onDelete: (d: Deleting) => void
@@ -53,6 +55,7 @@ function ZoneCard({ zone, currency, onEdit, onAddMethod, onEditMethod, onDelete 
         </div>
         <div className="flex gap-1">
           <Button variant="outline" size="sm" onClick={onEdit}><PencilIcon data-icon="inline-start" /> Edit zone</Button>
+          <Button variant="outline" size="sm" aria-label={`Areas of ${zone.name}`} onClick={onAreas}><MapPinIcon data-icon="inline-start" /> Areas</Button>
           <Button variant="ghost" size="icon-sm" aria-label={`Delete ${zone.name}`} onClick={() => onDelete({ kind: 'zone', zone })}><Trash2Icon /></Button>
         </div>
       </CardHeader>
@@ -79,7 +82,10 @@ function ZoneCard({ zone, currency, onEdit, onAddMethod, onEditMethod, onDelete 
                       <div className="font-medium">{m.name}</div>
                       {m.description && <div className="text-xs text-muted-foreground">{m.description}</div>}
                     </TableCell>
-                    <TableCell className="text-sm">{feeSummary(m, currency)}</TableCell>
+                    <TableCell className="text-sm">
+                      {feeSummary(m, currency)}
+                      {weightSummary(m, currency) && <div className="text-xs text-muted-foreground">{weightSummary(m, currency)}</div>}
+                    </TableCell>
                     <TableCell className="hidden text-sm sm:table-cell">{m.cod_allowed ? (/^0+(\.0+)?$/.test(m.cod_fee) ? 'Yes' : `Yes, fee ${formatMoney(m.cod_fee)}`) : 'No'}</TableCell>
                     <TableCell className="hidden text-sm md:table-cell">{etaLabel(m.eta_min_days, m.eta_max_days)}</TableCell>
                     <TableCell><Badge variant={m.is_active ? 'success' : 'outline'}>{m.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
@@ -109,6 +115,7 @@ export function ShippingPage() {
   const [editingZone, setEditingZone] = useState<ShippingZone | null | undefined>(undefined)
   const [editingMethod, setEditingMethod] = useState<{ zone: ShippingZone; method: ShippingMethod | null } | null>(null)
   const [deleting, setDeleting] = useState<Deleting | null>(null)
+  const [areasOf, setAreasOf] = useState<ShippingZone | null>(null)
 
   const list = [...(zones.data ?? [])].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
   const deletingName = deleting ? (deleting.kind === 'zone' ? deleting.zone.name : deleting.method.name) : ''
@@ -145,6 +152,7 @@ export function ShippingPage() {
               zone={zone}
               currency={currency}
               onEdit={() => setEditingZone(zone)}
+              onAreas={() => setAreasOf(zone)}
               onAddMethod={() => setEditingMethod({ zone, method: null })}
               onEditMethod={(method) => setEditingMethod({ zone, method })}
               onDelete={setDeleting}
@@ -163,6 +171,7 @@ export function ShippingPage() {
           onClose={() => setEditingMethod(null)}
         />
       )}
+      {areasOf && <AreasDialog key={areasOf.id} zone={areasOf} currency={currency} onClose={() => setAreasOf(null)} />}
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}

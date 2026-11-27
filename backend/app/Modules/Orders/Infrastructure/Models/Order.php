@@ -70,6 +70,9 @@ use LogicException;
  * @property ?string $user_agent
  * @property string $advance_amount BD1c: what a COD order pays in advance by Send Money (0 = nothing)
  * @property ?array<string, string> $tracking_ids BD1c: {fbp?, fbc?, ttp?, ttclid?, gclid?} (ClickIds), null when none
+ * @property ?string $shipping_base_fee BD2a: the delivery method's fee before free_over / promotions (null before BD2a)
+ * @property ?string $shipping_area_adjustment BD2a: the delivery area's part of it
+ * @property ?string $shipping_weight_fee BD2a: the extra-weight part of it
  * @property-read ?Shipment $shipment
  */
 #[Fillable([
@@ -85,6 +88,8 @@ use LogicException;
     'advance_amount',
     // BD1c: ad click ids for the Conversions API.
     'tracking_ids',
+    // BD2a: the delivery fee breakdown.
+    'shipping_base_fee', 'shipping_area_adjustment', 'shipping_weight_fee',
 ])]
 class Order extends Model
 {
@@ -116,6 +121,8 @@ class Order extends Model
     private const REVISABLE = [
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'shipping_discount', 'coupon_code', 'cod_fee', 'total', 'cost_total',
         'contact_name', 'contact_email', 'contact_phone', 'notes', 'shipping_method_name', 'eta_min_days', 'eta_max_days', 'revision',
+        // BD2a.
+        'shipping_base_fee', 'shipping_area_adjustment', 'shipping_weight_fee',
     ];
 
     private static bool $revising = false;
@@ -136,6 +143,9 @@ class Order extends Model
             'tax_total' => 'decimal:2',
             'shipping_total' => 'decimal:2',
             'shipping_discount' => 'decimal:2',
+            'shipping_base_fee' => 'decimal:2',
+            'shipping_area_adjustment' => 'decimal:2',
+            'shipping_weight_fee' => 'decimal:2',
             'cod_fee' => 'decimal:2',
             'total' => 'decimal:2',
             'paid_total' => 'decimal:2',

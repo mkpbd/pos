@@ -539,3 +539,52 @@ describe('checkout with promotions (E8b)', () => {
     expect(within(summary).getByRole('list', { name: 'Delivery offers' })).toHaveTextContent('Free delivery over ৳500−৳60.00')
   })
 })
+
+describe('delivery areas and weight (BD2a)', () => {
+  it('has the shopper choose an area of the district and explains the fee it adds', async () => {
+    const places: Body[] = []
+    const { previews } = serve({
+      routes: {
+        'GET /store/shipping/areas': (_init, url) => ok(url.searchParams.get('district_id') === '47' ? [{ id: 'ar-1', name: 'Mirpur' }, { id: 'ar-2', name: 'Uttara' }] : []),
+        'POST /store/checkout/preview': (init) => {
+          const body = bodyOf(init)
+          previews.push(body)
+          const area = (body.address as { area_id?: string } | undefined)?.area_id
+          // Uttara adds 20; the 2.4 kg cart pays 2 extra kg at 10 each.
+          const priced = area === 'ar-2' ? { ...home, fee: '100.00', base_fee: '60.00', area_adjustment: '20.00', weight_fee: '20.00' } : { ...home, base_fee: '60.00', area_adjustment: '0.00', weight_fee: '0.00' }
+          return ok(previewFor(body, () => [priced]))
+        },
+        'POST /store/checkout': (init) => {
+          places.push(bodyOf(init))
+          return { status: 201, body: { success: true, data: { order: orderFixture(), access_token: 'guest-token' }, meta: { request_id: 't' } } }
+        },
+      },
+    })
+    renderRoutes(storefrontRoutes, '/checkout')
+    const user = userEvent.setup()
+    await user.type(await screen.findByLabelText('Full name'), 'Karim Uddin')
+    await user.type(screen.getByLabelText('E-mail'), 'karim@example.com')
+    await user.type(screen.getByLabelText('Mobile number'), '01811-223344')
+    await user.selectOptions(screen.getByLabelText('Division'), '3')
+    await waitFor(() => expect(screen.getByLabelText('District')).toBeEnabled())
+    await user.selectOptions(screen.getByLabelText('District'), '47')
+    // The free-text area becomes a required choice of the district's areas.
+    const area = await screen.findByRole('combobox', { name: 'Area / thana' })
+    expect(within(area).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose your area', 'Mirpur', 'Uttara'])
+    await user.type(screen.getByLabelText('Street address'), 'Road 3, House 9')
+    await user.click(await screen.findByRole('radio', { name: /Cash on delivery/ }))
+    await waitForReady()
+    await user.click(placeButton())
+    expect(await screen.findByText('Please choose your area or thana.')).toBeInTheDocument()
+    expect(places).toHaveLength(0)
+
+    await user.selectOptions(area, 'ar-2')
+    await waitFor(() => expect(screen.getByTestId('shipping-fee-note')).toHaveTextContent('incl. ৳20.00 for your area · ৳20.00 for the parcel weight'))
+    expect(screen.getByRole('group', { name: 'Delivery method' })).toHaveTextContent('Home delivery৳100.00')
+    expect(previews.at(-1)).toMatchObject({ address: { district_id: 47, area_id: 'ar-2' } })
+    await waitForReady()
+    await user.click(placeButton())
+    await screen.findByRole('heading', { level: 1, name: /Thank you/ })
+    expect(places[0]!.address).toEqual({ recipient_name: 'Karim Uddin', phone: '01811223344', division_id: 3, district_id: 47, area_id: 'ar-2', address_line: 'Road 3, House 9' })
+  })
+})

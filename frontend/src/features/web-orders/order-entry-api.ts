@@ -19,6 +19,8 @@ export type QuoteAddressInput = {
   division_id?: number
   district_id?: number
   area?: string
+  /** BD2a: one of the district's delivery areas (then `area` is left out). */
+  area_id?: string
   address_line?: string
   postcode?: string
 }
@@ -63,6 +65,10 @@ export type QuoteShippingMethod = {
   cod_fee: string
   eta_min_days: number
   eta_max_days: number
+  /** BD2a: the fee's parts — the method's own fee, the area's change and the extra-weight charge. */
+  base_fee?: string
+  area_adjustment?: string
+  weight_fee?: string
 }
 
 export type QuoteCoupon = { code: string; applied: boolean; reason: string | null; message: string | null; promotion_name: string | null }
@@ -94,7 +100,7 @@ export type StaffOrderInput = {
   customer_id?: string | null
   contact: OrderContactInput
   lines: QuoteLineInput[]
-  address: Required<Pick<QuoteAddressInput, 'recipient_name' | 'phone' | 'division_id' | 'district_id' | 'address_line'>> & Pick<QuoteAddressInput, 'area' | 'postcode'>
+  address: Required<Pick<QuoteAddressInput, 'recipient_name' | 'phone' | 'division_id' | 'district_id' | 'address_line'>> & Pick<QuoteAddressInput, 'area' | 'area_id' | 'postcode'>
   shipping_method_id: string
   payment_method: WebPaymentMethod
   channel: OrderChannel

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { decimalPattern, MONEY_PATTERN } from '@/lib/money'
 import type { Product, ProductInput } from '@/features/products/api'
-import { barcodesInput } from '@/features/products/variant-grid'
+import { barcodesInput, weightGrams } from '@/features/products/variant-grid'
 
 const money = z.string().trim().regex(MONEY_PATTERN, 'Amount with up to 2 decimals.')
 const optionalMoney = z.union([money, z.literal('')])
@@ -17,6 +17,8 @@ const variantSchema = z.object({
   reorder_level: z.union([z.string().trim().regex(decimalPattern(3), 'Up to 3 decimals.'), z.literal('')]),
   /** Barcodes separated by commas, spaces or new lines. */
   barcodes: z.string(),
+  /** BD2a: whole grams ("" = not set). */
+  weight_grams: weightGrams,
   is_active: z.boolean(),
 })
 
@@ -56,7 +58,7 @@ export function splitList(value: string, separators = /[,\n]+/): string[] {
 }
 
 export function emptyVariant(optionValues: Record<string, string> = {}): VariantFormValues {
-  return { sku: '', name: '', option_values: optionValues, purchase_price: '', selling_price: '', wholesale_price: '', reorder_level: '', barcodes: '', is_active: true }
+  return { sku: '', name: '', option_values: optionValues, purchase_price: '', selling_price: '', wholesale_price: '', reorder_level: '', barcodes: '', weight_grams: '', is_active: true }
 }
 
 export function toFormValues(product?: Product): ProductFormValues {
@@ -123,6 +125,8 @@ export function toProductInput(form: ProductFormValues, current?: Product): Prod
         barcodes: barcodesInput(v),
         ...(v.price_tiers ? { price_tiers: v.price_tiers } : {}),
         ...(v.branch_prices ? { branch_prices: v.branch_prices } : {}),
+        // BD2a: the weight goes back unchanged too.
+        weight_grams: v.weight_grams ?? null,
         is_active: v.is_active,
       })),
     }
@@ -140,6 +144,7 @@ export function toProductInput(form: ProductFormValues, current?: Product): Prod
       wholesale_price: v.wholesale_price || null,
       reorder_level: v.reorder_level || '0',
       barcodes: splitList(v.barcodes, /[\s,]+/),
+      weight_grams: v.weight_grams.trim() ? Number(v.weight_grams.trim()) : null,
       is_active: v.is_active,
     })),
   }

@@ -134,8 +134,8 @@ describe('variant grid', () => {
       options: [{ name: 'Size', values: ['M', 'L'] }],
       stock_store_id: 's-1',
       variants: [
-        { id: 'v-m', option_values: { Size: 'M' }, sku: 'POLO-M', barcodes: ['1', '2'], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: '520', reorder_level: '0', is_active: true, price_tiers: [], branch_prices: [] },
-        { option_values: { Size: 'L' }, sku: null, barcodes: [], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: null, reorder_level: '0', is_active: true, price_tiers: [], branch_prices: [], opening_stock: '4' },
+        { id: 'v-m', option_values: { Size: 'M' }, sku: 'POLO-M', barcodes: ['1', '2'], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: '520', reorder_level: '0', weight_grams: null, is_active: true, price_tiers: [], branch_prices: [] },
+        { option_values: { Size: 'L' }, sku: null, barcodes: [], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: null, reorder_level: '0', weight_grams: null, is_active: true, price_tiers: [], branch_prices: [], opening_stock: '4' },
       ],
     })
     expect(gridErrorKey('variants.1.barcodes.0', rowOf)).toBe('variants.2.barcodes.0')
@@ -144,6 +144,21 @@ describe('variant grid', () => {
 
   it('parses blocks pasted from a spreadsheet', () => {
     expect(parseClipboard('450\t500\r\n460\t510\r\n')).toEqual([['450', '500'], ['460', '510']])
+  })
+})
+
+describe('BD2a variant weight', () => {
+  it('loads, validates, copies to new rows and sends the weight in grams', () => {
+    const values = toGridValues(product({ variants: [{ ...product().variants[0]!, weight_grams: 750 }] }))
+    expect(values.variants[0]!.weight_grams).toBe('750')
+    const generated = generateRows([{ name: 'Size', values: 'M, L, XL' }], values.variants, 'POLO')
+    expect(generated.find((r) => r.option_values.Size === 'XL')!.weight_grams).toBe('750')
+    expect(variantGridSchema.safeParse({ ...values, variants: [row({ weight_grams: '0' })] }).success).toBe(false)
+    expect(variantGridSchema.safeParse({ ...values, variants: [row({ weight_grams: '1.5' })] }).success).toBe(false)
+    expect(variantGridSchema.safeParse({ ...values, variants: [row({ weight_grams: '1000001' })] }).success).toBe(false)
+    expect(variantGridSchema.safeParse({ ...values, variants: [row({ weight_grams: '1000000' })] }).success).toBe(true)
+    const { input } = toGridInput({ options: [], stock_store_id: '', variants: [row({ weight_grams: ' 1200 ' }), row({ sku: 'B', weight_grams: '' })] })
+    expect(input.variants.map((v) => v.weight_grams)).toEqual([1200, null])
   })
 })
 

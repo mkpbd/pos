@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   changedPreview,
   createBodyFrom,
+  deliveryFeeNote,
   draftFromOrder,
   editBodyFrom,
   editDetails,
@@ -26,7 +27,7 @@ import { ApiError } from '@/lib/api/client'
 const filled = (): OrderDraft => ({
   ...withContact(emptyDraft(), { name: 'Ayesha Rahman', phone: '+880 1711-000000' }),
   lines: [{ variant_id: 'v-m', label: 'Baby Romper — Size M', sku: 'ROMP-M', quantity: '2' }],
-  address: { recipient_name: 'Ayesha Rahman', phone: '01711000000', division_id: 3, district_id: 26, area: '', address_line: 'House 12, Road 5', postcode: '' },
+  address: { recipient_name: 'Ayesha Rahman', phone: '01711000000', division_id: 3, district_id: 26, area: '', area_id: '', address_line: 'House 12, Road 5', postcode: '' },
 })
 
 describe('order entry draft', () => {
@@ -156,5 +157,26 @@ describe('order entry messages', () => {
     expect(editTotalText(anEdit(), 'BDT')).toBe('Total BDT 1,560.00 → BDT 2,310.00')
     expect(editTotalText(anEdit({ total_after: '1560.00' }))).toBe('Total unchanged at 1,560.00')
     expect(editDetails(anEdit({ contact_changed: true, shipping_after: 'Express' }))).toEqual(['Customer contact changed', 'Delivery address changed', 'Delivery method Home delivery → Express'])
+  })
+})
+
+describe('delivery areas (BD2a)', () => {
+  it('prices and saves with the chosen area, and needs one when the district has areas', () => {
+    const draft = { ...filled(), address: { ...filled().address, area: 'typed', area_id: 'ar-1' } }
+    expect(quoteInputFrom(draft)?.address).toEqual({ district_id: 26, division_id: 3, area_id: 'ar-1' })
+    expect(createBodyFrom(draft, { shippingMethodId: 'sm-home', paymentMethod: 'cod' }, '1560.00').address).toEqual({
+      recipient_name: 'Ayesha Rahman', phone: '01711000000', division_id: 3, district_id: 26, area_id: 'ar-1', address_line: 'House 12, Road 5',
+    })
+    const chosen = { shippingMethodId: 'sm-home', paymentMethod: 'cod' as const }
+    expect(validateDraft(filled(), 'create', chosen, true)['address.area_id']).toBe('Choose the area.')
+    expect(validateDraft(draft, 'create', chosen, true)['address.area_id']).toBeUndefined()
+    expect(validateDraft(filled(), 'create', chosen)['address.area_id']).toBeUndefined()
+  })
+
+  it('says what a delivery fee includes', () => {
+    expect(deliveryFeeNote({ fee: '120.00', area_adjustment: '20.00', weight_fee: '40.00' }, 'BDT')).toBe('incl. BDT 20.00 for the area · BDT 40.00 for weight')
+    expect(deliveryFeeNote({ fee: '50.00', area_adjustment: '-10.00', weight_fee: '0.00' }, 'BDT')).toBe('incl. BDT 10.00 less for the area')
+    expect(deliveryFeeNote({ fee: '0.00', area_adjustment: '20.00' })).toBeNull()
+    expect(deliveryFeeNote({ fee: '60.00' })).toBeNull()
   })
 })

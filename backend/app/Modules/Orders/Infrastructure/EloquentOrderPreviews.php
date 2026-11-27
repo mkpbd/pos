@@ -87,6 +87,7 @@ class EloquentOrderPreviews implements OrderPreviews
             'tax_total' => '0.00',
             'shipping_total' => $shipping,
             'shipping_discount' => '0.00',
+            'shipping_breakdown' => null,
             'promotions' => [],
             'coupon_code' => null,
             'cod_fee' => '0.00',

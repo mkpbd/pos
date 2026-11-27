@@ -50,6 +50,9 @@ export function VariantFields({ index, register, control, errors }: Props) {
       <Cell label="Reorder level" error={err(errors, index, 'reorder_level')}>
         <Input aria-label="Reorder level" inputMode="decimal" placeholder="0" {...register(`${p}.reorder_level`)} />
       </Cell>
+      <Cell label="Weight (g)" error={err(errors, index, 'weight_grams')}>
+        <Input aria-label="Weight (g)" inputMode="numeric" placeholder="Optional" {...register(`${p}.weight_grams`)} />
+      </Cell>
       <Cell label="Barcodes" error={err(errors, index, 'barcodes')}>
         <Input aria-label="Barcodes" placeholder="Scan or type, comma separated" className="font-mono" {...register(`${p}.barcodes`)} />
       </Cell>

@@ -100,6 +100,8 @@ export type WebOrderAddress = {
   /** BD1b: geography ids (the edit form starts from them). */
   division_id?: number | null
   district_id?: number | null
+  /** BD2a: the delivery area chosen from the district's areas (its name is in `area`). */
+  area_id?: string | null
 }
 
 /** Who made a status change (E9): staff, the signed-in customer (self-service cancel) or the system. */

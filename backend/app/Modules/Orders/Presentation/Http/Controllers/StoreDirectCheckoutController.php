@@ -49,6 +49,8 @@ class StoreDirectCheckoutController
             'contact.phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'address' => ['sometimes', 'nullable', 'array'],
             'address.district_id' => ['sometimes', 'nullable', 'integer'],
+            // BD2a: the delivery area (prices the delivery).
+            'address.area_id' => ['sometimes', 'nullable', 'uuid'],
             'shipping_method_id' => ['sometimes', 'nullable', 'uuid'],
             'payment_method' => ['sometimes', 'nullable', 'string', Rule::in(OrderPaymentMethod::values())],
         ]);
@@ -63,7 +65,7 @@ class StoreDirectCheckoutController
      *
      * Header `Idempotency-Key` required (a retry with the same key returns the first answer).
      * `{document_id, element_id, lines, contact: {name, phone, email?}, address: {district_id,
-     * division_id?, area?, address_line, postcode?}, shipping_method_id, payment_method, note?,
+     * division_id?, area?, area_id?, address_line, postcode?}, shipping_method_id, payment_method, note?,
      * expected_total, attribution?}`. The shopper's cart is not touched. 201 `{order,
      * access_token, order_url}`. Errors: `ORDER_FORM_UNAVAILABLE`, `ITEMS_UNAVAILABLE`,
      * `CHECKOUT_UNAVAILABLE`, `SHIPPING_UNAVAILABLE`, `PAYMENT_METHOD_UNAVAILABLE`,
@@ -90,6 +92,8 @@ class StoreDirectCheckoutController
             'address.district_id' => ['required', 'integer', 'exists:geo_districts,id'],
             'address.division_id' => ['sometimes', 'nullable', 'integer', 'exists:geo_divisions,id'],
             'address.area' => ['sometimes', 'nullable', 'string', 'max:100'],
+            // BD2a: a delivery area of the district — required when the district has active areas.
+            'address.area_id' => ['sometimes', 'nullable', 'uuid'],
             'address.address_line' => ['required', 'string', 'max:255'],
             'address.postcode' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}$/'],
             'shipping_method_id' => ['required', 'uuid'],

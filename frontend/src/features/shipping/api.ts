@@ -19,6 +19,9 @@ export type ShippingMethod = {
   eta_max_days: number
   is_active: boolean
   sort_order: number
+  /** BD2a weight pricing: the kg the fee covers (null = no weight pricing) and the fee per extra kg, rounded up. */
+  weight_included_kg?: string | null
+  fee_per_extra_kg?: string
   /** Bangla texts (E12b): name, description. */
   translations?: TranslationsMap
 }
@@ -39,6 +42,7 @@ export type MethodInput = Omit<ShippingMethod, 'id' | 'zone_id' | 'translations'
 export const shippingKeys = {
   all: ['shipping'] as const,
   zones: ['shipping', 'zones'] as const,
+  areas: (districtId: number | null) => ['shipping', 'areas', districtId] as const,
   divisions: ['geography', 'divisions'] as const,
   districts: ['geography', 'districts'] as const,
 }
@@ -100,6 +104,46 @@ export function useSaveMethodMutation() {
 export function useDeleteMethodMutation() {
   const invalidate = useInvalidateZones()
   return useMutation({ mutationFn: (id: string) => api.delete(`/shipping/methods/${id}`), onSuccess: invalidate })
+}
+
+// ── Delivery areas (BD2a) ────────────────────────────────────────────────────
+
+/** A merchant-defined area / thana of a district; its fee adjustment (may be negative) is added to every method's fee. */
+export type ShippingArea = {
+  id: string
+  district_id: number
+  name: string
+  fee_adjustment: string
+  is_active: boolean
+  sort_order: number
+}
+
+export type AreaInput = Omit<ShippingArea, 'id'>
+
+/** The areas of a district, active or not (staff with shipping.manage or web_orders.view). */
+export function useShippingAreasQuery(districtId: number | null) {
+  return useQuery({
+    queryKey: shippingKeys.areas(districtId),
+    queryFn: ({ signal }) => api.get<ShippingArea[]>('/shipping/areas', { signal, query: { district_id: districtId } }).then((r) => r.data),
+    enabled: districtId !== null,
+  })
+}
+
+export function useSaveAreaMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: AreaInput }) =>
+      (id ? api.patch<ShippingArea>(`/shipping/areas/${id}`, input) : api.post<ShippingArea>('/shipping/areas', input)).then((r) => r.data),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['shipping', 'areas'] }),
+  })
+}
+
+export function useDeleteAreaMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/shipping/areas/${id}`),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['shipping', 'areas'] }),
+  })
 }
 
 // ── Couriers (E10a) ──────────────────────────────────────────────────────────

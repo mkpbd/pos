@@ -396,6 +396,19 @@ describe('order form logic', () => {
     })
   })
 
+  it('BD2a: needs an area chosen when the district has areas, and sends its id', () => {
+    const variant = product.variants[0]!
+    const answers = { ...EMPTY_VALUES, name: 'Rina', phone: '01711223344', division_id: '3', district_id: '47', address_line: 'Road 1', shipping_method_id: 'sm-home', payment_method: 'cod' }
+    expect(orderFormErrors(answers, rules, variant, true)).toEqual({ area_id: 'checkout.validation.areaChoice' })
+    expect(orderFormErrors({ ...answers, area_id: 'ar-1' }, rules, variant, true)).toEqual({})
+    expect(orderFormErrors(answers, rules, variant)).toEqual({})
+    const base = { documentId: DOC_ID, elementId: 'e_order', lines: [{ variant_id: 'v-red-m', quantity: 1 }] }
+    const geo = (kind: 'division' | 'district', value: string) => (kind === 'district' ? Number(value) : value)
+    expect(toDirectPreviewInput(base, { ...answers, area_id: 'ar-1' }, geo).address).toEqual({ district_id: 47, area_id: 'ar-1' })
+    expect(toDirectOrderInput(base, { ...answers, area: 'typed', area_id: 'ar-1' }, rules, '500.00', geo, null).address).toEqual({ district_id: 47, division_id: '3', area_id: 'ar-1', address_line: 'Road 1' })
+    expect(orderFormFieldFor('address.area_id')).toBe('area_id')
+  })
+
   it('maps server errors to fields and friendly messages', () => {
     expect(orderFormFieldFor('contact.phone')).toBe('phone')
     expect(orderFormFieldFor('lines.0.quantity')).toBe('quantity')
@@ -823,6 +836,45 @@ describe('order form on a landing page', () => {
     await user.click(within(bar).getByRole('button', { name: /Order now/ }))
     expect(screen.getByTestId('order-form')).toHaveFocus()
     expect(orderFormsOf(landingPage())).toEqual(['e_order'])
+  })
+
+  it('BD2a: has the shopper choose an area and explains the delivery charge it adds', async () => {
+    const places: Body[] = []
+    const { previews } = serve({
+      routes: {
+        'GET /store/shipping/areas': (_init, url) => ok(url.searchParams.get('district_id') === '47' ? [{ id: 'ar-1', name: 'Mirpur' }] : []),
+        'POST /store/checkout/direct/preview': (init) => {
+          const body = bodyOf(init)
+          previews.push(body)
+          const preview = directPreviewFor(body)
+          const area = (body.address as { area_id?: string } | undefined)?.area_id
+          if (area !== 'ar-1') return ok(preview)
+          return ok({ ...preview, shipping_methods: preview.shipping_methods.map((m) => ({ ...m, fee: '110.00', base_fee: m.fee, area_adjustment: '20.00', weight_fee: '30.00' })) })
+        },
+        'POST /store/checkout/direct': (init) => {
+          places.push(bodyOf(init))
+          return placed()
+        },
+      },
+    })
+    const user = userEvent.setup()
+    renderRoutes(storefrontRoutes, '/p/eid-sale')
+    const form = await screen.findByRole('form', { name: 'Order now' })
+    await fillForm(user, form)
+    const area = await within(form).findByRole('combobox', { name: /^Area \/ thana/ })
+    expect(within(form).queryByRole('textbox', { name: /^Area/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(within(form).getByRole('radio', { name: /Home delivery/ })).toBeChecked())
+    await user.click(within(form).getByRole('button', { name: 'Confirm order' }))
+    const summary = await screen.findByTestId('order-form-error-summary')
+    expect(within(summary).getByRole('link', { name: 'Area / thana: Please choose your area or thana.' })).toBeInTheDocument()
+    expect(places).toHaveLength(0)
+
+    await user.selectOptions(area, 'ar-1')
+    await waitFor(() => expect(within(form).getByTestId('order-form-fee-note')).toHaveTextContent('incl. ৳20.00 for your area · ৳30.00 for the parcel weight'))
+    await waitFor(() => expect(previews.at(-1)).toMatchObject({ address: { district_id: 47, area_id: 'ar-1' } }))
+    await user.click(within(form).getByRole('button', { name: 'Confirm order' }))
+    await screen.findByTestId('order-form-thanks')
+    expect(places[0]!.address).toEqual({ district_id: 47, division_id: 3, area_id: 'ar-1', address_line: 'Road 3, House 9' })
   })
 
   it('is in Bangla when the store is', async () => {
