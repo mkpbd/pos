@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { STATEMENT_ENTRY_LABELS, useCustomerStatementQuery, type Customer, type CustomerStatementEntry } from '@/features/customers/api'
+import { DueReminderActions } from '@/features/customers/components/due-reminder-actions'
 import { OnlineAccountCard } from '@/features/customers/components/online-account-card'
 import { WebActivityCard } from '@/features/customers/components/web-activity-card'
 import { ReceivePaymentDialog } from '@/features/customers/components/receive-payment-dialog'
@@ -46,6 +47,7 @@ function StatementTab({ customer, currency }: { customer: Customer; currency?: s
           {can('payments.collect') && <Button size="sm" onClick={() => setReceiving(true)}>Receive payment</Button>}
         </div>
       </div>
+      <DueReminderActions customer={customer} balance={data.closing_balance} />
       <Table>
         <TableHeader>
           <TableRow>

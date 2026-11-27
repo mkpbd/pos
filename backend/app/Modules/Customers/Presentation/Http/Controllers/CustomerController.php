@@ -4,6 +4,7 @@ namespace App\Modules\Customers\Presentation\Http\Controllers;
 
 use App\Modules\Customers\Application\Actions\ArchiveCustomer;
 use App\Modules\Customers\Application\Actions\SaveCustomer;
+use App\Modules\Customers\Application\Actions\SendDueReminder;
 use App\Modules\Customers\Infrastructure\Models\Customer;
 use App\Modules\Customers\Presentation\Http\Exports\CustomersExport;
 use App\Modules\Customers\Presentation\Http\Requests\SaveCustomerRequest;
@@ -12,6 +13,7 @@ use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -69,6 +71,23 @@ class CustomerController
     public function show(Customer $customer): JsonResponse
     {
         return ApiResponse::success((new CustomerResource($customer->load('group')))->withOnlineAccount());
+    }
+
+    /**
+     * Send a due reminder (SMS)
+     *
+     * R1: `customers.manage` or `payments.collect`; 10 per minute per user. Sends the
+     * `due_reminder` text now → 201 `{recipient_masked, status: queued|skipped|failed, due}`.
+     * Errors: no mobile number (422 validation on `phone`), `NO_DUE`, `SMS_NOT_READY`,
+     * `SMS_TEMPLATE_OFF`.
+     */
+    public function dueReminder(Request $request, Customer $customer, SendDueReminder $send): JsonResponse
+    {
+        if (! $request->user()->canAny(['customers.manage', 'payments.collect'])) {
+            throw new AuthorizationException;
+        }
+
+        return ApiResponse::created($send($customer));
     }
 
     public function update(SaveCustomerRequest $request, Customer $customer, SaveCustomer $save): JsonResponse

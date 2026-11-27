@@ -3,6 +3,7 @@
 namespace App\Modules\Reports;
 
 use App\Modules\Reports\Application\ReportRegistry;
+use App\Modules\Reports\Infrastructure\Console\SendDailySummaryCommand;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
 
 /**
@@ -16,6 +17,16 @@ class ReportsServiceProvider extends ModuleServiceProvider
     public function register(): void
     {
         $this->app->singleton(ReportRegistry::class);
+    }
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        if ($this->app->runningInConsole()) {
+            // R1: the owners' daily summary.
+            $this->commands([SendDailySummaryCommand::class]);
+        }
     }
 
     protected function permissions(): array

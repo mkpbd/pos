@@ -2,6 +2,8 @@
 
 namespace App\Modules\Sales\Domain;
 
+use App\Modules\Shared\Domain\BangladeshMobile;
+
 /**
  * POS1d: how a receipt's recipient is shown and stored — never in full. A mobile number keeps
  * its operator prefix and last three digits (`017••••123`), an e-mail address the first two
@@ -11,12 +13,7 @@ final class RecipientMask
 {
     public static function phone(string $phone): string
     {
-        $digits = preg_replace('/\D/', '', $phone) ?? '';
-        if (strlen($digits) < 7) {
-            return '••••';
-        }
-
-        return substr($digits, 0, 3).'••••'.substr($digits, -3);
+        return BangladeshMobile::masked($phone);
     }
 
     public static function email(string $email): string

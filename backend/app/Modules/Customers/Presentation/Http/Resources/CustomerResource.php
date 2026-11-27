@@ -4,6 +4,7 @@ namespace App\Modules\Customers\Presentation\Http\Resources;
 
 use App\Modules\Customers\Application\Contracts\CustomerOnlineAccounts;
 use App\Modules\Customers\Application\Contracts\CustomerStoreCredit;
+use App\Modules\Customers\Application\Services\DueReminders;
 use App\Modules\Customers\Infrastructure\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -80,7 +81,13 @@ class CustomerResource extends JsonResource
             'archived_at' => $this->deleted_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            ...($this->withOnlineAccount ? ['online_account' => app(CustomerOnlineAccounts::class)->forCustomer($this->id)] : []),
+            ...($this->withOnlineAccount ? [
+                'online_account' => app(CustomerOnlineAccounts::class)->forCustomer($this->id),
+                // R1: WhatsApp click-to-chat with the due reminder text; null without a mobile
+                // number or a due, and for users who may not send reminders.
+                'whatsapp_reminder_url' => $request->user()?->canAny(['customers.manage', 'payments.collect']) === true
+                    ? app(DueReminders::class)->whatsappUrl($this->resource) : null,
+            ] : []),
             // POS1b: null for users without `store_credit.view`.
             'store_credit_balance' => $this->storeCreditBalance($request),
         ];

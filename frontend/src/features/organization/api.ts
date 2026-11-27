@@ -53,3 +53,40 @@ export function useUpdateOrganizationMutation() {
     },
   })
 }
+
+/** R1: organization.settings.alerts — scheduled summaries, alerts and due (বাকি) reminders (GET/PATCH /settings/alerts). */
+export type DueReminderSchedule = 'off' | 'weekly' | 'monthly'
+
+export type AlertSettings = {
+  daily_summary: boolean
+  /** Local hour (0–23) from which the day's summary goes out. */
+  daily_summary_hour: number
+  /** 0 = off. */
+  expiry_alert_days: number
+  /** 0 = off. */
+  register_open_hours: number
+  due_reminders: DueReminderSchedule
+  /** Smallest balance reminded (NUMERIC string). */
+  due_reminder_min: string
+  /** ISO weekday, 1 = Monday … 7 = Sunday. */
+  due_reminder_weekday: number
+}
+
+export const alertSettingsKey = ['organization', 'alerts'] as const
+
+export function useAlertSettingsQuery(enabled = true) {
+  return useQuery({
+    queryKey: alertSettingsKey,
+    queryFn: ({ signal }) => api.get<AlertSettings>('/settings/alerts', { signal }).then((r) => r.data),
+    enabled,
+  })
+}
+
+export function useSaveAlertSettingsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: Partial<AlertSettings>) => api.patch<AlertSettings>('/settings/alerts', input).then((r) => r.data),
+    onSuccess: (settings) => queryClient.setQueryData(alertSettingsKey, settings),
+  })
+}

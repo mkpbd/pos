@@ -21,6 +21,22 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### R1 — Loss-prevention, returns and dead-stock reports; daily summary and alerts; due reminders
+
+From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §6 and the due (বাকি) reminders (P1). No new packages.
+
+#### Added
+- Reports **Loss prevention** (per cashier: cancelled sales, discounts, price overrides, no-sale drawer openings, returns, exchanges — or every event with a link), **Returns** (by reason, product or cashier) and **Dead stock** (nothing sold in N days, value, stock aging).
+- **Alerts** (Organization → Alerts & reminders): a **daily summary** to owners in the app and by e-mail, **batch-expiry** alerts, and a reminder when a **register stays open** too long.
+- **Due reminders**: automatic SMS weekly or monthly to customers who owe at least a set amount (off by default), **Send due reminder** on the customer page, and a **WhatsApp** link with the reminder text; new SMS template *Due reminder*.
+
+#### Tests
+- Backend 2094 (2093 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3320; mocked Playwright 654 (two older specs — till set-up and store link sharing — failed once under full load and passed on rerun) (new `r1-reports-reminders`).
+- Full-stack (PostgreSQL, desktop) 70 — new **R1** on Bazar Fresh: alert settings saved, a customer owing 350 reminded by SMS (test mode) with a WhatsApp link, a cancelled sale in the loss-prevention report (API and page), the dead-stock report, and the daily summary in the owner's notifications.
+
+#### Upgrade
+- `php artisan migrate`; keep the scheduler and a queue worker running.
+
 ### ST2d — Serial-number register, stock value as of a past date
 
 Last part of ST2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). No new packages.

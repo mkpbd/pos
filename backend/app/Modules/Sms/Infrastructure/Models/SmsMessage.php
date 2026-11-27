@@ -36,7 +36,7 @@ class SmsMessage extends Model
 {
     use BelongsToOrganization, HasUuids;
 
-    public const PURPOSES = ['otp', 'order_placed', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled', 'test', 'sale_receipt'];
+    public const PURPOSES = ['otp', 'order_placed', 'order_confirmed', 'order_shipped', 'order_delivered', 'order_cancelled', 'test', 'sale_receipt', 'due_reminder'];
 
     public const STATUSES = ['queued', 'sent', 'failed', 'skipped'];
 

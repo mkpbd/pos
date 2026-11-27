@@ -3,6 +3,7 @@
 namespace App\Modules\Organizations\Infrastructure\Directory;
 
 use App\Modules\Organizations\Application\Contracts\OrganizationDirectory;
+use App\Modules\Organizations\Domain\AlertSettings;
 use App\Modules\Organizations\Domain\Enums\OrganizationStatus;
 use App\Modules\Organizations\Infrastructure\Models\Organization;
 
@@ -23,6 +24,11 @@ class EloquentOrganizationDirectory implements OrganizationDirectory
         $policy = Organization::query()->find($organizationId)?->settings['two_factor_policy'] ?? null;
 
         return in_array($policy, Organization::TWO_FACTOR_POLICIES, true) ? $policy : Organization::TWO_FACTOR_OPTIONAL;
+    }
+
+    public function alertSettings(string $organizationId): array
+    {
+        return AlertSettings::effective(Organization::query()->find($organizationId)?->settings['alerts'] ?? null);
     }
 
     public function summary(string $organizationId): ?array

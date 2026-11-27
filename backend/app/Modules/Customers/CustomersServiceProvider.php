@@ -12,9 +12,13 @@ use App\Modules\Customers\Application\Imports\CustomersImport;
 use App\Modules\Customers\Application\Services\NoOnlineAccounts;
 use App\Modules\Customers\Application\Services\NoStoreCredit;
 use App\Modules\Customers\Application\Services\NoWebActivity;
+use App\Modules\Customers\Infrastructure\Console\SendDueRemindersCommand;
 use App\Modules\Customers\Infrastructure\Directory\EloquentCustomerDirectory;
 use App\Modules\Imports\Application\Contracts\ImportHandler;
 use App\Modules\Shared\Infrastructure\Providers\ModuleServiceProvider;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Customers and customer groups. Balances, purchase history, statements and loyalty
@@ -35,6 +39,17 @@ class CustomersServiceProvider extends ModuleServiceProvider
         $this->app->bindIf(CustomerStoreCredit::class, NoStoreCredit::class);
         // ST1: customer import (Imports module).
         $this->app->tag([CustomersImport::class], ImportHandler::TAG);
+    }
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        // R1: due reminders — sending costs SMS credit.
+        RateLimiter::for('due-reminder', fn (Request $request) => Limit::perMinute(10)->by('due-reminder:'.($request->user()?->getAuthIdentifier() ?: $request->ip())));
+        if ($this->app->runningInConsole()) {
+            $this->commands([SendDueRemindersCommand::class]);
+        }
     }
 
     protected function permissions(): array

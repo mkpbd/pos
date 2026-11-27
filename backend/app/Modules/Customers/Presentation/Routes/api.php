@@ -16,6 +16,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('customers/{customer}', [CustomerController::class, 'show'])->middleware('can:customers.view');
     Route::get('customers/{customer}/web-activity', CustomerWebActivityController::class)->middleware('can:customers.view');
     Route::patch('customers/{customer}', [CustomerController::class, 'update'])->middleware('can:customers.manage');
+    // R1: due reminder by SMS now (customers.manage or payments.collect, checked in the controller).
+    Route::post('customers/{customer}/due-reminder', [CustomerController::class, 'dueReminder'])->middleware('throttle:due-reminder');
     Route::delete('customers/{customer}', [CustomerController::class, 'destroy'])->middleware('can:customers.manage');
     Route::post('customers/{customerId}/restore', [CustomerController::class, 'restore'])->whereUuid('customerId')->middleware('can:customers.manage');
 });

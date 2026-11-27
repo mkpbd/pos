@@ -11,6 +11,7 @@ use App\Modules\Inventory\Application\Contracts\StockLevels;
 use App\Modules\Inventory\Application\Contracts\StockValuation;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
 use App\Modules\Inventory\Application\Imports\OpeningStockImport;
+use App\Modules\Inventory\Infrastructure\Console\SendExpiryAlertsCommand;
 use App\Modules\Inventory\Infrastructure\Directory\EloquentBatchDirectory;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentSerialRegister;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLedger;
@@ -59,6 +60,11 @@ class InventoryServiceProvider extends ModuleServiceProvider
         Event::listen(StockFellBelowReorderLevel::class, NotifyLowStock::class);
 
         parent::boot();
+
+        if ($this->app->runningInConsole()) {
+            // R1: the daily batch-expiry alert.
+            $this->commands([SendExpiryAlertsCommand::class]);
+        }
     }
 
     protected function permissions(): array

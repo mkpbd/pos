@@ -1,6 +1,9 @@
+import { Link } from 'react-router'
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useCan } from '@/features/auth/use-auth'
 import type { ReportColumn, ReportRow } from '@/features/reports/api'
+import { documentLink } from '@/features/reports/columns'
 import { formatCell, isNumericType } from '@/features/reports/format'
 import { parseSort } from '@/features/reports/params'
 import { cn } from '@/lib/utils'
@@ -20,6 +23,7 @@ type Props = {
 /** Rows of a report with sortable headers (server-side sort) and its totals row. */
 export function ReportTable({ title, columns, rows, totals, sort, onSort, timeZone, note }: Props) {
   const current = parseSort(sort)
+  const can = useCan()
 
   const toggle = (column: ReportColumn) => {
     // Numbers sort high-to-low first; text and dates A–Z / oldest first.
@@ -66,7 +70,7 @@ export function ReportTable({ title, columns, rows, totals, sort, onSort, timeZo
                   key={c.key}
                   className={cn(isNumericType(c.type) && 'text-right font-mono tabular-nums', i === 0 && 'sticky left-0 z-[1] bg-card font-medium', isNegative(row[c.key]) && 'text-destructive')}
                 >
-                  {cellText(row, c, timeZone)}
+                  <CellContent row={row} column={c} timeZone={timeZone} can={can} />
                 </TableCell>
               ))}
             </TableRow>
@@ -90,6 +94,13 @@ export function ReportTable({ title, columns, rows, totals, sort, onSort, timeZo
       </Table>
     </div>
   )
+}
+
+/** A document number (a `<key>_type` / `<key>_id` pair in the row) links to its page when the user may open it. */
+function CellContent({ row, column, timeZone, can }: { row: ReportRow; column: ReportColumn; timeZone?: string; can: (permission: string) => boolean }) {
+  const text = cellText(row, column, timeZone)
+  const link = documentLink(row, column.key)
+  return link && can(link.permission) ? <Link to={link.to} className="font-mono underline-offset-4 hover:underline">{text}</Link> : <>{text}</>
 }
 
 /** A `<key>_label` sibling (e.g. month_label "Nov 2026") is the display form of the value. */

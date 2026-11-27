@@ -2,8 +2,10 @@
 
 namespace App\Modules\Sales;
 
+use App\Modules\Customers\Application\Contracts\CustomerDues;
 use App\Modules\Sales\Application\Contracts\LoyaltyProgram;
 use App\Modules\Sales\Application\Contracts\SaleBaskets;
+use App\Modules\Sales\Application\Services\CustomerCredit;
 use App\Modules\Sales\Application\Services\IssuedCreditNotes;
 use App\Modules\Sales\Application\Services\NoLoyaltyProgram;
 use App\Modules\Sales\Infrastructure\EloquentSaleBaskets;
@@ -32,6 +34,8 @@ class SalesServiceProvider extends ModuleServiceProvider
         // POS1b: credit notes issued in this request (their code is shown once). StoreCredit and
         // GiftCards are bound by the StoredValue module.
         $this->app->scoped(IssuedCreditNotes::class);
+        // R1: customers' dues for due reminders (the contract is declared by Customers).
+        $this->app->bind(CustomerDues::class, CustomerCredit::class);
     }
 
     public function boot(): void

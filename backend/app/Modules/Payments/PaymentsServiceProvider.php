@@ -3,6 +3,7 @@
 namespace App\Modules\Payments;
 
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
+use App\Modules\Payments\Infrastructure\Console\SendOpenRegisterRemindersCommand;
 use App\Modules\Payments\Infrastructure\Ledger\EloquentPaymentLedger;
 use App\Modules\Payments\Infrastructure\Models\CashRegister;
 use App\Modules\Payments\Infrastructure\Models\RegisterSession;
@@ -27,6 +28,11 @@ class PaymentsServiceProvider extends ModuleServiceProvider
         Route::model('registerSession', RegisterSession::class);
 
         parent::boot();
+
+        if ($this->app->runningInConsole()) {
+            // R1: reminders about register sessions left open.
+            $this->commands([SendOpenRegisterRemindersCommand::class]);
+        }
     }
 
     protected function permissions(): array

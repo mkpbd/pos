@@ -9,15 +9,18 @@ namespace App\Modules\Sms\Domain;
  *
  * POS1d: `sale_receipt` — the digital receipt of a till sale ({shop} {name} {invoice} {total}
  * {link}), sent on demand by the cashier.
+ *
+ * R1: `due_reminder` — a customer's outstanding balance ({shop} {name} {due} {link}), sent on
+ * demand from the customer page or on the scheduled reminder day.
  */
 final class SmsTemplate
 {
-    public const PLACEHOLDERS = ['shop', 'name', 'order', 'total', 'link', 'courier', 'tracking', 'tracking_link', 'invoice'];
+    public const PLACEHOLDERS = ['shop', 'name', 'order', 'total', 'link', 'courier', 'tracking', 'tracking_link', 'invoice', 'due'];
 
     public const MAX_LENGTH = 480;
 
     /** Events switched on until the merchant changes them (payment confirmations are off). */
-    public const ENABLED_BY_DEFAULT = ['order_placed' => true, 'order_confirmed' => false, 'order_shipped' => true, 'order_delivered' => true, 'order_cancelled' => true, 'sale_receipt' => true];
+    public const ENABLED_BY_DEFAULT = ['order_placed' => true, 'order_confirmed' => false, 'order_shipped' => true, 'order_delivered' => true, 'order_cancelled' => true, 'sale_receipt' => true, 'due_reminder' => true];
 
     /**
      * @param  array<string, string|int|float|null>  $vars
@@ -67,6 +70,10 @@ final class SmsTemplate
             'sale_receipt' => [
                 'en' => '{shop}: Receipt {invoice}, total Tk {total}. Thank you for shopping with us! {link}',
                 'bn' => '{shop}: রসিদ {invoice}, মোট ৳{total}। আমাদের সাথে কেনাকাটার জন্য ধন্যবাদ! {link}',
+            ],
+            'due_reminder' => [
+                'en' => '{shop}: Dear {name}, your due balance is Tk {due}. Please pay at your earliest convenience. {link}',
+                'bn' => '{shop}: প্রিয় {name}, আপনার বাকি ৳{due}। অনুগ্রহ করে শীঘ্রই পরিশোধ করুন। {link}',
             ],
         ];
 

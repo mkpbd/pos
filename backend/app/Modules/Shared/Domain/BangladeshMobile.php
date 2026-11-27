@@ -31,4 +31,18 @@ final class BangladeshMobile
 
         return preg_match(self::PATTERN, $digits) === 1 ? $digits : null;
     }
+
+    /**
+     * How a number is shown, logged and audited — never in full: the operator prefix and the
+     * last three digits (`017••••678`; POS1d receipts, R1 due reminders).
+     */
+    public static function masked(string $phone): string
+    {
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+        if (strlen($digits) < 7) {
+            return '••••';
+        }
+
+        return substr($digits, 0, 3).'••••'.substr($digits, -3);
+    }
 }

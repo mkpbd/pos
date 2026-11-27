@@ -1,4 +1,4 @@
-import type { ReportColumn, ReportDefinition, ReportRun } from '@/features/reports/api'
+import type { ReportColumn, ReportDefinition, ReportRow, ReportRun } from '@/features/reports/api'
 
 /** Reports that get a small trend chart above their table. */
 export const CHARTED_REPORTS = new Set(['sales_daily', 'sales_monthly'])
@@ -20,4 +20,20 @@ export function visibleColumns(definition: ReportDefinition, run: ReportRun | un
   const omitted = new Set([...definition.omitted_columns, ...(run?.omitted_columns ?? [])])
   const hidden = (c: ReportColumn) => omitted.has(c.key) || (c.cost_sensitive && !canViewCost)
   return { columns: all.filter((c) => !hidden(c)), hiddenCost: all.filter(hidden) }
+}
+
+/** Pages a report row's document (`<key>_type` + `<key>_id`, e.g. loss prevention events) opens, with the permission each needs. */
+const DOCUMENT_PAGES: Record<string, { path: string; permission: string }> = {
+  sale: { path: '/sales/', permission: 'sales.view' },
+  sale_return: { path: '/returns/', permission: 'returns.view' },
+  web_order: { path: '/web-orders/', permission: 'web_orders.view' },
+  register_session: { path: '/cash-registers/sessions/', permission: 'cash_registers.view' },
+}
+
+export function documentLink(row: ReportRow, key: string): { to: string; permission: string } | null {
+  const type = row[`${key}_type`]
+  const id = row[`${key}_id`]
+  const page = typeof type === 'string' ? DOCUMENT_PAGES[type] : undefined
+  if (!page || (typeof id !== 'string' && typeof id !== 'number') || id === '') return null
+  return { to: `${page.path}${encodeURIComponent(String(id))}`, permission: page.permission }
 }

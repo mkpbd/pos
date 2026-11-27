@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Display names for the ids in aggregated rows (one query per kind, organization-scoped,
- * read-only): branches, stores, products, categories, brands, users, suppliers, customers.
+ * read-only): branches, stores, products, categories, brands, users, suppliers, customers, return reasons.
  */
 final class Names
 {
@@ -20,6 +20,7 @@ final class Names
         'user' => ['users', 'name'],
         'supplier' => ['suppliers', 'name'],
         'customer' => ['customers', 'name'],
+        'return_reason' => ['return_reasons', 'name'],
     ];
 
     /**

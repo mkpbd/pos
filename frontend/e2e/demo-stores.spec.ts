@@ -3250,3 +3250,74 @@ test('ST2d: Bazar Fresh receives two phones by serial, sells one, cannot sell it
     await context.close()
   }
 })
+
+test('R1: Bazar Fresh sets its alerts, reminds a customer of a due by SMS and WhatsApp, sees a cancelled sale in the loss-prevention report and gets the daily summary', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date())
+  try {
+    // Alerts: weekly due reminders from 50.
+    const saved = await call('PATCH', '/api/v1/settings/alerts', { due_reminders: 'weekly', due_reminder_min: '50', expiry_alert_days: 30 })
+    expect(saved.status).toBe(200)
+    expect(saved.body.data).toMatchObject({ due_reminders: 'weekly', due_reminder_min: '50.00' })
+
+    // A customer who owes 350: an SMS reminder (test mode) and a WhatsApp link.
+    expect((await call('PATCH', '/api/v1/sms/settings', { is_enabled: true, driver: 'log' })).status).toBe(200)
+    const phone = `017${stamp}`
+    const customer = await call('POST', '/api/v1/customers', { name: `Selina Begum ${stamp}`, phone, opening_balance: '350' })
+    expect(customer.status).toBe(201)
+    const detail = (await call('GET', `/api/v1/customers/${customer.body.data.id}`)).body.data
+    expect(detail.whatsapp_reminder_url).toMatch(new RegExp(`^https://wa\\.me/88${phone}\\?text=`))
+    const reminded = await call('POST', `/api/v1/customers/${customer.body.data.id}/due-reminder`)
+    expect(reminded.status).toBe(201)
+    expect(reminded.body.data.recipient_masked).not.toContain(phone)
+    expect(reminded.body.data.due).toBe('350.00')
+
+    // A sale rung up and cancelled shows in the loss-prevention report.
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const current = await call('GET', '/api/v1/register-sessions/current')
+    if (!(current.status === 200 && current.body.data)) {
+      const register = await call('POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `L${stamp.slice(-6)}`, name: `Loss ${stamp}` })
+      expect(register.status).toBe(201)
+      expect((await call('POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '1000' })).status).toBeLessThan(300)
+    }
+    const items = (await call('GET', `/api/v1/pos/catalog?store_id=${store.id}&page=1`)).body.data as { variant_id: string; price: string; sellable: boolean; open_price?: boolean; track_batches: boolean; track_serials: boolean; on_hand: string | null }[]
+    const item = items.find((i) => i.sellable && !i.open_price && !i.track_serials && !i.track_batches && (i.on_hand === null || Number(i.on_hand) >= 2))!
+    const sale = await call('POST', '/api/v1/pos/checkout', { store_id: store.id, lines: [{ variant_id: item.variant_id, quantity: '1' }], payments: [{ method: 'cash', amount: Number(item.price).toFixed(2) }] })
+    expect(sale.status).toBe(201)
+    expect((await call('POST', `/api/v1/sales/${sale.body.data.id}/cancel`, { reason: `Rung up twice ${stamp}` })).status).toBe(200)
+    const events = await call('GET', `/api/v1/reports/loss_prevention?date_from=${today}&date_to=${today}&show=events`)
+    expect(events.status).toBe(200)
+    expect(JSON.stringify(events.body.data)).toContain(sale.body.data.number)
+    await page.goto(`${base}/admin/reports/loss_prevention?date_from=${today}&date_to=${today}&show=events`)
+    await expect(page.getByText(sale.body.data.number).first()).toBeVisible({ timeout: 20_000 })
+    expect((await call('GET', `/api/v1/reports/dead_stock?days=30`)).status).toBe(200)
+
+    // The daily summary (run now) arrives in the owner's notifications.
+    const backend = fileURLToPath(new URL('../../backend/', import.meta.url))
+    execFileSync(process.env.E2E_PHP ?? 'php', ['artisan', 'reports:daily-summary', '--any-hour'], {
+      cwd: backend,
+      env: { ...process.env, DB_CONNECTION: 'pgsql', DB_DATABASE: process.env.E2E_DB_DATABASE ?? 'pos_e2e', CACHE_STORE: 'database', QUEUE_CONNECTION: 'sync', MAIL_MAILER: 'log' },
+    })
+    await expect.poll(async () => JSON.stringify((await call('GET', '/api/v1/notifications')).body.data ?? []), { timeout: 15_000 }).toContain('reports.daily_summary')
+  } finally {
+    await context.close()
+  }
+})

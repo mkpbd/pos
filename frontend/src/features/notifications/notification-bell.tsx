@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api } from '@/lib/api/client'
 import { cn } from '@/lib/utils'
-import { notificationTarget } from '@/features/notifications/target'
+import { notificationLines, notificationTarget } from '@/features/notifications/target'
 
 type AppNotification = {
   id: string
   type: string
   /** `link` (older alerts) or `url` (e.g. "/web-orders/{id}"): an in-app path to open. */
-  data: { title?: string; message?: string; link?: string; url?: string }
+  data: { title?: string; message?: string; link?: string; url?: string } & Record<string, unknown>
   read_at: string | null
   created_at: string
 }
@@ -77,6 +77,7 @@ export function NotificationBell() {
                 >
                   <span className={cn(!n.read_at && 'font-medium')}>{n.data.title ?? 'Notification'}</span>
                   {n.data.message && <span className="text-xs text-muted-foreground">{n.data.message}</span>}
+                  {notificationLines(n.data).map((line, i) => <span key={i} className="text-xs text-muted-foreground">{line}</span>)}
                   <span className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</span>
                 </button>
               </li>

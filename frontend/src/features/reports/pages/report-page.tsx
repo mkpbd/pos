@@ -15,10 +15,11 @@ import { PnlStatement } from '@/features/reports/components/pnl-statement'
 import { ReportTrendChart } from '@/features/reports/components/report-chart'
 import { ReportFilters } from '@/features/reports/components/report-filters'
 import { ReportTable } from '@/features/reports/components/report-table'
-import { formatDateCell } from '@/features/reports/format'
+import { formatDateCell, formatQuantity } from '@/features/reports/format'
 import { DEFAULT_PER_PAGE, missingDefaults, pageValues, paramsProblem, paramValues, PER_PAGE_OPTIONS, runQuery, sortValue, withChanges } from '@/features/reports/params'
 import { toStatement } from '@/features/reports/statement'
 import { ApiError } from '@/lib/api/client'
+import { formatMoney } from '@/lib/money'
 
 function runErrorMessage(error: unknown): { title: string; message: string } {
   if (error instanceof ApiError) {
@@ -124,6 +125,7 @@ function ReportView({ definition }: { definition: ReportDefinition }) {
               <PnlStatement title={definition.title} statement={statement} currency={currency} />
             ) : (
               <>
+                <AgingSummary aging={run.data.meta.aging} currency={currency} />
                 {CHARTED_REPORTS.has(definition.key) && <ReportTrendChart definition={definition} columns={columns} rows={run.data.rows} partial={(pagination?.last_page ?? 1) > 1} />}
                 <ReportTable
                   title={definition.title}
@@ -175,5 +177,30 @@ function RunNotes({ run, currency, hiddenCost, timeZone }: { run: ReportRun; cur
         </p>
       )}
     </div>
+  )
+}
+
+const AGING_LABELS: Record<string, string> = {
+  days_0_30: '0–30 days',
+  days_31_60: '31–60 days',
+  days_61_90: '61–90 days',
+  days_91_180: '91–180 days',
+  days_over_180: 'Over 180 days',
+}
+
+/** R1 dead stock: the listed stock by days since it was last received (`meta.aging`; value only with cost permission). */
+function AgingSummary({ aging, currency }: { aging: unknown; currency: string | null }) {
+  if (!Array.isArray(aging) || aging.length === 0) return null
+  const buckets = aging as { key: string; items?: number; quantity?: string; value?: string }[]
+  return (
+    <dl aria-label="Stock aging by last received" className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+      {buckets.map((b) => (
+        <div key={b.key} className="rounded-md border bg-card p-3" data-testid={`aging-${b.key}`}>
+          <dt className="text-muted-foreground">{AGING_LABELS[b.key] ?? b.key}</dt>
+          <dd className="font-mono font-semibold tabular-nums">{b.value !== undefined ? formatMoney(b.value, currency ?? undefined) : formatQuantity(b.quantity ?? '0')}</dd>
+          <dd className="text-xs text-muted-foreground">{b.items ?? 0} {b.items === 1 ? 'item' : 'items'}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sales\Application\Services;
 
+use App\Modules\Customers\Application\Contracts\CustomerDues;
 use App\Modules\Sales\Domain\ReturnStatus;
 use App\Modules\Sales\Domain\SaleStatus;
 use App\Modules\Sales\Infrastructure\Models\CustomerPayment;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * What customers owe from sales (accounts receivable), computed from the posted documents:
  * opening balance + dues of completed sales − returns credited against them − payments received.
  */
-class CustomerCredit
+class CustomerCredit implements CustomerDues
 {
     /**
      * @param  array{id: string, opening_balance: string}  $customer

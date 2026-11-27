@@ -21,6 +21,7 @@ final class ReportResult
      * @param  array<string, mixed>|null  $totals
      * @param  array<string, string>  $labels  column key => label for this run (e.g. "Category" for the group column)
      * @param  array<string, mixed>  $meta  extra meta (e.g. P&L previous period, stock opening/closing)
+     * @param  list<string>|null  $columns  R1: the definition's columns this run returns (a report with modes), null = all
      */
     private function __construct(
         public readonly ?array $rows,
@@ -30,6 +31,7 @@ final class ReportResult
         public readonly ?array $totals,
         public readonly array $labels,
         public readonly array $meta,
+        public readonly ?array $columns = null,
     ) {}
 
     /**
@@ -37,10 +39,11 @@ final class ReportResult
      * @param  array<string, mixed>|null  $totals
      * @param  array<string, string>  $labels
      * @param  array<string, mixed>  $meta
+     * @param  list<string>|null  $columns
      */
-    public static function rows(array $rows, ?array $totals = null, array $labels = [], array $meta = []): self
+    public static function rows(array $rows, ?array $totals = null, array $labels = [], array $meta = [], ?array $columns = null): self
     {
-        return new self(array_values($rows), null, null, [], $totals, $labels, $meta);
+        return new self(array_values($rows), null, null, [], $totals, $labels, $meta, $columns);
     }
 
     /**

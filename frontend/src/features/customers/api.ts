@@ -34,6 +34,8 @@ export type Customer = {
   online_account?: OnlineAccount | null
   /** POS1b: store credit the customer can spend (NUMERIC string); on list rows and the detail. */
   store_credit_balance?: string
+  /** R1: wa.me click-to-chat link with the due reminder text; detail only, null without a phone or a balance owed. */
+  whatsapp_reminder_url?: string | null
 }
 
 export type OnlineAccountStatus = 'active' | 'disabled'
@@ -250,6 +252,15 @@ export function useReceiveCustomerPaymentMutation() {
       // Balances shown on the Customers page and at the till (GET /sales/customer-balances).
       void queryClient.invalidateQueries({ queryKey: [...salesKeys.all, 'customer-balances'] })
     },
+  })
+}
+
+/** R1: SMS the customer what they owe, now (customers.manage or payments.collect). */
+export type DueReminderResult = { recipient_masked: string; status: 'queued' | 'sent' | 'failed' | 'skipped'; due: string }
+
+export function useSendDueReminderMutation(customerId: string) {
+  return useMutation({
+    mutationFn: () => api.post<DueReminderResult>(`/customers/${customerId}/due-reminder`).then((r) => r.data),
   })
 }
 

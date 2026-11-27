@@ -36,6 +36,10 @@ final class ReportRegistry
         Reports\PaymentCollectionsReport::class,
         Reports\TaxReport::class,
         Reports\ExpensesReport::class,
+        // R1: loss prevention, returns, dead stock / stock aging.
+        Reports\LossPreventionReport::class,
+        Reports\ReturnsReport::class,
+        Reports\DeadStockReport::class,
     ];
 
     /** @var array<string, Report>|null */

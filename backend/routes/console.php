@@ -43,6 +43,15 @@ Schedule::command('purchasing:reorder-notifications')->hourly()->withoutOverlapp
 // (hourly runs; one notification per RFQ and local day).
 Schedule::command('purchasing:rfq-reminders')->hourly()->withoutOverlapping();
 
+// R1: the owners' daily summary (in-app + e-mail) from `alerts.daily_summary_hour` local time;
+// batch-expiry alerts per store from 08:00 local; reminders about register sessions open longer
+// than `alerts.register_open_hours`; due (বাকি) reminder SMS on the weekly / monthly day from 10:00
+// local. Hourly runs; each claimed once per subject and local day (alert_runs).
+Schedule::command('reports:daily-summary')->hourly()->withoutOverlapping();
+Schedule::command('inventory:expiry-alerts')->hourly()->withoutOverlapping();
+Schedule::command('payments:open-register-reminders')->hourly()->withoutOverlapping();
+Schedule::command('customers:due-reminders')->hourly()->withoutOverlapping();
+
 // Phase 8: yesterday's business insights per organization and branch, from 07:30 in each
 // organization's timezone (runs every 30 minutes; one cached insight per scope and day).
 Schedule::command('ai:daily-insights')->everyThirtyMinutes()->withoutOverlapping();

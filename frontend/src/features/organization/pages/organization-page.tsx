@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { AiSettingsCard } from '@/features/ai/components/ai-settings-card'
 import { useCan } from '@/features/auth/use-auth'
+import { AlertsCard } from '@/features/organization/components/alerts-card'
 import { SecurityCard } from '@/features/organization/components/security-card'
 import { useOrganizationQuery, useUpdateOrganizationMutation, type Organization } from '@/features/organization/api'
 import { handleFormError } from '@/lib/forms'
@@ -152,11 +153,12 @@ function OrganizationSettings() {
     <>
       <OrganizationForm organization={data} readOnly={!can('organization.update')} />
       {can('organization.update') && <SecurityCard organization={data} />}
+      {can('organization.update') && <AlertsCard />}
     </>
   )
 }
 
-/** Organization profile (organization.view), Security (organization.update, G1a) and the AI assistant card (ai.manage, Phase 8). */
+/** Organization profile (organization.view), Security (organization.update, G1a), Alerts & reminders (organization.update, R1) and the AI assistant card (ai.manage, Phase 8). */
 export function OrganizationPage() {
   const can = useCan()
 

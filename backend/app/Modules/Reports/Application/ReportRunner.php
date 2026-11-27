@@ -153,7 +153,7 @@ final class ReportRunner
     {
         $columns = [];
         foreach ($definition->columns as $column) {
-            if ($column->costSensitive && ! $canViewCost) {
+            if (($column->costSensitive && ! $canViewCost) || ($result->columns !== null && ! in_array($column->key, $result->columns, true))) {
                 continue;
             }
             $columns[] = isset($result->labels[$column->key]) ? $column->withLabel($result->labels[$column->key]) : $column;

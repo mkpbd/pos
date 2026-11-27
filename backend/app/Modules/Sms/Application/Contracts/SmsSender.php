@@ -15,6 +15,9 @@ interface SmsSender
     /** POS1d: the digital receipt of a till sale (template event and `sms_messages.purpose`). */
     public const SALE_RECEIPT = 'sale_receipt';
 
+    /** R1: a customer's due (বাকি) reminder (template event and `sms_messages.purpose`). */
+    public const DUE_REMINDER = 'due_reminder';
+
     /** SMS is switched on and the gateway is configured (driver `log`, or `http` with a URL). */
     public function ready(string $orgId): bool;
 

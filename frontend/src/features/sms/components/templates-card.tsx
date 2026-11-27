@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/use-auth'
-import { SALE_RECEIPT_EVENT, templateEvents, useSaveSmsSettingsMutation, type SmsSettings, type SmsTemplate, type SmsTemplates, type TemplateEvent } from '@/features/sms/api'
+import { DUE_REMINDER_EVENT, SALE_RECEIPT_EVENT, templateEvents, useSaveSmsSettingsMutation, type SmsSettings, type SmsTemplate, type SmsTemplates, type TemplateEvent } from '@/features/sms/api'
 import { analyzeSms, describeSms, EXAMPLE_VALUES, insertAt, renderSmsTemplate } from '@/features/sms/sms-text'
 import { fieldErrorMap } from '@/lib/forms'
 
@@ -20,11 +20,23 @@ const EVENTS: Record<TemplateEvent, { title: string; hint: string }> = {
   order_delivered: { title: 'Order delivered', hint: 'When the order is marked delivered.' },
   order_cancelled: { title: 'Order cancelled', hint: 'When the order is cancelled.' },
   sale_receipt: { title: 'Sale receipt', hint: 'When a shop sale’s receipt is sent by SMS from the till or the sale’s page.' },
+  due_reminder: { title: 'Due reminder', hint: 'When a customer who owes money is reminded — on the schedule in Organization → Alerts & reminders, or from the customer’s account.' },
 }
 
 /** POS1d: the sale receipt knows the invoice, not an order or a courier. */
 const SALE_RECEIPT_PLACEHOLDERS = ['shop', 'name', 'invoice', 'total', 'link']
 const SALE_RECEIPT_EXAMPLES = { invoice: 'INV-MAIN-000123', link: 'https://shop.example.com/receipt/k3Jx9QaZ' }
+
+/** R1: the due reminder knows the amount owed and the shop's account page. */
+const DUE_REMINDER_PLACEHOLDERS = ['shop', 'name', 'due', 'link']
+const DUE_REMINDER_EXAMPLES = { due: '2,450.00', link: 'https://shop.example.com/account' }
+
+/** Placeholders and example values of an event's template (the order events share the server's list). */
+function eventPlaceholders(event: TemplateEvent, all: string[], vars: Record<string, string>): { placeholders: string[]; vars: Record<string, string> } {
+  if (event === SALE_RECEIPT_EVENT) return { placeholders: SALE_RECEIPT_PLACEHOLDERS, vars: { ...vars, ...SALE_RECEIPT_EXAMPLES } }
+  if (event === DUE_REMINDER_EVENT) return { placeholders: DUE_REMINDER_PLACEHOLDERS, vars: { ...vars, ...DUE_REMINDER_EXAMPLES } }
+  return { placeholders: all.filter((p) => p !== 'invoice' && p !== 'due'), vars }
+}
 
 const EMPTY: SmsTemplate = { enabled: false, en: '', bn: '' }
 const templateOf = (templates: SmsTemplates, event: TemplateEvent): SmsTemplate => templates[event] ?? EMPTY
@@ -81,7 +93,7 @@ export function TemplatesCard({ settings, canManage }: { settings: SmsSettings; 
           <h2>Message templates</h2>
         </CardTitle>
         <CardDescription>
-          Texts sent to customers about their online orders and shop receipts, in the language they shopped in. Bangla texts use Unicode, so fewer characters fit in one SMS — each SMS part is charged.
+          Texts sent to customers about their online orders, shop receipts and what they owe, in the language they shopped in. Bangla texts use Unicode, so fewer characters fit in one SMS — each SMS part is charged.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -92,8 +104,7 @@ export function TemplatesCard({ settings, canManage }: { settings: SmsSettings; 
               event={event}
               value={templateOf(draft, event)}
               fallback={settings.default_templates[event] ?? templateOf(settings.templates, event)}
-              placeholders={event === SALE_RECEIPT_EVENT ? SALE_RECEIPT_PLACEHOLDERS : settings.placeholders.filter((p) => p !== 'invoice')}
-              vars={event === SALE_RECEIPT_EVENT ? { ...vars, ...SALE_RECEIPT_EXAMPLES } : vars}
+              {...eventPlaceholders(event, settings.placeholders, vars)}
               canManage={canManage}
               errors={errors}
               onChange={(next) => setDraft((d) => ({ ...d, [event]: next }))}

@@ -151,3 +151,40 @@ export const dashboardMeta = () => ({
   omitted: [],
   cache_seconds: 60,
 })
+
+// ── R1: loss prevention and dead stock (definitions as the registry returns them) ──────────────
+
+const col = (key: string, label: string, type: string, cost = false, sortable = true) => ({ key, label, type, cost_sensitive: cost, sortable })
+
+export const lossPreventionDefinition = {
+  key: 'loss_prevention', title: 'Loss prevention', description: 'Per cashier: cancelled sales, discounts, price overrides below list, no-sale drawer openings, returns and exchanges — or every event.',
+  group: 'sales', group_label: 'Sales', permission: 'reports.view', financial: false, time_based: true, granularity: null, max_range_days: 1827,
+  params: [
+    dateFrom, dateTo, branch,
+    { name: 'cashier_id', label: 'Cashier', type: 'entity', required: false, entity: 'cashier' },
+    { name: 'show', label: 'Show', type: 'enum', required: false, default: 'summary', options: [{ value: 'summary', label: 'Summary per cashier' }, { value: 'events', label: 'Every event' }] },
+  ],
+  columns: [
+    col('date', 'Date', 'datetime'), col('cashier', 'Cashier', 'text'), col('event', 'Type', 'text'), col('document', 'Document', 'text'), col('amount', 'Amount', 'money'),
+    col('reason', 'Reason', 'text', false, false), col('cancelled_count', 'Cancelled sales', 'number'), col('cancelled_value', 'Cancelled value', 'money'),
+    col('discounts', 'Discounts given', 'money'), col('overrides_count', 'Price overrides', 'number'), col('overrides_value', 'Given away by overrides', 'money'),
+    col('no_sales', 'No-sale openings', 'number'), col('returns_count', 'Returns', 'number'), col('returns_value', 'Refunded', 'money'), col('exchanges', 'Exchanges', 'number'),
+  ],
+  default_sort: 'date', totals: true, paginated: true, omitted_columns: [],
+}
+
+export const LOSS_SUMMARY = ['cashier', 'cancelled_count', 'cancelled_value', 'discounts', 'overrides_count', 'overrides_value', 'no_sales', 'returns_count', 'returns_value', 'exchanges']
+export const LOSS_EVENTS = ['date', 'cashier', 'event', 'document', 'amount', 'reason']
+export const lossColumns = (keys: string[]) => lossPreventionDefinition.columns.filter((c) => keys.includes(c.key))
+
+export const deadStockDefinition = {
+  key: 'dead_stock', title: 'Dead stock', description: 'Items in stock that have not sold in the last N days.',
+  group: 'inventory', group_label: 'Inventory', permission: 'reports.view', financial: false, time_based: false, granularity: null, max_range_days: null,
+  params: [branch, { name: 'store_id', label: 'Store', type: 'entity', required: false, entity: 'store' }, { name: 'category_id', label: 'Category', type: 'entity', required: false, entity: 'category' },
+    { name: 'days', label: 'Not sold for (days)', type: 'integer', required: false, default: 90, min: 1, max: 3650 }],
+  columns: [
+    col('product', 'Product', 'text'), col('sku', 'SKU', 'text'), col('on_hand', 'On hand', 'quantity'), col('value', 'Value', 'money', true),
+    col('last_sold_on', 'Last sold', 'date'), col('days_since_sold', 'Days since sold', 'number'), col('last_received_on', 'Last received', 'date'),
+  ],
+  default_sort: '-value', totals: true, paginated: true, omitted_columns: [],
+}

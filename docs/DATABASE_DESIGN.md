@@ -471,6 +471,11 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Alerts and reminders R1 (implemented)
+
+- `alert_runs` (kind, subject, local day; unique) — claims each daily alert once (summary per organization, expiry per store, open register per session, due reminders per organization).
+- `organizations.settings.alerts` (jsonb keys, see the API); `sms_messages.purpose` adds `due_reminder`.
+
 ### Serial register and past-date valuation ST2d (implemented)
 
 - `stock_movements.average_cost_after numeric(18,4)` — the level's weighted average right after the movement (written by the ledger; backfilled by replaying history).

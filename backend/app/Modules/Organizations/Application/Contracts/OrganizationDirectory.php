@@ -29,4 +29,11 @@ interface OrganizationDirectory
      * G1a: who must use two-factor sign-in — `optional` (default), `admins` or `everyone`.
      */
     public function twoFactorPolicy(string $organizationId): string;
+
+    /**
+     * R1: the scheduled alert and due reminder settings with their defaults (see AlertSettings).
+     *
+     * @return array{daily_summary: bool, daily_summary_hour: int, expiry_alert_days: int, register_open_hours: int, due_reminders: string, due_reminder_min: string, due_reminder_weekday: int}
+     */
+    public function alertSettings(string $organizationId): array;
 }

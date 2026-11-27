@@ -52,7 +52,7 @@ returns with approval, register X/Z reports, expenses, basic loyalty, per-branch
 | **Promotions & coupons at the till** | **Done (POS1a)** | promotion channels online / till, coupons at the till, one discount per level |
 | **Price override / open-price items with manager approval at the till** | **Done (POS1a)** | change price with permission or a manager's PIN; open-price products |
 | **Exchanges**, **store credit / gift cards / vouchers**, customer advances | **Done (POS1b, exchanges POS1c)** | store credit with advances, gift cards, vouchers, credit notes |
-| **Receipts by SMS / e-mail / WhatsApp**, due (বাকি) reminders | **Receipts by SMS / e-mail done (POS1d)**; WhatsApp and due reminders → R1 | public receipt link, SMS template, e-mail |
+| **Receipts by SMS / e-mail / WhatsApp**, due (বাকি) reminders | **Receipts by SMS / e-mail done (POS1d)**; due reminders by SMS + WhatsApp link done (R1); WhatsApp API needs an account | public receipt link, SMS template, e-mail |
 | **Silent receipt printing** (ESC/POS / print helper), **"no sale" drawer open** | **Done (POS1d)** | ESC/POS over Web Serial / WebUSB (Chrome / Edge), drawer kick, no-sale openings with reason / PIN approval; real printers to be checked per model |
 | **Cashier PIN login / quick switch / screen lock** | **Done (POS1a)** | tills, PIN sign-in, switch cashier, lock (auto after 5 min) |
 | **Restaurant mode** (tables, kitchen tickets, modifiers, service charge, tips, split bill) | P1 if restaurants are a target | — |
@@ -118,8 +118,8 @@ storefront, the page builder (B1–B21), shop assistant (AI2b).
 |---|---|---|
 | **Accounting core**: chart of accounts, journals, ledger, trial balance, balance sheet, bank accounts & reconciliation, period lock, Tally/QuickBooks export | P1 | Only P&L and tax reports exist |
 | **Admin in Bangla** (the back office and e-mails are English only; the staff manual is Bangla) | P1 | ARCHITECTURE: "back office stays English" — worth revisiting for Bangla-only cashiers |
-| **Reports missing**: dead stock / stock aging, voids & discounts & cancelled sales (loss prevention), returns | P1 | Balance sheet, cash flow, hourly sales, transfers, purchases by supplier, loyalty liability, Z-report as a report — P2 |
-| Scheduled jobs promised in ARCHITECTURE: daily summaries to owners, batch-expiry alerts, unclosed-register reminders | P1 | Not built |
+| **Reports missing**: dead stock / stock aging, voids & discounts & cancelled sales (loss prevention), returns | **Done (R1)** | Balance sheet, cash flow, hourly sales, transfers, purchases by supplier, loyalty liability, Z-report as a report — P2 |
+| Scheduled jobs promised in ARCHITECTURE: daily summaries to owners, batch-expiry alerts, unclosed-register reminders | **Done (R1)** | in-app + summary e-mail |
 | SaaS: plans, billing, usage limits, tenant usage view, support impersonation, tenant export / deletion, CAPTCHA + e-mail verification on sign-up | P0 only if sold as SaaS | — |
 | Payroll / HR, per-user notification preferences, approval chains, staging & rollback runbook, automated accessibility tests (axe), row-level security evaluation, deadlock retry | P2 | — |
 
